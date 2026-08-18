@@ -40,14 +40,23 @@ impl Segmenter {
     }
 
     pub(crate) fn probability_map_u8(&self, bgr: &ImageU8) -> OpResult<Vec<u8>> {
-        let rgb = cv::bgr_to_rgb(bgr)?;
-        let resized = cv::resize_bilinear(ImageRef::U8(&rgb), MASK_SIDE, MASK_SIDE)?.into_u8()?;
+        if bgr.channels != 3 {
+            return Err(format!(
+                "probability_map_u8: expected a 3-channel image, got {}",
+                bgr.channels
+            ));
+        }
+        // Resize first: the channel swap is per-pixel, so doing it after the
+        // downscale costs 256x256 instead of a full-resolution pass, and it
+        // folds into the tensor fill below.
+        let resized = cv::resize_bilinear(ImageRef::U8(bgr), MASK_SIDE, MASK_SIDE)?.into_u8()?;
 
-        let input: Vec<f32> = resized
-            .data
-            .iter()
-            .map(|&v| (v as f32 - 127.5) / 127.5)
-            .collect();
+        let mut input = vec![0.0f32; resized.data.len()];
+        for (out, px) in input.chunks_exact_mut(3).zip(resized.data.chunks_exact(3)) {
+            out[0] = (px[2] as f32 - 127.5) / 127.5;
+            out[1] = (px[1] as f32 - 127.5) / 127.5;
+            out[2] = (px[0] as f32 - 127.5) / 127.5;
+        }
 
         let side = MASK_SIDE as i64;
         let mut session = match self.session.lock() {

@@ -28,7 +28,7 @@ pub(crate) use arith::{
 };
 pub(crate) use bilateral::bilateral_filter_u8;
 pub(crate) use canny::canny;
-pub(crate) use channels::{bgr_to_gray, bgr_to_rgb, gray_to_bgr, merge_u8, split_u8};
+pub(crate) use channels::{bgr_to_gray, gray_to_bgr, merge_u8, split_u8};
 pub(crate) use contours::find_contours;
 pub(crate) use convert::{f32_to_u8, u8_to_f32};
 pub(crate) use draw::fill_poly;

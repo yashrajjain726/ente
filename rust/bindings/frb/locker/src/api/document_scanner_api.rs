@@ -112,10 +112,13 @@ impl ScannerSession {
         rotation_degrees: i32,
     ) -> Result<Option<RustQuad>, RustScanError> {
         catch_panic(AssertUnwindSafe(|| {
-            let rgba = bgra_to_rgba(&bgra, row_stride, width, height)?;
-            let quad = self
-                .inner
-                .live_detect_rgba(&rgba, width, height, rotation_degrees)?;
+            let row_stride = u32::try_from(row_stride).map_err(|_| RustScanError {
+                kind: RustScanErrorKind::InvalidInput,
+                message: format!("negative row stride {row_stride}"),
+            })?;
+            let quad =
+                self.inner
+                    .live_detect_bgra(&bgra, row_stride, width, height, rotation_degrees)?;
             Ok(quad.map(to_api_quad))
         }))
     }
@@ -185,55 +188,6 @@ fn panic_message(panic: &Box<dyn Any + Send>) -> String {
     } else {
         "unknown panic".to_string()
     }
-}
-
-fn bgra_to_rgba(
-    bgra: &[u8],
-    row_stride: i32,
-    width: u32,
-    height: u32,
-) -> Result<Vec<u8>, RustScanError> {
-    let invalid = |message: String| RustScanError {
-        kind: RustScanErrorKind::InvalidInput,
-        message,
-    };
-    if width == 0 || height == 0 {
-        return Err(invalid(format!("empty frame: {width}x{height}")));
-    }
-    let width = width as usize;
-    let height = height as usize;
-    let row_stride = usize::try_from(row_stride)
-        .map_err(|_| invalid(format!("negative row stride {row_stride}")))?;
-    let row_bytes = width
-        .checked_mul(4)
-        .ok_or_else(|| invalid(format!("width {width} overflows")))?;
-    if row_stride < row_bytes {
-        return Err(invalid(format!(
-            "row stride {row_stride} is less than {row_bytes} bytes per row"
-        )));
-    }
-    let required = (height - 1)
-        .checked_mul(row_stride)
-        .and_then(|bulk| bulk.checked_add(row_bytes))
-        .ok_or_else(|| invalid(format!("frame {width}x{height} overflows")))?;
-    if bgra.len() < required {
-        return Err(invalid(format!(
-            "buffer holds {} bytes, {required} required",
-            bgra.len()
-        )));
-    }
-
-    let mut rgba = vec![0u8; height * row_bytes];
-    for (row_index, rgba_row) in rgba.chunks_exact_mut(row_bytes).enumerate() {
-        let bgra_row = &bgra[row_index * row_stride..row_index * row_stride + row_bytes];
-        for (rgba_px, bgra_px) in rgba_row.chunks_exact_mut(4).zip(bgra_row.chunks_exact(4)) {
-            rgba_px[0] = bgra_px[2];
-            rgba_px[1] = bgra_px[1];
-            rgba_px[2] = bgra_px[0];
-            rgba_px[3] = bgra_px[3];
-        }
-    }
-    Ok(rgba)
 }
 
 impl From<scan::ScanError> for RustScanError {

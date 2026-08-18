@@ -6,7 +6,7 @@ use super::detection::{detect_document_quad, extract_document, resize_for_max_pi
 use super::geometry::{ImageSize, Quad};
 use super::mask::Mask;
 use super::segmentation::{MASK_SIDE, Segmenter};
-use super::yuv::{PlaneLayout, rgba_to_bgr, yuv420_to_bgr};
+use super::yuv::{PlaneLayout, bgra_to_bgr, rgba_to_bgr, yuv420_to_bgr};
 use crate::cv;
 use crate::cv::image::ImageU8;
 
@@ -99,6 +99,19 @@ impl ScannerSession {
     ) -> Result<Option<Quad>, ScanError> {
         let bgr =
             rgba_to_bgr(rgba, to_i32(width)?, to_i32(height)?).map_err(ScanError::InvalidInput)?;
+        self.live_detect(&bgr, rotation_degrees)
+    }
+
+    pub fn live_detect_bgra(
+        &self,
+        bgra: &[u8],
+        row_stride: u32,
+        width: u32,
+        height: u32,
+        rotation_degrees: i32,
+    ) -> Result<Option<Quad>, ScanError> {
+        let bgr = bgra_to_bgr(bgra, to_i32(row_stride)?, to_i32(width)?, to_i32(height)?)
+            .map_err(ScanError::InvalidInput)?;
         self.live_detect(&bgr, rotation_degrees)
     }
 
