@@ -39,6 +39,12 @@ type AppStoreController struct {
 	appStoreSharedPassword string
 }
 
+type appStoreEntitlement struct {
+	receiptInfo appstore.InApp
+	plan        ente.BillingPlan
+	expiryTime  int64
+}
+
 func NewAppStoreController(
 	plans ente.BillingPlansPerCountry,
 	billingRepo *repo.BillingRepository,
@@ -108,7 +114,11 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	latestReceiptInfo := c.getLatestReceiptInfo(purchase.LatestReceiptInfo)
+	entitlement, err := c.getCurrentEntitlement(purchase.LatestReceiptInfo)
+	if err != nil {
+		return err
+	}
+	latestReceiptInfo := entitlement.receiptInfo
 	if latestReceiptInfo.TransactionID == latestReceiptInfo.OriginalTransactionID && !slices.Contains(SubsUpdateNotificationTypes, string(notification.NotificationType)) {
 		var logMsg = fmt.Sprintf("Ignoring notification of type %s", notification.NotificationType)
 		if notification.NotificationType != appstore.NotificationTypeInitialBuy {
@@ -129,19 +139,11 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 		return err
 	}
 
-	expiryTimeInMillis, _ := strconv.ParseInt(latestReceiptInfo.ExpiresDate.ExpiresDateMS, 10, 64)
-	if latestReceiptInfo.ProductID == subscription.ProductID && expiryTimeInMillis*1000 < subscription.ExpiryTime {
+	if latestReceiptInfo.ProductID == subscription.ProductID && entitlement.expiryTime < subscription.ExpiryTime {
 		// Outdated notification, no-op
 	} else {
 		if latestReceiptInfo.ProductID != subscription.ProductID {
-			var newPlan ente.BillingPlan
-			plans := c.BillingPlansPerCountry["EU"] // Country code is irrelevant since Storage will be the same for a given subscriptionID
-			for _, plan := range plans {
-				if plan.IOSID == latestReceiptInfo.ProductID {
-					newPlan = plan
-					break
-				}
-			}
+			newPlan := entitlement.plan
 			if newPlan.Storage < subscription.Storage {
 				canDowngrade, canDowngradeErr := c.CommonBillCtrl.CanDowngradeToGivenStorage(newPlan.Storage, subscription.UserID)
 				if canDowngradeErr != nil {
@@ -154,7 +156,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 			}
 			newSubscription := ente.Subscription{
 				Storage:               newPlan.Storage,
-				ExpiryTime:            expiryTimeInMillis * 1000,
+				ExpiryTime:            entitlement.expiryTime,
 				ProductID:             latestReceiptInfo.ProductID,
 				PaymentProvider:       ente.AppStore,
 				OriginalTransactionID: latestReceiptInfo.OriginalTransactionID,
@@ -179,7 +181,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 					return stacktrace.Propagate(err, "")
 				}
 			}
-			err = c.BillingRepo.UpdateSubscriptionExpiryTime(subscription.ID, expiryTimeInMillis*1000)
+			err = c.BillingRepo.UpdateSubscriptionExpiryTime(subscription.ID, entitlement.expiryTime)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -190,13 +192,6 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 }
 
 func (c *AppStoreController) GetVerifiedSubscription(userID int64, productID string, verificationData string) (ente.Subscription, error) {
-	var s ente.Subscription
-	s.UserID = userID
-	s.ProductID = productID
-	s.PaymentProvider = ente.AppStore
-	s.Attributes.LatestVerificationData = verificationData
-	plans := c.BillingPlansPerCountry["EU"] // Country code is irrelevant since Storage will be the same for a given subscriptionID
-
 	response, err := c.verifyAppStoreSubscription(verificationData)
 	if err != nil {
 		return ente.Subscription{}, stacktrace.Propagate(err, "")
@@ -206,23 +201,38 @@ func (c *AppStoreController) GetVerifiedSubscription(userID int64, productID str
 		return ente.Subscription{}, err
 	}
 
-	for _, plan := range plans {
-		if plan.IOSID == productID {
-			s.Storage = plan.Storage
-			break
-		}
+	entitlement, err := c.getCurrentEntitlement(response.LatestReceiptInfo)
+	if err != nil {
+		return ente.Subscription{}, err
 	}
-	latestReceiptInfo := c.getLatestReceiptInfo(response.LatestReceiptInfo)
-	s.OriginalTransactionID = latestReceiptInfo.OriginalTransactionID
-	expiryTime, _ := strconv.ParseInt(latestReceiptInfo.ExpiresDate.ExpiresDateMS, 10, 64)
-	s.ExpiryTime = expiryTime * 1000
-	return s, nil
+	if entitlement.receiptInfo.CancellationDateMS != "" {
+		return ente.Subscription{}, stacktrace.Propagate(ente.ErrBadRequest, "App Store entitlement was cancelled")
+	}
+	if productID != entitlement.receiptInfo.ProductID {
+		logrus.WithFields(logrus.Fields{
+			"requested_product_id": productID,
+			"verified_product_id":  entitlement.receiptInfo.ProductID,
+			"user_id":              userID,
+		}).Warn("App Store product differs from verified entitlement")
+	}
+	return ente.Subscription{
+		UserID:                userID,
+		ProductID:             entitlement.receiptInfo.ProductID,
+		Storage:               entitlement.plan.Storage,
+		OriginalTransactionID: entitlement.receiptInfo.OriginalTransactionID,
+		ExpiryTime:            entitlement.expiryTime,
+		PaymentProvider:       ente.AppStore,
+		Attributes: ente.SubscriptionAttributes{
+			LatestVerificationData: verificationData,
+		},
+	}, nil
 }
 
 func (c *AppStoreController) verifyAppStoreSubscription(verificationData string) (*appstore.IAPResponse, error) {
 	iapRequest := appstore.IAPRequest{
-		ReceiptData: verificationData,
-		Password:    c.appStoreSharedPassword,
+		ReceiptData:            verificationData,
+		Password:               c.appStoreSharedPassword,
+		ExcludeOldTransactions: true,
 	}
 	response := &appstore.IAPResponse{}
 	context := context.Background()
@@ -236,12 +246,46 @@ func (c *AppStoreController) verifyAppStoreSubscription(verificationData string)
 	return response, nil
 }
 
-func (c *AppStoreController) getLatestReceiptInfo(receiptInfo []appstore.InApp) appstore.InApp {
-	latestReceiptInfo := receiptInfo[0]
-	for _, receiptInfo := range receiptInfo {
-		if strings.Compare(latestReceiptInfo.ExpiresDate.ExpiresDateMS, receiptInfo.ExpiresDate.ExpiresDateMS) < 0 {
-			latestReceiptInfo = receiptInfo
+func (c *AppStoreController) getCurrentEntitlement(receiptInfo []appstore.InApp) (appStoreEntitlement, error) {
+	plansByProductID := make(map[string]ente.BillingPlan)
+	for _, plan := range c.BillingPlansPerCountry["EU"] { // Storage is the same for a subscription ID in every country.
+		if plan.IOSID != "" {
+			plansByProductID[plan.IOSID] = plan
 		}
 	}
-	return latestReceiptInfo
+
+	var selected appstore.InApp
+	var selectedPlan ente.BillingPlan
+	var selectedPurchaseTime int64
+	found := false
+	for _, candidate := range receiptInfo {
+		purchaseTime, err := strconv.ParseInt(candidate.PurchaseDateMS, 10, 64)
+		if err != nil {
+			return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store purchase time")
+		}
+		if found && purchaseTime == selectedPurchaseTime && candidate.TransactionID != selected.TransactionID {
+			return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "ambiguous App Store entitlement")
+		}
+		if !found || purchaseTime > selectedPurchaseTime {
+			selected = candidate
+			selectedPurchaseTime = purchaseTime
+			found = true
+		}
+	}
+	if !found || selected.TransactionID == "" || selected.OriginalTransactionID == "" || selected.IsUpgraded == "true" {
+		return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "no current App Store entitlement")
+	}
+	selectedPlan, found = plansByProductID[selected.ProductID]
+	if !found {
+		return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "unknown App Store product")
+	}
+	expiryTime, err := strconv.ParseInt(selected.ExpiresDateMS, 10, 64)
+	if err != nil {
+		return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store expiry time")
+	}
+	return appStoreEntitlement{
+		receiptInfo: selected,
+		plan:        selectedPlan,
+		expiryTime:  expiryTime * 1000,
+	}, nil
 }
