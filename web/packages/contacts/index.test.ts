@@ -163,7 +163,7 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
         desktopAppVersion: undefined,
         isDesktop: false,
     }));
-    vi.doMock("ente-wasm", () => ({
+    vi.doMock("ente-core-wasm", () => ({
         contacts_open_ctx: vi.fn(() => ({
             ctx: {
                 update_auth_token,

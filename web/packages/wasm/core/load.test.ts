@@ -8,7 +8,7 @@ afterEach(() => {
 test("loadEnteWasm shares the same import promise", async () => {
     const wasmModule = { crypto_init: vi.fn() };
     const importFactory = vi.fn(() => Promise.resolve(wasmModule));
-    vi.doMock("ente-wasm", importFactory);
+    vi.doMock("ente-core-wasm", importFactory);
 
     const { loadEnteWasm } = await import("./load");
 
@@ -29,7 +29,7 @@ test("loadCryptoReadyEnteWasm initializes crypto once", async () => {
     const crypto_init = vi.fn();
     const wasmModule = { crypto_init };
     const importFactory = vi.fn(() => Promise.resolve(wasmModule));
-    vi.doMock("ente-wasm", importFactory);
+    vi.doMock("ente-core-wasm", importFactory);
 
     const { loadCryptoReadyEnteWasm } = await import("./load");
 
@@ -54,7 +54,7 @@ test("loadCryptoReadyEnteWasm retries after crypto init failure", async () => {
         }
     });
     const wasmModule = { crypto_init };
-    vi.doMock("ente-wasm", () => wasmModule);
+    vi.doMock("ente-core-wasm", () => wasmModule);
 
     const { loadCryptoReadyEnteWasm } = await import("./load");
 
@@ -68,7 +68,7 @@ test("loadCryptoReadyEnteWasm retries after crypto init failure", async () => {
 test("loadEnteWasm retries after a failed load attempt", async () => {
     const wasmModule = { crypto_init: vi.fn() };
     let attempts = 0;
-    vi.doMock("ente-wasm", () => {
+    vi.doMock("ente-core-wasm", () => {
         attempts += 1;
         if (attempts === 1) {
             throw new Error("import failed");

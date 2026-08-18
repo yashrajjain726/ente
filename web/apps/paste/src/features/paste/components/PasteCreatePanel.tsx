@@ -1,3 +1,4 @@
+import { MAX_PASTE_CHARS } from "@/features/paste/hooks/useCreatePaste";
 import { usePasteColorMode } from "@/features/paste/hooks/usePasteColorMode";
 import { getPasteThemeTokens } from "@/features/paste/theme/pasteThemeTokens";
 import { Navigation06Icon } from "@hugeicons/core-free-icons";
@@ -21,7 +22,6 @@ import {
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
 import type { SubmitEvent } from "react";
 import { useState } from "react";
-import { MAX_PASTE_CHARS } from "../constants";
 import { PasteLinkCard } from "./PasteLinkCard";
 import { downloadPasteQrCode } from "./qrCode";
 import { pasteTextFieldSx } from "./textFieldSx";
@@ -59,8 +59,7 @@ export const PasteCreatePanel = ({
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const isInputEmpty = inputText.trim().length === 0;
-    const nearLimitThreshold = Math.floor(MAX_PASTE_CHARS * 0.9);
-    const isNearCharLimit = inputText.length >= nearLimitThreshold;
+    const isNearCharLimit = inputText.length >= MAX_PASTE_CHARS * 0.9;
     const isCreateDisabled = isInputEmpty;
     const passwordTooltip = passwordProtected
         ? "Password protection enabled"

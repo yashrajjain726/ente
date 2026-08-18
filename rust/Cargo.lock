@@ -2488,6 +2488,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-core-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-accounts",
+ "ente-contacts",
+ "ente-core",
+ "ente-wasm-log",
+ "js-sys",
+ "md-5 0.11.0",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "ente-ensu"
 version = "0.0.0"
 dependencies = [
@@ -2603,6 +2619,17 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "ente-paste-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-paste",
+ "ente-wasm-log",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2724,31 +2751,6 @@ name = "ente-uniffi-log"
 version = "0.0.0"
 dependencies = [
  "log",
-]
-
-[[package]]
-name = "ente-wasm"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-contacts",
- "ente-core",
- "ente-wasm-log",
- "js-sys",
- "md-5 0.11.0",
- "serde",
- "serde-wasm-bindgen",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "ente-wasm-core"
-version = "0.0.0"
-dependencies = [
- "ente-core",
- "ente-wasm-log",
- "wasm-bindgen",
 ]
 
 [[package]]
