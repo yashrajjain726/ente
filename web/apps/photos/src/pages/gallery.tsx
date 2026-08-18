@@ -111,6 +111,7 @@ import {
     addToFavoritesCollection,
     canAddFilesToCollection,
     createAlbum,
+    createHiddenAlbum,
     createPublicURL,
     createQuickLinkCollection,
     removeFromCollection,
@@ -257,6 +258,7 @@ const Page: React.FC = () => {
     const [, setPostCreateAlbumOp] = useState<CollectionOp | undefined>(
         undefined,
     );
+    const postCreateAlbumHidden = useRef(false);
     const [pendingSidebarAction, setPendingSidebarAction] = useState<
         SidebarActionID | undefined
     >(undefined);
@@ -981,15 +983,19 @@ const Page: React.FC = () => {
     const createOnCreateForCollectionOp = useCallback(
         (op: CollectionOp) => {
             setPostCreateAlbumOp(op);
+            postCreateAlbumHidden.current =
+                op == "add" && barMode == "hidden-albums";
             return showAlbumNameInput;
         },
-        [showAlbumNameInput],
+        [showAlbumNameInput, barMode],
     );
 
     const handleAlbumNameSubmit = useCallback(
         async (name: string) => {
             try {
-                const collection = await createAlbum(name);
+                const collection = postCreateAlbumHidden.current
+                    ? await createHiddenAlbum(name)
+                    : await createAlbum(name);
 
                 if (pendingSingleFileAdd.current) {
                     await performCollectionOp(
@@ -1011,6 +1017,7 @@ const Page: React.FC = () => {
                     });
                     setOpenCollectionSelector(false);
                     setPostCreateAlbumOp(undefined);
+                    postCreateAlbumHidden.current = false;
                     return;
                 }
 
@@ -1020,6 +1027,7 @@ const Page: React.FC = () => {
                     );
                     return undefined;
                 });
+                postCreateAlbumHidden.current = false;
             } finally {
                 pendingSingleFileAdd.current = undefined;
             }
@@ -1598,6 +1606,7 @@ const Page: React.FC = () => {
                     handleOpenCollectionSelector({
                         action: "add",
                         sourceCollectionSummaryID: activeCollectionSummary?.id,
+                        showHiddenCollections: barMode == "hidden-albums",
                         onCreateCollection:
                             createOnCreateForCollectionOp("add"),
                         onSelectCollection:
@@ -1701,6 +1710,7 @@ const Page: React.FC = () => {
             showEditLocation,
             activeCollectionSummary,
             activeCollection,
+            barMode,
             selectedCount,
             selectedOwnCount,
         ],
@@ -1749,6 +1759,7 @@ const Page: React.FC = () => {
 
             const handleCreate = () => {
                 setPostCreateAlbumOp("add");
+                postCreateAlbumHidden.current = false;
                 showAlbumNameInput();
             };
 
@@ -2106,6 +2117,7 @@ const Page: React.FC = () => {
                 onClose={() => {
                     // Do not leak a cancelled add into the next album creation.
                     pendingSingleFileAdd.current = undefined;
+                    postCreateAlbumHidden.current = false;
                     albumNameInputVisibilityProps.onClose();
                 }}
                 onSubmit={handleAlbumNameSubmit}
