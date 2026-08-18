@@ -344,27 +344,48 @@ class TimeMemoriesCalculator {
     return showDates;
   }
 
-  static Map<int, ({int offset, DateTime targetDate})> _historicalDayMatches(
-    DateTime currentTime,
-  ) {
-    final startDate = _startOfDay(currentTime);
-    final matches = <int, ({int offset, DateTime targetDate})>{};
-    for (var offset = 0; offset < kMemoriesUpdateFrequency.inDays; offset++) {
-      final targetDate = startDate.add(Duration(days: offset));
-      matches[targetDate.month * 100 + targetDate.day] = (
-        offset: offset,
-        targetDate: targetDate,
+  static Set<int> _historicalDayCandidates(DateTime currentTime) {
+    final candidates = <int>{};
+    for (var offset = 0; offset <= kMemoriesUpdateFrequency.inDays; offset++) {
+      final targetDate = DateTime(
+        currentTime.year,
+        currentTime.month,
+        currentTime.day + offset,
       );
+      candidates.add(targetDate.month * 100 + targetDate.day);
       if (!_isLeapYear(targetDate.year) &&
           targetDate.month == DateTime.march &&
           targetDate.day == 1) {
-        matches[DateTime.february * 100 + 29] = (
-          offset: offset,
-          targetDate: targetDate,
-        );
+        candidates.add(DateTime.february * 100 + 29);
       }
     }
-    return matches;
+    return candidates;
+  }
+
+  static ({int dayOffset, int targetYear})? _historicalDateMatch(
+    DateTime fileDate,
+    DateTime currentTime,
+  ) {
+    final currentYearDiff = fileDate
+        .copyWith(year: currentTime.year)
+        .difference(currentTime);
+    if (!currentYearDiff.isNegative &&
+        currentYearDiff < kMemoriesUpdateFrequency) {
+      return (dayOffset: currentYearDiff.inDays, targetYear: currentTime.year);
+    }
+
+    final timeTillYearEnd = DateTime(
+      currentTime.year + 1,
+    ).difference(currentTime);
+    if (timeTillYearEnd >= kMemoriesUpdateFrequency) return null;
+
+    final nextYearDiff = fileDate
+        .copyWith(year: currentTime.year + 1)
+        .difference(currentTime);
+    if (!nextYearDiff.isNegative && nextYearDiff < kMemoriesUpdateFrequency) {
+      return (dayOffset: nextYearDiff.inDays, targetYear: currentTime.year + 1);
+    }
+    return null;
   }
 
   static Future<void> _maybeAddRecentTimeMemory(
@@ -436,7 +457,7 @@ class TimeMemoriesCalculator {
     final cutOffTime = currentTime.subtract(
       const Duration(days: 364) - kMemoriesUpdateFrequency,
     );
-    final historicalDayMatches = _historicalDayMatches(currentTime);
+    final historicalDayCandidates = _historicalDayCandidates(currentTime);
 
     final Map<int, List<Memory>> yearsAgoToMemories = {};
     for (final file in allFiles) {
@@ -444,10 +465,14 @@ class TimeMemoriesCalculator {
         continue;
       }
       final fileDate = DateTime.fromMicrosecondsSinceEpoch(file.creationTime!);
-      final dayMatch =
-          historicalDayMatches[fileDate.month * 100 + fileDate.day];
+      if (!historicalDayCandidates.contains(
+        fileDate.month * 100 + fileDate.day,
+      )) {
+        continue;
+      }
+      final dayMatch = _historicalDateMatch(fileDate, currentTime);
       if (dayMatch == null) continue;
-      final yearsAgo = dayMatch.targetDate.year - fileDate.year;
+      final yearsAgo = dayMatch.targetYear - fileDate.year;
       yearsAgoToMemories
           .putIfAbsent(yearsAgo, () => [])
           .add(
@@ -500,7 +525,7 @@ class TimeMemoriesCalculator {
     final cutOffTime = startPoint.subtract(
       const Duration(days: 363) - kMemoriesUpdateFrequency,
     );
-    final historicalDayMatches = _historicalDayMatches(startPoint);
+    final historicalDayCandidates = _historicalDayCandidates(startPoint);
 
     final Map<int, List<Memory>> daysToMemories = {};
     final Map<int, Set<int>> daysToYears = {};
@@ -511,11 +536,15 @@ class TimeMemoriesCalculator {
         continue;
       }
       final fileDate = DateTime.fromMicrosecondsSinceEpoch(file.creationTime!);
-      final dayMatch =
-          historicalDayMatches[fileDate.month * 100 + fileDate.day];
+      if (!historicalDayCandidates.contains(
+        fileDate.month * 100 + fileDate.day,
+      )) {
+        continue;
+      }
+      final dayMatch = _historicalDateMatch(fileDate, startPoint);
       if (dayMatch == null) continue;
       daysToMemories
-          .putIfAbsent(dayMatch.offset, () => [])
+          .putIfAbsent(dayMatch.dayOffset, () => [])
           .add(
             Memory.fromFile(
               file,
@@ -526,7 +555,7 @@ class TimeMemoriesCalculator {
               ),
             ),
           );
-      daysToYears.putIfAbsent(dayMatch.offset, () => {}).add(fileDate.year);
+      daysToYears.putIfAbsent(dayMatch.dayOffset, () => {}).add(fileDate.year);
     }
 
     for (var day = 0; day < daysToCompute; day++) {

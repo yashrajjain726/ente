@@ -156,7 +156,7 @@ void main() {
     );
 
     test(
-      "Filler memories preserve year-boundary and leap-day matching",
+      "Filler memories preserve year-boundary, leap-day, and time-window matching",
       () async {
         final yearBoundaryMemories =
             await TimeMemoriesCalculator.computeFillerMemories(
@@ -198,6 +198,23 @@ void main() {
             );
         expect(leapDayMemories.single.yearsAgo, 1);
         expect(leapDayMemories.single.memories.single.file.uploadedFileID, 4);
+
+        final sameDayMemories =
+            await TimeMemoriesCalculator.computeFillerMemories(
+              [
+                _file(id: 5, createdAt: DateTime(2025, 8, 18, 10)),
+                _file(id: 6, createdAt: DateTime(2025, 8, 18, 14)),
+                _file(id: 7, createdAt: DateTime(2025, 8, 21, 11)),
+              ],
+              DateTime(2026, 8, 18, 12),
+              seenTimes: const <int, int>{},
+            );
+        expect(
+          sameDayMemories.single.memories.map(
+            (memory) => memory.file.uploadedFileID,
+          ),
+          [6, 7],
+        );
       },
     );
 
