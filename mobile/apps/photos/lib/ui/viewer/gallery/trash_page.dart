@@ -163,7 +163,7 @@ class _TrashPageState extends State<_TrashPage> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: FABComponent(
-                  label: l10n.deleteAll,
+                  label: l10n.emptyTrash,
                   variant: FABComponentVariant.destructive,
                   onTap: () =>
                       showConfirmDeleteAllTrashSheet(context, _isOnEnteTrash),

@@ -1059,7 +1059,7 @@ class PermanentlyDeleteConfirmationSheet extends StatelessWidget {
     return BottomSheetComponent(
       title: l10n.areYouSure,
       message: l10n.selectedItemsWillBePermanentlyDeletedAndCannotBeRecovered,
-      illustration: Image.asset("assets/warning-grey.png"),
+      illustration: Image.asset("assets/warning-red.png"),
       closeTooltip: l10n.close,
       closeResult: ButtonResult(ButtonAction.fourth),
       actions: [
