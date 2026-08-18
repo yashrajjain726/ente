@@ -23,11 +23,12 @@ use ente_assets::download::CancellationToken;
 use ente_assets::{Asset, AssetFile, AssetStore};
 
 pub const SEGMENTATION_MODEL_SHA256: &str =
-    "36b8eeadd42592af496bf2e125a6aad9bebcbca1bda2ac19fa22e108574217a3";
+    "5ddcb87c70cb7674189e6fc148e84a490ca65b282276534210255a777d48a808";
 
 // Temporary dev hosting; will move to models.ente.com.
-const SEGMENTATION_MODEL_URL: &str = "https://entedevassets.priem.dev/document_segmentation.onnx";
-const SEGMENTATION_MODEL_FILE: &str = "document_segmentation.onnx";
+const SEGMENTATION_MODEL_URL: &str =
+    "https://entedevassets.priem.dev/document_segmentation_opt.onnx";
+const SEGMENTATION_MODEL_FILE: &str = "document_segmentation_opt.onnx";
 
 fn segmentation_model_asset() -> Result<Asset, ScanError> {
     Asset::file(
