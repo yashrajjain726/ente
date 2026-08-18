@@ -2178,6 +2178,12 @@
       "title": "Smouter"
     },
     {
+      "title": "SMSFAST",
+      "altNames": [
+        "SMSFAST"
+      ]
+    },
+    {
       "title": "SMSPool",
       "slug": "sms_pool_net",
       "altNames": [
