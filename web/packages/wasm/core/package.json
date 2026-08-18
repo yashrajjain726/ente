@@ -1,21 +1,21 @@
 {
-    "name": "ente-wasm",
+    "name": "ente-core-wasm",
     "version": "0.0.0",
     "private": true,
     "exports": {
         ".": {
-            "types": "./pkg/ente_wasm.d.ts",
-            "import": "./pkg/ente_wasm.js"
+            "types": "./pkg/ente_core_wasm.d.ts",
+            "import": "./pkg/ente_core_wasm.js"
         },
         "./load": {
             "types": "./load.ts",
             "import": "./load.ts"
         }
     },
-    "module": "./pkg/ente_wasm.js",
-    "types": "./pkg/ente_wasm.d.ts",
+    "module": "./pkg/ente_core_wasm.js",
+    "types": "./pkg/ente_core_wasm.d.ts",
     "scripts": {
-        "build": "wasm-pack build ../../../rust/bindings/wasm/ente-wasm --target bundler --out-dir ../../../../web/packages/wasm/pkg",
+        "build": "wasm-pack build ../../../../rust/bindings/wasm/core --target bundler --out-dir ../../../../web/packages/wasm/core/pkg",
         "test": "vitest --run"
     },
     "devDependencies": {

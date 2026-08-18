@@ -71,7 +71,13 @@ const nextConfig = {
     output: "export",
     devIndicators: false,
     compiler: { emotion: true },
-    transpilePackages: ["ente-base", "ente-utils", "ente-new", "ente-wasm"],
+    transpilePackages: [
+        "ente-base",
+        "ente-utils",
+        "ente-new",
+        "ente-core-wasm",
+        "ente-paste-wasm",
+    ],
 
     env: { gitSHA, appName, isDesktop, desktopAppVersion },
 

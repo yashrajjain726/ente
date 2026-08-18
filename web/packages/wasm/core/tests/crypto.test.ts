@@ -3,7 +3,7 @@ import {
     CryptoStreamEncryptor,
     crypto_decrypt_blob,
     crypto_decrypt_blob_legacy,
-} from "../pkg/ente_wasm.js";
+} from "../pkg/ente_core_wasm.js";
 
 test("strict blob decrypt rejects non-final secretstream payloads", () => {
     const encryptor = new CryptoStreamEncryptor();

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { file_download_url } from "../pkg/ente_wasm.js";
+import { file_download_url } from "../pkg/ente_core_wasm.js";
 
 test("generates CDN URL for production", () => {
     const url = file_download_url("https://api.ente.com", BigInt(12345));

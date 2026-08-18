@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { contacts_open_ctx } from "../pkg/ente_wasm.js";
+import { contacts_open_ctx } from "../pkg/ente_core_wasm.js";
 
 test("contacts errors cross as an Error carrying a tagged shape", async () => {
     try {

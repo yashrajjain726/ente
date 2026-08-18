@@ -1,10 +1,10 @@
-type EnteWasmModule = typeof import("ente-wasm");
+type EnteWasmModule = typeof import("ente-core-wasm");
 
 let wasmPromise: Promise<EnteWasmModule> | undefined;
 let cryptoReadyPromise: Promise<EnteWasmModule> | undefined;
 
 export const loadEnteWasm = (): Promise<EnteWasmModule> =>
-    (wasmPromise ??= import("ente-wasm").catch((error: unknown) => {
+    (wasmPromise ??= import("ente-core-wasm").catch((error: unknown) => {
         wasmPromise = undefined;
         throw error;
     }));

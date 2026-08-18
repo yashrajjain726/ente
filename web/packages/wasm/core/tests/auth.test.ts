@@ -6,7 +6,7 @@ import {
     auth_recovery_key_from_mnemonic_or_hex,
     auth_recovery_key_to_mnemonic,
     crypto_generate_key,
-} from "../pkg/ente_wasm.js";
+} from "../pkg/ente_core_wasm.js";
 
 test("generates an interactive kek bundle", () => {
     const generated = auth_generate_interactive_kek(

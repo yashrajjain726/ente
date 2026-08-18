@@ -1,10 +1,22 @@
-import { createPaste } from "@/services/paste";
+import { pasteClient } from "@/services/paste";
 import { useState } from "react";
-import { MAX_PASTE_CHARS } from "../constants";
-import { encryptPasteForCreate } from "../utils/pasteCrypto";
 
-const buildPasteLink = (accessToken: string, fragmentSecret: string) =>
-    `${window.location.origin}/${accessToken}#${fragmentSecret}`;
+// Duplicate the constant to avoid loading the entire WASM.
+export const MAX_PASTE_CHARS = 4000;
+
+const createErrorMessage = (error: unknown) => {
+    if (!(error instanceof Error)) return "Failed to create paste";
+    switch (error.name) {
+        case "empty_text":
+            return "Enter some text first";
+        case "text_too_long":
+            return `Paste is limited to ${MAX_PASTE_CHARS} characters`;
+        case "network":
+            return "Couldn't connect to Ente";
+        default:
+            return "Failed to create paste";
+    }
+};
 
 export const useCreatePaste = () => {
     const [inputText, setInputText] = useState("");
@@ -15,33 +27,16 @@ export const useCreatePaste = () => {
         useState(false);
 
     const createSecureLink = async (password?: string) => {
-        setCreateError(null);
-
-        if (!inputText.trim()) {
-            setCreateError("Enter some text first");
-            return;
-        }
-
-        if (inputText.length > MAX_PASTE_CHARS) {
-            setCreateError(`Paste is limited to ${MAX_PASTE_CHARS} characters`);
-            return;
-        }
-
         setCreating(true);
+        setCreateError(null);
         try {
-            const { linkFragment, payload } = await encryptPasteForCreate(
-                inputText,
-                password,
-            );
-            const response = await createPaste(payload);
-            setCreatedLink(buildPasteLink(response.accessToken, linkFragment));
-            setCreatedLinkPasswordProtected(!!password);
+            const paste = await (
+                await pasteClient()
+            ).create(window.location.origin, inputText, password);
+            setCreatedLink(paste.url);
+            setCreatedLinkPasswordProtected(paste.passwordRequired);
         } catch (error) {
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : "Failed to create paste";
-            setCreateError(message);
+            setCreateError(createErrorMessage(error));
         } finally {
             setCreating(false);
         }
