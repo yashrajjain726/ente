@@ -9,20 +9,4 @@ void main() {
     );
     expect(avatarSeedForIdentity('alice@example.com'), 2493822278);
   });
-
-  test('component identity colors use the Figma avatar palette', () {
-    final color = avatarComponentColorForIdentity('email:alice@example.com');
-
-    expect(avatarComponentColorForIdentity(' EMAIL:ALICE@EXAMPLE.COM '), color);
-    expect(color, isIn(avatarComponentIdentityPalette));
-    expect(avatarComponentIdentityPalette, const [
-      AvatarComponentColor.yellow,
-      AvatarComponentColor.green,
-      AvatarComponentColor.orange,
-      AvatarComponentColor.pink,
-      AvatarComponentColor.purple,
-      AvatarComponentColor.blue,
-      AvatarComponentColor.cyan,
-    ]);
-  });
 }

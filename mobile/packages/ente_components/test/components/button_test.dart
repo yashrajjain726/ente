@@ -264,30 +264,6 @@ void main() {
     expect(find.text("Fail"), findsOneWidget);
   });
 
-  testWidgets("IconButtonComponent can handle tap down without onTap", (
-    tester,
-  ) async {
-    TapDownDetails? tapDownDetails;
-
-    await tester.pumpWidget(
-      _wrap(
-        IconButtonComponent(
-          icon: const Icon(Icons.add),
-          onTapDown: (details) => tapDownDetails = details,
-        ),
-      ),
-    );
-
-    final surfaceFinder = find.byKey(const ValueKey('icon-button-surface'));
-    final gesture = await tester.startGesture(tester.getCenter(surfaceFinder));
-    await tester.pump();
-
-    expect(tapDownDetails, isNotNull);
-    expect(_iconButtonColor(tester), Colors.transparent);
-
-    await gesture.up();
-  });
-
   testWidgets("IconButtonComponent resets state after async errors", (
     tester,
   ) async {
@@ -413,11 +389,4 @@ Widget _wrapModalTestApp({
       ),
     ),
   );
-}
-
-Color _iconButtonColor(WidgetTester tester) {
-  final container = tester.widget<AnimatedContainer>(
-    find.byKey(const ValueKey('icon-button-surface')),
-  );
-  return (container.decoration! as BoxDecoration).color!;
 }

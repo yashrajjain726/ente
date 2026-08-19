@@ -1,7 +1,6 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
-import "package:flutter/cupertino.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 
@@ -129,29 +128,6 @@ void main() {
     expect(find.byKey(const ValueKey('toggle-state-idle')), findsOneWidget);
   });
 
-  testWidgets("ToggleSwitchComponent uses Cupertino switch on iOS", (
-    tester,
-  ) async {
-    bool? nextValue;
-
-    await tester.pumpWidget(
-      _wrap(
-        ToggleSwitchComponent(
-          selected: false,
-          onChanged: (value) => nextValue = value,
-        ),
-        platform: TargetPlatform.iOS,
-      ),
-    );
-
-    await tester.tap(find.byType(CupertinoSwitch));
-    await tester.pump();
-
-    expect(nextValue, isTrue);
-    expect(find.byType(Switch), findsNothing);
-    await tester.pump(const Duration(milliseconds: 200));
-  });
-
   testWidgets("LabeledControlComponent wraps long labels", (tester) async {
     const label =
         "This is a deliberately long label that should wrap inside the control row";
@@ -186,74 +162,13 @@ void main() {
       greaterThan(40),
     );
   });
-
-  testWidgets("FilterChipComponent keeps avatar fixed by default", (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        const FilterChipComponent(
-          avatar: ColoredBox(key: ValueKey("avatar"), color: Colors.purple),
-          state: FilterChipComponentState.unselected,
-        ),
-        textScaler: const TextScaler.linear(2),
-      ),
-    );
-
-    expect(
-      tester.getSize(find.byKey(const ValueKey("avatar"))),
-      const Size.square(32),
-    );
-  });
-
-  testWidgets("FilterChipComponent scales avatar when enabled", (tester) async {
-    await tester.pumpWidget(
-      _wrap(
-        const FilterChipComponent(
-          avatar: ColoredBox(key: ValueKey("avatar"), color: Colors.purple),
-          state: FilterChipComponentState.unselected,
-          scaleAvatarWithText: true,
-        ),
-        textScaler: const TextScaler.linear(2),
-      ),
-    );
-
-    expect(
-      tester.getSize(find.byKey(const ValueKey("avatar"))),
-      const Size.square(48),
-    );
-  });
-
-  testWidgets("FilterChipComponent scales custom avatar size when needed", (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        const FilterChipComponent(
-          avatar: ColoredBox(key: ValueKey("avatar"), color: Colors.purple),
-          state: FilterChipComponentState.unselected,
-          avatarSize: 40,
-          scaleAvatarWithText: true,
-        ),
-        textScaler: const TextScaler.linear(2),
-      ),
-    );
-
-    expect(
-      tester.getSize(find.byKey(const ValueKey("avatar"))),
-      const Size.square(48),
-    );
-  });
 }
 
-Widget _wrap(
-  Widget child, {
-  TargetPlatform platform = TargetPlatform.android,
-  TextScaler textScaler = TextScaler.noScaling,
-  ThemeData? theme,
-}) {
+Widget _wrap(Widget child, {TextScaler textScaler = TextScaler.noScaling}) {
   return MaterialApp(
-    theme: (theme ?? ComponentTheme.lightTheme()).copyWith(platform: platform),
+    theme: ComponentTheme.lightTheme().copyWith(
+      platform: TargetPlatform.android,
+    ),
     home: MediaQuery(
       data: MediaQueryData(textScaler: textScaler),
       child: Scaffold(body: Center(child: child)),

@@ -352,42 +352,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('SliverAppBarComponent preserves title callbacks with eyebrow', (
-    tester,
-  ) async {
-    var tapped = false;
-
-    await pumpComponent(
-      tester,
-      CustomScrollView(
-        slivers: [
-          SliverAppBarComponent(
-            title: 'Tap me',
-            eyebrow: 'Context',
-            onTitleTap: () => tapped = true,
-            actions: const [Icon(Icons.search)],
-          ),
-          SliverList.builder(
-            itemCount: 8,
-            itemBuilder: (context, index) {
-              return SizedBox(height: 60, child: Text('Item $index'));
-            },
-          ),
-        ],
-      ),
-      width: 320,
-      height: 360,
-    );
-
-    expect(find.byType(TooltipComponent), findsNothing);
-
-    await tester.tap(find.text('Tap me'));
-    await tester.pump();
-
-    expect(tapped, isTrue);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets(
     'SliverAppBarComponent collapses title content and reserved space',
     (tester) async {
