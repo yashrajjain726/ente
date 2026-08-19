@@ -1,5 +1,6 @@
-import { usePasteColorMode } from "@/features/paste/hooks/usePasteColorMode";
-import { getPasteThemeTokens } from "@/features/paste/theme/pasteThemeTokens";
+import { copyTextToClipboard } from "@/browser";
+import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
+import { useConsumePaste } from "@/usePaste";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
@@ -15,25 +16,15 @@ import type { SubmitEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { pasteTextFieldSx } from "./textFieldSx";
 
-interface PasteViewPanelProps {
-    consuming: boolean;
-    consumeError: string | null;
-    resolvedText: string | null;
-    passwordRequired: boolean;
-    passwordError: string | null;
-    onSubmitPassword: (password: string) => Promise<void>;
-    onCopyText: (value: string) => Promise<void>;
-}
-
-export const PasteViewPanel = ({
-    consuming,
-    consumeError,
-    resolvedText,
-    passwordRequired,
-    passwordError,
-    onSubmitPassword,
-    onCopyText,
-}: PasteViewPanelProps) => {
+export const PasteViewPanel = () => {
+    const {
+        consuming,
+        consumeError,
+        resolvedText,
+        passwordRequired,
+        passwordError,
+        submitPassword,
+    } = useConsumePaste();
     const { resolvedMode } = usePasteColorMode();
     const tokens = getPasteThemeTokens(resolvedMode);
     const [copied, setCopied] = useState(false);
@@ -61,7 +52,7 @@ export const PasteViewPanel = ({
         if (!password) {
             return;
         }
-        void onSubmitPassword(password);
+        void submitPassword(password);
     };
 
     return (
@@ -346,7 +337,7 @@ export const PasteViewPanel = ({
                                 size="small"
                                 disableElevation
                                 onClick={() => {
-                                    void onCopyText(resolvedText)
+                                    void copyTextToClipboard(resolvedText)
                                         .then(() => {
                                             setCopied(true);
                                             if (

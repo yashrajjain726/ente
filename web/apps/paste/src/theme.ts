@@ -1,3 +1,5 @@
+import { useColorScheme } from "@mui/material/styles";
+
 export type PasteResolvedMode = "light" | "dark";
 
 export interface PasteThemeTokens {
@@ -272,3 +274,9 @@ const lightTokens: PasteThemeTokens = {
 export const getPasteThemeTokens = (
     mode: PasteResolvedMode,
 ): PasteThemeTokens => (mode === "light" ? lightTokens : darkTokens);
+
+export const usePasteColorMode = () => {
+    const { systemMode } = useColorScheme();
+    const resolvedMode: PasteResolvedMode = systemMode ?? "dark";
+    return { resolvedMode };
+};

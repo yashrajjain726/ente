@@ -1,7 +1,4 @@
-import type {
-    PasteResolvedMode,
-    PasteThemeTokens,
-} from "@/features/paste/theme/pasteThemeTokens";
+import type { PasteResolvedMode, PasteThemeTokens } from "@/theme";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { Box, IconButton } from "@mui/material";
 import useMediaQuery from "@mui/material/useMediaQuery";

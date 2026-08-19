@@ -1,4 +1,4 @@
-import type { PasteThemeTokens } from "../theme/pasteThemeTokens";
+import type { PasteThemeTokens } from "@/theme";
 
 type PasteTextFieldTokens = Pick<
     PasteThemeTokens,

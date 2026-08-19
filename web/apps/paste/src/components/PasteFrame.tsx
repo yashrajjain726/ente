@@ -1,16 +1,11 @@
-import { usePasteColorMode } from "@/features/paste/hooks/usePasteColorMode";
-import { getPasteThemeTokens } from "@/features/paste/theme/pasteThemeTokens";
+import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import { Box, IconButton, Stack, Typography } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import type { ReactNode } from "react";
+import { PasteFooter } from "./PasteFooter";
 
-interface PasteFrameProps {
-    children: ReactNode;
-    footer: ReactNode;
-}
-
-export const PasteFrame = ({ children, footer }: PasteFrameProps) => {
+export const PasteFrame = ({ children }: { children: ReactNode }) => {
     const { resolvedMode } = usePasteColorMode();
     const tokens = getPasteThemeTokens(resolvedMode);
 
@@ -145,7 +140,7 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => {
                         pb: { xs: 3, md: 3.25 },
                     }}
                 >
-                    {footer}
+                    <PasteFooter />
                 </Box>
             </Box>
         </Box>

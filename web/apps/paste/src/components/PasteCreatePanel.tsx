@@ -1,6 +1,7 @@
-import { MAX_PASTE_CHARS } from "@/features/paste/hooks/useCreatePaste";
-import { usePasteColorMode } from "@/features/paste/hooks/usePasteColorMode";
-import { getPasteThemeTokens } from "@/features/paste/theme/pasteThemeTokens";
+import { copyTextToClipboard, shareUrlOrCopy } from "@/browser";
+import { MAX_PASTE_CHARS } from "@/paste";
+import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
+import { useCreatePaste } from "@/usePaste";
 import { Navigation06Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
@@ -26,29 +27,16 @@ import { PasteLinkCard } from "./PasteLinkCard";
 import { downloadPasteQrCode } from "./qrCode";
 import { pasteTextFieldSx } from "./textFieldSx";
 
-interface PasteCreatePanelProps {
-    inputText: string;
-    creating: boolean;
-    createError: string | null;
-    createdLink: string | null;
-    createdLinkPasswordProtected: boolean;
-    onInputChange: (value: string) => void;
-    onCreate: (password?: string) => Promise<void>;
-    onCopyLink: (value: string) => Promise<void>;
-    onShareLink: (url: string) => Promise<void>;
-}
-
-export const PasteCreatePanel = ({
-    inputText,
-    creating,
-    createError,
-    createdLink,
-    createdLinkPasswordProtected,
-    onInputChange,
-    onCreate,
-    onCopyLink,
-    onShareLink,
-}: PasteCreatePanelProps) => {
+export const PasteCreatePanel = () => {
+    const {
+        inputText,
+        setInputText,
+        creating,
+        createError,
+        createdLink,
+        createdLinkPasswordProtected,
+        createSecureLink,
+    } = useCreatePaste();
     const { resolvedMode } = usePasteColorMode();
     const tokens = getPasteThemeTokens(resolvedMode);
     const [passwordProtected, setPasswordProtected] = useState(false);
@@ -216,7 +204,7 @@ export const PasteCreatePanel = ({
         const submittedPassword = password;
         setPasswordDialogOpen(false);
         resetPasswordDialog();
-        void onCreate(submittedPassword);
+        void createSecureLink(submittedPassword);
     };
 
     const handleDownloadQrClick = () => {
@@ -257,7 +245,7 @@ export const PasteCreatePanel = ({
                     placeholder="Paste text (keys, snippets, notes, instructions...)"
                     value={inputText}
                     onChange={(event) => {
-                        onInputChange(event.target.value);
+                        setInputText(event.target.value);
                     }}
                     sx={[
                         pasteTextFieldSx(tokens, "20px"),
@@ -391,7 +379,7 @@ export const PasteCreatePanel = ({
                             if (passwordProtected) {
                                 setPasswordDialogOpen(true);
                             } else {
-                                void onCreate();
+                                void createSecureLink();
                             }
                         }}
                         disabled={isCreateDisabled}
@@ -524,8 +512,8 @@ export const PasteCreatePanel = ({
                 <Box sx={{ mt: 0, width: "100%", minWidth: 0 }}>
                     <PasteLinkCard
                         link={createdLink}
-                        onCopy={onCopyLink}
-                        onShare={onShareLink}
+                        onCopy={copyTextToClipboard}
+                        onShare={shareUrlOrCopy}
                         passwordProtected={createdLinkPasswordProtected}
                     />
                     <Box

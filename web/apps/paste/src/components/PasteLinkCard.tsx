@@ -1,5 +1,4 @@
-import { usePasteColorMode } from "@/features/paste/hooks/usePasteColorMode";
-import { getPasteThemeTokens } from "@/features/paste/theme/pasteThemeTokens";
+import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
 import { Link01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -17,7 +16,7 @@ import {
     parseArrowLottie,
     type ParsedArrow,
     type ParsedArrowPath,
-} from "../utils/lottie";
+} from "./arrow";
 import { PasteQrCode } from "./PasteQrCode";
 
 interface PasteLinkCardProps {
