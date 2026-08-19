@@ -11,7 +11,7 @@
     "module": "./index.ts",
     "types": "./index.ts",
     "scripts": {
-        "build": "wasm-pack build ../../../../rust/bindings/wasm/paste --target bundler --out-dir ../../../../web/packages/wasm/paste/pkg",
+        "build": "wasm-pack build ../../../../rust/bindings/wasm/paste --target bundler --out-dir ../../../../web/packages/wasm/paste/pkg --no-pack",
         "test": "vitest --run"
     },
     "dependencies": {
