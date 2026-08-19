@@ -1,5 +1,5 @@
 import { base64ToBytes, bytesToBase64 } from "../base64";
-import { ensureCryptoInit, enteWasm } from "../wasm";
+import { enteWasm } from "../wasm";
 
 const ATTACHMENT_KEY_INFO = "llmchat_attachment_v1";
 const BLOB_HEADER_BYTES = 24;
@@ -37,7 +37,6 @@ export const encryptAttachmentBytes = async (
     chatKeyB64: string,
     sessionUuid: string,
 ): Promise<Uint8Array<ArrayBuffer>> => {
-    await ensureCryptoInit();
     const wasm = await enteWasm();
     const derivedKeyB64 = await deriveAttachmentKeyB64(chatKeyB64, sessionUuid);
     const plaintextB64 = bytesToBase64(bytes);
@@ -63,7 +62,6 @@ export const decryptAttachmentBytes = async (
         throw new Error("Invalid attachment blob length");
     }
 
-    await ensureCryptoInit();
     const wasm = await enteWasm();
     const derivedKeyB64 = await deriveAttachmentKeyB64(chatKeyB64, sessionUuid);
 

@@ -9,7 +9,6 @@ import {
     publicRequestHeaders,
 } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { loadEnteWasm } from "ente-core-wasm/load";
 import { ensure } from "ente-utils/ensure";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
@@ -105,7 +104,7 @@ const createSRPSession = async (
     srpUserID: string,
     loginSubKey: string,
 ) => {
-    const wasm = await loadEnteWasm();
+    const wasm = await import("ente-core-wasm");
     return new wasm.SrpSession(srpUserID, srpSalt, loginSubKey);
 };
 

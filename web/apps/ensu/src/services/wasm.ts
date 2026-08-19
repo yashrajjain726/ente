@@ -1,5 +1,4 @@
 import { isTauriRuntime } from "@/services/tauri-runtime";
-import { loadEnteWasm } from "ente-core-wasm/load";
 
 export type EnteWasmModule = typeof import("ente-core-wasm");
 
@@ -9,7 +8,6 @@ export interface EncryptedBlob {
 }
 
 export interface EnteCryptoAdapter {
-    crypto_init(): Promise<void>;
     crypto_generate_key(): Promise<string>;
     crypto_encrypt_blob(
         dataB64: string,
@@ -24,10 +22,6 @@ export interface EnteCryptoAdapter {
 
 const createWasmAdapter = (wasm: EnteWasmModule): EnteCryptoAdapter => {
     return {
-        crypto_init: () => {
-            wasm.crypto_init();
-            return Promise.resolve();
-        },
         crypto_generate_key: () => Promise.resolve(wasm.crypto_generate_key()),
         crypto_encrypt_blob: (dataB64, keyB64) =>
             Promise.resolve(wasm.crypto_encrypt_blob(dataB64, keyB64)),
@@ -114,9 +108,6 @@ const createTauriAdapter = async (): Promise<EnteCryptoAdapter> => {
     };
 
     return {
-        crypto_init: async () => {
-            await invokeOrThrow("crypto_init");
-        },
         crypto_generate_key: () => invokeOrThrow<string>("crypto_generate_key"),
         crypto_encrypt_blob: (dataB64, keyB64) =>
             invokeOrThrow<EncryptedBlob>("crypto_encrypt_blob", {
@@ -130,23 +121,15 @@ const createTauriAdapter = async (): Promise<EnteCryptoAdapter> => {
 };
 
 let _wasmPromise: Promise<EnteCryptoAdapter> | undefined;
-let _cryptoInitDone = false;
 
 export const enteWasm = async (): Promise<EnteCryptoAdapter> => {
     _wasmPromise ??= (async () => {
         if (isTauriRuntime()) {
             return createTauriAdapter();
         }
-        const wasm = await loadEnteWasm();
+        const wasm = await import("ente-core-wasm");
         return createWasmAdapter(wasm);
     })();
 
     return _wasmPromise;
-};
-
-export const ensureCryptoInit = async () => {
-    if (_cryptoInitDone) return;
-    const wasm = await enteWasm();
-    await wasm.crypto_init();
-    _cryptoInitDone = true;
 };

@@ -64,13 +64,6 @@ pub struct CryptoBlobDecryptInput {
 }
 
 #[tauri::command]
-pub fn crypto_init() -> Result<(), ApiError> {
-    // No-op, kept only for frontend compatibility: the pure-Rust crypto
-    // needs no initialization.
-    Ok(())
-}
-
-#[tauri::command]
 pub fn crypto_generate_key() -> String {
     b64::encode(crypto::Key::generate().as_bytes())
 }

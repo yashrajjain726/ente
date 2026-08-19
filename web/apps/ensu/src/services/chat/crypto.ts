@@ -1,5 +1,5 @@
 import { base64ToUtf8, utf8ToBase64 } from "../base64";
-import { ensureCryptoInit, enteWasm } from "../wasm";
+import { enteWasm } from "../wasm";
 
 export interface EncryptedChatPayload {
     encryptedData: string;
@@ -12,7 +12,6 @@ export const encryptChatPayload = async (
     payload: unknown,
     chatKeyB64: string,
 ): Promise<EncryptedChatPayload> => {
-    await ensureCryptoInit();
     const wasm = await enteWasm();
 
     const plaintextB64 = utf8ToBase64(JSON.stringify(payload));
@@ -28,7 +27,6 @@ export const decryptChatPayload = async (
     { encryptedData, header }: EncryptedChatPayload,
     chatKeyB64: string,
 ): Promise<unknown> => {
-    await ensureCryptoInit();
     const wasm = await enteWasm();
 
     const plaintextB64 = await wasm.crypto_decrypt_blob(
@@ -43,7 +41,6 @@ export const encryptChatField = async (
     value: string,
     chatKeyB64: string,
 ): Promise<string> => {
-    await ensureCryptoInit();
     const wasm = await enteWasm();
 
     const plaintextB64 = utf8ToBase64(value);
@@ -64,7 +61,6 @@ export const decryptChatField = async (
         throw new Error("Invalid encrypted field format");
     }
 
-    await ensureCryptoInit();
     const wasm = await enteWasm();
     const plaintextB64 = await wasm.crypto_decrypt_blob(
         ciphertext,
