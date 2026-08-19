@@ -315,7 +315,20 @@ class SettingsSearchRegistry {
         routeBuilder: (_) =>
             const GallerySettingsScreen(fromGalleryLayoutSettingsCTA: false),
         isSubPage: true,
-        keywords: ["grid size", "group by", "layout"],
+        keywords: ["grid size", "group by", "layout", "masonry", "mosaic"],
+      ),
+    );
+
+    items.add(
+      SettingsSearchItem(
+        title: l10n.layout,
+        subtitle: l10n.gallery,
+        sectionPath: "${l10n.appearance} > ${l10n.gallery}",
+        icon: HugeIcons.strokeRoundedDashboardSquare02,
+        routeBuilder: (_) =>
+            const GallerySettingsScreen(fromGalleryLayoutSettingsCTA: false),
+        isSubPage: true,
+        keywords: ["layout", "grid", "masonry", "mosaic", "justified"],
       ),
     );
 

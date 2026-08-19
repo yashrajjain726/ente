@@ -12,6 +12,7 @@ import 'package:photos/core/constants.dart';
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/event.dart';
 import 'package:photos/events/files_updated_event.dart';
+import "package:photos/events/gallery_layout_changed_event.dart";
 import "package:photos/events/homepage_swipe_to_select_in_progress_event.dart";
 import 'package:photos/events/local_photos_updated_event.dart';
 import 'package:photos/events/tab_changed_event.dart';
@@ -48,6 +49,8 @@ typedef GalleryLoader =
       int? limit,
       bool? asc,
     });
+
+typedef _LayoutScrollAnchor = ({EnteFile file, bool inHeader, double progress});
 
 typedef SortAscFn = bool Function();
 
@@ -150,10 +153,12 @@ class GalleryState extends State<Gallery> {
   bool _allFilesLoaded = false;
   bool _completedJumpToDate = false;
   StreamSubscription<FilesUpdatedEvent>? _reloadEventSubscription;
+  StreamSubscription<GalleryLayoutChangedEvent>? _layoutChangeSubscription;
   StreamSubscription<TabDoubleTapEvent>? _tabDoubleTapEvent;
   final _forceReloadEventSubscriptions = <StreamSubscription<Event>>[];
   late String _logTag;
   bool _sortOrderAsc = false;
+  int _layoutChangeGeneration = 0;
   int _activeFileLoads = 0;
   List<EnteFile> _allGalleryFiles = [];
   final _scrollController = ScrollController();
@@ -197,6 +202,20 @@ class GalleryState extends State<Gallery> {
       widget.priorityReloadDebounceTime,
       leading: true,
     );
+    _layoutChangeSubscription = Bus.instance
+        .on<GalleryLayoutChangedEvent>()
+        .listen((event) async {
+          if (!mounted) return;
+          final generation = ++_layoutChangeGeneration;
+          final scrollAnchor = _captureLayoutScrollAnchor();
+          _logger.info("Rebuilding gallery for ${event.reason}");
+          _setGroupType();
+          final measuredHeaderExtent = await _measureGroupHeaderExtent();
+          if (!mounted || generation != _layoutChangeGeneration) return;
+          groupHeaderExtent = measuredHeaderExtent;
+          _updateGalleryGroups();
+          _restoreLayoutScrollAnchor(scrollAnchor, generation);
+        });
     _sortOrderAsc = widget.sortAsyncFn != null ? widget.sortAsyncFn!() : false;
     if (widget.reloadEvent != null) {
       _reloadEventSubscription = widget.reloadEvent!.listen((event) async {
@@ -288,19 +307,11 @@ class GalleryState extends State<Gallery> {
     });
 
     if (_groupType.showGroupHeader()) {
-      getIntrinsicSizeOfWidget(
-        GroupHeaderWidget(
-          title: "Dummy title",
-          gridSize: localSettings.getPhotoGridSize(),
-          filesInGroup: const [],
-          selectedFiles: null,
-          showSelectAll: false,
-        ),
-        context,
-      ).then((size) {
-        if (!mounted) return;
+      final generation = _layoutChangeGeneration;
+      _measureGroupHeaderExtent().then((extent) {
+        if (!mounted || generation != _layoutChangeGeneration) return;
         setState(() {
-          groupHeaderExtent = size.height;
+          groupHeaderExtent = extent;
           _updateGalleryGroups(callSetState: false);
         });
       });
@@ -390,6 +401,78 @@ class GalleryState extends State<Gallery> {
     if (callSetState) {
       setState(() {});
     }
+  }
+
+  _LayoutScrollAnchor? _captureLayoutScrollAnchor() {
+    final groups = galleryGroups;
+    if (groups == null || _scrollController.positions.length != 1) return null;
+    final appBarCollapseExtent =
+        widget.appBar?.resolveGeometry(context).collapseExtent ?? 0;
+    final sectionScrollOffset =
+        _scrollController.offset - appBarCollapseExtent - _headerHeight;
+    if (sectionScrollOffset < 0) return null;
+    final file = groups.getFileAtScrollOffset(sectionScrollOffset);
+    if (file == null) return null;
+    final geometry = groups.getGeometryOfFile(file);
+    if (geometry == null) return null;
+
+    final inHeader = sectionScrollOffset < geometry.rowOffset;
+    final offset = inHeader
+        ? geometry.rowOffset - sectionScrollOffset
+        : sectionScrollOffset - geometry.rowOffset;
+    final extent = inHeader ? geometry.headerExtent : geometry.rowExtent;
+    final progress = extent > 0 && extent.isFinite
+        ? (offset / extent).clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    return (file: file, inHeader: inHeader, progress: progress);
+  }
+
+  void _restoreLayoutScrollAnchor(_LayoutScrollAnchor? anchor, int generation) {
+    if (anchor == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _layoutChangeGeneration ||
+          _scrollController.positions.length != 1) {
+        return;
+      }
+      final geometry = galleryGroups?.getGeometryOfFile(anchor.file);
+      if (geometry == null) return;
+      final appBarCollapseExtent =
+          widget.appBar?.resolveGeometry(context).collapseExtent ?? 0;
+      final maxRowPenetration = geometry.rowExtent > precisionErrorTolerance
+          ? geometry.rowExtent - precisionErrorTolerance
+          : 0.0;
+      final rowPenetration = (geometry.rowExtent * anchor.progress)
+          .clamp(0.0, maxRowPenetration)
+          .toDouble();
+      final sectionOffset = anchor.inHeader
+          ? geometry.rowOffset - geometry.headerExtent * anchor.progress
+          : geometry.rowOffset + rowPenetration;
+      final targetOffset =
+          _scrollOffsetForSectionOffset(
+            sectionOffset,
+            appBarCollapseExtent,
+          ).clamp(
+            _scrollController.position.minScrollExtent,
+            _scrollController.position.maxScrollExtent,
+          );
+      _scrollController.jumpTo(targetOffset);
+    });
+  }
+
+  Future<double> _measureGroupHeaderExtent() async {
+    if (!_groupType.showGroupHeader()) return GalleryGroups.spacing;
+    final size = await getIntrinsicSizeOfWidget(
+      GroupHeaderWidget(
+        title: "Dummy title",
+        gridSize: localSettings.getPhotoGridSize(),
+        filesInGroup: const [],
+        selectedFiles: null,
+        showSelectAll: false,
+      ),
+      context,
+    );
+    return size.height;
   }
 
   void _selectedFilesListener() {
@@ -639,6 +722,7 @@ class GalleryState extends State<Gallery> {
     _boundariesProvider?.setScrollController(null);
 
     _reloadEventSubscription?.cancel();
+    _layoutChangeSubscription?.cancel();
     _tabDoubleTapEvent?.cancel();
     for (final subscription in _forceReloadEventSubscriptions) {
       subscription.cancel();
@@ -1187,7 +1271,7 @@ class _PinnedGroupHeaderState extends State<PinnedGroupHeader>
                                     .groupIDToFilesMap[currentGroupId]!
                                     .first,
                               ),
-                          gridSize: localSettings.getPhotoGridSize(),
+                          gridSize: widget.galleryGroups.crossAxisCount,
                           height: widget.galleryGroups.groupHeaderExtent,
                           filesInGroup: widget
                               .galleryGroups

@@ -1,0 +1,242 @@
+import "package:dio/dio.dart";
+import "package:flutter_test/flutter_test.dart";
+import "package:package_info_plus/package_info_plus.dart";
+import "package:photos/core/configuration.dart";
+import "package:photos/models/file/dummy_file.dart";
+import "package:photos/models/file/file.dart";
+import "package:photos/models/file/file_type.dart";
+import "package:photos/models/gallery/gallery_groups.dart";
+import "package:photos/models/gallery/mosaic_layout.dart";
+import "package:photos/models/metadata/file_magic.dart";
+import "package:photos/service_locator.dart";
+import "package:photos/settings/local_settings.dart";
+import "package:photos/ui/viewer/gallery/component/group/type.dart";
+import "package:shared_preferences/shared_preferences.dart";
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    ServiceLocator.instance.init(
+      preferences,
+      Dio(),
+      Dio(),
+      Dio(),
+      PackageInfo(
+        appName: "Photos",
+        packageName: "photos",
+        version: "1.0.0",
+        buildNumber: "1",
+      ),
+    );
+
+    // GalleryGroups only reads Configuration's preferences-backed user ID.
+    // The remaining plugin initialization is unavailable in unit tests.
+    try {
+      await Configuration.instance.init(preferences);
+    } catch (_) {}
+  });
+
+  setUp(() async {
+    await localSettings.setGalleryLayoutType(GalleryLayoutType.mosaic);
+    await localSettings.setPhotoGridSize(4);
+  });
+
+  test("day grouping creates independent, contiguous mosaic sections", () {
+    for (final sortOrderAsc in [false, true]) {
+      final days = sortOrderAsc ? [17, 18, 19] : [19, 18, 17];
+      final expectedGroups = <List<EnteFile>>[];
+      final files = <EnteFile>[];
+      var fileIndex = 0;
+      for (final day in days) {
+        final filesForDay = List<EnteFile>.generate(5, (index) {
+          final isPortrait = index.isEven;
+          return _file(
+            index: fileIndex++,
+            creationTime: DateTime(2026, 8, day).microsecondsSinceEpoch,
+            width: isPortrait ? 100 : 400,
+            height: isPortrait ? 400 : 100,
+          );
+        }, growable: false);
+        expectedGroups.add(filesForDay);
+        files.addAll(filesForDay);
+      }
+
+      final groups = _galleryGroups(
+        files: files,
+        groupType: GroupType.day,
+        groupHeaderExtent: 48,
+        sortOrderAsc: sortOrderAsc,
+      );
+
+      expect(groups.groupIDs, hasLength(expectedGroups.length));
+      expect(groups.groupLayouts, hasLength(expectedGroups.length));
+      var expectedFirstChildIndex = 0;
+      var expectedSectionOffset = 0.0;
+
+      for (
+        var groupIndex = 0;
+        groupIndex < expectedGroups.length;
+        groupIndex++
+      ) {
+        final expectedFiles = expectedGroups[groupIndex];
+        final groupID = groups.groupIDs[groupIndex];
+        final section = groups.groupLayouts[groupIndex];
+
+        expect(section, isA<MosaicSectionLayout>());
+        final mosaicSection = section as MosaicSectionLayout;
+        expect(groups.groupIDToFilesMap[groupID], orderedEquals(expectedFiles));
+        expect(mosaicSection.firstIndex, expectedFirstChildIndex);
+        expect(mosaicSection.minOffset, closeTo(expectedSectionOffset, 1e-9));
+        expect(mosaicSection.headerExtent, 48);
+        _expectRowsCoverFiles(mosaicSection, expectedFiles.length);
+        expect(
+          groups.getFileAtScrollOffset(mosaicSection.minOffset),
+          same(expectedFiles.first),
+          reason: "a shared section boundary belongs to the next section",
+        );
+        if (groupIndex > 0) {
+          expect(
+            groups.groupLayouts[groupIndex - 1].maxOffset,
+            mosaicSection.minOffset,
+          );
+        }
+
+        for (final file in expectedFiles) {
+          final fileOffset = groups.getOffsetOfFile(file);
+          expect(fileOffset, isNotNull);
+          expect(groups.getFileAtScrollOffset(fileOffset!), same(file));
+          expect(
+            groups.getOffsetOfGroupContainingFile(file),
+            closeTo(mosaicSection.minOffset, 1e-9),
+          );
+        }
+
+        expectedFirstChildIndex = mosaicSection.lastIndex + 1;
+        expectedSectionOffset = mosaicSection.maxOffset;
+      }
+    }
+  });
+
+  test("headerless mosaic remains one continuous group past grid chunks", () {
+    const fileCount = 100;
+    final files = List<EnteFile>.generate(
+      fileCount,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: 3,
+        height: 2,
+      ),
+      growable: false,
+    );
+
+    final groups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+    );
+
+    expect(groups.groupIDs, hasLength(1));
+    expect(groups.groupLayouts, hasLength(1));
+    expect(groups.groupIDToFilesMap.values.single, orderedEquals(files));
+    expect(groups.allFilesWithDummies, hasLength(fileCount));
+    for (var index = 0; index < fileCount; index++) {
+      expect(groups.allFilesWithDummies[index], same(files[index]));
+      expect(groups.allFilesWithDummies[index], isNot(isA<DummyFile>()));
+    }
+
+    final section = groups.groupLayouts.single as MosaicSectionLayout;
+    expect(section.headerExtent, GalleryGroups.spacing);
+    expect(section.bodyMinOffset, GalleryGroups.spacing);
+    _expectRowsCoverFiles(section, fileCount);
+
+    final rowAcrossLegacyBoundary = section.rows.singleWhere(
+      (row) => row.firstIndex <= 39 && row.lastIndex >= 40,
+    );
+    expect(rowAcrossLegacyBoundary.firstIndex, 39);
+    expect(rowAcrossLegacyBoundary.lastIndex, 41);
+
+    for (final index in [75, fileCount - 1]) {
+      final fileOffset = groups.getOffsetOfFile(files[index]);
+      expect(fileOffset, isNotNull);
+      expect(groups.getFileAtScrollOffset(fileOffset!), same(files[index]));
+    }
+    expect(groups.getFileAtScrollOffset(section.maxOffset), same(files.last));
+  });
+
+  test("file geometry survives replacement with the same stable identity", () {
+    final files = List<EnteFile>.generate(
+      20,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: 3,
+        height: 2,
+      ),
+      growable: false,
+    );
+    final original = files[13]..localID = "local-13";
+    final groups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+    );
+    final originalGeometry = groups.getGeometryOfFile(original);
+
+    final replacement = EnteFile.from(original)..uploadedFileID = 1013;
+    expect(replacement, isNot(same(original)));
+    expect(replacement == original, isFalse);
+    expect(groups.getGeometryOfFile(replacement), originalGeometry);
+    expect(groups.getOffsetOfFile(replacement), originalGeometry?.rowOffset);
+  });
+}
+
+GalleryGroups _galleryGroups({
+  required List<EnteFile> files,
+  required GroupType groupType,
+  required double groupHeaderExtent,
+  bool sortOrderAsc = false,
+}) {
+  return GalleryGroups(
+    allFiles: files,
+    groupType: groupType,
+    sortOrderAsc: sortOrderAsc,
+    widthAvailable: 430,
+    selectedFiles: null,
+    tagPrefix: "test_",
+    groupHeaderExtent: groupHeaderExtent,
+    showSelectAll: false,
+  );
+}
+
+EnteFile _file({
+  required int index,
+  required int creationTime,
+  required int width,
+  required int height,
+}) {
+  return EnteFile()
+    ..generatedID = index + 1
+    ..creationTime = creationTime
+    ..fileType = FileType.image
+    ..pubMagicMetadata = PubMagicMetadata(w: width, h: height);
+}
+
+void _expectRowsCoverFiles(MosaicSectionLayout section, int fileCount) {
+  expect(section.rows, isNotEmpty);
+  var expectedFirstFileIndex = 0;
+  var expectedRowOffset = 0.0;
+  for (final row in section.rows) {
+    expect(row.firstIndex, expectedFirstFileIndex);
+    expect(row.lastIndex, greaterThanOrEqualTo(row.firstIndex));
+    expect(row.itemWidths, hasLength(row.lastIndex - row.firstIndex + 1));
+    expect(row.minOffset, closeTo(expectedRowOffset, 1e-9));
+    expectedFirstFileIndex = row.lastIndex + 1;
+    expectedRowOffset = row.maxOffset + GalleryGroups.spacing;
+  }
+  expect(expectedFirstFileIndex, fileCount);
+  expect(section.rows.last.lastIndex, fileCount - 1);
+}

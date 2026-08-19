@@ -605,6 +605,7 @@ void logLocalSettings() {
     'ML enabled': flagService.hasGrantedMLConsent,
     'ML local indexing enabled': localSettings.isMLLocalIndexingEnabled,
     'Multipart upload enabled': localSettings.userEnabledMultiplePart,
+    'Gallery layout': localSettings.getGalleryLayoutType().name,
     'Gallery grid size': localSettings.getPhotoGridSize(),
     'Video streaming enabled':
         VideoPreviewService.instance.isVideoStreamingEnabled,
