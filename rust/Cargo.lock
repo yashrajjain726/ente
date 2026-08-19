@@ -2644,7 +2644,6 @@ dependencies = [
 name = "ente-photos-frb"
 version = "0.0.0"
 dependencies = [
- "ente-accounts",
  "ente-cast",
  "ente-contacts",
  "ente-core",
