@@ -166,7 +166,7 @@ class _TrashPageState extends State<_TrashPage> {
                   label: l10n.emptyTrash,
                   variant: FABComponentVariant.destructive,
                   onTap: () =>
-                      showConfirmDeleteAllTrashSheet(context, _isOnEnteTrash),
+                      showConfirmEmptyTrashSheet(context, _isOnEnteTrash),
                 ),
               );
             },

@@ -339,7 +339,7 @@ Future<bool> deleteFromEnteTrash(
   }
 }
 
-Future<void> showConfirmDeleteAllTrashSheet(
+Future<void> showConfirmEmptyTrashSheet(
   BuildContext context,
   bool isOnEnteTrash,
 ) async {
@@ -368,6 +368,7 @@ Future<void> showConfirmDeleteAllTrashSheet(
     builder: (sheetContext) => BottomSheetComponent(
       title: sheetContext.strings.emptyTrashQuestion,
       message: sheetContext.strings.permDeleteWarning,
+      illustration: Image.asset("assets/warning-red.png"),
       closeTooltip: sheetContext.strings.close,
       actions: [
         ButtonComponent(
