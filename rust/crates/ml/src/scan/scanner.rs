@@ -90,7 +90,8 @@ impl ScannerSession {
     ) -> Result<Option<Quad>, ScanError> {
         let bgr =
             rgba_to_bgr(rgba, to_i32(width)?, to_i32(height)?).map_err(ScanError::InvalidInput)?;
-        self.live_detect(&bgr, rotation_degrees)
+        let frame = ImageSize::new(bgr.width as f64, bgr.height as f64);
+        self.live_detect(&bgr, frame, rotation_degrees)
     }
 
     pub fn live_detect_bgra(
@@ -103,7 +104,8 @@ impl ScannerSession {
     ) -> Result<Option<Quad>, ScanError> {
         let bgr = bgra_to_bgr(bgra, to_i32(row_stride)?, to_i32(width)?, to_i32(height)?)
             .map_err(ScanError::InvalidInput)?;
-        self.live_detect(&bgr, rotation_degrees)
+        let frame = ImageSize::new(bgr.width as f64, bgr.height as f64);
+        self.live_detect(&bgr, frame, rotation_degrees)
     }
 
     pub fn live_detect_yuv420(
@@ -114,15 +116,21 @@ impl ScannerSession {
         layout: PlaneLayout,
         rotation_degrees: i32,
     ) -> Result<Option<Quad>, ScanError> {
-        let bgr = yuv420_to_bgr(y, u, v, layout).map_err(ScanError::InvalidInput)?;
-        self.live_detect(&bgr, rotation_degrees)
+        let bgr = yuv420_to_bgr(y, u, v, layout, MASK_SIDE, MASK_SIDE)
+            .map_err(ScanError::InvalidInput)?;
+        let frame = ImageSize::new(layout.width as f64, layout.height as f64);
+        self.live_detect(&bgr, frame, rotation_degrees)
     }
 
-    fn live_detect(&self, bgr: &ImageU8, rotation_degrees: i32) -> Result<Option<Quad>, ScanError> {
+    fn live_detect(
+        &self,
+        bgr: &ImageU8,
+        frame_size: ImageSize,
+        rotation_degrees: i32,
+    ) -> Result<Option<Quad>, ScanError> {
         let mask = self.segment(bgr)?;
-        let original_size = ImageSize::new(bgr.width as f64, bgr.height as f64);
         let quad_in_mask =
-            detect_document_quad(&mask, original_size, true).map_err(ScanError::Pipeline)?;
+            detect_document_quad(&mask, frame_size, true).map_err(ScanError::Pipeline)?;
         let mask_size = ImageSize::new(mask.width as f64, mask.height as f64);
         Ok(quad_in_mask.map(|q| q.rotate90(rotation_degrees / 90, mask_size)))
     }
