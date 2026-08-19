@@ -2179,6 +2179,17 @@
   },
   "librarySharingAllCurrentAlbumsShared": "All your current albums are shared",
   "librarySharingBannerDescription": "Share all your albums",
+  "librarySharingDisable": "Disable",
+  "librarySharingDisableDescription": "Albums you have already shared will stay shared with {recipient}, including any new photos you add to them. New albums will not be shared automatically.\n\nTo stop sharing an album, tap it and select 'Stop sharing'",
+  "@librarySharingDisableDescription": {
+    "placeholders": {
+      "recipient": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "librarySharingDisableTitle": "Disable library sharing?",
   "librarySharingEnableDescription": "Your existing albums and any albums you create in the future will be automatically shared with {recipient}.",
   "@librarySharingEnableDescription": {
     "placeholders": {

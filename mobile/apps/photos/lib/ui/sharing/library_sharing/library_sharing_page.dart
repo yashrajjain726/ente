@@ -406,6 +406,13 @@ class _LibrarySharingPageState extends State<LibrarySharingPage> {
 
   Future<void> _toggleLibrarySharing() async {
     if (_controller.isAutomaticSharingEnabled) {
+      final confirmed = await confirmDisableLibrarySharing(
+        context: context,
+        recipientLabel: _recipient.label,
+      );
+      if (!confirmed || !mounted) {
+        return;
+      }
       await _showFailureIfNeeded(
         await _controller.disableAutomaticSharing(),
         _toggleLibrarySharing,
