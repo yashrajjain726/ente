@@ -1,6 +1,5 @@
 import "dart:convert";
 import "dart:io";
-import 'dart:typed_data';
 
 import "package:computer/computer.dart";
 import "package:convert/convert.dart";
@@ -165,7 +164,7 @@ Future<FileEncryptResult> chachaEncryptFileWithVerification(
   ChunkedConversionSink<List<int>>? partMd5Sink;
 
   final List<String> partMd5s = [];
-  final BytesBuilder partBuffer = BytesBuilder();
+  var bytesInPart = 0;
 
   if (multiPartChunkSizeInBytes == null) {
     fullAccumulator = AccumulatorSink<Digest>();
@@ -241,50 +240,44 @@ Future<FileEncryptResult> chachaEncryptFileWithVerification(
         fullMd5Sink!.add(encryptedData);
         outSink.add(encryptedData);
       } else {
-        partBuffer.add(encryptedData);
-
-        final bool isLastChunk =
-            tag == Sodium.cryptoSecretstreamXchacha20poly1305TagFinal;
-
-        while (partBuffer.length >= multiPartChunkSizeInBytes) {
-          final partBytes = partBuffer.toBytes().sublist(
-            0,
-            multiPartChunkSizeInBytes,
+        outSink.add(encryptedData);
+        var offset = 0;
+        while (offset < encryptedData.length) {
+          final bytesToPartBoundary = multiPartChunkSizeInBytes - bytesInPart;
+          final end = offset + bytesToPartBoundary < encryptedData.length
+              ? offset + bytesToPartBoundary
+              : encryptedData.length;
+          partMd5Sink!.add(
+            offset == 0 && end == encryptedData.length
+                ? encryptedData
+                : Uint8List.sublistView(encryptedData, offset, end),
           );
+          bytesInPart += end - offset;
+          offset = end;
 
-          partMd5Sink!.add(partBytes);
-          partMd5Sink.close();
-          final digest = partAccumulator!.events.single;
-          partMd5s.add(base64.encode(digest.bytes));
+          if (bytesInPart == multiPartChunkSizeInBytes) {
+            partMd5Sink.close();
+            final digest = partAccumulator!.events.single;
+            partMd5s.add(base64.encode(digest.bytes));
 
-          logger.info(
-            "Part ${partMd5s.length}: $multiPartChunkSizeInBytes bytes",
-          );
+            logger.info(
+              "Part ${partMd5s.length}: $multiPartChunkSizeInBytes bytes",
+            );
 
-          outSink.add(partBytes);
-
-          final remaining = partBuffer.toBytes().sublist(
-            multiPartChunkSizeInBytes,
-          );
-          partBuffer.clear();
-          partBuffer.add(remaining);
-
-          if (!isLastChunk || partBuffer.isNotEmpty) {
-            partAccumulator = AccumulatorSink<Digest>();
-            partMd5Sink = md5.startChunkedConversion(partAccumulator);
+            bytesInPart = 0;
+            if (offset < encryptedData.length ||
+                tag != Sodium.cryptoSecretstreamXchacha20poly1305TagFinal) {
+              partAccumulator = AccumulatorSink<Digest>();
+              partMd5Sink = md5.startChunkedConversion(partAccumulator);
+            }
           }
         }
 
-        if (isLastChunk && partBuffer.isNotEmpty) {
-          final lastPartBytes = partBuffer.toBytes();
-
-          partMd5Sink!.add(lastPartBytes);
-          partMd5Sink.close();
+        if (tag == Sodium.cryptoSecretstreamXchacha20poly1305TagFinal &&
+            bytesInPart > 0) {
+          partMd5Sink!.close();
           final digest = partAccumulator!.events.single;
           partMd5s.add(base64.encode(digest.bytes));
-
-          outSink.add(lastPartBytes);
-          partBuffer.clear();
         }
       }
     }
