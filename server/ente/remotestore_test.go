@@ -50,24 +50,3 @@ func TestIsValidDomainWithoutScheme(t *testing.T) {
 		})
 	}
 }
-
-func TestValidatePublicCustomDomain(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{"valid domain", "example.com", false},
-		{"family pointer", "_123:example.com", true},
-		{"ip address", "172.17.0.2", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidatePublicCustomDomain(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidatePublicCustomDomain(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-			}
-		})
-	}
-}

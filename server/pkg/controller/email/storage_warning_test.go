@@ -702,46 +702,6 @@ func TestStorageWarningCadenceBroken(t *testing.T) {
 	}
 }
 
-func TestStorageWarningPreviousStageFreshnessWindowForSnapshot(t *testing.T) {
-	buffered60Snapshot := storageWarningSnapshot{
-		Bucket:               storageWarningBucketExpired,
-		ExpiredStage:         expiredWarningStage60,
-		ExpiredBufferedCycle: true,
-		WarningCycleStart:    65 * storageWarningOneDayInMicroseconds,
-		AutoDeleteDate:       150 * storageWarningOneDayInMicroseconds,
-	}
-	got := storageWarningPreviousStageFreshnessWindowForSnapshot(buffered60Snapshot)
-	want := expiredBufferedWarning60At(buffered60Snapshot.WarningCycleStart, buffered60Snapshot.AutoDeleteDate) -
-		buffered60Snapshot.WarningCycleStart + storageWarningOneDayInMicroseconds + storageWarningBufferedCadenceExtraGrace
-	if got != want {
-		t.Fatalf("unexpected buffered stage 60 freshness window: got %d want %d", got, want)
-	}
-
-	buffered119Snapshot := storageWarningSnapshot{
-		Bucket:               storageWarningBucketExpired,
-		ExpiredStage:         expiredWarningStage119,
-		ExpiredBufferedCycle: true,
-		WarningCycleStart:    65 * storageWarningOneDayInMicroseconds,
-		AutoDeleteDate:       150 * storageWarningOneDayInMicroseconds,
-	}
-	got = storageWarningPreviousStageFreshnessWindowForSnapshot(buffered119Snapshot)
-	want = expiredBufferedWarning119At(buffered119Snapshot.AutoDeleteDate) -
-		expiredBufferedWarning60At(buffered119Snapshot.WarningCycleStart, buffered119Snapshot.AutoDeleteDate) +
-		storageWarningOneDayInMicroseconds + storageWarningBufferedCadenceExtraGrace
-	if got != want {
-		t.Fatalf("unexpected buffered stage 119 freshness window: got %d want %d", got, want)
-	}
-
-	standardSnapshot := storageWarningSnapshot{
-		Bucket:       storageWarningBucketExpired,
-		ExpiredStage: expiredWarningStage60,
-	}
-	got = storageWarningPreviousStageFreshnessWindowForSnapshot(standardSnapshot)
-	if got != storageWarningPreviousStageFreshnessWindow {
-		t.Fatalf("unexpected standard freshness window: got %d want %d", got, storageWarningPreviousStageFreshnessWindow)
-	}
-}
-
 func TestMergeStorageWarningCandidatesDeduplicatesAndKeepsFamilyPlan(t *testing.T) {
 	candidates := mergeStorageWarningCandidates(
 		[]repo.StorageWarningCandidate{

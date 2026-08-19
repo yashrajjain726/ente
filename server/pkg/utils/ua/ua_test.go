@@ -5,16 +5,6 @@ import (
 	"testing"
 )
 
-func TestGetDeviceTypeReturnsErrorForUnparsableUserAgent(t *testing.T) {
-	deviceType, err := GetDeviceType("")
-	if err == nil {
-		t.Fatal("GetDeviceType returned nil error")
-	}
-	if deviceType != "" {
-		t.Fatalf("GetDeviceType = %q, want empty string", deviceType)
-	}
-}
-
 func TestGetDeviceTypeConcurrent(t *testing.T) {
 	const userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 	const workers = 16

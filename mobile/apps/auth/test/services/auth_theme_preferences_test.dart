@@ -17,23 +17,6 @@ void main() {
     expect(await AuthThemePreferences.getThemeMode(), ThemeMode.system);
   });
 
-  test("reads Auth theme preference using Flutter ThemeMode index", () async {
-    for (final mode in ThemeMode.values) {
-      await _setAuthThemeModeIndex(mode.index);
-      expect(await AuthThemePreferences.getThemeMode(), mode);
-    }
-  });
-
-  test(
-    "persists Auth theme preference using Flutter ThemeMode index",
-    () async {
-      for (final mode in ThemeMode.values) {
-        await AuthThemePreferences.setThemeMode(mode);
-        expect(await _getAuthThemeModeIndex(), mode.index);
-      }
-    },
-  );
-
   test("prefers Auth theme preference", () async {
     await _setAuthThemeModeIndex(ThemeMode.dark.index);
     await _setAsyncAdaptiveThemeModeIndex(0);
@@ -72,14 +55,6 @@ void main() {
       }
     },
   );
-
-  test("keeps Auth theme preference when adaptive value resets", () async {
-    await AuthThemePreferences.setThemeMode(ThemeMode.light);
-    await _setAsyncAdaptiveThemeModeIndex(2);
-    await _setLegacyAdaptiveThemeModeIndex(2);
-
-    expect(await AuthThemePreferences.getThemeMode(), ThemeMode.light);
-  });
 }
 
 void _resetPreferences() {

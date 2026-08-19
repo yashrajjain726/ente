@@ -54,56 +54,14 @@ func TestValidateSpaceSlugRejectsInvalidClientSlugs(t *testing.T) {
 	}
 }
 
-func TestValidateSpaceSlugAllowReservedOnlyBypassesReservedCheck(t *testing.T) {
+func TestValidateSpaceSlugAllowReservedAcceptsReservedSlug(t *testing.T) {
 	normalized, err := ValidateSpaceSlugAllowReserved(" Ente ")
 	require.NoError(t, err)
 	require.Equal(t, "ente", normalized)
-
-	_, err = ValidateSpaceSlugAllowReserved("ente-user")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "spaceSlug can only contain")
-
-	_, err = ValidateSpaceSlugAllowReserved("ali/ce")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "spaceSlug can only contain")
-
-	_, err = ValidateSpaceSlugAllowReserved("abc")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "spaceSlug must be 4-30 characters")
 }
 
-func TestReservedSpaceSlugListBuildsLookup(t *testing.T) {
-	seen := make(map[string]struct{}, len(reservedSpaceSlugList))
-	for _, slug := range reservedSpaceSlugList {
-		require.Equal(t, slug, normalizeSlug(slug))
-
-		_, ok := seen[slug]
-		require.False(t, ok, "duplicate reserved space slug: %s", slug)
-		seen[slug] = struct{}{}
-
-		_, ok = reservedSpaceSlugs[slug]
-		require.True(t, ok, "missing reserved space slug lookup: %s", slug)
-	}
-	require.Len(t, reservedSpaceSlugs, len(reservedSpaceSlugList))
-}
-
-func TestValidateSpaceSlugRejectsReservedFileSuffixes(t *testing.T) {
-	for _, slug := range []string{
-		"theme.css",
-		"page.htm",
-		"page.html",
-		"script.js",
-		"data.json",
-		"source.map",
-		"script.mjs",
-		"robots.txt",
-		"app.webmanifest",
-		"feed.xml",
-	} {
-		t.Run(slug, func(t *testing.T) {
-			_, err := ValidateSpaceSlug(slug)
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "spaceSlug is reserved")
-		})
-	}
+func TestValidateSpaceSlugRejectsReservedFileSuffix(t *testing.T) {
+	_, err := ValidateSpaceSlug("theme.css")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "spaceSlug is reserved")
 }

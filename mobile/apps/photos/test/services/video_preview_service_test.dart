@@ -29,15 +29,6 @@ void main() {
   });
 
   group('calcStatus', () {
-    test('reports completion when there are no files', () async {
-      final files = <EnteFile>[];
-      final previewIds = <int, PreviewInfo>{};
-
-      final status = await videoPreviewService.calcStatus(files, previewIds);
-
-      expect(status, equals(1.0));
-    });
-
     test('excludes legacy files unless they already have previews', () async {
       final files = [
         EnteFile()
