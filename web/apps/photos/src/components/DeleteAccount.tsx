@@ -174,7 +174,18 @@ const DeleteAccountDialogContents: React.FC<
                     await getAccountDeleteChallenge();
 
                 if (allowDelete && encryptedChallenge) {
-                    await onAuthenticateUser();
+                    try {
+                        await onAuthenticateUser();
+                    } catch (e) {
+                        const wasCancelled =
+                            e == undefined ||
+                            (e instanceof Error &&
+                                e.message ===
+                                    "app_lock_reauthentication_cancelled");
+                        if (!wasCancelled) onGenericError(e);
+                        setLoading(false);
+                        return;
+                    }
                     const decryptedChallenge =
                         await decryptDeleteAccountChallenge(encryptedChallenge);
                     await deleteAccount(
