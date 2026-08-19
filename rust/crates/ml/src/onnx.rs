@@ -300,6 +300,10 @@ fn is_execution_provider_run_failure(error: &MlError) -> bool {
 // A CoreML self-test failure is treated as construction failure so the caller
 // invalidates the possibly corrupt persistent cache. WebGPU validation stays
 // inside its crash-canary window instead.
+#[cfg_attr(
+    not(any(target_os = "ios", target_os = "macos")),
+    allow(unused_variables)
+)]
 fn build_and_validate_session(
     model_path: &str,
     attempt: providers::ProviderAttempt,
