@@ -19,6 +19,7 @@ use ort::ep::{
 #[cfg(target_os = "android")]
 use std::num::NonZeroUsize;
 
+use super::AccelerationValidation;
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 use super::coreml_cache;
 #[cfg(any(
@@ -45,12 +46,6 @@ use crate::error::MlResult;
 const ENABLE_PERSISTENT_COREML_CACHE: bool = true;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum GoldenSelfTest {
-    Required,
-    Skipped,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionMode {
     PlatformDefault,
     CpuOnly,
@@ -75,9 +70,13 @@ pub(super) struct ProviderPlan {
 }
 
 impl ProviderPlan {
-    pub(super) fn new(mode: ExecutionMode, model_path: &str, golden: GoldenSelfTest) -> Self {
+    pub(super) fn new(
+        mode: ExecutionMode,
+        model_path: &str,
+        validation: AccelerationValidation,
+    ) -> Self {
         let providers = match mode {
-            ExecutionMode::PlatformDefault => platform_default_providers(model_path, golden),
+            ExecutionMode::PlatformDefault => platform_default_providers(model_path, validation),
             ExecutionMode::CpuOnly => vec![ExecutionProvider::Cpu],
         };
         Self::from_providers(providers)
@@ -140,7 +139,6 @@ pub(super) struct ProviderAttempt {
     providers: Vec<ExecutionProviderDispatch>,
     disable_intra_op_spinning: bool,
     coreml_cache_dir: Option<PathBuf>,
-    uses_webgpu: bool,
     execution_provider: ExecutionProvider,
 }
 
@@ -150,7 +148,6 @@ impl ProviderAttempt {
             providers: vec![CPU::default().with_arena_allocator(true).build()],
             disable_intra_op_spinning: false,
             coreml_cache_dir: None,
-            uses_webgpu: false,
             execution_provider: ExecutionProvider::Cpu,
         }
     }
@@ -161,10 +158,6 @@ impl ProviderAttempt {
 
     pub(super) fn execution_provider(&self) -> ExecutionProvider {
         self.execution_provider
-    }
-
-    pub(super) fn uses_webgpu(&self) -> bool {
-        self.uses_webgpu
     }
 }
 
@@ -186,7 +179,6 @@ pub(super) fn provider_attempt(
                 ],
                 disable_intra_op_spinning: false,
                 coreml_cache_dir,
-                uses_webgpu: false,
                 execution_provider: ExecutionProvider::CoreMl,
             }
         }
@@ -195,7 +187,6 @@ pub(super) fn provider_attempt(
             providers: webgpu_attempt_providers(),
             disable_intra_op_spinning: true,
             coreml_cache_dir: None,
-            uses_webgpu: true,
             execution_provider: ExecutionProvider::WebGpu,
         },
         #[cfg(target_os = "android")]
@@ -221,9 +212,12 @@ pub(super) fn build_session(model_path: &str, attempt: ProviderAttempt) -> MlRes
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
-fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<ExecutionProvider> {
+fn platform_default_providers(
+    model_path: &str,
+    validation: AccelerationValidation,
+) -> Vec<ExecutionProvider> {
     let mut providers = Vec::new();
-    if accelerated_provider_allowed(model_path, "CoreML", golden) {
+    if accelerated_provider_allowed(model_path, "CoreML", validation) {
         providers.push(ExecutionProvider::CoreMl);
     }
     providers.push(ExecutionProvider::Cpu);
@@ -231,10 +225,13 @@ fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<E
 }
 
 #[cfg(target_os = "android")]
-fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<ExecutionProvider> {
+fn platform_default_providers(
+    model_path: &str,
+    validation: AccelerationValidation,
+) -> Vec<ExecutionProvider> {
     let mut providers = Vec::new();
     if webgpu::attempt_permitted(model_path)
-        && accelerated_provider_allowed(model_path, "WebGPU", golden)
+        && accelerated_provider_allowed(model_path, "WebGPU", validation)
     {
         providers.push(ExecutionProvider::WebGpu);
     }
@@ -244,10 +241,13 @@ fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<E
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
-fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<ExecutionProvider> {
+fn platform_default_providers(
+    model_path: &str,
+    validation: AccelerationValidation,
+) -> Vec<ExecutionProvider> {
     let mut providers = Vec::new();
     if webgpu::attempt_permitted(model_path)
-        && accelerated_provider_allowed(model_path, "WebGPU", golden)
+        && accelerated_provider_allowed(model_path, "WebGPU", validation)
     {
         providers.push(ExecutionProvider::WebGpu);
     }
@@ -264,7 +264,7 @@ fn platform_default_providers(model_path: &str, golden: GoldenSelfTest) -> Vec<E
 )))]
 fn platform_default_providers(
     _model_path: &str,
-    _golden: GoldenSelfTest,
+    _validation: AccelerationValidation,
 ) -> Vec<ExecutionProvider> {
     vec![ExecutionProvider::Cpu]
 }
@@ -281,9 +281,11 @@ fn platform_default_providers(
 fn accelerated_provider_allowed(
     model_path: &str,
     provider_label: &str,
-    golden: GoldenSelfTest,
+    validation: AccelerationValidation,
 ) -> bool {
-    if golden == GoldenSelfTest::Skipped || golden_test::lookup(model_path).is_some() {
+    if validation == AccelerationValidation::Unvalidated
+        || golden_test::lookup(model_path).is_some()
+    {
         return true;
     }
     log::error!(
@@ -368,7 +370,6 @@ fn xnnpack_attempt() -> ProviderAttempt {
         ],
         disable_intra_op_spinning: true,
         coreml_cache_dir: None,
-        uses_webgpu: false,
         execution_provider: ExecutionProvider::Xnnpack,
     }
 }
@@ -376,7 +377,7 @@ fn xnnpack_attempt() -> ProviderAttempt {
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecutionMode, ExecutionProvider, GoldenSelfTest, ProviderPlan, run_provider_plan,
+        AccelerationValidation, ExecutionMode, ExecutionProvider, ProviderPlan, run_provider_plan,
     };
 
     #[test]
@@ -450,7 +451,7 @@ mod tests {
         let mut plan = ProviderPlan::new(
             ExecutionMode::CpuOnly,
             "model.onnx",
-            GoldenSelfTest::Required,
+            AccelerationValidation::GoldenRequired,
         );
         let mut attempts = 0;
 

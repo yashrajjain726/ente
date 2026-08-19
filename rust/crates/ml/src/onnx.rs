@@ -22,7 +22,13 @@ pub(crate) use tensor::{
     with_prepared_float_output,
 };
 
-use providers::{ExecutionProvider, GoldenSelfTest, ProviderPlan};
+use providers::{ExecutionProvider, ProviderPlan};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AccelerationValidation {
+    GoldenRequired,
+    Unvalidated,
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProviderUsage {
@@ -49,7 +55,7 @@ impl ProviderUsage {
 #[derive(Debug)]
 pub(crate) struct OnnxSession {
     mode: ExecutionMode,
-    golden: GoldenSelfTest,
+    validation: AccelerationValidation,
     provider_plan: Option<ProviderPlan>,
     session: Option<Session>,
     first_run_canary: Option<webgpu::ArmedCanary>,
@@ -59,18 +65,17 @@ impl OnnxSession {
     pub(crate) fn new(mode: ExecutionMode) -> Self {
         Self {
             mode,
-            golden: GoldenSelfTest::Required,
+            validation: AccelerationValidation::GoldenRequired,
             provider_plan: None,
             session: None,
             first_run_canary: None,
         }
     }
 
-    /// Opt out of the golden self-test that otherwise gates accelerated
-    /// providers. Only for models whose output is not indexed and so cannot
+    /// Only for models whose output is not indexed and so cannot
     /// silently poison stored data.
-    pub(crate) fn without_golden_self_test(mut self) -> Self {
-        self.golden = GoldenSelfTest::Skipped;
+    pub(crate) fn with_unvalidated_acceleration(mut self) -> Self {
+        self.validation = AccelerationValidation::Unvalidated;
         self
     }
 
@@ -129,11 +134,12 @@ impl OnnxSession {
 
         let provider_plan = self
             .provider_plan
-            .get_or_insert_with(|| ProviderPlan::new(self.mode, model_path, self.golden));
+            .get_or_insert_with(|| ProviderPlan::new(self.mode, model_path, self.validation));
         let model_name = model_file_label(model_path);
         log::info!("loading {model_name} with {:?} execution", self.mode);
         let started_at = std::time::Instant::now();
-        let loaded = build_next_session(model_path, provider_plan, model_namespace, self.golden)?;
+        let loaded =
+            build_next_session(model_path, provider_plan, model_namespace, self.validation)?;
         let execution_provider = provider_plan
             .selected_provider()
             .expect("successful session build must select an execution provider");
@@ -247,27 +253,26 @@ fn build_next_session(
     model_path: &str,
     plan: &mut ProviderPlan,
     model_namespace: &str,
-    golden: GoldenSelfTest,
+    validation: AccelerationValidation,
 ) -> MlResult<LoadedSession> {
     let result = providers::run_provider_plan(plan, |execution_provider| {
         let attempt = providers::provider_attempt(execution_provider, model_path, model_namespace);
-        if attempt.uses_webgpu() {
+        if attempt.execution_provider() == ExecutionProvider::WebGpu {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
                 return build_webgpu_session_with_canary(
                     model_path,
                     model_namespace,
                     attempt,
-                    golden,
-                )
-                .map_err(|error| format!("{error}"));
+                    validation,
+                );
             }
             #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
             unreachable!("WebGPU provider attempts are not constructed on this platform");
         }
 
         let coreml_cache_dir = attempt.coreml_cache_dir().map(Path::to_path_buf);
-        match build_and_validate_session(model_path, attempt, golden) {
+        match build_and_validate_session(model_path, attempt, validation) {
             Ok(session) => {
                 if let Some(cache_dir) = coreml_cache_dir {
                     coreml_cache::finalize(&cache_dir, model_path);
@@ -283,7 +288,7 @@ fn build_next_session(
                         model_file_label(model_path)
                     );
                 }
-                Err(format!("{error}"))
+                Err(error)
             }
         }
     });
@@ -299,17 +304,25 @@ fn build_next_session(
 
     Err(MlError::Ort(format!(
         "failed to create ONNX session for model '{model_path}' across EP fallbacks: {}",
-        errors.join(" | ")
+        errors
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(" | ")
     )))
 }
 
 fn build_cpu_session(model_path: &str) -> MlResult<Session> {
-    let mut plan = ProviderPlan::new(ExecutionMode::CpuOnly, model_path, GoldenSelfTest::Required);
+    let mut plan = ProviderPlan::new(
+        ExecutionMode::CpuOnly,
+        model_path,
+        AccelerationValidation::GoldenRequired,
+    );
     build_next_session(
         model_path,
         &mut plan,
         "golden-tooling",
-        GoldenSelfTest::Required,
+        AccelerationValidation::GoldenRequired,
     )
     .map(|loaded| loaded.session)
 }
@@ -334,14 +347,10 @@ fn is_execution_provider_run_failure(error: &MlError) -> bool {
 // A CoreML self-test failure is treated as construction failure so the caller
 // invalidates the possibly corrupt persistent cache. WebGPU validation stays
 // inside its crash-canary window instead.
-#[cfg_attr(
-    not(any(target_os = "ios", target_os = "macos")),
-    allow(unused_variables)
-)]
 fn build_and_validate_session(
     model_path: &str,
     attempt: providers::ProviderAttempt,
-    golden: GoldenSelfTest,
+    _validation: AccelerationValidation,
 ) -> MlResult<Session> {
     #[cfg(any(
         target_os = "android",
@@ -374,7 +383,9 @@ fn build_and_validate_session(
     };
 
     #[cfg(any(target_os = "ios", target_os = "macos"))]
-    if execution_provider == ExecutionProvider::CoreMl && golden == GoldenSelfTest::Required {
+    if execution_provider == ExecutionProvider::CoreMl
+        && _validation == AccelerationValidation::GoldenRequired
+    {
         run_session_self_test(model_path, &mut session, "CoreML")?;
     }
 
@@ -388,7 +399,7 @@ fn build_webgpu_session_with_canary(
     model_path: &str,
     model_namespace: &str,
     attempt: providers::ProviderAttempt,
-    golden: GoldenSelfTest,
+    validation: AccelerationValidation,
 ) -> MlResult<LoadedSession> {
     // Fail closed: without a durable failure record, a crash during the
     // attempt would go unnoticed and the crash loop protection would be lost.
@@ -439,7 +450,7 @@ fn build_webgpu_session_with_canary(
             return Err(error);
         }
     };
-    let first_run_canary = if golden == GoldenSelfTest::Required {
+    let first_run_canary = if validation == AccelerationValidation::GoldenRequired {
         run_session_self_test(model_path, &mut session, "WebGPU")?;
         canary.disarm();
         None
@@ -586,11 +597,15 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-fn has_protobuf_parse_failure(errors: &[String]) -> bool {
+fn has_protobuf_parse_failure(errors: &[MlError]) -> bool {
     errors.iter().any(|error| {
-        error
-            .to_ascii_lowercase()
-            .contains("protobuf parsing failed")
+        matches!(
+            error,
+            MlError::Ort(message)
+                if message
+                    .to_ascii_lowercase()
+                    .contains("protobuf parsing failed")
+        )
     })
 }
 
@@ -659,15 +674,15 @@ mod tests {
 
     #[test]
     fn detects_protobuf_parse_failure() {
-        assert!(has_protobuf_parse_failure(&[String::from(
-            "Load model failed:Protobuf parsing failed.",
+        assert!(has_protobuf_parse_failure(&[super::MlError::Ort(
+            "Load model failed:Protobuf parsing failed.".to_string(),
         )]));
     }
 
     #[test]
     fn ignores_other_onnx_errors() {
-        assert!(!has_protobuf_parse_failure(&[String::from(
-            "Load model failed: missing initializer",
+        assert!(!has_protobuf_parse_failure(&[super::MlError::Ort(
+            "Load model failed: missing initializer".to_string(),
         )]));
     }
 
