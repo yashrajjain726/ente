@@ -18,9 +18,3 @@ export const base64ToBytes = (b64: string): Uint8Array<ArrayBuffer> => {
     }
     return bytes;
 };
-
-export const utf8ToBase64 = (s: string): string =>
-    bytesToBase64(new TextEncoder().encode(s));
-
-export const base64ToUtf8 = (b64: string): string =>
-    new TextDecoder().decode(base64ToBytes(b64));

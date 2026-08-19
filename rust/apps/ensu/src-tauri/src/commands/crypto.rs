@@ -1,92 +1,97 @@
-use ente_core::b64;
-use ente_core::crypto;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::common::ApiError;
 
-impl From<crypto::Error> for ApiError {
-    fn from(e: crypto::Error) -> Self {
-        use crypto::Error as E;
-
-        let code = match &e {
-            E::InvalidKeyLength { .. } => "invalid_key_length",
-            E::InvalidNonceLength { .. } => "invalid_nonce_length",
-            E::InvalidSaltLength { .. } => "invalid_salt_length",
-            E::InvalidHeaderLength { .. } => "invalid_header_length",
-            E::CiphertextTooShort { .. } => "ciphertext_too_short",
-            E::InvalidKeyDerivationParams(_) => "invalid_kdf_params",
-            E::KeyDerivationFailed => "key_derivation_failed",
-            E::EncryptionFailed => "encryption_failed",
-            E::DecryptionFailed => "decryption_failed",
-            E::StreamInitFailed => "stream_init_failed",
-            E::StreamPushFailed => "stream_push_failed",
-            E::StreamPullFailed => "stream_pull_failed",
-            E::StreamTruncated => "stream_truncated",
-            E::StreamTrailingData => "stream_trailing_data",
-            E::SealedBoxOpenFailed => "sealed_box_open_failed",
-            E::InvalidPublicKey => "invalid_public_key",
-            E::Json(_) => "json",
-            E::Argon2(_) => "argon2",
-            E::Aead => "aead",
-            E::ArrayConversion => "array_conversion",
-            E::Io(_) => "io",
-        };
-
-        ApiError::new(code, e.to_string())
-    }
-}
-
-impl From<b64::DecodeError> for ApiError {
-    fn from(e: b64::DecodeError) -> Self {
-        ApiError::new("base64_decode", e.to_string())
+impl From<ente_ensu_crypto::Error> for ApiError {
+    fn from(error: ente_ensu_crypto::Error) -> Self {
+        ApiError::new(error.code(), error.to_string())
     }
 }
 
 #[derive(Serialize)]
-pub struct EncryptedBlob {
+#[serde(rename_all = "camelCase")]
+pub struct EncryptedChatPayload {
     encrypted_data: String,
-    decryption_header: String,
+    header: String,
+}
+
+impl From<ente_ensu_crypto::EncryptedChatPayload> for EncryptedChatPayload {
+    fn from(payload: ente_ensu_crypto::EncryptedChatPayload) -> Self {
+        Self {
+            encrypted_data: payload.encrypted_data,
+            header: payload.header,
+        }
+    }
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CryptoBlobInput {
-    data_b64: String,
+pub struct PayloadEncryptInput {
+    value: String,
     key_b64: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CryptoBlobDecryptInput {
+pub struct PayloadDecryptInput {
     encrypted_data_b64: String,
     header_b64: String,
     key_b64: String,
 }
 
-#[tauri::command]
-pub fn crypto_generate_key() -> String {
-    b64::encode(crypto::Key::generate().as_bytes())
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FieldInput {
+    value: String,
+    key_b64: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentInput {
+    data_b64: String,
+    key_b64: String,
+    session_uuid: String,
 }
 
 #[tauri::command]
-pub fn crypto_encrypt_blob(input: CryptoBlobInput) -> Result<EncryptedBlob, ApiError> {
-    let data = b64::decode(&input.data_b64).map_err(ApiError::from)?;
-    let key = b64::decode(&input.key_b64).map_err(ApiError::from)?;
-    let key = crypto::Key::try_from_slice(&key).map_err(ApiError::from)?;
-    let out = crypto::blob::encrypt(&data, &key).map_err(ApiError::from)?;
-    Ok(EncryptedBlob {
-        encrypted_data: b64::encode(&out.encrypted_data),
-        decryption_header: b64::encode(out.decryption_header.as_bytes()),
-    })
+pub fn chat_crypto_generate_key() -> String {
+    ente_ensu_crypto::generate_chat_key()
 }
 
 #[tauri::command]
-pub fn crypto_decrypt_blob(input: CryptoBlobDecryptInput) -> Result<String, ApiError> {
-    let ciphertext = b64::decode(&input.encrypted_data_b64).map_err(ApiError::from)?;
-    let header = b64::decode(&input.header_b64).map_err(ApiError::from)?;
-    let key = b64::decode(&input.key_b64).map_err(ApiError::from)?;
-    let header = crypto::Header::try_from_slice(&header).map_err(ApiError::from)?;
-    let key = crypto::Key::try_from_slice(&key).map_err(ApiError::from)?;
-    let plaintext = crypto::blob::decrypt(&ciphertext, &header, &key).map_err(ApiError::from)?;
-    Ok(b64::encode(&plaintext))
+pub fn chat_crypto_encrypt_payload(
+    input: PayloadEncryptInput,
+) -> Result<EncryptedChatPayload, ApiError> {
+    ente_ensu_crypto::encrypt_payload(&input.value, &input.key_b64)
+        .map(Into::into)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn chat_crypto_decrypt_payload(input: PayloadDecryptInput) -> Result<String, ApiError> {
+    ente_ensu_crypto::decrypt_payload(&input.encrypted_data_b64, &input.header_b64, &input.key_b64)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn chat_crypto_encrypt_field(input: FieldInput) -> Result<String, ApiError> {
+    ente_ensu_crypto::encrypt_field_b64(&input.value, &input.key_b64).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn chat_crypto_decrypt_field(input: FieldInput) -> Result<String, ApiError> {
+    ente_ensu_crypto::decrypt_field_b64(&input.value, &input.key_b64).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn chat_crypto_encrypt_attachment(input: AttachmentInput) -> Result<String, ApiError> {
+    ente_ensu_crypto::encrypt_attachment_b64(&input.data_b64, &input.key_b64, &input.session_uuid)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn chat_crypto_decrypt_attachment(input: AttachmentInput) -> Result<String, ApiError> {
+    ente_ensu_crypto::decrypt_attachment_b64(&input.data_b64, &input.key_b64, &input.session_uuid)
+        .map_err(Into::into)
 }

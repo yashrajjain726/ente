@@ -1,38 +1,75 @@
+import { base64ToBytes, bytesToBase64 } from "@/services/base64";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 
-export type EnteWasmModule = typeof import("ente-core-wasm");
+type EnsuWasmModule = typeof import("ente-ensu-wasm");
 
-export interface EncryptedBlob {
-    encrypted_data: string;
-    decryption_header: string;
+export interface EncryptedChatPayload {
+    encryptedData: string;
+    header: string;
 }
 
-export interface EnteCryptoAdapter {
-    crypto_generate_key(): Promise<string>;
-    crypto_encrypt_blob(
-        dataB64: string,
+export interface EnsuCrypto {
+    generateKey(): Promise<string>;
+    encryptPayload(
+        value: string,
         keyB64: string,
-    ): Promise<EncryptedBlob>;
-    crypto_decrypt_blob(
+    ): Promise<EncryptedChatPayload>;
+    decryptPayload(
         encryptedDataB64: string,
         headerB64: string,
         keyB64: string,
     ): Promise<string>;
+    encryptField(value: string, keyB64: string): Promise<string>;
+    decryptField(value: string, keyB64: string): Promise<string>;
+    encryptAttachment(
+        data: Uint8Array,
+        keyB64: string,
+        sessionUuid: string,
+    ): Promise<Uint8Array<ArrayBuffer>>;
+    decryptAttachment(
+        data: Uint8Array,
+        keyB64: string,
+        sessionUuid: string,
+    ): Promise<Uint8Array<ArrayBuffer>>;
 }
 
-const createWasmAdapter = (wasm: EnteWasmModule): EnteCryptoAdapter => {
-    return {
-        crypto_generate_key: () => Promise.resolve(wasm.crypto_generate_key()),
-        crypto_encrypt_blob: (dataB64, keyB64) =>
-            Promise.resolve(wasm.crypto_encrypt_blob(dataB64, keyB64)),
-        crypto_decrypt_blob: (encryptedDataB64, headerB64, keyB64) =>
-            Promise.resolve(
-                wasm.crypto_decrypt_blob(encryptedDataB64, headerB64, keyB64),
-            ),
-    };
+const encryptedChatPayloadValue = (
+    payload: ReturnType<EnsuWasmModule["encryptChatPayload"]>,
+) => {
+    try {
+        return { encryptedData: payload.encryptedData, header: payload.header };
+    } finally {
+        payload.free();
+    }
 };
 
-const createTauriAdapter = async (): Promise<EnteCryptoAdapter> => {
+const wasmBytes = (bytes: Uint8Array) => bytes as Uint8Array<ArrayBuffer>;
+
+const createWasmClient = (wasm: EnsuWasmModule): EnsuCrypto => ({
+    generateKey: () => Promise.resolve(wasm.generateChatKey()),
+    encryptPayload: (value, keyB64) =>
+        Promise.resolve(
+            encryptedChatPayloadValue(wasm.encryptChatPayload(value, keyB64)),
+        ),
+    decryptPayload: (encryptedDataB64, headerB64, keyB64) =>
+        Promise.resolve(
+            wasm.decryptChatPayload(encryptedDataB64, headerB64, keyB64),
+        ),
+    encryptField: (value, keyB64) =>
+        Promise.resolve(wasm.encryptChatField(value, keyB64)),
+    decryptField: (value, keyB64) =>
+        Promise.resolve(wasm.decryptChatField(value, keyB64)),
+    encryptAttachment: (data, keyB64, sessionUuid) =>
+        Promise.resolve(
+            wasmBytes(wasm.encryptChatAttachment(data, keyB64, sessionUuid)),
+        ),
+    decryptAttachment: (data, keyB64, sessionUuid) =>
+        Promise.resolve(
+            wasmBytes(wasm.decryptChatAttachment(data, keyB64, sessionUuid)),
+        ),
+});
+
+const createTauriClient = async (): Promise<EnsuCrypto> => {
     const { invoke } = (await import("@tauri-apps/api/core")) as {
         invoke: <T>(
             command: string,
@@ -108,28 +145,49 @@ const createTauriAdapter = async (): Promise<EnteCryptoAdapter> => {
     };
 
     return {
-        crypto_generate_key: () => invokeOrThrow<string>("crypto_generate_key"),
-        crypto_encrypt_blob: (dataB64, keyB64) =>
-            invokeOrThrow<EncryptedBlob>("crypto_encrypt_blob", {
-                input: { dataB64, keyB64 },
+        generateKey: () => invokeOrThrow<string>("chat_crypto_generate_key"),
+        encryptPayload: (value, keyB64) =>
+            invokeOrThrow<EncryptedChatPayload>("chat_crypto_encrypt_payload", {
+                input: { value, keyB64 },
             }),
-        crypto_decrypt_blob: (encryptedDataB64, headerB64, keyB64) =>
-            invokeOrThrow<string>("crypto_decrypt_blob", {
+        decryptPayload: (encryptedDataB64, headerB64, keyB64) =>
+            invokeOrThrow<string>("chat_crypto_decrypt_payload", {
                 input: { encryptedDataB64, headerB64, keyB64 },
             }),
+        encryptField: (value, keyB64) =>
+            invokeOrThrow<string>("chat_crypto_encrypt_field", {
+                input: { value, keyB64 },
+            }),
+        decryptField: (value, keyB64) =>
+            invokeOrThrow<string>("chat_crypto_decrypt_field", {
+                input: { value, keyB64 },
+            }),
+        encryptAttachment: async (data, keyB64, sessionUuid) =>
+            base64ToBytes(
+                await invokeOrThrow<string>("chat_crypto_encrypt_attachment", {
+                    input: {
+                        dataB64: bytesToBase64(data),
+                        keyB64,
+                        sessionUuid,
+                    },
+                }),
+            ),
+        decryptAttachment: async (data, keyB64, sessionUuid) =>
+            base64ToBytes(
+                await invokeOrThrow<string>("chat_crypto_decrypt_attachment", {
+                    input: {
+                        dataB64: bytesToBase64(data),
+                        keyB64,
+                        sessionUuid,
+                    },
+                }),
+            ),
     };
 };
 
-let _wasmPromise: Promise<EnteCryptoAdapter> | undefined;
+let client: Promise<EnsuCrypto> | undefined;
 
-export const enteWasm = async (): Promise<EnteCryptoAdapter> => {
-    _wasmPromise ??= (async () => {
-        if (isTauriRuntime()) {
-            return createTauriAdapter();
-        }
-        const wasm = await import("ente-core-wasm");
-        return createWasmAdapter(wasm);
-    })();
-
-    return _wasmPromise;
-};
+export const ensuCrypto = () =>
+    (client ??= isTauriRuntime()
+        ? createTauriClient()
+        : import("ente-ensu-wasm").then(createWasmClient));

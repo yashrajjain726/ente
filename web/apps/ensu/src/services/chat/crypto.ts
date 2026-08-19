@@ -1,71 +1,29 @@
-import { base64ToUtf8, utf8ToBase64 } from "../base64";
-import { enteWasm } from "../wasm";
+import { ensuCrypto, type EncryptedChatPayload } from "../wasm";
 
-export interface EncryptedChatPayload {
-    encryptedData: string;
-    header: string;
-}
-
-const CHAT_FIELD_PREFIX = "enc:v1";
+export type { EncryptedChatPayload } from "../wasm";
 
 export const encryptChatPayload = async (
     payload: unknown,
     chatKeyB64: string,
-): Promise<EncryptedChatPayload> => {
-    const wasm = await enteWasm();
-
-    const plaintextB64 = utf8ToBase64(JSON.stringify(payload));
-    const encrypted = await wasm.crypto_encrypt_blob(plaintextB64, chatKeyB64);
-
-    return {
-        encryptedData: encrypted.encrypted_data,
-        header: encrypted.decryption_header,
-    };
-};
+): Promise<EncryptedChatPayload> =>
+    (await ensuCrypto()).encryptPayload(JSON.stringify(payload), chatKeyB64);
 
 export const decryptChatPayload = async (
     { encryptedData, header }: EncryptedChatPayload,
     chatKeyB64: string,
-): Promise<unknown> => {
-    const wasm = await enteWasm();
-
-    const plaintextB64 = await wasm.crypto_decrypt_blob(
-        encryptedData,
-        header,
-        chatKeyB64,
+): Promise<unknown> =>
+    JSON.parse(
+        await (
+            await ensuCrypto()
+        ).decryptPayload(encryptedData, header, chatKeyB64),
     );
-    return JSON.parse(base64ToUtf8(plaintextB64));
-};
 
 export const encryptChatField = async (
     value: string,
     chatKeyB64: string,
-): Promise<string> => {
-    const wasm = await enteWasm();
-
-    const plaintextB64 = utf8ToBase64(value);
-    const encrypted = await wasm.crypto_encrypt_blob(plaintextB64, chatKeyB64);
-    return `${CHAT_FIELD_PREFIX}:${encrypted.encrypted_data}:${encrypted.decryption_header}`;
-};
+): Promise<string> => (await ensuCrypto()).encryptField(value, chatKeyB64);
 
 export const decryptChatField = async (
     value: string,
     chatKeyB64: string,
-): Promise<string> => {
-    const [prefix, version, ciphertext, header] = value.split(":");
-    if (
-        `${prefix}:${version}` !== CHAT_FIELD_PREFIX ||
-        !ciphertext ||
-        !header
-    ) {
-        throw new Error("Invalid encrypted field format");
-    }
-
-    const wasm = await enteWasm();
-    const plaintextB64 = await wasm.crypto_decrypt_blob(
-        ciphertext,
-        header,
-        chatKeyB64,
-    );
-    return base64ToUtf8(plaintextB64);
-};
+): Promise<string> => (await ensuCrypto()).decryptField(value, chatKeyB64);
