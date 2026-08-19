@@ -171,8 +171,6 @@ void main() {
       await service.getProfilePicture(created.id),
       Uint8List.fromList([1, 2, 3, 4]),
     );
-    expect(rustApi.ctx.getAttachmentCalls, 0);
-
     final deletedPicture = await service.deleteProfilePicture(created.id);
     expect(deletedPicture.profilePictureAttachmentId, isNull);
     expect(
@@ -250,7 +248,6 @@ void main() {
       await service.getProfilePicture('ct_1'),
       Uint8List.fromList([7, 8, 9]),
     );
-    expect(rustApi.ctx.getAttachmentCalls, 0);
     expect(rustApi.ctx.getProfilePictureCalls, 1);
     expect(
       await service.getProfilePicture('ct_1'),
@@ -419,7 +416,6 @@ class FakeContactsRustContext implements ContactsRustContext {
   Future<List<ContactRecord>> Function(int sinceTime, int limit)? diffHandler;
   final List<int> diffSinceTimes = [];
   final List<int> diffLimits = [];
-  int getAttachmentCalls = 0;
   int getProfilePictureCalls = 0;
   String nextAttachmentId = 'att_profile';
 
@@ -488,11 +484,6 @@ class FakeContactsRustContext implements ContactsRustContext {
   }
 
   @override
-  Future<ContactRecord> deleteProfilePicture(String contactId) {
-    return deleteAttachment(contactId, ContactAttachmentType.profilePicture);
-  }
-
-  @override
   Future<ContactRecord> getContact(String contactId) async =>
       records[contactId]!;
 
@@ -517,15 +508,6 @@ class FakeContactsRustContext implements ContactsRustContext {
       records[record.id] = record;
     }
     return first;
-  }
-
-  @override
-  Future<Uint8List> getAttachment(
-    ContactAttachmentType attachmentType,
-    String attachmentId,
-  ) async {
-    getAttachmentCalls += 1;
-    return attachments[attachmentId]!;
   }
 
   @override
@@ -560,18 +542,6 @@ class FakeContactsRustContext implements ContactsRustContext {
     attachments[nextAttachmentId] = attachmentBytes;
     profilePictures[contactId] = attachmentBytes;
     return updated;
-  }
-
-  @override
-  Future<ContactRecord> setProfilePicture(
-    String contactId,
-    Uint8List profilePicture,
-  ) {
-    return setAttachment(
-      contactId,
-      ContactAttachmentType.profilePicture,
-      profilePicture,
-    );
   }
 
   @override
