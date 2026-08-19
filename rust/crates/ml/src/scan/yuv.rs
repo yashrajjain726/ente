@@ -210,26 +210,6 @@ pub(crate) fn bgra_to_bgr(
     ImageU8::new(width, height, 3, out)
 }
 
-pub(crate) fn rgba_to_bgr(rgba: &[u8], width: i32, height: i32) -> Result<ImageU8, String> {
-    if width <= 0 || height <= 0 {
-        return Err(format!("invalid frame size {width}x{height}"));
-    }
-    let expected = width as usize * height as usize * 4;
-    if rgba.len() != expected {
-        return Err(format!(
-            "RGBA buffer has {} bytes, expected {expected} for {width}x{height}",
-            rgba.len()
-        ));
-    }
-    let mut out = vec![0u8; width as usize * height as usize * 3];
-    for (dst, src) in out.chunks_exact_mut(3).zip(rgba.chunks_exact(4)) {
-        dst[0] = src[2];
-        dst[1] = src[1];
-        dst[2] = src[0];
-    }
-    ImageU8::new(width, height, 3, out)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,13 +542,5 @@ mod tests {
         assert!(bgra_to_bgr(&padded, 7, 2, 2).is_err());
         assert!(bgra_to_bgr(&padded, -8, 2, 2).is_err());
         assert!(bgra_to_bgr(&padded, stride as i32, 0, 2).is_err());
-    }
-
-    #[test]
-    fn rgba_to_bgr_drops_alpha_and_reverses_channels() {
-        let rgba = vec![1u8, 2, 3, 255, 10, 20, 30, 0];
-        let bgr = rgba_to_bgr(&rgba, 2, 1).expect("conversion");
-        assert_eq!(bgr.data, vec![3, 2, 1, 30, 20, 10]);
-        assert!(rgba_to_bgr(&rgba, 3, 1).is_err());
     }
 }

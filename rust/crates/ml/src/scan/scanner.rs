@@ -6,7 +6,7 @@ use super::detection::{detect_document_quad, extract_document, resize_for_max_pi
 use super::geometry::{ImageSize, Quad};
 use super::mask::Mask;
 use super::segmentation::{MASK_SIDE, Segmenter};
-use super::yuv::{PlaneLayout, bgra_to_bgr, rgba_to_bgr, yuv420_to_bgr};
+use super::yuv::{PlaneLayout, bgra_to_bgr, yuv420_to_bgr};
 use crate::cv::image::ImageU8;
 
 const DEFAULT_MAX_PIXELS: u32 = 2_000_000;
@@ -79,19 +79,6 @@ impl ScannerSession {
             .probability_map_u8(bgr)
             .map_err(ScanError::Pipeline)?;
         Ok(Mask::from_probmap(probmap, MASK_SIDE, MASK_SIDE))
-    }
-
-    pub fn live_detect_rgba(
-        &self,
-        rgba: &[u8],
-        width: u32,
-        height: u32,
-        rotation_degrees: i32,
-    ) -> Result<Option<Quad>, ScanError> {
-        let bgr =
-            rgba_to_bgr(rgba, to_i32(width)?, to_i32(height)?).map_err(ScanError::InvalidInput)?;
-        let frame = ImageSize::new(bgr.width as f64, bgr.height as f64);
-        self.live_detect(&bgr, frame, rotation_degrees)
     }
 
     pub fn live_detect_bgra(
