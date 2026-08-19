@@ -52,6 +52,7 @@ pub(crate) struct OnnxSession {
     golden: GoldenSelfTest,
     provider_plan: Option<ProviderPlan>,
     session: Option<Session>,
+    first_run_canary: Option<webgpu::ArmedCanary>,
 }
 
 impl OnnxSession {
@@ -61,6 +62,7 @@ impl OnnxSession {
             golden: GoldenSelfTest::Required,
             provider_plan: None,
             session: None,
+            first_run_canary: None,
         }
     }
 
@@ -102,9 +104,15 @@ impl OnnxSession {
                 .expect("session must be loaded before model execution");
             match operation(session) {
                 Ok(value) => {
+                    self.disarm_first_run_canary();
                     return Ok((value, ProviderUsage::from_provider(execution_provider)));
                 }
                 Err(error) => {
+                    if error.is_retryable() {
+                        self.leave_first_run_canary_armed();
+                    } else {
+                        self.disarm_first_run_canary();
+                    }
                     if self.retry_after_provider_failure(&error) {
                         continue;
                     }
@@ -125,7 +133,7 @@ impl OnnxSession {
         let model_name = model_file_label(model_path);
         log::info!("loading {model_name} with {:?} execution", self.mode);
         let started_at = std::time::Instant::now();
-        let session = build_next_session(model_path, provider_plan, model_namespace, self.golden)?;
+        let loaded = build_next_session(model_path, provider_plan, model_namespace, self.golden)?;
         let execution_provider = provider_plan
             .selected_provider()
             .expect("successful session build must select an execution provider");
@@ -133,8 +141,19 @@ impl OnnxSession {
             "loaded {model_name} with {execution_provider:?} in {:?}",
             started_at.elapsed()
         );
-        self.session = Some(session);
+        self.session = Some(loaded.session);
+        self.first_run_canary = loaded.first_run_canary;
         Ok(())
+    }
+
+    fn disarm_first_run_canary(&mut self) {
+        if let Some(canary) = self.first_run_canary.take() {
+            canary.disarm();
+        }
+    }
+
+    fn leave_first_run_canary_armed(&mut self) {
+        self.first_run_canary = None;
     }
 
     fn retry_after_provider_failure(&mut self, error: &SessionRunError) -> bool {
@@ -152,6 +171,20 @@ impl OnnxSession {
             "execution provider failed, retrying model with the next provider fallback: {error}"
         );
         true
+    }
+}
+
+struct LoadedSession {
+    session: Session,
+    first_run_canary: Option<webgpu::ArmedCanary>,
+}
+
+impl LoadedSession {
+    fn new(session: Session) -> Self {
+        Self {
+            session,
+            first_run_canary: None,
+        }
     }
 }
 
@@ -215,7 +248,7 @@ fn build_next_session(
     plan: &mut ProviderPlan,
     model_namespace: &str,
     golden: GoldenSelfTest,
-) -> MlResult<Session> {
+) -> MlResult<LoadedSession> {
     let result = providers::run_provider_plan(plan, |execution_provider| {
         let attempt = providers::provider_attempt(execution_provider, model_path, model_namespace);
         if attempt.uses_webgpu() {
@@ -239,7 +272,7 @@ fn build_next_session(
                 if let Some(cache_dir) = coreml_cache_dir {
                     coreml_cache::finalize(&cache_dir, model_path);
                 }
-                Ok(session)
+                Ok(LoadedSession::new(session))
             }
             Err(error) => {
                 if let Some(cache_dir) = coreml_cache_dir
@@ -278,6 +311,7 @@ fn build_cpu_session(model_path: &str) -> MlResult<Session> {
         "golden-tooling",
         GoldenSelfTest::Required,
     )
+    .map(|loaded| loaded.session)
 }
 
 fn is_execution_provider_run_failure(error: &MlError) -> bool {
@@ -355,7 +389,7 @@ fn build_webgpu_session_with_canary(
     model_namespace: &str,
     attempt: providers::ProviderAttempt,
     golden: GoldenSelfTest,
-) -> MlResult<Session> {
+) -> MlResult<LoadedSession> {
     // Fail closed: without a durable failure record, a crash during the
     // attempt would go unnoticed and the crash loop protection would be lost.
     let canary = match webgpu::arm_canary(model_path, model_namespace) {
@@ -405,11 +439,17 @@ fn build_webgpu_session_with_canary(
             return Err(error);
         }
     };
-    if golden == GoldenSelfTest::Required {
+    let first_run_canary = if golden == GoldenSelfTest::Required {
         run_session_self_test(model_path, &mut session, "WebGPU")?;
-    }
-    canary.disarm();
-    Ok(session)
+        canary.disarm();
+        None
+    } else {
+        Some(canary)
+    };
+    Ok(LoadedSession {
+        session,
+        first_run_canary,
+    })
 }
 
 #[cfg(any(
@@ -557,9 +597,40 @@ fn has_protobuf_parse_failure(errors: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecutionProvider, SessionRunError, has_protobuf_parse_failure,
+        ExecutionMode, ExecutionProvider, OnnxSession, SessionRunError, has_protobuf_parse_failure,
         is_execution_provider_run_failure, provider_attempt_failure_message,
     };
+
+    fn first_run_canary(temp: &tempfile::TempDir) -> super::webgpu::ArmedCanary {
+        let model = temp.path().join("model.onnx");
+        super::webgpu::arm_canary(&model.to_string_lossy(), "scanner").unwrap()
+    }
+
+    fn has_canary(temp: &tempfile::TempDir) -> bool {
+        std::fs::read_dir(temp.path()).unwrap().next().is_some()
+    }
+
+    #[test]
+    fn successful_first_run_disarms_the_canary() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut session = OnnxSession::new(ExecutionMode::CpuOnly);
+        session.first_run_canary = Some(first_run_canary(&temp));
+
+        session.disarm_first_run_canary();
+
+        assert!(!has_canary(&temp));
+    }
+
+    #[test]
+    fn retryable_first_run_failure_leaves_the_canary_armed() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut session = OnnxSession::new(ExecutionMode::CpuOnly);
+        session.first_run_canary = Some(first_run_canary(&temp));
+
+        session.leave_first_run_canary_armed();
+
+        assert!(has_canary(&temp));
+    }
 
     #[test]
     fn provider_failure_detection_is_limited_to_ort_execution_errors() {
