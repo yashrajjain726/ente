@@ -83,13 +83,13 @@ Yes! Ente's custom domains feature lets you serve your public album links using 
 For example, instead of:
 
 ```
-https://albums.ente.com/...#...
+https://albums.ente.com/?t=...#...
 ```
 
 You can use:
 
 ```
-https://pics.example.org/...#...
+https://pics.example.org/?t=...#...
 ```
 
 **Requirements:**
@@ -571,13 +571,13 @@ Deduplication and the similar-images tool only work within albums you own, not a
 
 ### Who can create collaborative albums or public links? {#who-can-share}
 
-Album sharing and public links are now available on every plan, including the free tier. Free plan users can create public links with a [device limit](https://ente.com/help/photos/features/sharing-and-collaboration/public-links#device-limits) of 5. This limitation helps safeguard against potential platform abuse.
+Album sharing and public links are now available on every plan, including the free tier. Free plan users can create public links with a [device limit](https://ente.com/help/photos/features/sharing-and-collaboration/public-links#device-limits) of 10. This limitation helps safeguard against potential platform abuse.
 
 Free users can:
 
 - Create and receive shared albums
 - Share albums directly with other Ente users
-- Create public links ([device limit](https://ente.com/help/photos/features/sharing-and-collaboration/public-links#device-limits) of 5)
+- Create public links ([device limit](https://ente.com/help/photos/features/sharing-and-collaboration/public-links#device-limits) of 10)
 - View public links shared with them
 - Add photos to collect links that allow uploads
 
@@ -650,7 +650,7 @@ Create a public link for your album, then add an iframe to your HTML with the UR
 
 ```html
 <iframe
-    src="https://embed.ente.com/...#..."
+    src="https://embed.ente.com/?t=...#..."
     width="800"
     height="600"
     frameborder="0"
@@ -670,7 +670,7 @@ If you're using the easy method (copy embed HTML button), the app automatically 
 If you're creating the embed code manually and have a custom domain configured:
 
 - Replace your custom domain with `embed.ente.com` in the iframe src
-- For example: `https://embed.ente.com/...#...` (not `https://pics.example.org/...#...`)
+- For example: `https://embed.ente.com/?t=...#...` (not `https://pics.example.org/?t=...#...`)
 
 The embed will still work perfectly - it's just served from the embed subdomain instead of your custom domain.
 

@@ -75,6 +75,7 @@ class SearchService {
   Future<List<EnteFile>>? _cachedFilesForGenericGallery;
   Future<List<EnteFile>>? _cachedFilesForOfflineGallery;
   Future<List<EnteFile>>? _cachedHiddenFilesFuture;
+  Future<Map<int, EnteFile>>? _cachedFilesByUploadedID;
   final _logger = Logger((SearchService).toString());
   final _collectionService = CollectionsService.instance;
   static const _maximumResultsLimit = 20;
@@ -90,14 +91,19 @@ class SearchService {
     _localPhotosUpdatedSubscription = Bus.instance
         .on<LocalPhotosUpdatedEvent>()
         .listen((event) {
-          // only invalidate, let the load happen on demand
-          _cachedFilesFuture = null;
-          _cachedFilesForSearch = null;
-          _cachedFilesForHierarchicalSearch = null;
-          _cachedFilesForGenericGallery = null;
-          _cachedFilesForOfflineGallery = null;
-          _cachedHiddenFilesFuture = null;
+          // Invalidate only; reload on demand.
+          _invalidateFileCaches();
         });
+  }
+
+  void _invalidateFileCaches() {
+    _cachedFilesFuture = null;
+    _cachedFilesForSearch = null;
+    _cachedFilesForHierarchicalSearch = null;
+    _cachedFilesForGenericGallery = null;
+    _cachedFilesForOfflineGallery = null;
+    _cachedHiddenFilesFuture = null;
+    _cachedFilesByUploadedID = null;
   }
 
   Set<int> ignoreCollections() {
@@ -295,12 +301,56 @@ class SearchService {
     return _cachedFilesForSearch!;
   }
 
+  Future<List<EnteFile>> _getFilesCreatedWithinDurations(
+    List<List<int>> durations,
+  ) async {
+    if (durations.isEmpty) {
+      return [];
+    }
+
+    final files = await getAllFilesForSearch();
+    final matchedFiles = <EnteFile>[];
+    for (final duration in durations.reversed) {
+      final firstIndex = _firstFileCreatedBefore(files, duration[1]);
+      final endIndex = _firstFileCreatedBefore(files, duration[0]);
+      matchedFiles.addAll(files.getRange(firstIndex, endIndex));
+    }
+    return matchedFiles;
+  }
+
+  int _firstFileCreatedBefore(List<EnteFile> files, int timestamp) {
+    var low = 0;
+    var high = files.length;
+    while (low < high) {
+      final middle = low + ((high - low) >> 1);
+      if (files[middle].creationTime! >= timestamp) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low;
+  }
+
   Future<bool> hasAnyFilesForSearch() async {
     if (_cachedFilesFuture != null && _cachedFilesForSearch != null) {
       return (await _cachedFilesForSearch!).isNotEmpty;
     }
 
     return FilesDB.instance.hasAnyFile();
+  }
+
+  Future<Map<int, EnteFile>> _getFilesByUploadedID() {
+    return _cachedFilesByUploadedID ??= getAllFilesForSearch().then((files) {
+      final filesByUploadedID = <int, EnteFile>{};
+      for (final file in files) {
+        final uploadedID = file.uploadedFileID;
+        if (uploadedID != null && !filesByUploadedID.containsKey(uploadedID)) {
+          filesByUploadedID[uploadedID] = file;
+        }
+      }
+      return filesByUploadedID;
+    });
   }
 
   Future<List<GenericSearchResult>> getUploadedFileIDsSearchResults(
@@ -432,17 +482,10 @@ class SearchService {
   }
 
   void clearCache() {
-    _cachedFilesFuture = null;
-    _cachedFilesForSearch = null;
-    _cachedFilesForHierarchicalSearch = null;
-    _cachedFilesForGenericGallery = null;
-    _cachedFilesForOfflineGallery = null;
-    _cachedHiddenFilesFuture = null;
+    _invalidateFileCaches();
     unawaited(memoriesCacheService.clearMemoriesCache());
   }
 
-  // getFilteredCollectionsWithThumbnail removes deleted or archived or
-  // collections which don't have a file from search result
   Future<List<AlbumSearchResult>> getCollectionSearchResults(
     String query,
   ) async {
@@ -537,9 +580,9 @@ class SearchService {
     final List<GenericSearchResult> searchResults = [];
     for (var yearData in YearsData.instance.yearsData) {
       if (yearData.year.startsWith(yearFromQuery)) {
-        final List<EnteFile> filesInYear = await _getFilesInYear(
+        final filesInYear = await _getFilesCreatedWithinDurations([
           yearData.duration,
-        );
+        ]);
         if (filesInYear.isNotEmpty) {
           searchResults.add(
             GenericSearchResult(
@@ -584,12 +627,9 @@ class SearchService {
     final List<GenericSearchResult> searchResults = [];
     final matchingMonths = _getMatchingMonths(context, query).toList();
     for (final month in matchingMonths) {
-      final matchedFiles = await FilesDB.instance
-          .getFilesCreatedWithinDurations(
-            _getDurationsOfMonthInEveryYear(month.monthNumber),
-            ignoreCollections(),
-            order: 'DESC',
-          );
+      final matchedFiles = await _getFilesCreatedWithinDurations(
+        _getDurationsOfMonthInEveryYear(month.monthNumber),
+      );
       if (matchedFiles.isNotEmpty) {
         searchResults.add(
           GenericSearchResult(
@@ -622,15 +662,9 @@ class SearchService {
 
     for (var holiday in holidays) {
       if (holiday.name.toLowerCase().contains(query.toLowerCase())) {
-        final matchedFiles = await FilesDB.instance
-            .getFilesCreatedWithinDurations(
-              _getDurationsForCalendarDateInEveryYear(
-                holiday.day,
-                holiday.month,
-              ),
-              ignoreCollections(),
-              order: 'DESC',
-            );
+        final matchedFiles = await _getFilesCreatedWithinDurations(
+          _getDurationsForCalendarDateInEveryYear(holiday.day, holiday.month),
+        );
         if (matchedFiles.isNotEmpty) {
           searchResults.add(
             GenericSearchResult(
@@ -996,8 +1030,10 @@ class SearchService {
       }
     }
     final allFiles = await getAllFilesForSearch();
+    final filesWithLocation = <EnteFile>[];
     for (EnteFile file in allFiles) {
       if (file.hasLocation) {
+        filesWithLocation.add(file);
         for (LocalEntity<LocationTag> tag in result.keys) {
           if (isFileInsideLocationTag(
             tag.item.centerPoint,
@@ -1032,12 +1068,7 @@ class SearchService {
     }
     if (showNoLocationTag) {
       _logger.info("finding photos with no location tag");
-      // find files that have location but the file's location is not inside
-      // any location tag
-      final noLocationTagFiles = allFiles.where((file) {
-        if (!file.hasLocation) {
-          return false;
-        }
+      final noLocationTagFiles = filesWithLocation.where((file) {
         for (LocalEntity<LocationTag> tag in locationTagEntities) {
           if (isFileInsideLocationTag(
             tag.item.centerPoint,
@@ -1092,17 +1123,19 @@ class SearchService {
         );
       }
     }
-    //todo: remove this later, this hack is for interval+external evaluation
-    // for suggestions
+    // TODO: Remove the __city override used by interval and external
+    // suggestion evaluation.
     final allCitiesSearch = query == '__city';
     if (allCitiesSearch) {
       query = '';
     }
-    final results = await locationService.getFilesInCity(allFiles, query);
+    final results = await locationService.getFilesInCity(
+      filesWithLocation,
+      query,
+    );
     final List<City> sortedByResultCount = results.keys.toList()
       ..sort((a, b) => results[b]!.length.compareTo(results[a]!.length));
     for (final city in sortedByResultCount) {
-      // If the location tag already exists for a city, don't add it again
       if (!locationTagNames.contains(city.city)) {
         final a =
             (defaultCityRadius * scaleFactor(city.lat)) / kilometersPerDegree;
@@ -1161,14 +1194,7 @@ class SearchService {
     bool includeManualAssigned = true,
     bool sortOnTime = true,
   }) async {
-    final allFiles = await getAllFilesForSearch();
-    final uploadedIdToFile = <int, EnteFile>{};
-    for (final file in allFiles) {
-      final uploadedID = file.uploadedFileID;
-      if (uploadedID != null && !uploadedIdToFile.containsKey(uploadedID)) {
-        uploadedIdToFile[uploadedID] = file;
-      }
-    }
+    final uploadedIdToFile = await _getFilesByUploadedID();
     final Map<int, Set<String>> fileIdToClusterID = await mlDataDB
         .getFileIdToClusterIDSet(personID);
     final files = <EnteFile>[];
@@ -1316,14 +1342,7 @@ class SearchService {
       final Map<String, List<EnteFile>> clusterIdToFiles = {};
       final Map<String, List<EnteFile>> personIdToFiles = {};
       final Map<String, Set<int>> personIdToFileIds = {};
-      final allFiles = await getAllFilesForSearch();
-      final Map<int, EnteFile> uploadedIdToFile = {};
-      for (final file in allFiles) {
-        final uploadedID = file.uploadedFileID;
-        if (uploadedID != null && !uploadedIdToFile.containsKey(uploadedID)) {
-          uploadedIdToFile[uploadedID] = file;
-        }
-      }
+      final uploadedIdToFile = await _getFilesByUploadedID();
 
       for (final entry in fileIdToClusterID.entries) {
         final file = uploadedIdToFile[entry.key];
@@ -1385,7 +1404,6 @@ class SearchService {
         }
       }
 
-      // get sorted personId by files count
       final sortedPersonIds = personIdToFiles.keys.toList()
         ..sort(
           (a, b) =>
@@ -1472,7 +1490,6 @@ class SearchService {
             final String personID = clusterIDToPersonID[clusterId]!;
             final PersonEntity? p = personIdToPerson[personID];
             if (p != null) {
-              // This should not be possible since it should be handled in the above loop, logging just in case
               _logger.severe(
                 "`getAllFace`: Something unexpected happened, Cluster $clusterId should not have person id $personID",
                 Exception(
@@ -1480,8 +1497,6 @@ class SearchService {
                 ),
               );
             } else {
-              // This should not happen, means a clusterID is still assigned to a personID of a person that no longer exists
-              // Logging the error and deleting the clusterID to personID mapping
               _logger.severe(
                 "`getAllFace`: Cluster $clusterId should not have person id ${clusterIDToPersonID[clusterId]}, deleting the mapping",
                 Exception(
@@ -1585,8 +1600,6 @@ class SearchService {
               tagToItemsMap[tag]!.add(file);
             }
           }
-          // If the location tag already exists for a city, do not consider
-          // it for the city suggestions
           if (!hasLocationTag) {
             filesWithNoLocTag.add(file);
           }
@@ -1607,7 +1620,6 @@ class SearchService {
                   LocationScreenStateProvider(
                     entry.key,
                     LocationScreen(
-                      //this is SearchResult.heroTag()
                       tagPrefix:
                           "${ResultType.location.toString()}_${entry.key.item.name}",
                     ),
@@ -1623,41 +1635,7 @@ class SearchService {
           );
         }
       }
-      // Add the found base locations from the location/memories service
       // TODO: lau: Add base location names
-      // if (limit == null || tagSearchResults.length < limit) {
-      //   for (final BaseLocation base in locationService.baseLocations) {
-      //     final a = (baseRadius * scaleFactor(base.location.latitude!)) /
-      //         kilometersPerDegree;
-      //     const b = baseRadius / kilometersPerDegree;
-      //     tagSearchResults.add(
-      //       GenericSearchResult(
-      //         ResultType.location,
-      //         "Base",
-      //         base.files,
-      //         onResultTap: (ctx) {
-      //           showAddLocationSheet(
-      //             ctx,
-      //             base.location,
-      //             name: "Base",
-      //             radius: baseRadius,
-      //           );
-      //         },
-      //         hierarchicalSearchFilter: LocationFilter(
-      //           locationTag: LocationTag(
-      //             name: "Base",
-      //             radius: baseRadius,
-      //             centerPoint: base.location,
-      //             aSquare: a * a,
-      //             bSquare: b * b,
-      //           ),
-      //           occurrence: kMostRelevantFilter,
-      //           matchedUploadedIDs: filesToUploadedFileIDs(base.files),
-      //         ),
-      //       ),
-      //     );
-      //   }
-      // }
 
       if (limit == null || tagSearchResults.length < limit) {
         final results = await locationService.getFilesInCity(
@@ -1720,18 +1698,14 @@ class SearchService {
     if (parsedDate.isEmpty) {
       return searchResults;
     }
-    // Handle month-year queries
     if (parsedDate.day == null &&
         parsedDate.month != null &&
         parsedDate.year != null) {
       final month = parsedDate.month!;
       final year = parsedDate.year!;
-      final monthYearFiles = await FilesDB.instance
-          .getFilesCreatedWithinDurations(
-            [_getDurationForMonthInYear(month, year)],
-            ignoreCollections(),
-            order: 'DESC',
-          );
+      final monthYearFiles = await _getFilesCreatedWithinDurations([
+        _getDurationForMonthInYear(month, year),
+      ]);
       if (monthYearFiles.isNotEmpty) {
         final monthName = DateParseService.instance.getMonthName(month);
         final name = '$monthName $year';
@@ -1750,19 +1724,14 @@ class SearchService {
           ),
         );
       }
-    }
-    // Handle day-month queries (with or without year)
-    else if (parsedDate.day != null && parsedDate.month != null) {
+    } else if (parsedDate.day != null && parsedDate.month != null) {
       final int day = parsedDate.day!;
       final int month = parsedDate.month!;
       final int? year = parsedDate.year; // nullable for generic dates
 
-      final matchedFiles = await FilesDB.instance
-          .getFilesCreatedWithinDurations(
-            _getDurationsForCalendarDateInEveryYear(day, month, year: year),
-            ignoreCollections(),
-            order: 'DESC',
-          );
+      final matchedFiles = await _getFilesCreatedWithinDurations(
+        _getDurationsForCalendarDateInEveryYear(day, month, year: year),
+      );
 
       if (matchedFiles.isNotEmpty) {
         final monthName = DateParseService.instance.getMonthName(month);
@@ -1842,7 +1811,7 @@ class SearchService {
     return searchResults;
   }
 
-  /// For debug purposes only, don't use this in production!
+  // Debug only; do not use in production.
   Future<List<GenericSearchResult>> smartMemories(
     BuildContext context,
     int? limit,
@@ -1852,7 +1821,6 @@ class SearchService {
     if (limit != null) {
       memories = await memoriesCacheService.getMemories();
     } else {
-      // await two seconds to let new page load first
       await Future.delayed(const Duration(seconds: 1));
       if (!context.mounted) return const [];
       final DateTime? pickedTime = await showDatePicker(
@@ -1878,7 +1846,6 @@ class SearchService {
         );
       }
       cache.baseLocations.addAll(memoriesResult.baseLocations);
-      // memories = memoriesResult.memories;
       final tempCachePath =
           (await getTemporaryDirectory()).path +
           "/cache/test/memories_cache_test";
@@ -1986,14 +1953,6 @@ class SearchService {
               monthData.name.toLowerCase().startsWith(query.toLowerCase()),
         )
         .toList();
-  }
-
-  Future<List<EnteFile>> _getFilesInYear(List<int> durationOfYear) async {
-    return await FilesDB.instance.getFilesCreatedWithinDurations(
-      [durationOfYear],
-      ignoreCollections(),
-      order: "DESC",
-    );
   }
 
   List<List<int>> _getDurationsForCalendarDateInEveryYear(

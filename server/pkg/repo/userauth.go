@@ -28,7 +28,6 @@ func (repo *UserAuthRepository) AddOTT(emailHash string, app ente.App, ott strin
 	return stacktrace.Propagate(err, "")
 }
 
-// RemoveOTT removes the specified OTT and returns whether it was consumed.
 func (repo *UserAuthRepository) RemoveOTT(emailHash string, ott string, app ente.App) (bool, error) {
 	result, err := repo.DB.Exec(`DELETE FROM otts WHERE email_hash = $1 AND ott = $2 AND app = $3`, emailHash, ott, app)
 	if err != nil {
@@ -139,7 +138,6 @@ func (repo *UserAuthRepository) AddToken(userID int64, app ente.App, token strin
 	return stacktrace.Propagate(err, "")
 }
 
-// GetUserIDWithToken returns the userID associated with a given token and whether the token is expired
 func (repo *UserAuthRepository) GetUserIDWithToken(token string, app ente.App) (int64, bool, error) {
 	row := repo.DB.QueryRow(`
 		SELECT 

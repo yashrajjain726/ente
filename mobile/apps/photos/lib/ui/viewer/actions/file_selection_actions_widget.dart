@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:io";
 
 import "package:ente_icons/ente_icons.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
@@ -9,15 +10,20 @@ import "package:hugeicons/hugeicons.dart";
 import "package:local_auth/local_auth.dart";
 import "package:logging/logging.dart";
 import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
+import "package:photo_manager/photo_manager.dart";
 import 'package:photos/core/configuration.dart';
+import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/files_updated_event.dart";
+import "package:photos/events/force_reload_trash_page_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/device_collection.dart';
+import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
+import "package:photos/models/file/trash_file.dart";
 import 'package:photos/models/files_split.dart';
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/metadata/common_keys.dart";
@@ -80,9 +86,7 @@ class _FileSelectionActionsWidgetState
   late FilesSplit split;
   late CollectionActions collectionActions;
   late bool isCollectionOwner;
-  // _cachedCollectionForSharedLink is primarily used to avoid creating duplicate
-  // links if user keeps on creating Create link button after selecting
-  // few files. This link is reset on any selection changed;
+  // Reuse the link while the selection is unchanged.
   Collection? _cachedCollectionForSharedLink;
   final GlobalKey shareButtonKey = GlobalKey();
   final GlobalKey sendLinkButtonKey = GlobalKey();
@@ -98,7 +102,6 @@ class _FileSelectionActionsWidgetState
   @override
   void initState() {
     super.initState();
-    //User ID will be null if the user is not logged in (links-in-app)
     currentUserID = Configuration.instance.getUserID() ?? -1;
 
     split = FilesSplit.split(<EnteFile>[], currentUserID);
@@ -164,9 +167,7 @@ class _FileSelectionActionsWidgetState
         isCollectionOwnerOrAdmin &&
         split.ownedByOtherUsers.isNotEmpty;
 
-    //To animate adding and removing of [SelectedActionButton], add all items
-    //and set [shouldShow] to false for items that should not be shown and true
-    //for items that should be shown.
+    // Hidden items remain in the list so their removal can animate.
     final List<SelectionActionButton> items = [];
     if (widget.type == GalleryType.trash) {
       items.add(
@@ -180,7 +181,7 @@ class _FileSelectionActionsWidgetState
         SelectionActionButton(
           hugeIcon: HugeIcons.strokeRoundedDelete01,
           labelText: context.strings.permanentlyDelete,
-          onTap: _permanentlyDelete,
+          onTap: _permanentlyDeleteFromTrash,
           isCritical: true,
         ),
       );
@@ -212,6 +213,19 @@ class _FileSelectionActionsWidgetState
         ),
       );
     } else {
+      if (widget.type != GalleryType.sharedPublicCollection) {
+        items.add(
+          SelectionActionButton(
+            labelText: context.strings.share,
+            hugeIcon: Platform.isIOS
+                ? HugeIcons.strokeRoundedShare03
+                : HugeIcons.strokeRoundedShare08,
+            key: shareButtonKey,
+            onTap: _shareSelectedFiles,
+          ),
+        );
+      }
+
       if (widget.type.showCreateLink()) {
         if (_cachedCollectionForSharedLink != null && anyUploadedFiles) {
           items.add(
@@ -232,36 +246,6 @@ class _FileSelectionActionsWidgetState
             ),
           );
         }
-      }
-      if (widget.type == GalleryType.peopleTag && widget.person != null) {
-        items.add(
-          SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
-            labelText: context.strings.notPersonLabel(
-              name: widget.person!.data.name,
-            ),
-            onTap: _onNotpersonClicked,
-          ),
-        );
-        if (ownedFilesCount == 1) {
-          items.add(
-            SelectionActionButton(
-              hugeIcon: HugeIcons.strokeRoundedImage01,
-              labelText: context.strings.useAsCover,
-              onTap: anyUploadedFiles ? _setPersonCover : null,
-            ),
-          );
-        }
-      }
-
-      if (widget.type == GalleryType.cluster && widget.clusterID != null) {
-        items.add(
-          SelectionActionButton(
-            labelText: context.strings.notThisPerson,
-            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
-            onTap: _onRemoveFromClusterClicked,
-          ),
-        );
       }
 
       final showUploadIcon =
@@ -318,18 +302,6 @@ class _FileSelectionActionsWidgetState
         );
       }
 
-      if (widget.type.showDeleteOption()) {
-        items.add(
-          SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedDelete01,
-            labelText: context.strings.delete,
-            onTap: anyOwnedFiles ? _onDeleteClick : null,
-            shouldShow: allOwnedFiles,
-            isCritical: true,
-          ),
-        );
-      }
-
       if (widget.type.showRemoveFromAlbum()) {
         items.add(
           SelectionActionButton(
@@ -337,6 +309,16 @@ class _FileSelectionActionsWidgetState
             labelText: context.strings.removeFromAlbum,
             onTap: removeCount > 0 ? _removeFilesFromAlbum : null,
             shouldShow: removeCount > 0,
+          ),
+        );
+      }
+
+      if (widget.type.showRemoveFromHiddenAlbum()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedRemove01,
+            labelText: context.strings.removeFromAlbum,
+            onTap: _removeFilesFromHiddenAlbum,
           ),
         );
       }
@@ -351,12 +333,45 @@ class _FileSelectionActionsWidgetState
         );
       }
 
-      if (widget.type.showRemoveFromHiddenAlbum()) {
+      if (widget.type.showDeleteOption()) {
         items.add(
           SelectionActionButton(
-            hugeIcon: HugeIcons.strokeRoundedRemove01,
-            labelText: context.strings.removeFromAlbum,
-            onTap: _removeFilesFromHiddenAlbum,
+            hugeIcon: HugeIcons.strokeRoundedDelete01,
+            labelText: context.strings.delete,
+            onTap: anyOwnedFiles ? _onDeleteClick : null,
+            shouldShow: allOwnedFiles,
+            isCritical: true,
+          ),
+        );
+      }
+
+      if (widget.type.showRestoreOption()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedRestoreBin,
+            labelText: context.strings.restore,
+            onTap: _restore,
+          ),
+        );
+      }
+
+      if (widget.type.showPermanentlyDeleteOption()) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedDelete01,
+            labelText: context.strings.permanentlyDelete,
+            onTap: _permanentlyDeleteFromTrash,
+            isCritical: true,
+          ),
+        );
+      }
+
+      if (showDownloadOption) {
+        items.add(
+          SelectionActionButton(
+            labelText: context.strings.download,
+            hugeIcon: HugeIcons.strokeRoundedDownload01,
+            onTap: () => _download(widget.selectedFiles.files.toList()),
           ),
         );
       }
@@ -380,13 +395,6 @@ class _FileSelectionActionsWidgetState
           ),
         );
       }
-      items.add(
-        SelectionActionButton(
-          hugeIcon: HugeIcons.strokeRoundedIncognito,
-          labelText: context.strings.guestView,
-          onTap: _onGuestViewClick,
-        ),
-      );
 
       if (flagService.manualTagFileToPerson &&
           widget.type.showAddToPersonOption()) {
@@ -399,6 +407,38 @@ class _FileSelectionActionsWidgetState
           ),
         );
       }
+
+      if (widget.type == GalleryType.peopleTag && widget.person != null) {
+        items.add(
+          SelectionActionButton(
+            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
+            labelText: context.strings.notPersonLabel(
+              name: widget.person!.data.name,
+            ),
+            onTap: _onNotpersonClicked,
+          ),
+        );
+        if (ownedFilesCount == 1) {
+          items.add(
+            SelectionActionButton(
+              hugeIcon: HugeIcons.strokeRoundedImage01,
+              labelText: context.strings.useAsCover,
+              onTap: anyUploadedFiles ? _setPersonCover : null,
+            ),
+          );
+        }
+      }
+
+      if (widget.type == GalleryType.cluster && widget.clusterID != null) {
+        items.add(
+          SelectionActionButton(
+            labelText: context.strings.notThisPerson,
+            hugeIcon: HugeIcons.strokeRoundedUserRemove01,
+            onTap: _onRemoveFromClusterClicked,
+          ),
+        );
+      }
+
       if (widget.type != GalleryType.sharedPublicCollection) {
         items.add(
           SelectionActionButton(
@@ -429,6 +469,7 @@ class _FileSelectionActionsWidgetState
           ),
         );
       }
+
       if (widget.type.showArchiveOption()) {
         items.add(
           SelectionActionButton(
@@ -464,7 +505,7 @@ class _FileSelectionActionsWidgetState
           SelectionActionButton(
             hugeIcon: HugeIcons.strokeRoundedDelete01,
             labelText: context.strings.permanentlyDelete,
-            onTap: _permanentlyDelete,
+            onTap: _permanentlyDeleteFromTrash,
             isCritical: true,
           ),
         );
@@ -504,25 +545,13 @@ class _FileSelectionActionsWidgetState
         );
       }
 
-      if (showDownloadOption) {
-        items.add(
-          SelectionActionButton(
-            labelText: context.strings.download,
-            hugeIcon: HugeIcons.strokeRoundedDownload01,
-            onTap: () => _download(widget.selectedFiles.files.toList()),
-          ),
-        );
-      }
-      if (widget.type != GalleryType.sharedPublicCollection) {
-        items.add(
-          SelectionActionButton(
-            labelText: context.strings.share,
-            hugeIcon: HugeIcons.strokeRoundedShare03,
-            key: shareButtonKey,
-            onTap: _shareSelectedFiles,
-          ),
-        );
-      }
+      items.add(
+        SelectionActionButton(
+          hugeIcon: HugeIcons.strokeRoundedIncognito,
+          labelText: context.strings.guestView,
+          onTap: _onGuestViewClick,
+        ),
+      );
     }
 
     if (items.isNotEmpty) {
@@ -571,7 +600,6 @@ class _FileSelectionActionsWidgetState
       topControl: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // This container is for increasing the tap area
           Container(
             width: double.infinity,
             height: 36,
@@ -1065,6 +1093,24 @@ class _FileSelectionActionsWidgetState
   }
 
   void _restore() {
+    final isDeviceOnly = widget.selectedFiles.files.every(
+      (f) => f.isDeviceTrash,
+    );
+    if (isDeviceOnly) {
+      _restoreFilesFromDeviceTrash(widget.selectedFiles)
+          .then((restoredCount) {
+            if (restoredCount == 0 || !mounted) return;
+            showToast(
+              context,
+              context.strings.restoredItems(count: restoredCount),
+            );
+          })
+          .onError((e, s) {
+            if (!mounted) return;
+            showGenericErrorDialog(context: context, error: e).ignore();
+          });
+      return;
+    }
     showCollectionActionSheet(
       context,
       selectedFiles: widget.selectedFiles,
@@ -1072,8 +1118,26 @@ class _FileSelectionActionsWidgetState
     );
   }
 
-  Future<void> _permanentlyDelete() async {
-    if (await deleteFromTrash(context, widget.selectedFiles.files.toList())) {
+  Future<void> _permanentlyDeleteFromTrash() async {
+    final isDeviceOnly = widget.selectedFiles.files.every(
+      (f) => f.isDeviceTrash,
+    );
+    if (isDeviceOnly) {
+      final deletedIDs = await permanentlyDeleteFromDeviceTrash(
+        context,
+        widget.selectedFiles.files.map((f) => f.localID!).toList(),
+      );
+      widget.selectedFiles.unSelectAll(
+        widget.selectedFiles.files
+            .where((f) => deletedIDs.contains(f.localID))
+            .toSet(),
+      );
+      return;
+    }
+    if (await deleteFromEnteTrash(
+      context,
+      widget.selectedFiles.files.whereType<EnteTrashFile>().toList(),
+    )) {
       widget.selectedFiles.clearAll();
     }
   }
@@ -1256,6 +1320,33 @@ class _FileSelectionActionsWidgetState
       widget.selectedFiles.clearAll();
     } else {
       widget.selectedFiles.replaceSelection(skippedFiles.toSet());
+    }
+  }
+
+  Future<int> _restoreFilesFromDeviceTrash(SelectedFiles selectedFiles) async {
+    final files = selectedFiles.files
+        .map((f) => f.asDeviceTrashFile!.toAssetEntity())
+        .toList();
+    final restoredIDs = <String>{};
+    try {
+      for (final batch in files.chunks(batchSize)) {
+        final result = await PhotoManager.editor.android.restoreFromTrash(
+          batch,
+        );
+        restoredIDs.addAll(result);
+      }
+      return restoredIDs.length;
+    } catch (e, s) {
+      _logger.warning("_restoreFilesFromDeviceTrash failed:", e, s);
+      rethrow;
+    } finally {
+      if (restoredIDs.isNotEmpty) {
+        final restoredFiles = selectedFiles.files.where(
+          (f) => restoredIDs.contains(f.localID),
+        );
+        selectedFiles.unSelectAll(restoredFiles.toSet());
+        Bus.instance.fire(ForceReloadTrashPageEvent());
+      }
     }
   }
 }

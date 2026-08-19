@@ -41,14 +41,12 @@ func (h *CastHandler) RegisterDevice(c *gin.Context) {
 
 func (h *CastHandler) GetDeviceInfo(c *gin.Context) {
 	deviceCode := getDeviceCode(c)
-	publicKey, err := h.Ctrl.GetPublicKey(c, deviceCode)
+	deviceInfo, err := h.Ctrl.GetDeviceInfo(c, deviceCode)
 	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, "failed to get public key"))
+		handler.Error(c, stacktrace.Propagate(err, "failed to get device info"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"publicKey": publicKey,
-	})
+	c.JSON(http.StatusOK, deviceInfo)
 }
 
 func (h *CastHandler) GetAllDevices(c *gin.Context) {
@@ -127,13 +125,11 @@ func (h *CastHandler) GetThumbnail(c *gin.Context) {
 	h.getFileForType(c, ente.THUMBNAIL)
 }
 
-// GetFileURLV3 returns the file URL and reserves HTTP 404 for an unavailable endpoint.
 func (h *CastHandler) GetFileURLV3(c *gin.Context) {
 	url, err := h.getFileURL(c, ente.FILE)
 	writeFileURLV3(c, url, err)
 }
 
-// GetThumbnailURLV3 returns the thumbnail URL and reserves HTTP 404 for an unavailable endpoint.
 func (h *CastHandler) GetThumbnailURLV3(c *gin.Context) {
 	url, err := h.getFileURL(c, ente.THUMBNAIL)
 	writeFileURLV3(c, url, err)

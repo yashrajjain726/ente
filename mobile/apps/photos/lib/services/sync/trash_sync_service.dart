@@ -112,12 +112,10 @@ class TrashSyncService {
         .getAllOwnedCollectionIDs();
     for (final item in trashRequestItems) {
       if (!includedFileIDs.contains(item.fileID)) {
-        // Check if the collectionID in the request is owned by the user
         if (ownedCollectionIDs.contains(item.collectionID)) {
           uniqueItems.add(item);
           includedFileIDs.add(item.fileID);
         } else {
-          // If not owned, use a different owned collectionID
           final fileCollectionIDs = await FilesDB.instance
               .getAllCollectionIDsOfFile(item.fileID);
           bool foundAnotherOwnedCollection = false;
@@ -149,15 +147,15 @@ class TrashSyncService {
     try {
       final responseData = await _gateway.getDiff(sinceTime);
       int latestUpdatedAtTime = 0;
-      final trashedFiles = <TrashFile>[];
+      final trashedFiles = <EnteTrashFile>[];
       final deletedUploadIDs = <int>[];
-      final restoredFiles = <TrashFile>[];
+      final restoredFiles = <EnteTrashFile>[];
 
       final diff = responseData["diff"] as List;
       final bool hasMore = responseData["hasMore"] as bool;
       final startTime = DateTime.now();
       for (final item in diff) {
-        final trash = TrashFile();
+        final trash = EnteTrashFile();
         trash.createdAt = item['createdAt'];
         trash.updateAt = item['updatedAt'];
         latestUpdatedAtTime = max(latestUpdatedAtTime, trash.updateAt);
@@ -245,7 +243,7 @@ class TrashSyncService {
     await _gateway.trashFiles(items);
   }
 
-  Future<void> deleteFromTrash(List<EnteFile> files) async {
+  Future<void> deleteFromTrash(List<EnteTrashFile> files) async {
     final uniqueFileIds = files.map((e) => e.uploadedFileID!).toSet().toList();
     final batchedFileIDs = uniqueFileIds.chunks(batchSize);
     for (final batch in batchedFileIDs) {
@@ -258,27 +256,21 @@ class TrashSyncService {
         rethrow;
       }
     }
-    // no need to await on syncing trash from remote
     unawaited(syncTrash());
   }
 
   Future<void> emptyTrash() async {
-    try {
-      await _gateway.emptyTrash(_getSyncTime());
-      await _trashDB.clearTable();
-      unawaited(syncTrash());
-      Bus.instance.fire(TrashUpdatedEvent());
-      Bus.instance.fire(ForceReloadTrashPageEvent());
-    } catch (e, s) {
-      _logger.severe("failed to empty trash", e, s);
-      rethrow;
-    }
+    await _gateway.emptyTrash(_getSyncTime());
+    await _trashDB.clearTable();
+    unawaited(syncTrash());
+    Bus.instance.fire(TrashUpdatedEvent());
+    Bus.instance.fire(ForceReloadTrashPageEvent());
   }
 }
 
 class TrashDiff {
-  final List<TrashFile> trashedFiles;
-  final List<TrashFile> restoredFiles;
+  final List<EnteTrashFile> trashedFiles;
+  final List<EnteTrashFile> restoredFiles;
   final List<int> deletedUploadIDs;
   final bool hasMore;
   final int lastSyncedTimeStamp;

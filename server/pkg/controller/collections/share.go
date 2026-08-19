@@ -475,6 +475,9 @@ func (c *CollectionController) UpdateShareeMagicMetadata(ctx *gin.Context, req e
 
 func (c *CollectionController) ShareURL(ctx *gin.Context, userID int64, req ente.CreatePublicAccessTokenRequest) (
 	ente.PublicURL, error) {
+	if err := req.Validate(); err != nil {
+		return ente.PublicURL{}, stacktrace.Propagate(err, "")
+	}
 	collection, err := c.CollectionRepo.Get(req.CollectionID)
 	if err != nil {
 		return ente.PublicURL{}, stacktrace.Propagate(err, "")
@@ -517,7 +520,7 @@ func (c *CollectionController) UpdateShareURL(
 	err := c.BillingCtrl.HasActiveSelfOrFamilySubscription(userID, true)
 	if err != nil {
 		if errors.Is(err, ente.ErrSharingDisabledForFreeAccounts) {
-			if req.DeviceLimit != nil && *req.DeviceLimit != public.FreeUserDeviceLimit {
+			if req.DeviceLimit != nil && !public.IsAllowedFreeUserDeviceLimit(*req.DeviceLimit) {
 				return nil, stacktrace.Propagate(&ente.ErrLinkEditNotAllowed, "")
 			}
 		} else {
@@ -566,7 +569,7 @@ func (c *CollectionController) GetPublicDiff(ctx *gin.Context, sinceTime int64) 
 	if err != nil {
 		return nil, false, stacktrace.Propagate(err, "")
 	}
-	// hide private metadata before returning files info in diff
+	// Don't expose private metadata in a public diff.
 	for idx := range diff {
 		if diff[idx].MagicMetadata != nil {
 			diff[idx].MagicMetadata = nil
@@ -580,7 +583,7 @@ func (c *CollectionController) GetPublicDiff(ctx *gin.Context, sinceTime int64) 
 		diff[idx].Action = nil
 		diff[idx].ActionUserID = nil
 		if diff[idx].Metadata.EncryptedData == "-" && !diff[idx].IsDeleted {
-			// This indicates that the file is deleted, but we still have a stale entry in the collection
+			// "-" marks a deleted file whose collection entry is stale.
 			reqContextLogger.WithFields(log.Fields{
 				"file_id":    diff[idx].ID,
 				"updated_at": diff[idx].UpdationTime,

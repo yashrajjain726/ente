@@ -1,18 +1,19 @@
 import 'package:dio/dio.dart';
 import 'package:ente_components/ente_components.dart';
+import 'package:ente_strings/ente_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photos/app_mode.dart';
 import 'package:photos/ente_theme_data.dart';
-import 'package:ente_strings/ente_strings.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
+import 'package:photos/models/file/trash_file.dart';
 import 'package:photos/models/files_split.dart';
 import 'package:photos/models/selected_files.dart';
-import 'package:photos/settings/local_settings.dart';
 import 'package:photos/service_locator.dart';
+import 'package:photos/settings/local_settings.dart';
 import 'package:photos/utils/delete_file_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,13 +42,18 @@ void main() {
 
   group('deleteFromTrash', () {
     testWidgets('uses the migrated warning delete sheet', (tester) async {
-      final file = _file(generatedID: 21, uploadedID: 31);
+      final file = EnteTrashFile.from(
+        _file(generatedID: 21, uploadedID: 31),
+        deleteBy: 0,
+        createdAt: 0,
+        updateAt: 0,
+      );
       bool? result;
 
       await tester.pumpWidget(
         _TestApp(
           onOpen: (context) async {
-            result = await deleteFromTrash(context, [file]);
+            result = await deleteFromEnteTrash(context, [file]);
           },
         ),
       );
@@ -696,7 +702,7 @@ void _expectVisibleButtonsInOrder(WidgetTester tester, List<String> labels) {
 }
 
 void _expectDeleteWarningIllustration([
-  String assetName = 'assets/warning-grey.png',
+  String assetName = 'assets/warning-red.png',
 ]) {
   expect(
     find.byWidgetPredicate(

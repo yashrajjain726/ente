@@ -2,9 +2,11 @@ package userentity
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/ente/base"
-	"strings"
 )
 
 type EntityType string
@@ -12,23 +14,19 @@ type EntityType string
 const (
 	Location EntityType = "location"
 	// Person entity is deprecated and will be removed in the future.
-	//Deprecated ..
 	Person EntityType = "person"
-	// CGroup is a new version of Person entity, where the data is gzipped before encryption
-	CGroup EntityType = "cgroup"
-	// SmartAlbum is a new entity type for storing smart album config data
-	SmartAlbum EntityType = "smart_album"
-	// Memory is the entity type for memory share encryption keys
-	Memory EntityType = "memory"
-	// Contact is the entity type for the shared contact root key.
-	Contact EntityType = "contact"
-	// Space is the entity type for the space root key.
-	Space EntityType = "space"
+	// CGroup replaces Person; its data is gzipped before encryption.
+	CGroup       EntityType = "cgroup"
+	SmartAlbum   EntityType = "smart_album"
+	Memory       EntityType = "memory"
+	Contact      EntityType = "contact"
+	Space        EntityType = "space"
+	LibraryShare EntityType = "library_share"
 )
 
 func (et EntityType) IsValid() error {
 	switch et {
-	case Location, Person, CGroup, SmartAlbum, Memory, Contact, Space:
+	case Location, Person, CGroup, SmartAlbum, Memory, Contact, Space, LibraryShare:
 		return nil
 	}
 	return ente.NewBadRequestWithMessage(fmt.Sprintf("Invalid EntityType: %s", et))
@@ -39,7 +37,7 @@ func (et EntityType) GetNewID() (*string, error) {
 }
 
 func (et EntityType) CanRestoreDeletedData() bool {
-	return et == SmartAlbum
+	return et == SmartAlbum || et == LibraryShare
 }
 
 type EntityKey struct {
@@ -75,7 +73,7 @@ type EntityDataRequest struct {
 	Type          EntityType `json:"type" binding:"required"`
 	EncryptedData string     `json:"encryptedData" binding:"required"`
 	Header        string     `json:"header" binding:"required"`
-	ID            *string    `json:"id"` // Optional ID, if not provided a new ID will be generated
+	ID            *string    `json:"id"`
 }
 
 func (edr *EntityDataRequest) IsValid(userID int64) error {
@@ -90,22 +88,46 @@ func (edr *EntityDataRequest) IsValid(userID int64) error {
 		if !strings.HasPrefix(*edr.ID, fmt.Sprintf("sa_%d_", userID)) {
 			return ente.NewBadRequestWithMessage(fmt.Sprintf("ID %s is not valid for SmartAlbum entity type", *edr.ID))
 		}
-		return nil
-	default:
-		return nil
+	case LibraryShare:
+		if edr.ID == nil {
+			return ente.NewBadRequestWithMessage("ID is required for LibraryShare entity type")
+		}
+		parts := strings.Split(*edr.ID, "_")
+		if len(parts) != 3 || parts[0] != "ls" {
+			return ente.NewBadRequestWithMessage(fmt.Sprintf("ID %s is not valid for LibraryShare entity type", *edr.ID))
+		}
+		ownerID, ownerErr := strconv.ParseInt(parts[1], 10, 64)
+		recipientID, recipientErr := strconv.ParseInt(parts[2], 10, 64)
+		if ownerErr != nil || recipientErr != nil || ownerID != userID || recipientID <= 0 || recipientID == userID || *edr.ID != fmt.Sprintf("ls_%d_%d", ownerID, recipientID) {
+			return ente.NewBadRequestWithMessage(fmt.Sprintf("ID %s is not valid for LibraryShare entity type", *edr.ID))
+		}
 	}
+	return nil
 }
 
 type UpdateEntityDataRequest struct {
-	ID            string     `json:"id" binding:"required"`
-	Type          EntityType `json:"type" binding:"required"`
-	EncryptedData string     `json:"encryptedData" binding:"required"`
-	Header        string     `json:"header" binding:"required"`
+	ID                string     `json:"id" binding:"required"`
+	Type              EntityType `json:"type" binding:"required"`
+	EncryptedData     string     `json:"encryptedData" binding:"required"`
+	Header            string     `json:"header" binding:"required"`
+	ExpectedUpdatedAt *int64     `json:"expectedUpdatedAt"`
+}
+
+func (uedr *UpdateEntityDataRequest) IsValid() error {
+	if err := uedr.Type.IsValid(); err != nil {
+		return err
+	}
+	if uedr.Type == LibraryShare {
+		if uedr.ExpectedUpdatedAt == nil || *uedr.ExpectedUpdatedAt <= 0 {
+			return ente.NewBadRequestWithMessage("expectedUpdatedAt is required for LibraryShare entity type")
+		}
+	}
+	return nil
 }
 
 type GetEntityDiffRequest struct {
 	Type EntityType `form:"type" binding:"required"`
-	// SinceTime *int64. Pointer allows us to pass 0 value otherwise binding fails for zero Value.
+	// Keep this a pointer so binding accepts zero.
 	SinceTime *int64 `form:"sinceTime" binding:"required"`
 	Limit     int16  `form:"limit" binding:"required"`
 }

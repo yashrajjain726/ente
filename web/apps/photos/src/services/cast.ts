@@ -1,6 +1,4 @@
-import { boxSeal } from "ente-base/crypto";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
-import { newID } from "ente-base/id";
 import { apiURL } from "ente-base/origins";
 import type { Collection } from "ente-media/collection";
 import { z } from "zod";
@@ -13,14 +11,15 @@ export const revokeAllCastTokens = async () =>
         }),
     );
 
-const publicKeyForPairingCode = async (code: string) => {
+const publicKeysForPairingCode = async (code: string) => {
     const res = await fetch(await apiURL(`/cast/device-info/${code}`), {
         headers: await authenticatedRequestHeaders(),
     });
     if (res.status == 404) return undefined;
     ensureOk(res);
-    return z.object({ publicKey: z.string() }).parse(await res.json())
-        .publicKey;
+    return z
+        .object({ publicKey: z.string(), pqPublicKey: z.string().optional() })
+        .parse(await res.json());
 };
 
 // AlbumCastDialog matches this exact message.
@@ -30,17 +29,16 @@ export const publishCastPayload = async (
     deviceCode: string,
     collection: Collection,
 ) => {
-    const publicKey = await publicKeyForPairingCode(deviceCode);
-    if (!publicKey) throw new Error(unknownDeviceCodeErrorMessage);
+    const publicKeys = await publicKeysForPairingCode(deviceCode);
+    if (!publicKeys) throw new Error(unknownDeviceCodeErrorMessage);
 
-    const castToken = newID("cast_");
-
-    const payload = JSON.stringify({
-        castToken,
-        collectionID: collection.id,
-        collectionKey: collection.key,
-    });
-    const encryptedPayload = await boxSeal(btoa(payload), publicKey);
+    const { preparePayload } = await import("ente-cast-wasm");
+    const { castToken, encryptedPayload } = preparePayload(
+        publicKeys.publicKey,
+        publicKeys.pqPublicKey,
+        BigInt(collection.id),
+        collection.key,
+    );
     const res = await fetch(await apiURL("/cast/cast-data"), {
         method: "POST",
         headers: await authenticatedRequestHeaders(),

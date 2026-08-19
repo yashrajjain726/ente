@@ -11,68 +11,26 @@ import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/services/location_service.dart";
 
-// ---------------------------------------------------------------------------
-// Strategy enums
-// ---------------------------------------------------------------------------
+enum SelectionDistribution { none, timeBuckets, yearRoundRobin }
 
-/// How to distribute photo selection across groups to ensure variety.
-enum SelectionDistribution {
-  /// No grouping. Iterate the scored list greedily.
-  none,
+enum SelectionPick { ranked, geographicFarthest }
 
-  /// Divide into N equal time-buckets and pick one per bucket.
-  /// Narrow each bucket to top [preNarrowTopPercent] before picking.
-  timeBuckets,
+enum SelectionSort { chronological, reverseChronological }
 
-  /// Group by year, round-robin through years (recent first).
-  yearRoundRobin,
-}
-
-/// How to pick the winner from a set of candidates.
-enum SelectionPick {
-  /// Take the highest-scored candidate that passes filters.
-  ranked,
-
-  /// Pick the candidate geographically farthest from already-selected photos.
-  geographicFarthest,
-}
-
-/// How to sort the final selection.
-enum SelectionSort {
-  /// Oldest first.
-  chronological,
-
-  /// Newest first.
-  reverseChronological,
-}
-
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
-/// All the parameters that control how [PhotoSelector.select] works.
 class SelectionConfig {
   final int targetSize;
   final bool isLocalGalleryMode;
   final Map<int, EmbeddingVector> fileIDToImageEmbedding;
 
-  /// Pre-computed score per file-ID. Higher = better.
-  /// For time/trip memories this is typically a combined CLIP + face score.
-  /// For people memories this is CLIP nostalgia only.
   final Map<int, double> scores;
 
   final SelectionDistribution distribution;
   final SelectionPick pick;
   final SelectionSort sort;
 
-  /// For [SelectionDistribution.timeBuckets]: fraction of each bucket to keep
-  /// after scoring (e.g. 0.3 = top 30%). `null` means keep all.
-  /// When less than 50% of a bucket has embeddings this is auto-disabled.
+  // Fraction of each bucket to retain; 0.3 means 30%.
   final double? preNarrowTopPercent;
 
-  /// For [SelectionDistribution.yearRoundRobin]: if true, skip the
-  /// near-duplicate check on the first round (to guarantee at least one
-  /// photo per year even when all photos look similar).
   final bool skipDuplicateCheckOnFirstRound;
 
   const SelectionConfig({
@@ -87,10 +45,6 @@ class SelectionConfig {
     this.skipDuplicateCheckOnFirstRound = false,
   });
 }
-
-// ---------------------------------------------------------------------------
-// PhotoSelector
-// ---------------------------------------------------------------------------
 
 class PhotoSelector {
   static const clipSimilarImageThreshold = 0.80;
@@ -134,17 +88,11 @@ class PhotoSelector {
     );
   }
 
-  // -----------------------------------------------------------------------
-  // Distribution strategies
-  // -----------------------------------------------------------------------
-
-  /// Flat selection: sort by score descending, greedily iterate.
   static List<Memory> _selectFlat(
     List<Memory> memories,
     SelectionConfig config,
   ) {
     final fileCount = memories.length;
-    // Sort by score descending.
     memories.sort((a, b) {
       final aID = memoryFileIdFromMemory(
         a,
@@ -186,13 +134,10 @@ class PhotoSelector {
     return selected;
   }
 
-  /// Time-bucket selection: divide into N equal chronological buckets, pick
-  /// one per bucket using nostalgia narrowing + geographic or ranked pick.
   static List<Memory> _selectTimeBuckets(
     List<Memory> memories,
     SelectionConfig config,
   ) {
-    // Filter to memories with creation time and sort chronologically.
     final sorted = memories.where((m) => m.file.creationTime != null).toList()
       ..sort((a, b) => a.file.creationTime!.compareTo(b.file.creationTime!));
 
@@ -225,7 +170,6 @@ class PhotoSelector {
 
     final finalSelection = <Memory>[];
     for (final bucket in buckets) {
-      // Score within bucket.
       final bucketFileIDs = bucket
           .map(
             (m) => memoryFileIdFromMemory(
@@ -239,9 +183,9 @@ class PhotoSelector {
         config.fileIDToImageEmbedding,
         bucketFileIDs,
       );
+      // Score narrowing is unreliable when fewer than half have embeddings.
       final bool littleEmbeddings = bucketVectors.length < bucket.length * 0.5;
 
-      // Sort bucket by score descending.
       bucket.sort((a, b) {
         final aID = memoryFileIdFromMemory(
           a,
@@ -254,7 +198,6 @@ class PhotoSelector {
         return (config.scores[bID] ?? 0.0).compareTo(config.scores[aID] ?? 0.0);
       });
 
-      // Optionally narrow to top N%.
       List<Memory> candidates;
       if (!littleEmbeddings && config.preNarrowTopPercent != null) {
         final keep = max(
@@ -271,7 +214,6 @@ class PhotoSelector {
         continue;
       }
 
-      // Filter against already-selected photos.
       if (finalSelection.isNotEmpty) {
         final filteredCandidates = excludeNearDuplicates(
           candidates,
@@ -286,7 +228,6 @@ class PhotoSelector {
       }
       if (candidates.isEmpty) continue;
 
-      // Pick the winner.
       final winner = _pickCandidate(candidates, finalSelection, config.pick);
       finalSelection.add(winner);
     }
@@ -345,15 +286,12 @@ class PhotoSelector {
     return finalSelection;
   }
 
-  /// Year-round-robin selection: group by year, sort each year by score,
-  /// round-robin through years taking one at a time.
   static List<Memory> _selectYearRoundRobin(
     List<Memory> memories,
     SelectionConfig config,
   ) {
     final fileCount = memories.length;
 
-    // Group by year.
     final yearToFiles = <int, List<Memory>>{};
     for (final mem in memories) {
       final year = DateTime.fromMicrosecondsSinceEpoch(
@@ -362,7 +300,6 @@ class PhotoSelector {
       yearToFiles.putIfAbsent(year, () => []).add(mem);
     }
 
-    // Sort each year's list by score descending.
     for (final yearFiles in yearToFiles.values) {
       yearFiles.sort((a, b) {
         final aID = memoryFileIdFromMemory(
@@ -377,8 +314,7 @@ class PhotoSelector {
       });
     }
 
-    final years = yearToFiles.keys.toList()
-      ..sort((a, b) => b.compareTo(a)); // Recent years first
+    final years = yearToFiles.keys.toList()..sort((a, b) => b.compareTo(a));
 
     final selected = <Memory>[];
     final selectedCreationTimes = <int>[];
@@ -440,17 +376,12 @@ class PhotoSelector {
         }
       }
       round++;
-      if (round > fileCount) break; // safety
+      if (round > fileCount) break;
     }
 
     return selected;
   }
 
-  // -----------------------------------------------------------------------
-  // Picking strategies
-  // -----------------------------------------------------------------------
-
-  /// Picks one candidate from the list based on the pick strategy.
   static Memory _pickCandidate(
     List<Memory> candidates,
     List<Memory> alreadySelected,
@@ -491,11 +422,6 @@ class PhotoSelector {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Shared filtering
-  // -----------------------------------------------------------------------
-
-  /// Returns true if [mem] passes time-spacing and near-duplicate filters.
   static bool _passesFilters(
     Memory mem,
     List<Memory> selected,
@@ -610,7 +536,6 @@ class PhotoSelector {
         return includeVideos(memories, memories, targetSize);
       }
 
-      // Pre-compute nostalgia scores.
       final Map<int, double> scores = {};
       for (final mem in memories) {
         final fileID = memoryFileIdFromMemory(
@@ -650,12 +575,6 @@ class PhotoSelector {
     }
   }
 
-  /// Returns the best selection for time and trip memories.
-  ///
-  /// When [mlEnabled] is false, scoring and CLIP near-duplicate filtering are
-  /// skipped; candidates are shuffled randomly and distributed across years or
-  /// chronologically based solely on creation time, keeping only the
-  /// time-spacing filter.
   static Future<List<Memory>> bestSelection(
     List<Memory> memories, {
     int? prefferedSize,
@@ -694,13 +613,11 @@ class PhotoSelector {
       );
       if (fileID == null) continue;
 
-      // CLIP score
       final embedding = fileIDToImageEmbedding[fileID];
       final clipScore = embedding != null
           ? embedding.vector.dot(clipPositiveTextVector)
           : 0.0;
 
-      // Face score: named faces = 10, unnamed = 1
       int faceCount = 0;
       final faces = fileIdToFaces[fileID];
       if (faces != null) {
@@ -749,7 +666,6 @@ class PhotoSelector {
         ),
       );
     } else {
-      // Multiple years: adjust target size for many years.
       if (prefferedSize == null && (allYears.length * 2) > 10) {
         targetSize = allYears.length * 3;
         if (fileCount < targetSize) {
@@ -773,15 +689,6 @@ class PhotoSelector {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // ML-free selection path
-  // -----------------------------------------------------------------------
-
-  /// Produces a time-distributed selection without using any ML signals:
-  /// - No scoring (face counts / CLIP nostalgia).
-  /// - No CLIP near-duplicate filtering.
-  /// - Within each year / bucket, candidates are shuffled with fresh
-  ///   randomness and then filtered by the time-spacing rule.
   static List<Memory> _bestSelectionNoMl(
     List<Memory> memories, {
     required int targetSize,
@@ -807,8 +714,6 @@ class PhotoSelector {
         (distributionOverride == null && allYears.length <= 1)) {
       sortedChronologically = List<Memory>.from(withCreationTime)
         ..sort((a, b) => a.file.creationTime!.compareTo(b.file.creationTime!));
-      // Single year / time-buckets override: distribute evenly across the
-      // chronological range and shuffle within each bucket.
       return _pickAcrossTimeBuckets(
         sortedChronologically,
         targetSize: effectiveTargetSize,
@@ -823,8 +728,6 @@ class PhotoSelector {
       }
     }
 
-    // Multiple years: round-robin through recent-years-first, shuffling each
-    // year's list with fresh randomness.
     final yearToFiles = <int, List<Memory>>{};
     for (final mem in withCreationTime) {
       final year = DateTime.fromMicrosecondsSinceEpoch(
@@ -937,10 +840,6 @@ class PhotoSelector {
     );
     return selected;
   }
-
-  // -----------------------------------------------------------------------
-  // Utility functions (shared building blocks)
-  // -----------------------------------------------------------------------
 
   static List<EmbeddingVector> getEmbeddingsForFileIDs(
     Map<int, EmbeddingVector> fileIDToImageEmbedding,

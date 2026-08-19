@@ -9,7 +9,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:uuid/uuid.dart";
 
 class _DeviceNotFoundException implements Exception {
   const _DeviceNotFoundException();
@@ -24,17 +23,21 @@ Future<void> _pairWithCode(
   if (!flagService.enableMultiCast) {
     await gw.revokeAllTokens();
   }
-  final publicKey = await gw.getPublicKey(code);
-  if (publicKey == null) {
+  final publicKeys = await gw.getPublicKeys(code);
+  if (publicKeys == null) {
     throw const _DeviceNotFoundException();
   }
-  final castToken = const Uuid().v4();
-  final castData = collectionsService.getCastData(
-    castToken,
+  final prepared = collectionsService.prepareCastPayloadForCollection(
     collection,
-    publicKey,
+    publicKeys.publicKey,
+    publicKeys.pqPublicKey,
   );
-  await gw.publishCastPayload(code, castData, collection.id, castToken);
+  await gw.publishCastPayload(
+    code,
+    prepared.encryptedPayload,
+    collection.id,
+    prepared.castToken,
+  );
 }
 
 Future<bool?> showPairWithCodeSheet(

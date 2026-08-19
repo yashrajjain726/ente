@@ -15,7 +15,6 @@ import "package:mobile_ocr/mobile_ocr.dart"
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
-import "package:photos/models/file/trash_file.dart";
 import "package:photos/module/download/file.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/ui/viewer/file/ocr/ocr_dot_wave_overlay.dart";
@@ -23,7 +22,6 @@ import "package:photos/ui/viewer/file/ocr/text_detector_widget.dart";
 import "package:photos/ui/viewer/file/ocr/text_region_hit_test.dart";
 import "package:photos/utils/image_util.dart";
 
-/// Routes still-photo gestures from the viewer to its OCR overlay.
 class InlineTextDetectionController {
   _InlineTextDetectionState? _state;
 
@@ -42,11 +40,8 @@ class InlineTextDetectionController {
   }
 }
 
-/// Inline on-demand text selection for the photo viewer.
-///
-/// Still images use long press as the signal to start recognition. Live and
-/// motion photos precompute detector-only regions so a long press on text
-/// starts selection, while a long press elsewhere continues to play video.
+// Live and motion photos detect text regions first. A long press on text starts
+// selection; a long press elsewhere plays the motion video.
 class InlineTextDetection extends StatefulWidget {
   final EnteFile file;
   final InlineTextDetectionController controller;
@@ -162,7 +157,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   }
 
   bool _didFileChange(EnteFile oldFile, EnteFile newFile) {
-    if ((oldFile is TrashFile) != (newFile is TrashFile)) return true;
+    if (oldFile.isTrash != newFile.isTrash) return true;
     if (oldFile.generatedID != newFile.generatedID) return true;
     if (oldFile.uploadedFileID != newFile.uploadedFileID) return true;
     if (oldFile.localID != newFile.localID) return true;
@@ -183,7 +178,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
   }
 
   bool _isFileEligible(EnteFile file) {
-    if (widget.isGuestView || file is TrashFile) return false;
+    if (widget.isGuestView || file.isTrash) return false;
     return file.fileType == FileType.image ||
         file.fileType == FileType.livePhoto;
   }
@@ -381,7 +376,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
 
   void _handleLongPressAt(Offset globalPosition) {
     if (!_isEligible) return;
-    if (_overlayActive) return; // Already active, let overlay handle it
+    if (_overlayActive) return;
     if (!_isGlobalPointEligibleForOcrGesture(globalPosition)) return;
     if (_isPreparingOnDemand) return;
     setState(() {
@@ -790,11 +785,8 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
         return ValueListenableBuilder<ZoomTransform>(
           valueListenable: zoomTransformNotifier,
           builder: (context, transform, _) {
-            // Only reset the debounce when the transform has genuinely changed.
-            // Guarding on value change prevents the setState rebuild from the
-            // timer itself from re-entering this block and restarting the timer,
-            // which would create an infinite loop where _zoomGestureSettled
-            // can never stay true.
+            // setState rebuilds this builder. Restarting the timer unless the
+            // transform changed would prevent zoom from ever settling.
             if (isZoomed && transform != _lastSeenTransform) {
               _lastSeenTransform = transform;
               _zoomGestureSettled = false;
@@ -815,13 +807,8 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
               uiOffset: transform.offset,
             );
 
-            // Always apply the Transform, even when not zoomed.
-            // When not zoomed, transform == ZoomTransform.identity (scale=1,
-            // offset=zero), so this is a no-op visually. Applying it
-            // unconditionally means teardrops and text boundaries immediately
-            // track zoom from the very first stream event, with no flash at
-            // the unscaled position that occurs when the Transform was only
-            // added after isZoomedNotifier fired.
+            // Apply the identity transform too so the overlay follows the first
+            // zoom event instead of briefly remaining at its old position.
             overlay = Transform(
               alignment: Alignment.center,
               transform: Matrix4.identity()
@@ -840,9 +827,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
               child: overlay,
             );
 
-            // Ignore pointer events when:
-            // - Actively pinching (2+ fingers down) — let PhotoView handle zoom
-            // - Zoomed but gesture not yet settled — transform is still changing
+            // Let PhotoView own gestures while pinching or settling a zoom.
             final shouldIgnore =
                 _isPinching || (isZoomed && !_zoomGestureSettled);
 

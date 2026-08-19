@@ -21,23 +21,58 @@ import "package:shared_preferences/shared_preferences.dart";
 
 const double earthRadius = 6371; // Earth's radius in kilometers
 
+class CitySearchIndex {
+  static const empty = CitySearchIndex(
+    cities: <City>[],
+    nodes: <List<int>>[],
+    root: -1,
+    maxLatDelta: 0,
+    maxLngDelta: 0,
+  );
+
+  final List<City> cities;
+  final List<List<int>> nodes;
+  final int root;
+  final double maxLatDelta;
+  final double maxLngDelta;
+
+  const CitySearchIndex({
+    required this.cities,
+    required this.nodes,
+    required this.root,
+    required this.maxLatDelta,
+    required this.maxLngDelta,
+  });
+
+  bool get isEmpty => cities.isEmpty;
+
+  Map<String, dynamic> searchArgs(List<EnteFile> files, {String query = ''}) {
+    return <String, dynamic>{
+      "query": query,
+      "cities": cities,
+      "files": files,
+      if (nodes.isNotEmpty && root >= 0) ...{
+        "kdTreeNodes": nodes,
+        "kdTreeRoot": root,
+        "kdTreeMaxLatDelta": maxLatDelta,
+        "kdTreeMaxLngDelta": maxLngDelta,
+      },
+    };
+  }
+}
+
 class LocationService {
   final SharedPreferences prefs;
   final Logger _logger = Logger((LocationService).toString());
   final Computer _computer = Computer.shared();
 
-  // If the discovery section is loaded before the cities are loaded, then we
-  // need to refresh the discovery section after the cities are loaded.
+  // Refresh discovery if it ran before the city index loaded.
   bool reloadLocationDiscoverySection = false;
 
   static const _kCitiesKdTreeRemotePath =
       "https://assets.ente.com/world_cities.kdtree.bin";
 
-  List<City> _cities = [];
-  List<List<int>> _kdTreeNodes = [];
-  int _kdTreeRoot = -1;
-  double _kdTreeMaxLatDelta = 0;
-  double _kdTreeMaxLngDelta = 0;
+  CitySearchIndex _citySearchIndex = CitySearchIndex.empty;
 
   // TODO: lau: consider actually using this in location section
   List<BaseLocation> baseLocations = [];
@@ -73,23 +108,22 @@ class LocationService {
     List<EnteFile> allFiles,
     String query,
   ) async {
-    // check if the cities where not loaded when discovery section was loaded
-    if (allFiles.isNotEmpty && _cities.isEmpty && query.isEmpty) {
+    if (allFiles.isNotEmpty && _citySearchIndex.isEmpty && query.isEmpty) {
       reloadLocationDiscoverySection = true;
     }
     final EnteWatch w = EnteWatch("cities_search")..start();
     w.log('start for files ${allFiles.length} and query $query');
-    final args = <String, dynamic>{
-      "query": query,
-      "cities": _cities,
-      "files": allFiles,
-    };
-    if (_kdTreeNodes.isNotEmpty && _kdTreeRoot >= 0) {
-      args["kdTreeNodes"] = _kdTreeNodes;
-      args["kdTreeRoot"] = _kdTreeRoot;
-      args["kdTreeMaxLatDelta"] = _kdTreeMaxLatDelta;
-      args["kdTreeMaxLngDelta"] = _kdTreeMaxLngDelta;
+    final normalizedQuery = query.toLowerCase();
+    if (normalizedQuery.isNotEmpty &&
+        !_citySearchIndex.cities.any(
+          (city) => city.city.toLowerCase().contains(normalizedQuery),
+        )) {
+      w.log(
+        'end for query: $query  on ${allFiles.length} files, found 0 cities',
+      );
+      return {};
     }
+    final args = _citySearchIndex.searchArgs(allFiles, query: query);
     final result = await _computer.compute(getCityResults, param: args);
     w.log(
       'end for query: $query  on ${allFiles.length} files, found '
@@ -99,10 +133,14 @@ class LocationService {
   }
 
   Future<List<City>> getCities() async {
-    if (_cities.isEmpty) {
+    return (await getCitySearchIndex()).cities;
+  }
+
+  Future<CitySearchIndex> getCitySearchIndex() async {
+    if (_citySearchIndex.isEmpty) {
       await _loadCities();
     }
-    return _cities;
+    return _citySearchIndex;
   }
 
   Future<Iterable<LocalEntity<LocationTag>>> getLocationTags() {
@@ -114,11 +152,8 @@ class LocationService {
     Location centerPoint,
     double radius,
   ) async {
-    //The area enclosed by the location tag will be a circle on a 3D spherical
-    //globe and an ellipse on a 2D Mercator projection (2D map)
-    //a & b are the semi-major and semi-minor axes of the ellipse
-    //Converting the unit from kilometers to degrees for a and b as that is
-    //the unit on the caritesian plane
+    // A circular radius on the globe maps to an ellipse in Mercator
+    // coordinates. Store its axes in degrees for latitude/longitude checks.
 
     try {
       final a =
@@ -164,7 +199,6 @@ class LocationService {
     }
   }
 
-  /// returns [lat, lng]
   List<String>? convertLocationToDMS(Location centerPoint) {
     if (centerPoint.latitude == null || centerPoint.longitude == null) {
       return null;
@@ -189,7 +223,6 @@ class LocationService {
     return [degrees, minutes, seconds];
   }
 
-  ///Will only update if there is a change in the locationTag's properties
   Future<void> updateLocationTag({
     required LocalEntity<LocationTag> locationTagEntity,
     double? newRadius,
@@ -202,7 +235,6 @@ class LocationService {
       final name = newName ?? locationTagEntity.item.name;
 
       final locationTag = locationTagEntity.item;
-      //Exit if there is no change in locationTag's properties
       if (radius == locationTag.radius &&
           centerPoint == locationTag.centerPoint &&
           name == locationTag.name) {
@@ -249,11 +281,13 @@ class LocationService {
   }
 
   void _applyKdTreeLoadResult(Map<String, dynamic> result) {
-    _cities = result["cities"] as List<City>;
-    _kdTreeNodes = (result["nodes"] as List).cast<List<int>>();
-    _kdTreeRoot = result["root"] as int;
-    _kdTreeMaxLatDelta = (result["maxLatDelta"] as num).toDouble();
-    _kdTreeMaxLngDelta = (result["maxLngDelta"] as num).toDouble();
+    _citySearchIndex = CitySearchIndex(
+      cities: result["cities"] as List<City>,
+      nodes: (result["nodes"] as List).cast<List<int>>(),
+      root: result["root"] as int,
+      maxLatDelta: (result["maxLatDelta"] as num).toDouble(),
+      maxLngDelta: (result["maxLngDelta"] as num).toDouble(),
+    );
   }
 
   Future<void> _loadCities() async {
@@ -527,19 +561,17 @@ Map<City, List<EnteFile>> getCityResults(Map args) {
 
     final Map<City, List<EnteFile>> results = {};
     for (final file in files) {
-      if (!file.hasLocation) continue; // Skip files without location
+      if (!file.hasLocation) continue;
       final fileLocation = file.location!;
       for (final city in matchingCities) {
         final x = city.lat - fileLocation.latitude!;
         final y = city.lng - fileLocation.longitude!;
 
-        // Bounding box pre-filter: quick rejection for points clearly outside
         if (x.abs() > city.a || y.abs() > city.b) continue;
 
-        // Ellipse containment check using pre-computed squared parameters
         if ((x * x) / city.aSquare + (y * y) / city.bSquare <= 1) {
           results.putIfAbsent(city, () => []).add(file);
-          break; // Stop searching once a file is matched with a city
+          break;
         }
       }
     }
@@ -549,7 +581,7 @@ Map<City, List<EnteFile>> getCityResults(Map args) {
   final bool hasQuery = query.isNotEmpty;
   final Map<City, List<EnteFile>> results = {};
   for (final file in files) {
-    if (!file.hasLocation) continue; // Skip files without location
+    if (!file.hasLocation) continue;
     final fileLocation = file.location!;
     final fileLat = fileLocation.latitude!;
     final fileLng = fileLocation.longitude!;
@@ -603,31 +635,27 @@ bool isFileInsideLocationTag(
   return false;
 }
 
+// Returns kilometers.
 double calculateDistance(Location point1, Location point2) {
   final lat1 = point1.latitude! * (pi / 180);
   final lat2 = point2.latitude! * (pi / 180);
   final long1 = point1.longitude! * (pi / 180);
   final long2 = point2.longitude! * (pi / 180);
 
-  // Difference in latitude and longitude
   final dLat = lat2 - lat1;
   final dLong = long2 - long1;
 
-  // Haversine formula
   final a =
       sin(dLat / 2) * sin(dLat / 2) +
       cos(lat1) * cos(lat2) * sin(dLong / 2) * sin(dLong / 2);
 
-  // Angular distance in radians
   final c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
-  return earthRadius * c; // Distance in kilometers
+  return earthRadius * c;
 }
 
-///The area bounded by the location tag becomes more elliptical with increase
-///in the magnitude of the latitude on the caritesian plane. When latitude is
-///0 degrees, the ellipse is a circle with a = b = r. When latitude incrases,
-///the major axis (a) has to be scaled by the secant of the latitude.
+// Mercator stretches longitude by sec(latitude), so a circle's horizontal
+// radius must scale with latitude.
 double scaleFactor(double lat) {
   return 1 / cos(lat * (pi / 180));
 }
@@ -638,17 +666,10 @@ class City {
   final double lat;
   final double lng;
 
-  /// Pre-computed ellipse parameter for location containment check.
-  /// a = (defaultCityRadius * scaleFactor(lat)) / kilometersPerDegree
+  // Ellipse semi-axes in degrees and their precomputed squares.
   final double a;
-
-  /// Pre-computed squared ellipse parameter: a * a
   final double aSquare;
-
-  /// Pre-computed ellipse parameter: defaultCityRadius / kilometersPerDegree
   final double b;
-
-  /// Pre-computed squared ellipse parameter: b * b
   final double bSquare;
 
   City({
@@ -726,8 +747,6 @@ class GPSData {
       }
     }
 
-    //At this point, latSign and longSign will only be null if latRef and longRef
-    //is of invalid format.
     if (latSign == null || longSign == null) {
       return null;
     }

@@ -5,7 +5,6 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:latlong2/latlong.dart";
 import 'package:logging/logging.dart';
-import 'package:path/path.dart';
 import 'package:photo_manager/photo_manager.dart' hide LatLng;
 import 'package:photos/core/configuration.dart';
 import "package:photos/db/device_files_db.dart";
@@ -70,6 +69,7 @@ class FilesService {
   }
 
   Future<FreeableSpaceInfo> getFreeableSpaceInfo({String? pathID}) async {
+    // PhotoManager cannot delete iCloud shared-album assets.
     final excludeLocalIDs = await _getICloudSharedAlbumAssetIDs();
     FreeableFileIDs ids;
     final bool hasMigratedSize = await FilesService.instance.hasMigratedSizes();
@@ -94,8 +94,6 @@ class FilesService {
     return FreeableSpaceInfo(ids.localIDs, size);
   }
 
-  /// Returns iCloud shared album paths on iOS.
-  /// Returns empty list on non-iOS platforms.
   Future<List<AssetPathEntity>> _getICloudSharedAlbumPaths() async {
     if (!Platform.isIOS) return [];
     return PhotoManager.getAssetPathList(
@@ -110,9 +108,6 @@ class FilesService {
     );
   }
 
-  /// Returns local asset IDs that belong to iCloud shared albums on iOS.
-  /// These assets cannot be deleted via PhotoManager and must be excluded
-  /// from the free-up-space operation.
   Future<Set<String>> _getICloudSharedAlbumAssetIDs() async {
     final paths = await _getICloudSharedAlbumPaths();
     final Set<String> sharedIDs = {};
@@ -127,8 +122,6 @@ class FilesService {
     return sharedIDs;
   }
 
-  /// Returns path IDs of iCloud shared albums on iOS.
-  /// Returns empty set on non-iOS platforms.
   Future<Set<String>> getICloudSharedAlbumPathIDs() async {
     final paths = await _getICloudSharedAlbumPaths();
     return paths.map((p) => p.id).toSet();
@@ -203,8 +196,6 @@ class FilesService {
     LatLng location,
   ) async {
     for (EnteFile remoteFile in uploadedFiles) {
-      // discard files not owned by user and also dedupe already processed
-      // files
       if (remoteFile.ownerID != _config.getUserID()! ||
           fileIDToUpdateMetadata.containsKey(remoteFile.uploadedFileID!)) {
         continue;
@@ -226,60 +217,6 @@ class FilesService {
     }
   }
 
-  // Note: this method is not used anywhere, but it is kept for future
-  // reference when we add bulk EditTime feature
-  Future<void> bulkEditTime(List<EnteFile> files, EditTimeSource source) async {
-    final ListMatch<EnteFile> result = files.splitMatch(
-      (element) => element.isUploaded,
-    );
-    final List<EnteFile> uploadedFiles = result.matched;
-    // editTime For LocalFiles
-    final List<EnteFile> localOnlyFiles = result.unmatched;
-    for (EnteFile localFile in localOnlyFiles) {
-      final timeResult = _parseTime(localFile, source);
-      if (timeResult != null) {
-        localFile.creationTime = timeResult;
-      }
-    }
-    await _filesDB.insertMultiple(localOnlyFiles);
-
-    final List<EnteFile> remoteFilesToUpdate = [];
-    final Map<int, Map<String, int>> fileIDToUpdateMetadata = {};
-    for (EnteFile remoteFile in uploadedFiles) {
-      // discard files not owned by user and also dedupe already processed
-      // files
-      if (remoteFile.ownerID != _config.getUserID()! ||
-          fileIDToUpdateMetadata.containsKey(remoteFile.uploadedFileID!)) {
-        continue;
-      }
-      final timeResult = _parseTime(remoteFile, source);
-      if (timeResult != null) {
-        remoteFilesToUpdate.add(remoteFile);
-        fileIDToUpdateMetadata[remoteFile.uploadedFileID!] = {
-          editTimeKey: timeResult,
-        };
-      }
-    }
-    if (remoteFilesToUpdate.isNotEmpty) {
-      await FileMagicService.instance.updatePublicMagicMetadata(
-        remoteFilesToUpdate,
-        null,
-        metadataUpdateMap: fileIDToUpdateMetadata,
-      );
-    }
-  }
-
-  int? _parseTime(EnteFile file, EditTimeSource source) {
-    assert(
-      source == EditTimeSource.fileName,
-      "edit source ${source.name} is not supported yet",
-    );
-    final timeResult = parseDateTimeFromFileNameV2(
-      basenameWithoutExtension(file.title ?? ""),
-    );
-    return timeResult?.microsecondsSinceEpoch;
-  }
-
   Future<void> removeIgnoredFiles(Future<FileLoadResult> result) async {
     final ignoredIDs = await IgnoredFilesService.instance.idToIgnoreReasonMap;
     (await result).files.removeWhere(
@@ -288,17 +225,4 @@ class FilesService {
           IgnoredFilesService.instance.shouldSkipUpload(ignoredIDs, f),
     );
   }
-}
-
-enum EditTimeSource {
-  // parse the time from fileName
-  fileName,
-  // parse the time from exif data of file.
-  exif,
-  // use the which user provided as input
-  manualFix,
-  // adjust the time of selected photos by +/- time.
-  // required for cases when the original device in which photos were taken
-  // had incorrect time (quite common with physical cameras)
-  manualAdjusted,
 }

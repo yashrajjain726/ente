@@ -18,6 +18,10 @@ type CreatePublicAccessTokenRequest struct {
 	DeviceLimit int   `json:"deviceLimit"`
 }
 
+func (ct *CreatePublicAccessTokenRequest) Validate() error {
+	return validatePublicLinkDeviceLimit(ct.DeviceLimit)
+}
+
 type UpdatePublicAccessTokenRequest struct {
 	CollectionID    int64                      `json:"collectionID" binding:"required"`
 	ValidTill       *int64                     `json:"validTill"`
@@ -40,8 +44,10 @@ func (ut *UpdatePublicAccessTokenRequest) Validate() error {
 		return NewBadRequestWithMessage("all parameters are missing")
 	}
 
-	if ut.DeviceLimit != nil && (*ut.DeviceLimit < 0 || *ut.DeviceLimit > 50) {
-		return NewBadRequestWithMessage(fmt.Sprintf("device limit: %d out of range [0-50]", *ut.DeviceLimit))
+	if ut.DeviceLimit != nil {
+		if err := validatePublicLinkDeviceLimit(*ut.DeviceLimit); err != nil {
+			return err
+		}
 	}
 
 	if ut.ValidTill != nil && *ut.ValidTill != 0 && *ut.ValidTill < time.Microseconds() {
@@ -61,6 +67,13 @@ func (ut *UpdatePublicAccessTokenRequest) Validate() error {
 
 	if ut.MinRole != nil && !ut.MinRole.IsValidShareRole() {
 		return NewBadRequestWithMessage(fmt.Sprintf("invalid min role %s", *ut.MinRole))
+	}
+	return nil
+}
+
+func validatePublicLinkDeviceLimit(deviceLimit int) error {
+	if deviceLimit < 0 || deviceLimit > 50 {
+		return NewBadRequestWithMessage(fmt.Sprintf("device limit: %d out of range [0-50]", deviceLimit))
 	}
 	return nil
 }
@@ -108,19 +121,18 @@ func (p CollectionLinkRow) CanJoin() error {
 }
 
 type PublicURL struct {
-	URL             string `json:"url"`
-	DeviceLimit     int    `json:"deviceLimit"`
-	ValidTill       int64  `json:"validTill"`
-	EnableDownload  bool   `json:"enableDownload"`
-	EnableCollect   bool   `json:"enableCollect"`
-	EnableComment   bool   `json:"enableComment"`
-	PasswordEnabled bool   `json:"passwordEnabled"`
-	// Nonce contains the nonce value for the password if the link is password protected.
-	Nonce      *string                    `json:"nonce,omitempty"`
-	MemLimit   *int64                     `json:"memLimit,omitempty"`
-	OpsLimit   *int64                     `json:"opsLimit,omitempty"`
-	EnableJoin bool                       `json:"enableJoin"`
-	MinRole    *CollectionParticipantRole `json:"minRole,omitempty"`
+	URL             string                     `json:"url"`
+	DeviceLimit     int                        `json:"deviceLimit"`
+	ValidTill       int64                      `json:"validTill"`
+	EnableDownload  bool                       `json:"enableDownload"`
+	EnableCollect   bool                       `json:"enableCollect"`
+	EnableComment   bool                       `json:"enableComment"`
+	PasswordEnabled bool                       `json:"passwordEnabled"`
+	Nonce           *string                    `json:"nonce,omitempty"`
+	MemLimit        *int64                     `json:"memLimit,omitempty"`
+	OpsLimit        *int64                     `json:"opsLimit,omitempty"`
+	EnableJoin      bool                       `json:"enableJoin"`
+	MinRole         *CollectionParticipantRole `json:"minRole,omitempty"`
 }
 
 type PublicAccessContext struct {
@@ -153,9 +165,8 @@ type PublicCollectionSummary struct {
 	CreatedAt         int64
 	UpdatedAt         int64
 	DeviceAccessCount int
-	// not empty value of passHash indicates that the link is password protected.
-	PassHash      *string
-	EnableComment bool
+	PassHash          *string
+	EnableComment     bool
 }
 
 type AbuseReportRequest struct {

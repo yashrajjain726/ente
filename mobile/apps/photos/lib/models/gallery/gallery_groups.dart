@@ -15,9 +15,6 @@ import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dar
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import "package:uuid/uuid.dart";
 
-/// In order to make the gallery performant when GroupTypes do not show group
-/// headers, groups are still created here but with the group header replaced by
-/// the grid's main axis spacing.
 class GalleryGroups {
   final List<EnteFile> allFiles;
   final GroupType groupType;
@@ -38,8 +35,6 @@ class GalleryGroups {
     required this.selectedFiles,
     required this.tagPrefix,
     this.sortOrderAsc = true,
-
-    /// Should be GroupGallery.spacing if GroupType.showGroupHeader() is false.
     required this.groupHeaderExtent,
     required this.showSelectAll,
     this.limitSelectionToOne = false,
@@ -86,8 +81,6 @@ class GalleryGroups {
   List<({String groupID, String title})> get scrollbarDivisions =>
       _scrollbarDivisions;
 
-  /// Returns allFiles with dummy entries added at appropriate positions to fill
-  /// incomplete rows in each group.
   List<EnteFile> get allFilesWithDummies => _allFilesWithDummies;
 
   double? getOffsetOfGroupContainingFile(EnteFile file) {
@@ -112,7 +105,6 @@ class GalleryGroups {
     return scrollOffset;
   }
 
-  /// Uses binary search to find the group ID that contains the given creation time.
   String? _findGroupForCreationTime(int creationTime) {
     if (_groupIds.isEmpty) {
       _logger.warning(
@@ -137,7 +129,6 @@ class GalleryGroups {
       final minTime = groupData.minCreationTime;
 
       if (creationTime <= maxTime && creationTime >= minTime) {
-        // Found the group containing this creation time
         return groupId;
       } else if (sortOrderAsc) {
         if (creationTime < minTime) {
@@ -238,7 +229,6 @@ class GalleryGroups {
                       filesInGroup[firstIndexOfRowWrtFilesInGroup + i];
 
                   if (currentFile is DummyFile) {
-                    // Add dummy widget for DummyFile
                     gridRowChildren.add(
                       RepaintBoundary(
                         key: ValueKey(tagPrefix + currentFile.tag),
@@ -250,7 +240,6 @@ class GalleryGroups {
                       ),
                     );
                   } else {
-                    // Add normal GalleryFileWidget for real files
                     gridRowChildren.add(
                       RepaintBoundary(
                         key: ValueKey(tagPrefix + currentFile.tag),
@@ -320,21 +309,13 @@ class GalleryGroups {
   void _buildGroups() {
     final stopwatch = Stopwatch()..start();
 
-    final yearsInGroups = <int>{}; //Only relevant for time grouping
-    List<EnteFile> groupFiles = [];
-    final allFilesLength = allFiles.length;
+    final yearsInGroups = <int>{};
 
     if (groupType.showGroupHeader()) {
-      for (int index = 0; index < allFilesLength; index++) {
-        if (index > 0 &&
-            !groupType.areFromSameGroup(allFiles[index - 1], allFiles[index])) {
-          _createNewGroup(groupFiles, yearsInGroups);
-          groupFiles = [];
-        }
-        groupFiles.add(allFiles[index]);
-      }
-      if (groupFiles.isNotEmpty) {
-        _createNewGroup(groupFiles, yearsInGroups);
+      var start = 0;
+      for (final end in _timeGroupEndIndexes()) {
+        _createNewGroup(_copyFilesInRange(start, end), yearsInGroups);
+        start = end;
       }
     } else {
       // Split allFiles into groups of max length 10 * crossAxisCount for
@@ -343,7 +324,7 @@ class GalleryGroups {
         final end = (i + 10 * crossAxisCount < allFiles.length)
             ? i + 10 * crossAxisCount
             : allFiles.length;
-        final subGroup = allFiles.sublist(i, end);
+        final subGroup = _copyFilesInRange(i, end);
         _createNewGroup(subGroup, yearsInGroups);
       }
     }
@@ -354,23 +335,56 @@ class GalleryGroups {
     stopwatch.stop();
   }
 
+  List<EnteFile> _copyFilesInRange(int start, int end) {
+    // Create a real List<EnteFile> so _createNewGroup can add DummyFiles.
+    // A sublist of List<EnteTrashFile>, for example, only accepts EnteTrashFile.
+    return List<EnteFile>.from(allFiles.getRange(start, end));
+  }
+
+  List<int> _timeGroupEndIndexes() {
+    final ends = <int>[];
+    if (allFiles.isEmpty) {
+      return ends;
+    }
+
+    if (groupType == GroupType.week) {
+      var previousFile = allFiles.first;
+      for (var index = 1; index < allFiles.length; index++) {
+        final file = allFiles[index];
+        if (!groupType.areFromSameGroup(previousFile, file)) {
+          ends.add(index);
+        }
+        previousFile = file;
+      }
+      ends.add(allFiles.length);
+      return ends;
+    }
+
+    var groupRange = groupType.getGroupRange(allFiles.first);
+    for (var index = 1; index < allFiles.length; index++) {
+      final creationTime = allFiles[index].creationTime!;
+      if (creationTime < groupRange.$1 || creationTime > groupRange.$2) {
+        ends.add(index);
+        groupRange = groupType.getGroupRange(allFiles[index]);
+      }
+    }
+    ends.add(allFiles.length);
+    return ends;
+  }
+
   void _createNewGroup(List<EnteFile> groupFiles, Set<int> yearsInGroups) {
     final uuid = _uuid.v1();
 
-    // Save original last file before adding dummies to the end
     final lastFile = groupFiles.last;
 
     // Dummy files are used for gesture tracking in swipe-to-select
     if (!limitSelectionToOne) {
-      // Add dummy files to fill the last row if needed
       final incompleteRowCount = groupFiles.length % crossAxisCount;
       if (incompleteRowCount != 0) {
         final dummiesNeeded = crossAxisCount - incompleteRowCount;
-        final filesWithDummies = List<EnteFile>.from(groupFiles);
         for (int i = 0; i < dummiesNeeded; i++) {
-          filesWithDummies.add(DummyFile(groupID: uuid, index: i));
+          groupFiles.add(DummyFile(groupID: uuid, index: i));
         }
-        groupFiles = filesWithDummies;
       }
     }
 
@@ -395,7 +409,6 @@ class GalleryGroups {
       _allFilesWithDummies.addAll(groupFiles);
     }
 
-    // For scrollbar divisions
     if (groupType.timeGrouping()) {
       final yearOfGroup = DateTime.fromMicrosecondsSinceEpoch(
         groupFiles.first.creationTime!,

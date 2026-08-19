@@ -88,7 +88,7 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 				return
 			}
 			if isFreeUser {
-				publicCollectionSummary.DeviceLimit = public2.FreeUserDeviceLimit
+				publicCollectionSummary.DeviceLimit = capFreeUserDeviceLimit(publicCollectionSummary.DeviceLimit)
 			}
 
 			if publicCollectionSummary.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
@@ -172,6 +172,13 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 	}
 }
 
+func capFreeUserDeviceLimit(deviceLimit int) int {
+	if deviceLimit <= 0 || deviceLimit > public2.FreeUserDeviceLimit {
+		return public2.FreeUserDeviceLimit
+	}
+	return deviceLimit
+}
+
 func (m *CollectionLinkMiddleware) checkDeviceLimit(c *gin.Context, accessToken string,
 	collectionSummary ente.PublicCollectionSummary, ip string, ua string) (string, bool, error) {
 	linkID := strconv.FormatInt(collectionSummary.ID, 10)
@@ -202,8 +209,6 @@ func shouldCheckCollectionLinkDeviceLimit(reqPath string) bool {
 		reqPath == "/public-collection/diff"
 }
 
-// validateOwnersSubscription checks if the owner has an active subscription.
-// Returns (isFreeUser, error) where isFreeUser is true if user is on free plan but has active subscription.
 func (m *CollectionLinkMiddleware) validateOwnersSubscription(c *gin.Context, cID int64) (bool, error) {
 	userID, err := m.CollectionRepo.GetOwnerID(cID)
 	if err != nil {
@@ -217,7 +222,6 @@ func (m *CollectionLinkMiddleware) validateOwnersSubscription(c *gin.Context, cI
 			return false, stacktrace.Propagate(err, "failed to validate owners subscription")
 		}
 		isFreeUser = true
-		// Free user - check if they have active subscription (not expired)
 		if err = m.BillingCtrl.HasActiveSelfOrFamilySubscription(userID, false); err != nil {
 			return false, stacktrace.Propagate(err, "failed to validate owners subscription")
 		}

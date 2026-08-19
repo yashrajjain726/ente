@@ -1,0 +1,1 @@
+- (i) Adds album slideshow playback.

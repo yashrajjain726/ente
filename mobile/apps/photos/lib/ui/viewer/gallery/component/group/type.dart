@@ -2,7 +2,6 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/widgets.dart";
 import "package:intl/intl.dart";
-import "package:photos/core/constants.dart";
 import "package:photos/models/file/file.dart";
 
 enum GroupType { day, week, month, size, year, none }
@@ -67,11 +66,6 @@ extension GroupTypeExtension on GroupType {
     }
   }
 
-  // returns true if the group should be refreshed.
-  // If groupType is day, it should return true if the list of modified files contains a file that was created on the same day as the first file.
-  // If groupType is week, it should return true if the list of modified files contains a file that was created in the same week as the first file.
-  // If groupType is month, it should return true if the list of modified files contains a file that was created in the same month as the first file.
-  // If groupType is year, it should return true if the list of modified files contains a file that was created in the same year as the first file.
   bool areModifiedFilesPartOfGroup(
     List<EnteFile> modifiedFiles,
     EnteFile fistFile, {
@@ -118,15 +112,15 @@ extension GroupTypeExtension on GroupType {
     }
   }
 
-  // for day, year, month, year type, return the microsecond range of the group
   (int, int) getGroupRange(EnteFile file) {
     switch (this) {
       case GroupType.day:
         final date = DateTime.fromMicrosecondsSinceEpoch(file.creationTime!);
         final startOfDay = DateTime(date.year, date.month, date.day);
+        final endOfDay = DateTime(date.year, date.month, date.day + 1);
         return (
           startOfDay.microsecondsSinceEpoch,
-          (startOfDay.microsecondsSinceEpoch + microSecondsInDay - 1),
+          endOfDay.microsecondsSinceEpoch - 1,
         );
       case GroupType.week:
         final date = DateTime.fromMicrosecondsSinceEpoch(file.creationTime!);
@@ -213,7 +207,6 @@ extension GroupTypeExtension on GroupType {
     final date = DateTime.fromMicrosecondsSinceEpoch(timestamp);
     final now = DateTime.now();
 
-    // Check if it's the current week
     final startOfWeek = date.subtract(Duration(days: date.weekday - 1));
     final nowStartOfWeek = now.subtract(Duration(days: now.weekday - 1));
 
@@ -223,7 +216,6 @@ extension GroupTypeExtension on GroupType {
       return context.strings.thisWeek;
     }
 
-    // Check if it's the previous week
     final lastWeekStart = nowStartOfWeek.subtract(const Duration(days: 7));
     if (startOfWeek.year == lastWeekStart.year &&
         startOfWeek.month == lastWeekStart.month &&
@@ -231,7 +223,6 @@ extension GroupTypeExtension on GroupType {
       return context.strings.lastWeek;
     }
 
-    // Return formatted week range
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
     return "${DateFormat.MMMd(Localizations.localeOf(context).languageCode).format(startOfWeek)} - ${DateFormat.MMMd(Localizations.localeOf(context).languageCode).format(endOfWeek)}, ${endOfWeek.year}";
   }

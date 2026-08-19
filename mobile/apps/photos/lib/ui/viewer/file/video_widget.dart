@@ -92,8 +92,7 @@ class _VideoWidgetState extends State<VideoWidget> {
         widget.file.uploadedFileID,
       );
       if (!widget.file.isOwner) {
-        // For shared video, we need to on-demand check if the file is streamable
-        // and if not, we need to set isPreviewLoadable to false
+        // Shared previews are discovered on demand; assume loadable until checked.
         isPreviewLoadable = true;
       }
       _checkForPreview();
@@ -193,7 +192,9 @@ class _VideoWidgetState extends State<VideoWidget> {
     }
 
     final shouldUseNativeVideoPlayer =
-        useNativeVideoPlayer && (!playPreview || Platform.isAndroid);
+        useNativeVideoPlayer &&
+        !widget.file.isDeviceTrash &&
+        (!playPreview || Platform.isAndroid);
 
     if (shouldUseNativeVideoPlayer) {
       return VideoWidgetNative(

@@ -151,10 +151,10 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
         default: { info, warn, error },
         logToDisk: vi.fn(),
     }));
-    vi.doMock("ente-accounts-rs/services/session-storage", () => ({
+    vi.doMock("ente-accounts/services/session-storage", () => ({
         masterKeyFromSession: vi.fn(() => "MASTER_KEY"),
     }));
-    vi.doMock("ente-accounts-rs/services/user", () => ({
+    vi.doMock("ente-accounts/services/user", () => ({
         ensureLocalUser: vi.fn(() => ({ id: 101 })),
     }));
     vi.doMock("ente-base/app", () => ({
@@ -163,7 +163,7 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
         desktopAppVersion: undefined,
         isDesktop: false,
     }));
-    vi.doMock("ente-wasm", () => ({
+    vi.doMock("ente-core-wasm", () => ({
         contacts_open_ctx: vi.fn(() => ({
             ctx: {
                 update_auth_token,

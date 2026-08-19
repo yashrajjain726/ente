@@ -50,9 +50,9 @@ jobs:
             - name: Reset ML test cache
               run: rm -rf .cache
 
-            - run: cargo clippy --locked --all-targets --features museum,ente-photos/ml-assets
+            - run: cargo clippy --locked --all-targets --features museum,ente-ml/ml-assets
 
-            - run: cargo test --locked --features museum,ente-photos/ml-assets
+            - run: cargo test --locked --features museum,ente-ml/ml-assets
               env:
                   GITHUB_TOKEN: ${{ github.token }}
 
@@ -83,9 +83,9 @@ jobs:
 
             - run: cargo codegen frb
 
-            - run: cargo clippy -p ente_photos_rust --features flutter --all-targets --locked
+            - run: cargo clippy -p ente-photos-frb --features flutter --all-targets --locked
 
-            - run: cargo clippy -p ente_rust --features flutter --all-targets --locked
+            - run: cargo clippy -p ente-locker-frb --features flutter --all-targets --locked
 
     rust-wasm:
         # For web-lint.yml's WASM builds.
@@ -113,6 +113,8 @@ jobs:
             - run: npm ci
 
             - run: npm run build:wasm
+
+            - run: npm run build:cast-wasm
 
             - run: npm run build:space-wasm
 
@@ -149,7 +151,7 @@ jobs:
               working-directory: rust
 
             - name: Build Ensu
-              working-directory: mobile/native/android/apps/ensu
+              working-directory: android/apps/ensu
               run: ./gradlew :app:assembleDebug
 
     ensu-ios:
@@ -169,7 +171,7 @@ jobs:
               working-directory: rust
 
             - name: Build Ensu
-              working-directory: mobile/native/apple/apps/ensu
+              working-directory: apple/apps/ensu
               run: xcodebuild build-for-testing -scheme Ensu -destination 'platform=iOS Simulator,name=iPhone 17'
 
     go-server:

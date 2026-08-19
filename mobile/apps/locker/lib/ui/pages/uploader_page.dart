@@ -20,26 +20,21 @@ import "package:locker/utils/bottom_sheet_illustration.dart";
 import "package:locker/utils/error_sheet.dart";
 import 'package:logging/logging.dart';
 
-/// Abstract base class that provides file upload functionality.
-/// Contains common file picking and uploading logic that can be reused
-/// across different pages like HomePage and CollectionPage.
 abstract class UploaderPage extends BaseHomePage {
   const UploaderPage({super.key});
 }
 
+enum _UploadFilesOutcome { cancelled, succeeded, failed }
+
 abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
   final _logger = Logger('UploaderPage');
 
-  /// Returns the collection that should be pre-selected in the upload dialog.
-  /// Return null to default to uncategorized collection.
   Collection? get selectedCollection => null;
 
-  /// Called after a successful file upload to refresh the UI
   void onFileUploadComplete();
 
-  /// Opens a file picker dialog and uploads the selected file
   Future<bool> addFile() async {
-    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+    final FilePickerResult? result = await FilePicker.pickFiles(
       type: FileType.any,
       allowMultiple: true,
     );
@@ -55,16 +50,21 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
           .toList();
 
       if (selectedFiles.isNotEmpty) {
-        return await uploadFiles(selectedFiles);
+        final outcome = await _uploadFiles(selectedFiles);
+        return outcome != _UploadFilesOutcome.cancelled;
       }
     }
 
     return false;
   }
 
-  Future<bool> uploadFiles(List<File> files) async {
-    var didUpload = false;
+  Future<bool> uploadFiles(List<File> files) async =>
+      await _uploadFiles(files) == _UploadFilesOutcome.succeeded;
+
+  Future<_UploadFilesOutcome> _uploadFiles(List<File> files) async {
+    var outcome = _UploadFilesOutcome.cancelled;
     var hasUploadError = false;
+    var completedPrimaryUploads = 0;
     var didShowDialog = false;
     final l10n = context.strings;
     ProgressDialog? progressDialog;
@@ -76,10 +76,9 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
           .getCollectionsForUI();
 
       if (!mounted) {
-        return false;
+        return _UploadFilesOutcome.cancelled;
       }
 
-      // Navigate to upload screen to get collection selection
       final uploadResult = await Navigator.of(context)
           .push<FileUploadScreenResult>(
             MaterialPageRoute(
@@ -91,16 +90,14 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
             ),
           );
 
-      // Handle both regular collections and uncategorized (empty set)
       final isUncategorizedUpload =
           uploadResult != null && uploadResult.selectedCollections.isEmpty;
       final isRegularUpload =
           uploadResult != null && uploadResult.selectedCollections.isNotEmpty;
 
       if (isUncategorizedUpload || isRegularUpload) {
-        didUpload = true;
+        outcome = _UploadFilesOutcome.failed;
         if (isUncategorizedUpload) {
-          // Get the uncategorized collection for upload
           final uncategorizedCollection = await CollectionService.instance
               .getOrCreateUncategorizedCollection();
           uploadResult.selectedCollections.add(uncategorizedCollection);
@@ -124,6 +121,7 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
           futures.add(
             fileUploadFuture.then<void>(
               (enteFile) async {
+                completedPrimaryUploads++;
                 completedUploads++;
                 if (didShowDialog &&
                     mounted &&
@@ -142,7 +140,6 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
                 }
 
                 final postUploadFutures = <Future<dynamic>>[];
-                // Add to additional collections if multiple were selected
                 for (
                   int cIndex = 1;
                   cIndex < uploadResult.selectedCollections.length;
@@ -201,8 +198,16 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
             _logger.warning('Background sync failed after upload', e);
           });
         }
+        if (!hasUploadError) {
+          outcome = _UploadFilesOutcome.succeeded;
+        }
       }
     } catch (e, s) {
+      final didUploadAllFiles =
+          files.isNotEmpty && completedPrimaryUploads == files.length;
+      outcome = didUploadAllFiles
+          ? _UploadFilesOutcome.succeeded
+          : _UploadFilesOutcome.failed;
       _logger.severe('Failed to complete file upload', e, s);
       if (didShowDialog && progressDialog?.isShowing() == true) {
         await progressDialog?.hide();
@@ -218,7 +223,7 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
       }
     }
 
-    return didUpload;
+    return outcome;
   }
 
   Future<void> _showUploadFailureError(Object error) async {

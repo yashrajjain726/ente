@@ -8,8 +8,12 @@ import {
     CollectionSelector,
     type CollectionSelectorAttributes,
 } from "@/components/CollectionSelector";
+import { CollectionMapDialog } from "@/components/Collections/CollectionMapDialog";
+import {
+    EditAlbumDetailsDialog,
+    type AlbumDetails,
+} from "@/components/Collections/EditAlbumDetailsDialog";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
-import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
 import { Export } from "@/components/Export";
 import { FamilyManagement } from "@/components/FamilyManagement";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
@@ -48,6 +52,7 @@ import {
 import { useIsOffline } from "@/components/utils/use-is-offline";
 import { shouldShowWhatsNew } from "@/services/changelog";
 import exportService from "@/services/export";
+import { processPendingAlbumJoin } from "@/services/join-album";
 import { Upload01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -59,7 +64,6 @@ import {
     getAndClearIsFirstLogin,
     getAndClearJustSignedUp,
 } from "ente-accounts/services/accounts-db";
-import { processPendingAlbumJoin } from "ente-accounts/services/join-album";
 import { stashRedirect } from "ente-accounts/services/redirect";
 import { isSessionInvalid } from "ente-accounts/services/session";
 import { ensureLocalUser } from "ente-accounts/services/user";
@@ -91,7 +95,7 @@ import { FullScreenDropZone } from "ente-gallery/components/FullScreenDropZone";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
 import { useSaveGroups } from "ente-gallery/components/utils/save-groups";
 import type { FileViewerInitialSidebar } from "ente-gallery/components/viewer/FileViewer";
-import { CollectionSubType, type Collection } from "ente-media/collection";
+import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { ItemVisibility, metadataHash } from "ente-media/file-metadata";
 import { AssignPersonDialog } from "ente-new/photos/components/AssignPersonDialog";
@@ -107,11 +111,13 @@ import {
     addToFavoritesCollection,
     canAddFilesToCollection,
     createAlbum,
+    createHiddenAlbum,
     createPublicURL,
     createQuickLinkCollection,
     removeFromCollection,
     removeFromFavoritesCollection,
-    updateCollectionCover,
+    renameCollection,
+    updateCollectionDetails,
 } from "ente-new/photos/services/collection";
 import {
     haveOnlySystemCollections,
@@ -153,7 +159,10 @@ import type {
     SearchOption,
     SidebarActionID,
 } from "ente-new/photos/services/search/types";
-import { initSettings } from "ente-new/photos/services/settings";
+import {
+    initSettings,
+    updateMapEnabled,
+} from "ente-new/photos/services/settings";
 import {
     redirectToCustomerPortal,
     savedUserDetailsOrTriggerPull,
@@ -224,7 +233,7 @@ const Page: React.FC = () => {
     const [collectionSelectorAttributes, setCollectionSelectorAttributes] =
         useState<CollectionSelectorAttributes | undefined>();
 
-    const { customDomain } = useSettingsSnapshot();
+    const { customDomain, mapEnabled } = useSettingsSnapshot();
     const userDetails = useUserDetailsSnapshot();
     const peopleState = usePeopleStateSnapshot();
 
@@ -249,6 +258,7 @@ const Page: React.FC = () => {
     const [, setPostCreateAlbumOp] = useState<CollectionOp | undefined>(
         undefined,
     );
+    const postCreateAlbumHidden = useRef(false);
     const [pendingSidebarAction, setPendingSidebarAction] = useState<
         SidebarActionID | undefined
     >(undefined);
@@ -278,9 +288,26 @@ const Page: React.FC = () => {
     const { show: showEditLocation, props: editLocationVisibilityProps } =
         useModalVisibility();
     const {
-        show: showPickCoverPhotoDialog,
-        props: pickCoverPhotoDialogVisibilityProps,
+        show: showEditAlbumDetails,
+        props: editAlbumDetailsVisibilityProps,
     } = useModalVisibility();
+    const { show: showCollectionMap, props: collectionMapVisibilityProps } =
+        useModalVisibility();
+    const closeCollectionMap = collectionMapVisibilityProps.onClose;
+
+    const handleShowCollectionMap = useCallback(() => {
+        void (async () => {
+            if (!mapEnabled) {
+                try {
+                    await updateMapEnabled(true);
+                } catch (e) {
+                    onGenericError(e);
+                    return;
+                }
+            }
+            showCollectionMap();
+        })();
+    }, [mapEnabled, onGenericError, showCollectionMap]);
 
     const [addToAlbumProgress, setAddToAlbumProgress] = useState<{
         open: boolean;
@@ -391,29 +418,6 @@ const Page: React.FC = () => {
             }, new Map<number, number[]>()),
         [state.collectionFiles],
     );
-
-    const isOwnedAlbumEligibleForCover = useMemo(() => {
-        if (
-            isInSearchMode ||
-            !activeCollection ||
-            !activeCollectionSummary ||
-            !user
-        )
-            return false;
-
-        if (activeCollection.owner.id != user.id) return false;
-        if (
-            activeCollection.magicMetadata?.data.subType ==
-            CollectionSubType.quicklink
-        ) {
-            return false;
-        }
-
-        return (
-            activeCollectionSummary.attributes.has("album") ||
-            activeCollectionSummary.attributes.has("folder")
-        );
-    }, [isInSearchMode, activeCollection, activeCollectionSummary, user]);
 
     const activeCollectionFiles = useMemo(() => {
         if (!activeCollection) return [];
@@ -603,6 +607,10 @@ const Page: React.FC = () => {
     }, [activeCollectionID, router.isReady]);
 
     useEffect(() => {
+        if (!activeCollectionSummary) closeCollectionMap();
+    }, [activeCollectionSummary, closeCollectionMap]);
+
+    useEffect(() => {
         if (router.isReady && haveMasterKeyInSession()) {
             void handleSubscriptionCompletionRedirectIfNeeded(
                 showMiniDialog,
@@ -689,7 +697,7 @@ const Page: React.FC = () => {
             exportVisibilityProps.open ||
             authenticateUserVisibilityProps.open ||
             albumNameInputVisibilityProps.open ||
-            pickCoverPhotoDialogVisibilityProps.open ||
+            editAlbumDetailsVisibilityProps.open ||
             isFileViewerOpen
         ) {
             return;
@@ -975,15 +983,19 @@ const Page: React.FC = () => {
     const createOnCreateForCollectionOp = useCallback(
         (op: CollectionOp) => {
             setPostCreateAlbumOp(op);
+            postCreateAlbumHidden.current =
+                op == "add" && barMode == "hidden-albums";
             return showAlbumNameInput;
         },
-        [showAlbumNameInput],
+        [showAlbumNameInput, barMode],
     );
 
     const handleAlbumNameSubmit = useCallback(
         async (name: string) => {
             try {
-                const collection = await createAlbum(name);
+                const collection = postCreateAlbumHidden.current
+                    ? await createHiddenAlbum(name)
+                    : await createAlbum(name);
 
                 if (pendingSingleFileAdd.current) {
                     await performCollectionOp(
@@ -1005,6 +1017,7 @@ const Page: React.FC = () => {
                     });
                     setOpenCollectionSelector(false);
                     setPostCreateAlbumOp(undefined);
+                    postCreateAlbumHidden.current = false;
                     return;
                 }
 
@@ -1014,6 +1027,7 @@ const Page: React.FC = () => {
                     );
                     return undefined;
                 });
+                postCreateAlbumHidden.current = false;
             } finally {
                 pendingSingleFileAdd.current = undefined;
             }
@@ -1449,17 +1463,22 @@ const Page: React.FC = () => {
     );
 
     const handleSelectCollection = useCallback(
-        (collectionID: number) =>
+        (collectionID: number) => {
+            closeCollectionMap();
             dispatch({
                 type: "showCollectionSummary",
                 collectionSummaryID: collectionID,
-            }),
-        [],
+            });
+        },
+        [closeCollectionMap],
     );
 
     const handleSelectPerson = useCallback(
-        (personID: string) => dispatch({ type: "showPerson", personID }),
-        [],
+        (personID: string) => {
+            closeCollectionMap();
+            dispatch({ type: "showPerson", personID });
+        },
+        [closeCollectionMap],
     );
 
     const handleOpenCollectionSelector = useCallback(
@@ -1477,34 +1496,39 @@ const Page: React.FC = () => {
         [favoriteFileIDs, selected],
     );
 
-    const handleUpdateCollectionCover = useCallback(
-        async (coverID: number) => {
-            if (!activeCollection || !isOwnedAlbumEligibleForCover)
-                return false;
+    const handleEditAlbumDetails = useCallback(
+        async ({ name, description, coverID }: AlbumDetails) => {
+            if (!activeCollection) return;
 
-            showLoadingBar();
+            let didAttemptWrite = false;
             try {
-                await updateCollectionCover(activeCollection, coverID);
-                await remotePull({
-                    silent: true,
-                    source: "update-collection-cover",
-                });
-                return true;
-            } catch (e) {
-                onGenericError(e);
-                return false;
+                if (activeCollection.name != name) {
+                    didAttemptWrite = true;
+                    await renameCollection(activeCollection, name);
+                }
+                const descriptionChanged =
+                    (
+                        activeCollection.pubMagicMetadata?.data.caption ?? ""
+                    ).trim() != description;
+                if (descriptionChanged || coverID !== undefined) {
+                    didAttemptWrite = true;
+                    await updateCollectionDetails(activeCollection, {
+                        description: descriptionChanged
+                            ? description
+                            : undefined,
+                        coverID,
+                    });
+                }
             } finally {
-                hideLoadingBar();
+                if (didAttemptWrite) {
+                    await remotePull({
+                        silent: true,
+                        source: "update-album-details",
+                    });
+                }
             }
         },
-        [
-            activeCollection,
-            isOwnedAlbumEligibleForCover,
-            showLoadingBar,
-            remotePull,
-            onGenericError,
-            hideLoadingBar,
-        ],
+        [activeCollection, remotePull],
     );
 
     const handleContextMenuAction = useCallback(
@@ -1582,6 +1606,7 @@ const Page: React.FC = () => {
                     handleOpenCollectionSelector({
                         action: "add",
                         sourceCollectionSummaryID: activeCollectionSummary?.id,
+                        showHiddenCollections: barMode == "hidden-albums",
                         onCreateCollection:
                             createOnCreateForCollectionOp("add"),
                         onSelectCollection:
@@ -1685,24 +1710,10 @@ const Page: React.FC = () => {
             showEditLocation,
             activeCollectionSummary,
             activeCollection,
+            barMode,
             selectedCount,
             selectedOwnCount,
         ],
-    );
-
-    const handleOpenPickCoverPhotoDialog = useCallback(() => {
-        if (!isOwnedAlbumEligibleForCover) return;
-        showPickCoverPhotoDialog();
-    }, [isOwnedAlbumEligibleForCover, showPickCoverPhotoDialog]);
-
-    const handleUseSelectedCoverPhoto = useCallback(
-        async (file: EnteFile) => handleUpdateCollectionCover(file.id),
-        [handleUpdateCollectionCover],
-    );
-
-    const handleResetCollectionCover = useCallback(
-        async () => handleUpdateCollectionCover(0),
-        [handleUpdateCollectionCover],
     );
 
     const handleCloseCollectionSelector = useCallback(
@@ -1748,6 +1759,7 @@ const Page: React.FC = () => {
 
             const handleCreate = () => {
                 setPostCreateAlbumOp("add");
+                postCreateAlbumHidden.current = false;
                 showAlbumNameInput();
             };
 
@@ -1907,24 +1919,13 @@ const Page: React.FC = () => {
                     // component need to be updated.
                     activeCollection: activeCollection!,
                     activeCollectionID: activeCollectionID!,
-                    files: activeCollection
-                        ? activeCollectionFiles
-                        : filteredFiles,
-                    mapFileSource,
                     activePerson,
                     setFileListHeader,
                     saveGroups,
                     canCreateAlbum: !isInArchiveSection,
                     onAddSaveGroup,
-                    onMarkTempDeleted: handleMarkTempDeleted,
-                    onAddFileToCollection: handleAddSingleFileToCollection,
-                    onRemoteFilesPull: remoteFilesPull,
-                    onVisualFeedback: handleVisualFeedback,
-                    fileNormalCollectionIDs,
-                    collectionNameByID,
-                    onSelectCollection: handleSelectCollection,
-                    canSetAlbumCover: isOwnedAlbumEligibleForCover,
-                    onSetAlbumCover: handleOpenPickCoverPhotoDialog,
+                    onEditAlbumDetails: showEditAlbumDetails,
+                    onShowMap: handleShowCollectionMap,
                 }}
                 mode={barMode}
                 shouldHide={isInSearchMode}
@@ -2017,7 +2018,7 @@ const Page: React.FC = () => {
                     footer={fileListFooter}
                     user={user}
                     files={filteredFiles}
-                    mapFileSource={mapFileSource}
+                    onShowMap={handleShowCollectionMap}
                     enableDownload={true}
                     disableGrouping={state.searchSuggestion?.type == "clip"}
                     enableSelect={true}
@@ -2026,7 +2027,6 @@ const Page: React.FC = () => {
                     // TODO: Incorrect assertion, need to update the type
                     activeCollectionID={activeCollectionID!}
                     activeCollectionSummary={activeCollectionSummary}
-                    activeCollection={activeCollection}
                     activePersonID={activePerson?.id}
                     isInIncomingSharedCollection={activeCollectionSummary?.attributes.has(
                         "sharedIncoming",
@@ -2070,18 +2070,36 @@ const Page: React.FC = () => {
                     }
                 />
             )}
-            {activeCollection && (
-                <PickCoverPhotoDialog
-                    {...pickCoverPhotoDialogVisibilityProps}
+            {activeCollectionSummary && (
+                <CollectionMapDialog
+                    {...collectionMapVisibilityProps}
+                    collectionSummary={activeCollectionSummary}
+                    files={
+                        activeCollection ? activeCollectionFiles : filteredFiles
+                    }
+                    mapFileSource={mapFileSource}
+                    onRemotePull={remotePull}
+                    onAddSaveGroup={onAddSaveGroup}
+                    onMarkTempDeleted={handleMarkTempDeleted}
+                    onAddFileToCollection={handleAddSingleFileToCollection}
+                    onRemoteFilesPull={remoteFilesPull}
+                    onVisualFeedback={handleVisualFeedback}
+                    fileNormalCollectionIDs={fileNormalCollectionIDs}
+                    collectionNameByID={collectionNameByID}
+                    emailByUserID={state.emailByUserID}
+                    onSelectCollection={handleSelectCollection}
+                    onSelectPerson={handleSelectPerson}
+                />
+            )}
+            {activeCollection && editAlbumDetailsVisibilityProps.open && (
+                <EditAlbumDetailsDialog
+                    key={activeCollection.id}
+                    {...editAlbumDetailsVisibilityProps}
                     collection={activeCollection}
                     files={activeCollectionFiles}
+                    initialCoverFile={activeCollectionSummary?.coverFile}
                     user={user}
-                    canResetToDefault={
-                        (activeCollection.pubMagicMetadata?.data.coverID ?? 0) >
-                        0
-                    }
-                    onUseSelectedPhoto={handleUseSelectedCoverPhoto}
-                    onResetToDefault={handleResetCollectionCover}
+                    onSubmit={handleEditAlbumDetails}
                 />
             )}
             <Export {...exportVisibilityProps} {...{ collectionNameByID }} />
@@ -2099,6 +2117,7 @@ const Page: React.FC = () => {
                 onClose={() => {
                     // Do not leak a cancelled add into the next album creation.
                     pendingSingleFileAdd.current = undefined;
+                    postCreateAlbumHidden.current = false;
                     albumNameInputVisibilityProps.onClose();
                 }}
                 onSubmit={handleAlbumNameSubmit}

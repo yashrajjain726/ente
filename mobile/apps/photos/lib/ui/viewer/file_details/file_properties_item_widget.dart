@@ -69,10 +69,7 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
       width = widget.file.width;
       height = widget.file.height;
     } else if (widget.isImage) {
-      // No saved public dimensions (local-only / not-yet-backed-up / removed
-      // from Ente). Derive from the actual current local file bytes so we show
-      // the real rendered size instead of the (often stale) EXIF tag. Uses the
-      // non-origin file (asset.file on iOS = the current rendered image).
+      // EXIF dimensions can be stale after edits. Read the current local file.
       try {
         final localFile = await getFile(widget.file);
         final decoded = localFile != null
@@ -108,11 +105,11 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
       subSectionWidgets.add(Text(formatBytes(fileSize), style: textStyle));
     }
 
-    if ((widget.file.fileType == FileType.video) &&
-        (widget.file.localID != null || widget.file.duration != 0)) {
-      if (widget.file.duration != 0) {
+    if (widget.file.fileType == FileType.video) {
+      final duration = widget.file.duration ?? 0;
+      if (duration != 0) {
         subSectionWidgets.add(
-          Text(secondsToHHMMSS(widget.file.duration!), style: textStyle),
+          Text(secondsToHHMMSS(duration), style: textStyle),
         );
       } else {
         final asset = await widget.file.getAsset;

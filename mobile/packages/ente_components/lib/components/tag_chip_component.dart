@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:ente_components/components/chip_surface.dart';
 import 'package:ente_components/theme/radii.dart';
 import 'package:ente_components/theme/spacing.dart';
@@ -7,9 +9,7 @@ import 'package:flutter/material.dart';
 
 enum TagChipComponentState { selected, unselected, disabled }
 
-/// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2482-6479&m=dev
-/// Section: Tag Chip
-/// Specs: 44px height, 16px radius, body text, selected/unselected/disabled states with one optional icon slot.
+// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2482-6479&m=dev
 class TagChipComponent extends StatelessWidget {
   const TagChipComponent({
     super.key,
@@ -27,6 +27,13 @@ class TagChipComponent extends StatelessWidget {
   final TagChipComponentState state;
   final VoidCallback? onTap;
   final String? tooltip;
+
+  static double preferredHeight(BuildContext context) {
+    final textHeight =
+        MediaQuery.textScalerOf(context).scale(TextStyles.body.fontSize!) *
+        TextStyles.body.height!;
+    return math.max(44, textHeight + 2 * Spacing.md);
+  }
 
   bool get _selected => state == TagChipComponentState.selected;
 

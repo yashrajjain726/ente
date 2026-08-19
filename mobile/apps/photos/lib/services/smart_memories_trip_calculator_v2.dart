@@ -84,23 +84,30 @@ class _TripSurfaceCandidate {
   });
 }
 
+class TripMemoriesAnalysis {
+  final List<BaseLocation> baseLocations;
+  final Set<String> baseCountriesToExclude;
+  final List<TripMemory> tripCandidates;
+
+  const TripMemoriesAnalysis({
+    required this.baseLocations,
+    required this.baseCountriesToExclude,
+    required this.tripCandidates,
+  });
+}
+
 class TripMemoriesCalculatorV2 {
-  // Temporal gap to split photos into separate time windows.
   static const _maxTemporalGapDays = 15;
 
-  // Spatial radius for clustering photos within a temporal block.
+  // Spatial distance constants in this class use kilometers.
   static const _tripClusterRadius = 25.0;
 
-  // Max hop distance for chaining clusters into road trips.
   static const _chainHopDistance = 800.0;
 
-  // Base location overlap check radius.
   static const _baseOverlapRadius = 10.0;
 
-  // Secondary merge radius for nearby home clusters.
   static const _baseMergeRadius = 1.5;
 
-  // Base evidence thresholds.
   static const _minBasePhotos = 10;
   static const _minBaseActiveDays = 10;
   static const _minBaseActiveWeeks = 6;
@@ -109,23 +116,16 @@ class TripMemoriesCalculatorV2 {
   static const _baseDensityWindowDays = 120;
   static const _minBaseActiveDaysInWindow = 12;
 
-  // Trip duration bounds (in days).
   static const _minTripDays = 2;
   static const _maxTripDays = 30;
 
-  // Minimum photos for a valid trip.
   static const _minTripPhotos = 20;
 
-  // Minimum photos for a cluster to participate in chain merging.
-  // Smaller clusters are kept as standalone candidates (and typically
-  // filtered out by _isValidTrip), preventing stray photos from being
-  // absorbed into legitimate trips.
+  // Keep small clusters separate so stray photos cannot join valid trips.
   static const _minChainClusterPhotos = 5;
 
-  // Max temporal gap (in days) for merging clusters or trips.
   static const _mergeWindowDays = 2;
 
-  // Max spatial distance (in km) for merging trips across temporal blocks.
   static const _mergeMaxDistance = 25.0;
 
   static const _tripDisplayDuration = Duration(days: 10);
@@ -145,48 +145,76 @@ class TripMemoriesCalculatorV2 {
     required Map<String, String> faceIDsToPersonID,
     required Map<int, EmbeddingVector> fileIDToImageEmbedding,
     required Vector clipPositiveTextVector,
-    required List<City> cities,
+    required CitySearchIndex citySearchIndex,
   }) async {
-    if (allFiles.isEmpty) return (<TripMemory>[], <BaseLocation>[]);
-
-    final nowInMicroseconds = currentTime.microsecondsSinceEpoch;
-    final windowEnd = currentTime
-        .add(kMemoriesUpdateFrequency)
-        .microsecondsSinceEpoch;
-    final cutOffTime = currentTime.subtract(const Duration(days: 365));
-
-    // ── Phase 1: Base location detection ──
-
-    final baseLocations = _detectBaseLocations(
+    final analysis = analyze(
       allFiles,
+      allFileIdsToFile,
+      isLocalGalleryMode: isLocalGalleryMode,
+      seenTimes: seenTimes,
+      citySearchIndex: citySearchIndex,
+    );
+    return surface(
+      analysis,
+      allFileIdsToFile,
+      currentTime,
+      shownTrips,
+      surfaceAll: surfaceAll,
+      cachedTripMemories: cachedTripMemories,
+      isLocalGalleryMode: isLocalGalleryMode,
+      mlEnabled: mlEnabled,
+      seenTimes: seenTimes,
+      fileIdToFaces: fileIdToFaces,
+      faceIDsToPersonID: faceIDsToPersonID,
+      fileIDToImageEmbedding: fileIDToImageEmbedding,
+      clipPositiveTextVector: clipPositiveTextVector,
+      citySearchIndex: citySearchIndex,
+    );
+  }
+
+  static TripMemoriesAnalysis analyze(
+    Iterable<EnteFile> allFiles,
+    Map<int, EnteFile> allFileIdsToFile, {
+    required bool isLocalGalleryMode,
+    required Map<int, int> seenTimes,
+    required CitySearchIndex citySearchIndex,
+  }) {
+    if (allFiles.isEmpty) {
+      return const TripMemoriesAnalysis(
+        baseLocations: <BaseLocation>[],
+        baseCountriesToExclude: <String>{},
+        tripCandidates: <TripMemory>[],
+      );
+    }
+
+    final filesWithLocation = allFiles.where((f) => f.hasLocation).toList()
+      ..sort((a, b) => a.creationTime!.compareTo(b.creationTime!));
+    final baseLocations = _detectBaseLocations(
+      filesWithLocation,
       isLocalGalleryMode: isLocalGalleryMode,
     );
     final baseCountriesToExclude = _baseCountriesToExcludeFromTripTitles(
       baseLocations,
       allFileIdsToFile,
-      cities,
+      citySearchIndex,
       seenTimes,
     );
 
-    // ── Phase 2: Trip detection ──
-
-    final filesWithLocation = allFiles.where((f) => f.hasLocation).toList()
-      ..sort((a, b) => a.creationTime!.compareTo(b.creationTime!));
-
     if (filesWithLocation.isEmpty) {
-      return (<TripMemory>[], baseLocations);
+      return TripMemoriesAnalysis(
+        baseLocations: baseLocations,
+        baseCountriesToExclude: baseCountriesToExclude,
+        tripCandidates: const <TripMemory>[],
+      );
     }
 
-    // Step 2a: Filter base photos out of the trip stream before
-    // temporal segmentation, so repeated visits to the same place remain
-    // separated by time spent back at base.
+    // Returning to a base separates otherwise nearby trips.
     final temporalBlocks = _segmentAwayFilesByTime(
       filesWithLocation,
       baseLocations,
     );
 
-    // Step 2b: Spatial clustering + chain merging within each block
-    final tripCandidates = <TripMemory>[];
+    final rawTripCandidates = <TripMemory>[];
     for (final block in temporalBlocks) {
       var spatialClusters = _clusterByLocation(
         block,
@@ -201,7 +229,7 @@ class TripMemoriesCalculatorV2 {
 
         if (!_isValidTrip(files, location, baseLocations)) continue;
 
-        tripCandidates.add(
+        rawTripCandidates.add(
           TripMemory(
             Memory.fromFiles(files, seenTimes),
             0,
@@ -219,20 +247,49 @@ class TripMemoriesCalculatorV2 {
       }
     }
 
-    // Step 2c: Merge trips across temporal blocks (same location, close time)
-    final mergedTrips = _mergeNearbyTrips(tripCandidates);
+    final mergedTrips = _mergeNearbyTrips(rawTripCandidates);
 
-    // Step 2d: Final validation
-    final validTrips = mergedTrips
-        .where(
-          (t) =>
-              t.memories.length >= _minTripPhotos &&
-              t.averageCreationTime() < cutOffTime.microsecondsSinceEpoch,
-        )
+    final tripCandidates = mergedTrips
+        .where((trip) => trip.memories.length >= _minTripPhotos)
         .map(_ensureTripKey)
         .toList();
 
-    // ── Phase 3: Surface selection ──
+    return TripMemoriesAnalysis(
+      baseLocations: baseLocations,
+      baseCountriesToExclude: baseCountriesToExclude,
+      tripCandidates: tripCandidates,
+    );
+  }
+
+  static Future<(List<TripMemory>, List<BaseLocation>)> surface(
+    TripMemoriesAnalysis analysis,
+    Map<int, EnteFile> allFileIdsToFile,
+    DateTime currentTime,
+    List<TripsShownLog> shownTrips, {
+    bool surfaceAll = false,
+    required Iterable<ToShowMemory> cachedTripMemories,
+    required bool isLocalGalleryMode,
+    required bool mlEnabled,
+    required Map<int, int> seenTimes,
+    required Map<int, List<FaceWithoutEmbedding>> fileIdToFaces,
+    required Map<String, String> faceIDsToPersonID,
+    required Map<int, EmbeddingVector> fileIDToImageEmbedding,
+    required Vector clipPositiveTextVector,
+    required CitySearchIndex citySearchIndex,
+  }) async {
+    final nowInMicroseconds = currentTime.microsecondsSinceEpoch;
+    final windowEnd = currentTime
+        .add(kMemoriesUpdateFrequency)
+        .microsecondsSinceEpoch;
+    final cutOffTime = currentTime.subtract(const Duration(days: 365));
+    final baseLocations = analysis.baseLocations;
+    final baseCountriesToExclude = analysis.baseCountriesToExclude;
+    final validTrips = analysis.tripCandidates
+        .where(
+          (trip) =>
+              trip.averageCreationTime() < cutOffTime.microsecondsSinceEpoch,
+        )
+        .toList();
 
     final List<TripMemory> memoryResults = [];
 
@@ -252,7 +309,7 @@ class TripMemoriesCalculatorV2 {
         faceIDsToPersonID: faceIDsToPersonID,
         fileIDToImageEmbedding: fileIDToImageEmbedding,
         clipPositiveTextVector: clipPositiveTextVector,
-        cities: cities,
+        citySearchIndex: citySearchIndex,
       );
     }
 
@@ -272,19 +329,14 @@ class TripMemoriesCalculatorV2 {
       faceIDsToPersonID: faceIDsToPersonID,
       fileIDToImageEmbedding: fileIDToImageEmbedding,
       clipPositiveTextVector: clipPositiveTextVector,
-      cities: cities,
+      citySearchIndex: citySearchIndex,
     );
   }
 
-  // ── Base location detection ──
-
   static List<BaseLocation> _detectBaseLocations(
-    Iterable<EnteFile> allFiles, {
+    List<EnteFile> filesWithLocation, {
     required bool isLocalGalleryMode,
   }) {
-    final filesWithLocation =
-        allFiles.where((file) => file.hasLocation).toList()
-          ..sort((a, b) => a.creationTime!.compareTo(b.creationTime!));
     final smallRadiusClusters = _mergeNearbyLocationClusters(
       _clusterByLocation(filesWithLocation, radius: baseRadius),
       radius: _baseMergeRadius,
@@ -322,8 +374,6 @@ class TripMemoriesCalculatorV2 {
     }
     return baseLocations;
   }
-
-  // ── Temporal segmentation ──
 
   static List<List<EnteFile>> _segmentAwayFilesByTime(
     List<EnteFile> sortedFiles,
@@ -366,8 +416,6 @@ class TripMemoriesCalculatorV2 {
     }
     return blocks;
   }
-
-  // ── Spatial clustering within a temporal block ──
 
   static List<_LocationCluster> _clusterByLocation(
     Iterable<EnteFile> files, {
@@ -417,10 +465,6 @@ class TripMemoriesCalculatorV2 {
     return mergedClusters;
   }
 
-  // ── Chain merge for road trips ──
-
-  /// Merges spatial clusters within the same temporal block if they form
-  /// a chronological chain with hops <= [_chainHopDistance].
   static List<_LocationCluster> _mergeChainedClusters(
     List<_LocationCluster> clusters,
   ) {
@@ -473,8 +517,6 @@ class TripMemoriesCalculatorV2 {
 
     return [...merged, ...tooSmall];
   }
-
-  // ── Trip validation ──
 
   static bool _isValidTrip(
     List<EnteFile> files,
@@ -548,8 +590,6 @@ class TripMemoriesCalculatorV2 {
     }
     return false;
   }
-
-  // ── Merge trips across temporal blocks ──
 
   static List<TripMemory> _mergeNearbyTrips(List<TripMemory> trips) {
     final sortedTrips = List<TripMemory>.from(trips)
@@ -870,8 +910,6 @@ class TripMemoriesCalculatorV2 {
     return b.trip.averageCreationTime().compareTo(a.trip.averageCreationTime());
   }
 
-  // ── Surface all (debug mode) ──
-
   static Future<(List<TripMemory>, List<BaseLocation>)> _surfaceAll(
     List<TripMemory> memoryResults,
     List<BaseLocation> baseLocations,
@@ -887,7 +925,7 @@ class TripMemoriesCalculatorV2 {
     required Map<String, String> faceIDsToPersonID,
     required Map<int, EmbeddingVector> fileIDToImageEmbedding,
     required Vector clipPositiveTextVector,
-    required List<City> cities,
+    required CitySearchIndex citySearchIndex,
   }) async {
     for (final baseLocation in baseLocations) {
       String name = "Base (${baseLocation.isCurrentBase ? 'current' : 'old'})";
@@ -896,7 +934,7 @@ class TripMemoriesCalculatorV2 {
           .toList();
       final String? locationName = SmartMemoriesService._tryFindLocationName(
         Memory.fromFiles(files, seenTimes),
-        cities,
+        citySearchIndex,
         base: true,
       );
       if (locationName != null) {
@@ -919,11 +957,11 @@ class TripMemoriesCalculatorV2 {
       ).year;
       final String? locationName = SmartMemoriesService._tryFindLocationName(
         trip.memories,
-        cities,
+        citySearchIndex,
         excludedCountryNames: baseCountriesToExclude,
       );
       final photoSelection = await SmartMemoriesService._bestSelection(
-        trip.memories,
+        List<Memory>.of(trip.memories),
         isLocalGalleryMode: isLocalGalleryMode,
         mlEnabled: mlEnabled,
         fileIdToFaces: fileIdToFaces,
@@ -944,8 +982,6 @@ class TripMemoriesCalculatorV2 {
     return (memoryResults, baseLocations);
   }
 
-  // ── Surface scheduled (production mode) ──
-
   static Future<(List<TripMemory>, List<BaseLocation>)> _surfaceScheduled(
     List<TripMemory> memoryResults,
     List<BaseLocation> baseLocations,
@@ -962,7 +998,7 @@ class TripMemoriesCalculatorV2 {
     required Map<String, String> faceIDsToPersonID,
     required Map<int, EmbeddingVector> fileIDToImageEmbedding,
     required Vector clipPositiveTextVector,
-    required List<City> cities,
+    required CitySearchIndex citySearchIndex,
   }) async {
     final activeTripIdentityKeys = _activeCachedTripIdentityKeys(
       cachedTripMemories,
@@ -1070,11 +1106,11 @@ class TripMemoriesCalculatorV2 {
       ).year;
       final String? locationName = SmartMemoriesService._tryFindLocationName(
         trip.memories,
-        cities,
+        citySearchIndex,
         excludedCountryNames: baseCountriesToExclude,
       );
       final photoSelection = await SmartMemoriesService._bestSelection(
-        trip.memories,
+        List<Memory>.of(trip.memories),
         isLocalGalleryMode: isLocalGalleryMode,
         mlEnabled: mlEnabled,
         fileIdToFaces: fileIdToFaces,
@@ -1098,7 +1134,7 @@ class TripMemoriesCalculatorV2 {
   static Set<String> _baseCountriesToExcludeFromTripTitles(
     List<BaseLocation> baseLocations,
     Map<int, EnteFile> allFileIdsToFile,
-    List<City> cities,
+    CitySearchIndex citySearchIndex,
     Map<int, int> seenTimes,
   ) {
     final excludedCountries = <String>{};
@@ -1113,7 +1149,7 @@ class TripMemoriesCalculatorV2 {
 
       final countryName = SmartMemoriesService._tryFindCountryName(
         Memory.fromFiles(files, seenTimes),
-        cities,
+        citySearchIndex,
       );
       if (countryName == null) {
         continue;

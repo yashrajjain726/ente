@@ -13,7 +13,7 @@ import { Stack } from "@mui/material";
 import Head from "next/head";
 
 const Page = () => {
-    const { mode, accessToken } = usePasteRoute();
+    const mode = usePasteRoute();
 
     const {
         inputText,
@@ -32,7 +32,7 @@ const Page = () => {
         passwordRequired,
         passwordError,
         submitPassword,
-    } = useConsumePaste(mode, accessToken);
+    } = useConsumePaste(mode);
 
     return (
         <>
