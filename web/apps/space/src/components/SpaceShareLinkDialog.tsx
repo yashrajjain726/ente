@@ -150,7 +150,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                         textAlign: "center",
                     }}
                 >
-                    Share your profile so friends and family can find you.
+                    Let friends and family add you as a friend on Space
                 </Box>
                 <Box
                     sx={{
