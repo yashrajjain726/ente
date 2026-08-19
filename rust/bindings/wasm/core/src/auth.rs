@@ -1,6 +1,5 @@
 use ente_accounts::auth;
 use ente_core::b64;
-use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -60,59 +59,6 @@ impl From<ente_accounts::Error> for AccountsError {
     }
 }
 
-impl From<swb::Error> for AccountsError {
-    fn from(e: swb::Error) -> Self {
-        Self {
-            code: "serde".to_string(),
-            message: e.to_string(),
-        }
-    }
-}
-
-#[wasm_bindgen]
-pub struct SrpCredentials {
-    kek: String,
-    login_key: String,
-}
-
-#[wasm_bindgen]
-impl SrpCredentials {
-    #[wasm_bindgen(getter)]
-    pub fn kek(&self) -> String {
-        self.kek.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn login_key(&self) -> String {
-        self.login_key.clone()
-    }
-}
-
-#[wasm_bindgen]
-pub struct DecryptedSecrets {
-    master_key: String,
-    secret_key: String,
-    token: String,
-}
-
-#[wasm_bindgen]
-impl DecryptedSecrets {
-    #[wasm_bindgen(getter)]
-    pub fn master_key(&self) -> String {
-        self.master_key.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn secret_key(&self) -> String {
-        self.secret_key.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn token(&self) -> String {
-        self.token.clone()
-    }
-}
-
 #[wasm_bindgen]
 pub struct GeneratedKek {
     key: String,
@@ -167,21 +113,6 @@ impl GeneratedSrpSetup {
     pub fn login_sub_key(&self) -> String {
         self.login_sub_key.clone()
     }
-}
-
-#[wasm_bindgen]
-pub fn auth_derive_srp_credentials(
-    password: &str,
-    srp_attrs: JsValue,
-) -> Result<SrpCredentials, AccountsError> {
-    let srp_attrs: auth::SrpAttributes = swb::from_value(srp_attrs)?;
-
-    let creds = auth::derive_srp_credentials(password, &srp_attrs)?;
-
-    Ok(SrpCredentials {
-        kek: b64::encode(&creds.kek),
-        login_key: b64::encode(&creds.login_key),
-    })
 }
 
 #[wasm_bindgen]
@@ -244,66 +175,6 @@ pub fn auth_recovery_key_from_mnemonic_or_hex(input: &str) -> Result<String, Acc
 #[wasm_bindgen]
 pub fn auth_recovery_key_to_mnemonic(recovery_key_b64: &str) -> Result<String, AccountsError> {
     auth::recovery_key_to_mnemonic(recovery_key_b64).map_err(Into::into)
-}
-
-#[wasm_bindgen]
-pub fn auth_decrypt_secrets(
-    kek_b64: &str,
-    key_attrs: JsValue,
-    encrypted_token_b64: &str,
-) -> Result<DecryptedSecrets, AccountsError> {
-    let kek = b64::decode(kek_b64).map_err(|e| AccountsError {
-        code: "decode".to_string(),
-        message: format!("kek: {}", e),
-    })?;
-
-    let key_attrs: auth::KeyAttributes = swb::from_value(key_attrs)?;
-
-    let secrets = auth::decrypt_secrets(&kek, &key_attrs, encrypted_token_b64)?;
-
-    Ok(DecryptedSecrets {
-        master_key: b64::encode(&secrets.master_key),
-        secret_key: b64::encode(&secrets.secret_key),
-        token: b64::encode_url_safe(&secrets.token),
-    })
-}
-
-#[wasm_bindgen]
-pub struct DecryptedKeys {
-    master_key: String,
-    secret_key: String,
-}
-
-#[wasm_bindgen]
-impl DecryptedKeys {
-    #[wasm_bindgen(getter)]
-    pub fn master_key(&self) -> String {
-        self.master_key.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn secret_key(&self) -> String {
-        self.secret_key.clone()
-    }
-}
-
-#[wasm_bindgen]
-pub fn auth_decrypt_keys_only(
-    kek_b64: &str,
-    key_attrs: JsValue,
-) -> Result<DecryptedKeys, AccountsError> {
-    let kek = b64::decode(kek_b64).map_err(|e| AccountsError {
-        code: "decode".to_string(),
-        message: format!("kek: {}", e),
-    })?;
-    let key_attrs: auth::KeyAttributes = swb::from_value(key_attrs)?;
-
-    let (master_key, secret_key) = auth::decrypt_keys_only(&kek, &key_attrs)?;
-
-    Ok(DecryptedKeys {
-        master_key: b64::encode(&master_key),
-        secret_key: b64::encode(&secret_key),
-    })
 }
 
 #[wasm_bindgen]

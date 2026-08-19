@@ -4,4 +4,3 @@ mod auth;
 mod contacts;
 mod crypto;
 mod legacy_kit;
-mod urls;
