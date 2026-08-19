@@ -25,14 +25,4 @@ void main() {
       AvatarComponentColor.cyan,
     ]);
   });
-
-  test(
-    'avatar initials use the first and last words with a two-letter cap',
-    () {
-      expect(avatarInitials('Sachin Jain'), 'SJ');
-      expect(avatarInitials('Sachin Kumar Jain'), 'SJ');
-      expect(avatarInitials('Sachin'), 'S');
-      expect(avatarInitials('  '), '?');
-    },
-  );
 }

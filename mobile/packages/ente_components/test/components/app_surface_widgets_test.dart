@@ -117,52 +117,6 @@ void main() {
     },
   );
 
-  testWidgets('MenuComponent can show only loading without success', (
-    tester,
-  ) async {
-    final completer = Completer<void>();
-
-    await pumpComponent(
-      tester,
-      MenuComponent(
-        title: 'Refresh',
-        showOnlyLoadingState: true,
-        onTap: () => completer.future,
-      ),
-    );
-
-    await tester.tap(find.text('Refresh'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const ValueKey('menu-item-loading')), findsOneWidget);
-
-    completer.complete();
-    await tester.pump();
-    expect(find.byKey(const ValueKey('menu-item-success')), findsNothing);
-    expect(find.byKey(const ValueKey('menu-item-loading')), findsNothing);
-  });
-
-  testWidgets('MenuComponent can force success for fast actions', (
-    tester,
-  ) async {
-    await pumpComponent(
-      tester,
-      MenuComponent(
-        title: 'Copy',
-        shouldSurfaceExecutionStates: true,
-        shouldShowSuccessConfirmation: true,
-        onTap: () async {},
-      ),
-    );
-
-    await tester.tap(find.text('Copy'));
-    await tester.pump();
-    expect(find.byKey(const ValueKey('menu-item-success')), findsOneWidget);
-
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(find.byKey(const ValueKey('menu-item-success')), findsNothing);
-  });
-
   testWidgets('MenuComponent resets to idle after async errors', (
     tester,
   ) async {

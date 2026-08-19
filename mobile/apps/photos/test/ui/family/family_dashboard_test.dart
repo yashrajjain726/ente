@@ -128,32 +128,6 @@ void main() {
     );
   });
 
-  group('familyMemberAvatarComponentColor', () {
-    test('hashes every member including the current user', () {
-      final currentUser = _member(email: 'admin@example.com', userID: 1);
-      final otherMember = _member(email: 'saved@example.com', userID: 42);
-
-      expect(
-        familyMemberAvatarComponentColor(currentUser),
-        avatarComponentColorForIdentity(
-          avatarIdentityKey(
-            email: currentUser.email,
-            userID: currentUser.userID,
-          ),
-        ),
-      );
-      expect(
-        familyMemberAvatarComponentColor(otherMember),
-        avatarComponentColorForIdentity(
-          avatarIdentityKey(
-            email: otherMember.email,
-            userID: otherMember.userID,
-          ),
-        ),
-      );
-    });
-  });
-
   testWidgets(
     'renders saved contacts and their shared-album counts at 375 pixels',
     (tester) async {

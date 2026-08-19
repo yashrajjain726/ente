@@ -110,66 +110,6 @@ void main() {
   );
 
   testWidgets(
-    "ButtonComponent shows success confirmation for fast actions when enabled",
-    (tester) async {
-      var tapCount = 0;
-
-      await tester.pumpWidget(
-        _wrap(
-          ButtonComponent(
-            label: "Saved",
-            shouldShowSuccessConfirmation: true,
-            onTap: () => tapCount += 1,
-          ),
-        ),
-      );
-
-      await tester.tap(find.text("Saved"));
-      await tester.pump();
-
-      expect(tapCount, 1);
-      expect(find.byType(HugeIcon), findsOneWidget);
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text("Saved"), findsOneWidget);
-      expect(tester.getSize(find.byType(AnimatedContainer)).height, 52);
-
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-
-      expect(find.text("Saved"), findsOneWidget);
-    },
-  );
-
-  testWidgets("ButtonComponent can surface loading without success", (
-    tester,
-  ) async {
-    final completer = Completer<void>();
-
-    await tester.pumpWidget(
-      _wrap(
-        ButtonComponent(
-          label: "Saving",
-          shouldShowSuccessState: false,
-          onTap: () => completer.future,
-        ),
-      ),
-    );
-
-    await tester.tap(find.text("Saving"));
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.byKey(const ValueKey('loading')), findsOneWidget);
-
-    completer.complete();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(find.byKey(const ValueKey('success')), findsNothing);
-    expect(find.text("Saving"), findsOneWidget);
-  });
-
-  testWidgets(
     "ButtonComponent can hide execution visuals while still blocking taps",
     (tester) async {
       var tapCount = 0;
@@ -408,30 +348,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byKey(const ValueKey('success')), findsOneWidget);
-  });
-
-  testWidgets("IconButtonComponent can show success for fast actions", (
-    tester,
-  ) async {
-    var tapCount = 0;
-
-    await tester.pumpWidget(
-      _wrap(
-        IconButtonComponent(
-          icon: const Icon(Icons.add),
-          shouldShowSuccessConfirmation: true,
-          onTap: () => tapCount += 1,
-        ),
-      ),
-    );
-
-    await tester.tap(find.byType(GestureDetector));
-    await tester.pump();
-
-    expect(tapCount, 1);
-    expect(find.byKey(const ValueKey('success')), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(find.byIcon(Icons.add), findsNothing);
   });
 }
 

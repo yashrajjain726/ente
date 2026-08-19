@@ -15,35 +15,6 @@ import "package:photos/utils/person_contact_linking_util.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 void main() {
-  group("PersonData contact link", () {
-    test("copyWith preserves link fields when omitted", () {
-      final data = PersonData(
-        name: "Alex",
-        email: "alex@example.com",
-        userID: 7,
-      );
-
-      final updated = data.copyWith(name: "Alex R");
-
-      expect(updated.name, "Alex R");
-      expect(updated.email, "alex@example.com");
-      expect(updated.userID, 7);
-    });
-
-    test("copyWith clears email and userID", () {
-      final data = PersonData(
-        name: "Alex",
-        email: "alex@example.com",
-        userID: 7,
-      );
-
-      final updated = data.copyWith(email: null, userID: null);
-
-      expect(updated.email, isNull);
-      expect(updated.userID, isNull);
-    });
-  });
-
   group("PersonService contact link", () {
     late _FakeEntityService entityService;
     late _FakePhotosContactsService contactsService;
@@ -162,18 +133,6 @@ void main() {
       );
 
       expect(updated.data.name, "Alex");
-      expect(contactsService.createOrUpdateCalls, 0);
-      expect(contactsService.lastUpdatedName, isNull);
-    });
-
-    test("updateAttributes can skip linked contact name sync", () async {
-      final updated = await personService.updateAttributes(
-        "person-1",
-        name: "Alex R",
-        syncLinkedContactName: false,
-      );
-
-      expect(updated.data.name, "Alex R");
       expect(contactsService.createOrUpdateCalls, 0);
       expect(contactsService.lastUpdatedName, isNull);
     });

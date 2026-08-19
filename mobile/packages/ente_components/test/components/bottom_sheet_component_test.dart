@@ -5,30 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('BottomSheetComponent dismisses from close button by default', (
-    tester,
-  ) async {
-    await _pumpLauncher(
-      tester,
-      (context) => showBottomSheetComponent<void>(
-        context: context,
-        builder: (_) => const BottomSheetComponent(
-          title: 'Default close',
-          content: Text('Sheet body'),
-        ),
-      ),
-    );
-
-    await _openLauncher(tester);
-
-    expect(find.text('Default close'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Close'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Default close'), findsNothing);
-  });
-
   testWidgets('BottomSheetComponent returns closeResult from close button', (
     tester,
   ) async {

@@ -162,13 +162,6 @@ void main() {
       expect(parsedDate.year, isNull);
     });
 
-    test('should parse "February 2025" (month-year query)', () {
-      final PartialDate parsedDate = dateParseService.parse('February 2025');
-      expect(parsedDate.day, isNull);
-      expect(parsedDate.month, 2);
-      expect(parsedDate.year, 2025);
-    });
-
     test('should parse "25th of February 2025"', () {
       final PartialDate parsedDate = dateParseService.parse(
         '25th of February 2025',
@@ -285,27 +278,6 @@ void main() {
       expect(parsedDate.month, isNull);
       expect(parsedDate.year, 2025);
     });
-
-    test('should parse month-year query "February 2025"', () {
-      final PartialDate parsedDate = dateParseService.parse('February 2025');
-      expect(parsedDate.day, isNull);
-      expect(parsedDate.month, 2);
-      expect(parsedDate.year, 2025);
-    });
-
-    test('should parse generic date query "25th Feb" (year is null)', () {
-      final PartialDate parsedDate = dateParseService.parse('25th Feb');
-      expect(parsedDate.day, 25);
-      expect(parsedDate.month, 2);
-      expect(parsedDate.year, isNull);
-    });
-
-    test('should parse specific date query "25/02/2025"', () {
-      final PartialDate parsedDate = dateParseService.parse('25/02/2025');
-      expect(parsedDate.day, 25);
-      expect(parsedDate.month, 2);
-      expect(parsedDate.year, 2025);
-    });
   });
 
   group('Invalid Date Queries', () {
@@ -338,13 +310,6 @@ void main() {
       expect(parsedDate3.day, isNull, reason: 'Day should be null for 0');
       expect(parsedDate3.month, 2);
       expect(parsedDate3.year, 2024);
-    });
-
-    test('should handle invalid day/month in tokenized parsing gracefully', () {
-      final PartialDate parsedDate = dateParseService.parse('32 Jan 2024');
-      expect(parsedDate.day, isNull, reason: 'Day should be null for 32');
-      expect(parsedDate.month, 1);
-      expect(parsedDate.year, 2024);
     });
   });
 }

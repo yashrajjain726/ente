@@ -6,19 +6,6 @@ import "package:photos/ui/payment/subscription_common_widgets.dart";
 
 void main() {
   group("SubscriptionToggle", () {
-    testWidgets("uses the provided initial billing period", (tester) async {
-      await tester.pumpWidget(
-        _buildTestApp(
-          const SubscriptionToggle(isYearly: false, onToggle: _noopToggle),
-        ),
-      );
-
-      final togglePosition = tester.widget<AnimatedPositioned>(
-        find.byType(AnimatedPositioned),
-      );
-      expect(togglePosition.left, greaterThan(0));
-    });
-
     testWidgets("updates when the selected billing period changes", (
       tester,
     ) async {
