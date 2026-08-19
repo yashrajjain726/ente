@@ -68,6 +68,7 @@ if (process.env.NEXT_PUBLIC_ENTE_SHARE_ENDPOINT) {
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+    agentRules: false,
     output: "export",
     devIndicators: false,
     compiler: { emotion: true },
