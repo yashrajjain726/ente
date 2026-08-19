@@ -40,8 +40,8 @@ type AppStoreController struct {
 }
 
 type appStoreTransaction struct {
-	receiptInfo appstore.InApp
-	expiryTime  int64
+	receiptInfo      appstore.InApp
+	expiryTimeMicros int64
 }
 
 func NewAppStoreController(
@@ -138,7 +138,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 		return err
 	}
 
-	if latestReceiptInfo.ProductID == subscription.ProductID && transaction.expiryTime < subscription.ExpiryTime {
+	if latestReceiptInfo.ProductID == subscription.ProductID && transaction.expiryTimeMicros < subscription.ExpiryTime {
 		// Outdated notification, no-op
 	} else {
 		if latestReceiptInfo.ProductID != subscription.ProductID {
@@ -158,7 +158,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 			}
 			newSubscription := ente.Subscription{
 				Storage:               newStorage,
-				ExpiryTime:            transaction.expiryTime,
+				ExpiryTime:            transaction.expiryTimeMicros,
 				ProductID:             latestReceiptInfo.ProductID,
 				PaymentProvider:       ente.AppStore,
 				OriginalTransactionID: latestReceiptInfo.OriginalTransactionID,
@@ -183,7 +183,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 					return stacktrace.Propagate(err, "")
 				}
 			}
-			err = c.BillingRepo.UpdateSubscriptionExpiryTime(subscription.ID, transaction.expiryTime)
+			err = c.BillingRepo.UpdateSubscriptionExpiryTime(subscription.ID, transaction.expiryTimeMicros)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -226,7 +226,7 @@ func (c *AppStoreController) GetVerifiedSubscription(userID int64, productID str
 		ProductID:             transaction.receiptInfo.ProductID,
 		Storage:               storage,
 		OriginalTransactionID: transaction.receiptInfo.OriginalTransactionID,
-		ExpiryTime:            transaction.expiryTime,
+		ExpiryTime:            transaction.expiryTimeMicros,
 		PaymentProvider:       ente.AppStore,
 		Attributes: ente.SubscriptionAttributes{
 			LatestVerificationData: verificationData,
@@ -254,20 +254,20 @@ func (c *AppStoreController) verifyAppStoreSubscription(verificationData string)
 
 func getCurrentAppStoreTransaction(receiptInfo []appstore.InApp) (appStoreTransaction, error) {
 	var selected appstore.InApp
-	var selectedPurchaseTime int64
+	var selectedPurchaseTimeMillis int64
 	found := false
 	ambiguous := false
 	for _, candidate := range receiptInfo {
-		purchaseTime, err := strconv.ParseInt(candidate.PurchaseDateMS, 10, 64)
+		purchaseTimeMillis, err := strconv.ParseInt(candidate.PurchaseDateMS, 10, 64)
 		if err != nil {
 			return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store purchase time")
 		}
-		if !found || purchaseTime > selectedPurchaseTime {
+		if !found || purchaseTimeMillis > selectedPurchaseTimeMillis {
 			selected = candidate
-			selectedPurchaseTime = purchaseTime
+			selectedPurchaseTimeMillis = purchaseTimeMillis
 			found = true
 			ambiguous = false
-		} else if purchaseTime == selectedPurchaseTime && candidate.TransactionID != selected.TransactionID {
+		} else if purchaseTimeMillis == selectedPurchaseTimeMillis && candidate.TransactionID != selected.TransactionID {
 			ambiguous = true
 		}
 	}
@@ -277,13 +277,13 @@ func getCurrentAppStoreTransaction(receiptInfo []appstore.InApp) (appStoreTransa
 	if !found || selected.ProductID == "" || selected.TransactionID == "" || selected.OriginalTransactionID == "" || selected.IsUpgraded == "true" {
 		return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "no current App Store entitlement")
 	}
-	expiryTime, err := strconv.ParseInt(selected.ExpiresDateMS, 10, 64)
+	expiryTimeMillis, err := strconv.ParseInt(selected.ExpiresDateMS, 10, 64)
 	if err != nil {
 		return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store expiry time")
 	}
 	return appStoreTransaction{
-		receiptInfo: selected,
-		expiryTime:  expiryTime * 1000,
+		receiptInfo:      selected,
+		expiryTimeMicros: expiryTimeMillis * 1000,
 	}, nil
 }
 

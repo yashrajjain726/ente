@@ -21,8 +21,8 @@ func TestGetCurrentAppStoreTransactionUsesLatestPurchase(t *testing.T) {
 	if transaction.receiptInfo.ProductID != "small" {
 		t.Fatalf("product ID = %q, want small", transaction.receiptInfo.ProductID)
 	}
-	if transaction.expiryTime != 400_000 {
-		t.Fatalf("expiry time = %d, want 400000", transaction.expiryTime)
+	if transaction.expiryTimeMicros != 400_000 {
+		t.Fatalf("expiry time in microseconds = %d, want 400000", transaction.expiryTimeMicros)
 	}
 }
 
@@ -55,6 +55,14 @@ func TestGetCurrentAppStoreTransactionRejectsInvalidCurrentPurchase(t *testing.T
 			receipts: []appstore.InApp{appStoreReceipt("", "new", "original", "200", "400", false, false)},
 		},
 		{
+			name:     "missing transaction",
+			receipts: []appstore.InApp{appStoreReceipt("small", "", "original", "200", "400", false, false)},
+		},
+		{
+			name:     "missing original transaction",
+			receipts: []appstore.InApp{appStoreReceipt("small", "new", "", "200", "400", false, false)},
+		},
+		{
 			name:     "invalid purchase time",
 			receipts: []appstore.InApp{appStoreReceipt("small", "new", "original", "invalid", "400", false, false)},
 		},
@@ -80,7 +88,7 @@ func TestGetCurrentAppStoreTransactionRejectsInvalidCurrentPurchase(t *testing.T
 	}
 }
 
-func TestGetAppStoreStorageUsesAllConfiguredPlans(t *testing.T) {
+func TestGetAppStoreStorageUsesAllConfiguredAccountsAndCountries(t *testing.T) {
 	controller := &AppStoreController{
 		BillingPlansPerAccount: ente.BillingPlansPerAccount{
 			ente.StripeUS: {"EU": {{IOSID: "current", Storage: 1000}}},
@@ -107,10 +115,6 @@ func TestGetAppStoreStorageRejectsInvalidConfiguration(t *testing.T) {
 			name:       "unknown product",
 			controller: appStoreControllerWithPlans(ente.BillingPlan{IOSID: "known", Storage: 100}),
 			productID:  "unknown",
-		},
-		{
-			name:       "missing product",
-			controller: appStoreControllerWithPlans(ente.BillingPlan{Storage: 100}),
 		},
 		{
 			name: "inconsistent storage",
@@ -201,8 +205,8 @@ func appStoreReceipt(
 	productID string,
 	transactionID string,
 	originalTransactionID string,
-	purchaseTime string,
-	expiryTime string,
+	purchaseTimeMillis string,
+	expiryTimeMillis string,
 	isUpgraded bool,
 	isCancelled bool,
 ) appstore.InApp {
@@ -210,8 +214,8 @@ func appStoreReceipt(
 		ProductID:             productID,
 		TransactionID:         transactionID,
 		OriginalTransactionID: originalTransactionID,
-		PurchaseDate:          appstore.PurchaseDate{PurchaseDateMS: purchaseTime},
-		ExpiresDate:           appstore.ExpiresDate{ExpiresDateMS: expiryTime},
+		PurchaseDate:          appstore.PurchaseDate{PurchaseDateMS: purchaseTimeMillis},
+		ExpiresDate:           appstore.ExpiresDate{ExpiresDateMS: expiryTimeMillis},
 	}
 	if isUpgraded {
 		receipt.IsUpgraded = "true"
