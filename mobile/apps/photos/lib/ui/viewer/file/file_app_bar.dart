@@ -35,11 +35,16 @@ import 'package:photos/ui/collections/collection_action_sheet.dart';
 import 'package:photos/ui/notification/toast.dart';
 import 'package:photos/ui/viewer/actions/suggest_delete_sheet.dart';
 import "package:photos/ui/viewer/file/detail_page.dart";
+import "package:photos/ui/viewer/file/video_control/video_speed_bottom_sheet.dart";
 import "package:photos/ui/viewer/file_details/favorite_widget.dart";
 import "package:photos/ui/viewer/file_details/upload_icon_widget.dart";
 import 'package:photos/utils/dialog_util.dart';
 import "package:photos/utils/magic_util.dart";
 import "package:photos/utils/share_util.dart";
+
+String _formatPlaybackSpeed(double speed) {
+  return speed == 1.0 ? "1x" : "${speed}x";
+}
 
 class FileAppBar extends StatefulWidget {
   final EnteFile file;
@@ -50,6 +55,7 @@ class FileAppBar extends StatefulWidget {
   final DetailPageMode mode;
   final bool showEditAction;
   final FutureOr<void> Function(BuildContext context)? onBackPressed;
+  final ValueNotifier<double> playbackSpeed;
 
   const FileAppBar(
     this.file,
@@ -60,6 +66,7 @@ class FileAppBar extends StatefulWidget {
     this.mode = DetailPageMode.full,
     this.showEditAction = true,
     this.onBackPressed,
+    required this.playbackSpeed,
     super.key,
   });
 
@@ -411,6 +418,19 @@ class FileAppBarState extends State<FileAppBar> {
     }
 
     if (widget.file.isVideo && !restrictFileActions) {
+      items.add(
+        _fileMenuOption(
+          context.strings.playbackSpeed,
+          value: 10,
+          hugeIcon: HugeIcons.strokeRoundedDashboardSpeed02,
+          trailing: ValueListenableBuilder<double>(
+            valueListenable: widget.playbackSpeed,
+            builder: (context, speed, _) =>
+                Text(_formatPlaybackSpeed(speed), style: TextStyles.tiny),
+          ),
+        ),
+      );
+
       if (_shouldShowCreateStreamOption()) {
         items.add(
           _fileMenuOption(
@@ -477,6 +497,7 @@ class FileAppBarState extends State<FileAppBar> {
     String label, {
     required int value,
     required List<List<dynamic>> hugeIcon,
+    Widget? trailing,
   }) {
     return EntePopupMenuOption<int>(
       value: value,
@@ -486,6 +507,7 @@ class FileAppBarState extends State<FileAppBar> {
         size: IconSizes.small,
         color: context.componentColors.textLight,
       ),
+      trailingWidget: trailing,
     );
   }
 
@@ -524,6 +546,12 @@ class FileAppBarState extends State<FileAppBar> {
       await _handleVideoStream('create');
     } else if (value == 9) {
       await _handleVideoStream('recreate');
+    } else if (value == 10) {
+      await showVideoSpeedBottomSheet(
+        context,
+        currentSpeed: widget.playbackSpeed.value,
+        onSpeedSelected: (speed) => widget.playbackSpeed.value = speed,
+      );
     } else if (value == 11) {
       widget.onEditRequested(widget.file);
     } else if (value == 12) {

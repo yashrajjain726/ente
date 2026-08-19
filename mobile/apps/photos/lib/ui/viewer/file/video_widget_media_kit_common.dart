@@ -9,8 +9,6 @@ import "package:photos/models/file/file.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
-import "package:photos/ui/viewer/file/video_control/video_speed_bottom_sheet.dart";
-import "package:photos/ui/viewer/file/video_control/video_speed_button.dart";
 import "package:photos/ui/viewer/file/video_stream_change.dart";
 import "package:photos/ui/viewer/file/zoomable_video_viewer.dart";
 
@@ -23,6 +21,7 @@ class VideoWidget extends StatefulWidget {
   final bool isFromMemories;
   final void Function() onStreamChange;
   final bool isPreviewPlayer;
+  final ValueNotifier<double> playbackSpeed;
 
   const VideoWidget(
     this.file,
@@ -35,6 +34,7 @@ class VideoWidget extends StatefulWidget {
     // ignore: unused_element
     required this.onStreamChange,
     required this.isPreviewPlayer,
+    required this.playbackSpeed,
   });
 
   @override
@@ -46,12 +46,12 @@ class _VideoWidgetState extends State<VideoWidget> {
   final _hideControlsDebouncer = Debouncer(const Duration(milliseconds: 2000));
   final _isSeekingNotifier = ValueNotifier<bool>(false);
   late final StreamSubscription<bool> _isPlayingStreamSubscription;
-  final _playbackSpeed = ValueNotifier<double>(1.0);
 
   @override
   void initState() {
     super.initState();
-    widget.controller.player.setRate(_playbackSpeed.value);
+    widget.playbackSpeed.addListener(_onPlaybackSpeedChanged);
+    widget.controller.player.setRate(widget.playbackSpeed.value);
     _isPlayingStreamSubscription = widget.controller.player.stream.playing
         .listen((isPlaying) {
           if (isPlaying && !_isSeekingNotifier.value) {
@@ -70,13 +70,17 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   @override
   void dispose() {
+    widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     showControlsNotifier.dispose();
     _isPlayingStreamSubscription.cancel();
     _hideControlsDebouncer.cancelDebounceTimer();
     _isSeekingNotifier.removeListener(isSeekingListener);
     _isSeekingNotifier.dispose();
-    _playbackSpeed.dispose();
     super.dispose();
+  }
+
+  void _onPlaybackSpeedChanged() {
+    widget.controller.player.setRate(widget.playbackSpeed.value);
   }
 
   void isSeekingListener() {
@@ -202,36 +206,12 @@ class _VideoWidgetState extends State<VideoWidget> {
                           child: SafeArea(
                             top: false,
                             left: false,
-                            child: Stack(
-                              children: [
-                                ValueListenableBuilder<double>(
-                                  valueListenable: _playbackSpeed,
-                                  builder: (context, speed, _) {
-                                    return VideoSpeedButton(
-                                      showControls: value,
-                                      playbackSpeed: speed,
-                                      onTap: () {
-                                        showVideoSpeedBottomSheet(
-                                          context,
-                                          currentSpeed: speed,
-                                          onSpeedSelected: (newSpeed) {
-                                            _playbackSpeed.value = newSpeed;
-                                            widget.controller.player.setRate(
-                                              newSpeed,
-                                            );
-                                          },
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                                VideoStreamChangeWidget(
-                                  showControls: value,
-                                  file: widget.file,
-                                  isPreviewPlayer: widget.isPreviewPlayer,
-                                  onStreamChange: widget.onStreamChange,
-                                ),
-                              ],
+                            right: false,
+                            child: VideoStreamChangeWidget(
+                              showControls: value,
+                              file: widget.file,
+                              isPreviewPlayer: widget.isPreviewPlayer,
+                              onStreamChange: widget.onStreamChange,
                             ),
                           ),
                         ),

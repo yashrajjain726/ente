@@ -22,6 +22,7 @@ class FileWidget extends StatelessWidget {
   final int? itemIndex;
   final ValueListenable<int>? activeItemIndexListenable;
   final bool? isAudioMutedOverride;
+  final ValueNotifier<double>? playbackSpeed;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueChanged<File>? onFinalImageLoaded;
   final ValueNotifier<QrCodeDetectionResult?>? qrDetectionsNotifier;
@@ -39,6 +40,7 @@ class FileWidget extends StatelessWidget {
     this.itemIndex,
     this.activeItemIndexListenable,
     this.isAudioMutedOverride,
+    this.playbackSpeed,
     this.onFinalFileLoad,
     this.onFinalImageLoaded,
     this.qrDetectionsNotifier,
@@ -86,6 +88,7 @@ class FileWidget extends StatelessWidget {
         itemIndex: itemIndex,
         activeItemIndexListenable: activeItemIndexListenable,
         isAudioMutedOverride: isAudioMutedOverride,
+        playbackSpeed: playbackSpeed,
         key: key ?? ValueKey(fileKey),
       );
     } else {
