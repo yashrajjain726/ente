@@ -1,5 +1,4 @@
-import { usePasteColorMode } from "@/features/paste/hooks/usePasteColorMode";
-import { getPasteThemeTokens } from "@/features/paste/theme/pasteThemeTokens";
+import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
 import { Box, Stack, Typography } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 
