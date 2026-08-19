@@ -66,52 +66,6 @@ extension GroupTypeExtension on GroupType {
     }
   }
 
-  bool areModifiedFilesPartOfGroup(
-    List<EnteFile> modifiedFiles,
-    EnteFile fistFile, {
-    EnteFile? lastFile,
-  }) {
-    switch (this) {
-      case GroupType.day:
-        return modifiedFiles.any(
-          (file) => areFromSameDay(fistFile.creationTime!, file.creationTime!),
-        );
-      case GroupType.week:
-        return modifiedFiles.any((file) {
-          final firstDate = DateTime.fromMicrosecondsSinceEpoch(
-            fistFile.creationTime!,
-          );
-          final fileDate = DateTime.fromMicrosecondsSinceEpoch(
-            file.creationTime!,
-          );
-          return areDatesInSameWeek(firstDate, fileDate);
-        });
-      case GroupType.month:
-        return modifiedFiles.any((file) {
-          final firstDate = DateTime.fromMicrosecondsSinceEpoch(
-            fistFile.creationTime!,
-          );
-          final fileDate = DateTime.fromMicrosecondsSinceEpoch(
-            file.creationTime!,
-          );
-          return firstDate.year == fileDate.year &&
-              firstDate.month == fileDate.month;
-        });
-      case GroupType.year:
-        return modifiedFiles.any((file) {
-          final firstDate = DateTime.fromMicrosecondsSinceEpoch(
-            fistFile.creationTime!,
-          );
-          final fileDate = DateTime.fromMicrosecondsSinceEpoch(
-            file.creationTime!,
-          );
-          return firstDate.year == fileDate.year;
-        });
-      default:
-        throw UnimplementedError("not implemented for $this");
-    }
-  }
-
   (int, int) getGroupRange(EnteFile file) {
     switch (this) {
       case GroupType.day:
