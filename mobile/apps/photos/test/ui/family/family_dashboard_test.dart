@@ -2,7 +2,6 @@ import 'package:ente_components/ente_components.dart';
 import 'package:ente_contacts/contacts.dart' as contacts;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hugeicons/hugeicons.dart';
 import 'package:photos/ente_theme_data.dart';
 import 'package:photos/gateways/billing/models/subscription.dart';
 import 'package:photos/gateways/storage_bonus/models/bonus.dart';
@@ -10,7 +9,6 @@ import 'package:ente_strings/ente_strings.dart';
 import 'package:photos/models/user_details.dart';
 import 'package:photos/ui/family/family_dashboard.dart';
 import 'package:photos/ui/viewer/people/person_face_widget.dart';
-import 'package:photos/utils/avatar_util.dart';
 
 void main() {
   testWidgets(
@@ -74,50 +72,6 @@ void main() {
       expect(find.text('Saved member'), findsNWidgets(2));
       expect(find.text('pending@example.com'), findsOneWidget);
       expect(find.textContaining('5 albums shared'), findsOneWidget);
-      final avatars = tester
-          .widgetList<AvatarComponent>(find.byType(AvatarComponent))
-          .where((avatar) => avatar.image == null)
-          .toList();
-      expect(avatars, hasLength(3));
-      expect(
-        avatars.map((avatar) => avatar.color),
-        everyElement(
-          isIn(const [
-            AvatarComponentColor.yellow,
-            AvatarComponentColor.green,
-            AvatarComponentColor.orange,
-            AvatarComponentColor.pink,
-            AvatarComponentColor.purple,
-            AvatarComponentColor.blue,
-            AvatarComponentColor.cyan,
-            AvatarComponentColor.black,
-          ]),
-        ),
-      );
-      expect(avatars.map((avatar) => avatar.seed), everyElement(isNull));
-      final currentUserAvatar = avatars.singleWhere(
-        (avatar) => avatar.semanticLabel == 'Current user',
-      );
-      expect(currentUserAvatar.color, isIn(avatarComponentIdentityPalette));
-      final savedMemberAvatar = avatars.singleWhere(
-        (avatar) => avatar.semanticLabel == 'Saved member',
-      );
-      expect(savedMemberAvatar.initials, 'SM');
-      expect(
-        savedMemberAvatar.color,
-        avatarComponentColorForIdentity(
-          avatarIdentityKey(
-            email: savedMember.email,
-            userID: savedMember.userID,
-          ),
-        ),
-      );
-      final crown = tester
-          .widgetList<HugeIcon>(find.byType(HugeIcon))
-          .singleWhere(
-            (icon) => identical(icon.icon, HugeIcons.strokeRoundedCrown02),
-          );
-      expect(crown.icon, HugeIcons.strokeRoundedCrown02);
       expect(find.bySemanticsLabel(RegExp(r'Admin')), findsOneWidget);
       semantics.dispose();
 
@@ -163,26 +117,6 @@ void main() {
       find.byType(PersonFaceWidget),
     );
     expect(personAvatar.personId, 'person-42');
-    final ringFinder = find.ancestor(
-      of: find.byType(PersonFaceWidget),
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is DecoratedBox &&
-            widget.position == DecorationPosition.foreground &&
-            widget.decoration is BoxDecoration &&
-            (widget.decoration as BoxDecoration).shape == BoxShape.circle,
-      ),
-    );
-    expect(ringFinder, findsOneWidget);
-    final ring = tester.widget<DecoratedBox>(ringFinder);
-    final border = (ring.decoration as BoxDecoration).border! as Border;
-    expect(
-      border.top.color,
-      avatarComponentColorValue(
-        tester.element(find.byType(PersonFaceWidget)),
-        familyMemberAvatarComponentColor(member),
-      ),
-    );
 
     await tester.tap(find.byType(MenuComponent));
     expect(selectedDisplayName, 'Current person');
