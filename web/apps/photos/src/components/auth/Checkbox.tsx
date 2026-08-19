@@ -14,12 +14,6 @@ export interface CheckboxProps extends Omit<
 > {
     checked: boolean;
     onChange: (checked: boolean) => void;
-    /**
-     * Label rendered next to the box, inside the label element, giving the
-     * checkbox its accessible name (and making the text itself clickable).
-     *
-     * When omitted, pass an `aria-label` instead.
-     */
     label?: React.ReactNode;
 }
 
@@ -84,7 +78,6 @@ const CheckboxMark = styled("span")({
     width: "16px",
     height: "16px",
     flex: "0 0 16px",
-    // Center against the first line of a (possibly wrapping) label.
     marginTop: "2px",
     borderRadius: "4px",
     display: "inline-flex",

@@ -1,15 +1,3 @@
-/**
- * The auth palette, exposed as CSS variables.
- *
- * Declared globally by {@link PhotosAuthShell} (via MUI's GlobalStyles) while
- * an auth screen is mounted, so the `var(--photos-auth-*)` consumers in this
- * directory resolve anywhere in the document — including MUI portals
- * (dialogs, menus, snackbars), which mount outside the shell's DOM subtree.
- *
- * Both selectors have zero specificity, so source order alone lets the dark
- * block win whenever the color scheme class (`colorSchemeSelector: "class"`
- * in the app theme) is present on an ancestor.
- */
 export const authColorVariables = {
     ":where(:root)": {
         "--photos-auth-primary": "#08c225",
@@ -41,31 +29,16 @@ export const authColorVariables = {
     },
 };
 
-/**
- * The auth layout's mobile cutoff.
- *
- * Both queries derive from the same constant. The 0.05px epsilon (the same
- * one MUI's breakpoint helpers use) keeps fractional viewport widths from
- * falling between the two queries.
- */
 const authMobileCutoffPx = 640;
 export const authMobileMediaQuery = `@media (max-width: ${authMobileCutoffPx - 0.05}px)`;
 export const authAboveMobileMediaQuery = `@media (min-width: ${authMobileCutoffPx}px)`;
 
-/**
- * styled() options that keep `$`-prefixed transient props off the DOM.
- *
- * All transient props in this directory use the `$` prefix, so every
- * styled() call with transient props can share this filter.
- */
 export const authTransientProps = {
     shouldForwardProp: (prop: string) => !prop.startsWith("$"),
 };
 
-/** The display font used for headlines and the OTP digits. */
 export const authDisplayFontFamily = '"Outfit Variable", sans-serif';
 
-/** The keyboard focus indicator shared by the interactive components. */
 export const authFocusRing = {
     outline: "1px solid var(--photos-auth-primary)",
     outlineOffset: "2px",

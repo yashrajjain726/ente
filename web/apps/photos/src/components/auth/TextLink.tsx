@@ -14,12 +14,6 @@ export interface TextLinkProps extends Omit<
     children: React.ReactNode;
 }
 
-/**
- * A button that looks like an inline text link.
- *
- * Named TextLink (not LinkButton) to avoid colliding with the LinkButton
- * exported by ente-base, which is used elsewhere in this app.
- */
 export function TextLink({
     regular = false,
     type = "button",
