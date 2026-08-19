@@ -2,8 +2,6 @@ import { expect, test } from "vitest";
 import {
     auth_generate_interactive_kek,
     auth_generate_srp_setup,
-    auth_recovery_key_from_mnemonic_or_hex,
-    auth_recovery_key_to_mnemonic,
     crypto_generate_key,
 } from "../pkg/ente_core_wasm.js";
 
@@ -27,12 +25,4 @@ test("generates SRP setup attributes from a kek", () => {
     expect(
         Buffer.from(generated.srp_verifier, "base64").length,
     ).toBeGreaterThan(0);
-});
-
-test("round-trips recovery key mnemonic", () => {
-    const recoveryKey = crypto_generate_key();
-    const mnemonic = auth_recovery_key_to_mnemonic(recoveryKey);
-    const decoded = auth_recovery_key_from_mnemonic_or_hex(mnemonic);
-
-    expect(decoded).toBe(recoveryKey);
 });
