@@ -33,7 +33,7 @@ type AppStoreController struct {
 	FileRepo               *repo.FileRepository
 	UserRepo               *repo.UserRepository
 	RemoteStoreRepo        *remotestore.Repository
-	BillingPlansPerCountry ente.BillingPlansPerCountry
+	BillingPlansPerAccount ente.BillingPlansPerAccount
 	CommonBillCtrl         *commonbilling.Controller
 	DiscordController      *discord.DiscordController
 	appStoreSharedPassword string
@@ -45,7 +45,7 @@ type appStoreTransaction struct {
 }
 
 func NewAppStoreController(
-	plans ente.BillingPlansPerCountry,
+	plans ente.BillingPlansPerAccount,
 	billingRepo *repo.BillingRepository,
 	fileRepo *repo.FileRepository,
 	userRepo *repo.UserRepository,
@@ -60,7 +60,7 @@ func NewAppStoreController(
 		FileRepo:               fileRepo,
 		UserRepo:               userRepo,
 		RemoteStoreRepo:        remoteStoreRepo,
-		BillingPlansPerCountry: plans,
+		BillingPlansPerAccount: plans,
 		appStoreSharedPassword: appleSharedSecret,
 		CommonBillCtrl:         commonBillCtrl,
 		DiscordController:      discordController,
@@ -293,16 +293,18 @@ func (c *AppStoreController) getAppStoreStorage(productID string) (int64, error)
 	}
 	var storage int64
 	found := false
-	for _, plans := range c.BillingPlansPerCountry {
-		for _, plan := range plans {
-			if plan.IOSID == "" || plan.IOSID != productID {
-				continue
+	for _, plansPerCountry := range c.BillingPlansPerAccount {
+		for _, plans := range plansPerCountry {
+			for _, plan := range plans {
+				if plan.IOSID == "" || plan.IOSID != productID {
+					continue
+				}
+				if found && storage != plan.Storage {
+					return 0, stacktrace.NewError("inconsistent App Store product storage")
+				}
+				storage = plan.Storage
+				found = true
 			}
-			if found && storage != plan.Storage {
-				return 0, stacktrace.NewError("inconsistent App Store product storage")
-			}
-			storage = plan.Storage
-			found = true
 		}
 	}
 	if !found {

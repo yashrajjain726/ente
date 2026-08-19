@@ -82,9 +82,9 @@ func TestGetCurrentAppStoreTransactionRejectsInvalidCurrentPurchase(t *testing.T
 
 func TestGetAppStoreStorageUsesAllConfiguredPlans(t *testing.T) {
 	controller := &AppStoreController{
-		BillingPlansPerCountry: ente.BillingPlansPerCountry{
-			"EU": {{IOSID: "current", Storage: 1000}},
-			"US": {{IOSID: "legacy", Storage: 100}},
+		BillingPlansPerAccount: ente.BillingPlansPerAccount{
+			ente.StripeUS: {"EU": {{IOSID: "current", Storage: 1000}}},
+			ente.StripeIN: {"US": {{IOSID: "legacy", Storage: 100}}},
 		},
 	}
 
@@ -114,9 +114,9 @@ func TestGetAppStoreStorageRejectsInvalidConfiguration(t *testing.T) {
 		},
 		{
 			name: "inconsistent storage",
-			controller: &AppStoreController{BillingPlansPerCountry: ente.BillingPlansPerCountry{
-				"EU": {{IOSID: "product", Storage: 100}},
-				"US": {{IOSID: "product", Storage: 1000}},
+			controller: &AppStoreController{BillingPlansPerAccount: ente.BillingPlansPerAccount{
+				ente.StripeUS: {"EU": {{IOSID: "product", Storage: 100}}},
+				ente.StripeIN: {"US": {{IOSID: "product", Storage: 1000}}},
 			}},
 			productID: "product",
 		},
@@ -166,7 +166,9 @@ func TestGetVerifiedAppStoreSubscriptionRejectsCancelledEntitlement(t *testing.T
 
 func appStoreControllerWithPlans(plans ...ente.BillingPlan) *AppStoreController {
 	return &AppStoreController{
-		BillingPlansPerCountry: ente.BillingPlansPerCountry{"EU": plans},
+		BillingPlansPerAccount: ente.BillingPlansPerAccount{
+			ente.StripeUS: {"EU": plans},
+		},
 	}
 }
 
