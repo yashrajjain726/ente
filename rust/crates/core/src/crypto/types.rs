@@ -1,9 +1,9 @@
 use subtle::ConstantTimeEq;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::ZeroizeOnDrop;
 
 use crate::crypto::{Error, Result, SecretVec};
 
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(ZeroizeOnDrop)]
 pub struct Key([u8; Self::BYTES]);
 
 impl Key {
@@ -163,7 +163,7 @@ impl PublicKey {
     }
 }
 
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(ZeroizeOnDrop)]
 pub struct SecretKey([u8; Self::BYTES]);
 
 impl SecretKey {
@@ -257,13 +257,6 @@ mod tests {
         let key = Key::from_bytes([42u8; 32]);
         let debug = format!("{key:?}");
         assert!(!debug.contains("42"));
-    }
-
-    #[test]
-    fn test_key_zeroize() {
-        let mut key = Key::from_bytes([0xABu8; 32]);
-        key.zeroize();
-        assert_eq!(key.as_bytes(), &[0u8; 32]);
     }
 
     #[test]
