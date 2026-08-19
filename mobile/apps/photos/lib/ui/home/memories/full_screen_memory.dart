@@ -381,7 +381,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
     _detailSheetEventSubscription = Bus.instance.on<DetailsSheetEvent>().listen(
       (event) {
-        if (!mounted) return;
+        if (!mounted || !widget.isActive) return;
         final inheritedData = FullScreenMemoryData.of(context);
         if (inheritedData == null) return;
         final index = inheritedData.indexNotifier.value;
@@ -394,7 +394,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
           uploadedFileID: currentFile.uploadedFileID,
           localID: currentFile.localID,
         )) {
-          _toggleAnimation(pause: event.opened);
+          event.opened ? _pauseViewer() : _resumeViewer();
         }
       },
     );
@@ -753,9 +753,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                   },
                   onSwipeUp: () {
                     if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
-                    _runWithViewerPaused(
-                      () => showDetailsSheet(context, currentFile),
-                    );
+                    unawaited(showDetailsSheet(context, currentFile));
                   },
                   canSwipeUp: () => !_isMediaZoomed,
                   hasPointerNotifier: hasPointerOnScreenNotifier,
@@ -941,11 +939,7 @@ class BottomIcons extends StatelessWidget {
                 color: Colors.white,
                 size: 24,
               ),
-              onPressed: () async {
-                await fullScreenState._runWithViewerPaused(
-                  () => showDetailsSheet(context, currentFile),
-                );
-              },
+              onPressed: () => showDetailsSheet(context, currentFile),
             ),
             _MemoryActionButton(
               tooltip: l10n.share,
@@ -1306,8 +1300,6 @@ class _MemoryViewerScrimsAndCaption extends StatelessWidget {
     if (inheritedData == null || inheritedData.memories.isEmpty) {
       return const SizedBox.shrink();
     }
-    final fullScreenState = context
-        .findAncestorStateOfType<_FullScreenMemoryState>()!;
     final safePadding = MediaQuery.paddingOf(context);
     return ValueListenableBuilder<int>(
       valueListenable: inheritedData.indexNotifier,
@@ -1396,9 +1388,7 @@ class _MemoryViewerScrimsAndCaption extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
-                    onTap: () => fullScreenState._runWithViewerPaused(
-                      () => showDetailsSheet(context, file),
-                    ),
+                    onTap: () => unawaited(showDetailsSheet(context, file)),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
