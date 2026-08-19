@@ -1,10 +1,6 @@
 use super::stream::{Decryptor, Encryptor};
 use crate::crypto::{Error, Header, Key, Result};
 
-pub const KEY_BYTES: usize = Key::BYTES;
-
-pub const HEADER_BYTES: usize = Header::BYTES;
-
 pub use super::stream::ABYTES;
 
 #[derive(Debug, Clone)]

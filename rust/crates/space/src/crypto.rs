@@ -1,11 +1,11 @@
 use ente_core::b64;
-use ente_core::crypto::{Key, Nonce, PublicKey, SecretKey, blob, sealed, secretbox};
+use ente_core::crypto::{Header, Key, Nonce, PublicKey, SecretKey, blob, sealed, secretbox};
 use md5::{Digest, Md5};
 
 use crate::error::Result;
 
 pub(crate) const SECRETBOX_PAYLOAD_OVERHEAD_BYTES: usize = Nonce::BYTES + secretbox::MAC_BYTES;
-pub(crate) const ASSET_PAYLOAD_OVERHEAD_BYTES: usize = blob::HEADER_BYTES + blob::ABYTES;
+pub(crate) const ASSET_PAYLOAD_OVERHEAD_BYTES: usize = Header::BYTES + blob::ABYTES;
 
 pub fn encrypt_space_root_entity_key(
     space_root_key_b64: &str,
