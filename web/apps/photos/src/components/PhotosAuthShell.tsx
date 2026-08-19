@@ -1,9 +1,14 @@
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { styled } from "@mui/material";
+import { GlobalStyles, styled } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { pt } from "ente-base/i18n";
 import type React from "react";
+import {
+    authAboveMobileMediaQuery,
+    authColorVariables,
+    authDisplayFontFamily,
+} from "./auth/styles";
 
 interface PhotosAuthShellProps extends React.PropsWithChildren {
     contentWidth?: 400 | 420;
@@ -14,6 +19,7 @@ export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
     contentWidth = 400,
 }) => (
     <PageRoot>
+        <GlobalStyles styles={authColorVariables} />
         <FrameCurves />
         <PageCard>
             <DesktopBrandSlot>
@@ -91,7 +97,7 @@ const PageRoot = styled("main")(({ theme }) => ({
     boxSizing: "border-box",
     backgroundColor: "#f4f4f4",
     ...theme.applyStyles("dark", { backgroundColor: "#0a0a0a" }),
-    "@media (min-width: 640px)": { padding: "40px" },
+    [authAboveMobileMediaQuery]: { padding: "40px" },
     "@media (min-width: 1024px)": {
         padding: 0,
         alignItems: "center",
@@ -103,7 +109,7 @@ const FrameCurves = styled("div")(({ theme }) => ({
     display: "none",
     opacity: 0.3,
     ...theme.applyStyles("dark", { opacity: 0.02 }),
-    "@media (min-width: 640px)": {
+    [authAboveMobileMediaQuery]: {
         display: "block",
         position: "absolute",
         inset: 0,
@@ -125,7 +131,7 @@ const PageCard = styled("div")(({ theme }) => ({
     overflow: "hidden",
     backgroundColor: "#fff",
     ...theme.applyStyles("dark", { backgroundColor: "#252525" }),
-    "@media (min-width: 640px)": { borderRadius: "24px" },
+    [authAboveMobileMediaQuery]: { borderRadius: "24px" },
     "@media (min-width: 1024px)": {
         width: "1032px",
         height: "740px",
@@ -146,7 +152,7 @@ const DesktopBrandSlot = styled("div")({
 
 const TabletBrandSlot = styled("div")({
     display: "none",
-    "@media (min-width: 640px) and (max-width: 1023px)": {
+    [`${authAboveMobileMediaQuery} and (max-width: 1023px)`]: {
         display: "block",
         // Grows with the copy when it wraps at narrow widths; the band's
         // 268px design height is enforced as a minimum by BrandPanelRoot.
@@ -162,7 +168,7 @@ const MobileBrandSlot = styled("div")({
     minHeight: 0,
     position: "relative",
     overflow: "hidden",
-    "@media (min-width: 640px)": { display: "none" },
+    [authAboveMobileMediaQuery]: { display: "none" },
 });
 
 const ContentSheet = styled("section")(({ theme }) => ({
@@ -180,7 +186,7 @@ const ContentSheet = styled("section")(({ theme }) => ({
     borderRadius: "24px 24px 0 0",
     backgroundColor: "#fff",
     ...theme.applyStyles("dark", { backgroundColor: "#252525" }),
-    "@media (min-width: 640px)": {
+    [authAboveMobileMediaQuery]: {
         marginTop: "-32px",
         padding: "16px 48px 48px",
     },
@@ -195,16 +201,15 @@ const ContentSheet = styled("section")(({ theme }) => ({
     "@media (min-width: 1600px)": { width: "744px", padding: "56px 172px" },
 }));
 
-const SheetHandle = styled("div")(({ theme }) => ({
+const SheetHandle = styled("div")({
     width: "36px",
     height: "4px",
     flexShrink: 0,
     alignSelf: "center",
     borderRadius: "999px",
-    backgroundColor: "#d2d2d2",
-    ...theme.applyStyles("dark", { backgroundColor: "#292929" }),
+    backgroundColor: "var(--photos-auth-fill-active)",
     "@media (min-width: 1024px)": { display: "none" },
-}));
+});
 
 const ContentColumn = styled("div", {
     shouldForwardProp: (prop) => prop !== "contentWidth",
@@ -214,7 +219,7 @@ const ContentColumn = styled("div", {
     display: "flex",
     flexDirection: "column",
     gap: "24px",
-    "@media (min-width: 640px)": {
+    [authAboveMobileMediaQuery]: {
         width: "440px",
         maxWidth: "100%",
         marginBlock: "auto",
@@ -243,7 +248,7 @@ const BrandPanelRoot = styled("div", {
     overflow: "hidden",
     boxSizing: "border-box",
     color: "#fff",
-    backgroundColor: "#08c225",
+    backgroundColor: "var(--photos-auth-primary)",
     backgroundImage: `url("/images/auth-surface-noise.svg"), url("/images/auth-frame-curves.svg"), url("${greenTileP3}")`,
     backgroundRepeat: "repeat, no-repeat, repeat",
     backgroundSize: "auto, cover, auto",
@@ -285,7 +290,7 @@ const PanelHeadline = styled("h1", {
     maxWidth:
         size === "desktop" ? "300px" : size === "tablet" ? "380px" : "188px",
     margin: 0,
-    fontFamily: '"Outfit Variable", sans-serif',
+    fontFamily: authDisplayFontFamily,
     fontSize: size === "desktop" ? "42px" : size === "tablet" ? "34px" : "26px",
     fontWeight: 600,
     lineHeight:
