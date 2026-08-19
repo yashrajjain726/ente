@@ -9,10 +9,6 @@ use zeroize::Zeroize;
 
 use crate::crypto::{Error, PublicKey, Result, SecretKey, fill_random};
 
-pub const PUBLIC_KEY_BYTES: usize = PublicKey::BYTES;
-
-pub const SECRET_KEY_BYTES: usize = SecretKey::BYTES;
-
 pub const SEAL_OVERHEAD: usize = 32 + 16;
 
 fn seal_nonce(ephemeral_pk: &[u8; 32], recipient_pk: &[u8; 32]) -> [u8; 24] {

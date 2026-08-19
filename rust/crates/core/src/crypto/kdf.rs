@@ -4,8 +4,6 @@ use crate::crypto::{Key, Result, SecretVec};
 
 pub const CONTEXT_BYTES: usize = 8;
 
-pub const KEY_BYTES: usize = Key::BYTES;
-
 pub const SUBKEY_BYTES_MIN: usize = 16;
 
 pub const SUBKEY_BYTES_MAX: usize = 64;
