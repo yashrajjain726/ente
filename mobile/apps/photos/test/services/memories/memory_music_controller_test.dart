@@ -37,7 +37,6 @@ void main() {
 
     expect(player.loadedAssets, <String>["assets/track-1.mp3"]);
     expect(player.looping, isTrue);
-    expect(player.position, Duration.zero);
     expect(player.playing, isTrue);
     expect(player.volume, 1.0);
   });
@@ -70,14 +69,28 @@ void main() {
     expect(persistedMuteValues, <bool>[true, false]);
   });
 
-  test("changing memories restarts the assigned track", () async {
+  test("changing memories loads the assigned track", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
-    player.position = const Duration(seconds: 4);
-
     await controller.activateMemory("memory-2", currentItemIsVideo: false);
 
-    expect(player.loadedAssets.last, "assets/track-2.mp3");
-    expect(player.position, Duration.zero);
+    expect(player.loadedAssets, <String>[
+      "assets/track-1.mp3",
+      "assets/track-2.mp3",
+    ]);
+  });
+
+  test("music resumes only after every pause reason clears", () async {
+    await controller.activateMemory("memory-1", currentItemIsVideo: false);
+
+    await controller.setAppActive(false);
+    expect(player.playing, isFalse);
+
+    await controller.setViewerActionPaused(true);
+    await controller.setAppActive(true);
+    expect(player.playing, isFalse);
+
+    await controller.setViewerActionPaused(false);
+    expect(player.playing, isTrue);
   });
 
   test("a failed track load can be retried", () async {
@@ -95,8 +108,7 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   final List<String> loadedAssets = <String>[];
   bool looping = false;
   bool playing = false;
-  double volume = 1.0;
-  Duration position = Duration.zero;
+  double volume = -1.0;
   bool failNextLoad = false;
   int loadAttempts = 0;
 
@@ -111,7 +123,6 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
       throw StateError("load failed");
     }
     loadedAssets.add(assetPath);
-    position = Duration.zero;
   }
 
   @override
