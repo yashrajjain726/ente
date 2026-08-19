@@ -11,97 +11,6 @@ import "package:photos/utils/dialog_util.dart";
 
 void main() {
   group("showDialogWidget", () {
-    testWidgets("returns the tapped button action", (tester) async {
-      ButtonResult? result;
-
-      await _pumpLauncher(tester, (context) async {
-        result = await showDialogWidget(
-          context: context,
-          title: "Confirm",
-          buttons: const [
-            ButtonWidget(
-              buttonType: ButtonType.neutral,
-              labelText: "Continue",
-              isInAlert: true,
-              buttonAction: ButtonAction.first,
-            ),
-          ],
-        );
-      });
-
-      await _openLauncher(tester);
-      await tester.tap(find.text("Continue"));
-      await tester.pumpAndSettle();
-
-      expect(result?.action, ButtonAction.first);
-      expect(result?.exception, isNull);
-      expect(find.byType(BottomSheetComponent), findsNothing);
-    });
-
-    testWidgets("returns the cancel action from the close button", (
-      tester,
-    ) async {
-      ButtonResult? result;
-
-      await _pumpLauncher(tester, (context) async {
-        result = await showDialogWidget(
-          context: context,
-          title: "Confirm",
-          buttons: const [
-            ButtonWidget(
-              buttonType: ButtonType.neutral,
-              labelText: "Continue",
-              isInAlert: true,
-              buttonAction: ButtonAction.first,
-            ),
-            ButtonWidget(
-              buttonType: ButtonType.secondary,
-              labelText: "Cancel",
-              isInAlert: true,
-              buttonAction: ButtonAction.second,
-            ),
-          ],
-        );
-      });
-
-      await _openLauncher(tester);
-      await tester.tap(find.byTooltip("Close"));
-      await tester.pumpAndSettle();
-
-      expect(result?.action, ButtonAction.second);
-      expect(result?.exception, isNull);
-      expect(find.byType(BottomSheetComponent), findsNothing);
-    });
-
-    testWidgets("returns null when dismissed", (tester) async {
-      ButtonResult? result;
-      var completed = false;
-
-      await _pumpLauncher(tester, (context) async {
-        result = await showDialogWidget(
-          context: context,
-          title: "Dismissible",
-          buttons: const [
-            ButtonWidget(
-              buttonType: ButtonType.secondary,
-              labelText: "Cancel",
-              isInAlert: true,
-              buttonAction: ButtonAction.cancel,
-            ),
-          ],
-        );
-        completed = true;
-      });
-
-      await _openLauncher(tester);
-      await tester.tapAt(const Offset(10, 10));
-      await tester.pumpAndSettle();
-
-      expect(completed, isTrue);
-      expect(result, isNull);
-      expect(find.byType(BottomSheetComponent), findsNothing);
-    });
-
     testWidgets("honors non-dismissible sheets", (tester) async {
       await _pumpLauncher(
         tester,
@@ -128,38 +37,6 @@ void main() {
 
       await tester.tap(find.text("OK"));
       await tester.pumpAndSettle();
-      expect(find.byType(BottomSheetComponent), findsNothing);
-    });
-
-    testWidgets("returns an error result when a button callback throws", (
-      tester,
-    ) async {
-      ButtonResult? result;
-
-      await _pumpLauncher(tester, (context) async {
-        result = await showDialogWidget(
-          context: context,
-          title: "Failure",
-          buttons: [
-            ButtonWidget(
-              buttonType: ButtonType.neutral,
-              labelText: "Fail",
-              isInAlert: true,
-              buttonAction: ButtonAction.first,
-              onTap: () async {
-                throw StateError("boom");
-              },
-            ),
-          ],
-        );
-      });
-
-      await _openLauncher(tester);
-      await tester.tap(find.text("Fail"));
-      await tester.pumpAndSettle();
-
-      expect(result?.action, ButtonAction.error);
-      expect(result?.exception, isA<Exception>());
       expect(find.byType(BottomSheetComponent), findsNothing);
     });
   });

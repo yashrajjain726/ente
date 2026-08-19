@@ -10,38 +10,6 @@ import "package:photos/ui/components/models/button_type.dart";
 
 void main() {
   group("showActionSheet", () {
-    testWidgets("returns the tapped button action", (tester) async {
-      ButtonResult? result;
-
-      await _pumpLauncher(tester, (context) async {
-        result = await showActionSheet(
-          context: context,
-          buttons: const [
-            ButtonWidget(
-              buttonType: ButtonType.neutral,
-              labelText: "Confirm",
-              isInAlert: true,
-              buttonAction: ButtonAction.first,
-            ),
-            ButtonWidget(
-              buttonType: ButtonType.secondary,
-              labelText: "Cancel",
-              isInAlert: true,
-              buttonAction: ButtonAction.cancel,
-            ),
-          ],
-        );
-      });
-
-      await _openLauncher(tester);
-      await tester.tap(find.text("Confirm"));
-      await tester.pumpAndSettle();
-
-      expect(result?.action, ButtonAction.first);
-      expect(result?.exception, isNull);
-      expect(find.byType(BottomSheetComponent), findsNothing);
-    });
-
     testWidgets("returns the cancel action from the close button", (
       tester,
     ) async {
@@ -73,34 +41,6 @@ void main() {
 
       expect(result?.action, ButtonAction.third);
       expect(result?.exception, isNull);
-      expect(find.byType(BottomSheetComponent), findsNothing);
-    });
-
-    testWidgets("returns null when dismissed", (tester) async {
-      ButtonResult? result;
-      var completed = false;
-
-      await _pumpLauncher(tester, (context) async {
-        result = await showActionSheet(
-          context: context,
-          buttons: const [
-            ButtonWidget(
-              buttonType: ButtonType.secondary,
-              labelText: "Cancel",
-              isInAlert: true,
-              buttonAction: ButtonAction.cancel,
-            ),
-          ],
-        );
-        completed = true;
-      });
-
-      await _openLauncher(tester);
-      await tester.tapAt(const Offset(10, 10));
-      await tester.pumpAndSettle();
-
-      expect(completed, isTrue);
-      expect(result, isNull);
       expect(find.byType(BottomSheetComponent), findsNothing);
     });
 

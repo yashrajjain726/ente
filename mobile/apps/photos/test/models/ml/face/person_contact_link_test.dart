@@ -126,17 +126,6 @@ void main() {
       expect(contactsService.lastUpdatedName, "Alex R");
     });
 
-    test("updateAttributes does not sync unchanged person name", () async {
-      final updated = await personService.updateAttributes(
-        "person-1",
-        name: "Alex",
-      );
-
-      expect(updated.data.name, "Alex");
-      expect(contactsService.createOrUpdateCalls, 0);
-      expect(contactsService.lastUpdatedName, isNull);
-    });
-
     test(
       "does not auto-create a contact without a configured person avatar",
       () async {

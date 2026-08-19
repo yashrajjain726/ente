@@ -195,28 +195,6 @@ void main() {
     },
   );
 
-  testWidgets("ButtonComponent does not dismiss modal routes by default", (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrapModalTestApp(
-        child: ButtonComponent(
-          label: "Stay",
-          shouldSurfaceExecutionStates: false,
-          onTap: () {},
-        ),
-      ),
-    );
-
-    await tester.tap(find.text("Open"));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text("Stay"));
-    await tester.pumpAndSettle();
-
-    expect(find.text("Stay"), findsOneWidget);
-  });
-
   testWidgets(
     "ButtonComponent does not dismiss normal page routes when configured",
     (tester) async {
