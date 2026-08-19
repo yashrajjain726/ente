@@ -39,9 +39,8 @@ type AppStoreController struct {
 	appStoreSharedPassword string
 }
 
-type appStoreEntitlement struct {
+type appStoreTransaction struct {
 	receiptInfo appstore.InApp
-	plan        ente.BillingPlan
 	expiryTime  int64
 }
 
@@ -114,11 +113,11 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	entitlement, err := c.getCurrentEntitlement(purchase.LatestReceiptInfo)
+	transaction, err := getCurrentAppStoreTransaction(purchase.LatestReceiptInfo)
 	if err != nil {
 		return err
 	}
-	latestReceiptInfo := entitlement.receiptInfo
+	latestReceiptInfo := transaction.receiptInfo
 	if latestReceiptInfo.TransactionID == latestReceiptInfo.OriginalTransactionID && !slices.Contains(SubsUpdateNotificationTypes, string(notification.NotificationType)) {
 		var logMsg = fmt.Sprintf("Ignoring notification of type %s", notification.NotificationType)
 		if notification.NotificationType != appstore.NotificationTypeInitialBuy {
@@ -139,13 +138,16 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 		return err
 	}
 
-	if latestReceiptInfo.ProductID == subscription.ProductID && entitlement.expiryTime < subscription.ExpiryTime {
+	if latestReceiptInfo.ProductID == subscription.ProductID && transaction.expiryTime < subscription.ExpiryTime {
 		// Outdated notification, no-op
 	} else {
 		if latestReceiptInfo.ProductID != subscription.ProductID {
-			newPlan := entitlement.plan
-			if newPlan.Storage < subscription.Storage {
-				canDowngrade, canDowngradeErr := c.CommonBillCtrl.CanDowngradeToGivenStorage(newPlan.Storage, subscription.UserID)
+			newStorage, err := c.getAppStoreStorage(latestReceiptInfo.ProductID)
+			if err != nil {
+				return err
+			}
+			if newStorage < subscription.Storage {
+				canDowngrade, canDowngradeErr := c.CommonBillCtrl.CanDowngradeToGivenStorage(newStorage, subscription.UserID)
 				if canDowngradeErr != nil {
 					return stacktrace.Propagate(canDowngradeErr, "")
 				}
@@ -155,8 +157,8 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 				log.Info("Usage is good")
 			}
 			newSubscription := ente.Subscription{
-				Storage:               newPlan.Storage,
-				ExpiryTime:            entitlement.expiryTime,
+				Storage:               newStorage,
+				ExpiryTime:            transaction.expiryTime,
 				ProductID:             latestReceiptInfo.ProductID,
 				PaymentProvider:       ente.AppStore,
 				OriginalTransactionID: latestReceiptInfo.OriginalTransactionID,
@@ -181,7 +183,7 @@ func (c *AppStoreController) HandleNotification(ctx *gin.Context, notification a
 					return stacktrace.Propagate(err, "")
 				}
 			}
-			err = c.BillingRepo.UpdateSubscriptionExpiryTime(subscription.ID, entitlement.expiryTime)
+			err = c.BillingRepo.UpdateSubscriptionExpiryTime(subscription.ID, transaction.expiryTime)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -201,26 +203,30 @@ func (c *AppStoreController) GetVerifiedSubscription(userID int64, productID str
 		return ente.Subscription{}, err
 	}
 
-	entitlement, err := c.getCurrentEntitlement(response.LatestReceiptInfo)
+	transaction, err := getCurrentAppStoreTransaction(response.LatestReceiptInfo)
 	if err != nil {
 		return ente.Subscription{}, err
 	}
-	if entitlement.receiptInfo.CancellationDateMS != "" {
+	if transaction.receiptInfo.CancellationDateMS != "" {
 		return ente.Subscription{}, stacktrace.Propagate(ente.ErrBadRequest, "App Store entitlement was cancelled")
 	}
-	if productID != entitlement.receiptInfo.ProductID {
+	storage, err := c.getAppStoreStorage(transaction.receiptInfo.ProductID)
+	if err != nil {
+		return ente.Subscription{}, err
+	}
+	if productID != transaction.receiptInfo.ProductID {
 		logrus.WithFields(logrus.Fields{
 			"requested_product_id": productID,
-			"verified_product_id":  entitlement.receiptInfo.ProductID,
+			"verified_product_id":  transaction.receiptInfo.ProductID,
 			"user_id":              userID,
 		}).Warn("App Store product differs from verified entitlement")
 	}
 	return ente.Subscription{
 		UserID:                userID,
-		ProductID:             entitlement.receiptInfo.ProductID,
-		Storage:               entitlement.plan.Storage,
-		OriginalTransactionID: entitlement.receiptInfo.OriginalTransactionID,
-		ExpiryTime:            entitlement.expiryTime,
+		ProductID:             transaction.receiptInfo.ProductID,
+		Storage:               storage,
+		OriginalTransactionID: transaction.receiptInfo.OriginalTransactionID,
+		ExpiryTime:            transaction.expiryTime,
 		PaymentProvider:       ente.AppStore,
 		Attributes: ente.SubscriptionAttributes{
 			LatestVerificationData: verificationData,
@@ -246,46 +252,61 @@ func (c *AppStoreController) verifyAppStoreSubscription(verificationData string)
 	return response, nil
 }
 
-func (c *AppStoreController) getCurrentEntitlement(receiptInfo []appstore.InApp) (appStoreEntitlement, error) {
-	plansByProductID := make(map[string]ente.BillingPlan)
-	for _, plan := range c.BillingPlansPerCountry["EU"] { // Storage is the same for a subscription ID in every country.
-		if plan.IOSID != "" {
-			plansByProductID[plan.IOSID] = plan
-		}
-	}
-
+func getCurrentAppStoreTransaction(receiptInfo []appstore.InApp) (appStoreTransaction, error) {
 	var selected appstore.InApp
-	var selectedPlan ente.BillingPlan
 	var selectedPurchaseTime int64
 	found := false
+	ambiguous := false
 	for _, candidate := range receiptInfo {
 		purchaseTime, err := strconv.ParseInt(candidate.PurchaseDateMS, 10, 64)
 		if err != nil {
-			return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store purchase time")
-		}
-		if found && purchaseTime == selectedPurchaseTime && candidate.TransactionID != selected.TransactionID {
-			return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "ambiguous App Store entitlement")
+			return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store purchase time")
 		}
 		if !found || purchaseTime > selectedPurchaseTime {
 			selected = candidate
 			selectedPurchaseTime = purchaseTime
 			found = true
+			ambiguous = false
+		} else if purchaseTime == selectedPurchaseTime && candidate.TransactionID != selected.TransactionID {
+			ambiguous = true
 		}
 	}
-	if !found || selected.TransactionID == "" || selected.OriginalTransactionID == "" || selected.IsUpgraded == "true" {
-		return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "no current App Store entitlement")
+	if ambiguous {
+		return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "ambiguous App Store entitlement")
 	}
-	selectedPlan, found = plansByProductID[selected.ProductID]
-	if !found {
-		return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "unknown App Store product")
+	if !found || selected.ProductID == "" || selected.TransactionID == "" || selected.OriginalTransactionID == "" || selected.IsUpgraded == "true" {
+		return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "no current App Store entitlement")
 	}
 	expiryTime, err := strconv.ParseInt(selected.ExpiresDateMS, 10, 64)
 	if err != nil {
-		return appStoreEntitlement{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store expiry time")
+		return appStoreTransaction{}, stacktrace.Propagate(ente.ErrBadRequest, "invalid App Store expiry time")
 	}
-	return appStoreEntitlement{
+	return appStoreTransaction{
 		receiptInfo: selected,
-		plan:        selectedPlan,
 		expiryTime:  expiryTime * 1000,
 	}, nil
+}
+
+func (c *AppStoreController) getAppStoreStorage(productID string) (int64, error) {
+	if productID == "" {
+		return 0, stacktrace.Propagate(ente.ErrBadRequest, "unknown App Store product")
+	}
+	var storage int64
+	found := false
+	for _, plans := range c.BillingPlansPerCountry {
+		for _, plan := range plans {
+			if plan.IOSID == "" || plan.IOSID != productID {
+				continue
+			}
+			if found && storage != plan.Storage {
+				return 0, stacktrace.NewError("inconsistent App Store product storage")
+			}
+			storage = plan.Storage
+			found = true
+		}
+	}
+	if !found {
+		return 0, stacktrace.Propagate(ente.ErrBadRequest, "unknown App Store product")
+	}
+	return storage, nil
 }

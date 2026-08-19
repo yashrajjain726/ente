@@ -10,48 +10,49 @@ import (
 	"github.com/ente/museum/ente"
 )
 
-func TestGetCurrentAppStoreEntitlementUsesLatestPurchase(t *testing.T) {
-	controller := appStoreControllerWithPlans(
-		ente.BillingPlan{IOSID: "small", Storage: 100},
-		ente.BillingPlan{IOSID: "large", Storage: 1000},
-	)
-
-	entitlement, err := controller.getCurrentEntitlement([]appstore.InApp{
+func TestGetCurrentAppStoreTransactionUsesLatestPurchase(t *testing.T) {
+	transaction, err := getCurrentAppStoreTransaction([]appstore.InApp{
 		appStoreReceipt("large", "old", "original", "100", "500", true, false),
 		appStoreReceipt("small", "new", "original", "200", "400", false, false),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if entitlement.receiptInfo.ProductID != "small" {
-		t.Fatalf("product ID = %q, want small", entitlement.receiptInfo.ProductID)
+	if transaction.receiptInfo.ProductID != "small" {
+		t.Fatalf("product ID = %q, want small", transaction.receiptInfo.ProductID)
 	}
-	if entitlement.plan.Storage != 100 {
-		t.Fatalf("storage = %d, want 100", entitlement.plan.Storage)
-	}
-	if entitlement.expiryTime != 400_000 {
-		t.Fatalf("expiry time = %d, want 400000", entitlement.expiryTime)
+	if transaction.expiryTime != 400_000 {
+		t.Fatalf("expiry time = %d, want 400000", transaction.expiryTime)
 	}
 }
 
-func TestGetCurrentAppStoreEntitlementRejectsInvalidCurrentPurchase(t *testing.T) {
-	controller := appStoreControllerWithPlans(ente.BillingPlan{IOSID: "small", Storage: 100})
+func TestGetCurrentAppStoreTransactionIgnoresAmbiguousOlderPurchase(t *testing.T) {
+	transaction, err := getCurrentAppStoreTransaction([]appstore.InApp{
+		appStoreReceipt("old", "old-first", "original", "100", "300", false, false),
+		appStoreReceipt("old", "old-second", "original", "100", "300", false, false),
+		appStoreReceipt("current", "current", "original", "200", "400", false, false),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transaction.receiptInfo.TransactionID != "current" {
+		t.Fatalf("transaction ID = %q, want current", transaction.receiptInfo.TransactionID)
+	}
+}
 
+func TestGetCurrentAppStoreTransactionRejectsInvalidCurrentPurchase(t *testing.T) {
 	tests := []struct {
 		name     string
 		receipts []appstore.InApp
 	}{
 		{name: "empty"},
 		{
-			name: "unknown product",
-			receipts: []appstore.InApp{
-				appStoreReceipt("small", "old", "original", "100", "500", false, false),
-				appStoreReceipt("unknown", "new", "original", "200", "400", false, false),
-			},
-		},
-		{
 			name:     "upgraded",
 			receipts: []appstore.InApp{appStoreReceipt("small", "new", "original", "200", "400", true, false)},
+		},
+		{
+			name:     "missing product",
+			receipts: []appstore.InApp{appStoreReceipt("", "new", "original", "200", "400", false, false)},
 		},
 		{
 			name:     "invalid purchase time",
@@ -72,8 +73,59 @@ func TestGetCurrentAppStoreEntitlementRejectsInvalidCurrentPurchase(t *testing.T
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := controller.getCurrentEntitlement(test.receipts); err == nil {
-				t.Fatal("getCurrentEntitlement() succeeded, want error")
+			if _, err := getCurrentAppStoreTransaction(test.receipts); err == nil {
+				t.Fatal("getCurrentAppStoreTransaction() succeeded, want error")
+			}
+		})
+	}
+}
+
+func TestGetAppStoreStorageUsesAllConfiguredPlans(t *testing.T) {
+	controller := &AppStoreController{
+		BillingPlansPerCountry: ente.BillingPlansPerCountry{
+			"EU": {{IOSID: "current", Storage: 1000}},
+			"US": {{IOSID: "legacy", Storage: 100}},
+		},
+	}
+
+	storage, err := controller.getAppStoreStorage("legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storage != 100 {
+		t.Fatalf("storage = %d, want 100", storage)
+	}
+}
+
+func TestGetAppStoreStorageRejectsInvalidConfiguration(t *testing.T) {
+	tests := []struct {
+		name       string
+		controller *AppStoreController
+		productID  string
+	}{
+		{
+			name:       "unknown product",
+			controller: appStoreControllerWithPlans(ente.BillingPlan{IOSID: "known", Storage: 100}),
+			productID:  "unknown",
+		},
+		{
+			name:       "missing product",
+			controller: appStoreControllerWithPlans(ente.BillingPlan{Storage: 100}),
+		},
+		{
+			name: "inconsistent storage",
+			controller: &AppStoreController{BillingPlansPerCountry: ente.BillingPlansPerCountry{
+				"EU": {{IOSID: "product", Storage: 100}},
+				"US": {{IOSID: "product", Storage: 1000}},
+			}},
+			productID: "product",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := test.controller.getAppStoreStorage(test.productID); err == nil {
+				t.Fatal("getAppStoreStorage() succeeded, want error")
 			}
 		})
 	}
