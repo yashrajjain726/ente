@@ -1,10 +1,12 @@
 package repo
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -358,6 +360,9 @@ func (repo *FileRepository) UpdateMagicAttributes(
 	isPublicMetadata bool,
 	skipVersion *bool,
 ) error {
+	slices.SortStableFunc(fileUpdates, func(a, b ente.UpdateMagicMetadata) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
 	updationTime := time.Microseconds()
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
