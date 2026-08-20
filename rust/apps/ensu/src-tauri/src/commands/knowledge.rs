@@ -83,7 +83,7 @@ pub struct KnowledgePackDto {
     stable_id: String,
     label: String,
     download_size_bytes: i64,
-    status: KnowledgePackStatusDto,
+    status: Option<KnowledgePackStatusDto>,
     attribution: AttributionDto,
 }
 
@@ -225,13 +225,13 @@ fn reconcile_and_open(
 
 fn pack_dto(
     dataset: KnowledgeDatasetConfig,
-    reconciliation: retrieval::KnowledgeReconciliation,
+    reconciliation: Option<retrieval::KnowledgeReconciliation>,
 ) -> KnowledgePackDto {
     KnowledgePackDto {
         stable_id: dataset.stable_id,
         label: dataset.label,
         download_size_bytes: dataset.download_size_bytes,
-        status: reconciliation.status.into(),
+        status: reconciliation.map(|result| result.status.into()),
         attribution: dataset.attribution.into(),
     }
 }
@@ -240,10 +240,19 @@ fn pack_dto(
 pub async fn knowledge_catalog(
     model_state: TauriState<'_, ModelDownloadState>,
     knowledge_state: TauriState<'_, State>,
+    reconcile_stable_ids: Option<Vec<String>>,
 ) -> Result<Vec<KnowledgePackDto>, ApiError> {
     let store = model_state.store();
+    let selected = reconcile_stable_ids.map(|ids| ids.into_iter().collect::<HashSet<_>>());
     let mut packs = Vec::new();
     for dataset in ente_ensu::config::defaults().knowledge_datasets {
+        if selected
+            .as_ref()
+            .is_some_and(|ids| !ids.contains(&dataset.stable_id))
+        {
+            packs.push(pack_dto(dataset, None));
+            continue;
+        }
         let lifecycle = knowledge_state.pack_lifecycle(&dataset.stable_id);
         let _lifecycle = lifecycle.lock().await;
         let indexes = Arc::clone(&knowledge_state.indexes);
@@ -275,7 +284,7 @@ pub async fn knowledge_catalog(
                 }
             }
         };
-        packs.push(pack_dto(dataset, reconciliation));
+        packs.push(pack_dto(dataset, Some(reconciliation)));
     }
     Ok(packs)
 }
@@ -384,7 +393,7 @@ pub async fn knowledge_download_pack(
         ));
     }
 
-    Ok(pack_dto(dataset, reconciliation))
+    Ok(pack_dto(dataset, Some(reconciliation)))
 }
 
 #[tauri::command]

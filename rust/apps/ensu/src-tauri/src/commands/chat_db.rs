@@ -357,7 +357,19 @@ pub async fn chat_db_insert_message(
     let sender = normalize_sender(&input.sender)?;
     let attachments = convert_attachments(input.attachments)?;
     let text = if sender == "other" {
-        finalize_assistant_text(&input.text, input.citations.unwrap_or_default())?
+        match finalize_assistant_text(&input.text, input.citations.unwrap_or_default()) {
+            Ok(text) => text,
+            Err(error) => {
+                logging::log(
+                    "ChatDb",
+                    format!(
+                        "assistant source finalization failed error={}",
+                        error.message
+                    ),
+                );
+                finalize_assistant_text(&input.text, Vec::new())?
+            }
+        }
     } else {
         input.text
     };

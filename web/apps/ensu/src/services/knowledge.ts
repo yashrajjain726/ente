@@ -17,7 +17,7 @@ export interface KnowledgePack {
     stableId: string;
     label: string;
     downloadSizeBytes: number;
-    status: KnowledgePackStatus;
+    status: KnowledgePackStatus | null;
     attribution: KnowledgeAttribution;
 }
 
@@ -52,8 +52,10 @@ const invokeKnowledge = async <T>(
     return invoke<T>(command, args);
 };
 
-export const loadKnowledgeCatalog = () =>
-    invokeKnowledge<KnowledgePack[]>("knowledge_catalog");
+export const loadKnowledgeCatalog = (reconcileStableIds?: string[]) =>
+    invokeKnowledge<KnowledgePack[]>("knowledge_catalog", {
+        reconcileStableIds,
+    });
 
 export const downloadKnowledgePack = async (
     stableId: string,

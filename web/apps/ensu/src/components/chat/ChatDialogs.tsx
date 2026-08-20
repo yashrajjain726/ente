@@ -771,7 +771,9 @@ export const ChatDialogs = memo(
                             {knowledgePacks.map((pack) => {
                                 const progress =
                                     knowledgeDownloadProgress[pack.stableId];
-                                const installed = pack.status !== "download";
+                                const installed =
+                                    pack.status === "ready" ||
+                                    pack.status === "updateAvailable";
                                 const isMutating = progress !== undefined;
                                 const enabled =
                                     enabledKnowledgePackIds.has(

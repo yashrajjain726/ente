@@ -692,6 +692,9 @@ const Page: React.FC = () => {
     const knowledgeCatalogPromiseRef = useRef<Promise<KnowledgePack[]> | null>(
         null,
     );
+    const knowledgeBootstrapPromiseRef = useRef<Promise<
+        KnowledgePack[]
+    > | null>(null);
     const generationStartingRef = useRef(false);
     const generationStoppingRef = useRef(false);
     const pendingGenerationStopsRef = useRef(0);
@@ -778,6 +781,15 @@ const Page: React.FC = () => {
             );
         }
         return knowledgeCatalogPromiseRef.current;
+    }, []);
+
+    const loadEnabledKnowledgeCatalogOnce = useCallback(() => {
+        if (!knowledgeBootstrapPromiseRef.current) {
+            knowledgeBootstrapPromiseRef.current = loadKnowledgeCatalog([
+                ...loadEnabledKnowledgePacks(),
+            ]);
+        }
+        return knowledgeBootstrapPromiseRef.current;
     }, []);
 
     const refreshKnowledgeCatalog = useCallback(async () => {
@@ -982,8 +994,45 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         if (!isTauriRuntime) return;
-        void refreshKnowledgeCatalog();
-    }, [isTauriRuntime, refreshKnowledgeCatalog]);
+        setKnowledgeCatalogLoading(true);
+        setKnowledgeCatalogError(null);
+        void loadEnabledKnowledgeCatalogOnce()
+            .then((packs) => {
+                setKnowledgePacks(packs);
+                const enabled = loadEnabledKnowledgePacks();
+                const disabledStableIds = packs
+                    .filter((pack) => !enabled.has(pack.stableId))
+                    .map((pack) => pack.stableId);
+                if (disabledStableIds.length === 0) return;
+                void loadKnowledgeCatalog(disabledStableIds)
+                    .then((updates) => {
+                        setKnowledgePacks((current) => {
+                            const currentById = new Map(
+                                current.map((pack) => [pack.stableId, pack]),
+                            );
+                            return updates.map((pack) =>
+                                pack.status
+                                    ? pack
+                                    : (currentById.get(pack.stableId) ?? pack),
+                            );
+                        });
+                    })
+                    .catch((error: unknown) => {
+                        setKnowledgeCatalogError(knowledgeErrorMessage(error));
+                        log.error(
+                            "Failed to refresh disabled Ensu Packs",
+                            error,
+                        );
+                    });
+            })
+            .catch((error: unknown) => {
+                setKnowledgeCatalogError(knowledgeErrorMessage(error));
+                log.error("Failed to bootstrap enabled Ensu Packs", error);
+            })
+            .finally(() => {
+                setKnowledgeCatalogLoading(false);
+            });
+    }, [isTauriRuntime, loadEnabledKnowledgeCatalogOnce]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -1741,11 +1790,10 @@ const Page: React.FC = () => {
     const showImageAttachment = isTauriRuntime;
     const showDownloadProgress =
         !!downloadStatus?.status && downloadStatus.status !== "Ready";
-    const showModelGate = isTauriRuntime
-        ? modelGateStatus !== "ready"
-        : modelGateStatus === "missing" ||
-          modelGateStatus === "error" ||
-          modelGateStatus === "downloading";
+    const showModelGate =
+        modelGateStatus === "missing" ||
+        modelGateStatus === "error" ||
+        modelGateStatus === "downloading";
     const hideMessagesForModelGate = isTauriRuntime && showModelGate;
 
     const downloadSizeLabel = useMemo(() => {
@@ -3030,7 +3078,7 @@ const Page: React.FC = () => {
                     readyPacks.length === 0
                 ) {
                     try {
-                        readyPacks = await loadKnowledgeCatalogOnce();
+                        readyPacks = await loadEnabledKnowledgeCatalogOnce();
                         if (!isActiveGeneration()) return;
                         setKnowledgePacks(readyPacks);
                     } catch (error) {
@@ -3043,7 +3091,8 @@ const Page: React.FC = () => {
                 const enabledReadyPackIds = readyPacks
                     .filter(
                         (pack) =>
-                            pack.status !== "download" &&
+                            (pack.status === "ready" ||
+                                pack.status === "updateAvailable") &&
                             enabledKnowledgePackIds.has(pack.stableId),
                     )
                     .map((pack) => pack.stableId);
@@ -3317,7 +3366,7 @@ const Page: React.FC = () => {
             isTauriRuntime,
             enabledKnowledgePackIds,
             knowledgePacks,
-            loadKnowledgeCatalogOnce,
+            loadEnabledKnowledgeCatalogOnce,
         ],
     );
 
