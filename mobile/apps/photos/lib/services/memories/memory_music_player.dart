@@ -13,6 +13,8 @@ abstract interface class MemoryMusicPlayer {
 
   Future<void> play();
 
+  Future<void> playImmediately();
+
   Future<void> pause();
 
   Future<void> pauseImmediately();
@@ -56,18 +58,18 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
       if (!_player.playing) {
         await _player.setVolume(0);
         if (generation != _fadeGeneration) return;
-        unawaited(
-          _player.play().catchError((Object error, StackTrace stackTrace) {
-            _logger.fine(
-              "Failed to start memory music playback",
-              error,
-              stackTrace,
-            );
-          }),
-        );
+        _startPlayback();
       }
       await _fadeTo(1, _fadeInDuration, generation);
     });
+  }
+
+  @override
+  Future<void> playImmediately() async {
+    final generation = ++_fadeGeneration;
+    await _player.setVolume(1);
+    if (generation != _fadeGeneration) return;
+    _startPlayback();
   }
 
   @override
@@ -114,6 +116,19 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
         initialVolume + (targetVolume - initialVolume) * progress,
       );
     }
+  }
+
+  void _startPlayback() {
+    if (_player.playing) return;
+    unawaited(
+      _player.play().catchError((Object error, StackTrace stackTrace) {
+        _logger.fine(
+          "Failed to start memory music playback",
+          error,
+          stackTrace,
+        );
+      }),
+    );
   }
 
   Future<void> _enqueueFade(int generation, Future<void> Function() operation) {

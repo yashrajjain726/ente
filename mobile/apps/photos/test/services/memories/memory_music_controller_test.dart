@@ -72,10 +72,12 @@ void main() {
 
     await controller.toggleMuted();
     expect(player.playing, isFalse);
+    expect(player.pausedImmediately, isTrue);
     expect(persistedMuteValues, <bool>[true]);
 
     await controller.toggleMuted();
     expect(player.playing, isTrue);
+    expect(player.playedImmediately, isTrue);
     expect(persistedMuteValues, <bool>[true, false]);
   });
 
@@ -158,6 +160,7 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   final List<String> loadedAssets = <String>[];
   bool looping = false;
   bool playing = false;
+  bool playedImmediately = false;
   bool pausedImmediately = false;
   bool failNextLoad = false;
   int loadAttempts = 0;
@@ -188,6 +191,13 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   @override
   Future<void> play() async {
     playAttempts++;
+    playing = true;
+  }
+
+  @override
+  Future<void> playImmediately() async {
+    playAttempts++;
+    playedImmediately = true;
     playing = true;
   }
 
