@@ -8,6 +8,7 @@ import {
     authAboveMobileMediaQuery,
     authColorVariables,
     authDisplayFontFamily,
+    authMobileMediaQuery,
 } from "./auth/styles";
 
 interface PhotosAuthShellProps extends React.PropsWithChildren {
@@ -222,6 +223,7 @@ const ContentColumn = styled("div", {
     display: "flex",
     flexDirection: "column",
     gap: "24px",
+    [authMobileMediaQuery]: { flexGrow: 1 },
     [authAboveMobileMediaQuery]: {
         width: "440px",
         maxWidth: "100%",

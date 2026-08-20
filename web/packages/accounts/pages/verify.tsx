@@ -4,7 +4,10 @@ import {
     AccountsPageFooter,
     AccountsPageTitle,
 } from "ente-accounts/components/layouts/centered-paper";
-import { VerifyingPasskey } from "ente-accounts/components/LoginComponents";
+import {
+    VerifyingPasskey,
+    type VerifyingPasskeyPresentationProps,
+} from "ente-accounts/components/LoginComponents";
 import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
 import { useSecondFactorChoiceIfNeeded } from "ente-accounts/components/utils/second-factor-choice";
 import {
@@ -64,9 +67,13 @@ export interface VerifyEmailPresentationProps {
 
 export interface VerifyPageProps {
     presentation?: ComponentType<VerifyEmailPresentationProps>;
+    passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
 }
 
-const Page: React.FC<VerifyPageProps> = ({ presentation: Presentation }) => {
+const Page: React.FC<VerifyPageProps> = ({
+    presentation: Presentation,
+    passkeyPresentation,
+}) => {
     const { logout, showMiniDialog } = useBaseContext();
 
     const [email, setEmail] = useState("");
@@ -172,6 +179,12 @@ const Page: React.FC<VerifyPageProps> = ({ presentation: Presentation }) => {
         setTimeout(() => setResend("enable"), 3000);
     }, [email]);
 
+    const handlePasskeyRetry = useCallback(() => {
+        if (passkeyVerificationData) {
+            openPasskeyVerificationURL(passkeyVerificationData);
+        }
+    }, [passkeyVerificationData]);
+
     if (!email) {
         return <LoadingIndicator />;
     }
@@ -189,9 +202,8 @@ const Page: React.FC<VerifyPageProps> = ({ presentation: Presentation }) => {
             <VerifyingPasskey
                 email={email}
                 passkeySessionID={passkeyVerificationData.passkeySessionID}
-                onRetry={() =>
-                    openPasskeyVerificationURL(passkeyVerificationData)
-                }
+                onRetry={handlePasskeyRetry}
+                presentation={passkeyPresentation}
                 {...{ logout, showMiniDialog }}
             />
         );

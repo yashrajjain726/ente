@@ -1,6 +1,8 @@
+import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
 import { VerifyEmailForm } from "@/components/auth/VerifyEmailForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/featureFlags";
+import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
 import AccountsVerifyPage, {
     type VerifyEmailPresentationProps,
 } from "ente-accounts/pages/verify";
@@ -16,12 +18,27 @@ function VerifyEmailPresentation(
     );
 }
 
+function PasskeyPresentation(
+    props: VerifyingPasskeyPresentationProps,
+): React.JSX.Element {
+    return (
+        <PhotosAuthShell>
+            <PasskeyVerificationForm {...props} />
+        </PhotosAuthShell>
+    );
+}
+
 function VerifyPage(): React.JSX.Element {
     if (!featureFlags.enableNewPhotosAuthFlow) {
         return <AccountsVerifyPage />;
     }
 
-    return <AccountsVerifyPage presentation={VerifyEmailPresentation} />;
+    return (
+        <AccountsVerifyPage
+            presentation={VerifyEmailPresentation}
+            passkeyPresentation={PasskeyPresentation}
+        />
+    );
 }
 
 export default VerifyPage;
