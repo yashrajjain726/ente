@@ -11,6 +11,8 @@ void main() {
         GPSData(null, [1, 2], null, [1, 2, 3]),
         GPSData(null, [1, 2, 3], null, [1, 2]),
         GPSData(null, [1, 2], null, [1, 2]),
+        GPSData(null, [1, 2, 3], "E", [1, 2, 3]),
+        GPSData("N", [1, 2, 3], null, [1, 2, 3]),
         GPSData("A", [1, 2, 3], "xyz", [1, 2, 3]),
       ]) {
         expect(gpsData.toLocationObj(), isNull);
@@ -93,12 +95,7 @@ void main() {
           ),
         ]) {
       test(name, () {
-        final location = GPSData(
-          latRef,
-          [...lat],
-          longRef,
-          [...long],
-        ).toLocationObj();
+        final location = GPSData(latRef, lat, longRef, long).toLocationObj();
 
         expect(location, isNotNull);
         expect(location!.latitude, closeTo(expectedLat, 0.00001));
