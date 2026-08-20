@@ -13,25 +13,25 @@
     "sha256": "2def6506e098234abc2e6e10febd820b8e3e66d6ad4c9525cb4f1cec3418f9b6"
   },
   "onnx_runtime": {
-    "version": "1.28.1",
+    "version": "1.28.1-r1",
     "archives": {
       "aarch64-apple-darwin": {
-        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.28.1/onnxruntime-osx-arm64-1.28.1.tgz",
-        "sha256": "18c853e5c5deba90e244e1b953a65121f23747ba2c04e6743885caa6ce1ea12f",
-        "library_path": "onnxruntime-osx-arm64-1.28.1/lib/libonnxruntime.dylib",
-        "library_sha256": "0686a33bf7a9fa93062ca4827e4e1d06e1cd5ea6f0f37dbe948187df3376ee20"
+        "url": "https://github.com/ente/ort-packaging/releases/download/ort-1.28.1-r1/onnxruntime-coreml-macos-arm64-1.28.1-r1.tar.gz",
+        "sha256": "12890a871d0e658dd064be187fa63d27c6b692e69f94d4750532fd8f4d179c1e",
+        "library_path": "./libonnxruntime.1.28.1.dylib",
+        "library_sha256": "11a4bb659860e56448aae6dfac2cd31eaddf2218588d435eb26d6f79a07b91bc"
       },
       "x86_64-unknown-linux-gnu": {
-        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.28.1/onnxruntime-linux-x64-1.28.1.tgz",
-        "sha256": "2529aef968d0ad0603365054bc46ebefa7f0fe3bc12f28c5f729c99ddffe2a81",
-        "library_path": "onnxruntime-linux-x64-1.28.1/lib/libonnxruntime.so.1.28.1",
-        "library_sha256": "e38d2cec3d582c41786bdd428865fc017145599666cb7c82410e52496e7e066d"
+        "url": "https://github.com/ente/ort-packaging/releases/download/ort-1.28.1-r1/onnxruntime-webgpu-linux-x64-1.28.1-r1.tar.gz",
+        "sha256": "94e55336214e891e9f648901f0c815f113d1534cecae82ecef9c3828cd73d4f4",
+        "library_path": "./libonnxruntime.so.1.28.1",
+        "library_sha256": "1750d82f5b8c3c4924fd0301de7ac92747e33d852f4748e1e9da97406f257bed"
       },
       "aarch64-unknown-linux-gnu": {
-        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.28.1/onnxruntime-linux-aarch64-1.28.1.tgz",
-        "sha256": "53bab9a5c6ae198b7be75663b780c64caa388d30257fac458c71fbff0a82e98e",
-        "library_path": "onnxruntime-linux-aarch64-1.28.1/lib/libonnxruntime.so.1.28.1",
-        "library_sha256": "0ce5f75809ba44fdc766b64edf8961014f0ab7ea3686b1be466a61f1474918ac"
+        "url": "https://github.com/ente/ort-packaging/releases/download/ort-1.28.1-r1/onnxruntime-webgpu-linux-arm64-1.28.1-r1.tar.gz",
+        "sha256": "2eb71ced50e16b4e2d4ab20b924276d50d123417962a7d874a0cdb7f0171c63d",
+        "library_path": "./libonnxruntime.so.1.28.1",
+        "library_sha256": "5d801e125ca434b5b699e900ee841d44bf5dbb5a660645265f2fcf71d7dd7bec"
       }
     }
   },
