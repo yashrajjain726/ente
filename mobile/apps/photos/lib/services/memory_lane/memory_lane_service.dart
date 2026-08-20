@@ -230,6 +230,7 @@ class MemoryLaneService {
   }
 
   Future<void> _repairTimelineCropReadiness(String personId) async {
+    if (!_isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane crop readiness skipped for $personId: PersonService not initialized",
