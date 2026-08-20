@@ -13,16 +13,15 @@ const MODEL_NAMESPACE: &str = "document-segmentation";
 
 pub(crate) struct Segmenter {
     session: Mutex<OnnxSession>,
-    model_path: String,
 }
 
 impl Segmenter {
     pub(crate) fn new(model_path: &str) -> Result<Self, ScanError> {
         let segmenter = Self {
             session: Mutex::new(
-                OnnxSession::new(ExecutionMode::PlatformDefault).with_unvalidated_acceleration(),
+                OnnxSession::new(model_path, MODEL_NAMESPACE, ExecutionMode::PlatformDefault)
+                    .with_unvalidated_acceleration(),
             ),
-            model_path: model_path.to_string(),
         };
         let samples = (MASK_SIDE * MASK_SIDE * 3) as usize;
         segmenter
@@ -40,7 +39,7 @@ impl Segmenter {
             Err(poisoned) => poisoned.into_inner(),
         };
         let (data, _usage) = guard
-            .run(&self.model_path, MODEL_NAMESPACE, |session| {
+            .run(|session| {
                 let (shape, values) = run_f32(session, &input, [1i64, side, side, 3])?;
                 if values.len() != expected {
                     return Err(SessionRunError::from(MlError::Ort(format!(
