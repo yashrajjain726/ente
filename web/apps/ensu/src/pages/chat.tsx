@@ -689,6 +689,7 @@ const Page: React.FC = () => {
     const providerRef = useRef<LlmProvider | null>(null);
     const currentJobIdRef = useRef<number | null>(null);
     const activeKnowledgeCitationsRef = useRef<SourceCitation[]>([]);
+    const activeKnowledgeDownloadsRef = useRef(new Set<string>());
     const knowledgeCatalogPromiseRef = useRef<Promise<KnowledgePack[]> | null>(
         null,
     );
@@ -3607,6 +3608,9 @@ const Page: React.FC = () => {
     );
     const handleDownloadKnowledgePack = useCallback(
         (stableId: string) => {
+            if (activeKnowledgeDownloadsRef.current.has(stableId)) return;
+            activeKnowledgeDownloadsRef.current.add(stableId);
+
             const previousPack = knowledgePacks.find(
                 (pack) => pack.stableId === stableId,
             );
@@ -3652,6 +3656,7 @@ const Page: React.FC = () => {
                     void refreshKnowledgeCatalog();
                 })
                 .finally(() => {
+                    activeKnowledgeDownloadsRef.current.delete(stableId);
                     setKnowledgeDownloadProgress((current) => ({
                         ...current,
                         [stableId]: undefined,
