@@ -334,18 +334,23 @@ export const ChatComposer = memo(
                                             variant="contained"
                                             color="accent"
                                             disabled={
-                                                modelGateStatus ===
-                                                    "downloading" ||
-                                                isDownloading
+                                                modelGateStatus !== "missing" &&
+                                                modelGateStatus !== "error"
                                             }
                                             onClick={() =>
                                                 void handleDownloadModel()
                                             }
                                         >
-                                            {modelGateStatus ===
-                                                "downloading" || isDownloading
-                                                ? "Downloading..."
-                                                : "Download"}
+                                            {modelGateStatus === "checking"
+                                                ? "Checking..."
+                                                : modelGateStatus ===
+                                                        "preloading" ||
+                                                    modelGateStatus ===
+                                                        "downloading"
+                                                  ? "Loading..."
+                                                  : modelGateStatus === "error"
+                                                    ? "Retry"
+                                                    : "Download"}
                                         </Button>
                                     </Stack>
                                 </Stack>
