@@ -2351,6 +2351,7 @@ dependencies = [
  "ente-assets",
  "ente-core",
  "ente-ensu",
+ "ente-ensu-crypto",
  "keyring",
  "libc",
  "log",
@@ -2509,6 +2510,7 @@ version = "0.0.0"
 dependencies = [
  "ente-assets",
  "ente-core",
+ "ente-ensu-crypto",
  "ente-image",
  "llama-cpp-2",
  "memmap2",
@@ -2531,6 +2533,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-ensu-crypto"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "hkdf 0.13.0",
+ "sha2 0.11.0",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "ente-ensu-uniffi"
 version = "0.0.0"
 dependencies = [
@@ -2540,6 +2552,16 @@ dependencies = [
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
+]
+
+[[package]]
+name = "ente-ensu-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-ensu-crypto",
+ "ente-wasm-log",
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]

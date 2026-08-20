@@ -67,12 +67,6 @@ impl From<b64::DecodeError> for CryptoError {
     }
 }
 
-// Kept for existing web callers; pure Rust crypto needs no initialization.
-#[wasm_bindgen]
-pub fn crypto_init() -> Result<(), CryptoError> {
-    Ok(())
-}
-
 #[wasm_bindgen]
 pub fn crypto_generate_key() -> String {
     b64::encode(crypto::Key::generate().as_bytes())
