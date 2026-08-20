@@ -156,7 +156,7 @@ class MemoryLaneService {
   }
 
   Future<MemoryLanePersonTimeline?> getTimeline(String personId) async {
-    if (!hasGrantedMLConsent) throw StateError("Memory Lane is disabled");
+    if (!hasGrantedMLConsent) return null;
     final timeline = await _cacheService.getTimeline(personId);
     if (timeline == null || timeline.entries.isEmpty) {
       return timeline;
@@ -192,7 +192,7 @@ class MemoryLaneService {
   }
 
   bool hasReadyTimelineSync(String personId) {
-    if (!hasGrantedMLConsent) throw StateError("Memory Lane is disabled");
+    if (!hasGrantedMLConsent) return false;
     return readyPersonIds.value.contains(personId);
   }
 
