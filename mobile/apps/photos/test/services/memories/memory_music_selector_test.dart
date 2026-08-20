@@ -10,28 +10,18 @@ void main() {
   ];
   const memoryIDs = <String>["memory-a", "memory-b", "memory-c", "memory-d"];
 
-  test("assignments are deterministic", () {
-    final first = assignMemoryMusicTracks(memoryIDs: memoryIDs, tracks: tracks);
-    final second = assignMemoryMusicTracks(
-      memoryIDs: memoryIDs,
-      tracks: tracks,
-    );
-
-    expect(second, first);
-  });
-
-  test("adjacent memories do not receive the same track", () {
+  test("assigns stable tracks without adjacent repeats", () {
     final assignments = assignMemoryMusicTracks(
       memoryIDs: memoryIDs,
       tracks: tracks,
     );
-    final assignedTracks = memoryIDs
-        .map((memoryID) => assignments[memoryID]!.id)
-        .toList();
 
-    for (var index = 1; index < assignedTracks.length; index++) {
-      expect(assignedTracks[index], isNot(assignedTracks[index - 1]));
-    }
+    expect(memoryIDs.map((memoryID) => assignments[memoryID]!.id), <String>[
+      "track-2",
+      "track-1",
+      "track-2",
+      "track-3",
+    ]);
   });
 
   test("one-track list reuses its only track", () {

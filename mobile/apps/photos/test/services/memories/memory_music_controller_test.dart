@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/models/memories/memory_music_track.dart";
 import "package:photos/services/memories/memory_music_controller.dart";
@@ -8,10 +10,8 @@ void main() {
   late List<bool> persistedMuteValues;
   late MemoryMusicController controller;
 
-  setUp(() {
-    player = _FakeMemoryMusicPlayer();
-    persistedMuteValues = <bool>[];
-    controller = MemoryMusicController(
+  MemoryMusicController createController({bool initiallyMuted = false}) {
+    return MemoryMusicController(
       assignments: const <String, MemoryMusicTrack>{
         "memory-1": MemoryMusicTrack(
           id: "track-1",
@@ -22,10 +22,16 @@ void main() {
           assetPath: "assets/track-2.mp3",
         ),
       },
-      initiallyMuted: false,
+      initiallyMuted: initiallyMuted,
       persistMuted: (value) async => persistedMuteValues.add(value),
       player: player,
     );
+  }
+
+  setUp(() {
+    player = _FakeMemoryMusicPlayer();
+    persistedMuteValues = <bool>[];
+    controller = createController();
   });
 
   tearDown(() {
@@ -46,12 +52,19 @@ void main() {
     await controller.activateMemory("memory-1", currentItemIsVideo: true);
     expect(player.playing, isFalse);
 
-    await controller.activateMemory("memory-1", currentItemIsVideo: true);
-    expect(player.playing, isFalse);
-
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
     expect(player.playing, isTrue);
     expect(player.loadAttempts, 1);
+  });
+
+  test("initial mute state prevents playback", () async {
+    controller.dispose();
+    player = _FakeMemoryMusicPlayer();
+    controller = createController(initiallyMuted: true);
+
+    await controller.activateMemory("memory-1", currentItemIsVideo: false);
+
+    expect(player.playing, isFalse);
   });
 
   test("mute pauses music and unmute resumes it", () async {
@@ -91,6 +104,30 @@ void main() {
     ]);
   });
 
+  test("newer memory wins when activations overlap", () async {
+    final firstLoadStarted = Completer<void>();
+    final releaseFirstLoad = Completer<void>();
+    player.beforeNextLoadCompletes = () {
+      firstLoadStarted.complete();
+      return releaseFirstLoad.future;
+    };
+
+    final firstActivation = controller.activateMemory(
+      "memory-1",
+      currentItemIsVideo: false,
+    );
+    await firstLoadStarted.future;
+    await controller.activateMemory("memory-2", currentItemIsVideo: false);
+    releaseFirstLoad.complete();
+    await firstActivation;
+
+    expect(player.loadedAssets, <String>[
+      "assets/track-1.mp3",
+      "assets/track-2.mp3",
+    ]);
+    expect(player.playAttempts, 1);
+  });
+
   test("music resumes only after every pause reason clears", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
@@ -122,6 +159,8 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   bool playing = false;
   bool failNextLoad = false;
   int loadAttempts = 0;
+  int playAttempts = 0;
+  Future<void> Function()? beforeNextLoadCompletes;
 
   @override
   Future<void> configureAudioSession() async {}
@@ -134,6 +173,9 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
       throw StateError("load failed");
     }
     loadedAssets.add(assetPath);
+    final beforeCompleting = beforeNextLoadCompletes;
+    beforeNextLoadCompletes = null;
+    await beforeCompleting?.call();
   }
 
   @override
@@ -143,6 +185,7 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
 
   @override
   Future<void> play() async {
+    playAttempts++;
     playing = true;
   }
 
