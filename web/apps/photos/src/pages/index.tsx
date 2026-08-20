@@ -116,7 +116,7 @@ const Page: React.FC = () => {
         <TappableContainer onMaybeChangeHost={refreshHost}>
             {loading ? (
                 <ActivityIndicator />
-            ) : featureFlags.enableNewPhotosSignupFlow && !showLogin ? (
+            ) : featureFlags.enableNewPhotosAuthFlow && !showLogin ? (
                 <PhotosAuthShell>
                     <SignUpContents
                         {...{ router, host }}

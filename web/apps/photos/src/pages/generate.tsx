@@ -16,7 +16,7 @@ function RecoveryKeyPresentation(
 }
 
 function GeneratePage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosSignupFlow) {
+    if (!featureFlags.enableNewPhotosAuthFlow) {
         return <AccountsGeneratePage />;
     }
 
