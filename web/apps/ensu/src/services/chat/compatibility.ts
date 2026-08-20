@@ -8,7 +8,7 @@ import {
     secureStorageGet,
     secureStorageSet,
 } from "../secure-storage";
-import { decryptAttachmentBytes, encryptAttachmentBytes } from "./attachments";
+import { decryptAttachmentBytes, encryptAttachmentBytes } from "./crypto";
 import {
     attachmentBytesExists,
     chatDb,
