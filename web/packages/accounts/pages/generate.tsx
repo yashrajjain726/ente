@@ -41,13 +41,18 @@ import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
     NewPasswordForm,
     type NewPasswordFormProps,
+    type NewPasswordPresentationProps,
 } from "../components/NewPasswordForm";
 
 export interface GeneratePageProps {
+    passwordPresentation?: ComponentType<NewPasswordPresentationProps>;
     recoveryKeyPresentation?: ComponentType<RecoveryKeyPresentationProps>;
 }
 
-const Page: React.FC<GeneratePageProps> = ({ recoveryKeyPresentation }) => {
+const Page: React.FC<GeneratePageProps> = ({
+    passwordPresentation,
+    recoveryKeyPresentation,
+}) => {
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState("");
@@ -121,6 +126,14 @@ const Page: React.FC<GeneratePageProps> = ({ recoveryKeyPresentation }) => {
             open
             onClose={handleRecoveryKeyClose}
             showMiniDialog={showMiniDialog}
+        />
+    ) : userEmail && passwordPresentation ? (
+        <NewPasswordForm
+            userEmail={userEmail}
+            submitButtonTitle={t("set_password")}
+            onSubmit={handleSubmit}
+            onBack={logout}
+            presentation={passwordPresentation}
         />
     ) : userEmail ? (
         <AccountsPageContents>
