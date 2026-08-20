@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     Error, Result,
-    legacy_kit_models::{LEGACY_KIT_PAYLOAD_VERSION, LegacyKitShare, LegacyKitVariant},
+    kit_models::{LEGACY_KIT_PAYLOAD_VERSION, LegacyKitShare, LegacyKitVariant},
 };
 
 pub(super) fn checksum(

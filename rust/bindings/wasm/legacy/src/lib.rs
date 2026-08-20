@@ -1,4 +1,4 @@
-use ente_contacts::{LegacyKitRecoveryClient, LegacyKitShare};
+use ente_legacy::{LegacyKitRecoveryClient, LegacyKitShare};
 use js_sys::Reflect;
 use serde::Deserialize;
 use serde_wasm_bindgen as swb;
@@ -24,9 +24,9 @@ impl From<LegacyError> for JsValue {
     }
 }
 
-impl From<ente_contacts::Error> for LegacyError {
-    fn from(error: ente_contacts::Error) -> Self {
-        use ente_contacts::ErrorKind as K;
+impl From<ente_legacy::Error> for LegacyError {
+    fn from(error: ente_legacy::Error) -> Self {
+        use ente_legacy::ErrorKind as K;
         let kind = match error.kind() {
             K::Network => "network",
             K::Http => "http",
@@ -34,9 +34,6 @@ impl From<ente_contacts::Error> for LegacyError {
             K::Crypto => "crypto",
             K::Auth => "auth",
             K::InvalidInput => "invalid_input",
-            K::MissingEncryptedData => "missing_encrypted_data",
-            K::MissingEncryptedKey => "missing_encrypted_key",
-            K::ProfilePictureNotFound => "profile_picture_not_found",
             K::ActiveRecoverySession => "active_recovery_session",
         };
         Self {
@@ -85,7 +82,7 @@ pub async fn legacy_kit_open_recovery(
 
 #[wasm_bindgen]
 pub struct LegacyKitRecoveryHandle {
-    inner: ente_contacts::LegacyKitRecoveryHandle,
+    inner: ente_legacy::LegacyKitRecoveryHandle,
 }
 
 #[wasm_bindgen]

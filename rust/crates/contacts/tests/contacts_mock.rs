@@ -1,7 +1,13 @@
-use ente_contacts::client::{ContactsCtx, OpenContactsCtxInput, RootKeySource};
+use std::sync::Arc;
+
+use ente_contacts::client::{ContactsClient, OpenContactsInput, OpenContactsResult, RootKeySource};
 use ente_contacts::crypto as contacts_crypto;
 use ente_contacts::models::{AttachmentType, ContactData, WrappedRootContactKey};
-use ente_core::{b64, crypto::Key};
+use ente_core::{
+    b64,
+    crypto::{Key, SecretVec},
+    http::{Api, ApiConfig, Auth, Http},
+};
 use md5::Digest;
 use mockito::{Matcher, Server};
 
@@ -12,17 +18,29 @@ fn sample_contact() -> ContactData {
     }
 }
 
-fn open_input(base_url: String, master_key: Vec<u8>) -> OpenContactsCtxInput {
-    OpenContactsCtxInput {
-        base_url,
-        auth_token: "auth-token".to_string(),
-        user_id: 7,
-        master_key,
-        cached_wrapped_root_contact_key: None,
-        user_agent: Some("ente-contacts-test".to_string()),
-        client_package: Some("io.ente.photos".to_string()),
-        client_version: Some("1.0.0".to_string()),
-    }
+fn open(
+    base_url: String,
+    master_key: Vec<u8>,
+    cached_wrapped_root_contact_key: Option<WrappedRootContactKey>,
+) -> ente_contacts::Result<OpenContactsResult> {
+    let api = Api::new(
+        Http::new()?,
+        ApiConfig {
+            origin: base_url,
+            client_package: Some("io.ente.photos".to_string()),
+            client_version: Some("1.0.0".to_string()),
+            user_agent: Some("ente-contacts-test".to_string()),
+            auth: Some(Auth::User("auth-token".to_string())),
+        },
+    );
+    ContactsClient::open(
+        Arc::new(api),
+        Arc::new(SecretVec::new(master_key)),
+        OpenContactsInput {
+            user_id: 7,
+            cached_wrapped_root_contact_key,
+        },
+    )
 }
 
 fn wrap_root(root_key: &[u8], master_key: &[u8]) -> WrappedRootContactKey {
@@ -78,9 +96,7 @@ async fn open_without_cached_wrapped_root_contact_key_is_unresolved() {
         .create_async()
         .await;
 
-    let opened = ContactsCtx::open(open_input(server.url(), master_key.clone()))
-        .await
-        .unwrap();
+    let opened = open(server.url(), master_key.clone(), None).unwrap();
 
     root_mock.assert_async().await;
     assert_eq!(opened.root_key_source, RootKeySource::Unresolved);
@@ -130,16 +146,14 @@ async fn get_contact_fetches_root_key_when_unresolved_context_reads_live_contact
         .create_async()
         .await;
 
-    let opened = ContactsCtx::open(open_input(server.url(), master_key))
-        .await
-        .unwrap();
-    let fetched = opened.ctx.get_contact("ct_contact1").await.unwrap();
+    let opened = open(server.url(), master_key, None).unwrap();
+    let fetched = opened.client.get_contact("ct_contact1").await.unwrap();
 
     root_fetch_mock.assert_async().await;
     get_contact_mock.assert_async().await;
     assert_eq!(opened.root_key_source, RootKeySource::Unresolved);
     assert_eq!(
-        opened.ctx.current_wrapped_root_contact_key(),
+        opened.client.current_wrapped_root_contact_key(),
         Some(server_wrapped_root)
     );
     assert_eq!(fetched.name.as_deref(), Some(contact.name.as_str()));
@@ -193,13 +207,9 @@ async fn create_contact_uses_cached_wrapped_root_contact_key_without_fetching_re
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(OpenContactsCtxInput {
-        cached_wrapped_root_contact_key: Some(wrapped_root),
-        ..open_input(server.url(), master_key)
-    })
-    .await
-    .unwrap()
-    .ctx;
+    let ctx = open(server.url(), master_key, Some(wrapped_root))
+        .unwrap()
+        .client;
 
     let created = ctx.create_contact(&contact).await.unwrap();
 
@@ -298,10 +308,7 @@ async fn set_profile_picture_uses_signed_upload_url_and_commit() {
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(open_input(server.url(), master_key))
-        .await
-        .unwrap()
-        .ctx;
+    let ctx = open(server.url(), master_key, None).unwrap().client;
 
     let updated = ctx
         .set_profile_picture("ct_picture1", &picture_bytes)
@@ -395,10 +402,7 @@ async fn get_profile_picture_uses_signed_download_url() {
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(open_input(server.url(), master_key))
-        .await
-        .unwrap()
-        .ctx;
+    let ctx = open(server.url(), master_key, None).unwrap().client;
 
     let downloaded = ctx.get_profile_picture("ct_picture1").await.unwrap();
 
@@ -454,10 +458,7 @@ async fn delete_profile_picture_fetches_root_key_when_unresolved_context_decodes
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(open_input(server.url(), master_key))
-        .await
-        .unwrap()
-        .ctx;
+    let ctx = open(server.url(), master_key, None).unwrap().client;
 
     let updated = ctx.delete_profile_picture("ct_picture1").await.unwrap();
 
@@ -519,10 +520,7 @@ async fn get_attachment_uses_generic_signed_download_url() {
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(open_input(server.url(), master_key))
-        .await
-        .unwrap()
-        .ctx;
+    let ctx = open(server.url(), master_key, None).unwrap().client;
 
     let downloaded = ctx
         .get_attachment_encrypted(AttachmentType::ProfilePicture, "ua_generic1")
@@ -586,10 +584,7 @@ async fn deleted_contacts_surface_as_tombstones() {
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(open_input(server.url(), master_key))
-        .await
-        .unwrap()
-        .ctx;
+    let ctx = open(server.url(), master_key, None).unwrap().client;
     let diff = ctx.get_diff(0, 10).await.unwrap();
 
     root_mock.assert_async().await;
@@ -640,13 +635,9 @@ async fn get_diff_uses_cached_wrapped_root_contact_key_for_reads_without_fetchin
         .create_async()
         .await;
 
-    let ctx = ContactsCtx::open(OpenContactsCtxInput {
-        cached_wrapped_root_contact_key: Some(cached_wrapped_root),
-        ..open_input(server.url(), master_key)
-    })
-    .await
-    .unwrap()
-    .ctx;
+    let ctx = open(server.url(), master_key, Some(cached_wrapped_root))
+        .unwrap()
+        .client;
 
     let diff = ctx.get_diff(0, 10).await.unwrap();
 

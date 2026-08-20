@@ -2443,6 +2443,7 @@ version = "0.0.0"
 dependencies = [
  "ente-accounts",
  "ente-core",
+ "ente-legacy",
  "ente-test-support",
  "hmac 0.13.0",
  "md-5 0.11.0",
@@ -2451,7 +2452,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1 0.11.0",
- "sha2 0.11.0",
  "thiserror 2.0.18",
  "tokio",
  "uuid",
@@ -2495,6 +2495,7 @@ dependencies = [
  "ente-accounts",
  "ente-contacts",
  "ente-core",
+ "ente-legacy",
  "ente-wasm-log",
  "js-sys",
  "md-5 0.11.0",
@@ -2587,11 +2588,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-legacy"
+version = "0.0.0"
+dependencies = [
+ "ente-accounts",
+ "ente-core",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "ente-legacy-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-contacts",
  "ente-core",
+ "ente-legacy",
  "ente-wasm-log",
  "js-sys",
  "serde",
@@ -2609,6 +2623,7 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "ente-frb-log",
+ "ente-legacy",
  "ente-ml",
  "flutter_rust_bridge",
 ]

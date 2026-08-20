@@ -1,7 +1,7 @@
 use ente_accounts::auth::KeyAttributes;
 use serde::{Deserialize, Serialize};
 
-use crate::legacy_kit_models::{
+use crate::kit_models::{
     LegacyKitOwnerRecoverySession, LegacyKitRecoverySession, LegacyKitVariant,
 };
 
@@ -95,7 +95,7 @@ pub struct LegacyKitOpenRecoveryResponse {
 #[serde(rename_all = "camelCase")]
 pub struct LegacyKitOwnerRecoverySessionResponse {
     pub session: Option<LegacyKitRecoverySession>,
-    pub initiators: Vec<crate::legacy_kit_models::LegacyKitRecoveryInitiator>,
+    pub initiators: Vec<crate::kit_models::LegacyKitRecoveryInitiator>,
 }
 
 impl From<LegacyKitOwnerRecoverySessionResponse> for LegacyKitOwnerRecoverySession {

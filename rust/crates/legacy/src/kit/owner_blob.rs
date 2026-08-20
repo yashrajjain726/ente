@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     Error, Result,
-    legacy_kit_models::{LegacyKitMetadata, LegacyKitPart, LegacyKitShare},
+    kit_models::{LegacyKitMetadata, LegacyKitPart, LegacyKitShare},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

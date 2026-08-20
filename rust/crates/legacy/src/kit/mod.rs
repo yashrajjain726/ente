@@ -13,11 +13,11 @@ use uuid::Uuid;
 
 use crate::{
     Error, Result,
-    legacy_kit_models::{
+    kit_models::{
         LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitRecoveryBundle, LegacyKitRecoverySession,
         LegacyKitShare, LegacyKitVariant,
     },
-    legacy_kit_transport::{
+    kit_transport::{
         CreateLegacyKitRequest, LegacyKitChallengeRequest, LegacyKitChallengeResponse,
         LegacyKitChangePasswordRequest, LegacyKitChangePasswordResponse,
         LegacyKitDownloadContentResponse, LegacyKitInitChangePasswordRequest,
