@@ -135,7 +135,7 @@ const PageCard = styled("div")(({ theme }) => ({
     [authAboveMobileMediaQuery]: { borderRadius: "24px" },
     "@media (min-width: 1024px)": {
         width: "1032px",
-        height: "min(740px, 100%)",
+        height: "min(780px, 100%)",
         flexDirection: "row",
     },
     "@media (min-width: 1600px)": {

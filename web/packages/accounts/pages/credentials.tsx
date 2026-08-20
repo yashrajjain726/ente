@@ -11,6 +11,7 @@ import { useSecondFactorChoiceIfNeeded } from "ente-accounts/components/utils/se
 import {
     VerifyMasterPasswordForm,
     type VerifyMasterPasswordFormProps,
+    type VerifyMasterPasswordPresentationProps,
 } from "ente-accounts/components/VerifyMasterPasswordForm";
 import {
     savedIsFirstLogin,
@@ -59,16 +60,37 @@ import { useBaseContext } from "ente-base/context";
 import { isDevBuild } from "ente-base/env";
 import { clearLocalStorage } from "ente-base/local-storage";
 import log from "ente-base/log";
+import { customAPIHost } from "ente-base/origins";
 import { saveAuthToken, savedAuthToken } from "ente-base/token";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import {
+    useCallback,
+    useEffect,
+    useState,
+    type ComponentType,
+    type ReactNode,
+} from "react";
+
+export interface CredentialsPresentationProps {
+    userEmail: string;
+    host: string | undefined;
+    passwordForm: ReactNode;
+    onRecover: () => void;
+    onChangeEmail: () => void;
+}
 
 export interface CredentialsPageProps {
+    presentation?: ComponentType<CredentialsPresentationProps>;
+    passwordPresentation?: ComponentType<VerifyMasterPasswordPresentationProps>;
     passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
 }
 
-const Page: React.FC<CredentialsPageProps> = ({ passkeyPresentation }) => {
+const Page: React.FC<CredentialsPageProps> = ({
+    presentation: Presentation,
+    passwordPresentation,
+    passkeyPresentation,
+}) => {
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState<string>("");
@@ -84,6 +106,7 @@ const Page: React.FC<CredentialsPageProps> = ({ passkeyPresentation }) => {
     const [sessionValidityCheck, setSessionValidityCheck] = useState<
         Promise<void> | undefined
     >(undefined);
+    const [host, setHost] = useState<string | undefined>();
 
     const {
         secondFactorChoiceProps,
@@ -91,6 +114,10 @@ const Page: React.FC<CredentialsPageProps> = ({ passkeyPresentation }) => {
     } = useSecondFactorChoiceIfNeeded();
 
     const router = useRouter();
+
+    useEffect(() => {
+        if (Presentation) void customAPIHost().then(setHost);
+    }, [Presentation]);
 
     const validateSession = useCallback(async () => {
         const showSessionExpiredDialog = () =>
@@ -305,6 +332,10 @@ const Page: React.FC<CredentialsPageProps> = ({ passkeyPresentation }) => {
         }
     }, [passkeyVerificationData]);
 
+    const handleRecover = useCallback(() => {
+        void router.push("/recover");
+    }, [router]);
+
     if (!userEmail) {
         return <LoadingIndicator />;
     }
@@ -334,26 +365,52 @@ const Page: React.FC<CredentialsPageProps> = ({ passkeyPresentation }) => {
     }
 
     return (
-        <AccountsPageContents>
-            <PasswordHeader caption={userEmail} />
-            <VerifyMasterPasswordForm
-                {...{
-                    userEmail,
-                    keyAttributes,
-                    getKeyAttributes,
-                    srpAttributes,
-                }}
-                submitButtonTitle={t("sign_in")}
-                onVerify={handleVerifyMasterPassword}
-            />
-            <AccountsPageFooterWithHost>
-                <LinkButton onClick={() => router.push("/recover")}>
-                    {t("forgot_password")}
-                </LinkButton>
-                <LinkButton onClick={logout}>{t("change_email")}</LinkButton>
-            </AccountsPageFooterWithHost>
+        <>
+            {Presentation ? (
+                <Presentation
+                    userEmail={userEmail}
+                    host={host}
+                    passwordForm={
+                        <VerifyMasterPasswordForm
+                            {...{
+                                userEmail,
+                                keyAttributes,
+                                getKeyAttributes,
+                                srpAttributes,
+                            }}
+                            submitButtonTitle={t("sign_in")}
+                            onVerify={handleVerifyMasterPassword}
+                            presentation={passwordPresentation}
+                        />
+                    }
+                    onRecover={handleRecover}
+                    onChangeEmail={logout}
+                />
+            ) : (
+                <AccountsPageContents>
+                    <PasswordHeader caption={userEmail} />
+                    <VerifyMasterPasswordForm
+                        {...{
+                            userEmail,
+                            keyAttributes,
+                            getKeyAttributes,
+                            srpAttributes,
+                        }}
+                        submitButtonTitle={t("sign_in")}
+                        onVerify={handleVerifyMasterPassword}
+                    />
+                    <AccountsPageFooterWithHost>
+                        <LinkButton onClick={handleRecover}>
+                            {t("forgot_password")}
+                        </LinkButton>
+                        <LinkButton onClick={logout}>
+                            {t("change_email")}
+                        </LinkButton>
+                    </AccountsPageFooterWithHost>
+                </AccountsPageContents>
+            )}
             <SecondFactorChoice {...secondFactorChoiceProps} />
-        </AccountsPageContents>
+        </>
     );
 };
 
