@@ -67,19 +67,8 @@ impl From<b64::DecodeError> for CryptoError {
     }
 }
 
-// Kept for existing web callers; pure Rust crypto needs no initialization.
-#[wasm_bindgen]
-pub fn crypto_init() -> Result<(), CryptoError> {
-    Ok(())
-}
-
 #[wasm_bindgen]
 pub fn crypto_generate_key() -> String {
-    b64::encode(crypto::Key::generate().as_bytes())
-}
-
-#[wasm_bindgen]
-pub fn crypto_generate_stream_key() -> String {
     b64::encode(crypto::Key::generate().as_bytes())
 }
 
@@ -167,11 +156,6 @@ impl CryptoStreamDecryptor {
         self.finalized = is_final;
         Ok(plaintext)
     }
-}
-
-#[wasm_bindgen]
-pub fn crypto_generate_salt() -> String {
-    b64::encode(crypto::Salt::generate().as_bytes())
 }
 
 #[wasm_bindgen]
@@ -372,26 +356,6 @@ pub fn crypto_box_seal_open(
 }
 
 #[wasm_bindgen]
-pub fn crypto_derive_key(
-    password: &str,
-    salt_b64: &str,
-    mem_limit: u32,
-    ops_limit: u32,
-) -> Result<String, CryptoError> {
-    let salt = b64::decode(salt_b64)?;
-    let salt = crypto::Salt::try_from_slice(&salt)?;
-    let key = crypto::argon::derive_key(
-        password,
-        &salt,
-        crypto::argon::Params {
-            mem_limit,
-            ops_limit,
-        },
-    )?;
-    Ok(b64::encode(key.as_bytes()))
-}
-
-#[wasm_bindgen]
 pub fn crypto_derive_subkey(
     key_b64: &str,
     subkey_len: usize,
@@ -481,11 +445,4 @@ pub fn crypto_encrypt_stream_with_key(
         md5_hash: b64::encode(&md5),
         key: b64::encode(key.as_bytes()),
     })
-}
-
-#[wasm_bindgen]
-pub fn crypto_derive_login_key(master_key_b64: &str) -> Result<String, CryptoError> {
-    let key = b64::decode(master_key_b64)?;
-    let login_key = crypto::kdf::derive_login_key(&crypto::Key::try_from_slice(&key)?);
-    Ok(b64::encode(&login_key))
 }

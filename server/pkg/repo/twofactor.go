@@ -114,23 +114,17 @@ func (repo *TwoFactorRepository) RemoveExpiredTempTwoFactorSecrets() error {
 	return stacktrace.Propagate(err, "")
 }
 
-func (repo *TwoFactorRepository) GetWrongAttempts(sessionID string) (int, error) {
-	row := repo.DB.QueryRow(`SELECT wrong_attempt FROM two_factor_sessions WHERE session_id = $1`,
-		sessionID)
-	var wrongAttempt int
-	if err := row.Scan(&wrongAttempt); err != nil {
-		return 0, stacktrace.Propagate(err, "Failed to scan row")
-	}
-	return wrongAttempt, nil
-}
-
-func (repo *TwoFactorRepository) RecordWrongAttempt(sessionID string) error {
-	_, err := repo.DB.Exec(`UPDATE two_factor_sessions SET wrong_attempt = wrong_attempt + 1
-			WHERE session_id = $1`, sessionID)
+func (repo *TwoFactorRepository) ReserveTwoFactorAttempt(sessionID string) (bool, error) {
+	result, err := repo.DB.Exec(`UPDATE two_factor_sessions SET wrong_attempt = wrong_attempt + 1
+			WHERE session_id = $1 AND expiration_time > $2 AND wrong_attempt < 10`, sessionID, time.Microseconds())
 	if err != nil {
-		return stacktrace.Propagate(err, "Failed to update wrong attempt count")
+		return false, stacktrace.Propagate(err, "Failed to reserve two-factor attempt")
 	}
-	return nil
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, stacktrace.Propagate(err, "Failed to get rows affected")
+	}
+	return rowsAffected == 1, nil
 }
 
 // TryRecordUsedOTPCode atomically tries to record an OTP code as used

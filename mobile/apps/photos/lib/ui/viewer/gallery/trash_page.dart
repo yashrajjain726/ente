@@ -114,6 +114,7 @@ class _TrashPageState extends State<_TrashPage> {
       duration: const Duration(milliseconds: 150),
       child: Gallery(
         key: ValueKey(_isOnEnteTrash ? 'ente_trash_page' : 'device_trash_page'),
+        header: header == null ? const SizedBox(height: 6) : null,
         enableFileGrouping: false,
         appBar: GalleryAppBarWidget.sliverConfig(
           GalleryType.trash,
@@ -166,7 +167,7 @@ class _TrashPageState extends State<_TrashPage> {
                   label: l10n.emptyTrash,
                   variant: FABComponentVariant.destructive,
                   onTap: () =>
-                      showConfirmDeleteAllTrashSheet(context, _isOnEnteTrash),
+                      showConfirmEmptyTrashSheet(context, _isOnEnteTrash),
                 ),
               );
             },

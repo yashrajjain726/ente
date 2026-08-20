@@ -13,6 +13,7 @@ members = [
     "bindings/uniffi/log",
     "bindings/wasm/cast",
     "bindings/wasm/core",
+    "bindings/wasm/ensu",
     "bindings/wasm/log",
     "bindings/wasm/paste",
     "bindings/wasm/space",
@@ -22,6 +23,7 @@ members = [
     "crates/contacts",
     "crates/core",
     "crates/ensu",
+    "crates/ensu-crypto",
     "crates/image",
     "crates/ml",
     "crates/paste",
@@ -37,6 +39,7 @@ ente-cast = { path = "crates/cast" }
 ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-ensu = { path = "crates/ensu" }
+ente-ensu-crypto = { path = "crates/ensu-crypto" }
 ente-frb-log = { path = "bindings/frb/log" }
 ente-image = { path = "crates/image" }
 ente-ml = { path = "crates/ml" }
@@ -48,6 +51,7 @@ ente-uniffi-log = { path = "bindings/uniffi/log" }
 ente-wasm-log = { path = "bindings/wasm/log" }
 flutter_rust_bridge = "=2.12.0"
 flutter_rust_bridge_codegen = "=2.12.0"
+hkdf = "0.13.0"
 js-sys = "0.3.102"
 log = "0.4.29"
 md-5 = "0.11.0"
@@ -66,7 +70,7 @@ url = "2.5.8"
 urlencoding = "2.1.3"
 wasm-bindgen = "0.2.125"
 wasm-bindgen-futures = "0.4.75"
-zeroize = { version = "1.8.2", features = ["derive"] }
+zeroize = { version = "1.9.0", features = ["derive"] }
 
 # Unoptimized Argon2 makes production-strength derivations dominate test runtime.
 [profile.dev.package.argon2]

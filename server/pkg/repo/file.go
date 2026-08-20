@@ -256,9 +256,12 @@ func (repo *FileRepository) ResetNeedsReplication(file ente.File, hotDC string) 
 	}
 }
 
-func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize int64, usageDiff int64, oldObjects []string, isDuplicateRequest bool) error {
+func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize int64, usageDiff int64, oldObjects []string, stagedObjects []string) error {
 	hotDC := repo.S3Config.GetHotDataCenter()
 	dcsForNewEntry := pq.StringArray{hotDC}
+	// iOS may retry after backgrounding before receiving a successful response.
+	// Only matching object keys and total size make the update a duplicate.
+	isDuplicateRequest := len(stagedObjects) == 0 && usageDiff == 0
 
 	ctx := context.Background()
 	tx, err := repo.DB.BeginTx(ctx, nil)
@@ -323,15 +326,11 @@ func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize
 		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
-	err = repo.ObjectCleanupRepo.RemoveTempObjectKey(ctx, tx, file.File.ObjectKey, hotDC)
-	if err != nil {
-		tx.Rollback()
-		return stacktrace.Propagate(err, "")
-	}
-	err = repo.ObjectCleanupRepo.RemoveTempObjectKey(ctx, tx, file.Thumbnail.ObjectKey, hotDC)
-	if err != nil {
-		tx.Rollback()
-		return stacktrace.Propagate(err, "")
+	for _, objectKey := range stagedObjects {
+		if err = repo.ObjectCleanupRepo.RemoveTempObjectKey(ctx, tx, objectKey, hotDC); err != nil {
+			tx.Rollback()
+			return stacktrace.Propagate(err, "")
+		}
 	}
 	if isDuplicateRequest {
 		// Re-inserting object_copies on a duplicate request violates its primary
@@ -481,10 +480,11 @@ func (repo *FileRepository) UpdateThumbnail(ctx context.Context, fileID int64, u
 		return stacktrace.Propagate(err, "")
 	}
 
-	err = repo.ObjectCleanupRepo.RemoveTempObjectKey(ctx, tx, thumbnail.ObjectKey, hotDC)
-	if err != nil {
-		tx.Rollback()
-		return stacktrace.Propagate(err, "")
+	if oldThumbnailObject != nil {
+		if err = repo.ObjectCleanupRepo.RemoveTempObjectKey(ctx, tx, thumbnail.ObjectKey, hotDC); err != nil {
+			tx.Rollback()
+			return stacktrace.Propagate(err, "")
+		}
 	}
 	err = repo.markThumbnailAsNeedingReplication(ctx, tx, thumbnail.ObjectKey, hotDC)
 	if err != nil {
