@@ -1083,7 +1083,7 @@ class _MemoryMusicMuteButton extends StatelessWidget {
           minimumSize: const Size.square(48),
           maximumSize: const Size.square(48),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          overlayColor: Colors.white.withValues(alpha: 0.08),
+          overlayColor: Colors.transparent,
         ),
         onPressed: () => unawaited(controller.toggleMuted()),
         icon: DecoratedBox(
