@@ -7,8 +7,6 @@ Map<String, MemoryMusicTrack> assignMemoryMusicTracks({
   required Iterable<String> memoryIDs,
   required List<MemoryMusicTrack> tracks,
 }) {
-  if (tracks.isEmpty) return const <String, MemoryMusicTrack>{};
-
   final assignments = <String, MemoryMusicTrack>{};
   String? previousTrackID;
   for (final memoryID in memoryIDs) {

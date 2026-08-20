@@ -1378,19 +1378,18 @@ class MemoriesCacheService {
       );
       return;
     }
-    final selectedPersonMemory = personMemory;
     if (context != null && !context.mounted) return;
     final page = FullScreenMemoryDataUpdater(
       initialIndex: 0,
-      memories: selectedPersonMemory.memories,
+      memories: personMemory.memories,
       child: Container(
         color: backgroundColorDark,
         width: double.infinity,
         height: double.infinity,
         child: FullScreenMemory(
-          selectedPersonMemory.title,
+          personMemory.title,
           0,
-          memoryID: selectedPersonMemory.id,
+          memoryID: personMemory.id,
           isActive: true,
         ),
       ),
@@ -1398,7 +1397,7 @@ class MemoriesCacheService {
     await _routeToPage(
       flagService.internalUser
           ? MemoryMusicSession(
-              memoryIDs: <String>[selectedPersonMemory.id],
+              memoryIDs: <String>[personMemory.id],
               child: page,
             )
           : page,

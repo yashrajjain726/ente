@@ -56,21 +56,14 @@ class MemoryMusicController extends ChangeNotifier {
       return;
     }
 
-    final track = _assignments[memoryID];
+    final track = _assignments[memoryID]!;
     final generation = ++_loadGeneration;
     _status = _MemoryMusicPlaybackStatus.loading;
     await _synchronizePlayback();
     if (!_isCurrentLoad(generation)) return;
-    if (track == null) {
-      _status = _MemoryMusicPlaybackStatus.idle;
-      await _player.stop();
-      return;
-    }
 
     try {
       await _ensureAudioSessionInitialized();
-      if (!_isCurrentLoad(generation)) return;
-      await _player.stop();
       if (!_isCurrentLoad(generation)) return;
       await _player.loadAsset(track.assetPath);
       if (!_isCurrentLoad(generation)) return;

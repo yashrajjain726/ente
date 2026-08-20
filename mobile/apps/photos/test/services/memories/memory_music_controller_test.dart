@@ -213,10 +213,5 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   }
 
   @override
-  Future<void> stop() async {
-    playing = false;
-  }
-
-  @override
   Future<void> dispose() async {}
 }

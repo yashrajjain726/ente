@@ -37,14 +37,4 @@ void main() {
       everyElement("track-1"),
     );
   });
-
-  test("empty track list produces no assignments", () {
-    expect(
-      assignMemoryMusicTracks(
-        memoryIDs: memoryIDs,
-        tracks: const <MemoryMusicTrack>[],
-      ),
-      isEmpty,
-    );
-  });
 }

@@ -425,18 +425,14 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     final nextNotifier = memoryData?.indexNotifier;
     if (identical(nextNotifier, _itemIndexNotifier)) {
       if (!identical(previousMemoryData, memoryData)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _activateCurrentItemMusic();
-        });
+        _activateCurrentItemMusic();
       }
       return;
     }
     _itemIndexNotifier?.removeListener(_activateCurrentItemMusic);
     _itemIndexNotifier = nextNotifier;
     _itemIndexNotifier?.addListener(_activateCurrentItemMusic);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _activateCurrentItemMusic();
-    });
+    _activateCurrentItemMusic();
   }
 
   @override
