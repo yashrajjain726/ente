@@ -4,7 +4,6 @@ on:
     pull_request:
         paths:
             - ".github/workflows/rust-test.yml"
-            - "infra/ml/test/ml_indexing/assets.json"
             - "rust/**"
             - "server/**"
 
