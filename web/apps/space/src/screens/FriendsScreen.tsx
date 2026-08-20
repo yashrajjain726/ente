@@ -923,7 +923,7 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
                     {isSubmitting ? (
                         <SpaceActionFeedbackIcon phase="busy" />
                     ) : isSent ? (
-                        "Request sent"
+                        <SpaceActionFeedbackIcon phase="done" />
                     ) : (
                         "Send request"
                     )}
