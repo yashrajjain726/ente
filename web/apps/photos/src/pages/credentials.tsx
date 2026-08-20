@@ -1,6 +1,8 @@
-import { CredentialsForm } from "@/components/auth/CredentialsForm";
+import {
+    CredentialsForm,
+    PasswordForm,
+} from "@/components/auth/CredentialsForm";
 import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
-import { PasswordForm } from "@/components/auth/PasswordForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/featureFlags";
 import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
