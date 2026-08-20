@@ -1075,32 +1075,36 @@ class _MemoryMusicMuteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMuted = controller.isMuted;
-    return SizedBox(
-      width: 47,
-      height: 34,
-      child: Center(
-        child: SizedBox.square(
-          dimension: 34,
-          child: IconButton(
-            tooltip: isMuted
-                ? pendingTranslation("Unmute audio")
-                : pendingTranslation("Mute audio"),
-            padding: const EdgeInsets.all(8),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0x66000000),
-              shape: const CircleBorder(),
-              minimumSize: const Size.square(34),
-              maximumSize: const Size.square(34),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              overlayColor: Colors.white.withValues(alpha: 0.08),
-            ),
-            onPressed: () => unawaited(controller.toggleMuted()),
-            icon: HugeIcon(
-              icon: isMuted
-                  ? HugeIcons.strokeRoundedVolumeOff
-                  : HugeIcons.strokeRoundedVolumeHigh,
-              color: Colors.white,
-              size: 18,
+    return SizedBox.square(
+      dimension: 48,
+      child: IconButton(
+        tooltip: isMuted
+            ? pendingTranslation("Unmute audio")
+            : pendingTranslation("Mute audio"),
+        padding: const EdgeInsets.all(7),
+        style: IconButton.styleFrom(
+          shape: const CircleBorder(),
+          minimumSize: const Size.square(48),
+          maximumSize: const Size.square(48),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          overlayColor: Colors.white.withValues(alpha: 0.08),
+        ),
+        onPressed: () => unawaited(controller.toggleMuted()),
+        icon: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: Color(0x66000000),
+            shape: BoxShape.circle,
+          ),
+          child: SizedBox.square(
+            dimension: 34,
+            child: Center(
+              child: HugeIcon(
+                icon: isMuted
+                    ? HugeIcons.strokeRoundedVolumeOff
+                    : HugeIcons.strokeRoundedVolumeHigh,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ),
