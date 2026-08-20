@@ -1380,25 +1380,28 @@ class MemoriesCacheService {
     }
     final selectedPersonMemory = personMemory;
     if (context != null && !context.mounted) return;
-    await _routeToPage(
-      MemoryMusicSession(
-        memoryIDs: <String>[selectedPersonMemory.id],
-        child: FullScreenMemoryDataUpdater(
-          initialIndex: 0,
-          memories: selectedPersonMemory.memories,
-          child: Container(
-            color: backgroundColorDark,
-            width: double.infinity,
-            height: double.infinity,
-            child: FullScreenMemory(
-              selectedPersonMemory.title,
-              0,
-              memoryID: selectedPersonMemory.id,
-              isActive: true,
-            ),
-          ),
+    final page = FullScreenMemoryDataUpdater(
+      initialIndex: 0,
+      memories: selectedPersonMemory.memories,
+      child: Container(
+        color: backgroundColorDark,
+        width: double.infinity,
+        height: double.infinity,
+        child: FullScreenMemory(
+          selectedPersonMemory.title,
+          0,
+          memoryID: selectedPersonMemory.id,
+          isActive: true,
         ),
       ),
+    );
+    await _routeToPage(
+      flagService.internalUser
+          ? MemoryMusicSession(
+              memoryIDs: <String>[selectedPersonMemory.id],
+              child: page,
+            )
+          : page,
       context: context,
       forceCustomPageRoute: true,
     );

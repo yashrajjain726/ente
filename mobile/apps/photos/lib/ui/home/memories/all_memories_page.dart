@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/pause_video_event.dart";
 import "package:photos/models/memories/smart_memory.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/ui/home/memories/full_screen_memory.dart";
 import "package:photos/ui/home/memories/memory_cover_util.dart";
@@ -52,50 +53,53 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
 
   @override
   Widget build(BuildContext context) {
-    return MemoryMusicSession(
-      memoryIDs: _memories.map((memory) => memory.id).toList(),
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: backgroundColorDark,
-        child: PageView.builder(
-          controller: pageController,
-          physics: const BouncingScrollPhysics(),
-          hitTestBehavior: HitTestBehavior.translucent,
-          itemCount: _memories.length,
-          onPageChanged: (index) {
-            Bus.instance.fire(PauseVideoEvent());
-            setState(() => _activePageIndex = index);
-          },
-          itemBuilder: (context, index) {
-            final smartMemory = _memories[index];
-            final initialMemoryIndex = _initialItemIndexForPage(index);
-            return FullScreenMemoryDataUpdater(
-              initialIndex: initialMemoryIndex,
-              memories: smartMemory.memories,
-              child: FullScreenMemory(
-                smartMemory.title,
-                initialMemoryIndex,
-                memoryID: smartMemory.id,
-                isActive: index == _activePageIndex,
-                onNextMemory: index < _memories.length - 1
-                    ? () => pageController.nextPage(
-                        duration: const Duration(milliseconds: 675),
-                        curve: Curves.easeOutQuart,
-                      )
-                    : null,
-                onPreviousMemory: index > 0
-                    ? () => pageController.previousPage(
-                        duration: const Duration(milliseconds: 675),
-                        curve: Curves.easeOutQuart,
-                      )
-                    : null,
-              ),
-            );
-          },
-        ),
+    final page = Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: backgroundColorDark,
+      child: PageView.builder(
+        controller: pageController,
+        physics: const BouncingScrollPhysics(),
+        hitTestBehavior: HitTestBehavior.translucent,
+        itemCount: _memories.length,
+        onPageChanged: (index) {
+          Bus.instance.fire(PauseVideoEvent());
+          setState(() => _activePageIndex = index);
+        },
+        itemBuilder: (context, index) {
+          final smartMemory = _memories[index];
+          final initialMemoryIndex = _initialItemIndexForPage(index);
+          return FullScreenMemoryDataUpdater(
+            initialIndex: initialMemoryIndex,
+            memories: smartMemory.memories,
+            child: FullScreenMemory(
+              smartMemory.title,
+              initialMemoryIndex,
+              memoryID: smartMemory.id,
+              isActive: index == _activePageIndex,
+              onNextMemory: index < _memories.length - 1
+                  ? () => pageController.nextPage(
+                      duration: const Duration(milliseconds: 675),
+                      curve: Curves.easeOutQuart,
+                    )
+                  : null,
+              onPreviousMemory: index > 0
+                  ? () => pageController.previousPage(
+                      duration: const Duration(milliseconds: 675),
+                      curve: Curves.easeOutQuart,
+                    )
+                  : null,
+            ),
+          );
+        },
       ),
     );
+    return flagService.internalUser
+        ? MemoryMusicSession(
+            memoryIDs: _memories.map((memory) => memory.id).toList(),
+            child: page,
+          )
+        : page;
   }
 
   int _initialItemIndexForPage(int pageIndex) {

@@ -64,10 +64,13 @@ class MemoryMusicScope extends InheritedNotifier<MemoryMusicController> {
     super.key,
   }) : super(notifier: controller);
 
-  static MemoryMusicController of(BuildContext context, {bool listen = true}) {
+  static MemoryMusicController? maybeOf(
+    BuildContext context, {
+    bool listen = true,
+  }) {
     final scope = listen
         ? context.dependOnInheritedWidgetOfExactType<MemoryMusicScope>()
         : context.getInheritedWidgetOfExactType<MemoryMusicScope>();
-    return scope!.notifier!;
+    return scope?.notifier;
   }
 }

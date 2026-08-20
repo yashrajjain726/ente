@@ -26,6 +26,7 @@ import "package:photos/models/selected_files.dart";
 import "package:photos/module/download/file.dart";
 import "package:photos/module/download/thumbnail.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/services/memories/memory_music_controller.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/services/smart_memories_service.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
@@ -466,8 +467,10 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     );
     if (index == null) return;
     final file = inheritedData.memories[index].file;
+    final controller = MemoryMusicScope.maybeOf(context, listen: false);
+    if (controller == null) return;
     unawaited(
-      MemoryMusicScope.of(context, listen: false).activateMemory(
+      controller.activateMemory(
         widget.memoryID,
         currentItemIsVideo: file.fileType == FileType.video,
       ),
@@ -680,9 +683,10 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _pauseViewer() {
     if (!mounted) return;
-    unawaited(
-      MemoryMusicScope.of(context, listen: false).setViewerActionPaused(true),
-    );
+    final controller = MemoryMusicScope.maybeOf(context, listen: false);
+    if (controller != null) {
+      unawaited(controller.setViewerActionPaused(true));
+    }
     _toggleAnimation(pause: true);
     Bus.instance.fire(PauseVideoEvent());
   }
@@ -691,15 +695,16 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     if (!mounted) return;
     Bus.instance.fire(ResumeVideoEvent());
     _toggleAnimation(pause: false);
-    unawaited(
-      MemoryMusicScope.of(context, listen: false).setViewerActionPaused(false),
-    );
+    final controller = MemoryMusicScope.maybeOf(context, listen: false);
+    if (controller != null) {
+      unawaited(controller.setViewerActionPaused(false));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final inheritedData = FullScreenMemoryData.of(context);
-    final memoryMusicController = MemoryMusicScope.of(context);
+    final memoryMusicController = MemoryMusicScope.maybeOf(context);
     if (inheritedData == null || inheritedData.memories.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -799,7 +804,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                             color: Colors.transparent,
                           ),
                           isFromMemories: true,
-                          isAudioMutedOverride: memoryMusicController.isMuted,
+                          isAudioMutedOverride: memoryMusicController?.isMuted,
                           shouldDisableScroll: (isZoomed) {
                             _isMediaZoomed = isZoomed;
                           },
@@ -837,16 +842,17 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
             _MemoryViewerScrimsAndCaption(
               socialControlsVisible: _socialControlsVisible,
             ),
-            Positioned(
-              left:
-                  MediaQuery.paddingOf(context).left +
-                  _memoryOverlayHorizontalInset,
-              bottom:
-                  MediaQuery.paddingOf(context).bottom +
-                  kMemoryBottomActionBarHeight +
-                  _socialToActionBarGap,
-              child: const _MemoryMusicMuteButton(),
-            ),
+            if (memoryMusicController != null)
+              Positioned(
+                left:
+                    MediaQuery.paddingOf(context).left +
+                    _memoryOverlayHorizontalInset,
+                bottom:
+                    MediaQuery.paddingOf(context).bottom +
+                    kMemoryBottomActionBarHeight +
+                    _socialToActionBarGap,
+                child: _MemoryMusicMuteButton(memoryMusicController),
+              ),
             ValueListenableBuilder<int>(
               valueListenable: inheritedData.indexNotifier,
               builder: (context, index, _) {
@@ -1067,11 +1073,12 @@ class _MemoryActionButton extends StatelessWidget {
 }
 
 class _MemoryMusicMuteButton extends StatelessWidget {
-  const _MemoryMusicMuteButton();
+  final MemoryMusicController controller;
+
+  const _MemoryMusicMuteButton(this.controller);
 
   @override
   Widget build(BuildContext context) {
-    final controller = MemoryMusicScope.of(context);
     final isMuted = controller.isMuted;
     return SizedBox(
       width: 47,
