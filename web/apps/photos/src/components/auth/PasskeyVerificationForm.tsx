@@ -43,6 +43,7 @@ export function PasskeyVerificationForm({
             fullWidth
             variant={stalled ? "primary" : "secondary"}
             onClick={onRetry}
+            disabled={isChecking}
         >
             {pt("Open the browser window again")}
         </Button>
@@ -111,10 +112,10 @@ export function PasskeyVerificationForm({
                     </>
                 )}
                 <FooterLinks>
-                    <TextLink onClick={onRecover}>
+                    <TextLink onClick={onRecover} disabled={isChecking}>
                         {t("recover_account")}
                     </TextLink>
-                    <TextLink onClick={onChangeEmail}>
+                    <TextLink onClick={onChangeEmail} disabled={isChecking}>
                         {t("change_email")}
                     </TextLink>
                 </FooterLinks>
