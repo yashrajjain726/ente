@@ -19,6 +19,9 @@ export interface TextFieldProps {
     onChange: (
         event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => void;
+    onKeyDown?: (
+        event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    ) => void;
     type?: React.HTMLInputTypeAttribute;
     placeholder?: string;
     required?: boolean;
@@ -40,6 +43,7 @@ export function TextField({
     label,
     value,
     onChange,
+    onKeyDown,
     type = "text",
     placeholder,
     required,
@@ -119,6 +123,7 @@ export function TextField({
                         {...sharedControlProps}
                         rows={rows}
                         onChange={handleTextAreaChange}
+                        onKeyDown={onKeyDown}
                     />
                 ) : (
                     <TextInputControl
@@ -126,6 +131,7 @@ export function TextField({
                         type={inputType}
                         inputMode={inputMode}
                         onChange={handleInputChange}
+                        onKeyDown={onKeyDown}
                     />
                 )}
                 {showPasswordToggle && !multiline && (
