@@ -95,8 +95,8 @@ class MosaicLayoutCalculator {
   static const double _minimumAspectRatio = 1 / 3;
   static const double _maximumAspectRatio = 4.0;
   static const double _maximumRowHeightFactor = 2.4;
-  static const double _minimumTileExtentFactor = 0.62;
-  static const double _rowCompressionThreshold = 0.88;
+  // Logical pixels map to density-independent tap extents on both platforms.
+  static const double _minimumTappableExtent = 48.0;
 
   const MosaicLayoutCalculator._();
 
@@ -134,7 +134,6 @@ class MosaicLayoutCalculator {
     final rows = <MosaicRowLayout>[];
     final pendingRatios = <double>[];
     final maximumRowHeight = targetRowHeight * _maximumRowHeightFactor;
-    final minimumTileExtent = targetRowHeight * _minimumTileExtentFactor;
     var pendingRatioSum = 0.0;
     var pendingMinimumRatio = double.infinity;
     var pendingFirstIndex = 0;
@@ -147,9 +146,16 @@ class MosaicLayoutCalculator {
       if (pendingRatios.isEmpty) return;
       final contentWidth = widthWithoutGaps(pendingRatios.length);
       final fittedHeight = contentWidth / pendingRatioSum;
+      final minimumTappableHeight = math.max(
+        _minimumTappableExtent,
+        _minimumTappableExtent / pendingMinimumRatio,
+      );
       final height = fillWidth
           ? fittedHeight
-          : math.min(targetRowHeight, fittedHeight);
+          : math.min(
+              fittedHeight,
+              math.max(targetRowHeight, minimumTappableHeight),
+            );
       final widths = pendingRatios
           .map((ratio) => ratio * height)
           .toList(growable: false);
@@ -188,8 +194,8 @@ class MosaicLayoutCalculator {
         final currentHeight =
             widthWithoutGaps(pendingRatios.length) / pendingRatioSum;
         final wouldOverCompress =
-            candidateHeight < targetRowHeight * _rowCompressionThreshold ||
-            candidateMinimumWidth < minimumTileExtent;
+            candidateHeight < _minimumTappableExtent ||
+            candidateMinimumWidth < _minimumTappableExtent;
 
         if (wouldOverCompress) {
           addPendingRow(fillWidth: currentHeight <= maximumRowHeight);

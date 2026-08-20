@@ -65,7 +65,7 @@ void main() {
       expect(row.itemWidths, everyElement(closeTo(98.5, 1e-9)));
     });
 
-    test("the final incomplete row does not grow past the target height", () {
+    test("an already-tappable final row stays at the target height", () {
       const availableWidth = 400.0;
       const targetRowHeight = 100.0;
       const spacing = 2.0;
@@ -85,7 +85,7 @@ void main() {
       expect(occupiedWidth, lessThanOrEqualTo(availableWidth));
     });
 
-    test("a sparse portrait final row remains ragged at target height", () {
+    test("a sparse portrait final row remains ragged and tappable", () {
       const availableWidth = 400.0;
       const targetRowHeight = 100.0;
       final rows = MosaicLayoutCalculator.computeRows(
@@ -97,9 +97,32 @@ void main() {
 
       expect(rows, hasLength(1));
       final row = rows.single;
-      expect(row.height, targetRowHeight);
+      expect(row.height, 144);
       expect(row.itemWidths.single / row.height, closeTo(1 / 3, 1e-9));
+      expect(row.itemWidths.single, closeTo(48, 1e-9));
       expect(row.itemWidths.single, lessThan(availableWidth));
+    });
+
+    test("keeps a tappable portrait with the following panorama", () {
+      const availableWidth = 393.0;
+      const spacing = 2.0;
+      final rows = MosaicLayoutCalculator.computeRows(
+        aspectRatios: const [0.85, 4.0],
+        availableWidth: availableWidth,
+        targetRowHeight: 130,
+        spacing: spacing,
+      );
+
+      expect(rows, hasLength(1));
+      final row = rows.single;
+      expect(row.firstIndex, 0);
+      expect(row.lastIndex, 1);
+      expect(row.height, closeTo(391 / 4.85, 1e-9));
+      expect(row.height, greaterThanOrEqualTo(48));
+      expect(row.itemWidths, everyElement(greaterThanOrEqualTo(48)));
+      final occupiedWidth =
+          row.itemWidths.fold<double>(0, (sum, width) => sum + width) + spacing;
+      expect(occupiedWidth, closeTo(availableWidth, 1e-9));
     });
 
     test("does not squeeze an extreme item into a mixed row", () {
@@ -117,7 +140,52 @@ void main() {
         expect(rows, hasLength(2));
         expect(rows.first.lastIndex, 0);
         expect(rows.last.firstIndex, 1);
+        for (final row in rows) {
+          expect(row.height, greaterThanOrEqualTo(48));
+          expect(row.itemWidths, everyElement(greaterThanOrEqualTo(48)));
+        }
       }
+    });
+
+    test("does not make a justified row shorter than the tap target", () {
+      final rows = MosaicLayoutCalculator.computeRows(
+        aspectRatios: const [4.0, 4.0],
+        availableWidth: 360,
+        targetRowHeight: 80,
+        spacing: 2,
+      );
+
+      expect(rows, hasLength(2));
+      for (final row in rows) {
+        expect(row.height, greaterThanOrEqualTo(48));
+        expect(row.itemWidths, everyElement(greaterThanOrEqualTo(48)));
+      }
+    });
+
+    test("accepts a justified row exactly at the tap target", () {
+      final rows = MosaicLayoutCalculator.computeRows(
+        aspectRatios: const [1.0, 4.0],
+        availableWidth: 242,
+        targetRowHeight: 100,
+        spacing: 2,
+      );
+
+      expect(rows, hasLength(1));
+      expect(rows.single.height, 48);
+      expect(rows.single.itemWidths, [48, 192]);
+    });
+
+    test("raises a sparse row to the minimum tappable height", () {
+      final rows = MosaicLayoutCalculator.computeRows(
+        aspectRatios: const [4.0],
+        availableWidth: 400,
+        targetRowHeight: 30,
+        spacing: 2,
+      );
+
+      expect(rows, hasLength(1));
+      expect(rows.single.height, 48);
+      expect(rows.single.itemWidths, [192]);
     });
 
     test("lays out 100k ratios quickly and deterministically", () {
@@ -148,6 +216,10 @@ void main() {
       expect(first.first.firstIndex, 0);
       expect(first.last.lastIndex, ratios.length - 1);
       _expectValidRows(first, itemCount: ratios.length, spacing: 2);
+      for (final row in first) {
+        expect(row.height, greaterThanOrEqualTo(48 - 1e-9));
+        expect(row.itemWidths, everyElement(greaterThanOrEqualTo(48 - 1e-9)));
+      }
 
       final second = MosaicLayoutCalculator.computeRows(
         aspectRatios: ratios,
