@@ -457,7 +457,6 @@ class PhotoSelector {
     return memories;
   }
 
-  // Legacy entry points retained for existing callers.
   static Future<List<Memory>> bestSelectionPeople(
     List<Memory> memories, {
     int? prefferedSize,
