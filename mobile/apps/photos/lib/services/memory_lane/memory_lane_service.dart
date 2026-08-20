@@ -40,7 +40,7 @@ int? eligibleCreationTimeCutoffMicros(String? birthDateString) {
 }
 
 class MemoryLaneService {
-  MemoryLaneService._internal();
+  MemoryLaneService._internal() : _isFeatureEnabled = hasGrantedMLConsent;
 
   static final MemoryLaneService instance = MemoryLaneService._internal();
 
@@ -74,6 +74,7 @@ class MemoryLaneService {
   final Map<String, bool> _pendingRequests = {};
   final Set<String> _cropReadinessInFlight = {};
 
+  bool _isFeatureEnabled;
   bool _initialized = false;
 
   Timer? _startupBackfillTimer;
@@ -91,17 +92,14 @@ class MemoryLaneService {
   }
 
   void _handleMlConsentChange(MLConsentChangedEvent event) {
-    if (event.enabled) {
-      _scheduleStartupBackfill();
-      unawaited(_queueFullRecompute());
-      return;
-    }
+    if (event.enabled) return;
+    _isFeatureEnabled = false;
     _startupBackfillTimer?.cancel();
     _startupBackfillTimer = null;
   }
 
   Future<void> _queueFullRecompute({bool force = false}) async {
-    if (!hasGrantedMLConsent) return;
+    if (!_isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane full recompute skipped: PersonService not initialized",
@@ -137,7 +135,7 @@ class MemoryLaneService {
   }
 
   Future<void> ensureTimelineReachability(String personId) async {
-    if (!hasGrantedMLConsent) return;
+    if (!_isFeatureEnabled) return;
     if (personId.isEmpty) {
       return;
     }
@@ -156,7 +154,7 @@ class MemoryLaneService {
   }
 
   Future<MemoryLanePersonTimeline?> getTimeline(String personId) async {
-    if (!hasGrantedMLConsent) return null;
+    if (!_isFeatureEnabled) return null;
     final timeline = await _cacheService.getTimeline(personId);
     if (timeline == null || timeline.entries.isEmpty) {
       return timeline;
@@ -192,7 +190,7 @@ class MemoryLaneService {
   }
 
   bool hasReadyTimelineSync(String personId) {
-    if (!hasGrantedMLConsent) return false;
+    if (!_isFeatureEnabled) return false;
     return readyPersonIds.value.contains(personId);
   }
 
@@ -305,7 +303,7 @@ class MemoryLaneService {
   }
 
   void _handlePeopleChange(PeopleChangedEvent event) {
-    if (!hasGrantedMLConsent) return;
+    if (!_isFeatureEnabled) return;
     if (event.type == PeopleEventType.syncDone) {
       return;
     }
@@ -404,7 +402,7 @@ class MemoryLaneService {
   }
 
   Future<void> _runStartupBackfill() async {
-    if (!hasGrantedMLConsent) return;
+    if (!_isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane startup diff skipped: PersonService not initialized",
@@ -514,7 +512,7 @@ class MemoryLaneService {
     String personId, {
     required bool force,
   }) async {
-    if (!hasGrantedMLConsent) return;
+    if (!_isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane recompute skipped for $personId: PersonService not initialized",
@@ -836,7 +834,7 @@ class MemoryLaneService {
     String personId, {
     int frameCount = 6,
   }) async {
-    if (!hasGrantedMLConsent) return;
+    if (!_isFeatureEnabled) return;
     try {
       final timeline = await _cacheService.getTimeline(personId);
       if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
