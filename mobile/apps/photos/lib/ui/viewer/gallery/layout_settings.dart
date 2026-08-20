@@ -6,6 +6,7 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/gallery_layout_changed_event.dart";
+import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/settings/gallery_settings_screen.dart";
@@ -19,30 +20,35 @@ class GalleryLayoutSettings extends StatefulWidget {
 }
 
 class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
-  bool isDayLayout =
-      localSettings.getGalleryLayoutType() == GalleryLayoutType.grid &&
-      localSettings.getGalleryGroupType() == GroupType.day &&
-      localSettings.getPhotoGridSize() == 3;
-  bool isMonthLayout =
-      localSettings.getGalleryLayoutType() == GalleryLayoutType.grid &&
-      localSettings.getGalleryGroupType() == GroupType.month &&
-      localSettings.getPhotoGridSize() == 5;
-  bool isMosaicLayout =
-      localSettings.getGalleryLayoutType() == GalleryLayoutType.mosaic;
+  late bool isDayLayout;
+  late bool isMonthLayout;
+  late bool isMosaicLayout;
+
+  @override
+  void initState() {
+    super.initState();
+    _readLatestSetting();
+  }
+
+  void _readLatestSetting() {
+    final layoutType = resolveGalleryLayoutType(
+      localSettings.getGalleryLayoutType(),
+    );
+    isDayLayout =
+        layoutType == GalleryLayoutType.grid &&
+        localSettings.getGalleryGroupType() == GroupType.day &&
+        localSettings.getPhotoGridSize() == 3;
+    isMonthLayout =
+        layoutType == GalleryLayoutType.grid &&
+        localSettings.getGalleryGroupType() == GroupType.month &&
+        localSettings.getPhotoGridSize() == 5;
+    isMosaicLayout = layoutType == GalleryLayoutType.mosaic;
+  }
 
   void _reloadWithLatestSetting() {
     if (!mounted) return;
     setState(() {
-      isDayLayout =
-          localSettings.getGalleryLayoutType() == GalleryLayoutType.grid &&
-          localSettings.getGalleryGroupType() == GroupType.day &&
-          localSettings.getPhotoGridSize() == 3;
-      isMonthLayout =
-          localSettings.getGalleryLayoutType() == GalleryLayoutType.grid &&
-          localSettings.getGalleryGroupType() == GroupType.month &&
-          localSettings.getPhotoGridSize() == 5;
-      isMosaicLayout =
-          localSettings.getGalleryLayoutType() == GalleryLayoutType.mosaic;
+      _readLatestSetting();
     });
   }
 
@@ -71,15 +77,16 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             showOnlyLoadingState: true,
             onTap: () => _applyLayout(GroupType.month, 5),
           ),
-          MenuComponent(
-            title: context.strings.layoutMasonry,
-            leading: const Icon(Icons.view_quilt_outlined),
-            trailing: isMosaicLayout
-                ? Icon(Icons.check, color: colors.primary)
-                : null,
-            showOnlyLoadingState: true,
-            onTap: _applyMosaicLayout,
-          ),
+          if (isMosaicLayoutAvailable)
+            MenuComponent(
+              title: context.strings.layoutMasonry,
+              leading: const Icon(Icons.view_quilt_outlined),
+              trailing: isMosaicLayout
+                  ? Icon(Icons.check, color: colors.primary)
+                  : null,
+              showOnlyLoadingState: true,
+              onTap: _applyMosaicLayout,
+            ),
           MenuComponent(
             title: context.strings.custom,
             trailing: Row(
@@ -126,6 +133,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
   }
 
   Future<void> _applyMosaicLayout() async {
+    if (!isMosaicLayoutAvailable) return;
     if (localSettings.getGalleryLayoutType() != GalleryLayoutType.mosaic) {
       await localSettings.setGalleryLayoutType(GalleryLayoutType.mosaic);
       Bus.instance.fire(GalleryLayoutChangedEvent());

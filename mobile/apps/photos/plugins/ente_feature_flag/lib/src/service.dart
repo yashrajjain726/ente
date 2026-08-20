@@ -23,22 +23,28 @@ class FlagService {
   final SharedPreferences _prefs;
   final Dio _enteDio;
 
-  FlagService(this._prefs, this._enteDio) {
-    Future.delayed(const Duration(seconds: 5), () {
-      _fetch();
-    });
+  FlagService(this._prefs, this._enteDio, {bool autoRefresh = true}) {
+    if (autoRefresh) {
+      Future.delayed(const Duration(seconds: 5), () {
+        _fetch();
+      });
+    }
   }
 
   RemoteFlags? _flags;
+  String? _flagsJson;
 
   RemoteFlags get flags {
     try {
       if (!_prefs.containsKey("remote_flags")) {
         _fetch().ignore();
       }
-      _flags ??= RemoteFlags.fromMap(
-        jsonDecode(_prefs.getString("remote_flags") ?? "{}"),
-      );
+      final flagsJson = _prefs.getString("remote_flags");
+      if (_flags == null || flagsJson != _flagsJson) {
+        final flags = RemoteFlags.fromMap(jsonDecode(flagsJson ?? "{}"));
+        _flags = flags;
+        _flagsJson = flagsJson;
+      }
       return _flags!;
     } catch (e) {
       debugPrint("Failed to get feature flags $e");
@@ -154,29 +160,59 @@ class FlagService {
   }
 
   Completer<void>? _fetchCompleter;
+  String? _fetchToken;
+  int? _fetchUserID;
+
   Future<void> _fetch() async {
-    if (!_prefs.containsKey("token")) {
+    final requestToken = _prefs.getString("token");
+    final requestUserID = _prefs.getInt(_userIdKey);
+    if (requestToken == null) {
       log("token not found, skip", name: "FlagService");
       return;
     }
-    if (_fetchCompleter != null) {
-      await _fetchCompleter!.future;
+
+    final pendingFetch = _fetchCompleter;
+    if (pendingFetch != null) {
+      final isSameAccount =
+          _fetchToken == requestToken && _fetchUserID == requestUserID;
+      await pendingFetch.future;
+      if (!isSameAccount && _isCurrentAccount(requestToken, requestUserID)) {
+        await _fetch();
+      }
       return;
     }
-    _fetchCompleter = Completer<void>();
+
+    final fetchCompleter = Completer<void>();
+    _fetchCompleter = fetchCompleter;
+    _fetchToken = requestToken;
+    _fetchUserID = requestUserID;
     try {
       log("fetching feature flags", name: "FlagService");
       final response = await _enteDio.get("/remote-store/feature-flags");
+      if (!_isCurrentAccount(requestToken, requestUserID)) {
+        log(
+          "discarding feature flags fetched for a stale account",
+          name: "FlagService",
+        );
+        return;
+      }
       final remoteFlags = RemoteFlags.fromMap(response.data);
-      await _prefs.setString("remote_flags", remoteFlags.toJson());
+      final flagsJson = remoteFlags.toJson();
+      await _prefs.setString("remote_flags", flagsJson);
       _flags = remoteFlags;
+      _flagsJson = flagsJson;
     } catch (e) {
       debugPrint("Failed to sync feature flags $e");
     } finally {
-      _fetchCompleter?.complete();
       _fetchCompleter = null;
+      _fetchToken = null;
+      _fetchUserID = null;
+      fetchCompleter.complete();
     }
   }
+
+  bool _isCurrentAccount(String token, int? userID) =>
+      _prefs.getString("token") == token && _prefs.getInt(_userIdKey) == userID;
 
   Future<void> _updateKeyValue(String key, String value) async {
     try {
@@ -194,8 +230,10 @@ class FlagService {
   }
 
   void _updateFlags(RemoteFlags flags) {
+    final flagsJson = flags.toJson();
     _flags = flags;
-    _prefs.setString("remote_flags", flags.toJson());
+    _flagsJson = flagsJson;
+    _prefs.setString("remote_flags", flagsJson);
     _fetch().ignore();
   }
 

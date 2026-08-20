@@ -8,6 +8,7 @@ import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/gallery/fixed_extent_grid_row.dart";
 import "package:photos/models/gallery/fixed_extent_section_layout.dart";
+import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/models/gallery/mosaic_grid_row.dart";
 import "package:photos/models/gallery/mosaic_layout.dart";
 import "package:photos/models/gallery/section_layout.dart";
@@ -30,6 +31,7 @@ class GalleryGroups {
   final _logger = Logger("GalleryGroups");
   final bool showGallerySettingsCTA;
   final GalleryLayoutType? layoutTypeOverride;
+  final bool mosaicLayoutAvailable;
 
   final bool sortOrderAsc;
   final double widthAvailable;
@@ -46,6 +48,7 @@ class GalleryGroups {
     this.limitSelectionToOne = false,
     this.showGallerySettingsCTA = false,
     this.layoutTypeOverride,
+    required this.mosaicLayoutAvailable,
   }) {
     init();
     if (!groupType.showGroupHeader()) {
@@ -260,7 +263,10 @@ class GalleryGroups {
 
   void init() {
     crossAxisCount = localSettings.getPhotoGridSize();
-    layoutType = layoutTypeOverride ?? localSettings.getGalleryLayoutType();
+    layoutType = resolveGalleryLayoutType(
+      layoutTypeOverride ?? localSettings.getGalleryLayoutType(),
+      mosaicLayoutAvailable: mosaicLayoutAvailable,
+    );
     _buildGroups();
 
     _groupLayouts = switch (layoutType) {

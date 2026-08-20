@@ -216,6 +216,55 @@ void main() {
     expect(groups.layoutType, GalleryLayoutType.grid);
     expect(groups.groupLayouts, everyElement(isA<FixedExtentSectionLayout>()));
   });
+
+  test("mosaic falls back to grid when the rollout is unavailable", () {
+    final files = List<EnteFile>.generate(
+      12,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: index.isEven ? 100 : 400,
+        height: index.isEven ? 400 : 100,
+      ),
+      growable: false,
+    );
+
+    final publicGroups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+      mosaicLayoutAvailable: false,
+    );
+    final publicOverrideGroups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+      layoutTypeOverride: GalleryLayoutType.mosaic,
+      mosaicLayoutAvailable: false,
+    );
+    final internalGroups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+    );
+
+    expect(
+      localSettings.getGalleryLayoutType(),
+      GalleryLayoutType.mosaic,
+      reason: "the raw preference should be preserved across rollout changes",
+    );
+    expect(publicGroups.layoutType, GalleryLayoutType.grid);
+    expect(
+      publicGroups.groupLayouts,
+      everyElement(isA<FixedExtentSectionLayout>()),
+    );
+    expect(publicOverrideGroups.layoutType, GalleryLayoutType.grid);
+    expect(internalGroups.layoutType, GalleryLayoutType.mosaic);
+    expect(
+      internalGroups.groupLayouts,
+      everyElement(isA<MosaicSectionLayout>()),
+    );
+  });
 }
 
 GalleryGroups _galleryGroups({
@@ -224,6 +273,7 @@ GalleryGroups _galleryGroups({
   required double groupHeaderExtent,
   bool sortOrderAsc = false,
   GalleryLayoutType? layoutTypeOverride,
+  bool mosaicLayoutAvailable = true,
 }) {
   return GalleryGroups(
     allFiles: files,
@@ -235,6 +285,7 @@ GalleryGroups _galleryGroups({
     groupHeaderExtent: groupHeaderExtent,
     showSelectAll: false,
     layoutTypeOverride: layoutTypeOverride,
+    mosaicLayoutAvailable: mosaicLayoutAvailable,
   );
 }
 

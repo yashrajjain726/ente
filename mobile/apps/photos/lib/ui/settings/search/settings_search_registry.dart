@@ -6,6 +6,7 @@ import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/settings/about/about_us_page.dart";
 import "package:photos/ui/settings/account/account_settings_page.dart";
@@ -27,6 +28,7 @@ class SettingsSearchRegistry {
     final hasLoggedIn = Configuration.instance.isLoggedIn();
     final isLocalGallery = isLocalGalleryMode;
     final showThemeControls = Platform.isAndroid || kDebugMode;
+    final showMosaicLayout = isMosaicLayoutAvailable;
     final items = <SettingsSearchItem>[];
 
     if (hasLoggedIn && !isLocalGallery) {
@@ -315,22 +317,30 @@ class SettingsSearchRegistry {
         routeBuilder: (_) =>
             const GallerySettingsScreen(fromGalleryLayoutSettingsCTA: false),
         isSubPage: true,
-        keywords: ["grid size", "group by", "layout", "masonry", "mosaic"],
+        keywords: [
+          "grid size",
+          "group by",
+          "layout",
+          if (showMosaicLayout) "masonry",
+          if (showMosaicLayout) "mosaic",
+        ],
       ),
     );
 
-    items.add(
-      SettingsSearchItem(
-        title: l10n.layout,
-        subtitle: l10n.gallery,
-        sectionPath: "${l10n.appearance} > ${l10n.gallery}",
-        icon: HugeIcons.strokeRoundedDashboardSquare02,
-        routeBuilder: (_) =>
-            const GallerySettingsScreen(fromGalleryLayoutSettingsCTA: false),
-        isSubPage: true,
-        keywords: ["layout", "grid", "masonry", "mosaic", "justified"],
-      ),
-    );
+    if (showMosaicLayout) {
+      items.add(
+        SettingsSearchItem(
+          title: l10n.layout,
+          subtitle: l10n.gallery,
+          sectionPath: "${l10n.appearance} > ${l10n.gallery}",
+          icon: HugeIcons.strokeRoundedDashboardSquare02,
+          routeBuilder: (_) =>
+              const GallerySettingsScreen(fromGalleryLayoutSettingsCTA: false),
+          isSubPage: true,
+          keywords: ["layout", "grid", "masonry", "mosaic", "justified"],
+        ),
+      );
+    }
 
     items.add(
       SettingsSearchItem(

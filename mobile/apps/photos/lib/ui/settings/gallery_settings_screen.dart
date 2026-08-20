@@ -5,6 +5,7 @@ import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/gallery_layout_changed_event.dart";
 import "package:photos/events/hide_shared_items_from_home_gallery_event.dart";
+import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
@@ -28,7 +29,9 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _layoutType = localSettings.getGalleryLayoutType();
+    _layoutType = resolveGalleryLayoutType(
+      localSettings.getGalleryLayoutType(),
+    );
     _photoGridSize = localSettings.getPhotoGridSize();
     _groupType = localSettings.getGalleryGroupType();
   }
@@ -40,15 +43,17 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
     return SettingsPageScaffold(
       title: l10n.gallery,
       children: [
-        SettingsItem(
-          title: l10n.layout,
-          trailing: _trailingLabel(
-            context,
-            _layoutTypeLabel(context, _layoutType),
+        if (isMosaicLayoutAvailable) ...[
+          SettingsItem(
+            title: l10n.layout,
+            trailing: _trailingLabel(
+              context,
+              _layoutTypeLabel(context, _layoutType),
+            ),
+            onTap: () async => _showLayoutTypeSheet(context),
           ),
-          onTap: () async => _showLayoutTypeSheet(context),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         SettingsItem(
           title: l10n.photoGridSize,
           trailing: _trailingLabel(context, _photoGridSize.toString()),
@@ -104,6 +109,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _showLayoutTypeSheet(BuildContext context) async {
+    if (!isMosaicLayoutAvailable) return;
     final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
@@ -135,6 +141,9 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _setLayoutType(GalleryLayoutType layoutType) async {
+    if (layoutType == GalleryLayoutType.mosaic && !isMosaicLayoutAvailable) {
+      return;
+    }
     if (localSettings.getGalleryLayoutType() == layoutType) return;
     await localSettings.setGalleryLayoutType(layoutType);
     if (mounted) {
