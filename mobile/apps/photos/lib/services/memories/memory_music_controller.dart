@@ -139,7 +139,7 @@ class MemoryMusicController extends ChangeNotifier {
       }
     } catch (error, stackTrace) {
       if (_isDisposed) return;
-      _logger.fine(
+      _logger.warning(
         "Failed to synchronize memory music playback",
         error,
         stackTrace,
@@ -154,7 +154,7 @@ class MemoryMusicController extends ChangeNotifier {
     try {
       await _player.configureAudioSession();
     } catch (error, stackTrace) {
-      _logger.fine(
+      _logger.warning(
         "Failed to configure the memory music audio session",
         error,
         stackTrace,

@@ -122,7 +122,7 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
     if (_player.playing) return;
     unawaited(
       _player.play().catchError((Object error, StackTrace stackTrace) {
-        _logger.fine(
+        _logger.warning(
           "Failed to start memory music playback",
           error,
           stackTrace,
