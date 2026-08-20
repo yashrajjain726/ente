@@ -49,8 +49,8 @@ export function OTPField({
     }
 
     function updateDigit(index: number, digit: string) {
-        const otp = value.split("");
-        otp[index] = digit;
+        const otp = value.padEnd(length, " ").slice(0, length).split("");
+        otp[index] = digit || " ";
         onChange(otp.join(""));
     }
 
@@ -97,7 +97,7 @@ export function OTPField({
         index: number,
         event: React.KeyboardEvent<HTMLInputElement>,
     ) {
-        const otp = value.split("");
+        const otp = value.padEnd(length, " ").slice(0, length).split("");
         if ([event.code, event.key].includes("Backspace")) {
             event.preventDefault();
             updateDigit(index, "");
@@ -111,15 +111,12 @@ export function OTPField({
         } else if (event.code === "ArrowRight") {
             event.preventDefault();
             focusInput(index + 1);
+        } else if (event.code === "Spacebar" || event.code === "Space") {
+            event.preventDefault();
         } else if (event.key === otp[index]) {
             event.preventDefault();
             focusInput(index + 1);
-        } else if (
-            event.code === "Spacebar" ||
-            event.code === "Space" ||
-            event.code === "ArrowUp" ||
-            event.code === "ArrowDown"
-        ) {
+        } else if (event.code === "ArrowUp" || event.code === "ArrowDown") {
             event.preventDefault();
         }
     }
@@ -129,7 +126,7 @@ export function OTPField({
         event: React.ClipboardEvent<HTMLInputElement>,
     ) {
         event.preventDefault();
-        const otp = value.split("");
+        const otp = value.padEnd(length, " ").slice(0, length).split("");
         const pastedData = event.clipboardData
             .getData("text/plain")
             .slice(0, length - index)
@@ -158,7 +155,7 @@ export function OTPField({
                     id={index === 0 ? id : undefined}
                     name={index === 0 ? name : undefined}
                     type="tel"
-                    value={value[index] ?? ""}
+                    value={value[index]?.trim() ?? ""}
                     onChange={(event) => handleChange(index, event)}
                     onFocus={(event) => event.currentTarget.select()}
                     onInput={(event) => handleInput(index, event)}

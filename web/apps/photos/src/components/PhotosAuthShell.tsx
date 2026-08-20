@@ -134,10 +134,13 @@ const PageCard = styled("div")(({ theme }) => ({
     [authAboveMobileMediaQuery]: { borderRadius: "24px" },
     "@media (min-width: 1024px)": {
         width: "1032px",
-        height: "740px",
+        height: "min(740px, 100%)",
         flexDirection: "row",
     },
-    "@media (min-width: 1600px)": { width: "1240px", height: "900px" },
+    "@media (min-width: 1600px)": {
+        width: "1240px",
+        height: "min(900px, 100%)",
+    },
 }));
 
 const DesktopBrandSlot = styled("div")({
