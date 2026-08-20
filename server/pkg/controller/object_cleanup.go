@@ -100,7 +100,7 @@ func (c *ObjectCleanupController) removeUnreportedObjects() int {
 	// Always commit the batch. skip() delays failed rows to prevent a tight loop.
 	cerr := tx.Commit()
 	if cerr != nil {
-		cerr = stacktrace.Propagate(err, "Failed to commit transaction")
+		cerr = stacktrace.Propagate(cerr, "Failed to commit transaction")
 		logger.Error(cerr)
 	}
 
