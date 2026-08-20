@@ -1,3 +1,5 @@
+import { SignUpForm } from "@/components/auth/SignUpForm";
+import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { Box, Stack, Typography, styled } from "@mui/material";
 import { LoginContents } from "ente-accounts/components/LoginContents";
 import { SignUpContents } from "ente-accounts/components/SignUpContents";
@@ -113,6 +115,14 @@ const Page: React.FC = () => {
         <TappableContainer onMaybeChangeHost={refreshHost}>
             {loading ? (
                 <ActivityIndicator />
+            ) : !showLogin ? (
+                <PhotosAuthShell>
+                    <SignUpContents
+                        {...{ router, host }}
+                        onLogin={() => setShowLogin(true)}
+                        presentation={SignUpForm}
+                    />
+                </PhotosAuthShell>
             ) : (
                 <>
                     <SlideshowPanel>
@@ -145,17 +155,10 @@ const Page: React.FC = () => {
                         ]}
                     >
                         <Stack sx={{ width: "320px", py: 4, gap: 4 }}>
-                            {showLogin ? (
-                                <LoginContents
-                                    {...{ host }}
-                                    onSignUp={() => setShowLogin(false)}
-                                />
-                            ) : (
-                                <SignUpContents
-                                    {...{ router, host }}
-                                    onLogin={() => setShowLogin(true)}
-                                />
-                            )}
+                            <LoginContents
+                                {...{ host }}
+                                onSignUp={() => setShowLogin(false)}
+                            />
                         </Stack>
                     </DesktopBox>
                 </>

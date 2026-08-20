@@ -1,1 +1,19 @@
-export { default } from "ente-accounts/pages/signup";
+import { SignUpForm } from "@/components/auth/SignUpForm";
+import { PhotosAuthShell } from "@/components/PhotosAuthShell";
+import type { SignUpPresentationProps } from "ente-accounts/components/SignUpContents";
+import AccountsSignUpPage from "ente-accounts/pages/signup";
+import type React from "react";
+
+function SignUpPresentation(props: SignUpPresentationProps): React.JSX.Element {
+    return (
+        <PhotosAuthShell>
+            <SignUpForm {...props} />
+        </PhotosAuthShell>
+    );
+}
+
+function SignUpPage(): React.JSX.Element {
+    return <AccountsSignUpPage presentation={SignUpPresentation} />;
+}
+
+export default SignUpPage;
