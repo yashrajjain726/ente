@@ -8,7 +8,6 @@ import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
-import "package:photos/events/memory_lane_changed_event.dart";
 import "package:photos/events/ml_consent_changed_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/models/file/file.dart";
@@ -81,14 +80,18 @@ class MemoryLaneService {
 
   Future<void> init() async {
     if (_initialized) return;
-    await _cacheService.init();
-    await _cacheService.ensureComputeLogVersion(_timelineLogicVersion);
-    await _refreshReadyPersonIds();
-    Bus.instance.on<PeopleChangedEvent>().listen(_handlePeopleChange);
-    Bus.instance.on<MLConsentChangedEvent>().listen(_handleMlConsentChange);
-    _scheduleStartupBackfill();
-    unawaited(_queueFullRecompute());
-    _initialized = true;
+    try {
+      await _cacheService.init();
+      await _cacheService.ensureComputeLogVersion(_timelineLogicVersion);
+      await _refreshReadyPersonIds();
+      Bus.instance.on<PeopleChangedEvent>().listen(_handlePeopleChange);
+      Bus.instance.on<MLConsentChangedEvent>().listen(_handleMlConsentChange);
+      _scheduleStartupBackfill();
+      unawaited(_queueFullRecompute());
+      _initialized = true;
+    } catch (error, stackTrace) {
+      _logger.severe("Failed to initialize Memory Lane", error, stackTrace);
+    }
   }
 
   void _handleMlConsentChange(MLConsentChangedEvent event) {
@@ -244,12 +247,6 @@ class MemoryLaneService {
     }
     if (await _areTimelineFaceCropsCached(timeline)) {
       await _refreshReadyPersonIds();
-      Bus.instance.fire(
-        MemoryLaneChangedEvent(
-          personId: personId,
-          status: MemoryLaneStatus.ready,
-        ),
-      );
       return;
     }
     final person = await PersonService.instance.getPerson(personId);
@@ -257,12 +254,6 @@ class MemoryLaneService {
       _logger.info("Memory Lane: person $personId missing, clearing cache");
       await _cacheService.removeTimeline(personId);
       await _refreshReadyPersonIds();
-      Bus.instance.fire(
-        MemoryLaneChangedEvent(
-          personId: personId,
-          status: MemoryLaneStatus.ineligible,
-        ),
-      );
       return;
     }
     if (person.data.isIgnored) {
@@ -279,14 +270,7 @@ class MemoryLaneService {
       filesById,
     );
     await _refreshReadyPersonIds();
-    if (cropsReady) {
-      Bus.instance.fire(
-        MemoryLaneChangedEvent(
-          personId: personId,
-          status: MemoryLaneStatus.ready,
-        ),
-      );
-    } else {
+    if (!cropsReady) {
       _logger.warning("Memory Lane crop readiness failed for $personId");
     }
   }
@@ -295,12 +279,6 @@ class MemoryLaneService {
     _pendingRequests.remove(personId);
     await _cacheService.removeTimeline(personId);
     await _refreshReadyPersonIds();
-    Bus.instance.fire(
-      MemoryLaneChangedEvent(
-        personId: personId,
-        status: MemoryLaneStatus.ineligible,
-      ),
-    );
   }
 
   void _handlePeopleChange(PeopleChangedEvent event) {
@@ -526,12 +504,6 @@ class MemoryLaneService {
       _logger.info("Memory Lane: person $personId missing, clearing cache");
       await _cacheService.removeTimeline(personId);
       await _refreshReadyPersonIds();
-      Bus.instance.fire(
-        MemoryLaneChangedEvent(
-          personId: personId,
-          status: MemoryLaneStatus.ineligible,
-        ),
-      );
       return;
     }
     if (person.data.isIgnored) {
@@ -590,9 +562,6 @@ class MemoryLaneService {
       );
       if (!timeline.isReady) {
         await _refreshReadyPersonIds();
-        Bus.instance.fire(
-          MemoryLaneChangedEvent(personId: personId, status: timeline.status),
-        );
         return;
       }
       final cropsReady = await _ensureFaceCrops(
@@ -601,11 +570,7 @@ class MemoryLaneService {
         filesById,
       );
       await _refreshReadyPersonIds();
-      if (cropsReady) {
-        Bus.instance.fire(
-          MemoryLaneChangedEvent(personId: personId, status: timeline.status),
-        );
-      } else {
+      if (!cropsReady) {
         _logger.warning("Memory Lane crop readiness failed for $personId");
         _queueTimelineCropReadiness(personId);
       }
