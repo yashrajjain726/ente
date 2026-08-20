@@ -550,7 +550,7 @@ class TimeMemoriesCalculator {
         (a, b) => a.file.creationTime!.compareTo(b.file.creationTime!),
       );
       final fillerMemory = FillerMemory(
-        PhotoSelector.includeVideos(memories, memories, memories.length),
+        memories,
         yearAgo,
         nowInMicroseconds,
         windowEnd,
@@ -664,7 +664,7 @@ class TimeMemoriesCalculator {
         (a, b) => a.file.creationTime!.compareTo(b.file.creationTime!),
       );
       final onThisDayMemory = OnThisDayMemory(
-        PhotoSelector.includeVideos(filteredMemories, memories, 20),
+        filteredMemories,
         startPoint.add(Duration(days: day)).microsecondsSinceEpoch,
         startPoint.add(Duration(days: day + 1)).microsecondsSinceEpoch,
       );

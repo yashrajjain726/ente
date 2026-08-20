@@ -5,7 +5,6 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:ml_linalg/vector.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/models/file/file_type.dart";
 import "package:photos/models/memories/memory.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/vector.dart";
@@ -54,13 +53,10 @@ class PhotoSelector {
     List<Memory> memories,
     SelectionConfig config,
   ) async {
-    final candidates = List<Memory>.from(memories);
-    if (memories.length < config.targetSize) {
-      return includeVideos(memories, candidates, config.targetSize);
-    }
+    if (memories.length < config.targetSize) return memories;
     if (memories.length == config.targetSize &&
         config.distribution != SelectionDistribution.yearRoundRobin) {
-      return includeVideos(memories, candidates, config.targetSize);
+      return memories;
     }
 
     final List<Memory> result;
@@ -73,11 +69,7 @@ class PhotoSelector {
         result = _selectYearRoundRobin(memories, config);
     }
 
-    return includeVideos(
-      _sortResult(result, config.sort),
-      candidates,
-      config.targetSize,
-    );
+    return _sortResult(result, config.sort);
   }
 
   static List<Memory> _selectFlat(
@@ -465,49 +457,6 @@ class PhotoSelector {
     return memories;
   }
 
-  // Adjacent videos intentionally exercise video-to-video playback.
-  static List<Memory> includeVideos(
-    List<Memory> selected,
-    List<Memory> candidates,
-    int targetSize,
-  ) {
-    bool isPhoto(Memory memory) =>
-        memory.file.fileType == FileType.image ||
-        memory.file.fileType == FileType.livePhoto;
-
-    final videos =
-        candidates.where((m) => m.file.fileType == FileType.video).toList()
-          ..shuffle();
-    final photos = candidates.where(isPhoto);
-    if (videos.isEmpty || photos.isEmpty || targetSize < 2) return selected;
-
-    final requiredVideoCount = videos.length > 1 && targetSize > 2 ? 2 : 1;
-    final requiredVideos = videos.take(requiredVideoCount).toList();
-    final requiredPhoto = selected.firstWhere(
-      isPhoto,
-      orElse: () => photos.first,
-    );
-    final required = [...requiredVideos, requiredPhoto];
-    final result = List<Memory>.from(selected);
-
-    for (final memory in required) {
-      if (result.contains(memory)) continue;
-      if (result.length >= targetSize) {
-        result.removeAt(result.lastIndexWhere((m) => !required.contains(m)));
-      }
-      result.add(memory);
-    }
-
-    if (requiredVideos.length == 2) {
-      result.remove(requiredVideos.last);
-      result.insert(
-        result.indexOf(requiredVideos.first) + 1,
-        requiredVideos.last,
-      );
-    }
-    return result;
-  }
-
   // Legacy entry points retained for existing callers.
   static Future<List<Memory>> bestSelectionPeople(
     List<Memory> memories, {
@@ -519,9 +468,7 @@ class PhotoSelector {
     try {
       final w = (kDebugMode ? EnteWatch('getPeopleResults') : null)?..start();
       final int targetSize = prefferedSize ?? 10;
-      if (memories.length <= targetSize) {
-        return includeVideos(memories, memories, targetSize);
-      }
+      if (memories.length <= targetSize) return memories;
 
       final Map<int, double> scores = {};
       for (final mem in memories) {
@@ -575,18 +522,15 @@ class PhotoSelector {
   }) async {
     final fileCount = memories.length;
     int targetSize = prefferedSize ?? 10;
-    if (fileCount <= targetSize) {
-      return includeVideos(memories, memories, targetSize);
-    }
+    if (fileCount <= targetSize) return memories;
 
     if (!mlEnabled) {
-      final result = _bestSelectionNoMl(
+      return _bestSelectionNoMl(
         memories,
         targetSize: targetSize,
         isLocalGalleryMode: isLocalGalleryMode,
         distributionOverride: distributionOverride,
       );
-      return includeVideos(result, memories, targetSize);
     }
 
     // Pre-compute combined score: face count * 1000 + CLIP nostalgia.
@@ -655,9 +599,7 @@ class PhotoSelector {
     } else {
       if (prefferedSize == null && (allYears.length * 2) > 10) {
         targetSize = allYears.length * 3;
-        if (fileCount < targetSize) {
-          return includeVideos(memories, memories, targetSize);
-        }
+        if (fileCount < targetSize) return memories;
       }
 
       return select(

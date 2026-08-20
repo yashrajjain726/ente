@@ -18,13 +18,12 @@ EnteFile _file({
   required int creationTime,
   Location? location,
   int? generatedID,
-  FileType fileType = FileType.image,
 }) {
   final f = EnteFile()
     ..uploadedFileID = uploadedFileID
     ..generatedID = generatedID ?? uploadedFileID
     ..creationTime = creationTime
-    ..fileType = fileType;
+    ..fileType = FileType.image;
   if (location != null) f.location = location;
   return f;
 }
@@ -374,45 +373,6 @@ void main() {
   });
 
   group('PhotoSelector.select (unified API)', () {
-    test('includes an adjacent video pair while retaining photos', () async {
-      final memories = [
-        for (var i = 0; i < 6; i++)
-          _mem(_file(uploadedFileID: i, creationTime: _baseTime + i * _hour)),
-        for (var i = 6; i < 9; i++)
-          _mem(
-            _file(
-              uploadedFileID: i,
-              creationTime: _baseTime + i * _hour,
-              fileType: FileType.video,
-            ),
-          ),
-      ];
-      final result = await PhotoSelector.select(
-        memories,
-        SelectionConfig(
-          targetSize: 5,
-          isLocalGalleryMode: false,
-          fileIDToImageEmbedding: const {},
-          scores: {for (var i = 0; i < 6; i++) i: 100 - i.toDouble()},
-          distribution: SelectionDistribution.none,
-          pick: SelectionPick.ranked,
-          sort: SelectionSort.chronological,
-        ),
-      );
-
-      final videoIndexes = [
-        for (var i = 0; i < result.length; i++)
-          if (result[i].file.fileType == FileType.video) i,
-      ];
-      expect(result, hasLength(5));
-      expect(videoIndexes, hasLength(2));
-      expect(videoIndexes.last, videoIndexes.first + 1);
-      expect(
-        result.any((memory) => memory.file.fileType != FileType.video),
-        isTrue,
-      );
-    });
-
     test(
       'flat distribution selects by score and respects targetSize',
       () async {
