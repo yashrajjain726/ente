@@ -680,7 +680,6 @@ func (repo *CollectionRepository) AddFiles(
 	files []ente.CollectionFileItem,
 	fileOwnerID int64,
 ) error {
-	updationTime := time.Microseconds()
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -694,6 +693,7 @@ func (repo *CollectionRepository) AddFiles(
 	if err := lockFiles(ctx, tx, fileOwnerID, fileIDs); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	updationTime := time.Microseconds()
 	trashedOrDeletedFileIDs, err := repo.TrashRepo.getFilesInTrashOrDeleted(ctx, tx, fileOwnerID, fileIDs)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to check trash state")

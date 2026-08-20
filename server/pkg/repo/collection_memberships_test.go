@@ -241,6 +241,7 @@ func TestAddFilesAndTrashFilesSerializeOnFile(t *testing.T) {
 	}()
 
 	waitForFileLockWaiters(t, db)
+	lockReleaseTime := time.Now().UnixMicro()
 	if err := blocker.Commit(); err != nil {
 		t.Fatal(err)
 	}
@@ -262,6 +263,9 @@ func TestAddFilesAndTrashFilesSerializeOnFile(t *testing.T) {
 	}
 	if activeMemberships != 0 || activeTrashRows != 1 {
 		t.Fatalf("final state = (%d active memberships, %d active Trash rows), want (0, 1)", activeMemberships, activeTrashRows)
+	}
+	if updationTime := readCollectionMembershipState(t, db, sourceCollectionID, fileID).updationTime; updationTime < lockReleaseTime {
+		t.Fatalf("membership updation_time = %d, want >= %d", updationTime, lockReleaseTime)
 	}
 }
 

@@ -119,7 +119,6 @@ func (t *TrashRepository) TrashFiles(ctx context.Context, userID int64, trash en
 	for _, item := range trash.TrashItems {
 		fileIDs = append(fileIDs, item.FileID)
 	}
-	updationTime := time.Microseconds()
 	tx, err := t.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -128,6 +127,7 @@ func (t *TrashRepository) TrashFiles(ctx context.Context, userID int64, trash en
 	if err := lockFiles(ctx, tx, userID, fileIDs); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	updationTime := time.Microseconds()
 	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT collection_id FROM 
 			collection_files WHERE file_id = ANY($1) AND is_deleted = $2`, pq.Array(fileIDs), false)
 	if err != nil {
