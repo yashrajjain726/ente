@@ -21,7 +21,8 @@ abstract interface class MemoryMusicPlayer {
 }
 
 class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
-  static const _fadeDuration = Duration(milliseconds: 700);
+  static const _fadeInDuration = Duration(milliseconds: 650);
+  static const _fadeOutDuration = Duration(milliseconds: 250);
   static const _fadeSteps = 14;
 
   final AudioPlayer _player;
@@ -63,7 +64,7 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
           }),
         );
       }
-      await _fadeTo(1, generation);
+      await _fadeTo(1, _fadeInDuration, generation);
     });
   }
 
@@ -72,7 +73,7 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
     final generation = ++_fadeGeneration;
     return _enqueueFade(generation, () async {
       if (!_player.playing) return;
-      await _fadeTo(0, generation);
+      await _fadeTo(0, _fadeOutDuration, generation);
       if (generation == _fadeGeneration) await _player.pause();
     });
   }
@@ -90,9 +91,13 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
     await _enqueueFade(generation, _player.dispose);
   }
 
-  Future<void> _fadeTo(double targetVolume, int generation) async {
+  Future<void> _fadeTo(
+    double targetVolume,
+    Duration duration,
+    int generation,
+  ) async {
     final initialVolume = _player.volume;
-    final stepDuration = _fadeDuration ~/ _fadeSteps;
+    final stepDuration = duration ~/ _fadeSteps;
     for (var step = 1; step <= _fadeSteps; step++) {
       await Future<void>.delayed(stepDuration);
       if (generation != _fadeGeneration) return;
