@@ -1,4 +1,5 @@
 import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
+import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "@/components/auth/VerifyEmailForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/featureFlags";
@@ -37,6 +38,7 @@ function VerifyPage(): React.JSX.Element {
         <AccountsVerifyPage
             presentation={VerifyEmailPresentation}
             passkeyPresentation={PasskeyPresentation}
+            secondFactorChoicePresentation={SecondFactorChoiceDialog}
         />
     );
 }

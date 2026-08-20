@@ -5,7 +5,10 @@ import {
     VerifyingPasskey,
     type VerifyingPasskeyPresentationProps,
 } from "ente-accounts/components/LoginComponents";
-import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
+import {
+    SecondFactorChoice,
+    type SecondFactorChoicePresentationProps,
+} from "ente-accounts/components/SecondFactorChoice";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import { useSecondFactorChoiceIfNeeded } from "ente-accounts/components/utils/second-factor-choice";
 import {
@@ -84,12 +87,14 @@ export interface CredentialsPageProps {
     presentation?: ComponentType<CredentialsPresentationProps>;
     passwordPresentation?: ComponentType<VerifyMasterPasswordPresentationProps>;
     passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
+    secondFactorChoicePresentation?: ComponentType<SecondFactorChoicePresentationProps>;
 }
 
 const Page: React.FC<CredentialsPageProps> = ({
     presentation: Presentation,
     passwordPresentation,
     passkeyPresentation,
+    secondFactorChoicePresentation,
 }) => {
     const { logout, showMiniDialog } = useBaseContext();
 
@@ -409,7 +414,10 @@ const Page: React.FC<CredentialsPageProps> = ({
                     </AccountsPageFooterWithHost>
                 </AccountsPageContents>
             )}
-            <SecondFactorChoice {...secondFactorChoiceProps} />
+            <SecondFactorChoice
+                {...secondFactorChoiceProps}
+                presentation={secondFactorChoicePresentation}
+            />
         </>
     );
 };
