@@ -75,9 +75,9 @@ export function TwoFactorForm({
                         disabled={formik.isSubmitting}
                         autoFocus
                     />
-                    {formik.errors.otp ? (
-                        <Message kind="error">{formik.errors.otp}</Message>
-                    ) : null}
+                    <Message kind="error" visible={Boolean(formik.errors.otp)}>
+                        {formik.errors.otp}
+                    </Message>
                 </FormFields>
                 <FormFooter>
                     <Button

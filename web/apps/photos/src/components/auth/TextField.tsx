@@ -22,6 +22,9 @@ export interface TextFieldProps {
     onKeyDown?: (
         event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => void;
+    onBlur?: (
+        event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
+    ) => void;
     type?: React.HTMLInputTypeAttribute;
     placeholder?: string;
     required?: boolean;
@@ -36,6 +39,7 @@ export interface TextFieldProps {
     rows?: number;
     inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
     ariaLabel?: string;
+    trailing?: React.ReactNode;
 }
 
 export function TextField({
@@ -44,6 +48,7 @@ export function TextField({
     value,
     onChange,
     onKeyDown,
+    onBlur,
     type = "text",
     placeholder,
     required,
@@ -58,10 +63,12 @@ export function TextField({
     rows = 5,
     inputMode,
     ariaLabel,
+    trailing,
 }: TextFieldProps): React.JSX.Element {
     const generatedID = useId();
     const inputID = id ?? generatedID;
-    const helperID = helperText ? `${inputID}-helper` : undefined;
+    const helperID = `${inputID}-helper`;
+    const hasHelper = Boolean(helperText);
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const inputType = showPasswordToggle
         ? isPasswordVisible
@@ -98,9 +105,10 @@ export function TextField({
         autoFocus,
         autoComplete,
         name,
+        onBlur,
         "aria-label": ariaLabel,
         "aria-invalid": error || undefined,
-        "aria-describedby": helperID,
+        "aria-describedby": hasHelper ? helperID : undefined,
     };
 
     return (
@@ -137,6 +145,7 @@ export function TextField({
                 {showPasswordToggle && !multiline && (
                     <PasswordToggle
                         type="button"
+                        tabIndex={-1}
                         aria-label={t("show_or_hide_password")}
                         aria-controls={inputID}
                         aria-pressed={isPasswordVisible}
@@ -154,26 +163,33 @@ export function TextField({
                         />
                     </PasswordToggle>
                 )}
+                {trailing}
             </FieldBox>
-            {helperText && (
-                <Message id={helperID} kind={error ? "error" : "info"}>
-                    {helperText}
-                </Message>
-            )}
+            <Message
+                id={helperID}
+                kind={error ? "error" : "info"}
+                visible={hasHelper}
+            >
+                {helperText}
+            </Message>
         </FieldRoot>
     );
 }
 
 const FieldRoot = styled("div")({
+    "--photos-auth-message-gap": "9px",
     width: "100%",
     display: "flex",
     flexDirection: "column",
     gap: "9px",
+    "&:focus-within > label": { color: "var(--photos-auth-text)" },
 });
 
 const FieldLabel = styled("label")({
     ...authMiniTypography,
     color: "var(--photos-auth-text-muted)",
+    transition: "color 100ms ease-in",
+    "@media (prefers-reduced-motion: reduce)": { transition: "none" },
 });
 
 const RequiredMark = styled("span")({ color: "var(--photos-auth-warning)" });
@@ -198,7 +214,7 @@ const FieldBox = styled(
     gap: "8px",
     boxSizing: "border-box",
     backgroundColor: $disabled
-        ? "var(--photos-auth-fill)"
+        ? "var(--photos-auth-fill-hover)"
         : "var(--photos-auth-field)",
     boxShadow: $disabled
         ? "none"
@@ -259,5 +275,8 @@ const PasswordToggle = styled("button")({
     color: "var(--photos-auth-text-faint)",
     cursor: "pointer",
     "&:focus-visible": authFocusRing,
-    "&:disabled": { cursor: "not-allowed" },
+    "&:disabled": {
+        color: "var(--photos-auth-text-disabled)",
+        cursor: "not-allowed",
+    },
 });

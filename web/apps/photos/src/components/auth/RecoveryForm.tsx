@@ -5,28 +5,66 @@ import { pt } from "ente-base/i18n";
 import log from "ente-base/log";
 import { useFormik } from "formik";
 import { t } from "i18next";
-import type React from "react";
+import React, { useState } from "react";
+import {
+    AuthDialog,
+    AuthDialogHeader,
+    AuthDialogText,
+    AuthDialogTitle,
+} from "./AuthDialog";
 import { Button } from "./Button";
 import { Form } from "./Form";
 import { FormFields } from "./FormFields";
 import { FormFooter } from "./FormFooter";
 import { ScreenHeader } from "./ScreenHeader";
+import { authDialogContentLayout } from "./styles";
 import { TextField } from "./TextField";
 import { TextLink } from "./TextLink";
 
 export function RecoverAccountForm(
     props: RecoverAccountPresentationProps,
 ): React.JSX.Element {
+    const [showNoRecoveryKey, setShowNoRecoveryKey] = useState(false);
+
     return (
-        <RecoveryForm
-            {...props}
-            title={t("recover_account")}
-            subtitle={pt(
-                "Enter the recovery key you saved when you created your account.",
-            )}
-        />
+        <>
+            <RecoveryForm
+                {...props}
+                onNoRecoveryKey={() => setShowNoRecoveryKey(true)}
+                title={t("recover_account")}
+                subtitle={pt(
+                    "Enter the recovery key you saved when you created your account.",
+                )}
+            />
+            <AuthDialog
+                open={showNoRecoveryKey}
+                onClose={() => setShowNoRecoveryKey(false)}
+                ariaLabelledby="no-recovery-key-title"
+            >
+                <DialogContent>
+                    <AuthDialogHeader>
+                        <AuthDialogTitle id="no-recovery-key-title">
+                            {t("sorry")}
+                        </AuthDialogTitle>
+                        <AuthDialogText>
+                            {t("no_recovery_key_message")}
+                        </AuthDialogText>
+                    </AuthDialogHeader>
+                    <Button
+                        variant="secondary"
+                        fullWidth
+                        autoFocus
+                        onClick={() => setShowNoRecoveryKey(false)}
+                    >
+                        {t("ok")}
+                    </Button>
+                </DialogContent>
+            </AuthDialog>
+        </>
     );
 }
+
+const DialogContent = styled("div")(authDialogContentLayout);
 
 export function RecoverTwoFactorForm(
     props: TwoFactorRecoverPresentationProps,

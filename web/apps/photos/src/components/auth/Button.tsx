@@ -80,20 +80,35 @@ const ButtonRoot = styled(
     backgroundColor:
         $variant === "primary"
             ? "var(--photos-auth-primary)"
-            : "var(--photos-auth-fill)",
+            : "var(--photos-auth-button-secondary)",
+    boxShadow:
+        $variant === "primary"
+            ? "inset 0 0 0 1px var(--photos-auth-button-primary-stroke)"
+            : "inset 0 0 0 1px var(--photos-auth-button-secondary-stroke)",
     cursor: $loading ? "default" : "pointer",
-    transition: "background-color 120ms ease",
+    transition:
+        "background-color 160ms ease, box-shadow 160ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
     "&:hover:not(:disabled)": {
         backgroundColor:
             $variant === "primary"
                 ? "var(--photos-auth-primary-hover)"
-                : "var(--photos-auth-fill-hover)",
+                : "var(--photos-auth-button-secondary-hover)",
+        boxShadow:
+            $variant === "primary"
+                ? "inset 0 0 0 1px var(--photos-auth-button-primary-stroke-hover)"
+                : "inset 0 0 0 1px var(--photos-auth-button-secondary-stroke-hover)",
+        transform: "translateY(-2px)",
     },
     "&:active:not(:disabled)": {
         backgroundColor:
             $variant === "primary"
                 ? "var(--photos-auth-primary-active)"
-                : "var(--photos-auth-fill-active)",
+                : "var(--photos-auth-button-secondary-active)",
+        boxShadow:
+            $variant === "primary"
+                ? "inset 0 0 0 1px var(--photos-auth-button-primary-stroke-active)"
+                : "inset 0 0 0 1px var(--photos-auth-button-secondary-stroke-active)",
+        transform: "translateY(0) scale(0.985)",
     },
     "&:focus-visible": authFocusRing,
     "&:disabled": $loading
@@ -101,9 +116,16 @@ const ButtonRoot = styled(
         : {
               color: "var(--photos-auth-text-disabled)",
               backgroundColor: "var(--photos-auth-fill-hover)",
+              boxShadow: "none",
               cursor: "not-allowed",
           },
     "& > .MuiCircularProgress-root": { position: "absolute" },
+    "@media (prefers-reduced-motion: reduce)": {
+        transition: "background-color 120ms ease",
+        "&:hover:not(:disabled), &:active:not(:disabled)": {
+            transform: "none",
+        },
+    },
 }));
 
 const ButtonLabel = styled(

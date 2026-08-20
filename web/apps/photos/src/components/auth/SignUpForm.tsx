@@ -10,7 +10,7 @@ import { Checkbox } from "./Checkbox";
 import { Form } from "./Form";
 import { FormFields } from "./FormFields";
 import { FormFooter } from "./FormFooter";
-import { Message, type MessageKind } from "./Message";
+import { PasswordStrengthMessage } from "./PasswordStrengthMessage";
 import { ScreenHeader } from "./ScreenHeader";
 import { TextField } from "./TextField";
 import { TextLink } from "./TextLink";
@@ -37,14 +37,6 @@ export function SignUpForm({
     onSubmit,
     onLogin,
 }: SignUpPresentationProps): React.JSX.Element {
-    const passwordStrengthKind: MessageKind | undefined = passwordStrength
-        ? passwordStrength === "weak"
-            ? "error"
-            : passwordStrength === "moderate"
-              ? "warning"
-              : "success"
-        : undefined;
-
     return (
         <>
             <ScreenHeader
@@ -83,13 +75,10 @@ export function SignUpForm({
                             helperText={passwordError}
                             disabled={isSubmitting}
                         />
-                        {passwordStrength && passwordStrengthKind ? (
-                            <Message kind={passwordStrengthKind}>
-                                {t("password_strength", {
-                                    context: passwordStrength,
-                                })}
-                            </Message>
-                        ) : null}
+                        <PasswordStrengthMessage
+                            strength={passwordStrength}
+                            visible={Boolean(passwordStrength)}
+                        />
                     </PasswordField>
                     <TextField
                         name="confirmPassword"
@@ -174,6 +163,7 @@ export function SignUpForm({
 }
 
 const PasswordField = styled("div")({
+    "--photos-auth-message-gap": "8px",
     display: "flex",
     flexDirection: "column",
     gap: "8px",

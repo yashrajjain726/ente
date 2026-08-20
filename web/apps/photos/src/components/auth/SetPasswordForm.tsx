@@ -7,7 +7,8 @@ import { Button } from "./Button";
 import { Form } from "./Form";
 import { FormFields } from "./FormFields";
 import { FormFooter } from "./FormFooter";
-import { Message, type MessageKind } from "./Message";
+import { Message } from "./Message";
+import { PasswordStrengthMessage } from "./PasswordStrengthMessage";
 import { ScreenHeader } from "./ScreenHeader";
 import { TextField } from "./TextField";
 import { TextLink } from "./TextLink";
@@ -27,13 +28,6 @@ export function SetPasswordForm({
     onConfirmPasswordChange,
     onSubmit,
 }: NewPasswordPresentationProps): React.JSX.Element {
-    const passwordStrengthKind: MessageKind =
-        passwordStrength === "weak"
-            ? "error"
-            : passwordStrength === "moderate"
-              ? "warning"
-              : "success";
-
     return (
         <>
             <ScreenHeader
@@ -66,13 +60,10 @@ export function SetPasswordForm({
                             disabled={isSubmitting}
                             autoFocus
                         />
-                        {password ? (
-                            <Message kind={passwordStrengthKind}>
-                                {t("password_strength", {
-                                    context: passwordStrength,
-                                })}
-                            </Message>
-                        ) : null}
+                        <PasswordStrengthMessage
+                            strength={passwordStrength}
+                            visible={Boolean(password)}
+                        />
                     </PasswordField>
                     <TextField
                         name="confirmPassword"
@@ -117,6 +108,7 @@ export function SetPasswordForm({
 const HiddenEmail = styled("input")({ display: "none" });
 
 const PasswordField = styled("div")({
+    "--photos-auth-message-gap": "8px",
     display: "flex",
     flexDirection: "column",
     gap: "8px",

@@ -76,18 +76,18 @@ export function VerifyEmailForm({
             />
             <Form onSubmit={formik.handleSubmit}>
                 <FormFields>
-                    <FieldLabel>{t("verification_code")}</FieldLabel>
                     <OTPField
                         name="code"
+                        label={t("verification_code")}
                         value={formik.values.code}
                         onChange={handleCodeChange}
                         error={Boolean(formik.errors.code)}
                         disabled={formik.isSubmitting}
                         autoFocus
                     />
-                    {formik.errors.code ? (
-                        <Message kind="error">{formik.errors.code}</Message>
-                    ) : null}
+                    <Message kind="error" visible={Boolean(formik.errors.code)}>
+                        {formik.errors.code}
+                    </Message>
                 </FormFields>
                 <FormFooter>
                     <Button
@@ -117,13 +117,6 @@ export function VerifyEmailForm({
 const Email = styled("strong")({
     color: "var(--photos-auth-text)",
     wordBreak: "break-word",
-});
-
-const FieldLabel = styled("span")({
-    fontSize: "12px",
-    fontWeight: 500,
-    lineHeight: "16px",
-    color: "var(--photos-auth-text-muted)",
 });
 
 const FooterLinks = styled("div")({

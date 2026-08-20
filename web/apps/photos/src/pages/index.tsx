@@ -1,3 +1,4 @@
+import { DevSettingsDialog } from "@/components/auth/DevSettingsDialog";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
@@ -233,7 +234,15 @@ const TappableContainer: React.FC<
             ]}
             onClick={handleClick}
         >
-            <DevSettings open={showDevSettings} onClose={handleClose} />
+            <DevSettings
+                open={showDevSettings}
+                onClose={handleClose}
+                presentation={
+                    featureFlags.enableNewPhotosAuthFlow
+                        ? DevSettingsDialog
+                        : undefined
+                }
+            />
             {children}
         </CenteredFill>
     );
