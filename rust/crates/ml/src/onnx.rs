@@ -90,7 +90,7 @@ impl OnnxSession {
     pub(crate) fn unload(&mut self) {
         self.provider_plan = None;
         self.session = None;
-        self.disarm_first_run_canary();
+        self.leave_first_run_canary_armed();
     }
 
     #[cfg(test)]
@@ -671,13 +671,15 @@ mod tests {
     }
 
     #[test]
-    fn unload_preserves_model_identity() {
+    fn unload_preserves_model_identity_and_armed_canary() {
+        let temp = tempfile::tempdir().unwrap();
         let mut session = OnnxSession::new(
             "/models/document.onnx",
             "document-segmentation",
             ExecutionMode::CpuOnly,
         );
         session.initialize_load_state();
+        session.first_run_canary = Some(first_run_canary(&temp));
 
         session.unload();
 
@@ -685,6 +687,7 @@ mod tests {
         assert_eq!(session.model_namespace, "document-segmentation");
         assert!(!session.is_loaded());
         assert!(!session.has_load_state());
+        assert!(has_canary(&temp));
     }
 
     #[test]
