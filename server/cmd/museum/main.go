@@ -139,6 +139,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Could not decode jwt-secret ", err)
 	}
+	if len(jwtSecretBytes) == 0 {
+		log.Fatal("jwt-secret must not be empty")
+	}
 
 	db := setupDatabase()
 	defer db.Close()
