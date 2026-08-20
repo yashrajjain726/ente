@@ -314,16 +314,16 @@ class FullScreenMemoryData extends InheritedWidget {
 class FullScreenMemory extends StatefulWidget {
   final String title;
   final int initialIndex;
+  final String memoryID;
   final bool isActive;
-  final ValueChanged<EnteFile>? onCurrentItemChanged;
   final VoidCallback? onNextMemory;
   final VoidCallback? onPreviousMemory;
 
   const FullScreenMemory(
     this.title,
     this.initialIndex, {
+    required this.memoryID,
     required this.isActive,
-    this.onCurrentItemChanged,
     this.onNextMemory,
     this.onPreviousMemory,
     super.key,
@@ -425,16 +425,16 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     if (identical(nextNotifier, _itemIndexNotifier)) {
       if (!identical(previousMemoryData, memoryData)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _reportCurrentItem();
+          if (mounted) _activateCurrentItemMusic();
         });
       }
       return;
     }
-    _itemIndexNotifier?.removeListener(_reportCurrentItem);
+    _itemIndexNotifier?.removeListener(_activateCurrentItemMusic);
     _itemIndexNotifier = nextNotifier;
-    _itemIndexNotifier?.addListener(_reportCurrentItem);
+    _itemIndexNotifier?.addListener(_activateCurrentItemMusic);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _reportCurrentItem();
+      if (mounted) _activateCurrentItemMusic();
     });
   }
 
@@ -443,12 +443,12 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
     _syncAnimationState();
-    if (widget.isActive) _reportCurrentItem();
+    if (widget.isActive) _activateCurrentItemMusic();
   }
 
   @override
   void dispose() {
-    _itemIndexNotifier?.removeListener(_reportCurrentItem);
+    _itemIndexNotifier?.removeListener(_activateCurrentItemMusic);
     hasPointerOnScreenNotifier.removeListener(_hasPointerListener);
     _detailSheetEventSubscription.cancel();
     _captionUpdatedSubscription.cancel();
@@ -456,8 +456,8 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     super.dispose();
   }
 
-  void _reportCurrentItem() {
-    if (!mounted) return;
+  void _activateCurrentItemMusic() {
+    if (!mounted || !widget.isActive) return;
     final inheritedData = _memoryData;
     if (inheritedData == null) return;
     final index = _clampedMemoryIndex(
@@ -466,7 +466,12 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     );
     if (index == null) return;
     final file = inheritedData.memories[index].file;
-    if (widget.isActive) widget.onCurrentItemChanged?.call(file);
+    unawaited(
+      MemoryMusicScope.of(context, listen: false).activateMemory(
+        widget.memoryID,
+        currentItemIsVideo: file.fileType == FileType.video,
+      ),
+    );
   }
 
   /// Used to check if user has touched the screen and then to pause animation

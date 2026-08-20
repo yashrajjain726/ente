@@ -1,9 +1,6 @@
-import "dart:async";
-
 import 'package:flutter/material.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/pause_video_event.dart";
-import "package:photos/models/file/file_type.dart";
 import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/ui/home/memories/full_screen_memory.dart";
@@ -57,7 +54,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
   Widget build(BuildContext context) {
     return MemoryMusicSession(
       memoryIDs: _memories.map((memory) => memory.id).toList(),
-      builder: (musicController) => Container(
+      child: Container(
         width: double.infinity,
         height: double.infinity,
         color: backgroundColorDark,
@@ -79,15 +76,8 @@ class _AllMemoriesPageState extends State<AllMemoriesPage>
               child: FullScreenMemory(
                 smartMemory.title,
                 initialMemoryIndex,
+                memoryID: smartMemory.id,
                 isActive: index == _activePageIndex,
-                onCurrentItemChanged: (file) {
-                  unawaited(
-                    musicController.activateMemory(
-                      smartMemory.id,
-                      currentItemIsVideo: file.fileType == FileType.video,
-                    ),
-                  );
-                },
                 onNextMemory: index < _memories.length - 1
                     ? () => pageController.nextPage(
                         duration: const Duration(milliseconds: 675),

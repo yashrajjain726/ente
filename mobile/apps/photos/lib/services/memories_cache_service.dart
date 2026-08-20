@@ -19,7 +19,6 @@ import "package:photos/events/memory_seen_event.dart";
 import "package:photos/events/sync_status_update_event.dart";
 import "package:photos/locale.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/models/file/file_type.dart";
 import "package:photos/models/memories/memories_cache.dart";
 import "package:photos/models/memories/memory.dart";
 import "package:photos/models/memories/people_memory.dart";
@@ -1384,7 +1383,7 @@ class MemoriesCacheService {
     await _routeToPage(
       MemoryMusicSession(
         memoryIDs: <String>[selectedPersonMemory.id],
-        builder: (musicController) => FullScreenMemoryDataUpdater(
+        child: FullScreenMemoryDataUpdater(
           initialIndex: 0,
           memories: selectedPersonMemory.memories,
           child: Container(
@@ -1394,15 +1393,8 @@ class MemoriesCacheService {
             child: FullScreenMemory(
               selectedPersonMemory.title,
               0,
+              memoryID: selectedPersonMemory.id,
               isActive: true,
-              onCurrentItemChanged: (file) {
-                unawaited(
-                  musicController.activateMemory(
-                    selectedPersonMemory.id,
-                    currentItemIsVideo: file.fileType == FileType.video,
-                  ),
-                );
-              },
             ),
           ),
         ),

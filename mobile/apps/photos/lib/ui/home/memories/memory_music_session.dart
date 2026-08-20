@@ -8,11 +8,11 @@ import "package:photos/services/memories/memory_music_selector.dart";
 
 class MemoryMusicSession extends StatefulWidget {
   final List<String> memoryIDs;
-  final Widget Function(MemoryMusicController controller) builder;
+  final Widget child;
 
   const MemoryMusicSession({
     required this.memoryIDs,
-    required this.builder,
+    required this.child,
     super.key,
   });
 
@@ -53,10 +53,7 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
 
   @override
   Widget build(BuildContext context) {
-    return MemoryMusicScope(
-      controller: _controller,
-      child: widget.builder(_controller),
-    );
+    return MemoryMusicScope(controller: _controller, child: widget.child);
   }
 }
 
