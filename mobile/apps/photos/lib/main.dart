@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import "package:flutter/rendering.dart";
 import "package:flutter/services.dart";
 import "package:flutter_displaymode/flutter_displaymode.dart";
+import "package:in_app_purchase_storekit/in_app_purchase_storekit.dart";
 import "package:intl/date_symbol_data_local.dart";
 import 'package:logging/logging.dart';
 import "package:media_extension/media_extension_action_types.dart";
@@ -93,6 +94,10 @@ enum ForegroundStartupMode { normal, picker }
 void main() async {
   debugRepaintRainbowEnabled = false;
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isIOS) {
+    // ignore: deprecated_member_use
+    await InAppPurchaseStoreKitPlatform.enableStoreKit1();
+  }
   ente_ui.AppThemeConfig.initialize(ente_ui.EnteApp.photos);
   await initIsIPad();
   if (isIPad) {
