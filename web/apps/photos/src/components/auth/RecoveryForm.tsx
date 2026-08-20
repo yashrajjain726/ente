@@ -1,5 +1,6 @@
 import { styled } from "@mui/material";
 import type { RecoverAccountPresentationProps } from "ente-accounts/pages/recover";
+import type { TwoFactorRecoverPresentationProps } from "ente-accounts/pages/two-factor/recover";
 import { pt } from "ente-base/i18n";
 import log from "ente-base/log";
 import { useFormik } from "formik";
@@ -22,6 +23,20 @@ export function RecoverAccountForm(
             title={t("recover_account")}
             subtitle={pt(
                 "Enter the recovery key you saved when you created your account.",
+            )}
+        />
+    );
+}
+
+export function RecoverTwoFactorForm(
+    props: TwoFactorRecoverPresentationProps,
+): React.JSX.Element {
+    return (
+        <RecoveryForm
+            {...props}
+            title={t("recover_two_factor")}
+            subtitle={pt(
+                "Enter your recovery key to regain access to your account.",
             )}
         />
     );
