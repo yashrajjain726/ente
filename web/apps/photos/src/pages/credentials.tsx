@@ -3,6 +3,7 @@ import {
     PasswordForm,
 } from "@/components/auth/CredentialsForm";
 import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
+import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/featureFlags";
 import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
@@ -41,6 +42,7 @@ function CredentialsPage(): React.JSX.Element {
             presentation={CredentialsPresentation}
             passwordPresentation={PasswordForm}
             passkeyPresentation={PasskeyPresentation}
+            secondFactorChoicePresentation={SecondFactorChoiceDialog}
         />
     );
 }

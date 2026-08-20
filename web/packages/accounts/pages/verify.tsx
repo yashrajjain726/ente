@@ -8,7 +8,10 @@ import {
     VerifyingPasskey,
     type VerifyingPasskeyPresentationProps,
 } from "ente-accounts/components/LoginComponents";
-import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
+import {
+    SecondFactorChoice,
+    type SecondFactorChoicePresentationProps,
+} from "ente-accounts/components/SecondFactorChoice";
 import { useSecondFactorChoiceIfNeeded } from "ente-accounts/components/utils/second-factor-choice";
 import {
     replaceSavedLocalUser,
@@ -68,11 +71,13 @@ export interface VerifyEmailPresentationProps {
 export interface VerifyPageProps {
     presentation?: ComponentType<VerifyEmailPresentationProps>;
     passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
+    secondFactorChoicePresentation?: ComponentType<SecondFactorChoicePresentationProps>;
 }
 
 const Page: React.FC<VerifyPageProps> = ({
     presentation: Presentation,
     passkeyPresentation,
+    secondFactorChoicePresentation,
 }) => {
     const { logout, showMiniDialog } = useBaseContext();
 
@@ -219,7 +224,10 @@ const Page: React.FC<VerifyPageProps> = ({
                     onResend={resendEmail}
                     onChangeEmail={logout}
                 />
-                <SecondFactorChoice {...secondFactorChoiceProps} />
+                <SecondFactorChoice
+                    {...secondFactorChoiceProps}
+                    presentation={secondFactorChoicePresentation}
+                />
             </>
         );
     }
@@ -265,7 +273,10 @@ const Page: React.FC<VerifyPageProps> = ({
                 <LinkButton onClick={logout}>{t("change_email")}</LinkButton>
             </AccountsPageFooter>
 
-            <SecondFactorChoice {...secondFactorChoiceProps} />
+            <SecondFactorChoice
+                {...secondFactorChoiceProps}
+                presentation={secondFactorChoicePresentation}
+            />
         </AccountsPageContents>
     );
 };
