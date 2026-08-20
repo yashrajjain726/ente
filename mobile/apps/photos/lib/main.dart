@@ -181,7 +181,13 @@ Future<void> _runInForeground(
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(SemanticSearchService.instance.init());
-      unawaited(_warmForegroundDeferredServices());
+      unawaited(MemoryLaneService.instance.init());
+      unawaited(
+        Future.delayed(
+          const Duration(seconds: 5),
+          installSourceService.autoAttributePendingSource,
+        ),
+      );
     });
     unawaited(_scheduleFGSync('appStart in FG'));
   });
@@ -196,26 +202,6 @@ Future<void> _warmPickerFilesDb() async {
   } catch (e, s) {
     _logger.warning("Picker FilesDB warm-up failed", e, s);
   }
-}
-
-Future<void> _warmForegroundDeferredServices() async {
-  try {
-    final memoryLaneService = MemoryLaneService.instance;
-    if (memoryLaneService.isFeatureEnabled) {
-      await memoryLaneService.init();
-      memoryLaneService.queueFullRecompute().ignore();
-    } else {
-      _logger.info("Memory Lane disabled");
-    }
-  } catch (e, s) {
-    _logger.warning("Deferred MemoryLaneService warm failed", e, s);
-  }
-  unawaited(
-    Future.delayed(
-      const Duration(seconds: 5),
-      installSourceService.autoAttributePendingSource,
-    ),
-  );
 }
 
 ThemeMode _themeMode(AdaptiveThemeMode? savedThemeMode) {

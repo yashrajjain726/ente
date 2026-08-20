@@ -109,9 +109,8 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   int _currentCaptionValue = 0;
   _CaptionType _currentCaptionType = _CaptionType.yearsAgo;
   int _maxCaptionDigits = 1;
-  bool get _featureEnabled => MemoryLaneService.instance.isFeatureEnabled;
   bool get _showShareAction =>
-      _featureEnabled &&
+      hasGrantedMLConsent &&
       flagService.enableMemoryShareLink &&
       !isLocalGalleryMode;
 
@@ -123,7 +122,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
           ..addListener(_onCardAnimationTick)
           ..addStatusListener(_onCardAnimationStatusChanged);
     _stackProgressNotifier = ValueNotifier<double>(_stackProgress);
-    if (_featureEnabled) {
+    if (hasGrantedMLConsent) {
       unawaited(_loadFrames());
     } else {
       _timelineUnavailable = true;
@@ -600,7 +599,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
 
   @override
   Widget build(BuildContext context) {
-    if (!_featureEnabled) {
+    if (!hasGrantedMLConsent) {
       final l10n = context.strings;
       final colorScheme = getEnteColorScheme(context);
       final textTheme = getEnteTextTheme(context);

@@ -31,7 +31,6 @@ import "package:photos/ui/viewer/gallery/state/inherited_search_filter_data.dart
 import "package:photos/ui/viewer/gallery/state/search_filter_data_provider.dart";
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
 import "package:photos/ui/viewer/people/memory_lane_banner.dart";
-import "package:photos/ui/viewer/people/memory_lane_debug_panel.dart";
 import "package:photos/ui/viewer/people/memory_lane_page.dart";
 import "package:photos/ui/viewer/people/people_app_bar.dart";
 import "package:photos/ui/viewer/people/person_gallery_suggestion.dart";
@@ -72,7 +71,7 @@ class _PeoplePageState extends State<PeoplePage> {
   bool _memoryLanePrewarmStarted = false;
   bool _isTryingToPopDeletedPersonPage = false;
 
-  bool get _memoryLaneEnabled => MemoryLaneService.instance.isFeatureEnabled;
+  bool get _memoryLaneEnabled => hasGrantedMLConsent;
 
   @override
   void initState() {
@@ -388,8 +387,6 @@ class _GalleryState extends State<_Gallery> {
             personId: widget.personEntity.remoteID,
             onTap: widget.memoryLaneEnabled ? widget.onTimelineTap : null,
           ),
-          if (widget.memoryLaneEnabled)
-            MemoryLaneDebugPanel(personId: widget.personEntity.remoteID),
           !userDismissedPersonGallerySuggestion
               ? Dismissible(
                   key: const Key("personGallerySuggestion"),
