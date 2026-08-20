@@ -477,11 +477,6 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     );
   }
 
-  /// Used to check if user has touched the screen and then to pause animation
-  /// and once the pointer is removed from the screen, it resumes the animation
-  /// It also resets the zoom of the photo view to default for better user
-  /// experience after finger(s) is removed from the screen after zooming in by
-  /// pinching.
   void _hasPointerListener() {
     if (hasPointerOnScreenNotifier.value) {
       _toggleAnimation(pause: true);

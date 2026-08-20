@@ -50,14 +50,6 @@ class PhotoSelector {
   static const clipSimilarImageThreshold = 0.80;
   static const minimumMemoryTimeGap = Duration(minutes: 10);
 
-  // -----------------------------------------------------------------------
-  // Unified selection entry point
-  // -----------------------------------------------------------------------
-
-  /// Selects up to [config.targetSize] memories from [memories], applying the
-  /// distribution, filtering, picking and sorting strategies in [config].
-  ///
-  /// Skips scoring when [memories] is already small enough.
   static Future<List<Memory>> select(
     List<Memory> memories,
     SelectionConfig config,
@@ -473,8 +465,7 @@ class PhotoSelector {
     return memories;
   }
 
-  /// Adds videos from [candidates] to [selected] while retaining a photo.
-  /// Two videos are placed together so video-to-video playback is exercised.
+  // Adjacent videos intentionally exercise video-to-video playback.
   static List<Memory> includeVideos(
     List<Memory> selected,
     List<Memory> candidates,
@@ -517,11 +508,7 @@ class PhotoSelector {
     return result;
   }
 
-  // -----------------------------------------------------------------------
-  // Legacy entry points (delegate to select())
-  // -----------------------------------------------------------------------
-
-  /// Creates a curated selection of memories for the People memories.
+  // Legacy entry points retained for existing callers.
   static Future<List<Memory>> bestSelectionPeople(
     List<Memory> memories, {
     int? prefferedSize,

@@ -72,7 +72,6 @@ class _VideoWidgetState extends State<VideoWidget> {
   void initState() {
     super.initState();
     widget.activeItemIndexListenable?.addListener(_onActiveItemChanged);
-    // Automatic error fallback: switch to MediaKit when native player fails
     useMediaKitForVideoSubscription = Bus.instance
         .on<UseMediaKitForVideo>()
         .listen((event) {
