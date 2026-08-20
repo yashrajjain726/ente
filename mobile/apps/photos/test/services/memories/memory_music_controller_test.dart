@@ -38,7 +38,6 @@ void main() {
     expect(player.loadedAssets, <String>["assets/track-1.mp3"]);
     expect(player.looping, isTrue);
     expect(player.playing, isTrue);
-    expect(player.volume, 1.0);
   });
 
   test("video items pause music and photos resume it", () async {
@@ -55,18 +54,31 @@ void main() {
     expect(player.loadAttempts, 1);
   });
 
-  test("mute persists and changes volume without pausing", () async {
+  test("mute pauses music and unmute resumes it", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
     await controller.toggleMuted();
-    expect(player.playing, isTrue);
-    expect(player.volume, 0.0);
+    expect(player.playing, isFalse);
     expect(persistedMuteValues, <bool>[true]);
 
     await controller.toggleMuted();
     expect(player.playing, isTrue);
-    expect(player.volume, 1.0);
     expect(persistedMuteValues, <bool>[true, false]);
+  });
+
+  test("mute and video independently keep music paused", () async {
+    await controller.activateMemory("memory-1", currentItemIsVideo: true);
+    await controller.toggleMuted();
+
+    await controller.activateMemory("memory-2", currentItemIsVideo: false);
+    expect(player.playing, isFalse);
+
+    await controller.activateMemory("memory-2", currentItemIsVideo: true);
+    await controller.toggleMuted();
+    expect(player.playing, isFalse);
+
+    await controller.activateMemory("memory-2", currentItemIsVideo: false);
+    expect(player.playing, isTrue);
   });
 
   test("changing memories loads the assigned track", () async {
@@ -108,7 +120,6 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   final List<String> loadedAssets = <String>[];
   bool looping = false;
   bool playing = false;
-  double volume = -1.0;
   bool failNextLoad = false;
   int loadAttempts = 0;
 
@@ -128,11 +139,6 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   @override
   Future<void> setLooping() async {
     looping = true;
-  }
-
-  @override
-  Future<void> setVolume(double value) async {
-    volume = value;
   }
 
   @override

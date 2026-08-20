@@ -58,13 +58,15 @@ class MemoryMusicController extends ChangeNotifier {
 
     final track = _assignments[memoryID];
     final generation = ++_loadGeneration;
+    _status = _MemoryMusicPlaybackStatus.loading;
+    await _synchronizePlayback();
+    if (!_isCurrentLoad(generation)) return;
     if (track == null) {
       _status = _MemoryMusicPlaybackStatus.idle;
       await _player.stop();
       return;
     }
 
-    _status = _MemoryMusicPlaybackStatus.loading;
     try {
       await _ensureAudioSessionInitialized();
       if (!_isCurrentLoad(generation)) return;
@@ -73,7 +75,6 @@ class MemoryMusicController extends ChangeNotifier {
       await _player.loadAsset(track.assetPath);
       if (!_isCurrentLoad(generation)) return;
       await _player.setLooping();
-      await _player.setVolume(_isMuted ? 0.0 : 1.0);
       if (!_isCurrentLoad(generation)) return;
       _status = _MemoryMusicPlaybackStatus.ready;
       await _synchronizePlayback();
@@ -93,11 +94,7 @@ class MemoryMusicController extends ChangeNotifier {
     final isMuted = !_isMuted;
     _isMuted = isMuted;
     notifyListeners();
-    try {
-      await _player.setVolume(isMuted ? 0.0 : 1.0);
-    } catch (error, stackTrace) {
-      _logger.fine("Failed to update memories music volume", error, stackTrace);
-    }
+    final synchronizePlayback = _synchronizePlayback();
     try {
       await _persistMuted(isMuted);
     } catch (error, stackTrace) {
@@ -107,6 +104,7 @@ class MemoryMusicController extends ChangeNotifier {
         stackTrace,
       );
     }
+    await synchronizePlayback;
   }
 
   Future<void> setAppActive(bool isActive) async {
@@ -130,19 +128,12 @@ class MemoryMusicController extends ChangeNotifier {
   Future<void> _synchronizePlayback() async {
     if (_isDisposed) return;
     final shouldPlay =
-        _status == _MemoryMusicPlaybackStatus.ready && _pauseReasons.isEmpty;
+        _status == _MemoryMusicPlaybackStatus.ready &&
+        !_isMuted &&
+        _pauseReasons.isEmpty;
     try {
       if (shouldPlay) {
-        unawaited(
-          _player.play().catchError((Object error, StackTrace stackTrace) {
-            if (_isDisposed) return;
-            _logger.fine(
-              "Failed to start memory music playback",
-              error,
-              stackTrace,
-            );
-          }),
-        );
+        await _player.play();
       } else {
         await _player.pause();
       }

@@ -1,5 +1,8 @@
+import "dart:async";
+
 import "package:audio_session/audio_session.dart";
 import "package:just_audio/just_audio.dart";
+import "package:logging/logging.dart";
 
 abstract interface class MemoryMusicPlayer {
   Future<void> configureAudioSession();
@@ -7,8 +10,6 @@ abstract interface class MemoryMusicPlayer {
   Future<void> loadAsset(String assetPath);
 
   Future<void> setLooping();
-
-  Future<void> setVolume(double volume);
 
   Future<void> play();
 
@@ -20,7 +21,14 @@ abstract interface class MemoryMusicPlayer {
 }
 
 class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
+  static const _fadeDuration = Duration(milliseconds: 700);
+  static const _fadeSteps = 14;
+
   final AudioPlayer _player;
+  final Logger _logger = Logger("JustAudioMemoryMusicPlayer");
+
+  Future<void> _fadeQueue = Future<void>.value();
+  int _fadeGeneration = 0;
 
   JustAudioMemoryMusicPlayer() : _player = AudioPlayer();
 
@@ -39,17 +47,67 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
   Future<void> setLooping() => _player.setLoopMode(LoopMode.one);
 
   @override
-  Future<void> setVolume(double volume) => _player.setVolume(volume);
+  Future<void> play() {
+    final generation = ++_fadeGeneration;
+    return _enqueueFade(generation, () async {
+      if (!_player.playing) {
+        await _player.setVolume(0);
+        if (generation != _fadeGeneration) return;
+        unawaited(
+          _player.play().catchError((Object error, StackTrace stackTrace) {
+            _logger.fine(
+              "Failed to start memory music playback",
+              error,
+              stackTrace,
+            );
+          }),
+        );
+      }
+      await _fadeTo(1, generation);
+    });
+  }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> pause() {
+    final generation = ++_fadeGeneration;
+    return _enqueueFade(generation, () async {
+      if (!_player.playing) return;
+      await _fadeTo(0, generation);
+      if (generation == _fadeGeneration) await _player.pause();
+    });
+  }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> stop() {
+    final generation = ++_fadeGeneration;
+    return _enqueueFade(generation, _player.stop);
+  }
 
   @override
-  Future<void> stop() => _player.stop();
+  Future<void> dispose() async {
+    await pause();
+    final generation = ++_fadeGeneration;
+    await _enqueueFade(generation, _player.dispose);
+  }
 
-  @override
-  Future<void> dispose() => _player.dispose();
+  Future<void> _fadeTo(double targetVolume, int generation) async {
+    final initialVolume = _player.volume;
+    final stepDuration = _fadeDuration ~/ _fadeSteps;
+    for (var step = 1; step <= _fadeSteps; step++) {
+      await Future<void>.delayed(stepDuration);
+      if (generation != _fadeGeneration) return;
+      final progress = step / _fadeSteps;
+      await _player.setVolume(
+        initialVolume + (targetVolume - initialVolume) * progress,
+      );
+    }
+  }
+
+  Future<void> _enqueueFade(int generation, Future<void> Function() operation) {
+    final result = _fadeQueue.then((_) async {
+      if (generation == _fadeGeneration) await operation();
+    });
+    _fadeQueue = result.catchError((Object _, StackTrace _) {});
+    return result;
+  }
 }
