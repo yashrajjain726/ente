@@ -1,7 +1,7 @@
-import { base64ToBytes, bytesToBase64 } from "@/services/base64";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 
 type EnsuWasmModule = typeof import("ente-ensu-wasm");
+type TauriCoreModule = typeof import("@tauri-apps/api/core");
 
 export interface EncryptedChatPayload {
     encryptedData: string;
@@ -11,11 +11,10 @@ export interface EncryptedChatPayload {
 const ensuWasm = () => import("ente-ensu-wasm");
 
 const tauriInvoke = async <T>(
-    command: string,
-    args?: Record<string, unknown>,
+    ...args: Parameters<TauriCoreModule["invoke"]>
 ) => {
     const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<T>(command, args);
+    return invoke<T>(...args);
 };
 
 const encryptedChatPayloadValue = (
@@ -29,6 +28,18 @@ const encryptedChatPayloadValue = (
 };
 
 const wasmBytes = (bytes: Uint8Array) => bytes as Uint8Array<ArrayBuffer>;
+
+const invokeAttachmentCommand = async (
+    command: string,
+    data: Uint8Array,
+    chatKeyB64: string,
+    sessionUuid: string,
+) =>
+    new Uint8Array(
+        await tauriInvoke<ArrayBuffer>(command, data, {
+            headers: { "chat-key": chatKeyB64, "session-uuid": sessionUuid },
+        }),
+    );
 
 export const generateChatKey = async () =>
     isTauriRuntime()
@@ -96,14 +107,11 @@ export const encryptAttachmentBytes = async (
     sessionUuid: string,
 ): Promise<Uint8Array<ArrayBuffer>> =>
     isTauriRuntime()
-        ? base64ToBytes(
-              await tauriInvoke<string>("chat_crypto_encrypt_attachment", {
-                  input: {
-                      dataB64: bytesToBase64(data),
-                      keyB64: chatKeyB64,
-                      sessionUuid,
-                  },
-              }),
+        ? invokeAttachmentCommand(
+              "chat_crypto_encrypt_attachment",
+              data,
+              chatKeyB64,
+              sessionUuid,
           )
         : wasmBytes(
               (await ensuWasm()).encryptChatAttachment(
@@ -119,14 +127,11 @@ export const decryptAttachmentBytes = async (
     sessionUuid: string,
 ): Promise<Uint8Array<ArrayBuffer>> =>
     isTauriRuntime()
-        ? base64ToBytes(
-              await tauriInvoke<string>("chat_crypto_decrypt_attachment", {
-                  input: {
-                      dataB64: bytesToBase64(data),
-                      keyB64: chatKeyB64,
-                      sessionUuid,
-                  },
-              }),
+        ? invokeAttachmentCommand(
+              "chat_crypto_decrypt_attachment",
+              data,
+              chatKeyB64,
+              sessionUuid,
           )
         : wasmBytes(
               (await ensuWasm()).decryptChatAttachment(

@@ -88,30 +88,6 @@ pub fn decrypt_attachment(data: &[u8], chat_key_b64: &str, session_uuid: &str) -
     decrypt_blob(data, attachment_key(chat_key_b64, session_uuid)?.as_bytes())
 }
 
-pub fn encrypt_attachment_b64(
-    data_b64: &str,
-    chat_key_b64: &str,
-    session_uuid: &str,
-) -> Result<String> {
-    Ok(b64::encode(&encrypt_attachment(
-        &b64::decode(data_b64)?,
-        chat_key_b64,
-        session_uuid,
-    )?))
-}
-
-pub fn decrypt_attachment_b64(
-    data_b64: &str,
-    chat_key_b64: &str,
-    session_uuid: &str,
-) -> Result<String> {
-    Ok(b64::encode(&decrypt_attachment(
-        &b64::decode(data_b64)?,
-        chat_key_b64,
-        session_uuid,
-    )?))
-}
-
 pub fn encrypt_blob(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     Ok(blob::encrypt_combined(
         plaintext,

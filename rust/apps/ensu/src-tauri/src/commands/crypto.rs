@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
+use tauri::ipc::{InvokeBody, Request, Response};
 
 use crate::commands::common::ApiError;
+
+const CHAT_KEY_HEADER: &str = "chat-key";
+const SESSION_UUID_HEADER: &str = "session-uuid";
 
 impl From<ente_ensu_crypto::Error> for ApiError {
     fn from(error: ente_ensu_crypto::Error) -> Self {
@@ -46,14 +50,6 @@ pub struct FieldInput {
     key_b64: String,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AttachmentInput {
-    data_b64: String,
-    key_b64: String,
-    session_uuid: String,
-}
-
 #[tauri::command]
 pub fn chat_crypto_generate_key() -> String {
     ente_ensu_crypto::generate_chat_key()
@@ -85,13 +81,30 @@ pub fn chat_crypto_decrypt_field(input: FieldInput) -> Result<String, ApiError> 
 }
 
 #[tauri::command]
-pub fn chat_crypto_encrypt_attachment(input: AttachmentInput) -> Result<String, ApiError> {
-    ente_ensu_crypto::encrypt_attachment_b64(&input.data_b64, &input.key_b64, &input.session_uuid)
-        .map_err(Into::into)
+pub fn chat_crypto_encrypt_attachment(request: Request<'_>) -> Result<Response, ApiError> {
+    transform_attachment(request, ente_ensu_crypto::encrypt_attachment)
 }
 
 #[tauri::command]
-pub fn chat_crypto_decrypt_attachment(input: AttachmentInput) -> Result<String, ApiError> {
-    ente_ensu_crypto::decrypt_attachment_b64(&input.data_b64, &input.key_b64, &input.session_uuid)
+pub fn chat_crypto_decrypt_attachment(request: Request<'_>) -> Result<Response, ApiError> {
+    transform_attachment(request, ente_ensu_crypto::decrypt_attachment)
+}
+
+fn transform_attachment(
+    request: Request<'_>,
+    transform: impl FnOnce(&[u8], &str, &str) -> ente_ensu_crypto::Result<Vec<u8>>,
+) -> Result<Response, ApiError> {
+    let InvokeBody::Raw(data) = request.body() else {
+        return Err(ApiError::new("invalid_args", "Expected attachment bytes"));
+    };
+    let header = |name| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| ApiError::new("invalid_args", format!("Missing {name} header")))
+    };
+    transform(data, header(CHAT_KEY_HEADER)?, header(SESSION_UUID_HEADER)?)
+        .map(Response::new)
         .map_err(Into::into)
 }
