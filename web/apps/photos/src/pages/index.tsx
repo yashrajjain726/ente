@@ -1,3 +1,4 @@
+import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/featureFlags";
@@ -41,6 +42,9 @@ const Page: React.FC = () => {
         () => void customAPIHost().then(setHost),
         [],
     );
+
+    const handleShowLogin = useCallback(() => setShowLogin(true), []);
+    const handleShowSignUp = useCallback(() => setShowLogin(false), []);
 
     useEffect(() => {
         void (async () => {
@@ -116,13 +120,21 @@ const Page: React.FC = () => {
         <TappableContainer onMaybeChangeHost={refreshHost}>
             {loading ? (
                 <ActivityIndicator />
-            ) : featureFlags.enableNewPhotosAuthFlow && !showLogin ? (
+            ) : featureFlags.enableNewPhotosAuthFlow ? (
                 <PhotosAuthShell>
-                    <SignUpContents
-                        {...{ router, host }}
-                        onLogin={() => setShowLogin(true)}
-                        presentation={SignUpForm}
-                    />
+                    {showLogin ? (
+                        <LoginContents
+                            {...{ host }}
+                            onSignUp={handleShowSignUp}
+                            presentation={LoginForm}
+                        />
+                    ) : (
+                        <SignUpContents
+                            {...{ router, host }}
+                            onLogin={handleShowLogin}
+                            presentation={SignUpForm}
+                        />
+                    )}
                 </PhotosAuthShell>
             ) : (
                 <>
@@ -159,12 +171,12 @@ const Page: React.FC = () => {
                             {showLogin ? (
                                 <LoginContents
                                     {...{ host }}
-                                    onSignUp={() => setShowLogin(false)}
+                                    onSignUp={handleShowSignUp}
                                 />
                             ) : (
                                 <SignUpContents
                                     {...{ router, host }}
-                                    onLogin={() => setShowLogin(true)}
+                                    onLogin={handleShowLogin}
                                 />
                             )}
                         </Stack>
