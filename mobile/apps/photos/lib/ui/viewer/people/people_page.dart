@@ -129,10 +129,7 @@ class _PeoplePageState extends State<PeoplePage> {
       };
       _timelineNotifier!.addListener(_timelineListener!);
       unawaited(
-        MemoryLaneService.instance.ensureTimelineReachability(
-          _person.remoteID,
-          trigger: "people_page_visit",
-        ),
+        MemoryLaneService.instance.ensureTimelineReachability(_person.remoteID),
       );
     }
   }
@@ -162,7 +159,7 @@ class _PeoplePageState extends State<PeoplePage> {
   }
 
   void _maybePrewarmMemoryLane() {
-    if (_memoryLanePrewarmStarted || !_memoryLaneEnabled) {
+    if (_memoryLanePrewarmStarted) {
       return;
     }
     final bool memoryLaneReady = MemoryLaneService.instance
@@ -202,7 +199,6 @@ class _PeoplePageState extends State<PeoplePage> {
   }
 
   Future<void> _openMemoryLanePage() async {
-    if (!_memoryLaneEnabled) return;
     _timelineLogger.info("banner_tap person=${_person.remoteID}");
     await routeToPage(context, MemoryLanePage(person: _person));
     if (!mounted) {
@@ -389,11 +385,11 @@ class _GalleryState extends State<_Gallery> {
         children: [
           MemoryLaneBannerSection(
             showBanner: widget.memoryLaneEnabled && widget.showTimelineBanner,
-            person: widget.personEntity,
+            personId: widget.personEntity.remoteID,
             onTap: widget.memoryLaneEnabled ? widget.onTimelineTap : null,
           ),
           if (widget.memoryLaneEnabled)
-            MemoryLaneDebugPanel(person: widget.personEntity),
+            MemoryLaneDebugPanel(personId: widget.personEntity.remoteID),
           !userDismissedPersonGallerySuggestion
               ? Dismissible(
                   key: const Key("personGallerySuggestion"),

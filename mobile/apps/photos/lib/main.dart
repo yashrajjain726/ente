@@ -200,11 +200,10 @@ Future<void> _warmPickerFilesDb() async {
 
 Future<void> _warmForegroundDeferredServices() async {
   try {
-    await MemoryLaneService.instance.init();
-    if (MemoryLaneService.instance.isFeatureEnabled) {
-      MemoryLaneService.instance
-          .queueFullRecompute(trigger: "startup")
-          .ignore();
+    final memoryLaneService = MemoryLaneService.instance;
+    if (memoryLaneService.isFeatureEnabled) {
+      await memoryLaneService.init();
+      memoryLaneService.queueFullRecompute().ignore();
     } else {
       _logger.info("Memory Lane disabled");
     }

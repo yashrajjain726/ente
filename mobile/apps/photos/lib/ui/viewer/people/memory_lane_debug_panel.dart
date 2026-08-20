@@ -5,15 +5,14 @@ import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/memory_lane_changed_event.dart";
 import "package:photos/models/memory_lane/memory_lane_models.dart";
-import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/memory_lane/memory_lane_cache_service.dart";
 import "package:photos/services/memory_lane/memory_lane_service.dart";
 import "package:photos/theme/ente_theme.dart";
 
 class MemoryLaneDebugPanel extends StatefulWidget {
-  final PersonEntity person;
+  final String personId;
 
-  const MemoryLaneDebugPanel({required this.person, super.key});
+  const MemoryLaneDebugPanel({required this.personId, super.key});
 
   @override
   State<MemoryLaneDebugPanel> createState() => _MemoryLaneDebugPanelState();
@@ -46,7 +45,7 @@ class _MemoryLaneDebugPanelState extends State<MemoryLaneDebugPanel> {
   }
 
   void _handleTimelineChanged(MemoryLaneChangedEvent event) {
-    if (event.personId != widget.person.remoteID) return;
+    if (event.personId != widget.personId) return;
     _reloadTimeline();
   }
 
@@ -58,7 +57,7 @@ class _MemoryLaneDebugPanelState extends State<MemoryLaneDebugPanel> {
     });
     try {
       final timeline = await MemoryLaneService.instance.getTimeline(
-        widget.person.remoteID,
+        widget.personId,
       );
       if (!mounted) return;
       setState(() {
@@ -80,9 +79,8 @@ class _MemoryLaneDebugPanelState extends State<MemoryLaneDebugPanel> {
 
   Future<void> _forceRecompute() async {
     MemoryLaneService.instance.schedulePersonRecompute(
-      widget.person.remoteID,
+      widget.personId,
       force: true,
-      trigger: "debug_panel",
     );
     if (!mounted) return;
     setState(() {
@@ -97,9 +95,7 @@ class _MemoryLaneDebugPanelState extends State<MemoryLaneDebugPanel> {
       _error = null;
     });
     try {
-      await MemoryLaneCacheService.instance.removeTimeline(
-        widget.person.remoteID,
-      );
+      await MemoryLaneCacheService.instance.removeTimeline(widget.personId);
       await _reloadTimeline();
       if (!mounted) return;
       setState(() {
@@ -127,7 +123,7 @@ class _MemoryLaneDebugPanelState extends State<MemoryLaneDebugPanel> {
     final textTheme = getEnteTextTheme(context);
     final timeline = _timeline;
     final bool inReadySet = MemoryLaneService.instance.hasReadyTimelineSync(
-      widget.person.remoteID,
+      widget.personId,
     );
     final DateTime? updatedAt = timeline == null
         ? null

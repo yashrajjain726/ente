@@ -49,6 +49,23 @@ const LinearGradient _memoryLaneBackgroundGradient = LinearGradient(
   stops: [0.0, 0.3, 0.52, 0.74, 1.0],
 );
 
+@visibleForTesting
+int wholeYearsBetween(DateTime start, DateTime end) {
+  final startDate = DateTime(start.year, start.month, start.day);
+  final endDate = DateTime(end.year, end.month, end.day);
+  if (endDate.isBefore(startDate)) return 0;
+
+  int years = endDate.year - startDate.year;
+  final lastDay = DateTime(endDate.year, startDate.month + 1, 0).day;
+  final anniversary = DateTime(
+    endDate.year,
+    startDate.month,
+    startDate.day.clamp(1, lastDay),
+  );
+  if (endDate.isBefore(anniversary)) years--;
+  return years;
+}
+
 class _MemoryLanePageState extends State<MemoryLanePage>
     with TickerProviderStateMixin {
   static const _frameInterval = Duration(milliseconds: 800);
@@ -427,21 +444,12 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       final birthDateString = widget.person.data.birthDate!;
       final birthDate = DateTime.tryParse(birthDateString);
       if (birthDate == null) {
-        captionValue = MemoryLaneService.completedYearsBetween(
-          creationDate,
-          DateTime.now(),
-        );
+        captionValue = wholeYearsBetween(creationDate, DateTime.now());
       } else {
-        captionValue = MemoryLaneService.completedYearsBetween(
-          birthDate,
-          creationDate,
-        );
+        captionValue = wholeYearsBetween(birthDate, creationDate);
       }
     } else {
-      captionValue = MemoryLaneService.completedYearsBetween(
-        creationDate,
-        DateTime.now(),
-      );
+      captionValue = wholeYearsBetween(creationDate, DateTime.now());
     }
     final timelineFrame = _TimelineFrame(
       entry: entry,
