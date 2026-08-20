@@ -44,8 +44,12 @@ func shouldSkipBodyLog(method string, path string) bool {
 	isReadOnly := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
 	if !isReadOnly {
 		switch path {
-		case "/users/change-email",
+		case "/users/attributes",
+			"/users/change-email",
 			"/users/srp/setup",
+			"/users/srp/update",
+			"/users/srp/verify-session",
+			"/users/two-factor/enable",
 			"/users/two-factor/verify",
 			"/users/two-factor/remove",
 			"/users/two-factor/passkeys/begin",
