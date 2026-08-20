@@ -146,9 +146,11 @@ func (c *ObjectCleanupController) removeUnreportedObject(tx *sql.Tx, t ente.Temp
 
 	if t.IsMultipart {
 		err = c.abortMultipartUpload(t.ObjectKey, t.UploadID, dc)
-	} else {
-		err = c.DeleteObjectFromDataCenter(t.ObjectKey, dc)
+		if err != nil {
+			return skip(err)
+		}
 	}
+	err = c.DeleteObjectFromDataCenter(t.ObjectKey, dc)
 	if err != nil {
 		return skip(err)
 	}
