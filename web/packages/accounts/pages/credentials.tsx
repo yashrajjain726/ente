@@ -3,6 +3,7 @@ import {
     AccountsPageFooterWithHost,
     PasswordHeader,
     VerifyingPasskey,
+    type VerifyingPasskeyPresentationProps,
 } from "ente-accounts/components/LoginComponents";
 import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
@@ -61,9 +62,13 @@ import log from "ente-base/log";
 import { saveAuthToken, savedAuthToken } from "ente-base/token";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentType } from "react";
 
-const Page: React.FC = () => {
+export interface CredentialsPageProps {
+    passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
+}
+
+const Page: React.FC<CredentialsPageProps> = ({ passkeyPresentation }) => {
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState<string>("");
@@ -294,6 +299,12 @@ const Page: React.FC = () => {
             [postVerification, userEmail, sessionValidityCheck],
         );
 
+    const handlePasskeyRetry = useCallback(() => {
+        if (passkeyVerificationData) {
+            openPasskeyVerificationURL(passkeyVerificationData);
+        }
+    }, [passkeyVerificationData]);
+
     if (!userEmail) {
         return <LoadingIndicator />;
     }
@@ -315,9 +326,8 @@ const Page: React.FC = () => {
             <VerifyingPasskey
                 email={userEmail}
                 passkeySessionID={passkeyVerificationData.passkeySessionID}
-                onRetry={() =>
-                    openPasskeyVerificationURL(passkeyVerificationData)
-                }
+                onRetry={handlePasskeyRetry}
+                presentation={passkeyPresentation}
                 {...{ logout, showMiniDialog }}
             />
         );
