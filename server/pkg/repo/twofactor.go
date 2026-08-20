@@ -55,6 +55,14 @@ func (repo *TwoFactorRepository) GetUserIDWithTwoFactorSession(sessionID string)
 	return id, nil
 }
 
+func (repo *TwoFactorRepository) ConsumeTwoFactorSession(sessionID string) error {
+	var userID int64
+	err := repo.DB.QueryRow(`DELETE FROM two_factor_sessions
+		WHERE session_id = $1 AND expiration_time > $2
+		RETURNING user_id`, sessionID, time.Microseconds()).Scan(&userID)
+	return stacktrace.Propagate(err, "Failed to consume two-factor session")
+}
+
 func (repo *TwoFactorRepository) GetRecoveryKeyEncryptedTwoFactorSecret(userID int64) (ente.TwoFactorRecoveryResponse, error) {
 	var response ente.TwoFactorRecoveryResponse
 	row := repo.DB.QueryRow(`SELECT recovery_encrypted_two_factor_secret, recovery_two_factor_secret_decryption_nonce FROM two_factor WHERE user_id = $1`, userID)
