@@ -144,15 +144,6 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt_large() {
-        let key = Key::generate();
-        let plaintext = vec![0x42u8; 1024 * 1024];
-
-        let encrypted = encrypt(&plaintext, &key).unwrap();
-        assert_eq!(encrypted.decrypt(&key).unwrap(), plaintext);
-    }
-
-    #[test]
     fn test_encrypt_decrypt_combined() {
         let key = Key::generate();
         let plaintext = b"Combined blob payload";

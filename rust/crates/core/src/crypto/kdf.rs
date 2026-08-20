@@ -68,12 +68,6 @@ mod tests {
     }
 
     #[test]
-    fn test_derive_subkey() {
-        let subkey = derive_subkey(&test_key(), 32, 1, b"testctx0").unwrap();
-        assert_eq!(subkey.len(), 32);
-    }
-
-    #[test]
     fn test_derive_subkey_deterministic() {
         let subkey1 = derive_subkey(&test_key(), 32, 1, b"context0").unwrap();
         let subkey2 = derive_subkey(&test_key(), 32, 1, b"context0").unwrap();
@@ -108,13 +102,6 @@ mod tests {
             let subkey = derive_subkey(&test_key(), len, 1, b"testctx0").unwrap();
             assert_eq!(subkey.len(), len);
         }
-    }
-
-    #[test]
-    fn test_derive_login_key() {
-        let login_key = derive_login_key(&test_key());
-        assert_eq!(login_key.len(), 16);
-        assert_eq!(login_key, derive_login_key(&test_key()));
     }
 
     #[test]

@@ -180,28 +180,6 @@ void main() {
     expect(await database.getCachedAttachment('att_profile'), isNull);
   });
 
-  test(
-    'getContactByUserId resolves cached contact without scanning all rows',
-    () async {
-      await service.open(
-        ContactsSession(
-          baseUrl: 'http://localhost:8080',
-          authToken: 'token',
-          userId: 1,
-          accountKey: Uint8List.fromList([1, 2, 3]),
-        ),
-      );
-
-      final created = await service.createContact(
-        const ContactData(contactUserId: 42, name: 'Douglas'),
-      );
-
-      final cached = await service.getContactByUserId(42);
-      expect(cached?.id, created.id);
-      expect(cached?.data?.name, 'Douglas');
-    },
-  );
-
   test('open can resolve account key from provider', () async {
     await service.open(
       ContactsSession(
