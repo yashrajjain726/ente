@@ -21,7 +21,7 @@ abstract interface class MemoryMusicPlayer {
 }
 
 class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
-  static const _fadeInDuration = Duration(milliseconds: 650);
+  static const _fadeInDuration = Duration(milliseconds: 900);
   static const _fadeOutDuration = Duration(milliseconds: 250);
   static const _fadeSteps = 14;
 
