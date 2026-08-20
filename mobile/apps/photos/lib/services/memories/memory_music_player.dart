@@ -15,6 +15,8 @@ abstract interface class MemoryMusicPlayer {
 
   Future<void> pause();
 
+  Future<void> pauseImmediately();
+
   Future<void> stop();
 
   Future<void> dispose();
@@ -79,6 +81,12 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
   }
 
   @override
+  Future<void> pauseImmediately() {
+    _fadeGeneration++;
+    return _player.pause();
+  }
+
+  @override
   Future<void> stop() {
     final generation = ++_fadeGeneration;
     return _enqueueFade(generation, _player.stop);
@@ -86,7 +94,7 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
 
   @override
   Future<void> dispose() async {
-    await pause();
+    await pauseImmediately();
     final generation = ++_fadeGeneration;
     await _enqueueFade(generation, _player.dispose);
   }

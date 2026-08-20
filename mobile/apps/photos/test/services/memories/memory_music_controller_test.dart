@@ -133,6 +133,7 @@ void main() {
 
     await controller.setAppActive(false);
     expect(player.playing, isFalse);
+    expect(player.pausedImmediately, isTrue);
 
     await controller.setViewerActionPaused(true);
     await controller.setAppActive(true);
@@ -157,6 +158,7 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   final List<String> loadedAssets = <String>[];
   bool looping = false;
   bool playing = false;
+  bool pausedImmediately = false;
   bool failNextLoad = false;
   int loadAttempts = 0;
   int playAttempts = 0;
@@ -191,6 +193,12 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
 
   @override
   Future<void> pause() async {
+    playing = false;
+  }
+
+  @override
+  Future<void> pauseImmediately() async {
+    pausedImmediately = true;
     playing = false;
   }
 

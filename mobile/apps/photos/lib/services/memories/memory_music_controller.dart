@@ -109,7 +109,7 @@ class MemoryMusicController extends ChangeNotifier {
 
   Future<void> setAppActive(bool isActive) async {
     if (_setPauseReason(_MemoryMusicPauseReason.appBackground, !isActive)) {
-      await _synchronizePlayback();
+      await _synchronizePlayback(pauseImmediately: !isActive);
     }
   }
 
@@ -125,7 +125,7 @@ class MemoryMusicController extends ChangeNotifier {
         : _pauseReasons.remove(reason);
   }
 
-  Future<void> _synchronizePlayback() async {
+  Future<void> _synchronizePlayback({bool pauseImmediately = false}) async {
     if (_isDisposed) return;
     final shouldPlay =
         _status == _MemoryMusicPlaybackStatus.ready &&
@@ -134,6 +134,8 @@ class MemoryMusicController extends ChangeNotifier {
     try {
       if (shouldPlay) {
         await _player.play();
+      } else if (pauseImmediately) {
+        await _player.pauseImmediately();
       } else {
         await _player.pause();
       }
