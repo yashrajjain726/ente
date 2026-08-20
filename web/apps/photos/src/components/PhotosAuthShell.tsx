@@ -185,8 +185,6 @@ const ContentSheet = styled("section")(({ theme }) => ({
     position: "relative",
     zIndex: 1,
     overflowY: "auto",
-    scrollbarWidth: "none",
-    "&::-webkit-scrollbar": { display: "none" },
     boxSizing: "border-box",
     borderRadius: "24px 24px 0 0",
     backgroundColor: "#fff",

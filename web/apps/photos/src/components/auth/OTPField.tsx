@@ -111,15 +111,12 @@ export function OTPField({
         } else if (event.code === "ArrowRight") {
             event.preventDefault();
             focusInput(index + 1);
+        } else if (event.code === "Spacebar" || event.code === "Space") {
+            event.preventDefault();
         } else if (event.key === otp[index]) {
             event.preventDefault();
             focusInput(index + 1);
-        } else if (
-            event.code === "Spacebar" ||
-            event.code === "Space" ||
-            event.code === "ArrowUp" ||
-            event.code === "ArrowDown"
-        ) {
+        } else if (event.code === "ArrowUp" || event.code === "ArrowDown") {
             event.preventDefault();
         }
     }

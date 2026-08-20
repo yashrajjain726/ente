@@ -45,8 +45,12 @@ export function VerifyEmailForm({
     });
 
     function handleCodeChange(code: string) {
+        const shouldAutoSubmit =
+            !completeCodePattern.test(formik.values.code) &&
+            completeCodePattern.test(code);
+
         void formik.setFieldValue("code", code).then(() => {
-            if (completeCodePattern.test(code) && !formik.isSubmitting) {
+            if (shouldAutoSubmit && !formik.isSubmitting) {
                 void formik.submitForm();
             }
         });

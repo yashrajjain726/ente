@@ -15,6 +15,7 @@ export interface ButtonProps extends Omit<
     variant?: ButtonVariant;
     fullWidth?: boolean;
     loading?: boolean;
+    loadingMessage?: React.ReactNode;
     children: React.ReactNode;
 }
 
@@ -22,6 +23,7 @@ export function Button({
     variant = "primary",
     fullWidth = false,
     loading = false,
+    loadingMessage,
     disabled,
     type = "button",
     children,
@@ -37,8 +39,17 @@ export function Button({
             $loading={loading}
             {...buttonProps}
         >
-            <ButtonLabel $loading={loading}>{children}</ButtonLabel>
-            {loading && <CircularProgress size={20} color="inherit" />}
+            {loading && loadingMessage ? (
+                <LoadingContent>
+                    <CircularProgress size={20} color="inherit" />
+                    <span>{loadingMessage}</span>
+                </LoadingContent>
+            ) : (
+                <>
+                    <ButtonLabel $loading={loading}>{children}</ButtonLabel>
+                    {loading && <CircularProgress size={20} color="inherit" />}
+                </>
+            )}
         </ButtonRoot>
     );
 }
@@ -99,3 +110,13 @@ const ButtonLabel = styled(
     "span",
     authTransientProps,
 )<{ $loading: boolean }>(({ $loading }) => ({ opacity: $loading ? 0 : 1 }));
+
+const LoadingContent = styled("span")({
+    minWidth: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    whiteSpace: "nowrap",
+    "& > .MuiCircularProgress-root": { flexShrink: 0 },
+});

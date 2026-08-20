@@ -155,15 +155,11 @@ export function SignUpForm({
                         fullWidth
                         type="submit"
                         loading={isSubmitting}
+                        loadingMessage={t("key_generation_in_progress")}
                         disabled={isSubmitDisabled}
                     >
                         {t("create_account")}
                     </Button>
-                    {isSubmitting ? (
-                        <CenteredMessage>
-                            <Message>{t("key_generation_in_progress")}</Message>
-                        </CenteredMessage>
-                    ) : null}
                     <AccountPrompt>
                         <span>{pt("Already have an account?")}</span>
                         <TextLink regular onClick={onLogin}>
@@ -206,11 +202,6 @@ const TermsLink = styled("a")({
         outline: "2px solid var(--photos-auth-primary)",
         outlineOffset: "2px",
     },
-});
-
-const CenteredMessage = styled("div")({
-    display: "flex",
-    justifyContent: "center",
 });
 
 const AccountPrompt = styled("div")({
