@@ -14,6 +14,7 @@ members = [
     "bindings/wasm/cast",
     "bindings/wasm/core",
     "bindings/wasm/ensu",
+    "bindings/wasm/legacy",
     "bindings/wasm/log",
     "bindings/wasm/paste",
     "bindings/wasm/space",

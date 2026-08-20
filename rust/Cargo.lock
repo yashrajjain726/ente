@@ -2587,6 +2587,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-legacy-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-contacts",
+ "ente-core",
+ "ente-wasm-log",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "ente-locker-frb"
 version = "0.0.0"
 dependencies = [
