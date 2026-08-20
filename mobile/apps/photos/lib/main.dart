@@ -20,7 +20,6 @@ import 'package:flutter/material.dart';
 import "package:flutter/rendering.dart";
 import "package:flutter/services.dart";
 import "package:flutter_displaymode/flutter_displaymode.dart";
-import "package:in_app_purchase_storekit/in_app_purchase_storekit.dart";
 import "package:intl/date_symbol_data_local.dart";
 import 'package:logging/logging.dart';
 import "package:media_extension/media_extension_action_types.dart";
@@ -40,6 +39,7 @@ import "package:photos/locale.dart";
 import 'package:photos/module/upload/service/file_uploader.dart';
 import 'package:photos/module/upload/service/local_file_update_service.dart';
 import "package:photos/service_locator.dart";
+import "package:photos/services/account/purchase_update_listener.dart";
 import "package:photos/services/account/user_service.dart";
 import 'package:photos/services/app_lifecycle_service.dart';
 import 'package:photos/services/collections_service.dart';
@@ -94,10 +94,7 @@ enum ForegroundStartupMode { normal, picker }
 void main() async {
   debugRepaintRainbowEnabled = false;
   WidgetsFlutterBinding.ensureInitialized();
-  if (Platform.isIOS) {
-    // ignore: deprecated_member_use
-    await InAppPurchaseStoreKitPlatform.enableStoreKit1();
-  }
+  await configureStoreKit();
   ente_ui.AppThemeConfig.initialize(ente_ui.EnteApp.photos);
   await initIsIPad();
   if (isIPad) {
