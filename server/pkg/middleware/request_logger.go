@@ -31,11 +31,12 @@ var latency = promauto.NewHistogramVec(prometheus.HistogramOpts{
 }, []string{"code", "method", "host", "url"})
 
 var queryParamDenylist = map[string]struct{}{
-	"accesstoken":    {},
-	"accesstokenjwt": {},
-	"casttoken":      {},
-	"sessionid":      {},
-	"token":          {},
+	"accesstoken":       {},
+	"accesstokenjwt":    {},
+	"casttoken":         {},
+	"ceremonysessionid": {},
+	"sessionid":         {},
+	"token":             {},
 }
 
 // Skip read-only requests and writes with large or sensitive bodies.
