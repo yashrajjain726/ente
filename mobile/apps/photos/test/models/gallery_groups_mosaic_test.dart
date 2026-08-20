@@ -5,6 +5,7 @@ import "package:photos/core/configuration.dart";
 import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
+import "package:photos/models/gallery/fixed_extent_section_layout.dart";
 import "package:photos/models/gallery/gallery_groups.dart";
 import "package:photos/models/gallery/mosaic_layout.dart";
 import "package:photos/models/metadata/file_magic.dart";
@@ -192,6 +193,29 @@ void main() {
     expect(groups.getGeometryOfFile(replacement), originalGeometry);
     expect(groups.getOffsetOfFile(replacement), originalGeometry?.rowOffset);
   });
+
+  test("a layout override keeps an embedded gallery on the fixed grid", () {
+    final files = List<EnteFile>.generate(
+      12,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: 400,
+        height: 100,
+      ),
+      growable: false,
+    );
+
+    final groups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+      layoutTypeOverride: GalleryLayoutType.grid,
+    );
+
+    expect(groups.layoutType, GalleryLayoutType.grid);
+    expect(groups.groupLayouts, everyElement(isA<FixedExtentSectionLayout>()));
+  });
 }
 
 GalleryGroups _galleryGroups({
@@ -199,6 +223,7 @@ GalleryGroups _galleryGroups({
   required GroupType groupType,
   required double groupHeaderExtent,
   bool sortOrderAsc = false,
+  GalleryLayoutType? layoutTypeOverride,
 }) {
   return GalleryGroups(
     allFiles: files,
@@ -209,6 +234,7 @@ GalleryGroups _galleryGroups({
     tagPrefix: "test_",
     groupHeaderExtent: groupHeaderExtent,
     showSelectAll: false,
+    layoutTypeOverride: layoutTypeOverride,
   );
 }
 

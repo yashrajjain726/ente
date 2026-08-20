@@ -22,6 +22,7 @@ import "package:photos/models/gallery/gallery_groups.dart";
 import "package:photos/models/gallery_type.dart";
 import 'package:photos/models/selected_files.dart';
 import "package:photos/service_locator.dart" show localSettings;
+import "package:photos/settings/local_settings.dart" show GalleryLayoutType;
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/component/gallery_file_widget.dart";
 import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dart";
@@ -78,6 +79,7 @@ class Gallery extends StatefulWidget {
   final Duration priorityReloadDebounceTime;
   final GalleryType? galleryType;
   final bool showGallerySettingsCTA;
+  final GalleryLayoutType? layoutTypeOverride;
 
   // Return null to force a full reload.
   final NewLocalFilesResolver? newLocalFilesResolver;
@@ -128,6 +130,7 @@ class Gallery extends StatefulWidget {
     this.galleryType,
     this.disableVerticalPaddingForScrollbar = false,
     this.showGallerySettingsCTA = false,
+    this.layoutTypeOverride,
     this.fileToJumpTo,
     this.newLocalFilesResolver,
     super.key,
@@ -391,6 +394,7 @@ class GalleryState extends State<Gallery> {
       showSelectAll: widget.showSelectAll,
       limitSelectionToOne: widget.limitSelectionToOne,
       showGallerySettingsCTA: widget.showGallerySettingsCTA,
+      layoutTypeOverride: widget.layoutTypeOverride,
     );
     galleryGroups = groups;
 

@@ -29,6 +29,7 @@ class GalleryGroups {
   final bool showSelectAll;
   final _logger = Logger("GalleryGroups");
   final bool showGallerySettingsCTA;
+  final GalleryLayoutType? layoutTypeOverride;
 
   final bool sortOrderAsc;
   final double widthAvailable;
@@ -44,6 +45,7 @@ class GalleryGroups {
     required this.showSelectAll,
     this.limitSelectionToOne = false,
     this.showGallerySettingsCTA = false,
+    this.layoutTypeOverride,
   }) {
     init();
     if (!groupType.showGroupHeader()) {
@@ -258,7 +260,7 @@ class GalleryGroups {
 
   void init() {
     crossAxisCount = localSettings.getPhotoGridSize();
-    layoutType = localSettings.getGalleryLayoutType();
+    layoutType = layoutTypeOverride ?? localSettings.getGalleryLayoutType();
     _buildGroups();
 
     _groupLayouts = switch (layoutType) {
