@@ -142,6 +142,9 @@ func (c *UserController) VerifyTwoFactor(context *gin.Context, sessionID string,
 		go c.DiscordController.NotifyPotentialAbuse(msg)
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(ente.ErrIncorrectTOTP, "OTP code has already been used")
 	}
+	if err = c.TwoFactorRepo.ConsumeTwoFactorSession(sessionID); err != nil {
+		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
+	}
 
 	response, err := c.GetKeyAttributeAndToken(context, userID)
 	if err != nil {
@@ -184,6 +187,9 @@ func (c *UserController) RemoveTOTPTwoFactor(context *gin.Context, sessionID str
 	}
 	if !exists {
 		return nil, stacktrace.Propagate(ente.ErrPermissionDenied, "")
+	}
+	if err = c.TwoFactorRepo.ConsumeTwoFactorSession(sessionID); err != nil {
+		return nil, stacktrace.Propagate(err, "")
 	}
 	err = c.TwoFactorRepo.UpdateTwoFactorStatus(userID, false)
 	if err != nil {
