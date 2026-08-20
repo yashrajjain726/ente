@@ -119,18 +119,16 @@ class _PeoplePageState extends State<PeoplePage> {
     _searchFilterDataProvider = SearchFilterDataProvider(
       initialGalleryFilter: initialGalleryFilter,
     );
-    if (_memoryLaneEnabled) {
-      _timelineNotifier = MemoryLaneService.instance.readyPersonIds;
-      _timelineListener = () {
-        if (!mounted) return;
-        setState(() {});
-        _maybePrewarmMemoryLane();
-      };
-      _timelineNotifier!.addListener(_timelineListener!);
-      unawaited(
-        MemoryLaneService.instance.ensureTimelineReachability(_person.remoteID),
-      );
-    }
+    _timelineNotifier = MemoryLaneService.instance.readyPersonIds;
+    _timelineListener = () {
+      if (!mounted) return;
+      setState(() {});
+      _maybePrewarmMemoryLane();
+    };
+    _timelineNotifier!.addListener(_timelineListener!);
+    unawaited(
+      MemoryLaneService.instance.ensureTimelineReachability(_person.remoteID),
+    );
   }
 
   Future<List<EnteFile>> _loadPersonFiles() async {
@@ -158,7 +156,7 @@ class _PeoplePageState extends State<PeoplePage> {
   }
 
   void _maybePrewarmMemoryLane() {
-    if (_memoryLanePrewarmStarted) {
+    if (_memoryLanePrewarmStarted || !_memoryLaneEnabled) {
       return;
     }
     final bool memoryLaneReady = MemoryLaneService.instance
