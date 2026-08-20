@@ -1,3 +1,3 @@
-export const featureFlags: Record<"enableNewPhotosSignupFlow", boolean> = {
-    enableNewPhotosSignupFlow: true,
+export const featureFlags: Record<"enableNewPhotosAuthFlow", boolean> = {
+    enableNewPhotosAuthFlow: true,
 };

@@ -14,7 +14,7 @@ function SignUpPresentation(props: SignUpPresentationProps): React.JSX.Element {
 }
 
 function SignUpPage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosSignupFlow) {
+    if (!featureFlags.enableNewPhotosAuthFlow) {
         return <AccountsSignUpPage />;
     }
 

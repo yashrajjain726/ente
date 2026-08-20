@@ -17,7 +17,7 @@ function VerifyEmailPresentation(
 }
 
 function VerifyPage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosSignupFlow) {
+    if (!featureFlags.enableNewPhotosAuthFlow) {
         return <AccountsVerifyPage />;
     }
 
