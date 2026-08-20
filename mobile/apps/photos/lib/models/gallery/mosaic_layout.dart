@@ -92,7 +92,7 @@ class MosaicSectionLayout extends SectionLayout {
 }
 
 class MosaicLayoutCalculator {
-  static const double _minimumAspectRatio = 0.25;
+  static const double _minimumAspectRatio = 1 / 3;
   static const double _maximumAspectRatio = 4.0;
   static const double _maximumRowHeightFactor = 2.4;
   static const double _minimumTileExtentFactor = 0.62;

@@ -14,7 +14,7 @@ void main() {
 
     test("preserves normal ratios and clamps extreme dimensions", () {
       expect(MosaicLayoutCalculator.aspectRatioForDimensions(4, 3), 4 / 3);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(1, 100), 0.25);
+      expect(MosaicLayoutCalculator.aspectRatioForDimensions(1, 100), 1 / 3);
       expect(MosaicLayoutCalculator.aspectRatioForDimensions(100, 1), 4);
     });
 
@@ -98,7 +98,7 @@ void main() {
       expect(rows, hasLength(1));
       final row = rows.single;
       expect(row.height, targetRowHeight);
-      expect(row.itemWidths.single / row.height, closeTo(0.25, 1e-9));
+      expect(row.itemWidths.single / row.height, closeTo(1 / 3, 1e-9));
       expect(row.itemWidths.single, lessThan(availableWidth));
     });
 
