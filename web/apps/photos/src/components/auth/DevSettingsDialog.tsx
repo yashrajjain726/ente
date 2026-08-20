@@ -19,7 +19,6 @@ import {
 } from "./styles";
 import { TextField } from "./TextField";
 
-/** Photos styling for the shared developer-settings controller. */
 export function DevSettingsDialog({
     open,
     onDialogClose,

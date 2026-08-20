@@ -24,8 +24,6 @@ import { TextLink } from "./TextLink";
 export function RecoverAccountForm(
     props: RecoverAccountPresentationProps,
 ): React.JSX.Element {
-    // Present the no-recovery-key notice in the styled auth dialog instead of
-    // the shared MiniDialog the page supplies via onNoRecoveryKey.
     const [showNoRecoveryKey, setShowNoRecoveryKey] = useState(false);
 
     return (

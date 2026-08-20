@@ -14,11 +14,6 @@ interface AuthDialogProps extends React.PropsWithChildren {
     ariaLabelledby?: string;
 }
 
-/**
- * The dialog frame shared by the modals of the new Photos auth presentation:
- * a 456px centered card over a dimmed backdrop on desktop, and a bottom sheet
- * with a drag handle on mobile widths.
- */
 export const AuthDialog: React.FC<AuthDialogProps> = ({
     open,
     onClose,

@@ -75,10 +75,6 @@ export const authMiniTypography = {
     lineHeight: "16px",
 };
 
-/**
- * The column layout for an {@link AuthDialog}'s content. Apply to the direct
- * child that holds the dialog's sections (header, fields, buttons).
- */
 export const authDialogContentLayout = {
     display: "flex",
     flexDirection: "column",
