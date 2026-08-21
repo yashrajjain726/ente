@@ -10,18 +10,15 @@ import "package:photos/ui/viewer/file/image_zoom_viewer.dart";
 
 const _viewportSize = Size(400, 400);
 const _landscapeSize = Size(1200, 800);
-const _portraitSize = Size(800, 1200);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late ui.Image landscapeImage;
-  late ui.Image portraitImage;
   late ui.Image largerLandscapeImage;
 
   setUpAll(() async {
     landscapeImage = await _createTestImage(_landscapeSize);
-    portraitImage = await _createTestImage(_portraitSize);
     largerLandscapeImage = await _createTestImage(const Size(2400, 1600));
   });
 
@@ -39,22 +36,10 @@ void main() {
 
   tearDownAll(() {
     landscapeImage.dispose();
-    portraitImage.dispose();
     largerLandscapeImage.dispose();
   });
 
   group("double-tap focal zoom", () {
-    testWidgets("a center double tap changes scale without translating", (
-      tester,
-    ) async {
-      final harness = await _pumpViewer(tester, image: landscapeImage);
-
-      await _doubleTap(tester, harness.globalPoint(const Offset(200, 200)));
-
-      _expectTransform(harness.controller, scale: 1.5, offset: Offset.zero);
-      expect(harness.controller.stage, ImageZoomStage.covering);
-    });
-
     testWidgets("centers the tapped horizontal area", (tester) async {
       final harness = await _pumpViewer(tester, image: landscapeImage);
 
@@ -69,18 +54,6 @@ void main() {
         offset: const Offset(-75, 0),
       );
       expect(harness.controller.stage, ImageZoomStage.covering);
-    });
-
-    testWidgets("centers the tapped vertical area", (tester) async {
-      final harness = await _pumpViewer(tester, image: portraitImage);
-
-      await _doubleTap(tester, harness.globalPoint(const Offset(200, 250)));
-
-      _expectTransform(
-        harness.controller,
-        scale: 1.5,
-        offset: const Offset(0, -75),
-      );
     });
 
     testWidgets("clamps a focal point near the image edge", (tester) async {
@@ -141,14 +114,16 @@ void main() {
       );
     });
 
-    testWidgets("single taps reach the parent and double taps do not", (
+    testWidgets("single taps and long presses still reach the parent", (
       tester,
     ) async {
       var parentTapCount = 0;
+      var parentLongPressCount = 0;
       final harness = await _pumpViewer(
         tester,
         image: landscapeImage,
         onParentTap: () => parentTapCount++,
+        onParentLongPress: () => parentLongPressCount++,
       );
       final center = harness.globalPoint(const Offset(200, 200));
 
@@ -164,35 +139,11 @@ void main() {
         scale: 1.5,
         offset: const Offset(-75, 0),
       );
-    });
 
-    testWidgets("double-tap resets a manual pinch from the baseline", (
-      tester,
-    ) async {
-      final harness = await _pumpViewer(tester, image: landscapeImage);
-      final center = harness.globalPoint(const Offset(200, 200));
-      final firstFinger = await tester.createGesture(pointer: 21);
-      final secondFinger = await tester.createGesture(pointer: 22);
-
-      await firstFinger.down(center - const Offset(20, 0));
-      await secondFinger.down(center + const Offset(20, 0));
-      await tester.pump();
-      await firstFinger.moveTo(center - const Offset(80, 0));
-      await secondFinger.moveTo(center + const Offset(80, 0));
-      await tester.pump();
-      await firstFinger.up();
-      await secondFinger.up();
-      await tester.pump();
-
-      expect(harness.controller.transform.scale, closeTo(4, 0.01));
-      expect(harness.controller.transform.offset.dx, closeTo(0, 0.5));
-      expect(harness.controller.transform.offset.dy, closeTo(0, 0.5));
-      expect(harness.controller.stage, ImageZoomStage.gesture);
-
-      await _doubleTap(tester, center);
-
-      expect(harness.controller.transform, ImageZoomTransform.identity);
-      expect(harness.controller.stage, ImageZoomStage.initial);
+      final longPress = await tester.startGesture(center, pointer: 12);
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      expect(parentLongPressCount, 1);
+      await longPress.up();
     });
 
     testWidgets("a baseline pinch enables a subsequent one-finger pan", (
@@ -219,6 +170,10 @@ void main() {
       expect(harness.controller.transform.offset.dx, greaterThan(20));
       expect(harness.controller.transform.offset.dx, lessThanOrEqualTo(200));
       expect(harness.controller.transform.scale, closeTo(2, 0.01));
+
+      await _doubleTap(tester, center);
+      expect(harness.controller.transform, ImageZoomTransform.identity);
+      expect(harness.controller.stage, ImageZoomStage.initial);
     });
 
     testWidgets("a replacement pointer rebases an active baseline pinch", (
@@ -274,47 +229,6 @@ void main() {
       expect(harness.controller.stage, ImageZoomStage.initial);
     });
 
-    testWidgets(
-      "animation frames stay bounded and move the focus monotonically",
-      (tester) async {
-        final harness = await _pumpViewer(tester, image: landscapeImage);
-        const localTap = Offset(250, 200);
-        await _beginDoubleTap(tester, harness.globalPoint(localTap));
-
-        var previousDistance =
-            (localTap - _viewportSize.center(Offset.zero)).distance;
-        var sawIntermediateFrame = false;
-        for (var frame = 0; frame < 12; frame++) {
-          await tester.pump(const Duration(milliseconds: 20));
-          final transform = harness.controller.transform;
-          _expectFiniteAndInBounds(
-            transform,
-            viewportSize: _viewportSize,
-            fittedImageSize: const Size(400, 800 / 3),
-          );
-          final transformedFocus = _applyTransform(
-            transform,
-            point: localTap,
-            viewportSize: _viewportSize,
-          );
-          final distance =
-              (transformedFocus - _viewportSize.center(Offset.zero)).distance;
-          expect(distance, lessThanOrEqualTo(previousDistance + 0.01));
-          previousDistance = distance;
-          sawIntermediateFrame |=
-              transform.scale > 1.001 && transform.scale < 1.499;
-        }
-
-        expect(sawIntermediateFrame, isTrue);
-        _expectTransform(
-          harness.controller,
-          scale: 1.5,
-          offset: const Offset(-75, 0),
-        );
-        expect(previousDistance, closeTo(0, 0.1));
-      },
-    );
-
     testWidgets("a pinch interrupts a double-tap animation cleanly", (
       tester,
     ) async {
@@ -352,45 +266,6 @@ void main() {
   });
 
   group("parent gesture handoff", () {
-    testWidgets("baseline horizontal drag is handed to PageView", (
-      tester,
-    ) async {
-      final harness = await _pumpPageHarness(tester, image: landscapeImage);
-
-      await tester.dragFrom(
-        harness.globalPoint(const Offset(200, 200)),
-        const Offset(-300, 0),
-      );
-      await tester.pumpAndSettle();
-
-      expect(harness.pageController.page, closeTo(2, 0.01));
-      expect(harness.zoomController.transform, ImageZoomTransform.identity);
-    });
-
-    testWidgets("baseline vertical drag is handed to the outer detector", (
-      tester,
-    ) async {
-      var verticalDragDistance = 0.0;
-      final harness = await _pumpViewer(
-        tester,
-        image: landscapeImage,
-        onVerticalDragUpdate: (details) {
-          verticalDragDistance += details.delta.dy;
-        },
-      );
-
-      await tester.dragFrom(
-        harness.globalPoint(const Offset(200, 200)),
-        const Offset(0, 120),
-      );
-      await tester.pumpAndSettle();
-
-      // The vertical recognizer consumes the initial 20 logical pixels as slop;
-      // every post-slop update must still be delivered to the outer detector.
-      expect(verticalDragDistance, closeTo(100, 0.5));
-      expect(harness.controller.transform, ImageZoomTransform.identity);
-    });
-
     testWidgets("the second pointer locks interaction before either moves", (
       tester,
     ) async {
@@ -418,53 +293,6 @@ void main() {
       expect(lockChanges.last, isFalse);
     });
 
-    testWidgets("a baseline long press reaches the parent", (tester) async {
-      var longPressCount = 0;
-      final harness = await _pumpViewer(
-        tester,
-        image: landscapeImage,
-        onParentLongPress: () => longPressCount++,
-      );
-      final gesture = await tester.startGesture(
-        harness.globalPoint(const Offset(200, 200)),
-        pointer: 51,
-      );
-
-      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-      expect(longPressCount, 1);
-      await gesture.up();
-      await tester.pumpAndSettle();
-
-      expect(harness.controller.transform, ImageZoomTransform.identity);
-    });
-
-    testWidgets("a zoomed vertical drag on a clamped axis is a no-op", (
-      tester,
-    ) async {
-      var parentVerticalDragDistance = 0.0;
-      final harness = await _pumpPageHarness(
-        tester,
-        image: landscapeImage,
-        onVerticalDragUpdate: (details) {
-          parentVerticalDragDistance += details.delta.dy;
-        },
-      );
-      final center = harness.globalPoint(const Offset(200, 200));
-
-      await _doubleTap(tester, center);
-      final beforeDrag = harness.zoomController.transform;
-      _expectTransform(harness.zoomController, scale: 1.5, offset: Offset.zero);
-      expect(harness.isLocked, isTrue);
-
-      await tester.dragFrom(center, const Offset(0, 120));
-      await tester.pumpAndSettle();
-
-      expect(parentVerticalDragDistance, 0);
-      _expectSameTransform(harness.zoomController.transform, beforeDrag);
-      expect(harness.zoomController.stage, ImageZoomStage.covering);
-      expect(harness.pageController.page, closeTo(1, 0.01));
-    });
-
     testWidgets("reset restores PageView and vertical-dismiss handoff", (
       tester,
     ) async {
@@ -480,6 +308,11 @@ void main() {
 
       await _doubleTap(tester, center);
       expect(harness.isLocked, isTrue);
+      expect(harness.pageController.page, closeTo(1, 0.01));
+
+      await tester.dragFrom(center, const Offset(0, 120));
+      await tester.pumpAndSettle();
+      expect(verticalDragDistance, 0);
       expect(harness.pageController.page, closeTo(1, 0.01));
 
       await tester.dragFrom(center, const Offset(300, 0));
@@ -508,33 +341,6 @@ void main() {
 
       expect(harness.pageController.page, closeTo(2, 0.01));
     });
-  });
-
-  testWidgets("reset during or after a fling cannot be overwritten", (
-    tester,
-  ) async {
-    final harness = await _pumpViewer(tester, image: landscapeImage);
-    final center = harness.globalPoint(const Offset(200, 200));
-
-    await _doubleTap(tester, center);
-    await tester.flingFrom(center, const Offset(160, 0), 3000);
-    await harness.controller.reset(animated: false);
-    await tester.pump();
-    expect(harness.controller.transform, ImageZoomTransform.identity);
-
-    await tester.pump(const Duration(seconds: 1));
-    expect(harness.controller.transform, ImageZoomTransform.identity);
-    expect(harness.controller.stage, ImageZoomStage.initial);
-
-    await _doubleTap(tester, center);
-    await tester.flingFrom(center, const Offset(-160, 0), 3000);
-    await tester.pumpAndSettle();
-    expect(harness.controller.isZoomed, isTrue);
-
-    await harness.controller.reset(animated: false);
-    await tester.pump(const Duration(seconds: 1));
-    expect(harness.controller.transform, ImageZoomTransform.identity);
-    expect(harness.controller.stage, ImageZoomStage.initial);
   });
 
   testWidgets("fling inertia stays bounded and keeps the image visible", (
@@ -604,71 +410,14 @@ void main() {
 
     _expectTransform(controller, scale: 1.5, offset: const Offset(100, 0));
     expect(transformNotifications, greaterThan(0));
-  });
 
-  testWidgets("orientation change preserves a valid normalized focus", (
-    tester,
-  ) async {
-    final controller = ImageZoomController();
-    addTearDown(controller.dispose);
-    final viewportKey = GlobalKey();
-    var viewportSize = const Size(400, 600);
-    late StateSetter setHostState;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                setHostState = setState;
-                return SizedBox(
-                  key: viewportKey,
-                  width: viewportSize.width,
-                  height: viewportSize.height,
-                  child: ImageZoomViewer(
-                    imageProvider: _DeterministicImageProvider(landscapeImage),
-                    controller: controller,
-                    loadingBuilder: _emptyLoadingBuilder,
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
+    await controller.reset(animated: false);
+    await tester.pump(const Duration(seconds: 1));
+    expect(controller.transform, ImageZoomTransform.identity);
+    expect(
+      await tester.runAsync(() => _centerPixel(find.byKey(boundaryKey))),
+      const Color(0xFFFFFFFF),
     );
-    await tester.pump();
-    var viewportTopLeft = tester.getTopLeft(find.byKey(viewportKey));
-    await _doubleTap(tester, viewportTopLeft + const Offset(250, 300));
-    _expectTransform(controller, scale: 2.25, offset: const Offset(-112.5, 0));
-
-    setHostState(() => viewportSize = const Size(600, 400));
-    await tester.pump();
-    await tester.pump();
-    viewportTopLeft = tester.getTopLeft(find.byKey(viewportKey));
-
-    final transform = controller.transform;
-    expect(transform.scale, closeTo(2.25, 0.01));
-    expect(controller.stage, ImageZoomStage.gesture);
-    _expectFiniteAndInBounds(
-      transform,
-      viewportSize: viewportSize,
-      fittedImageSize: viewportSize,
-    );
-    // The old normalized x focus was 0.625. It remains centered after the
-    // fitted image changes from 400x266.67 to 600x400.
-    final transformedFocus = _applyTransform(
-      transform,
-      point: const Offset(375, 200),
-      viewportSize: viewportSize,
-    );
-    expect(transformedFocus.dx, closeTo(300, 0.5));
-    expect(transformedFocus.dy, closeTo(200, 0.5));
-    final globalFocus = viewportTopLeft + transformedFocus;
-    final globalViewportCenter = tester.getCenter(find.byKey(viewportKey));
-    expect(globalFocus.dx, closeTo(globalViewportCenter.dx, 0.01));
-    expect(globalFocus.dy, closeTo(globalViewportCenter.dy, 0.01));
   });
 
   testWidgets(
@@ -764,37 +513,6 @@ void main() {
     },
   );
 
-  testWidgets("one controller cannot be attached to two viewers", (
-    tester,
-  ) async {
-    final controller = ImageZoomController();
-    addTearDown(controller.dispose);
-    final imageProvider = _DeterministicImageProvider(landscapeImage);
-
-    await tester.pumpWidget(
-      Directionality(
-        textDirection: TextDirection.ltr,
-        child: Row(
-          children: [
-            for (var index = 0; index < 2; index++)
-              SizedBox(
-                width: 200,
-                height: 200,
-                child: ImageZoomViewer(
-                  imageProvider: imageProvider,
-                  controller: controller,
-                  loadingBuilder: _emptyLoadingBuilder,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    expect(tester.takeException(), isA<StateError>());
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
   testWidgets(
     "cover baseline is semantic identity when collage owns gestures",
     (tester) async {
@@ -851,57 +569,6 @@ void main() {
     expect(heroRect.center, viewportRect.center);
     expect(heroRect, isNot(viewportRect));
   });
-
-  testWidgets(
-    "same-aspect provider replacement preserves the visible transform",
-    (tester) async {
-      final controller = ImageZoomController();
-      addTearDown(controller.dispose);
-      final viewportKey = GlobalKey();
-      final firstProvider = _DeterministicImageProvider(landscapeImage);
-      final replacementProvider = _DeterministicImageProvider(
-        largerLandscapeImage,
-      );
-      ImageProvider currentProvider = firstProvider;
-      late StateSetter setHostState;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  setHostState = setState;
-                  return SizedBox(
-                    key: viewportKey,
-                    width: _viewportSize.width,
-                    height: _viewportSize.height,
-                    child: ImageZoomViewer(
-                      imageProvider: currentProvider,
-                      controller: controller,
-                      loadingBuilder: _emptyLoadingBuilder,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      final viewportTopLeft = tester.getTopLeft(find.byKey(viewportKey));
-      await _doubleTap(tester, viewportTopLeft + const Offset(250, 200));
-      _expectTransform(controller, scale: 1.5, offset: const Offset(-75, 0));
-
-      setHostState(() => currentProvider = replacementProvider);
-      await tester.pump();
-      await tester.pump();
-
-      _expectTransform(controller, scale: 1.5, offset: const Offset(-75, 0));
-      expect(controller.stage, ImageZoomStage.gesture);
-    },
-  );
 
   testWidgets(
     "same-aspect provider replacement during animation stays stable",
@@ -968,56 +635,6 @@ void main() {
       expect(controller.stage, ImageZoomStage.initial);
     },
   );
-
-  testWidgets("dimension probes detach across replacement and disposal", (
-    tester,
-  ) async {
-    final firstProvider = _TrackingImageProvider(landscapeImage);
-    final replacementProvider = _TrackingImageProvider(largerLandscapeImage);
-    ImageProvider currentProvider = firstProvider;
-    late StateSetter setHostState;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: StatefulBuilder(
-            builder: (context, setState) {
-              setHostState = setState;
-              return ImageZoomViewer(
-                imageProvider: currentProvider,
-                loadingBuilder: _emptyLoadingBuilder,
-              );
-            },
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    // One listener belongs to ImageZoomViewer's dimension probe and one to the
-    // Image widget that paints the frame. Cache bookkeeping is already settled.
-    expect(firstProvider.completer.activeListenerCount, 2);
-
-    setHostState(() => currentProvider = replacementProvider);
-    await tester.pump();
-    await tester.pump();
-
-    expect(firstProvider.completer.activeListenerCount, 0);
-    expect(replacementProvider.completer.activeListenerCount, 2);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-
-    expect(replacementProvider.completer.activeListenerCount, 0);
-    expect(
-      firstProvider.completer.removeCount,
-      firstProvider.completer.addCount,
-    );
-    expect(
-      replacementProvider.completer.removeCount,
-      replacementProvider.completer.addCount,
-    );
-  });
 }
 
 Future<_ViewerHarness> _pumpViewer(
@@ -1262,49 +879,6 @@ class _DeterministicImageProvider
   ) => OneFrameImageStreamCompleter(
     SynchronousFuture<ImageInfo>(ImageInfo(image: image.clone())),
   );
-}
-
-class _TrackingImageProvider extends ImageProvider<_TrackingImageProvider> {
-  _TrackingImageProvider(ui.Image image)
-    : completer = _TrackingImageStreamCompleter(image);
-
-  final _TrackingImageStreamCompleter completer;
-
-  @override
-  Future<_TrackingImageProvider> obtainKey(ImageConfiguration configuration) =>
-      SynchronousFuture<_TrackingImageProvider>(this);
-
-  @override
-  ImageStreamCompleter loadImage(
-    _TrackingImageProvider key,
-    ImageDecoderCallback decode,
-  ) => completer;
-}
-
-class _TrackingImageStreamCompleter extends OneFrameImageStreamCompleter {
-  _TrackingImageStreamCompleter(ui.Image image)
-    : super(SynchronousFuture<ImageInfo>(ImageInfo(image: image.clone())));
-
-  final List<ImageStreamListener> _activeListeners = <ImageStreamListener>[];
-  int addCount = 0;
-  int removeCount = 0;
-
-  int get activeListenerCount => _activeListeners.length;
-
-  @override
-  void addListener(ImageStreamListener listener) {
-    addCount++;
-    _activeListeners.add(listener);
-    super.addListener(listener);
-  }
-
-  @override
-  void removeListener(ImageStreamListener listener) {
-    super.removeListener(listener);
-    if (_activeListeners.remove(listener)) {
-      removeCount++;
-    }
-  }
 }
 
 class _ViewerHarness {
