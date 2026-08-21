@@ -152,7 +152,7 @@ class MemoryLaneService {
       return;
     }
     final timeline = await _cacheService.getTimeline(personId);
-    if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
+    if (timeline == null || !timeline.isEligible || timeline.entries.isEmpty) {
       await _refreshReadyPersonIds();
       schedulePersonRecompute(personId);
       return;
@@ -183,7 +183,7 @@ class MemoryLaneService {
       (entry) => hiddenFileIds.contains(entry.fileId),
     );
     if (!containsHiddenEntry) {
-      if (timeline.isReady && !await _areTimelineFaceCropsCached(timeline)) {
+      if (timeline.isEligible && !await _areTimelineFaceCropsCached(timeline)) {
         _logger.info("Missing face crops for $personId");
         _queueTimelineCropReadiness(personId);
         await _refreshReadyPersonIds();
@@ -209,7 +209,7 @@ class MemoryLaneService {
   Future<bool> _areTimelineFaceCropsCached(
     MemoryLanePersonTimeline timeline,
   ) async {
-    if (!timeline.isReady || timeline.entries.isEmpty) {
+    if (!timeline.isEligible || timeline.entries.isEmpty) {
       return false;
     }
     return areFullFaceCropsCached(
@@ -248,7 +248,7 @@ class MemoryLaneService {
       return;
     }
     final timeline = await _cacheService.getTimeline(personId);
-    if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
+    if (timeline == null || !timeline.isEligible || timeline.entries.isEmpty) {
       await _refreshReadyPersonIds();
       return;
     }
@@ -532,7 +532,7 @@ class MemoryLaneService {
         logicVersion: _timelineLogicVersion,
       ),
     );
-    if (!timeline.isReady) {
+    if (!timeline.isEligible) {
       await _refreshReadyPersonIds();
       return;
     }
@@ -558,7 +558,7 @@ class MemoryLaneService {
       return (
         MemoryLanePersonTimeline(
           personId: personId,
-          status: MemoryLaneStatus.ineligible,
+          isEligible: false,
           updatedAtMicros: nowMicros,
           entries: const [],
         ),
@@ -628,7 +628,7 @@ class MemoryLaneService {
       return (
         MemoryLanePersonTimeline(
           personId: personId,
-          status: MemoryLaneStatus.ineligible,
+          isEligible: false,
           updatedAtMicros: nowMicros,
           entries: const [],
         ),
@@ -647,11 +647,11 @@ class MemoryLaneService {
       taskName: "faces_timeline_select",
     );
 
-    if (selectionResult["status"] != "ready") {
+    if (!(selectionResult["isEligible"] as bool)) {
       return (
         MemoryLanePersonTimeline(
           personId: personId,
-          status: MemoryLaneStatus.ineligible,
+          isEligible: false,
           updatedAtMicros: nowMicros,
           entries: const [],
         ),
@@ -675,7 +675,7 @@ class MemoryLaneService {
     return (
       MemoryLanePersonTimeline(
         personId: personId,
-        status: MemoryLaneStatus.ready,
+        isEligible: true,
         updatedAtMicros: nowMicros,
         entries: entries,
       ),
@@ -749,7 +749,9 @@ class MemoryLaneService {
     }
     try {
       final timeline = await _cacheService.getTimeline(personId);
-      if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
+      if (timeline == null ||
+          !timeline.isEligible ||
+          timeline.entries.isEmpty) {
         return;
       }
       final entries = timeline.entries.take(frameCount).toList();
@@ -794,7 +796,7 @@ class MemoryLaneService {
     final cache = await _cacheService.getCache();
     final current = <String>{};
     for (final timeline in cache.allTimelines) {
-      if (!timeline.isReady) {
+      if (!timeline.isEligible) {
         continue;
       }
       if (await _areTimelineFaceCropsCached(timeline)) {
@@ -860,7 +862,7 @@ Map<String, dynamic> _selectTimelineEntriesTask(Map<String, dynamic> param) {
   }
 
   if (faces.isEmpty) {
-    return {"status": "ineligible", "eligibleYearCount": 0};
+    return {"isEligible": false, "eligibleYearCount": 0};
   }
 
   final eligible = groupBy(faces, (face) => face.year).entries
@@ -868,7 +870,7 @@ Map<String, dynamic> _selectTimelineEntriesTask(Map<String, dynamic> param) {
       .sortedBy((a) => a.key);
 
   if (eligible.length < minYears) {
-    return {"status": "ineligible", "eligibleYearCount": eligible.length};
+    return {"isEligible": false, "eligibleYearCount": eligible.length};
   }
 
   final selected = eligible
@@ -879,7 +881,7 @@ Map<String, dynamic> _selectTimelineEntriesTask(Map<String, dynamic> param) {
 
   final years = eligible.map((entry) => entry.key).toList();
 
-  return {"status": "ready", "entries": selected, "years": years};
+  return {"isEligible": true, "entries": selected, "years": years};
 }
 
 List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
