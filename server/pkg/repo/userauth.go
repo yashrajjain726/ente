@@ -111,7 +111,7 @@ func (repo *UserAuthRepository) GetValidOTTs(emailHash string, app ente.App) ([]
 	return otts, nil
 }
 
-func (repo *UserAuthRepository) ReserveOTTVerificationAttempt(emailHash string, app ente.App, limit int) ([]string, bool, error) {
+func (repo *UserAuthRepository) ReserveOTTVerificationAttempt(emailHash string, app ente.App, submittedOTT string, limit int) ([]string, bool, error) {
 	tx, err := repo.DB.Begin()
 	if err != nil {
 		return nil, false, stacktrace.Propagate(err, "")
@@ -128,6 +128,7 @@ func (repo *UserAuthRepository) ReserveOTTVerificationAttempt(emailHash string, 
 
 	otts := make([]string, 0)
 	limited := false
+	matched := false
 	for rows.Next() {
 		var ott string
 		var wrongAttempt int
@@ -136,11 +137,12 @@ func (repo *UserAuthRepository) ReserveOTTVerificationAttempt(emailHash string, 
 		}
 		otts = append(otts, ott)
 		limited = limited || wrongAttempt >= limit
+		matched = matched || ott == submittedOTT
 	}
 	if err := rows.Err(); err != nil {
 		return nil, false, stacktrace.Propagate(err, "")
 	}
-	if limited || len(otts) == 0 {
+	if limited || len(otts) == 0 || matched {
 		return otts, limited, nil
 	}
 

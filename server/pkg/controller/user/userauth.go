@@ -267,7 +267,7 @@ func (c *UserController) verifyEmailOtt(context *gin.Context, email string, ott 
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	otts, limited, err := c.UserAuthRepo.ReserveOTTVerificationAttempt(emailHash, app, OTTWrongAttemptLimit)
+	otts, limited, err := c.UserAuthRepo.ReserveOTTVerificationAttempt(emailHash, app, ott, OTTWrongAttemptLimit)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
