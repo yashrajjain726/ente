@@ -1273,7 +1273,12 @@ class ClusterFeedbackService<T> {
     }
 
     if (firePeopleChangedEvent) {
-      Bus.instance.fire(PeopleChangedEvent());
+      Bus.instance.fire(
+        PeopleChangedEvent(
+          type: PeopleEventType.automaticallyMergedClustersIntoPerson,
+          person: await PersonService.instance.getPerson(p.remoteID),
+        ),
+      );
     }
 
     return true;

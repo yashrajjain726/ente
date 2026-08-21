@@ -292,10 +292,17 @@ class MemoryLaneService {
     if (!isFeatureEnabled) {
       return;
     }
-    if (event.type == PeopleEventType.syncDone) {
-      return;
+    final person = event.person;
+    if (person != null) {
+      final clusters = person.data.assigned.map((cluster) => cluster.id);
+      unawaited(_cleanupAssignedClusterTimelines(clusters));
     }
-    unawaited(_processPeopleChange(event));
+    if (event.type == PeopleEventType.addedClusterToPerson) {
+      unawaited(_cleanupAssignedClusterTimelines([event.source]));
+    }
+    if (event.type != PeopleEventType.syncDone) {
+      unawaited(_processPeopleChange(event));
+    }
   }
 
   Future<void> _processPeopleChange(PeopleChangedEvent event) async {
@@ -818,6 +825,28 @@ class MemoryLaneService {
       }
     }
     readyPersonIds.value = current;
+  }
+
+  Future<void> _cleanupAssignedClusterTimelines(
+    Iterable<String> clusters,
+  ) async {
+    try {
+      if (clusters.isEmpty) {
+        return;
+      }
+      final cache = await _cacheService.getCache();
+      for (final timeline in cache.allTimelines) {
+        if (!timeline.isCluster) {
+          continue;
+        }
+        if (!clusters.contains(timeline.personId)) {
+          continue;
+        }
+        await _removeTimeline(timeline.personId);
+      }
+    } catch (e, s) {
+      _logger.severe("_cleanupAssignedClusterTimelines failed", e, s);
+    }
   }
 }
 

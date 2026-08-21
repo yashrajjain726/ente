@@ -29,4 +29,5 @@ enum PeopleEventType {
   saveOrEditPerson,
   addedClusterToPerson,
   reviewedSuggestion,
+  automaticallyMergedClustersIntoPerson,
 }
