@@ -1,6 +1,5 @@
 import { styled } from "@mui/material";
 import type { NewPasswordPresentationProps } from "ente-accounts/components/NewPasswordForm";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
 import { Button } from "./Button";
@@ -32,9 +31,7 @@ export function SetPasswordForm({
         <>
             <ScreenHeader
                 title={submitButtonTitle}
-                subtitle={pt(
-                    "We don't store your password. If you forget it, the only way back to your photos is your recovery key.",
-                )}
+                subtitle={t("auth_password_recovery_warning")}
             />
             <Form onSubmit={onSubmit}>
                 <HiddenEmail
@@ -50,7 +47,7 @@ export function SetPasswordForm({
                         <TextField
                             name="password"
                             label={t("password")}
-                            placeholder={pt("Choose a strong password")}
+                            placeholder={t("auth_strong_password_placeholder")}
                             autoComplete="new-password"
                             showPasswordToggle
                             value={password}
@@ -68,7 +65,7 @@ export function SetPasswordForm({
                     <TextField
                         name="confirmPassword"
                         label={t("confirm_password")}
-                        placeholder={pt("Type it once more")}
+                        placeholder={t("auth_repeat_password_placeholder")}
                         autoComplete="new-password"
                         showPasswordToggle
                         value={confirmPassword}

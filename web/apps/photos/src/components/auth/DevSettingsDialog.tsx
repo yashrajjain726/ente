@@ -1,7 +1,6 @@
 import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CircularProgress, styled } from "@mui/material";
-import { pt } from "ente-base/i18n";
 import type { DevSettingsPresentationProps } from "ente-new/photos/components/DevSettings";
 import { t } from "i18next";
 import type React from "react";
@@ -43,9 +42,7 @@ export function DevSettingsDialog({
                         {t("developer_settings")}
                     </AuthDialogTitle>
                     <AuthDialogText>
-                        {pt(
-                            "Point this app at your own Ente server. Leave it blank to use api.ente.io.",
-                        )}
+                        {t("auth_developer_settings_subtitle")}
                     </AuthDialogText>
                 </AuthDialogHeader>
                 <TextField
@@ -60,9 +57,9 @@ export function DevSettingsDialog({
                     error={Boolean(error)}
                     helperText={
                         error == "Invalid endpoint"
-                            ? pt("Enter a full URL, including https://")
+                            ? t("auth_endpoint_invalid_url")
                             : error
-                              ? pt("Could not reach this endpoint")
+                              ? t("auth_endpoint_unreachable")
                               : undefined
                     }
                     trailing={
@@ -87,7 +84,7 @@ export function DevSettingsDialog({
                             size={18}
                             sx={{ color: "var(--photos-auth-primary)" }}
                         />
-                        <span>{pt("Checking the endpoint is reachable")}</span>
+                        <span>{t("auth_endpoint_checking")}</span>
                     </StatusPill>
                 )}
                 <ButtonRow>

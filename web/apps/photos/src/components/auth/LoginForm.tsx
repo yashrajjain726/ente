@@ -1,6 +1,5 @@
 import { Input, styled } from "@mui/material";
 import type { LoginPresentationProps } from "ente-accounts/components/LoginContents";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
 import { Button } from "./Button";
@@ -29,9 +28,9 @@ export function LoginForm({
                 title={
                     isJoinAlbumContext
                         ? t("login_to_join_album")
-                        : pt("Welcome back")
+                        : t("auth_welcome_back")
                 }
-                subtitle={pt("Enter your details to continue.")}
+                subtitle={t("auth_login_subtitle")}
             />
             <Form onSubmit={onSubmit}>
                 <FormFields>
@@ -41,8 +40,8 @@ export function LoginForm({
                         onChange={onEmailChange}
                         type="email"
                         autoComplete="username"
-                        label={pt("Email address")}
-                        placeholder={pt("name@example.com")}
+                        label={t("auth_email_label")}
+                        placeholder={t("auth_email_placeholder")}
                         autoFocus
                         disabled={isSubmitting}
                         error={Boolean(emailError)}
@@ -66,7 +65,7 @@ export function LoginForm({
                             </TextLink>
                         ) : (
                             <AccountPrompt>
-                                <span>{pt("Don't have an account?")}</span>
+                                <span>{t("auth_new_account_prompt")}</span>
                                 <TextLink regular onClick={onSignUp}>
                                     {t("sign_up")}
                                 </TextLink>

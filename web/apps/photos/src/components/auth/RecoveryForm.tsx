@@ -1,7 +1,6 @@
 import { styled } from "@mui/material";
 import type { RecoverAccountPresentationProps } from "ente-accounts/pages/recover";
 import type { TwoFactorRecoverPresentationProps } from "ente-accounts/pages/two-factor/recover";
-import { pt } from "ente-base/i18n";
 import log from "ente-base/log";
 import { useFormik } from "formik";
 import { t } from "i18next";
@@ -32,9 +31,7 @@ export function RecoverAccountForm(
                 {...props}
                 onNoRecoveryKey={() => setShowNoRecoveryKey(true)}
                 title={t("recover_account")}
-                subtitle={pt(
-                    "Enter the recovery key you saved when you created your account.",
-                )}
+                subtitle={t("auth_recover_account_subtitle")}
             />
             <AuthDialog
                 open={showNoRecoveryKey}
@@ -73,9 +70,7 @@ export function RecoverTwoFactorForm(
         <RecoveryForm
             {...props}
             title={t("recover_two_factor")}
-            subtitle={pt(
-                "Enter your recovery key to regain access to your account.",
-            )}
+            subtitle={t("auth_recover_two_factor_subtitle")}
         />
     );
 }
@@ -134,7 +129,7 @@ function RecoveryForm({
                     <TextField
                         name="recoveryKey"
                         label={t("recovery_key")}
-                        placeholder={pt("Paste your 24-word recovery key")}
+                        placeholder={t("auth_recovery_key_placeholder")}
                         value={formik.values.recoveryKey}
                         onChange={formik.handleChange}
                         onKeyDown={handleRecoveryKeyDown}

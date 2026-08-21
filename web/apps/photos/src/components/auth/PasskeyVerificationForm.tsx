@@ -2,9 +2,9 @@ import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CircularProgress, styled } from "@mui/material";
 import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
+import { Trans } from "react-i18next";
 import { Button } from "./Button";
 import { FormFooter } from "./FormFooter";
 import { ScreenHeader } from "./ScreenHeader";
@@ -45,24 +45,24 @@ export function PasskeyVerificationForm({
             onClick={onRetry}
             disabled={isChecking}
         >
-            {pt("Open the browser window again")}
+            {t("auth_passkey_reopen")}
         </Button>
     );
 
     return (
         <>
             <ScreenHeader
-                title={pt("Verify your passkey")}
+                title={t("auth_passkey_verify_title")}
                 subtitle={
-                    <>
-                        {pt("We opened a browser window")}
-                        {email ? (
-                            <>
-                                {pt(" for ")}
-                                <Email>{email}</Email>
-                            </>
-                        ) : null}
-                    </>
+                    email ? (
+                        <Trans
+                            i18nKey="auth_passkey_window_opened_for"
+                            components={{ a: <Email /> }}
+                            values={{ email }}
+                        />
+                    ) : (
+                        t("auth_passkey_window_opened")
+                    )
                 }
             />
             <StatusCard role="status" $stalled={stalled}>
@@ -87,15 +87,13 @@ export function PasskeyVerificationForm({
                 <StatusText>
                     <StatusTitle>
                         {stalled
-                            ? pt("Still waiting")
+                            ? t("auth_passkey_still_waiting")
                             : t("waiting_for_verification")}
                     </StatusTitle>
                     <StatusCaption>
                         {stalled
-                            ? pt(
-                                  "The browser window may have been closed before you finished. Open it again to retry.",
-                              )
-                            : pt("This page updates on its own")}
+                            ? t("auth_passkey_stalled_hint")
+                            : t("auth_passkey_auto_updates")}
                     </StatusCaption>
                 </StatusText>
             </StatusCard>
