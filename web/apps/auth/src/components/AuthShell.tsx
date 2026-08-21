@@ -11,11 +11,11 @@ import {
     authMobileMediaQuery,
 } from "./auth/styles";
 
-interface PhotosAuthShellProps extends React.PropsWithChildren {
+interface AuthShellProps extends React.PropsWithChildren {
     contentWidth?: 400 | 420;
 }
 
-export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
+export const AuthShell: React.FC<AuthShellProps> = ({
     children,
     contentWidth = 400,
 }) => (
@@ -25,19 +25,19 @@ export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
         <PageCard>
             <DesktopBrandSlot>
                 <BrandPanel
-                    headline={t("photos_auth_headline")}
+                    headline={t("authenticator_auth_headline")}
                     size="desktop"
                 />
             </DesktopBrandSlot>
             <TabletBrandSlot>
                 <BrandPanel
-                    headline={t("photos_auth_headline")}
+                    headline={t("authenticator_auth_headline")}
                     size="tablet"
                 />
             </TabletBrandSlot>
             <MobileBrandSlot>
                 <BrandPanel
-                    headline={t("photos_auth_headline")}
+                    headline={t("authenticator_auth_headline")}
                     size="mobile"
                 />
             </MobileBrandSlot>
@@ -86,10 +86,8 @@ const cameraSparkle = keyframes({
 });
 
 const brandCurvesDrift = keyframes({
-    "0%, 100%": {
-        backgroundPosition: "0 0, calc(50% - 6px) calc(50% + 4px), 0 0",
-    },
-    "50%": { backgroundPosition: "0 0, calc(50% + 6px) calc(50% - 4px), 0 0" },
+    "0%, 100%": { backgroundPosition: "calc(50% - 6px) calc(50% + 4px)" },
+    "50%": { backgroundPosition: "calc(50% + 6px) calc(50% - 4px)" },
 });
 
 const brandCopyAnimation = {
@@ -117,7 +115,7 @@ const BrandPanel: React.FC<BrandPanelProps> = ({ headline, size }) => (
             {size === "desktop" && (
                 <BulletList>
                     {[
-                        t("photos_auth_free_storage"),
+                        t("authenticator_auth_free"),
                         t("photos_auth_no_ads_no_spying"),
                         t("auth_independently_audited"),
                     ].map((bullet) => (
@@ -266,7 +264,7 @@ const SheetHandle = styled("div")({
     flexShrink: 0,
     alignSelf: "center",
     borderRadius: "999px",
-    backgroundColor: "var(--photos-auth-fill-active)",
+    backgroundColor: "var(--auth-app-fill-active)",
     [authMobileMediaQuery]: { display: "none" },
     "@media (min-width: 1024px)": { display: "none" },
 });
@@ -309,19 +307,30 @@ const BrandPanelRoot = styled("div", {
     overflow: "hidden",
     boxSizing: "border-box",
     color: "#fff",
-    backgroundColor: "var(--photos-auth-primary)",
-    backgroundImage: `url("/images/auth-surface-noise.svg"), url("/images/auth-frame-curves.svg"), url("${greenTileP3}")`,
-    backgroundRepeat: "repeat, no-repeat, repeat",
-    backgroundPosition: "0 0, center, 0 0",
-    backgroundSize: "auto, cover, auto",
-    animation: `${brandCurvesDrift} 20s ease-in-out infinite`,
-    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+    backgroundColor: "var(--auth-app-primary)",
+    backgroundImage: 'url("/images/auth-surface-noise.svg")',
+    backgroundRepeat: "repeat",
+    backgroundPosition: "0 0",
+    backgroundSize: "auto",
+    "&::before": {
+        content: '""',
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        backgroundImage: 'url("/images/auth-frame-curves.svg")',
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+        maskImage:
+            "linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.55) 42%, #000 100%)",
+        WebkitMaskImage:
+            "linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.55) 42%, #000 100%)",
+        animation: `${brandCurvesDrift} 20s ease-in-out infinite`,
+    },
+    "@media (prefers-reduced-motion: reduce)": {
+        "&::before": { animation: "none" },
+    },
 }));
-
-/* 1x1 Display-P3 PNG tiled so the brand green renders in P3 on capable
-   screens; the #08c225 background color is the sRGB fallback. */
-const greenTileP3 =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAsTAAALEwEAmpwYAAABaWlDQ1BEaXNwbGF5IFAzAAB4nHWQvUvDUBTFT6tS0DqIDh0cMolD1NIKdnFoKxRFMFQFq1OafgltfCQpUnETVyn4H1jBWXCwiFRwcXAQRAcR3Zw6KbhoeN6XVNoi3sfl/Ticc7lcwBtQGSv2AijplpFMxKS11Lrke4OHnlOqZrKooiwK/v276/PR9d5PiFlNu3YQ2U9cl84ul3aeAlN//V3Vn8maGv3f1EGNGRbgkYmVbYsJ3iUeMWgp4qrgvMvHgtMunzuelWSc+JZY0gpqhrhJLKc79HwHl4plrbWD2N6f1VeXxRzqUcxhEyYYilBRgQQF4X/8044/ji1yV2BQLo8CLMpESRETssTz0KFhEjJxCEHqkLhz634PrfvJbW3vFZhtcM4v2tpCAzidoZPV29p4BBgaAG7qTDVUR+qh9uZywPsJMJgChu8os2HmwiF3e38M6Hvh/GMM8B0CdpXzryPO7RqFn4Er/QcXKWq8MSlPPgAAABBJREFUeAEBBQD6/wAIwiX/A7QB7/maltEAAAAASUVORK5CYII=";
 
 const Wordmark = styled("div", {
     shouldForwardProp: (prop) => prop !== "size",
@@ -339,7 +348,7 @@ const Wordmark = styled("div", {
 const PanelCopy = styled("div", {
     shouldForwardProp: (prop) => prop !== "size",
 })<{ size: BrandPanelProps["size"] }>(({ size }) => ({
-    marginTop: size === "desktop" ? "52px" : 0,
+    marginTop: size === "desktop" ? "36px" : 0,
     marginLeft: size === "mobile" ? "8px" : 0,
     // On the tablet band the ducky is anchored to the right edge, so keep
     // the copy from running underneath it at narrow widths.
@@ -416,7 +425,7 @@ const IllustrationClip = styled("div", {
 })<{ size: BrandPanelProps["size"] }>(({ size }) => ({
     width: size === "desktop" ? "313px" : size === "tablet" ? "237px" : "175px",
     height:
-        size === "desktop" ? "219px" : size === "tablet" ? "172px" : "127px",
+        size === "desktop" ? "245px" : size === "tablet" ? "185px" : "137px",
     flexShrink: 0,
     position: "relative",
     overflow: "hidden",
@@ -429,7 +438,7 @@ const IllustrationClip = styled("div", {
         ? {
               marginTop: "auto",
               alignSelf: "center",
-              "@media (min-width: 1600px)": { width: "355px", height: "249px" },
+              "@media (min-width: 1600px)": { width: "355px", height: "278px" },
           }
         : {
               position: "absolute",
