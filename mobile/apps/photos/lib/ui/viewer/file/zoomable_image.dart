@@ -37,6 +37,7 @@ class ZoomableImage extends StatefulWidget {
   final bool shouldCover;
   final bool isGuestView;
   final bool isFromMemories;
+  final bool enableVerticalSwipeActions;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueChanged<File>? onFinalImageLoaded;
 
@@ -49,6 +50,7 @@ class ZoomableImage extends StatefulWidget {
     this.shouldCover = false,
     this.isGuestView = false,
     this.isFromMemories = false,
+    this.enableVerticalSwipeActions = true,
     this.onFinalFileLoad,
     this.onFinalImageLoaded,
   });
@@ -237,7 +239,9 @@ class _ZoomableImageState extends State<ZoomableImage> {
     }
 
     final GestureDragUpdateCallback? verticalDragCallback =
-        _interactionLocked || widget.isGuestView
+        _interactionLocked ||
+            widget.isGuestView ||
+            !widget.enableVerticalSwipeActions
         ? null
         : (d) => {
             if (!_isZooming)

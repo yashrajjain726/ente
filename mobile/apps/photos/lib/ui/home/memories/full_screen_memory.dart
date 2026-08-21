@@ -319,6 +319,7 @@ class FullScreenMemory extends StatefulWidget {
   final bool isActive;
   final VoidCallback? onNextMemory;
   final VoidCallback? onPreviousMemory;
+  final ValueChanged<bool>? onMediaInteractionLockChanged;
 
   const FullScreenMemory(
     this.title,
@@ -327,6 +328,7 @@ class FullScreenMemory extends StatefulWidget {
     required this.isActive,
     this.onNextMemory,
     this.onPreviousMemory,
+    this.onMediaInteractionLockChanged,
     super.key,
   });
 
@@ -798,6 +800,9 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                           isAudioMutedOverride: memoryMusicController?.isMuted,
                           shouldDisableScroll: (isZoomed) {
                             _isMediaZoomed = isZoomed;
+                            widget.onMediaInteractionLockChanged?.call(
+                              isZoomed,
+                            );
                           },
                           playbackCallback: (shouldEnable, _) {
                             final activeIndex = _clampedMemoryIndex(
