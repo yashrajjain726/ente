@@ -1,0 +1,1 @@
+- Zoom double-tapped photos toward the tapped area instead of the image center.
