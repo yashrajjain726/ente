@@ -3,11 +3,14 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/internal/testutil"
+	"github.com/ente/museum/pkg/repo/public"
 )
 
 func TestAddFilesUpsertsBatchAndPreservesConflictFields(t *testing.T) {
@@ -178,6 +181,92 @@ func TestAddFilesHonorsCanceledContext(t *testing.T) {
 		t.Fatalf("membership count after canceled request = %d, want 0", membershipCount)
 	}
 	assertCollectionMembershipTestUpdationTime(t, db, collectionID, 1)
+}
+
+func TestAddFilesRejectsTrashedFileInsideTransaction(t *testing.T) {
+	repository, db, ownerID := setupCollectionMembershipTest(t)
+	collectionID := insertObjectTestCollection(t, db, ownerID)
+	fileID := insertObjectTestFile(t, db, ownerID)
+	linkObjectTestFileToCollection(t, db, collectionID, fileID, ownerID)
+	if _, err := db.Exec(`UPDATE collection_files SET is_deleted = TRUE
+		WHERE collection_id = $1 AND file_id = $2`, collectionID, fileID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO trash(file_id, user_id, collection_id, delete_by)
+		VALUES($1, $2, $3, $4)`, fileID, ownerID, collectionID, int64(100)); err != nil {
+		t.Fatal(err)
+	}
+
+	err := repository.AddFiles(t.Context(), collectionID, ownerID, []ente.CollectionFileItem{collectionMembershipTestItem(fileID)}, ownerID)
+	if !errors.Is(err, &ente.ErrFileInTrash) {
+		t.Fatalf("AddFiles() error = %v, want ErrFileInTrash", err)
+	}
+
+	if state := readCollectionMembershipState(t, db, collectionID, fileID); !state.isDeleted {
+		t.Fatal("AddFiles() reactivated trashed membership")
+	}
+}
+
+func TestAddFilesAndTrashFilesSerializeOnFile(t *testing.T) {
+	repository, db, ownerID := setupCollectionMembershipTest(t)
+	sourceCollectionID := insertObjectTestCollection(t, db, ownerID)
+	destinationCollectionID := insertObjectTestCollection(t, db, ownerID)
+	fileID := insertObjectTestFile(t, db, ownerID)
+	linkObjectTestFileToCollection(t, db, sourceCollectionID, fileID, ownerID)
+	repository.TrashRepo.FileLinkRepo = public.NewFileLinkRepo(db)
+
+	blocker, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Rollback()
+	if _, err := blocker.ExecContext(t.Context(), `SELECT file_id FROM files
+		WHERE file_id = $1 FOR UPDATE`, fileID); err != nil {
+		t.Fatal(err)
+	}
+
+	addResult := make(chan error, 1)
+	go func() {
+		addResult <- repository.AddFiles(t.Context(), destinationCollectionID, ownerID,
+			[]ente.CollectionFileItem{collectionMembershipTestItem(fileID)}, ownerID)
+	}()
+	trashResult := make(chan error, 1)
+	go func() {
+		trashResult <- repository.TrashRepo.TrashFiles(t.Context(), ownerID, ente.TrashRequest{
+			TrashItems: []ente.TrashItemRequest{{
+				FileID:       fileID,
+				CollectionID: sourceCollectionID,
+			}},
+		})
+	}()
+
+	waitForFileLockWaiters(t, db)
+	lockReleaseTime := time.Now().UnixMicro()
+	if err := blocker.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	addErr := <-addResult
+	if addErr != nil && !errors.Is(addErr, &ente.ErrFileInTrash) {
+		t.Fatalf("AddFiles() error = %v", addErr)
+	}
+	if err := <-trashResult; err != nil {
+		t.Fatalf("TrashFiles() error = %v", err)
+	}
+
+	var activeMemberships, activeTrashRows int
+	if err := db.QueryRow(`SELECT
+			(SELECT COUNT(*) FROM collection_files WHERE file_id = $1 AND is_deleted = FALSE),
+			(SELECT COUNT(*) FROM trash WHERE file_id = $1 AND is_deleted = FALSE AND is_restored = FALSE)`,
+		fileID).Scan(&activeMemberships, &activeTrashRows); err != nil {
+		t.Fatal(err)
+	}
+	if activeMemberships != 0 || activeTrashRows != 1 {
+		t.Fatalf("final state = (%d active memberships, %d active Trash rows), want (0, 1)", activeMemberships, activeTrashRows)
+	}
+	if updationTime := readCollectionMembershipState(t, db, sourceCollectionID, fileID).updationTime; updationTime < lockReleaseTime {
+		t.Fatalf("membership updation_time = %d, want >= %d", updationTime, lockReleaseTime)
+	}
 }
 
 func TestRestoreFilesUpsertsBatchAndMarksTrashRestored(t *testing.T) {
@@ -360,6 +449,28 @@ func insertCollectionMembershipTestFiles(t *testing.T, db *sql.DB, ownerID int64
 		t.Fatalf("inserted file count = %d, want %d", len(fileIDs), count)
 	}
 	return fileIDs
+}
+
+func waitForFileLockWaiters(t *testing.T, db *sql.DB) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pg_stat_activity
+			WHERE datname = current_database()
+				AND pid <> pg_backend_pid()
+				AND wait_event_type = 'Lock'
+				AND query LIKE '%FROM files%'
+				AND query LIKE '%FOR UPDATE%'`).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count >= 2 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for file-lock waiters")
 }
 
 func readCollectionMembershipState(t *testing.T, db *sql.DB, collectionID int64, fileID int64) collectionMembershipState {

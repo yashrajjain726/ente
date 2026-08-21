@@ -42,19 +42,6 @@ func (c *CollectionController) AddFiles(ctx *gin.Context, userID int64, files []
 		return stacktrace.Propagate(err, "Failed to verify fileOwnership")
 	}
 
-	trashedOrDeletedFileIDs, err := c.TrashRepo.GetFilesInTrashOrDeleted(ctx, userID, fileIDs)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed to check trash state")
-	}
-	if len(trashedOrDeletedFileIDs) > 0 {
-		log.WithFields(log.Fields{
-			"user_id":                     userID,
-			"collection_id":               cID,
-			"trashed_or_deleted_file_ids": trashedOrDeletedFileIDs,
-		}).Warn("attempt to add trashed or deleted files to collection")
-		return stacktrace.Propagate(&ente.ErrFileInTrash, "")
-	}
-
 	err = c.CollectionRepo.AddFiles(ctx.Request.Context(), cID, collectionOwnerID, files, filesOwnerID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")

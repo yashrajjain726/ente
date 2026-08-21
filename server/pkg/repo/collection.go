@@ -680,19 +680,33 @@ func (repo *CollectionRepository) AddFiles(
 	files []ente.CollectionFileItem,
 	fileOwnerID int64,
 ) error {
-	updationTime := time.Microseconds()
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
+
+	fileIDs := make([]int64, 0, len(files))
+	for _, file := range files {
+		fileIDs = append(fileIDs, file.ID)
+	}
+	if err := lockFiles(ctx, tx, fileOwnerID, fileIDs); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	updationTime := time.Microseconds()
+	trashedOrDeletedFileIDs, err := repo.TrashRepo.getFilesInTrashOrDeleted(ctx, tx, fileOwnerID, fileIDs)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to check trash state")
+	}
+	if len(trashedOrDeletedFileIDs) > 0 {
+		return stacktrace.Propagate(&ente.ErrFileInTrash, "")
+	}
 	if err := upsertCollectionFiles(ctx, tx, collectionID, collectionOwnerID, files, fileOwnerID, updationTime); err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
 		 WHERE collection_id = $2`, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()
