@@ -8,6 +8,7 @@ import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
+import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/ml_consent_changed_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/models/file/file.dart";
@@ -36,8 +37,10 @@ class MemoryLaneService {
 
   final Logger _logger = Logger("MemoryLaneService");
   final MemoryLaneCacheService _cacheService = MemoryLaneCacheService.instance;
-  final MLDataDB _mlDataDB = MLDataDB.instance;
+  MLDataDB get _mlDataDB =>
+      isLocalGalleryMode ? MLDataDB.localGalleryInstance : MLDataDB.instance;
   final FilesDB _filesDB = FilesDB.instance;
+  final OfflineFilesDB _offlineFilesDB = OfflineFilesDB.instance;
   final TaskQueue<String> _precomputeQueue = TaskQueue(
     maxConcurrentTasks: 1,
     taskTimeout: const Duration(minutes: 5),
@@ -269,7 +272,7 @@ class MemoryLaneService {
     }
 
     final fileIds = timeline.entries.map((entry) => entry.fileId).toSet();
-    final filesById = await _filesDB.getFileIDToFileFromIDs(fileIds.toList());
+    final filesById = await _getFilesById(fileIds);
     final cropsReady = await _ensureFaceCrops(
       personId,
       timeline.entries,
@@ -579,7 +582,7 @@ class MemoryLaneService {
         .map(getFileIdFromFaceId<int>)
         .toSet()
         .toList();
-    final fileMap = await _filesDB.getFileIDToFileFromIDs(uniqueFileIds);
+    final fileMap = await _getFilesById(uniqueFileIds);
     final hiddenFiles = await SearchService.instance.getHiddenFiles();
     final hiddenFileIds = hiddenFiles
         .map((e) => e.uploadedFileID)
@@ -776,7 +779,7 @@ class MemoryLaneService {
           .map((entry) => entry.fileId)
           .toSet()
           .toList();
-      final filesById = await _filesDB.getFileIDToFileFromIDs(uniqueFileIds);
+      final filesById = await _getFilesById(uniqueFileIds);
       final Map<int, Future<List<Face>?>> facesFutures = {};
       for (final entry in entries) {
         final file = filesById[entry.fileId];
@@ -818,6 +821,21 @@ class MemoryLaneService {
       }
     }
     readyPersonIds.value = current;
+  }
+
+  Future<Map<int, EnteFile>> _getFilesById(Iterable<int> fileIds) async {
+    if (!isLocalGalleryMode) {
+      return _filesDB.getFileIDToFileFromIDs(fileIds.toList());
+    }
+    final idToLocalId = await _offlineFilesDB.getLocalIdsForIntIds(fileIds);
+    final localIdToId = idToLocalId.map((id, localId) => MapEntry(localId, id));
+    final files = await _filesDB.getLocalFiles(
+      idToLocalId.values.toList(),
+      dedupeByLocalID: true,
+    );
+    return Map.fromEntries(
+      files.map((file) => MapEntry(localIdToId[file.localID]!, file)),
+    );
   }
 
   Future<void> _cleanupAssignedClusterTimelines(
