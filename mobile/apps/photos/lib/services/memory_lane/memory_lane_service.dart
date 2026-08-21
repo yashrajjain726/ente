@@ -57,7 +57,7 @@ class MemoryLaneService {
   );
 
   final Map<String, int> _lastForcedComputeMicros = {};
-  final Map<String, bool> _pendingRequests = {};
+  final Map<String, _TimelineRequest> _pendingRequests = {};
   final Set<String> _cropReadinessInFlight = {};
 
   bool __isFeatureEnabled = false;
@@ -121,18 +121,26 @@ class MemoryLaneService {
     if (personId.isEmpty) {
       return;
     }
-    _pendingRequests[personId] = (_pendingRequests[personId] ?? false) || force;
+    _pendingRequests[personId] = _TimelineRequest(
+      (_pendingRequests[personId]?.force ?? false) || force,
+    );
     _precomputeQueue
         .addTask(personId, () async {
-          final requestForce = _pendingRequests.remove(personId) ?? force;
-          await _recomputeTimelineForPerson(
-            personId,
-            isCluster: isCluster,
-            force: requestForce,
-          );
+          final request = _pendingRequests[personId];
+          if (request == null) return;
+          try {
+            await _recomputeTimelineForPerson(
+              personId,
+              isCluster: isCluster,
+              request: request,
+            );
+          } finally {
+            if (identical(_pendingRequests[personId], request)) {
+              _pendingRequests.remove(personId);
+            }
+          }
         })
         .catchError((e, s) {
-          _pendingRequests.remove(personId);
           _logger.severe("Recompute failed for $personId", e, s);
         });
   }
@@ -476,8 +484,9 @@ class MemoryLaneService {
   Future<void> _recomputeTimelineForPerson(
     String personId, {
     required bool isCluster,
-    required bool force,
+    required _TimelineRequest request,
   }) async {
+    final force = request.force;
     if (!isFeatureEnabled) {
       return;
     }
@@ -529,6 +538,9 @@ class MemoryLaneService {
       _eligibleCreationTimeCutoffMicros(person?.data.birthDate),
       isCluster: isCluster,
     );
+    if (!identical(_pendingRequests[personId], request)) {
+      return;
+    }
     await _cacheService.upsertTimeline(timeline);
     await _cacheService.upsertComputeLogEntry(
       MemoryLaneComputeLogEntry(
@@ -874,6 +886,12 @@ class MemoryLaneService {
       _logger.severe("_cleanupAssignedClusterTimelines failed", e, s);
     }
   }
+}
+
+class _TimelineRequest {
+  final bool force;
+
+  const _TimelineRequest(this.force);
 }
 
 class _TimelineFaceData {
