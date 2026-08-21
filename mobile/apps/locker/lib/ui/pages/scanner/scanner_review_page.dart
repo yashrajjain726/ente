@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_strings/ente_strings.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
+import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 import 'package:locker/ui/components/text_input_sheet.dart';
@@ -92,7 +94,7 @@ class ScannerReviewPage extends StatefulWidget {
 }
 
 class _ScannerReviewPageState extends State<ScannerReviewPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _thumbnailWidth = 40.0;
   static const _thumbnailHeight = 56.0;
 
@@ -101,9 +103,16 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     vsync: this,
     duration: Motion.standard,
   );
+  late final AnimationController _rotateController = AnimationController(
+    vsync: this,
+    duration: Motion.slow,
+  );
   int _index = 0;
   bool _operationInFlight = false;
   String? _deletingId;
+  String? _rotatingId;
+  File? _rotatingFile;
+  double _rotatingAspect = 1;
 
   @override
   void initState() {
@@ -127,6 +136,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     widget.session.removeListener(_onSessionChanged);
     _pageController.dispose();
     _deleteController.dispose();
+    _rotateController.dispose();
     super.dispose();
   }
 
@@ -211,8 +221,64 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
   Future<void> _rotate() => _runExclusive(() async {
     final page = _currentPage;
     if (page == null) return;
-    await widget.session.rotatePageClockwise(page.id);
+    unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      _rotatingId = page.id;
+      _rotatingFile = page.processedJpeg;
+      _rotatingAspect = page.height == 0 ? 1 : page.width / page.height;
+    });
+    await Future.wait([
+      _rotateController.forward(from: 0),
+      widget.session.rotatePageClockwise(page.id),
+    ]);
+    if (!mounted) return;
+    for (final updated in widget.session.pages) {
+      if (updated.id == page.id) {
+        await precacheImage(FileImage(updated.processedJpeg), context);
+        break;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _rotatingId = null;
+      _rotatingFile = null;
+    });
+    _rotateController.reset();
   });
+
+  Widget _buildRotatingPage(File file, double aspect) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final box = constraints.biggest;
+        final before = fittedRect(box, aspect);
+        final after = fittedRect(box, 1 / aspect);
+        final targetScale = after.width / before.height;
+        return AnimatedBuilder(
+          animation: _rotateController,
+          builder: (context, child) {
+            final t = Curves.easeInOutCubic.transform(_rotateController.value);
+            return Transform.rotate(
+              angle: t * math.pi / 2,
+              child: Transform.scale(
+                scale: 1 + (targetScale - 1) * t,
+                child: child,
+              ),
+            );
+          },
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.sm),
+              child: Image.file(
+                file,
+                key: ValueKey(file.path),
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _delete() => _runExclusive(() async {
     final page = _currentPage;
@@ -438,7 +504,14 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                                   fit: BoxFit.contain,
                                 ),
                               );
-                              final content = index == current
+                              final rotatingFile = _rotatingFile;
+                              final content =
+                                  page.id == _rotatingId && rotatingFile != null
+                                  ? _buildRotatingPage(
+                                      rotatingFile,
+                                      _rotatingAspect,
+                                    )
+                                  : index == current
                                   ? ScannerPageHero(
                                       file: page.processedJpeg,
                                       primary: true,
