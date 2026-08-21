@@ -39,7 +39,9 @@ int? eligibleCreationTimeCutoffMicros(String? birthDateString) {
 }
 
 class MemoryLaneService {
-  MemoryLaneService._internal() : _isFeatureEnabled = hasGrantedMLConsent;
+  MemoryLaneService._internal() {
+    __isFeatureEnabled = hasGrantedMLConsent;
+  }
 
   static final MemoryLaneService instance = MemoryLaneService._internal();
 
@@ -73,7 +75,9 @@ class MemoryLaneService {
   final Map<String, bool> _pendingRequests = {};
   final Set<String> _cropReadinessInFlight = {};
 
-  bool _isFeatureEnabled;
+  bool __isFeatureEnabled = false;
+  // TODO: this should be removed, but flagService does not fire MLConsentChangedEvent on remote flags sync
+  bool get _isFeatureEnabled => hasGrantedMLConsent && __isFeatureEnabled;
   bool _initialized = false;
 
   Timer? _startupBackfillTimer;
@@ -96,7 +100,7 @@ class MemoryLaneService {
 
   void _handleMlConsentChange(MLConsentChangedEvent event) {
     if (event.enabled) return;
-    _isFeatureEnabled = false;
+    __isFeatureEnabled = false;
     _startupBackfillTimer?.cancel();
     _startupBackfillTimer = null;
   }
