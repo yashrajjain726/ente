@@ -79,6 +79,14 @@ class _ScannerCropPageState extends State<ScannerCropPage> {
     if (mounted) navigator.pop();
   }
 
+  void _endDrag() {
+    if (_dragging < 0 && _dragFocus == null) return;
+    setState(() {
+      _dragging = -1;
+      _dragFocus = null;
+    });
+  }
+
   Widget _buildLoupe(Size container, Offset focus, Color color) {
     final above = focus.dy - _loupeLift - _loupeSize / 2 > 0;
     final centerY = above ? focus.dy - _loupeLift : focus.dy + _loupeLift;
@@ -216,7 +224,8 @@ class _ScannerCropPageState extends State<ScannerCropPage> {
                                 _dragFocus = toScreen(normalized);
                               });
                             },
-                            onPanEnd: (_) => setState(() => _dragging = -1),
+                            onPanEnd: (_) => _endDrag(),
+                            onPanCancel: _endDrag,
                             child: Stack(
                               fit: StackFit.expand,
                               children: [

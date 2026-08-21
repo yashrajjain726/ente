@@ -220,7 +220,8 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     setState(() => _deletingId = page.id);
     await _deleteController.forward(from: 0);
     await widget.session.deletePage(page.id);
-    if (mounted) setState(() => _deletingId = null);
+    if (!mounted) return;
+    setState(() => _deletingId = null);
     _deleteController.reset();
   });
 
