@@ -215,36 +215,22 @@ func TestAddFilesAndTrashFilesSerializeOnFile(t *testing.T) {
 	linkObjectTestFileToCollection(t, db, sourceCollectionID, fileID, ownerID)
 	repository.TrashRepo.FileLinkRepo = public.NewFileLinkRepo(db)
 
-	blocker, err := db.BeginTx(t.Context(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer blocker.Rollback()
-	if _, err := blocker.ExecContext(t.Context(), `SELECT file_id FROM files
-		WHERE file_id = $1 FOR UPDATE`, fileID); err != nil {
-		t.Fatal(err)
-	}
-
 	addResult := make(chan error, 1)
-	go func() {
-		addResult <- repository.AddFiles(t.Context(), destinationCollectionID, ownerID,
-			[]ente.CollectionFileItem{collectionMembershipTestItem(fileID)}, ownerID)
-	}()
 	trashResult := make(chan error, 1)
-	go func() {
-		trashResult <- repository.TrashRepo.TrashFiles(t.Context(), ownerID, ente.TrashRequest{
-			TrashItems: []ente.TrashItemRequest{{
-				FileID:       fileID,
-				CollectionID: sourceCollectionID,
-			}},
-		})
-	}()
-
-	waitForFileLockWaiters(t, db)
-	lockReleaseTime := time.Now().UnixMicro()
-	if err := blocker.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	lockReleaseTime := runFileLockRace(t, db, fileID, func() {
+		go func() {
+			addResult <- repository.AddFiles(t.Context(), destinationCollectionID, ownerID,
+				[]ente.CollectionFileItem{collectionMembershipTestItem(fileID)}, ownerID)
+		}()
+		go func() {
+			trashResult <- repository.TrashRepo.TrashFiles(t.Context(), ownerID, ente.TrashRequest{
+				TrashItems: []ente.TrashItemRequest{{
+					FileID:       fileID,
+					CollectionID: sourceCollectionID,
+				}},
+			})
+		}()
+	})
 
 	addErr := <-addResult
 	if addErr != nil && !errors.Is(addErr, &ente.ErrFileInTrash) {
@@ -310,6 +296,72 @@ func TestRestoreFilesUpsertsBatchAndMarksTrashRestored(t *testing.T) {
 	}
 }
 
+func TestRestoreFilesAndDeleteSerializeOnFile(t *testing.T) {
+	repository, db, ownerID := setupCollectionMembershipTest(t)
+	collectionID := insertObjectTestCollection(t, db, ownerID)
+	fileID := insertObjectTestFile(t, db, ownerID)
+	linkObjectTestFileToCollection(t, db, collectionID, fileID, ownerID)
+	if _, err := db.Exec(`UPDATE collection_files SET is_deleted = TRUE
+		WHERE collection_id = $1 AND file_id = $2`, collectionID, fileID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO trash(file_id, user_id, collection_id, delete_by)
+		VALUES($1, $2, $3, $4)`, fileID, ownerID, collectionID, int64(100)); err != nil {
+		t.Fatal(err)
+	}
+	insertObjectTestKey(t, db, fileID, ente.FILE, "restore-delete-race", 100, []string{"b2-eu-cen"})
+	testutil.InsertUsage(t, db, ownerID, 100)
+	repository.TrashRepo.FileRepo = &FileRepository{
+		DB: db,
+		ObjectRepo: &ObjectRepository{
+			DB:        db,
+			QueueRepo: &QueueRepository{DB: db},
+		},
+	}
+
+	restoreResult := make(chan error, 1)
+	deleteResult := make(chan error, 1)
+	lockReleaseTime := runFileLockRace(t, db, fileID, func() {
+		go func() {
+			restoreResult <- repository.RestoreFiles(t.Context(), ownerID, collectionID,
+				[]ente.CollectionFileItem{collectionMembershipTestItem(fileID)})
+		}()
+		go func() {
+			deleteResult <- repository.TrashRepo.Delete(t.Context(), ownerID, []int64{fileID})
+		}()
+	})
+
+	restoreErr := <-restoreResult
+	if restoreErr != nil && !errors.Is(restoreErr, ente.ErrBadRequest) {
+		t.Fatalf("RestoreFiles() error = %v", restoreErr)
+	}
+	if err := <-deleteResult; err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+
+	var membershipDeleted, trashDeleted, trashRestored, objectDeleted bool
+	if err := db.QueryRow(`SELECT cf.is_deleted, t.is_deleted, t.is_restored, ok.is_deleted
+		FROM collection_files AS cf
+		JOIN trash AS t ON t.file_id = cf.file_id
+		JOIN object_keys AS ok ON ok.file_id = cf.file_id AND ok.o_type = 'file'
+		WHERE cf.collection_id = $1 AND cf.file_id = $2`, collectionID, fileID).Scan(
+		&membershipDeleted, &trashDeleted, &trashRestored, &objectDeleted); err != nil {
+		t.Fatal(err)
+	}
+	if membershipDeleted {
+		if !trashDeleted || trashRestored || !objectDeleted {
+			t.Fatalf("deleted outcome = (trash deleted %t, restored %t, object deleted %t)", trashDeleted, trashRestored, objectDeleted)
+		}
+	} else {
+		if trashDeleted || !trashRestored || objectDeleted {
+			t.Fatalf("restored outcome = (trash deleted %t, restored %t, object deleted %t)", trashDeleted, trashRestored, objectDeleted)
+		}
+		if updationTime := readCollectionMembershipState(t, db, collectionID, fileID).updationTime; updationTime < lockReleaseTime {
+			t.Fatalf("membership updation_time = %d, want >= %d", updationTime, lockReleaseTime)
+		}
+	}
+}
+
 func TestMoveFilesUpsertsDestinationAndDeletesSource(t *testing.T) {
 	repository, db, ownerID := setupCollectionMembershipTest(t)
 	fromCollectionID := insertObjectTestCollection(t, db, ownerID)
@@ -369,6 +421,54 @@ func TestMoveFilesUpsertsDestinationAndDeletesSource(t *testing.T) {
 	}
 	if fromUpdationTime <= 1 || fromUpdationTime != toUpdationTime {
 		t.Errorf("collection updation times = (%d, %d), want equal values greater than 1", fromUpdationTime, toUpdationTime)
+	}
+}
+
+func TestMoveFilesAndTrashFilesSerializeOnFile(t *testing.T) {
+	repository, db, ownerID := setupCollectionMembershipTest(t)
+	sourceCollectionID := insertObjectTestCollection(t, db, ownerID)
+	destinationCollectionID := insertObjectTestCollection(t, db, ownerID)
+	fileID := insertObjectTestFile(t, db, ownerID)
+	linkObjectTestFileToCollection(t, db, sourceCollectionID, fileID, ownerID)
+	repository.TrashRepo.FileLinkRepo = public.NewFileLinkRepo(db)
+
+	moveResult := make(chan error, 1)
+	trashResult := make(chan error, 1)
+	lockReleaseTime := runFileLockRace(t, db, fileID, func() {
+		go func() {
+			moveResult <- repository.MoveFiles(t.Context(), destinationCollectionID, sourceCollectionID,
+				[]ente.CollectionFileItem{collectionMembershipTestItem(fileID)}, ownerID, ownerID)
+		}()
+		go func() {
+			trashResult <- repository.TrashRepo.TrashFiles(t.Context(), ownerID, ente.TrashRequest{
+				TrashItems: []ente.TrashItemRequest{{
+					FileID:       fileID,
+					CollectionID: sourceCollectionID,
+				}},
+			})
+		}()
+	})
+
+	moveErr := <-moveResult
+	if moveErr != nil && !errors.Is(moveErr, &ente.ErrFileInTrash) {
+		t.Fatalf("MoveFiles() error = %v", moveErr)
+	}
+	if err := <-trashResult; err != nil {
+		t.Fatalf("TrashFiles() error = %v", err)
+	}
+
+	var activeMemberships, activeTrashRows int
+	if err := db.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM collection_files WHERE file_id = $1 AND is_deleted = FALSE),
+		(SELECT COUNT(*) FROM trash WHERE file_id = $1 AND is_deleted = FALSE AND is_restored = FALSE)`,
+		fileID).Scan(&activeMemberships, &activeTrashRows); err != nil {
+		t.Fatal(err)
+	}
+	if activeMemberships != 0 || activeTrashRows != 1 {
+		t.Fatalf("final state = (%d active memberships, %d active Trash rows), want (0, 1)", activeMemberships, activeTrashRows)
+	}
+	if updationTime := readCollectionMembershipState(t, db, sourceCollectionID, fileID).updationTime; updationTime < lockReleaseTime {
+		t.Fatalf("membership updation_time = %d, want >= %d", updationTime, lockReleaseTime)
 	}
 }
 
@@ -471,6 +571,28 @@ func waitForFileLockWaiters(t *testing.T, db *sql.DB) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("timed out waiting for file-lock waiters")
+}
+
+func runFileLockRace(t *testing.T, db *sql.DB, fileID int64, start func()) int64 {
+	t.Helper()
+
+	blocker, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Rollback()
+	if _, err := blocker.ExecContext(t.Context(), `SELECT file_id FROM files
+		WHERE file_id = $1 FOR UPDATE`, fileID); err != nil {
+		t.Fatal(err)
+	}
+
+	start()
+	waitForFileLockWaiters(t, db)
+	lockReleaseTime := time.Now().UnixMicro()
+	if err := blocker.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return lockReleaseTime
 }
 
 func readCollectionMembershipState(t *testing.T, db *sql.DB, collectionID int64, fileID int64) collectionMembershipState {
