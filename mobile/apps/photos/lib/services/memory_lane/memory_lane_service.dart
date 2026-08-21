@@ -77,7 +77,8 @@ class MemoryLaneService {
 
   bool __isFeatureEnabled = false;
   // TODO: this should be removed, but flagService does not fire MLConsentChangedEvent on remote flags sync
-  bool get _isFeatureEnabled => hasGrantedMLConsent && __isFeatureEnabled;
+  bool get isFeatureEnabled =>
+      hasGrantedMLConsent && __isFeatureEnabled && flagService.facesTimeline;
   bool _initialized = false;
 
   Timer? _startupBackfillTimer;
@@ -106,7 +107,7 @@ class MemoryLaneService {
   }
 
   Future<void> _queueFullRecompute({bool force = false}) async {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane full recompute skipped: PersonService not initialized",
@@ -142,7 +143,7 @@ class MemoryLaneService {
   }
 
   Future<void> ensureTimelineReachability(String personId) async {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     if (personId.isEmpty) {
       return;
     }
@@ -161,7 +162,7 @@ class MemoryLaneService {
   }
 
   Future<MemoryLanePersonTimeline?> getTimeline(String personId) async {
-    if (!_isFeatureEnabled) return null;
+    if (!isFeatureEnabled) return null;
     final timeline = await _cacheService.getTimeline(personId);
     if (timeline == null || timeline.entries.isEmpty) {
       return timeline;
@@ -197,7 +198,7 @@ class MemoryLaneService {
   }
 
   bool hasReadyTimelineSync(String personId) {
-    if (!_isFeatureEnabled) return false;
+    if (!isFeatureEnabled) return false;
     return readyPersonIds.value.contains(personId);
   }
 
@@ -237,7 +238,7 @@ class MemoryLaneService {
   }
 
   Future<void> _repairTimelineCropReadiness(String personId) async {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane crop readiness skipped for $personId: PersonService not initialized",
@@ -286,7 +287,7 @@ class MemoryLaneService {
   }
 
   void _handlePeopleChange(PeopleChangedEvent event) {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     if (event.type == PeopleEventType.syncDone) {
       return;
     }
@@ -385,7 +386,7 @@ class MemoryLaneService {
   }
 
   Future<void> _runStartupBackfill() async {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane startup diff skipped: PersonService not initialized",
@@ -495,7 +496,7 @@ class MemoryLaneService {
     String personId, {
     required bool force,
   }) async {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Memory Lane recompute skipped for $personId: PersonService not initialized",
