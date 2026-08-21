@@ -581,6 +581,10 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
       geometry.initialScale,
       Offset.zero,
     );
+    if (animated &&
+        _matricesNearlyEqual(_transformationController.value, target)) {
+      return Future<void>.value();
+    }
     if (!animated) {
       _stopProgrammaticAnimation();
       _stage = ImageZoomStage.initial;
