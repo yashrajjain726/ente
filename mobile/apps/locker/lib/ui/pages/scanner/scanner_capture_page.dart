@@ -160,7 +160,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         if (!mounted) return;
         await controller.startImageStream(_onFrame);
         if (!mounted) return;
-        _torchOn = false;
+        if (_torchOn) await _applyTorch(controller, true);
+        if (!mounted) return;
         setState(() {
           _camera = controller;
           _status = _CameraStatus.ready;
@@ -457,12 +458,17 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   Future<void> _toggleTorch() async {
     final camera = _camera;
     if (camera == null) return;
-    final next = !_torchOn;
+    await _applyTorch(camera, !_torchOn);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _applyTorch(CameraController camera, bool on) async {
     try {
-      await camera.setFlashMode(next ? FlashMode.torch : FlashMode.off);
-      setState(() => _torchOn = next);
+      await camera.setFlashMode(on ? FlashMode.torch : FlashMode.off);
+      _torchOn = on;
     } on CameraException catch (e) {
       _logger.warning('Torch unavailable: ${e.code}');
+      _torchOn = false;
     }
   }
 
@@ -555,6 +561,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                     ],
                   ),
                   const Spacer(),
+                  _PreparingHint(
+                    visible: !_session.isServiceReady && !_scannerInitFailed,
+                  ),
                   SizedBox(
                     height: 88,
                     child: Stack(
@@ -769,6 +778,56 @@ class _CameraMessage extends StatelessWidget {
   }
 }
 
+class _PreparingHint extends StatelessWidget {
+  const _PreparingHint({required this.visible});
+
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    return AnimatedSize(
+      duration: Motion.standard,
+      curve: Curves.easeInOut,
+      child: visible
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.md),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Spacing.md,
+                  vertical: Spacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colors.specialWhite,
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.sm),
+                    Text(
+                      context.strings.scannerPreparing,
+                      style: TextStyles.mini.copyWith(
+                        color: colors.specialWhite,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+}
+
 class _ChromeButton extends StatelessWidget {
   const _ChromeButton({required this.icon, required this.onTap, this.tooltip});
 
@@ -825,30 +884,36 @@ class _ShutterButtonState extends State<_ShutterButton> {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final white = colors.specialWhite;
-    return GestureDetector(
-      onTapDown: widget.enabled ? (_) => _setPressed(true) : null,
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      onTap: widget.enabled ? () => widget.onTap() : null,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 150),
-        opacity: widget.enabled ? 1 : 0.5,
-        child: AnimatedScale(
-          scale: _pressed ? 0.9 : 1,
-          duration: _pressed ? Motion.quick : Motion.slow,
-          curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
-          child: Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: white, width: 4),
-            ),
-            child: Center(
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: white),
+    return Tooltip(
+      message: context.strings.scannerCapture,
+      child: GestureDetector(
+        onTapDown: widget.enabled ? (_) => _setPressed(true) : null,
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        onTap: widget.enabled ? () => widget.onTap() : null,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: widget.enabled ? 1 : 0.5,
+          child: AnimatedScale(
+            scale: _pressed ? 0.9 : 1,
+            duration: _pressed ? Motion.quick : Motion.slow,
+            curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: white, width: 4),
+              ),
+              child: Center(
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: white,
+                  ),
+                ),
               ),
             ),
           ),

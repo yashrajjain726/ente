@@ -296,6 +296,26 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     );
   }
 
+  Widget _buildProcessingState(ColorTokens colors) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+          const SizedBox(height: Spacing.lg),
+          Text(
+            context.strings.scanProcessing,
+            style: TextStyles.body.copyWith(color: colors.textLighter),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildThumbnailStrip(
     List<ScannedPage> pages,
     int current,
@@ -336,7 +356,10 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                     page.processedJpeg,
                     key: ValueKey(page.processedJpeg.path),
                     fit: BoxFit.cover,
-                    cacheHeight: 168,
+                    cacheHeight:
+                        (_thumbnailHeight *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round(),
                   ),
                 ),
               ),
@@ -380,7 +403,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                           ),
                           variant: IconButtonComponentVariant.unfilled,
                           onTap: () => Navigator.of(context).pop(false),
-                          tooltip: l10n.addPage,
+                          tooltip: l10n.back,
                         ),
                         Expanded(
                           child: Center(child: _buildFileNameField(colors)),
@@ -399,7 +422,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                   ),
                   Expanded(
                     child: pageCount == 0
-                        ? const Center(child: CircularProgressIndicator())
+                        ? _buildProcessingState(colors)
                         : PageView.builder(
                             controller: _pageController,
                             itemCount: pageCount,
@@ -465,10 +488,20 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
                       ),
                     ),
                   const SizedBox(height: Spacing.sm),
-                  if (pageCount > 1) ...[
-                    _buildThumbnailStrip(pages, current, colors),
-                    const SizedBox(height: Spacing.sm),
-                  ],
+                  AnimatedSize(
+                    duration: Motion.standard,
+                    curve: Curves.easeInOut,
+                    alignment: Alignment.topCenter,
+                    child: pageCount > 1
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildThumbnailStrip(pages, current, colors),
+                              const SizedBox(height: Spacing.sm),
+                            ],
+                          )
+                        : const SizedBox(width: double.infinity),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
