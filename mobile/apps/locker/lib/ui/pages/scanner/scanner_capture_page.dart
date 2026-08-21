@@ -41,7 +41,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   bool _analysisInFlight = false;
   bool _takingPicture = false;
   bool _torchOn = false;
-  bool _autoMode = false;
+  bool _autoMode = true;
   bool _scannerInitFailed = false;
 
   @override
