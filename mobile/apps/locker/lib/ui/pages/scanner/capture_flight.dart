@@ -101,6 +101,57 @@ List<Offset> lerpCorners(List<Offset> a, List<Offset> b, double t) => [
   for (var i = 0; i < a.length; i++) Offset.lerp(a[i], b[i], t)!,
 ];
 
+Offset centroid(List<Offset> corners) {
+  var sum = Offset.zero;
+  for (final c in corners) {
+    sum += c;
+  }
+  return sum / corners.length.toDouble();
+}
+
+List<Offset> poseCorners(
+  List<Offset> corners, {
+  required Offset about,
+  required Offset offset,
+  required double angle,
+  required double scale,
+}) {
+  final cosA = math.cos(angle);
+  final sinA = math.sin(angle);
+  return [
+    for (final c in corners)
+      () {
+        final d = (c - about) * scale;
+        return about +
+            offset +
+            Offset(d.dx * cosA - d.dy * sinA, d.dx * sinA + d.dy * cosA);
+      }(),
+  ];
+}
+
+const developContrast = 1.16;
+const developBrightness = 12.0;
+const developSaturation = 0.88;
+
+List<double> developMatrix(double t) {
+  final c = ui.lerpDouble(1, developContrast, t)!;
+  final b = ui.lerpDouble(0, developBrightness, t)!;
+  final s = ui.lerpDouble(1, developSaturation, t)!;
+  const lr = 0.2126;
+  const lg = 0.7152;
+  const lb = 0.0722;
+  final sr = (1 - s) * lr;
+  final sg = (1 - s) * lg;
+  final sb = (1 - s) * lb;
+  final offset = 128 * (1 - c) + b;
+  return [
+    c * (sr + s), c * sg, c * sb, 0, offset, //
+    c * sr, c * (sg + s), c * sb, 0, offset, //
+    c * sr, c * sg, c * (sb + s), 0, offset, //
+    0, 0, 0, 1, 0, //
+  ];
+}
+
 Path roundedPolygonPath(List<Offset> corners, double radius) {
   final path = Path();
   if (radius <= 0.01) return path..addPolygon(corners, true);
@@ -126,6 +177,10 @@ Path roundedPolygonPath(List<Offset> corners, double radius) {
   }
   return path..close();
 }
+
+const flightArcHeight = 0.08;
+const flightTilt = -3 * math.pi / 180;
+const flightLift = 0.02;
 
 class CaptureFlightCard extends StatefulWidget {
   const CaptureFlightCard({
@@ -201,9 +256,30 @@ class _FlightPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final t = progress.value;
-    final clip = lerpCorners(spec.sourceCorners, spec.clipEnd, t);
+    final swing = math.sin(math.pi * t);
+    final travel = spec.target.center - centroid(spec.sourceCorners);
+    final pose = (
+      offset: Offset(0, -travel.distance * flightArcHeight * swing),
+      angle: flightTilt * swing,
+      scale: 1 + flightLift * math.sin(math.pi * (t / 0.35).clamp(0.0, 1.0)),
+    );
+    final rawClip = lerpCorners(spec.sourceCorners, spec.clipEnd, t);
+    final about = centroid(rawClip);
+    final clip = poseCorners(
+      rawClip,
+      about: about,
+      offset: pose.offset,
+      angle: pose.angle,
+      scale: pose.scale,
+    );
     final sourceQuad = lerpCorners(spec.sourceCorners, spec.zoomedCorners, t);
-    final imageQuad = lerpCorners(spec.sourceCorners, spec.imageEnd, t);
+    final imageQuad = poseCorners(
+      lerpCorners(spec.sourceCorners, spec.imageEnd, t),
+      about: about,
+      offset: pose.offset,
+      angle: pose.angle,
+      scale: pose.scale,
+    );
     final path = roundedPolygonPath(clip, spec.targetRadius * t);
     final elevation = 18 * math.sin(math.pi * t) + 3 * t;
     if (elevation > 0) {
@@ -212,7 +288,7 @@ class _FlightPainter extends CustomPainter {
     canvas
       ..save()
       ..clipPath(path);
-    paintMappedSnapshot(canvas, spec, sourceQuad, imageQuad);
+    paintMappedSnapshot(canvas, spec, sourceQuad, imageQuad, develop: t);
     final borderAlpha = ((t - 0.7) / 0.3).clamp(0.0, 1.0);
     if (borderAlpha > 0) {
       canvas.drawPath(
@@ -235,8 +311,9 @@ void paintMappedSnapshot(
   Canvas canvas,
   CaptureFlightSpec spec,
   List<Offset> sourceQuad,
-  List<Offset> imageQuad,
-) {
+  List<Offset> imageQuad, {
+  required double develop,
+}) {
   canvas.save();
   final homography = homographyMatrix(sourceQuad, imageQuad);
   if (homography != null) {
@@ -249,13 +326,13 @@ void paintMappedSnapshot(
       ..scale(to.width / from.width, to.height / from.height)
       ..translate(-from.left, -from.top);
   }
+  final paint = Paint()..filterQuality = FilterQuality.medium;
+  if (develop > 0) {
+    paint.colorFilter = ColorFilter.matrix(developMatrix(develop));
+  }
   canvas
     ..transform(spec.imageToLayer)
-    ..drawImage(
-      spec.image,
-      Offset.zero,
-      Paint()..filterQuality = FilterQuality.medium,
-    )
+    ..drawImage(spec.image, Offset.zero, paint)
     ..restore();
 }
 
@@ -302,7 +379,13 @@ class _SnapshotThumbnailPainter extends CustomPainter {
       ..save()
       ..clipRect(Offset.zero & size)
       ..translate(-origin.dx, -origin.dy);
-    paintMappedSnapshot(canvas, spec, spec.zoomedCorners, spec.imageEnd);
+    paintMappedSnapshot(
+      canvas,
+      spec,
+      spec.zoomedCorners,
+      spec.imageEnd,
+      develop: 1,
+    );
     canvas.restore();
   }
 

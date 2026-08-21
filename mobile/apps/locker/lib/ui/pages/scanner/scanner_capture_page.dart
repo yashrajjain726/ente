@@ -239,10 +239,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       }
       if (mounted) {
         setState(() => _stableQuad = stable);
-        if (fire) {
-          unawaited(HapticFeedback.lightImpact());
-          unawaited(_capture());
-        }
+        if (fire) unawaited(_capture());
       }
     } catch (_) {
     } finally {
@@ -255,6 +252,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     if (camera == null || _takingPicture) return;
     final quad = _stableQuad ?? ScanQuad.fullFrame();
     _autoCapture.notifyCaptureStarted();
+    unawaited(HapticFeedback.mediumImpact());
     setState(() {
       _takingPicture = true;
       _stableQuad = null;
@@ -365,6 +363,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
 
   void _onFlightLanded(_ActiveFlight flight) {
     if (!mounted) return;
+    unawaited(HapticFeedback.selectionClick());
     setState(() {
       _flights.remove(flight);
       flight.capture.landed = true;
@@ -411,7 +410,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     }
   }
 
-  ({int count, Widget? thumbnail}) _pagesButtonState() {
+  ({int count, Widget? thumbnail, File? heroFile}) _pagesButtonState() {
     final hiddenPages = _pending
         .where((capture) => capture.processed && !capture.landed)
         .length;
@@ -424,6 +423,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         if (capture.landed && !capture.failed && capture.spec != null) capture,
     ];
     Widget? thumbnail;
+    final heroFile = shownPages > 0
+        ? _session.pages[shownPages - 1].processedJpeg
+        : null;
     if (showingSnapshot.isNotEmpty) {
       final capture = showingSnapshot.last;
       thumbnail = CaptureSnapshotThumbnail(
@@ -437,7 +439,11 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         page: page,
       );
     }
-    return (count: shownPages + landedUnprocessed, thumbnail: thumbnail);
+    return (
+      count: shownPages + landedUnprocessed,
+      thumbnail: thumbnail,
+      heroFile: heroFile,
+    );
   }
 
   void _toggleAutoMode() {
@@ -460,6 +466,13 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   Future<void> _openReview() async {
     if (_session.pageCount == 0 && !_session.isProcessing) return;
     final navigator = Navigator.of(context);
+    if (_session.pageCount > 0) {
+      await precacheImage(
+        FileImage(_session.pages.last.processedJpeg),
+        context,
+      );
+      if (!mounted) return;
+    }
     await _pauseCamera();
     final saved = await navigator.push<bool>(
       MaterialPageRoute(
@@ -538,8 +551,6 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                               _status == _CameraStatus.ready &&
                               !_takingPicture &&
                               _session.isServiceReady,
-                          armingProgress: _autoMode ? _autoCapture.progress : 0,
-                          armingColor: colors.primary,
                           onTap: _capture,
                         ),
                         Align(
@@ -548,6 +559,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                             key: _pagesButtonKey,
                             count: pages.count,
                             thumbnail: pages.thumbnail,
+                            heroFile: pages.heroFile,
                             accent: colors.primary,
                             onTap: _openReview,
                           ),
@@ -631,6 +643,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                         ? null
                         : _stableQuad,
                     color: colors.primary,
+                    armingProgress: _autoMode ? _autoCapture.progress : 0,
                   ),
                   CaptureSnapOverlay(
                     quad: _snapQuad,
@@ -777,97 +790,58 @@ class _ChromeButton extends StatelessWidget {
   }
 }
 
-class _ShutterButton extends StatelessWidget {
-  const _ShutterButton({
-    required this.enabled,
-    required this.armingProgress,
-    required this.armingColor,
-    required this.onTap,
-  });
+class _ShutterButton extends StatefulWidget {
+  const _ShutterButton({required this.enabled, required this.onTap});
 
   final bool enabled;
-
-  final double armingProgress;
-  final Color armingColor;
   final Future<void> Function() onTap;
+
+  @override
+  State<_ShutterButton> createState() => _ShutterButtonState();
+}
+
+class _ShutterButtonState extends State<_ShutterButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed != pressed) setState(() => _pressed = pressed);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final white = colors.specialWhite;
     return GestureDetector(
-      onTap: enabled ? () => onTap() : null,
+      onTapDown: widget.enabled ? (_) => _setPressed(true) : null,
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: widget.enabled ? () => widget.onTap() : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 150),
-        opacity: enabled ? 1 : 0.5,
-        child: SizedBox(
-          width: 76,
-          height: 76,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: white, width: 4),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: white,
-                    ),
-                  ),
-                ),
+        opacity: widget.enabled ? 1 : 0.5,
+        child: AnimatedScale(
+          scale: _pressed ? 0.9 : 1,
+          duration: _pressed ? Motion.quick : Motion.slow,
+          curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
+          child: Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: white, width: 4),
+            ),
+            child: Center(
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: white),
               ),
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: armingProgress.clamp(0.0, 1.0)),
-                duration: Motion.quick,
-                builder: (context, value, _) => CustomPaint(
-                  painter: _ArmingArcPainter(
-                    progress: value,
-                    color: armingColor,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
-}
-
-class _ArmingArcPainter extends CustomPainter {
-  const _ArmingArcPainter({required this.progress, required this.color});
-
-  final double progress;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || size.isEmpty) return;
-    canvas.drawArc(
-      Rect.fromCircle(
-        center: size.center(Offset.zero),
-        radius: size.shortestSide / 2 - 2,
-      ),
-      -math.pi / 2,
-      progress * 2 * math.pi,
-      false,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ArmingArcPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.color != color;
 }
 
 class _AutoToggle extends StatelessWidget {
@@ -957,14 +931,17 @@ class _PagesButton extends StatefulWidget {
     super.key,
     required this.count,
     required this.thumbnail,
+    required this.heroFile,
     required this.accent,
     required this.onTap,
   });
 
   static const borderWidth = 2.0;
+  static const maxStackedSheets = 2;
 
   final int count;
   final Widget? thumbnail;
+  final File? heroFile;
   final Color accent;
   final VoidCallback onTap;
 
@@ -1017,6 +994,44 @@ class _PagesButtonState extends State<_PagesButton>
   static Widget _expandedLayout(Widget? current, List<Widget> previous) =>
       Stack(fit: StackFit.expand, children: [...previous, ?current]);
 
+  Widget _stackedSheet(int depth, ColorTokens colors) {
+    final visible = widget.count > depth;
+    final angle = (depth.isOdd ? -5.0 : 4.0) * math.pi / 180;
+    final shift = Offset(depth.isOdd ? -1 : 2, -2.0 * depth);
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          duration: Motion.standard,
+          opacity: visible ? 1 : 0,
+          child: AnimatedScale(
+            duration: Motion.standard,
+            curve: Curves.easeOutBack,
+            scale: visible ? 1 : 0.8,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.translationValues(shift.dx, shift.dy, 0)
+                ..rotateZ(angle),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(Radii.md),
+                  color: colors.specialWhite.withValues(
+                    alpha: depth == 1 ? 0.85 : 0.6,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
@@ -1030,6 +1045,8 @@ class _PagesButtonState extends State<_PagesButton>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            for (var depth = _PagesButton.maxStackedSheets; depth >= 1; depth--)
+              _stackedSheet(depth, colors),
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
@@ -1046,16 +1063,20 @@ class _PagesButtonState extends State<_PagesButton>
                     ),
                   ],
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    Radii.md - _PagesButton.borderWidth,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: _switchDuration,
-                    layoutBuilder: _expandedLayout,
-                    child:
-                        widget.thumbnail ??
-                        const SizedBox.expand(key: ValueKey('empty')),
+                child: ScannerPageHero(
+                  file: widget.heroFile,
+                  primary: false,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      Radii.md - _PagesButton.borderWidth,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: _switchDuration,
+                      layoutBuilder: _expandedLayout,
+                      child:
+                          widget.thumbnail ??
+                          const SizedBox.expand(key: ValueKey('empty')),
+                    ),
                   ),
                 ),
               ),
