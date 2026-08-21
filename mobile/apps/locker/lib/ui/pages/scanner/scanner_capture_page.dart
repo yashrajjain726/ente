@@ -323,51 +323,64 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                         onTap: () => Navigator.of(context).pop(false),
                         tooltip: context.strings.close,
                       ),
-                      _ChromeButton(
-                        icon: _torchOn
-                            ? HugeIcons.strokeRoundedFlash
-                            : HugeIcons.strokeRoundedFlashOff,
-                        onTap: _camera == null ? null : _toggleTorch,
-                        tooltip: _torchOn
-                            ? context.strings.scannerTorchOff
-                            : context.strings.scannerTorchOn,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ChromeButton(
+                            icon: _torchOn
+                                ? HugeIcons.strokeRoundedFlash
+                                : HugeIcons.strokeRoundedFlashOff,
+                            onTap: _camera == null ? null : _toggleTorch,
+                            tooltip: _torchOn
+                                ? context.strings.scannerTorchOff
+                                : context.strings.scannerTorchOn,
+                          ),
+                          const SizedBox(width: Spacing.sm),
+                          _AutoToggle(
+                            active: _autoMode,
+                            onTap: _toggleAutoMode,
+                          ),
+                        ],
                       ),
                     ],
                   ),
                   const Spacer(),
                   SizedBox(
                     height: 88,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        _ShutterButton(
-                          enabled:
-                              _status == _CameraStatus.ready &&
-                              !_takingPicture &&
-                              _session.isServiceReady,
-                          armingProgress: _autoMode ? _autoCapture.progress : 0,
-                          armingColor: colors.primary,
-                          onTap: _capture,
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: _AutoToggle(
-                            active: _autoMode,
-                            onTap: _toggleAutoMode,
+                    child: ListenableBuilder(
+                      listenable: _session,
+                      builder: (context, _) => Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          _ShutterButton(
+                            enabled:
+                                _status == _CameraStatus.ready &&
+                                !_takingPicture &&
+                                _session.isServiceReady,
+                            armingProgress: _autoMode
+                                ? _autoCapture.progress
+                                : 0,
+                            armingColor: colors.primary,
+                            onTap: _capture,
                           ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ListenableBuilder(
-                            listenable: _session,
-                            builder: (context, _) => _DoneButton(
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: _PagesButton(
                               session: _session,
                               accent: colors.primary,
                               onTap: _openReview,
                             ),
                           ),
-                        ),
-                      ],
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: _DoneButton(
+                              session: _session,
+                              accent: colors.primary,
+                              onTap: _openReview,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -411,15 +424,18 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         return Center(
           child: AspectRatio(
             aspectRatio: 1 / camera.value.aspectRatio,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CameraPreview(camera),
-                ScanQuadOverlay(
-                  quad: _takingPicture ? null : _stableQuad,
-                  color: colors.primary,
-                ),
-              ],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.sheet),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CameraPreview(camera),
+                  ScanQuadOverlay(
+                    quad: _takingPicture ? null : _stableQuad,
+                    color: colors.primary,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -636,6 +652,134 @@ class _AutoToggle extends StatelessWidget {
   }
 }
 
+class _SessionActionReveal extends StatelessWidget {
+  const _SessionActionReveal({
+    required this.session,
+    required this.tooltip,
+    required this.onTap,
+    required this.child,
+  });
+
+  static const size = 62.0;
+
+  final ScanSessionController session;
+  final String tooltip;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = session.pageCount > 0 || session.isProcessing;
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedScale(
+        scale: visible ? 1 : 0,
+        duration: Motion.standard,
+        curve: visible ? Curves.easeOutBack : Curves.easeIn,
+        child: Tooltip(
+          message: tooltip,
+          child: GestureDetector(
+            onTap: onTap,
+            child: SizedBox(width: size, height: size, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PagesButton extends StatelessWidget {
+  const _PagesButton({
+    required this.session,
+    required this.accent,
+    required this.onTap,
+  });
+
+  static const _borderWidth = 2.0;
+
+  final ScanSessionController session;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    final page = session.lastPage;
+    return _SessionActionReveal(
+      session: session,
+      tooltip: context.strings.review,
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(Radii.md),
+                color: Colors.black.withValues(alpha: 0.4),
+                border: Border.all(
+                  color: colors.specialWhite,
+                  width: _borderWidth,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(Radii.md - _borderWidth),
+                child: page == null
+                    ? Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: colors.specialWhite,
+                          ),
+                        ),
+                      )
+                    : Image.file(
+                        page.processedJpeg,
+                        key: ValueKey(page.processedJpeg.path),
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        cacheHeight: (_SessionActionReveal.size * 3).round(),
+                      ),
+              ),
+            ),
+          ),
+          if (session.pageCount > 0)
+            Positioned(
+              top: -Spacing.sm,
+              right: -Spacing.sm,
+              child: Container(
+                padding: const EdgeInsets.all(Spacing.xs),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent,
+                  border: Border.all(
+                    color: colors.specialWhite,
+                    width: _borderWidth,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    '${session.pageCount}',
+                    style: TextStyles.mini.copyWith(color: colors.specialWhite),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DoneButton extends StatelessWidget {
   const _DoneButton({
     required this.session,
@@ -650,76 +794,36 @@ class _DoneButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final visible = session.pageCount > 0 || session.isProcessing;
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedScale(
-        scale: visible ? 1 : 0,
-        duration: Motion.standard,
-        curve: visible ? Curves.easeOutBack : Curves.easeIn,
-        child: Tooltip(
-          message: context.strings.done,
-          child: GestureDetector(
-            onTap: onTap,
-            child: SizedBox(
-              width: 62,
-              height: 62,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: accent,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            blurRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: session.isProcessing
-                            ? SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: colors.specialWhite,
-                                ),
-                              )
-                            : HugeIcon(
-                                icon: HugeIcons.strokeRoundedTick02,
-                                color: colors.specialWhite,
-                                size: 30,
-                              ),
-                      ),
-                    ),
-                  ),
-                  if (session.pageCount > 0)
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: Container(
-                        padding: const EdgeInsets.all(Spacing.xs),
-                        constraints: const BoxConstraints(minWidth: 22),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colors.specialWhite,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${session.pageCount}',
-                            style: TextStyles.mini.copyWith(color: accent),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+    return _SessionActionReveal(
+      session: session,
+      tooltip: context.strings.done,
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: accent,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 10,
             ),
-          ),
+          ],
+        ),
+        child: Center(
+          child: session.isProcessing
+              ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: colors.specialWhite,
+                  ),
+                )
+              : HugeIcon(
+                  icon: HugeIcons.strokeRoundedTick02,
+                  color: colors.specialWhite,
+                  size: 30,
+                ),
         ),
       ),
     );
