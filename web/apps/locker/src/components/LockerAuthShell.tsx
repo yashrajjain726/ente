@@ -86,8 +86,8 @@ const cameraSparkle = keyframes({
 });
 
 const brandCurvesDrift = keyframes({
-    "0%, 100%": { backgroundPosition: "0 0, calc(50% - 6px) calc(50% + 4px)" },
-    "50%": { backgroundPosition: "0 0, calc(50% + 6px) calc(50% - 4px)" },
+    "0%, 100%": { backgroundPosition: "calc(50% - 6px) calc(50% + 4px)" },
+    "50%": { backgroundPosition: "calc(50% + 6px) calc(50% - 4px)" },
 });
 
 const brandCopyAnimation = {
@@ -308,16 +308,31 @@ const BrandPanelRoot = styled("div", {
     boxSizing: "border-box",
     color: "#fff",
     backgroundColor: "var(--locker-auth-primary)",
-    backgroundImage:
-        'url("/images/auth-surface-noise.svg"), url("/images/auth-frame-curves.svg")',
-    backgroundRepeat: "repeat, no-repeat",
-    backgroundPosition: "0 0, center",
-    backgroundSize: "auto, cover",
-    animation: `${brandCurvesDrift} 20s ease-in-out infinite`,
+    backgroundImage: 'url("/images/auth-surface-noise.svg")',
+    backgroundRepeat: "repeat",
+    backgroundPosition: "0 0",
+    backgroundSize: "auto",
+    "&::before": {
+        content: '""',
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        backgroundImage: 'url("/images/auth-frame-curves.svg")',
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+        maskImage:
+            "linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.55) 42%, #000 100%)",
+        WebkitMaskImage:
+            "linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.55) 42%, #000 100%)",
+        animation: `${brandCurvesDrift} 20s ease-in-out infinite`,
+    },
     "@supports (color: color(display-p3 1 1 1))": {
         backgroundColor: "color(display-p3 0.0627 0.4431 1)",
     },
-    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+    "@media (prefers-reduced-motion: reduce)": {
+        "&::before": { animation: "none" },
+    },
 }));
 
 const Wordmark = styled("div", {
