@@ -1,10 +1,10 @@
 import "dart:async";
 
 import "package:flutter/material.dart";
-import "package:photos/ui/viewer/file/image_zoom_geometry.dart";
-import "package:photos/ui/viewer/file/image_zoom_stage_policy.dart";
+import "package:photos/ui/viewer/file/image_zoom/image_zoom_geometry.dart";
+import "package:photos/ui/viewer/file/image_zoom/image_zoom_stage_policy.dart";
 
-export "package:photos/ui/viewer/file/image_zoom_stage_policy.dart"
+export "package:photos/ui/viewer/file/image_zoom/image_zoom_stage_policy.dart"
     show ImageZoomStage;
 
 const double _kZoomEpsilon = 0.001;

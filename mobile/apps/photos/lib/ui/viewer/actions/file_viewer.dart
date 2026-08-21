@@ -18,7 +18,7 @@ import "package:photos/module/metadata/local_file.dart";
 import "package:photos/module/metadata/video.dart";
 import "package:photos/services/app_lifecycle_service.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
-import "package:photos/ui/viewer/file/image_zoom_viewer.dart";
+import "package:photos/ui/viewer/file/image_zoom/image_zoom_viewer.dart";
 import "package:receive_sharing_intent/receive_sharing_intent.dart";
 import "package:video_player/video_player.dart";
 

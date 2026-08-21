@@ -1,5 +1,5 @@
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/ui/viewer/file/image_zoom_stage_policy.dart";
+import "package:photos/ui/viewer/file/image_zoom/image_zoom_stage_policy.dart";
 
 void main() {
   test("duplicate or clamped stages are skipped", () {

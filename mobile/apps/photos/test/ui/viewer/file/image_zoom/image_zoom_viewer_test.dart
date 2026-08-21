@@ -6,7 +6,7 @@ import "package:flutter/gestures.dart";
 import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/ui/viewer/file/image_zoom_viewer.dart";
+import "package:photos/ui/viewer/file/image_zoom/image_zoom_viewer.dart";
 
 const _viewportSize = Size(400, 400);
 const _landscapeSize = Size(1200, 800);

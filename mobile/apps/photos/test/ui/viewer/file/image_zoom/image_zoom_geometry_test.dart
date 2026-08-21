@@ -1,6 +1,6 @@
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/ui/viewer/file/image_zoom_geometry.dart";
+import "package:photos/ui/viewer/file/image_zoom/image_zoom_geometry.dart";
 
 void main() {
   group("ImageZoomGeometry", () {
