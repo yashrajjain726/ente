@@ -190,6 +190,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
       context,
       title: l10n.renameFile,
       initialValue: base,
+      selectInitialValue: true,
       hintText: l10n.enterFileName,
       submitButtonLabel: l10n.save,
       onSubmit: (String name) async => widget.session.renameFile(name),
