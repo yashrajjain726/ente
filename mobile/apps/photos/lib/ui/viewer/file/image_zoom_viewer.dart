@@ -303,16 +303,8 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     });
   }
 
-  Size? _validSize(Size? size) {
-    if (size == null ||
-        !size.width.isFinite ||
-        !size.height.isFinite ||
-        size.width <= 0 ||
-        size.height <= 0) {
-      return null;
-    }
-    return size;
-  }
+  Size? _validSize(Size? size) =>
+      size != null && size.isFinite && !size.isEmpty ? size : null;
 
   void _updateGeometry(Size viewportSize, Size imageSize) {
     final nextGeometry = ImageZoomGeometry.calculate(
@@ -632,7 +624,6 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     _publishTransform();
     _animationCompleter?.complete();
     _animationCompleter = null;
-    _updateInteractionLock();
   }
 
   void _stopProgrammaticAnimation() {
@@ -697,24 +688,13 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
           image = Hero(tag: widget.heroTag!, child: image);
         }
 
-        final transformedChild = SizedBox.expand(
-          child: Center(
-            child: SizedBox(
-              width: fittedSize.width,
-              height: fittedSize.height,
-              child: image,
-            ),
-          ),
-        );
+        final transformedChild = SizedBox.expand(child: Center(child: image));
         final interactiveViewer = InteractiveViewer(
           key: ValueKey(_interactiveViewerGeneration),
           transformationController: _transformationController,
           alignment: null,
           minScale: geometry.initialScale,
           maxScale: geometry.maxScale,
-          panEnabled: true,
-          scaleEnabled: true,
-          clipBehavior: Clip.hardEdge,
           onInteractionStart: _onInteractionStart,
           onInteractionUpdate: _onInteractionUpdate,
           onInteractionEnd: _onInteractionEnd,

@@ -54,7 +54,6 @@ class FileViewerState extends State<FileViewer> {
   Widget _boundedImageViewer(ImageProvider imageProvider) {
     return ImageZoomViewer(
       imageProvider: imageProvider,
-      filterQuality: FilterQuality.high,
       maxScaleOverCover: 3.0,
     );
   }

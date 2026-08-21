@@ -76,7 +76,6 @@ class _ZoomableImageState extends State<ZoomableImage> {
   // Start the memory slideshow timer when any image is ready, without waiting
   // for the original.
   bool _firedOnReady = false;
-  bool _isZooming = false;
   bool _interactionLocked = false;
   final _imageZoomController = ImageZoomController();
   late final StreamSubscription<ResetZoomOfPhotoView> _resetZoomSubscription;
@@ -141,10 +140,10 @@ class _ZoomableImageState extends State<ZoomableImage> {
   void _onZoomChanged() {
     if (!mounted) return;
     final transform = _imageZoomController.transform;
-    _isZooming = _imageZoomController.isZoomed;
+    final isZooming = _imageZoomController.isZoomed;
     final state = InheritedDetailPageState.maybeOf(context);
-    state?.isZoomedNotifier.value = _isZooming;
-    state?.zoomTransformNotifier.value = _isZooming
+    state?.isZoomedNotifier.value = isZooming;
+    state?.zoomTransformNotifier.value = isZooming
         ? ZoomTransform(scale: transform.scale, offset: transform.offset)
         : ZoomTransform.identity;
   }
@@ -153,6 +152,15 @@ class _ZoomableImageState extends State<ZoomableImage> {
     widget.shouldDisableScroll?.call(isLocked);
     if (_interactionLocked == isLocked || !mounted) return;
     setState(() => _interactionLocked = isLocked);
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (_imageZoomController.isZoomed) return;
+    if (details.delta.dy > dragSensitivity) {
+      unawaited(Navigator.maybePop(context));
+    } else if (details.delta.dy < -dragSensitivity) {
+      showDetailsSheet(context, widget.photo);
+    }
   }
 
   @override
@@ -186,36 +194,23 @@ class _ZoomableImageState extends State<ZoomableImage> {
         initialFit: widget.shouldCover ? BoxFit.cover : BoxFit.contain,
         // Collage already owns its transform with an outer InteractiveViewer.
         gesturesEnabled: !widget.shouldCover,
-        filterQuality: FilterQuality.high,
-        gaplessPlayback: true,
         onInteractionLockChanged: _onInteractionLockChanged,
         loadingBuilder: (context, event) {
           // Match the loading state to the image's on-screen size during the
           // hero animation.
-          final screenDimensions = MediaQuery.sizeOf(context);
-          late final double screenRelativeImageWidth;
-          late final double screenRelativeImageHeight;
-          final screenWidth = screenDimensions.width;
-          final screenHeight = screenDimensions.height;
-
-          final aspectRatioOfScreen = screenWidth / screenHeight;
-          final aspectRatioOfImage = _photo.width / _photo.height;
-
-          if (aspectRatioOfImage > aspectRatioOfScreen) {
-            screenRelativeImageWidth = screenWidth;
-            screenRelativeImageHeight = screenWidth / aspectRatioOfImage;
-          } else if (aspectRatioOfImage < aspectRatioOfScreen) {
-            screenRelativeImageHeight = screenHeight;
-            screenRelativeImageWidth = screenHeight * aspectRatioOfImage;
-          } else {
-            screenRelativeImageWidth = screenWidth;
-            screenRelativeImageHeight = screenHeight;
-          }
+          final screenSize = MediaQuery.sizeOf(context);
+          final fittedSize = _photo.width > 0 && _photo.height > 0
+              ? applyBoxFit(
+                  BoxFit.contain,
+                  Size(_photo.width.toDouble(), _photo.height.toDouble()),
+                  screenSize,
+                ).destination
+              : screenSize;
 
           return Center(
             child: SizedBox(
-              width: screenRelativeImageWidth,
-              height: screenRelativeImageHeight,
+              width: fittedSize.width,
+              height: fittedSize.height,
               child: widget.isFromMemories
                   ? const _DelayedLoadingIndicator()
                   : const EnteLoadingWidget(color: Colors.white),
@@ -243,17 +238,7 @@ class _ZoomableImageState extends State<ZoomableImage> {
             widget.isGuestView ||
             !widget.enableVerticalSwipeActions
         ? null
-        : (d) => {
-            if (!_isZooming)
-              {
-                if (d.delta.dy > dragSensitivity)
-                  {
-                    {unawaited(Navigator.maybePop(context))},
-                  }
-                else if (d.delta.dy < (dragSensitivity * -1))
-                  {showDetailsSheet(context, widget.photo)},
-              },
-          };
+        : _onVerticalDragUpdate;
     return GestureDetector(
       onVerticalDragUpdate: verticalDragCallback,
       child: content,
