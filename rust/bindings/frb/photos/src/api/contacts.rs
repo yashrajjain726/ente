@@ -8,31 +8,13 @@ use flutter_rust_bridge::frb;
 
 #[frb]
 pub enum ContactsError {
-    Network { message: String },
-    Http { message: String },
-    Parse { message: String },
-    Crypto { message: String },
-    Auth { message: String },
-    InvalidInput { message: String },
-    MissingEncryptedData { message: String },
-    MissingEncryptedKey { message: String },
-    ProfilePictureNotFound { message: String },
-    ActiveRecoverySession { message: String },
+    Other { message: String },
 }
 
 impl From<ente_contacts::Error> for ContactsError {
     fn from(e: ente_contacts::Error) -> Self {
-        use ente_contacts::ErrorKind as K;
-        let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::MissingEncryptedData => Self::MissingEncryptedData { message },
-            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
-            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
+        Self::Other {
+            message: ente_core::error::chain(&e),
         }
     }
 }

@@ -25,32 +25,4 @@ pub enum Error {
     ProfilePictureNotFound,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ErrorKind {
-    Network,
-    Http,
-    Parse,
-    Crypto,
-    InvalidInput,
-    MissingEncryptedData,
-    MissingEncryptedKey,
-    ProfilePictureNotFound,
-}
-
-impl Error {
-    pub fn kind(&self) -> ErrorKind {
-        match self {
-            Error::Http(http::Error::Network(_)) => ErrorKind::Network,
-            Error::Http(http::Error::Parse(_)) => ErrorKind::Parse,
-            Error::Http(_) => ErrorKind::Http,
-            Error::Crypto(_) => ErrorKind::Crypto,
-            Error::Base64Decode(_) => ErrorKind::Crypto,
-            Error::InvalidInput(_) => ErrorKind::InvalidInput,
-            Error::MissingEncryptedData => ErrorKind::MissingEncryptedData,
-            Error::MissingEncryptedKey => ErrorKind::MissingEncryptedKey,
-            Error::ProfilePictureNotFound => ErrorKind::ProfilePictureNotFound,
-        }
-    }
-}
-
 pub type Result<T> = std::result::Result<T, Error>;

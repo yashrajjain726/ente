@@ -13,77 +13,35 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ContactsError {
-    Network { message: String },
-    Http { message: String },
-    Parse { message: String },
-    Crypto { message: String },
-    Auth { message: String },
-    InvalidInput { message: String },
-    MissingEncryptedData { message: String },
-    MissingEncryptedKey { message: String },
-    ProfilePictureNotFound { message: String },
-    ActiveRecoverySession { message: String },
-    Serde { message: String },
-    Decode { message: String },
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Contacts(#[from] ente_contacts::Error),
+    #[error(transparent)]
+    Legacy(#[from] ente_legacy::Error),
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
+    #[error(transparent)]
+    Decode(#[from] b64::DecodeError),
 }
 
-impl From<ContactsError> for JsValue {
-    fn from(e: ContactsError) -> Self {
-        let object = match swb::to_value(&e) {
-            Ok(object) => object,
-            Err(err) => return JsValue::from_str(&err.to_string()),
-        };
-        let message = Reflect::get(&object, &JsValue::from_str("message"))
-            .ok()
-            .and_then(|message| message.as_string())
-            .unwrap_or_default();
-        let error = js_sys::Error::new(&message);
-        Object::assign(error.as_ref(), object.unchecked_ref());
-        error.into()
+impl Error {
+    fn name(&self) -> Option<&'static str> {
+        None
+    }
+
+    fn message(&self) -> String {
+        ente_core::error::chain(self)
     }
 }
 
-impl From<ente_contacts::Error> for ContactsError {
-    fn from(e: ente_contacts::Error) -> Self {
-        use ente_contacts::ErrorKind as K;
-        let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::MissingEncryptedData => Self::MissingEncryptedData { message },
-            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
-            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
+impl From<Error> for JsValue {
+    fn from(error: Error) -> Self {
+        let js_error = js_sys::Error::new(&error.message());
+        if let Some(name) = error.name() {
+            js_error.set_name(name);
         }
-    }
-}
-
-impl From<ente_legacy::Error> for ContactsError {
-    fn from(e: ente_legacy::Error) -> Self {
-        use ente_legacy::ErrorKind as K;
-        let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::Auth => Self::Auth { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
-        }
-    }
-}
-
-impl From<swb::Error> for ContactsError {
-    fn from(e: swb::Error) -> Self {
-        Self::Serde {
-            message: e.to_string(),
-        }
+        js_error.into()
     }
 }
 
@@ -137,11 +95,9 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
 }
 
 #[wasm_bindgen]
-pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError> {
+pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, Error> {
     let input: OpenContactsCtxJsInput = swb::from_value(input)?;
-    let master_key = b64::decode(&input.master_key_b64).map_err(|e| ContactsError::Decode {
-        message: e.to_string(),
-    })?;
+    let master_key = b64::decode(&input.master_key_b64)?;
     let api = Arc::new(Api::new(
         Http::new().map_err(ente_contacts::Error::from)?,
         ApiConfig {
@@ -177,7 +133,7 @@ pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError>
     Reflect::set(
         &output,
         &JsValue::from_str("wrappedRootContactKey"),
-        &swb::to_value(&result.wrapped_root_contact_key).map_err(ContactsError::from)?,
+        &swb::to_value(&result.wrapped_root_contact_key)?,
     )
     .expect("setting wrappedRootContactKey should not fail");
     Reflect::set(
@@ -206,11 +162,11 @@ impl ContactsCtxHandle {
         self.api.set_auth(Some(Auth::User(auth_token)));
     }
 
-    pub fn current_wrapped_root_contact_key(&self) -> Result<JsValue, ContactsError> {
+    pub fn current_wrapped_root_contact_key(&self) -> Result<JsValue, Error> {
         swb::to_value(&self.contacts.current_wrapped_root_contact_key()).map_err(Into::into)
     }
 
-    pub async fn get_diff(&self, since_time: i64, limit: u16) -> Result<JsValue, ContactsError> {
+    pub async fn get_diff(&self, since_time: i64, limit: u16) -> Result<JsValue, Error> {
         let diff: Vec<ContactRecordJs> = self
             .contacts
             .get_diff(since_time, limit)
@@ -221,24 +177,24 @@ impl ContactsCtxHandle {
         swb::to_value(&diff).map_err(Into::into)
     }
 
-    pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>, ContactsError> {
+    pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>, Error> {
         self.contacts
             .get_profile_picture(contact_id)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn legacy_get_info(&self) -> Result<JsValue, ContactsError> {
+    pub async fn legacy_get_info(&self) -> Result<JsValue, Error> {
         let info = self.legacy.info().await?;
         swb::to_value(&info).map_err(Into::into)
     }
 
-    pub async fn legacy_public_key(&self, email: String) -> Result<JsValue, ContactsError> {
+    pub async fn legacy_public_key(&self, email: String) -> Result<JsValue, Error> {
         let public_key = self.legacy.public_key(&email).await?;
         swb::to_value(&public_key).map_err(Into::into)
     }
 
-    pub fn legacy_verification_id(&self, public_key_b64: String) -> Result<String, ContactsError> {
+    pub fn legacy_verification_id(&self, public_key_b64: String) -> Result<String, Error> {
         self.legacy
             .verification_id(&public_key_b64)
             .map_err(Into::into)
@@ -249,7 +205,7 @@ impl ContactsCtxHandle {
         email: String,
         current_user_key_attrs: JsValue,
         recovery_notice_in_days: Option<i32>,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
         self.legacy
             .add_contact(&email, &current_user_key_attrs, recovery_notice_in_days)
@@ -262,7 +218,7 @@ impl ContactsCtxHandle {
         user_id: i64,
         emergency_contact_id: i64,
         state: JsValue,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         let state: LegacyContactState = swb::from_value(state)?;
         self.legacy
             .update_contact(user_id, emergency_contact_id, state)
@@ -274,7 +230,7 @@ impl ContactsCtxHandle {
         &self,
         emergency_contact_id: i64,
         recovery_notice_in_days: i32,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         self.legacy
             .update_recovery_notice(emergency_contact_id, recovery_notice_in_days)
             .await
@@ -285,7 +241,7 @@ impl ContactsCtxHandle {
         &self,
         user_id: i64,
         emergency_contact_id: i64,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         self.legacy
             .start_recovery(user_id, emergency_contact_id)
             .await
@@ -297,7 +253,7 @@ impl ContactsCtxHandle {
         recovery_id: String,
         user_id: i64,
         emergency_contact_id: i64,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         self.legacy
             .stop_recovery(&recovery_id, user_id, emergency_contact_id)
             .await
@@ -309,7 +265,7 @@ impl ContactsCtxHandle {
         recovery_id: String,
         user_id: i64,
         emergency_contact_id: i64,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         self.legacy
             .reject_recovery(&recovery_id, user_id, emergency_contact_id)
             .await
@@ -321,7 +277,7 @@ impl ContactsCtxHandle {
         recovery_id: String,
         user_id: i64,
         emergency_contact_id: i64,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         self.legacy
             .approve_recovery(&recovery_id, user_id, emergency_contact_id)
             .await
@@ -332,7 +288,7 @@ impl ContactsCtxHandle {
         &self,
         recovery_id: String,
         current_user_key_attrs: JsValue,
-    ) -> Result<JsValue, ContactsError> {
+    ) -> Result<JsValue, Error> {
         let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
         let bundle = self
             .legacy
@@ -350,7 +306,7 @@ impl ContactsCtxHandle {
         recovery_id: String,
         current_user_key_attrs: JsValue,
         new_password: String,
-    ) -> Result<(), ContactsError> {
+    ) -> Result<(), Error> {
         let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
         self.legacy
             .change_password(&recovery_id, &current_user_key_attrs, &new_password)

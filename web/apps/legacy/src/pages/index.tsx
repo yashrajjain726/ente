@@ -57,11 +57,6 @@ const slotLabels: Record<SlotID, string> = {
 
 const slotNumbers: Record<SlotID, number> = { first: 1, second: 2 };
 
-const inactiveLegacyKitRequestPaths = [
-    "/legacy-kits/recovery/challenge",
-    "/legacy-kits/recovery/open",
-];
-
 const getErrorMessage = (error: unknown) =>
     error instanceof Error
         ? error.message
@@ -69,16 +64,8 @@ const getErrorMessage = (error: unknown) =>
           ? String(error.message)
           : "Something went wrong.";
 
-const isInactiveLegacyKitError = (error: unknown) => {
-    const message = getErrorMessage(error).toLowerCase();
-    return (
-        message.includes("legacy kit not found") ||
-        (message.includes("http 404") &&
-            inactiveLegacyKitRequestPaths.some((path) =>
-                message.includes(path),
-            ))
-    );
-};
+const isInactiveLegacyKitError = (error: unknown) =>
+    error instanceof Error && error.name == "legacy_kit_inactive";
 
 const parseSlotCode = (rawCode: string): Pick<SheetSlot, "error" | "share"> => {
     if (!rawCode.trim()) {

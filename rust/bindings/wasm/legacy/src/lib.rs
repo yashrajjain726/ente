@@ -1,54 +1,38 @@
 use ente_legacy::{LegacyKitRecoveryClient, LegacyKitShare};
-use js_sys::Reflect;
 use serde::Deserialize;
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
 use ente_wasm_log as _;
 
-pub struct LegacyError {
-    kind: &'static str,
-    message: String,
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Legacy(#[from] ente_legacy::Error),
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
 }
 
-impl From<LegacyError> for JsValue {
-    fn from(error: LegacyError) -> Self {
-        let js_error = js_sys::Error::new(&error.message);
-        Reflect::set(
-            js_error.as_ref(),
-            &JsValue::from_str("kind"),
-            &JsValue::from_str(error.kind),
-        )
-        .expect("setting error kind should not fail");
+impl Error {
+    fn name(&self) -> Option<&'static str> {
+        match self {
+            Self::Legacy(ente_legacy::Error::LegacyKitInactive) => Some("legacy_kit_inactive"),
+            _ => None,
+        }
+    }
+
+    fn message(&self) -> String {
+        ente_core::error::chain(self)
+    }
+}
+
+impl From<Error> for JsValue {
+    fn from(error: Error) -> Self {
+        let js_error = js_sys::Error::new(&error.message());
+        if let Some(name) = error.name() {
+            js_error.set_name(name);
+        }
         js_error.into()
-    }
-}
-
-impl From<ente_legacy::Error> for LegacyError {
-    fn from(error: ente_legacy::Error) -> Self {
-        use ente_legacy::ErrorKind as K;
-        let kind = match error.kind() {
-            K::Network => "network",
-            K::Http => "http",
-            K::Parse => "parse",
-            K::Crypto => "crypto",
-            K::Auth => "auth",
-            K::InvalidInput => "invalid_input",
-            K::ActiveRecoverySession => "active_recovery_session",
-        };
-        Self {
-            kind,
-            message: ente_core::error::chain(&error),
-        }
-    }
-}
-
-impl From<swb::Error> for LegacyError {
-    fn from(error: swb::Error) -> Self {
-        Self {
-            kind: "serde",
-            message: error.to_string(),
-        }
     }
 }
 
@@ -64,9 +48,7 @@ struct OpenLegacyKitRecoveryInput {
 }
 
 #[wasm_bindgen]
-pub async fn legacy_kit_open_recovery(
-    input: JsValue,
-) -> Result<LegacyKitRecoveryHandle, LegacyError> {
+pub async fn legacy_kit_open_recovery(input: JsValue) -> Result<LegacyKitRecoveryHandle, Error> {
     let input: OpenLegacyKitRecoveryInput = swb::from_value(input)?;
     let client = LegacyKitRecoveryClient::new_with_headers(
         input.base_url,
@@ -87,19 +69,16 @@ pub struct LegacyKitRecoveryHandle {
 
 #[wasm_bindgen]
 impl LegacyKitRecoveryHandle {
-    pub fn session(&self) -> Result<JsValue, LegacyError> {
-        swb::to_value(self.inner.session()).map_err(Into::into)
+    pub fn session(&self) -> Result<JsValue, Error> {
+        Ok(swb::to_value(self.inner.session())?)
     }
 
-    pub async fn refresh_session(&self) -> Result<JsValue, LegacyError> {
+    pub async fn refresh_session(&self) -> Result<JsValue, Error> {
         let session = self.inner.refresh_session().await?;
-        swb::to_value(&session).map_err(Into::into)
+        Ok(swb::to_value(&session)?)
     }
 
-    pub async fn change_password(&self, new_password: String) -> Result<(), LegacyError> {
-        self.inner
-            .change_password(&new_password)
-            .await
-            .map_err(Into::into)
+    pub async fn change_password(&self, new_password: String) -> Result<(), Error> {
+        Ok(self.inner.change_password(&new_password).await?)
     }
 }

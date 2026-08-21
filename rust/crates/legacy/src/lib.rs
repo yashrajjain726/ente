@@ -7,7 +7,7 @@ pub mod models;
 pub mod transport;
 
 pub use client::LegacyClient;
-pub use error::{Error, ErrorKind, Result};
+pub use error::{Error, Result};
 pub use kit::{LegacyKitRecoveryClient, LegacyKitRecoveryHandle};
 pub use kit_models::{
     LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitCreateResult, LegacyKitMetadata,

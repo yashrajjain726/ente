@@ -9,47 +9,26 @@ use flutter_rust_bridge::frb;
 
 #[frb]
 pub enum ContactsError {
-    Network { message: String },
-    Http { message: String },
-    Parse { message: String },
-    Crypto { message: String },
-    Auth { message: String },
-    InvalidInput { message: String },
-    MissingEncryptedData { message: String },
-    MissingEncryptedKey { message: String },
-    ProfilePictureNotFound { message: String },
     ActiveRecoverySession { message: String },
+    Other { message: String },
 }
 
 impl From<ente_contacts::Error> for ContactsError {
     fn from(e: ente_contacts::Error) -> Self {
-        use ente_contacts::ErrorKind as K;
-        let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::MissingEncryptedData => Self::MissingEncryptedData { message },
-            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
-            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
+        Self::Other {
+            message: ente_core::error::chain(&e),
         }
     }
 }
 
 impl From<ente_legacy::Error> for ContactsError {
     fn from(e: ente_legacy::Error) -> Self {
-        use ente_legacy::ErrorKind as K;
+        use ente_legacy::Error as E;
+
         let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::Auth => Self::Auth { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
+        match e {
+            E::ActiveRecoverySession => Self::ActiveRecoverySession { message },
+            _ => Self::Other { message },
         }
     }
 }
@@ -555,12 +534,9 @@ impl ContactsCtx {
         part_names: Vec<String>,
         notice_period_in_hours: i32,
     ) -> Result<LegacyKitCreateResult, ContactsError> {
-        let part_names: [String; 3] =
-            part_names
-                .try_into()
-                .map_err(|_| ContactsError::InvalidInput {
-                    message: "legacy kit requires exactly three part names".into(),
-                })?;
+        let part_names: [String; 3] = part_names.try_into().map_err(|_| ContactsError::Other {
+            message: "legacy kit requires exactly three part names".into(),
+        })?;
         self.legacy
             .create_kit(
                 &current_user_key_attrs.into(),
