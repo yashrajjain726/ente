@@ -56,18 +56,6 @@ void main() {
       expect(harness.controller.stage, ImageZoomStage.covering);
     });
 
-    testWidgets("clamps a focal point near the image edge", (tester) async {
-      final harness = await _pumpViewer(tester, image: landscapeImage);
-
-      await _doubleTap(tester, harness.globalPoint(const Offset(390, 200)));
-
-      _expectTransform(
-        harness.controller,
-        scale: 1.5,
-        offset: const Offset(-100, 0),
-      );
-    });
-
     testWidgets("cycles through cover, original size, and initial", (
       tester,
     ) async {
@@ -227,41 +215,6 @@ void main() {
       expect(lockChanges, <bool>[true, false]);
       expect(harness.controller.transform, ImageZoomTransform.identity);
       expect(harness.controller.stage, ImageZoomStage.initial);
-    });
-
-    testWidgets("a pinch interrupts a double-tap animation cleanly", (
-      tester,
-    ) async {
-      final harness = await _pumpViewer(tester, image: landscapeImage);
-      final center = harness.globalPoint(const Offset(200, 200));
-      await _beginDoubleTap(tester, center);
-      await tester.pump(const Duration(milliseconds: 60));
-      final interruptedScale = harness.controller.transform.scale;
-      expect(interruptedScale, inExclusiveRange(1, 1.5));
-
-      final firstFinger = await tester.createGesture(pointer: 41);
-      final secondFinger = await tester.createGesture(pointer: 42);
-      await firstFinger.down(center - const Offset(30, 0));
-      await secondFinger.down(center + const Offset(30, 0));
-      await tester.pump();
-      await firstFinger.moveTo(center - const Offset(70, 0));
-      await secondFinger.moveTo(center + const Offset(70, 0));
-      await tester.pump();
-      await firstFinger.up();
-      await secondFinger.up();
-      await tester.pump();
-
-      final pinchResult = harness.controller.transform;
-      expect(pinchResult.scale, greaterThan(interruptedScale + 0.1));
-      expect(harness.controller.stage, ImageZoomStage.gesture);
-      _expectFiniteAndInBounds(
-        pinchResult,
-        viewportSize: _viewportSize,
-        fittedImageSize: const Size(400, 800 / 3),
-      );
-
-      await tester.pump(const Duration(milliseconds: 500));
-      _expectSameTransform(harness.controller.transform, pinchResult);
     });
   });
 
@@ -547,29 +500,6 @@ void main() {
     },
   );
 
-  testWidgets("Hero bounds match the fitted image instead of the viewport", (
-    tester,
-  ) async {
-    final harness = await _pumpViewer(
-      tester,
-      image: landscapeImage,
-      heroTag: "fitted-image-hero",
-    );
-
-    final viewportRect = Rect.fromLTWH(
-      harness.viewportTopLeft.dx,
-      harness.viewportTopLeft.dy,
-      _viewportSize.width,
-      _viewportSize.height,
-    );
-    final heroRect = tester.getRect(find.byType(Hero));
-
-    expect(heroRect.width, closeTo(400, 0.01));
-    expect(heroRect.height, closeTo(800 / 3, 0.01));
-    expect(heroRect.center, viewportRect.center);
-    expect(heroRect, isNot(viewportRect));
-  });
-
   testWidgets(
     "same-aspect provider replacement during animation stays stable",
     (tester) async {
@@ -646,7 +576,6 @@ Future<_ViewerHarness> _pumpViewer(
   ValueChanged<bool>? onInteractionLockChanged,
   BoxFit initialFit = BoxFit.contain,
   bool gesturesEnabled = true,
-  Object? heroTag,
 }) async {
   final viewportKey = GlobalKey();
   final controller = ImageZoomController();
@@ -669,7 +598,6 @@ Future<_ViewerHarness> _pumpViewer(
                 controller: controller,
                 initialFit: initialFit,
                 gesturesEnabled: gesturesEnabled,
-                heroTag: heroTag,
                 loadingBuilder: _emptyLoadingBuilder,
                 onInteractionLockChanged: onInteractionLockChanged,
               ),

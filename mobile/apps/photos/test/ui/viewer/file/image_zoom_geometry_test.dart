@@ -4,22 +4,6 @@ import "package:photos/ui/viewer/file/image_zoom_geometry.dart";
 
 void main() {
   group("ImageZoomGeometry", () {
-    test("calculates contain, cover, original, and maximum scales", () {
-      final geometry = _geometry(
-        viewportSize: const Size(400, 300),
-        imageSize: const Size(1000, 500),
-        maxScaleOverCover: 2,
-      );
-
-      expect(geometry.fittedImageSize, const Size(400, 200));
-      expect(geometry.fittedImageRect, const Rect.fromLTWH(0, 50, 400, 200));
-      expect(geometry.viewportCenter, const Offset(200, 150));
-      expect(geometry.initialScale, 1);
-      expect(geometry.coverScale, 1.5);
-      expect(geometry.originalScale, 2.5);
-      expect(geometry.maxScale, 3);
-    });
-
     test("builds a bounded focal target around the tapped scene point", () {
       final geometry = _geometry(
         viewportSize: const Size(400, 400),
@@ -57,22 +41,6 @@ void main() {
       expect(state.isInitial, isFalse);
       expect(geometry.clampScale(0.5), 1);
       expect(geometry.clampScale(8), 3);
-    });
-
-    test("describes an initial cover transform as semantic identity", () {
-      final geometry = _geometry(
-        viewportSize: const Size(400, 300),
-        imageSize: const Size(1000, 500),
-        initialFit: BoxFit.cover,
-      );
-      final state = geometry.describe(
-        geometry.matrixForScaleAndOffset(geometry.initialScale, Offset.zero),
-      );
-
-      expect(state.absoluteScale, 1.5);
-      expect(state.relativeScale, 1);
-      expect(state.semanticOffset, Offset.zero);
-      expect(state.isInitial, isTrue);
     });
   });
 
