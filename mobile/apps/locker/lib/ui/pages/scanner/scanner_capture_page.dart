@@ -297,7 +297,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     ScanQuad quad,
   ) async {
     final spec = await _buildFlightSpec(bytes, quad);
-    if (!mounted) {
+    if (!mounted || capture.landed) {
       spec?.image.dispose();
       return;
     }
@@ -499,13 +499,11 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       navigator.pop(true);
     } else {
       setState(() {
-        for (final flight in _flights) {
-          flight.capture.landed = true;
-        }
-        _flights.clear();
         for (final capture in _pending) {
+          capture.landed = true;
           _releaseSnapshot(capture);
         }
+        _flights.clear();
         _purgeResolved();
       });
       unawaited(_startCamera());
