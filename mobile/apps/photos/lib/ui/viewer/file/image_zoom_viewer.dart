@@ -1,11 +1,13 @@
 import "dart:async";
-import "dart:math" as math;
 
 import "package:flutter/material.dart";
+import "package:photos/ui/viewer/file/image_zoom_geometry.dart";
+import "package:photos/ui/viewer/file/image_zoom_stage_policy.dart";
+
+export "package:photos/ui/viewer/file/image_zoom_stage_policy.dart"
+    show ImageZoomStage;
 
 const double _kZoomEpsilon = 0.001;
-
-enum ImageZoomStage { initial, covering, originalSize, gesture }
 
 typedef ImageZoomLoadingBuilder =
     Widget Function(BuildContext context, ImageChunkEvent? progress);
@@ -134,12 +136,7 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   StackTrace? _imageErrorStack;
   bool _hasImageFrame = false;
 
-  Size? _viewportSize;
-  Size? _fittedImageSize;
-  double _initialScale = 1.0;
-  double _coverScale = 1.0;
-  double _originalScale = 1.0;
-  double _maxScale = double.infinity;
+  ImageZoomGeometry? _geometry;
 
   final Map<int, Offset> _pointerPositions = <int, Offset>{};
   List<int> _manualPinchPointers = const <int>[];
@@ -155,13 +152,7 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   Offset? _doubleTapPosition;
   int _geometryGeneration = 0;
 
-  bool get _hasGeometry =>
-      _viewportSize != null &&
-      _fittedImageSize != null &&
-      _viewportSize!.width > 0 &&
-      _viewportSize!.height > 0 &&
-      _fittedImageSize!.width > 0 &&
-      _fittedImageSize!.height > 0;
+  bool get _hasGeometry => _geometry != null;
 
   @override
   void initState() {
@@ -324,70 +315,33 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   }
 
   void _updateGeometry(Size viewportSize, Size imageSize) {
-    final fittedSize = applyBoxFit(
-      BoxFit.contain,
-      imageSize,
-      viewportSize,
-    ).destination;
-    if (fittedSize.isEmpty) return;
+    final nextGeometry = ImageZoomGeometry.calculate(
+      viewportSize: viewportSize,
+      imageSize: imageSize,
+      initialFit: widget.initialFit,
+      maxScaleOverCover: widget.maxScaleOverCover,
+    );
+    if (nextGeometry == null) return;
 
-    final previousViewport = _viewportSize;
-    final previousFittedSize = _fittedImageSize;
-    final previousInitialScale = _initialScale;
+    final previousGeometry = _geometry;
     final previousMatrix = _transformationController.value.clone();
-    final hadGeometry = _hasGeometry;
+    if (previousGeometry?.hasSameConfiguration(nextGeometry) ?? false) return;
 
-    final coverScale = math.max(
-      viewportSize.width / fittedSize.width,
-      viewportSize.height / fittedSize.height,
-    );
-    final initialScale = widget.initialFit == BoxFit.cover ? coverScale : 1.0;
-    final originalScale = math.max(
-      imageSize.width / fittedSize.width,
-      imageSize.height / fittedSize.height,
-    );
-    final maxScale = widget.maxScaleOverCover.isInfinite
-        ? double.infinity
-        : math.max(initialScale, coverScale * widget.maxScaleOverCover);
-
-    final geometryUnchanged =
-        viewportSize == previousViewport &&
-        fittedSize == previousFittedSize &&
-        initialScale == previousInitialScale &&
-        coverScale == _coverScale &&
-        originalScale == _originalScale &&
-        maxScale == _maxScale;
-    if (geometryUnchanged) return;
-
-    final coordinateGeometryChanged =
-        hadGeometry &&
-        previousViewport != null &&
-        previousFittedSize != null &&
-        (!_sizesNearlyEqual(viewportSize, previousViewport) ||
-            !_sizesNearlyEqual(fittedSize, previousFittedSize) ||
-            (initialScale - previousInitialScale).abs() > _kZoomEpsilon);
-    if (coordinateGeometryChanged && _programmaticAnimationActive) {
+    if (previousGeometry != null &&
+        !nextGeometry.coordinatesMatch(previousGeometry) &&
+        _programmaticAnimationActive) {
       _stopProgrammaticAnimationForGeometryChange();
     }
 
-    _viewportSize = viewportSize;
-    _fittedImageSize = fittedSize;
-    _initialScale = initialScale;
-    _coverScale = coverScale;
-    _originalScale = originalScale;
-    _maxScale = maxScale;
-    _transformationController.configure(
-      viewportSize: viewportSize,
-      fittedImageSize: fittedSize,
-      minScale: initialScale,
-      maxScale: maxScale,
-    );
+    _geometry = nextGeometry;
+    _transformationController.configure(nextGeometry);
 
-    if (!hadGeometry ||
-        previousViewport == null ||
-        previousFittedSize == null) {
+    if (previousGeometry == null) {
       _transformationController.setOwnerValue(
-        _matrixForScaleAndOffset(initialScale, Offset.zero),
+        nextGeometry.matrixForScaleAndOffset(
+          nextGeometry.initialScale,
+          Offset.zero,
+        ),
       );
       _stage = ImageZoomStage.initial;
       _publishTransform();
@@ -395,92 +349,15 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     }
 
     final generation = ++_geometryGeneration;
-    final wasInitial = _isMatrixAtInitial(
-      previousMatrix,
-      viewport: previousViewport,
-      initialScale: previousInitialScale,
-    );
-    final previousScale = previousMatrix.getMaxScaleOnAxis();
-    final relativeScale = previousInitialScale > 0
-        ? previousScale / previousInitialScale
-        : 1.0;
-    final previousSceneCenter = _scenePoint(
-      previousMatrix,
-      previousViewport.center(Offset.zero),
-    );
-    final previousRect = Alignment.center.inscribe(
-      previousFittedSize,
-      Offset.zero & previousViewport,
-    );
-    final normalizedFocus = Offset(
-      (previousSceneCenter.dx - previousRect.left) / previousRect.width,
-      (previousSceneCenter.dy - previousRect.top) / previousRect.height,
-    );
+    final rebase = ImageZoomRebase.capture(previousGeometry, previousMatrix);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || generation != _geometryGeneration) return;
-      if (wasInitial) {
-        _transformationController.setOwnerValue(
-          _matrixForScaleAndOffset(_initialScale, Offset.zero),
-        );
-        _stage = ImageZoomStage.initial;
-      } else {
-        final targetScale = (_initialScale * relativeScale).clamp(
-          _initialScale,
-          _maxScale,
-        );
-        final newRect = Alignment.center.inscribe(
-          _fittedImageSize!,
-          Offset.zero & _viewportSize!,
-        );
-        final newSceneFocus = Offset(
-          newRect.left + normalizedFocus.dx * newRect.width,
-          newRect.top + normalizedFocus.dy * newRect.height,
-        );
-        final center = _viewportSize!.center(Offset.zero);
-        final translation = center - newSceneFocus * targetScale;
-        _transformationController.setOwnerValue(
-          _matrixForScaleAndTranslation(targetScale, translation),
-        );
-        _stage = ImageZoomStage.gesture;
-      }
+      _transformationController.setOwnerValue(rebase.resolve(_geometry!));
+      _stage = rebase.wasInitial
+          ? ImageZoomStage.initial
+          : ImageZoomStage.gesture;
       _publishTransform();
     });
-  }
-
-  Matrix4 _matrixForScaleAndOffset(double scale, Offset offset) {
-    final center = _viewportSize!.center(Offset.zero);
-    return _matrixForScaleAndTranslation(
-      scale,
-      offset - (center * (scale - 1.0)),
-    );
-  }
-
-  Matrix4 _matrixForScaleAndTranslation(double scale, Offset translation) =>
-      Matrix4.identity()
-        ..translateByDouble(translation.dx, translation.dy, 0, 1)
-        ..scaleByDouble(scale, scale, 1, 1);
-
-  Offset _scenePoint(Matrix4 matrix, Offset viewportPoint) {
-    final inverse = Matrix4.tryInvert(matrix);
-    return inverse == null
-        ? viewportPoint
-        : MatrixUtils.transformPoint(inverse, viewportPoint);
-  }
-
-  bool _isMatrixAtInitial(
-    Matrix4 matrix, {
-    Size? viewport,
-    double? initialScale,
-  }) {
-    final size = viewport ?? _viewportSize;
-    final scale = initialScale ?? _initialScale;
-    if (size == null) return true;
-    final actualScale = matrix.getMaxScaleOnAxis();
-    final center = size.center(Offset.zero);
-    final translation = Offset(matrix.storage[12], matrix.storage[13]);
-    final offset = translation + center * (actualScale - 1.0);
-    return (actualScale / scale - 1.0).abs() <= _kZoomEpsilon &&
-        offset.distanceSquared <= _kZoomEpsilon * _kZoomEpsilon;
   }
 
   void _onTransformationChanged() {
@@ -494,7 +371,7 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
         widget.gesturesEnabled &&
         !_manualPinchActive &&
         (_interactiveStartScale != null ||
-            !_isMatrixAtInitial(_transformationController.value));
+            !_geometry!.describe(_transformationController.value).isInitial);
     if (_interactiveViewerEnabled != shouldEnable && mounted) {
       setState(() => _interactiveViewerEnabled = shouldEnable);
     }
@@ -502,22 +379,17 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
 
   void _publishTransform() {
     if (!_hasGeometry) return;
-    final matrix = _transformationController.value;
-    final scale = matrix.getMaxScaleOnAxis();
-    final relativeScale = scale / _initialScale;
-    final center = _viewportSize!.center(Offset.zero);
-    final translation = Offset(matrix.storage[12], matrix.storage[13]);
-    final offset = translation + center * (scale - 1.0);
-    final isInitial =
-        (relativeScale - 1.0).abs() <= _kZoomEpsilon &&
-        offset.distanceSquared <= _kZoomEpsilon * _kZoomEpsilon;
-    if (isInitial) {
+    final matrixState = _geometry!.describe(_transformationController.value);
+    if (matrixState.isInitial) {
       _stage = ImageZoomStage.initial;
     }
     _controller._update(
-      isInitial
+      matrixState.isInitial
           ? ImageZoomTransform.identity
-          : ImageZoomTransform(scale: relativeScale, offset: offset),
+          : ImageZoomTransform(
+              scale: matrixState.relativeScale,
+              offset: matrixState.semanticOffset,
+            ),
       _stage,
     );
     _updateInteractionLock();
@@ -547,7 +419,7 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
       _beginManualPinch();
     } else if (_pointerPositions.length >= 2 &&
         !_manualPinchActive &&
-        _isMatrixAtInitial(_transformationController.value)) {
+        _geometry!.describe(_transformationController.value).isInitial) {
       _beginManualPinch();
     }
     _updateInteractionLock();
@@ -590,7 +462,10 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     final focalPoint = (first + second) / 2;
     _manualPinchStartDistance = (first - second).distance;
     _manualPinchStartMatrix = _transformationController.value.clone();
-    _manualPinchScenePoint = _scenePoint(_manualPinchStartMatrix!, focalPoint);
+    _manualPinchScenePoint = _geometry!.scenePoint(
+      _manualPinchStartMatrix!,
+      focalPoint,
+    );
     if (mounted) setState(() {});
   }
 
@@ -607,12 +482,13 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     final distance = (first - second).distance;
     final focalPoint = (first + second) / 2;
     final startScale = _manualPinchStartMatrix!.getMaxScaleOnAxis();
-    final targetScale = (startScale * distance / _manualPinchStartDistance)
-        .clamp(_initialScale, _maxScale);
+    final targetScale = _geometry!.clampScale(
+      startScale * distance / _manualPinchStartDistance,
+    );
     final translation = focalPoint - _manualPinchScenePoint! * targetScale;
     _stage = ImageZoomStage.gesture;
     _transformationController.setOwnerValue(
-      _matrixForScaleAndTranslation(targetScale, translation),
+      _geometry!.matrixForScaleAndTranslation(targetScale, translation),
     );
   }
 
@@ -621,10 +497,13 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     _manualPinchPointers = const <int>[];
     _manualPinchStartMatrix = null;
     _manualPinchScenePoint = null;
-    if (_isMatrixAtInitial(_transformationController.value)) {
+    if (_geometry!.describe(_transformationController.value).isInitial) {
       _stage = ImageZoomStage.initial;
       _transformationController.setOwnerValue(
-        _matrixForScaleAndOffset(_initialScale, Offset.zero),
+        _geometry!.matrixForScaleAndOffset(
+          _geometry!.initialScale,
+          Offset.zero,
+        ),
       );
     }
     _publishTransform();
@@ -666,49 +545,28 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
     _doubleTapPosition = null;
     if (!_hasGeometry || tapPosition == null) return;
 
+    final geometry = _geometry!;
     final currentScale = _transformationController.value.getMaxScaleOnAxis();
-    final nextStage = _nextDistinctStage(currentScale);
+    final stagePolicy = ImageZoomStagePolicy(
+      initialScale: geometry.initialScale,
+      coverScale: geometry.coverScale,
+      originalScale: geometry.originalScale,
+      maxScale: geometry.maxScale,
+    );
+    final nextStage = stagePolicy.nextDoubleTapStage(
+      currentStage: _stage,
+      currentScale: currentScale,
+    );
     if (nextStage == null) return;
-    final targetScale = _scaleForStage(nextStage);
-    late final Matrix4 target;
-    if (nextStage == ImageZoomStage.initial) {
-      target = _matrixForScaleAndOffset(_initialScale, Offset.zero);
-    } else {
-      final scenePoint = _transformationController.toScene(tapPosition);
-      final center = _viewportSize!.center(Offset.zero);
-      target = _matrixForScaleAndTranslation(
-        targetScale,
-        center - scenePoint * targetScale,
-      );
-    }
+    final targetScale = stagePolicy.targetScale(nextStage);
+    final target = nextStage == ImageZoomStage.initial
+        ? geometry.matrixForScaleAndOffset(geometry.initialScale, Offset.zero)
+        : geometry.matrixForFocalPoint(
+            _transformationController.value,
+            tapPosition,
+            targetScale,
+          );
     unawaited(_animateTo(target, nextStage));
-  }
-
-  ImageZoomStage? _nextDistinctStage(double currentScale) {
-    if (_stage == ImageZoomStage.gesture) return ImageZoomStage.initial;
-    var candidate = _stage;
-    for (var i = 0; i < 3; i++) {
-      candidate = switch (candidate) {
-        ImageZoomStage.initial => ImageZoomStage.covering,
-        ImageZoomStage.covering => ImageZoomStage.originalSize,
-        ImageZoomStage.originalSize ||
-        ImageZoomStage.gesture => ImageZoomStage.initial,
-      };
-      final targetScale = _scaleForStage(candidate);
-      if ((targetScale - currentScale).abs() > _kZoomEpsilon) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  double _scaleForStage(ImageZoomStage stage) {
-    final scale = switch (stage) {
-      ImageZoomStage.initial || ImageZoomStage.gesture => _initialScale,
-      ImageZoomStage.covering => _coverScale,
-      ImageZoomStage.originalSize => _originalScale,
-    };
-    return scale.clamp(_initialScale, _maxScale);
   }
 
   @override
@@ -718,7 +576,11 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
       _controller._update(ImageZoomTransform.identity, _stage);
       return Future<void>.value();
     }
-    final target = _matrixForScaleAndOffset(_initialScale, Offset.zero);
+    final geometry = _geometry!;
+    final target = geometry.matrixForScaleAndOffset(
+      geometry.initialScale,
+      Offset.zero,
+    );
     if (!animated) {
       _stopProgrammaticAnimation();
       _stage = ImageZoomStage.initial;
@@ -817,11 +679,9 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
           return const SizedBox.shrink();
         }
         _updateGeometry(viewportSize, _resolvedImageSize!);
-        final fittedSize = applyBoxFit(
-          BoxFit.contain,
-          _resolvedImageSize!,
-          viewportSize,
-        ).destination;
+        final geometry = _geometry;
+        if (geometry == null) return const SizedBox.shrink();
+        final fittedSize = geometry.fittedImageSize;
 
         Widget image = Image(
           image: widget.imageProvider,
@@ -850,8 +710,8 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
           key: ValueKey(_interactiveViewerGeneration),
           transformationController: _transformationController,
           alignment: null,
-          minScale: _initialScale,
-          maxScale: _maxScale,
+          minScale: geometry.initialScale,
+          maxScale: geometry.maxScale,
           panEnabled: true,
           scaleEnabled: true,
           clipBehavior: Clip.hardEdge,
@@ -894,26 +754,11 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
 }
 
 class _BoundedTransformationController extends TransformationController {
-  Size? _viewportSize;
-  Size? _fittedImageSize;
-  double _minScale = 1.0;
-  double _maxScale = double.infinity;
+  ImageZoomGeometry? _geometry;
   bool _ownerWrite = false;
   bool _suppressInteractiveWrites = false;
 
-  bool get _hasGeometry => _viewportSize != null && _fittedImageSize != null;
-
-  void configure({
-    required Size viewportSize,
-    required Size fittedImageSize,
-    required double minScale,
-    required double maxScale,
-  }) {
-    _viewportSize = viewportSize;
-    _fittedImageSize = fittedImageSize;
-    _minScale = minScale;
-    _maxScale = maxScale;
-  }
+  void configure(ImageZoomGeometry geometry) => _geometry = geometry;
 
   void suppressInteractiveWrites() {
     _suppressInteractiveWrites = true;
@@ -937,37 +782,8 @@ class _BoundedTransformationController extends TransformationController {
     super.value = sanitized;
   }
 
-  Matrix4 sanitize(Matrix4 matrix) {
-    if (!_hasGeometry) return matrix.clone();
-    var scale = matrix.getMaxScaleOnAxis();
-    if (!scale.isFinite || scale <= 0) scale = _minScale;
-    scale = scale.clamp(_minScale, _maxScale);
-
-    final viewportSize = _viewportSize!;
-    final fittedImageSize = _fittedImageSize!;
-    final center = viewportSize.center(Offset.zero);
-    var translation = Offset(matrix.storage[12], matrix.storage[13]);
-    if (!translation.dx.isFinite || !translation.dy.isFinite) {
-      translation = -(center * (scale - 1.0));
-    }
-    var offset = translation + center * (scale - 1.0);
-    final maxOffsetX = math.max(
-      0.0,
-      (fittedImageSize.width * scale - viewportSize.width) / 2,
-    );
-    final maxOffsetY = math.max(
-      0.0,
-      (fittedImageSize.height * scale - viewportSize.height) / 2,
-    );
-    offset = Offset(
-      offset.dx.clamp(-maxOffsetX, maxOffsetX),
-      offset.dy.clamp(-maxOffsetY, maxOffsetY),
-    );
-    translation = offset - center * (scale - 1.0);
-    return Matrix4.identity()
-      ..translateByDouble(translation.dx, translation.dy, 0, 1)
-      ..scaleByDouble(scale, scale, 1, 1);
-  }
+  Matrix4 sanitize(Matrix4 matrix) =>
+      _geometry?.sanitize(matrix) ?? matrix.clone();
 }
 
 bool _matricesNearlyEqual(Matrix4 first, Matrix4 second) {
@@ -979,7 +795,3 @@ bool _matricesNearlyEqual(Matrix4 first, Matrix4 second) {
   }
   return true;
 }
-
-bool _sizesNearlyEqual(Size first, Size second) =>
-    (first.width - second.width).abs() <= _kZoomEpsilon &&
-    (first.height - second.height).abs() <= _kZoomEpsilon;
