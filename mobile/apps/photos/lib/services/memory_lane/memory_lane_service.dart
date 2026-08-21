@@ -91,8 +91,8 @@ class MemoryLaneService {
       Bus.instance.on<PeopleChangedEvent>().listen(_handlePeopleChange);
       Bus.instance.on<MLConsentChangedEvent>().listen(_handleMlConsentChange);
       _scheduleStartupBackfill();
-      await _queueFullRecompute();
       _initialized = true;
+      await _queueFullRecompute();
     } catch (error, stackTrace) {
       _logger.severe("Failed to initialize Memory Lane", error, stackTrace);
     }
