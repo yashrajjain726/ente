@@ -431,6 +431,7 @@ func (repo *FileRepository) UpdateThumbnail(ctx context.Context, fileID int64, u
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
 	updationTime := time.Microseconds()
 	_, err = tx.ExecContext(ctx, `UPDATE files SET 
 			thumbnail_decryption_header = $1, 

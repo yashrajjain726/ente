@@ -282,34 +282,37 @@ func (c *UserController) verifySRPSession(ctx context.Context,
 	if len(srpM1Bytes) != 32 {
 		return nil, ente.NewBadRequestWithMessage(fmt.Sprintf("srpM1 size is %d, expected 32", len(srpM1Bytes)))
 	}
-	srpSession, err := c.UserAuthRepo.GetSrpSessionEntity(ctx, sessionID)
+	srpSession, err := c.UserAuthRepo.ReserveSrpSessionAttempt(ctx, sessionID, 5)
 	if err != nil {
-		// Do not reveal whether the session exists.
-		if errors.Is(err, sql.ErrNoRows) {
-			// Match normal verification timing.
-			time.Sleep(time.Duration(10+mathRand.Intn(20)) * time.Millisecond)
-			return nil, stacktrace.Propagate(ente.ErrInvalidPassword, "session not found")
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, stacktrace.Propagate(err, "")
 		}
-		return nil, stacktrace.Propagate(err, "")
-	}
-
-	if srpSession.IsFake {
-		// Match real-session timing and attempt bookkeeping.
-		time.Sleep(time.Duration(20+mathRand.Intn(30)) * time.Millisecond)
-		_ = c.UserAuthRepo.IncrementSrpSessionAttemptCount(ctx, sessionID)
-		return nil, stacktrace.Propagate(ente.ErrInvalidPassword, "fake session verification")
-	}
-
-	if srpSession.IsVerified {
-		return nil, stacktrace.Propagate(&ente.ApiError{
-			Code:           "SESSION_ALREADY_VERIFIED",
-			HttpStatusCode: http.StatusGone,
-		}, "")
-	} else if srpSession.AttemptCount >= 5 {
+		srpSession, err = c.UserAuthRepo.GetSrpSessionEntity(ctx, sessionID)
+		if err != nil {
+			// Do not reveal whether the session exists.
+			if errors.Is(err, sql.ErrNoRows) {
+				// Match normal verification timing.
+				time.Sleep(time.Duration(10+mathRand.Intn(20)) * time.Millisecond)
+				return nil, stacktrace.Propagate(ente.ErrInvalidPassword, "session not found")
+			}
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if srpSession.IsVerified {
+			return nil, stacktrace.Propagate(&ente.ApiError{
+				Code:           "SESSION_ALREADY_VERIFIED",
+				HttpStatusCode: http.StatusGone,
+			}, "")
+		}
 		return nil, stacktrace.Propagate(&ente.ApiError{
 			Code:           "TOO_MANY_WRONG_ATTEMPTS",
 			HttpStatusCode: http.StatusGone,
 		}, "")
+	}
+
+	if srpSession.IsFake {
+		// Match real-session timing.
+		time.Sleep(time.Duration(20+mathRand.Intn(30)) * time.Millisecond)
+		return nil, stacktrace.Propagate(ente.ErrInvalidPassword, "fake session verification")
 	}
 
 	srpParams := srp.GetParams(Srp4096Params)
@@ -336,16 +339,17 @@ func (c *UserController) verifySRPSession(ctx context.Context,
 	srpM2Bytes, err := srpServer.CheckM1(srpM1Bytes)
 
 	if err != nil {
-		err2 := c.UserAuthRepo.IncrementSrpSessionAttemptCount(ctx, sessionID)
-		if err2 != nil {
-			return nil, stacktrace.Propagate(err2, "")
-		}
 		return nil, stacktrace.Propagate(ente.ErrInvalidPassword, "failed to verify srp session")
-	} else {
-		err2 := c.UserAuthRepo.SetSrpSessionVerified(ctx, sessionID)
-		if err2 != nil {
-			return nil, stacktrace.Propagate(err2, "")
-		}
+	}
+	claimed, err := c.UserAuthRepo.TrySetSrpSessionVerified(ctx, sessionID)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if !claimed {
+		return nil, stacktrace.Propagate(&ente.ApiError{
+			Code:           "SESSION_ALREADY_VERIFIED",
+			HttpStatusCode: http.StatusGone,
+		}, "")
 	}
 	srpM2 := convertBytesToString(srpM2Bytes)
 	return &srpM2, nil
