@@ -135,7 +135,7 @@ const MODEL_INFO_FALLBACKS = [
 
 const modelMissingError = () =>
     Object.assign(new Error("Required model assets are not downloaded"), {
-        code: "model_missing",
+        name: "model_missing",
     });
 
 export class LlmProvider {
@@ -466,7 +466,7 @@ export class LlmProvider {
         await this.ensureInFlight?.promise.catch(() => undefined);
         if (!shouldContinue()) {
             throw Object.assign(new Error("Knowledge retrieval cancelled"), {
-                code: "cancelled",
+                name: "cancelled",
             });
         }
         this.invalidateModelState();

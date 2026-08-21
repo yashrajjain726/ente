@@ -689,24 +689,13 @@ const normalizeInvokeError = (error: unknown, fallback: string) => {
     if (error instanceof Error) return error;
     if (typeof error === "string") return new Error(error);
     if (error && typeof error === "object") {
-        const code =
-            "code" in error
-                ? String((error as { code?: unknown }).code)
-                : undefined;
-        const message =
-            "message" in error
-                ? String((error as { message?: unknown }).message)
-                : "";
+        const value = error as { name?: unknown; message?: unknown };
+        const name = typeof value.name === "string" ? value.name : undefined;
+        const message = typeof value.message === "string" ? value.message : "";
         const payload = message || safeJson(error);
-        const text = payload
-            ? code
-                ? `${payload} (${code})`
-                : payload
-            : fallback;
+        const text = payload || fallback;
         const err = new Error(text);
-        if (code) {
-            (err as Error & { code?: string }).code = code;
-        }
+        if (name) err.name = name;
         return err;
     }
     return new Error(fallback);

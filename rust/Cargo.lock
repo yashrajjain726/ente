@@ -2549,6 +2549,7 @@ name = "ente-ensu-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-assets",
+ "ente-core",
  "ente-ensu",
  "ente-uniffi-log",
  "thiserror 2.0.18",
@@ -2560,9 +2561,11 @@ dependencies = [
 name = "ente-ensu-wasm"
 version = "0.0.0"
 dependencies = [
+ "ente-core",
  "ente-ensu-crypto",
  "ente-wasm-log",
  "js-sys",
+ "thiserror 2.0.18",
  "wasm-bindgen",
 ]
 

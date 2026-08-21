@@ -28,18 +28,6 @@ pub enum Error {
     Utf8(#[from] std::string::FromUtf8Error),
 }
 
-impl Error {
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::InvalidBlobLength { .. } => "invalid_blob_length",
-            Self::InvalidEncryptedField => "invalid_encrypted_field",
-            Self::Crypto(error) => error.code(),
-            Self::Base64Decode(_) => "base64_decode",
-            Self::Utf8(_) => "invalid_utf8",
-        }
-    }
-}
-
 pub struct EncryptedChatPayload {
     pub encrypted_data: String,
     pub header: String,

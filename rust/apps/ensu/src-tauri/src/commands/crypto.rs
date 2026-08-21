@@ -8,7 +8,7 @@ const SESSION_UUID_HEADER: &str = "session-uuid";
 
 impl From<ente_ensu_crypto::Error> for ApiError {
     fn from(error: ente_ensu_crypto::Error) -> Self {
-        ApiError::new(error.code(), error.to_string())
+        ApiError::other(ente_core::error::chain(&error))
     }
 }
 
