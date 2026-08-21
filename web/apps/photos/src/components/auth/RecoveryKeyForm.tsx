@@ -3,7 +3,6 @@ import DoneIcon from "@mui/icons-material/Done";
 import { CircularProgress, styled } from "@mui/material";
 import type { RecoveryKeyPresentationProps } from "ente-accounts/components/RecoveryKey";
 import { useClipboardCopy } from "ente-base/components/utils/hooks";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
 import { Button } from "./Button";
@@ -23,7 +22,7 @@ export function RecoveryKeyForm({
     return (
         <>
             <ScreenHeader
-                title={pt("Your recovery key")}
+                title={t("auth_recovery_key_title")}
                 subtitle={t("recovery_key_description")}
             />
             <RecoveryKeyBox>
@@ -34,7 +33,9 @@ export function RecoveryKeyForm({
                             type="button"
                             onClick={handleCopy}
                             aria-label={
-                                copied ? t("copied") : pt("Copy recovery key")
+                                copied
+                                    ? t("copied")
+                                    : t("auth_copy_recovery_key")
                             }
                         >
                             <CopyIcon fontSize="small" />

@@ -2,7 +2,7 @@ import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { GlobalStyles, keyframes, styled } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
-import { pt } from "ente-base/i18n";
+import { t } from "i18next";
 import type React from "react";
 import {
     authAboveMobileMediaQuery,
@@ -24,13 +24,22 @@ export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
         <FrameCurves />
         <PageCard>
             <DesktopBrandSlot>
-                <BrandPanel headline={authHeadline} size="desktop" />
+                <BrandPanel
+                    headline={t("photos_auth_headline")}
+                    size="desktop"
+                />
             </DesktopBrandSlot>
             <TabletBrandSlot>
-                <BrandPanel headline={authHeadline} size="tablet" />
+                <BrandPanel
+                    headline={t("photos_auth_headline")}
+                    size="tablet"
+                />
             </TabletBrandSlot>
             <MobileBrandSlot>
-                <BrandPanel headline={authHeadline} size="mobile" />
+                <BrandPanel
+                    headline={t("photos_auth_headline")}
+                    size="mobile"
+                />
             </MobileBrandSlot>
             <ContentSheet>
                 <SheetHandle />
@@ -41,8 +50,6 @@ export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
         </PageCard>
     </PageRoot>
 );
-
-const authHeadline = pt("Safe home for your photos");
 
 const shellReveal = keyframes({
     from: { opacity: 0, transform: "translateY(18px)" },
@@ -104,15 +111,15 @@ const BrandPanel: React.FC<BrandPanelProps> = ({ headline, size }) => (
             <PanelHeadline size={size}>{headline}</PanelHeadline>
             {size !== "mobile" && (
                 <PanelSubtitle size={size}>
-                    {pt("End-to-end encrypted. Cross-platform. Open-source.")}
+                    {t("photos_auth_subtitle")}
                 </PanelSubtitle>
             )}
             {size === "desktop" && (
                 <BulletList>
                     {[
-                        pt("10 GB free forever"),
-                        pt("Stored in 3 locations"),
-                        pt("Open source, independently audited"),
+                        t("photos_auth_free_storage"),
+                        t("photos_auth_no_ads_no_spying"),
+                        t("photos_auth_open_source_audited"),
                     ].map((bullet) => (
                         <Bullet key={bullet}>
                             <CheckCircle aria-hidden="true">

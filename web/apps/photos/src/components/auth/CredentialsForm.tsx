@@ -1,9 +1,9 @@
 import { styled } from "@mui/material";
 import type { VerifyMasterPasswordPresentationProps } from "ente-accounts/components/VerifyMasterPasswordForm";
 import type { CredentialsPresentationProps } from "ente-accounts/pages/credentials";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
+import { Trans } from "react-i18next";
 import { Button } from "./Button";
 import { Form } from "./Form";
 import { FormFields } from "./FormFields";
@@ -24,10 +24,11 @@ export function CredentialsForm({
             <ScreenHeader
                 title={t("enter_password")}
                 subtitle={
-                    <>
-                        {pt("Signing in as ")}
-                        <Email>{userEmail}</Email>
-                    </>
+                    <Trans
+                        i18nKey="auth_signing_in_as"
+                        components={{ a: <Email /> }}
+                        values={{ email: userEmail }}
+                    />
                 }
             />
             {passwordForm}

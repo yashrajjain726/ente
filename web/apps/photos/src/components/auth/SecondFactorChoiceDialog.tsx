@@ -1,6 +1,5 @@
 import { styled } from "@mui/material";
 import type { SecondFactorChoicePresentationProps } from "ente-accounts/components/SecondFactorChoice";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
 import {
@@ -29,9 +28,7 @@ export function SecondFactorChoiceDialog({
                         {t("two_factor")}
                     </AuthDialogTitle>
                     <AuthDialogText>
-                        {pt(
-                            "Confirm it’s you with the second factor you set up.",
-                        )}
+                        {t("auth_second_factor_choice_subtitle")}
                     </AuthDialogText>
                 </AuthDialogHeader>
                 <ButtonStack>

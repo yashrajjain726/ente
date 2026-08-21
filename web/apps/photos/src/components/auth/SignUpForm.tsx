@@ -1,7 +1,6 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { styled, Tooltip } from "@mui/material";
 import type { SignUpPresentationProps } from "ente-accounts/components/SignUpContents";
-import { pt } from "ente-base/i18n";
 import { t } from "i18next";
 import type React from "react";
 import { Trans } from "react-i18next";
@@ -43,16 +42,16 @@ export function SignUpForm({
                 title={
                     isJoinAlbumContext
                         ? t("signup_to_join_album")
-                        : pt("Create your account")
+                        : t("auth_create_account")
                 }
-                subtitle={pt("A few details and you’ll be ready to go.")}
+                subtitle={t("auth_signup_subtitle")}
             />
             <Form onSubmit={onSubmit}>
                 <FormFields>
                     <TextField
                         name="email"
-                        label={pt("Email address")}
-                        placeholder={pt("name@example.com")}
+                        label={t("auth_email_label")}
+                        placeholder={t("auth_email_placeholder")}
                         type="email"
                         autoComplete="username"
                         value={email}
@@ -66,7 +65,7 @@ export function SignUpForm({
                         <TextField
                             name="password"
                             label={t("password")}
-                            placeholder={pt("Your password")}
+                            placeholder={t("auth_password_placeholder")}
                             autoComplete="new-password"
                             showPasswordToggle
                             value={password}
@@ -83,7 +82,7 @@ export function SignUpForm({
                     <TextField
                         name="confirmPassword"
                         label={t("confirm_password")}
-                        placeholder={pt("Repeat password")}
+                        placeholder={t("auth_confirm_password_placeholder")}
                         autoComplete="new-password"
                         showPasswordToggle
                         value={confirmPassword}
@@ -106,7 +105,7 @@ export function SignUpForm({
                                 </Tooltip>
                             </ReferralLabel>
                         }
-                        placeholder={pt("Optional")}
+                        placeholder={t("auth_optional")}
                         value={referral}
                         onChange={onReferralChange}
                         disabled={isSubmitting}
@@ -150,7 +149,7 @@ export function SignUpForm({
                         {t("create_account")}
                     </Button>
                     <AccountPrompt>
-                        <span>{pt("Already have an account?")}</span>
+                        <span>{t("auth_existing_account_prompt")}</span>
                         <TextLink regular onClick={onLogin}>
                             {t("login")}
                         </TextLink>

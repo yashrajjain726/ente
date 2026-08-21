@@ -1,10 +1,10 @@
 import { styled } from "@mui/material";
 import type { VerifyEmailPresentationProps } from "ente-accounts/pages/verify";
-import { pt } from "ente-base/i18n";
 import log from "ente-base/log";
 import { useFormik } from "formik";
 import { t } from "i18next";
 import type React from "react";
+import { Trans } from "react-i18next";
 import { Button } from "./Button";
 import { Form } from "./Form";
 import { FormFields } from "./FormFields";
@@ -66,12 +66,13 @@ export function VerifyEmailForm({
     return (
         <>
             <ScreenHeader
-                title={pt("Check your inbox")}
+                title={t("auth_check_inbox")}
                 subtitle={
-                    <>
-                        {pt("We sent a verification code to ")}
-                        <Email>{email}</Email>
-                    </>
+                    <Trans
+                        i18nKey="auth_verification_code_sent_to"
+                        components={{ a: <Email /> }}
+                        values={{ email }}
+                    />
                 }
             />
             <Form onSubmit={formik.handleSubmit}>
