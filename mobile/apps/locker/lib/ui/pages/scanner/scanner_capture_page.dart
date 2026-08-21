@@ -857,6 +857,7 @@ class _AutoToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
+    final labelStyle = TextStyles.mini.copyWith(color: colors.specialWhite);
     return Tooltip(
       message: active
           ? context.strings.scannerAutoCaptureOff
@@ -879,11 +880,21 @@ class _AutoToggle extends StatelessWidget {
                 size: 20,
               ),
               const SizedBox(width: Spacing.xs),
-              Text(
-                active
-                    ? context.strings.scannerCaptureModeAuto
-                    : context.strings.scannerCaptureModeManual,
-                style: TextStyles.mini.copyWith(color: colors.specialWhite),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  for (final label in [
+                    context.strings.scannerCaptureModeAuto,
+                    context.strings.scannerCaptureModeManual,
+                  ])
+                    Opacity(opacity: 0, child: Text(label, style: labelStyle)),
+                  Text(
+                    active
+                        ? context.strings.scannerCaptureModeAuto
+                        : context.strings.scannerCaptureModeManual,
+                    style: labelStyle,
+                  ),
+                ],
               ),
             ],
           ),
