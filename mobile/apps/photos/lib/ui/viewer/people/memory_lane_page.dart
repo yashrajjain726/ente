@@ -166,7 +166,9 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       if (!mounted) {
         return;
       }
-      if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
+      if (timeline == null ||
+          !timeline.isEligible ||
+          timeline.entries.isEmpty) {
         setState(() {
           _timelineUnavailable = true;
           _allFramesLoaded = true;
@@ -1125,7 +1127,9 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       final timeline = await MemoryLaneService.instance.getTimeline(
         widget.person.remoteID,
       );
-      if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
+      if (timeline == null ||
+          !timeline.isEligible ||
+          timeline.entries.isEmpty) {
         await dialog.hide();
         if (context.mounted) {
           showShortToast(context, l10n.somethingWentWrong);

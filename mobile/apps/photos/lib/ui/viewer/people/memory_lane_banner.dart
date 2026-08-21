@@ -264,7 +264,7 @@ class _MemoryLaneBannerSectionState extends State<MemoryLaneBannerSection> {
       final loader =
           widget.loadTimeline ?? MemoryLaneService.instance.getTimeline;
       final timeline = await loader(widget.personId);
-      if (!mounted || timeline == null || !timeline.isReady) {
+      if (!mounted || timeline == null || !timeline.isEligible) {
         _markThumbnailResolved();
         return;
       }
