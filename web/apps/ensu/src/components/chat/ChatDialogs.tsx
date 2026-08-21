@@ -764,10 +764,7 @@ export const ChatDialogs = memo(
                                     </Button>
                                 </Stack>
                             )}
-                            {knowledgeCatalogLoading &&
-                                knowledgePacks.length === 0 && (
-                                    <LinearProgress />
-                                )}
+                            {knowledgeCatalogLoading && <LinearProgress />}
                             {knowledgePacks.map((pack) => {
                                 const progress =
                                     knowledgeDownloadProgress[pack.stableId];

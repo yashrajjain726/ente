@@ -1005,7 +1005,7 @@ const Page: React.FC = () => {
                     .filter((pack) => !enabled.has(pack.stableId))
                     .map((pack) => pack.stableId);
                 if (disabledStableIds.length === 0) return;
-                void loadKnowledgeCatalog(disabledStableIds)
+                return loadKnowledgeCatalog(disabledStableIds)
                     .then((updates) => {
                         setKnowledgePacks((current) => {
                             const currentById = new Map(
@@ -4178,7 +4178,7 @@ const Page: React.FC = () => {
         if (!trimmed && !hasDocuments && !hasImages) {
             return;
         }
-        if (showModelGate) return;
+        if (showModelGate || isModelPreparationActive) return;
         if (generationStartingRef.current || generationStoppingRef.current) {
             return;
         }
@@ -4409,6 +4409,7 @@ const Page: React.FC = () => {
         editingMessage,
         isDownloading,
         isGenerating,
+        isModelPreparationActive,
         messageState.path,
         pendingDocuments,
         pendingImages,

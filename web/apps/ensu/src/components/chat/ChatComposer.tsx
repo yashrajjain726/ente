@@ -131,7 +131,12 @@ export const ChatComposer = memo(
         actionIconProps,
         stopButtonColor,
     }: ChatComposerProps) => {
+        const isModelPreparationActive =
+            modelGateStatus === "checking" ||
+            modelGateStatus === "preloading" ||
+            modelGateStatus === "downloading";
         const disableSend =
+            isModelPreparationActive ||
             isDownloading ||
             (!isGenerating &&
                 !input.trim() &&
@@ -139,6 +144,7 @@ export const ChatComposer = memo(
                 pendingImages.length === 0);
         const disableAttachmentButton =
             isGenerating ||
+            isModelPreparationActive ||
             isDownloading ||
             (showImageAttachment && isImageAttachmentLimitReached);
 
