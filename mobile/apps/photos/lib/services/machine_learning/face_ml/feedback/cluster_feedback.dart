@@ -1276,7 +1276,8 @@ class ClusterFeedbackService<T> {
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.automaticallyMergedClustersIntoPerson,
-          person: await PersonService.instance.getPerson(p.remoteID),
+          person: p,
+          clusterIDs: suggestions.map((s) => s.$1).toSet(),
         ),
       );
     }
