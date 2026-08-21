@@ -82,7 +82,7 @@ impl LegacyClient {
         let public_key = self
             .public_key(email)
             .await?
-            .ok_or_else(|| Error::InvalidInput("legacy contact is not on Ente".into()))?;
+            .ok_or(Error::ContactNotOnEnte)?;
         let recovery_key = self.current_recovery_key(current_user_key_attrs)?;
         let recipient_public_key = b64::decode(&public_key)?;
         let encrypted_key = sealed::seal(

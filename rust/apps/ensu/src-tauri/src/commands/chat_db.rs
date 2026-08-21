@@ -489,8 +489,13 @@ pub async fn chat_db_compress_attachment_image_file(
         let data = fs::read(canonical_path).map_err(|error| {
             ApiError::new("io", format!("failed to read image file '{path}': {error}"))
         })?;
-        ente_ensu::image::compress_attachment_image(&data)
-            .map_err(|error| ApiError::new("image", error.to_string()))
+        ente_ensu::image::compress_attachment_image(&data).map_err(|error| {
+            let name = match &error {
+                ente_ensu::image::ImageError::TooLarge(_) => "image_too_large",
+                _ => "image",
+            };
+            ApiError::new(name, ente_core::error::chain(&error))
+        })
     })
     .await
     .map_err(|_| image_thread_error())?

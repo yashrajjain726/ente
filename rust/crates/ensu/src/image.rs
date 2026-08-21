@@ -1,4 +1,5 @@
-use ente_image::{ImageError, image_compression::compress_image_bytes_to_jpeg};
+pub use ente_image::ImageError;
+use ente_image::image_compression::compress_image_bytes_to_jpeg;
 
 pub const ATTACHMENT_IMAGE_MAX_LONG_EDGE: u32 = 512;
 pub const ATTACHMENT_IMAGE_JPEG_QUALITY: u8 = 85;

@@ -7,6 +7,7 @@ import {
     ModelValidationStatus,
     Wllama,
     WllamaAbortError,
+    WllamaError,
 } from "@wllama/wllama/esm/index.js";
 import wllamaPackage from "@wllama/wllama/package.json";
 import log from "ente-base/log";
@@ -123,7 +124,11 @@ class WasmInference implements InferenceBackend {
         params: ContextParams = {},
     ) {
         const modelUrl = ensureUrl(model.modelPath);
-        await this.ensureModelLoaded(modelUrl, params);
+        try {
+            await this.ensureModelLoaded(modelUrl, params);
+        } catch (error) {
+            throw normalizeWllamaError(error, "Model failed to start");
+        }
     }
 
     async applyChatTemplate(
@@ -157,13 +162,17 @@ class WasmInference implements InferenceBackend {
         request: GenerateChatRequest,
         onEvent?: (event: GenerateEvent) => void,
     ): Promise<GenerateSummary> {
-        const addAssistant = request.addAssistant ?? true;
-        const prompt = await this.wllama.formatChat(
-            request.messages,
-            addAssistant,
-            request.templateOverride ?? undefined,
-        );
-        return this.generateCompletion(prompt, request, onEvent);
+        try {
+            const addAssistant = request.addAssistant ?? true;
+            const prompt = await this.wllama.formatChat(
+                request.messages,
+                addAssistant,
+                request.templateOverride ?? undefined,
+            );
+            return await this.generateCompletion(prompt, request, onEvent);
+        } catch (error) {
+            throw normalizeWllamaError(error, "Generation failed");
+        }
     }
 
     cancel(jobId: number): Promise<void> {
@@ -438,11 +447,6 @@ class WasmInference implements InferenceBackend {
                     });
                 }
             }
-        } catch (error) {
-            if (error instanceof WllamaAbortError) {
-                throw new Error("Generation cancelled", { cause: error });
-            }
-            throw error instanceof Error ? error : new Error(String(error));
         } finally {
             this.abortControllers.delete(jobId);
         }
@@ -707,6 +711,20 @@ const safeJson = (value: unknown) => {
     } catch {
         return "";
     }
+};
+
+const normalizeWllamaError = (error: unknown, fallback: string) => {
+    if (error instanceof WllamaAbortError) {
+        return new Error("Generation cancelled", { cause: error });
+    }
+
+    if (error instanceof WllamaError && error.type == "kv_cache_full") {
+        const normalized = new Error(error.message, { cause: error });
+        normalized.name = "prompt_too_long";
+        return normalized;
+    }
+    if (error instanceof Error) return error;
+    return new Error(typeof error === "string" ? error : fallback);
 };
 
 const buildGenerateChatRequest = (request: GenerateChatRequest) => ({

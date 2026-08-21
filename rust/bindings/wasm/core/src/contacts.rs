@@ -27,7 +27,13 @@ pub enum Error {
 
 impl Error {
     fn name(&self) -> Option<&'static str> {
-        None
+        match self {
+            Self::Legacy(ente_legacy::Error::ContactNotOnEnte) => Some("contact_not_on_ente"),
+            Self::Legacy(ente_legacy::Error::ActiveRecoverySession) => {
+                Some("active_recovery_session")
+            }
+            _ => None,
+        }
     }
 
     fn message(&self) -> String {

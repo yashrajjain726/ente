@@ -131,14 +131,13 @@ const imageProcessingFailureDialog = (
     error: unknown,
     selectedImageCount: number,
 ) => {
-    const { name, message } = tauriCommandError(error);
-    const lowerMessage = message?.toLowerCase() ?? "";
+    const { name } = tauriCommandError(error);
     const subject =
         selectedImageCount == 1
             ? "The selected image"
             : "One of the selected images";
 
-    if (name == "image" && lowerMessage.includes("memory limit")) {
+    if (name == "image_too_large") {
         return {
             title: "Image too large",
             message: `${subject} is too large for Ensu to process. Try resizing it or exporting a smaller copy, then attach it again.`,
@@ -1886,34 +1885,10 @@ const Page: React.FC = () => {
     );
 
     const formatErrorMessage = useCallback((error: unknown) => {
-        const normalizeErrorMessage = (message: string) => {
-            if (
-                message.toLowerCase().includes("length out of range of buffer")
-            ) {
-                return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
-            }
-            return message;
-        };
-
-        if (error instanceof Error) return normalizeErrorMessage(error.message);
-        if (typeof error === "string") return normalizeErrorMessage(error);
-        if (error && typeof error === "object") {
-            const maybeMessage = (error as { message?: unknown }).message;
-            if (typeof maybeMessage === "string" && maybeMessage.trim()) {
-                return normalizeErrorMessage(maybeMessage);
-            }
-            if ("__wbg_ptr" in error) {
-                return "Model failed to start. Please refresh and try again.";
-            }
+        if (error instanceof Error && error.name == "prompt_too_long") {
+            return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
         }
-        try {
-            const serialized = JSON.stringify(error);
-            return serialized
-                ? normalizeErrorMessage(serialized)
-                : "Unknown model error";
-        } catch {
-            return "Unknown model error";
-        }
+        return error instanceof Error ? error.message : "Unknown model error";
     }, []);
 
     const trimToWords = useCallback((text: string, maxWords: number) => {
