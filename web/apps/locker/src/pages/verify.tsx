@@ -1,3 +1,4 @@
+import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "@/components/auth/VerifyEmailForm";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
 import { featureFlags } from "@/featureFlags";
@@ -21,7 +22,12 @@ function VerifyPage(): React.JSX.Element {
         return <AccountsVerifyPage />;
     }
 
-    return <AccountsVerifyPage presentation={VerifyEmailPresentation} />;
+    return (
+        <AccountsVerifyPage
+            presentation={VerifyEmailPresentation}
+            secondFactorChoicePresentation={SecondFactorChoiceDialog}
+        />
+    );
 }
 
 export default VerifyPage;

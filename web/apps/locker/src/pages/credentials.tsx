@@ -2,6 +2,7 @@ import {
     CredentialsForm,
     PasswordForm,
 } from "@/components/auth/CredentialsForm";
+import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
 import { featureFlags } from "@/featureFlags";
 import AccountsCredentialsPage, {
@@ -28,6 +29,7 @@ function CredentialsPage(): React.JSX.Element {
         <AccountsCredentialsPage
             presentation={CredentialsPresentation}
             passwordPresentation={PasswordForm}
+            secondFactorChoicePresentation={SecondFactorChoiceDialog}
         />
     );
 }
