@@ -487,6 +487,10 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       navigator.pop(true);
     } else {
       setState(() {
+        for (final flight in _flights) {
+          flight.capture.landed = true;
+        }
+        _flights.clear();
         for (final capture in _pending) {
           _releaseSnapshot(capture);
         }
