@@ -805,7 +805,7 @@ class MemoryLaneService {
     String personId, {
     int frameCount = 6,
   }) async {
-    if (!_isFeatureEnabled) return;
+    if (!isFeatureEnabled) return;
     try {
       final timeline = await _cacheService.getTimeline(personId);
       if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
