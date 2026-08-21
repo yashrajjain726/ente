@@ -197,10 +197,10 @@ class _PeoplePageState extends State<PeoplePage> {
 
   Future<void> _openMemoryLanePage() async {
     _timelineLogger.info("banner_tap person=${_person.remoteID}");
-    await routeToPage(context, MemoryLanePage(person: _person));
-    if (!mounted) {
-      return;
+    if (MemoryLaneService.instance.hasReadyTimelineSync(_person.remoteID)) {
+      await routeToPage(context, MemoryLanePage(person: _person));
     }
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -230,14 +230,12 @@ class _PeoplePageState extends State<PeoplePage> {
   Widget build(BuildContext context) {
     _logger.info("Building for ${_person.data.name}");
     final bool featureEnabled = _memoryLaneEnabled;
-    final bool memoryLaneReady = featureEnabled
-        ? MemoryLaneService.instance.hasReadyTimelineSync(_person.remoteID)
-        : false;
+    final bool memoryLaneReady = MemoryLaneService.instance
+        .hasReadyTimelineSync(_person.remoteID);
     final bool hasSeenMemoryLane = localSettings.hasSeenMemoryLane(
       _person.remoteID,
     );
-    final bool showMemoryLaneBanner =
-        featureEnabled && memoryLaneReady && !hasSeenMemoryLane;
+    final bool showMemoryLaneBanner = memoryLaneReady && !hasSeenMemoryLane;
 
     final appBar = PeopleAppBar.sliverConfig(
       GalleryType.peopleTag,
@@ -245,9 +243,7 @@ class _PeoplePageState extends State<PeoplePage> {
       _selectedFiles,
       _person,
       memoryLaneReady: memoryLaneReady,
-      onMemoryLaneTap: featureEnabled && memoryLaneReady
-          ? _openMemoryLanePage
-          : null,
+      onMemoryLaneTap: _openMemoryLanePage,
     );
 
     final personGallery = _Gallery(
@@ -259,9 +255,7 @@ class _PeoplePageState extends State<PeoplePage> {
       personEntity: _person,
       memoryLaneEnabled: featureEnabled,
       showTimelineBanner: showMemoryLaneBanner,
-      onTimelineTap: featureEnabled && memoryLaneReady
-          ? () => unawaited(_openMemoryLanePage())
-          : null,
+      onTimelineTap: () => unawaited(_openMemoryLanePage()),
     );
 
     return GalleryBoundariesProvider(
