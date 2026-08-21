@@ -7,19 +7,7 @@ import type {
 } from "ente-base/crypto/types";
 
 const shouldFallbackToLegacyBlobDecrypt = (error: unknown): boolean => {
-    if (!error || typeof error !== "object") {
-        return false;
-    }
-    if ("code" in error && error.code === "stream_truncated") {
-        return true;
-    }
-    if ("message" in error && typeof error.message === "string") {
-        return (
-            error.message.includes("stream_truncated") ||
-            error.message.includes("StreamTruncated")
-        );
-    }
-    return false;
+    return error instanceof Error && error.name === "stream_truncated";
 };
 
 const toB64String = (v: Uint8Array | string): string => {
