@@ -117,6 +117,8 @@ final class ImageZoomGeometry {
     final absoluteScale = matrix.getMaxScaleOnAxis();
     final relativeScale = absoluteScale / initialScale;
     final translation = Offset(matrix.storage[12], matrix.storage[13]);
+    // Convert top-left matrix translation to the center-relative offset used
+    // by OCR and the rest of the photo viewer.
     final semanticOffset = translation + viewportCenter * (absoluteScale - 1.0);
     final isInitial =
         (relativeScale - 1.0).abs() <= _imageZoomGeometryEpsilon &&

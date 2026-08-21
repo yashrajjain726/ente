@@ -360,7 +360,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   bool _isPlaybackPaused = false;
   bool get _isAnimationPaused =>
       !widget.isActive || _isViewerPaused || _isPlaybackPaused;
-  bool _isMediaZoomed = false;
+  bool _isMediaInteractionLocked = false;
   final _socialControlsVisible = ValueNotifier<bool>(false);
   FullScreenMemoryData? _memoryData;
   ValueNotifier<int>? _itemIndexNotifier;
@@ -594,7 +594,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   void _goToNext(FullScreenMemoryData inheritedData) {
     if (!widget.isActive) return;
     if (inheritedData.memories.isEmpty) return;
-    _isMediaZoomed = false;
+    _isMediaInteractionLocked = false;
     hasFinalFileLoaded = false;
     final currentIndex = _clampedMemoryIndex(
       inheritedData.indexNotifier.value,
@@ -616,7 +616,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   void _goToPrevious(FullScreenMemoryData inheritedData) {
     if (!widget.isActive) return;
     if (inheritedData.memories.isEmpty) return;
-    _isMediaZoomed = false;
+    _isMediaInteractionLocked = false;
     hasFinalFileLoaded = false;
     final currentIndex = _clampedMemoryIndex(
       inheritedData.indexNotifier.value,
@@ -646,7 +646,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
         inheritedData.memories[currentIndex].file.fileType == FileType.video) {
       Bus.instance.fire(PauseVideoEvent());
     }
-    _isMediaZoomed = false;
+    _isMediaInteractionLocked = false;
     isAtFirstOrLastFile = false;
     unawaited(
       memoriesCacheService.markMemoryAsSeen(
@@ -758,7 +758,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                     if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
                     unawaited(showDetailsSheet(context, currentFile));
                   },
-                  canSwipeUp: () => !_isMediaZoomed,
+                  canSwipeUp: () => !_isMediaInteractionLocked,
                   hasPointerNotifier: hasPointerOnScreenNotifier,
                   child: AnimatedOpacity(
                     opacity: _firstPhotoOpacity,
@@ -798,10 +798,10 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
                           ),
                           isFromMemories: true,
                           isAudioMutedOverride: memoryMusicController?.isMuted,
-                          shouldDisableScroll: (isZoomed) {
-                            _isMediaZoomed = isZoomed;
+                          shouldDisableScroll: (isLocked) {
+                            _isMediaInteractionLocked = isLocked;
                             widget.onMediaInteractionLockChanged?.call(
-                              isZoomed,
+                              isLocked,
                             );
                           },
                           playbackCallback: (shouldEnable, _) {

@@ -9,6 +9,11 @@ export "package:photos/ui/viewer/file/image_zoom_stage_policy.dart"
 
 const double _kZoomEpsilon = 0.001;
 
+// At the initial transform, parent PageView/dismiss gestures own one-finger
+// drags and this widget handles the first two-finger pinch manually. Once the
+// image is zoomed, InteractiveViewer owns pan and subsequent pinch gestures.
+// Published transforms are relative to the initial fit, not the raw matrix.
+
 typedef ImageZoomLoadingBuilder =
     Widget Function(BuildContext context, ImageChunkEvent? progress);
 
@@ -138,6 +143,8 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
 
   ImageZoomGeometry? _geometry;
 
+  // This raw pointer state lets a second finger lock parent navigation before
+  // either Flutter scale recognizer has accepted the gesture.
   final Map<int, Offset> _pointerPositions = <int, Offset>{};
   List<int> _manualPinchPointers = const <int>[];
   Matrix4? _manualPinchStartMatrix;
@@ -146,9 +153,9 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   bool _manualPinchActive = false;
   bool _programmaticAnimationActive = false;
   bool _interactionLocked = false;
-  bool _interactiveViewerEnabled = false;
+  bool _interactiveViewerOwnsGestures = false;
+  bool _interactiveGestureActive = false;
   int _interactiveViewerGeneration = 0;
-  double? _interactiveStartScale;
   Offset? _doubleTapPosition;
   int _geometryGeneration = 0;
 
@@ -233,6 +240,8 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   }
 
   void _resolveImage() {
+    // The visible Image owns painting; this listener only resolves decoded
+    // dimensions and loading/error state for transform geometry.
     final newStream = widget.imageProvider.resolve(
       createLocalImageConfiguration(context),
     );
@@ -355,17 +364,17 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   void _onTransformationChanged() {
     if (!_hasGeometry) return;
     _publishTransform();
-    _syncInteractiveViewerEnabled();
+    _syncInteractiveViewerOwnership();
   }
 
-  void _syncInteractiveViewerEnabled() {
+  void _syncInteractiveViewerOwnership() {
     final shouldEnable =
         widget.gesturesEnabled &&
         !_manualPinchActive &&
-        (_interactiveStartScale != null ||
+        (_interactiveGestureActive ||
             !_geometry!.describe(_transformationController.value).isInitial);
-    if (_interactiveViewerEnabled != shouldEnable && mounted) {
-      setState(() => _interactiveViewerEnabled = shouldEnable);
+    if (_interactiveViewerOwnsGestures != shouldEnable && mounted) {
+      setState(() => _interactiveViewerOwnsGestures = shouldEnable);
     }
   }
 
@@ -499,13 +508,12 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
       );
     }
     _publishTransform();
-    _syncInteractiveViewerEnabled();
+    _syncInteractiveViewerOwnership();
   }
 
   void _onInteractionStart(ScaleStartDetails _) {
     _transformationController.allowInteractiveWrites();
-    _interactiveStartScale = _transformationController.value
-        .getMaxScaleOnAxis();
+    _interactiveGestureActive = true;
     if (_animationController.isAnimating) {
       _stopProgrammaticAnimation();
     }
@@ -520,8 +528,8 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
   }
 
   void _onInteractionEnd(ScaleEndDetails _) {
-    _interactiveStartScale = null;
-    _syncInteractiveViewerEnabled();
+    _interactiveGestureActive = false;
+    _syncInteractiveViewerOwnership();
   }
 
   void _onDoubleTapDown(TapDownDetails details) {
@@ -603,6 +611,8 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
             curve: Curves.easeOutCubic,
           ),
         );
+    // InteractiveViewer owns its inertia simulation internally. Re-key it so
+    // stale inertia cannot resume after an owner animation or reset.
     _interactiveViewerGeneration++;
     _updateInteractionLock();
     if (mounted) setState(() {});
@@ -716,7 +726,7 @@ class _ImageZoomViewerState extends State<ImageZoomViewer>
               ignoring:
                   !widget.gesturesEnabled ||
                   _manualPinchActive ||
-                  !_interactiveViewerEnabled,
+                  !_interactiveViewerOwnsGestures,
               child: interactiveViewer,
             ),
           ),
@@ -758,6 +768,8 @@ class _BoundedTransformationController extends TransformationController {
   set value(Matrix4 newValue) {
     if (_suppressInteractiveWrites && !_ownerWrite) return;
     final sanitized = sanitize(newValue);
+    // Edge inertia can keep proposing movement after clamping has rejected it.
+    // Avoid notifying/repainting when the effective bounded matrix is unchanged.
     if (!_ownerWrite && _matricesNearlyEqual(value, sanitized)) return;
     super.value = sanitized;
   }
