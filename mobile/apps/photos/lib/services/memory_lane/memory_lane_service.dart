@@ -919,8 +919,6 @@ class _TimelineFaceData {
       blur: (json["blur"] as num?)?.toDouble() ?? 0.0,
     );
   }
-
-  bool get hasHighScore => score >= 0.8;
 }
 
 Map<String, dynamic> selectTimelineEntriesTask(Map<String, dynamic> param) {
@@ -981,81 +979,40 @@ Map<String, dynamic> selectTimelineEntriesTask(Map<String, dynamic> param) {
 }
 
 List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
-  if (faces.isEmpty) {
-    return <_TimelineFaceData>[];
-  }
+  if (faces.isEmpty) return [];
 
-  final sortedByQuality = List<_TimelineFaceData>.from(faces)
-    ..sort(_compareFaceQuality);
-
-  final picks = <_TimelineFaceData>[];
-  final selectedIds = <String>{};
-  final usedDayKeys = <int>{};
-  final uniqueDayKeys = sortedByQuality
-      .map((face) => _dayKeyForMicros(face.creationTimeMicros))
-      .toSet();
-  final totalUniqueDays = uniqueDayKeys.length;
-  final targetUniqueDayCount = totalUniqueDays >= 4 ? 4 : totalUniqueDays;
-  final allowDuplicateDays = totalUniqueDays < 4;
-
-  if (targetUniqueDayCount > 0) {
-    for (final face in sortedByQuality) {
-      final dayKey = _dayKeyForMicros(face.creationTimeMicros);
-      if (usedDayKeys.contains(dayKey)) {
-        continue;
-      }
-      picks.add(face);
-      selectedIds.add(face.faceId);
-      usedDayKeys.add(dayKey);
-      if (picks.length == targetUniqueDayCount) {
-        break;
-      }
+  final byQuality = faces.sorted((a, b) {
+    const highScoreThreshold = 0.8;
+    final aIsHighScore = a.score >= highScoreThreshold;
+    final bIsHighScore = b.score >= highScoreThreshold;
+    if (aIsHighScore != bIsHighScore) {
+      return aIsHighScore ? -1 : 1;
     }
-  }
 
-  if (picks.length < 4) {
-    for (final face in sortedByQuality) {
-      if (selectedIds.contains(face.faceId)) {
-        continue;
-      }
-      final dayKey = _dayKeyForMicros(face.creationTimeMicros);
-      if (!allowDuplicateDays && usedDayKeys.contains(dayKey)) {
-        continue;
-      }
-      picks.add(face);
-      selectedIds.add(face.faceId);
-      usedDayKeys.add(dayKey);
-      if (picks.length == 4) {
-        break;
-      }
-    }
-  }
+    final scoreComparison = b.score.compareTo(a.score);
+    if (scoreComparison != 0) return scoreComparison;
 
-  picks.sort((a, b) => a.creationTimeMicros.compareTo(b.creationTimeMicros));
+    final blurComparison = b.blur.compareTo(a.blur);
+    if (blurComparison != 0) return blurComparison;
+
+    return a.creationTimeMicros.compareTo(b.creationTimeMicros);
+  });
+
+  final byDays = groupBy(byQuality, (face) {
+    final date = DateTime.fromMicrosecondsSinceEpoch(face.creationTimeMicros);
+    return date.year * 10000 + date.month * 100 + date.day;
+  });
+
+  final picks = byDays.values.map((group) => group[0]).take(4).toList();
+
+  if (picks.length == 4) return picks;
+
+  final selectedIds = picks.map((face) => face.faceId).toSet();
+  picks.addAll(
+    byQuality
+        .where((face) => !selectedIds.contains(face.faceId))
+        .take(4 - picks.length),
+  );
+
   return picks;
-}
-
-int _compareFaceQuality(_TimelineFaceData a, _TimelineFaceData b) {
-  final highScoreComparison =
-      (b.hasHighScore ? 1 : 0) - (a.hasHighScore ? 1 : 0);
-  if (highScoreComparison != 0) {
-    return highScoreComparison;
-  }
-
-  final scoreComparison = b.score.compareTo(a.score);
-  if (scoreComparison != 0) {
-    return scoreComparison;
-  }
-
-  final blurComparison = b.blur.compareTo(a.blur);
-  if (blurComparison != 0) {
-    return blurComparison;
-  }
-
-  return a.creationTimeMicros.compareTo(b.creationTimeMicros);
-}
-
-int _dayKeyForMicros(int micros) {
-  final localDate = DateTime.fromMicrosecondsSinceEpoch(micros);
-  return localDate.year * 10000 + localDate.month * 100 + localDate.day;
 }
