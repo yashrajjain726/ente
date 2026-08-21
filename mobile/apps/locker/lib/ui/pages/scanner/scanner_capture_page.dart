@@ -619,14 +619,11 @@ class _AutoToggle extends StatelessWidget {
           : context.strings.scannerAutoCaptureOn,
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: Motion.standard,
+        child: Container(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
           decoration: BoxDecoration(
-            color: active
-                ? colors.primary
-                : Colors.black.withValues(alpha: 0.4),
+            color: Colors.black.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(22),
           ),
           child: Row(
