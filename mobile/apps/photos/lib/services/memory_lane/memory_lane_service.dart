@@ -84,7 +84,9 @@ class MemoryLaneService {
   Timer? _startupBackfillTimer;
 
   Future<void> init() async {
-    if (_initialized) return;
+    if (_initialized) {
+      return;
+    }
     try {
       await _cacheService.init();
       await _cacheService.ensureComputeLogVersion(_timelineLogicVersion);
@@ -100,14 +102,18 @@ class MemoryLaneService {
   }
 
   void _handleMlConsentChange(MLConsentChangedEvent event) {
-    if (event.enabled) return;
+    if (event.enabled) {
+      return;
+    }
     __isFeatureEnabled = false;
     _startupBackfillTimer?.cancel();
     _startupBackfillTimer = null;
   }
 
   Future<void> _queueFullRecompute({bool force = false}) async {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     if (!PersonService.isInitialized) {
       _logger.warning("Full recompute skipped: PersonService unavailable");
       return;
@@ -123,7 +129,9 @@ class MemoryLaneService {
   }
 
   void schedulePersonRecompute(String personId, {bool force = false}) {
-    if (personId.isEmpty) return;
+    if (personId.isEmpty) {
+      return;
+    }
     _pendingRequests[personId] = (_pendingRequests[personId] ?? false) || force;
     _precomputeQueue
         .addTask(personId, () async {
@@ -137,7 +145,9 @@ class MemoryLaneService {
   }
 
   Future<void> ensureTimelineReachability(String personId) async {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     if (personId.isEmpty) {
       return;
     }
@@ -156,7 +166,9 @@ class MemoryLaneService {
   }
 
   Future<MemoryLanePersonTimeline?> getTimeline(String personId) async {
-    if (!isFeatureEnabled) return null;
+    if (!isFeatureEnabled) {
+      return null;
+    }
     final timeline = await _cacheService.getTimeline(personId);
     if (timeline == null || timeline.entries.isEmpty) {
       return timeline;
@@ -188,7 +200,9 @@ class MemoryLaneService {
   }
 
   bool hasReadyTimelineSync(String personId) {
-    if (!isFeatureEnabled) return false;
+    if (!isFeatureEnabled) {
+      return false;
+    }
     return readyPersonIds.value.contains(personId);
   }
 
@@ -224,7 +238,9 @@ class MemoryLaneService {
   }
 
   Future<void> _repairTimelineCropReadiness(String personId) async {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Crop repair skipped for $personId: PersonService unavailable",
@@ -271,7 +287,9 @@ class MemoryLaneService {
   }
 
   void _handlePeopleChange(PeopleChangedEvent event) {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     if (event.type == PeopleEventType.syncDone) {
       return;
     }
@@ -342,7 +360,9 @@ class MemoryLaneService {
   }
 
   Future<void> _runStartupBackfill() async {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     if (!PersonService.isInitialized) {
       _logger.warning("Startup backfill skipped: PersonService unavailable");
       return;
@@ -356,8 +376,12 @@ class MemoryLaneService {
           .toSet();
       final missingIds = <String>[];
       for (final person in persons) {
-        if (person.data.isIgnored) continue;
-        if (alreadyComputed.contains(person.remoteID)) continue;
+        if (person.data.isIgnored) {
+          continue;
+        }
+        if (alreadyComputed.contains(person.remoteID)) {
+          continue;
+        }
         missingIds.add(person.remoteID);
         if (missingIds.length >= _startupBackfillBatchSize) {
           break;
@@ -394,7 +418,9 @@ class MemoryLaneService {
     final counts = <int, int>{};
     for (final faceId in faceIds) {
       final fileId = getFileIdFromFaceId<int>(faceId);
-      if (hiddenFileIds.contains(fileId)) continue;
+      if (hiddenFileIds.contains(fileId)) {
+        continue;
+      }
       final file = fileMap[fileId];
       final creationTime = file?.creationTime;
       if (creationTime == null || creationTime <= 0) {
@@ -446,7 +472,9 @@ class MemoryLaneService {
     String personId, {
     required bool force,
   }) async {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     if (!PersonService.isInitialized) {
       _logger.warning(
         "Recompute skipped for $personId: PersonService unavailable",
@@ -553,7 +581,9 @@ class MemoryLaneService {
     final facesByFileId = <int, Map<String, Face>>{};
     for (final faceId in faceIds) {
       final fileId = getFileIdFromFaceId<int>(faceId);
-      if (hiddenFileIds.contains(fileId)) continue;
+      if (hiddenFileIds.contains(fileId)) {
+        continue;
+      }
       final file = fileMap[fileId];
       if (file == null) {
         continue;
@@ -658,11 +688,15 @@ class MemoryLaneService {
     List<MemoryLaneEntry> entries,
     Map<int, EnteFile> fileMap,
   ) async {
-    if (entries.isEmpty) return false;
+    if (entries.isEmpty) {
+      return false;
+    }
     final byFile = groupBy(entries, (entry) => entry.fileId);
     var allCropsReady = true;
     for (final group in byFile.entries) {
-      if (group.value.isEmpty) continue;
+      if (group.value.isEmpty) {
+        continue;
+      }
       final file = fileMap[group.key];
       if (file == null) {
         allCropsReady = false;
@@ -710,7 +744,9 @@ class MemoryLaneService {
     String personId, {
     int frameCount = 6,
   }) async {
-    if (!isFeatureEnabled) return;
+    if (!isFeatureEnabled) {
+      return;
+    }
     try {
       final timeline = await _cacheService.getTimeline(personId);
       if (timeline == null || !timeline.isReady || timeline.entries.isEmpty) {
@@ -847,7 +883,9 @@ Map<String, dynamic> _selectTimelineEntriesTask(Map<String, dynamic> param) {
 }
 
 List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
-  if (faces.isEmpty) return [];
+  if (faces.isEmpty) {
+    return [];
+  }
 
   final byQuality = faces.sorted((a, b) {
     const highScoreThreshold = 0.8;
@@ -858,10 +896,14 @@ List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
     }
 
     final scoreComparison = b.score.compareTo(a.score);
-    if (scoreComparison != 0) return scoreComparison;
+    if (scoreComparison != 0) {
+      return scoreComparison;
+    }
 
     final blurComparison = b.blur.compareTo(a.blur);
-    if (blurComparison != 0) return blurComparison;
+    if (blurComparison != 0) {
+      return blurComparison;
+    }
 
     return a.creationTimeMicros.compareTo(b.creationTimeMicros);
   });
@@ -873,7 +915,9 @@ List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
 
   final picks = byDays.values.map((group) => group[0]).take(4).toList();
 
-  if (picks.length == 4) return picks;
+  if (picks.length == 4) {
+    return picks;
+  }
 
   final selectedIds = picks.map((face) => face.faceId).toSet();
   picks.addAll(
