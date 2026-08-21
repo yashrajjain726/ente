@@ -45,6 +45,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   bool _torchOn = false;
   bool _autoMode = true;
   bool _scannerInitFailed = false;
+  bool _reviewActive = false;
 
   final _previewKey = GlobalKey();
   final _flightLayerKey = GlobalKey();
@@ -107,7 +108,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       }
       _autoCapture.reset();
     } else if (state == AppLifecycleState.resumed) {
-      if (_camera == null && _status != _CameraStatus.starting) {
+      if (!_reviewActive &&
+          _camera == null &&
+          _status != _CameraStatus.starting) {
         unawaited(_startCamera());
       }
     }
@@ -464,24 +467,33 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   }
 
   Future<void> _openReview() async {
-    if (_session.pageCount == 0 && !_session.isProcessing) return;
-    final navigator = Navigator.of(context);
-    if (_session.pageCount > 0) {
-      await precacheImage(
-        FileImage(_session.pages.last.processedJpeg),
-        context,
-      );
-      if (!mounted) return;
+    if (_reviewActive || (_session.pageCount == 0 && !_session.isProcessing)) {
+      return;
     }
-    await _pauseCamera();
-    final saved = await navigator.push<bool>(
-      MaterialPageRoute(
-        builder: (_) => ScannerReviewPage(
-          session: _session,
-          onUploadFiles: widget.onUploadFiles,
+    final navigator = Navigator.of(context);
+    _reviewActive = true;
+    bool? saved;
+    try {
+      if (_session.pageCount > 0) {
+        await precacheImage(
+          FileImage(_session.pages.last.processedJpeg),
+          context,
+        );
+        if (!mounted) return;
+      }
+      await _pauseCamera();
+      if (!mounted) return;
+      saved = await navigator.push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ScannerReviewPage(
+            session: _session,
+            onUploadFiles: widget.onUploadFiles,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _reviewActive = false;
+    }
     if (!mounted) return;
     if (saved == true) {
       navigator.pop(true);
