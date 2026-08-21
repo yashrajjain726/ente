@@ -675,7 +675,7 @@ class MemoryLaneService {
     }
 
     final selectionResult = await Computer.shared().compute(
-      selectTimelineEntriesTask,
+      _selectTimelineEntriesTask,
       param: {
         "faces": faces.map((face) => face.toJson()).toList(),
         "minYears": _minimumYears,
@@ -921,14 +921,15 @@ class _TimelineFaceData {
   }
 }
 
-Map<String, dynamic> selectTimelineEntriesTask(Map<String, dynamic> param) {
-  final facesJson = (param["faces"] as List<dynamic>)
-      .cast<Map<String, dynamic>>();
-  final minYears = param["minYears"] as int;
-  final minFacesPerYear = param["minFaces"] as int;
-  final minCreationTimeMicros = param["minCreationTime"] as int?;
+Map<String, dynamic> _selectTimelineEntriesTask(Map<String, dynamic> param) {
+  final int minYears = param["minYears"];
+  final int minFacesPerYear = param["minFaces"];
+  final int? minCreationTimeMicros = param["minCreationTime"];
 
-  final faces = facesJson.map(_TimelineFaceData.fromJson).toList();
+  final faces = (param["faces"] as List<dynamic>)
+      .cast<Map<String, dynamic>>()
+      .map(_TimelineFaceData.fromJson)
+      .toList();
 
   if (minCreationTimeMicros != null) {
     faces.removeWhere(
@@ -940,42 +941,23 @@ Map<String, dynamic> selectTimelineEntriesTask(Map<String, dynamic> param) {
     return {"status": "ineligible", "eligibleYearCount": 0};
   }
 
-  final yearGroups = <int, List<_TimelineFaceData>>{};
-  for (final face in faces) {
-    yearGroups.putIfAbsent(face.year, () => []).add(face);
+  final eligible = groupBy(faces, (face) => face.year).entries
+      .where((entry) => entry.value.length >= minFacesPerYear)
+      .sortedBy((a) => a.key);
+
+  if (eligible.length < minYears) {
+    return {"status": "ineligible", "eligibleYearCount": eligible.length};
   }
 
-  final eligibleEntries =
-      yearGroups.entries
-          .where((entry) => entry.value.length >= minFacesPerYear)
-          .toList()
-        ..sort((a, b) => a.key.compareTo(b.key));
+  final selected = eligible
+      .expand((entry) => _pickFacesForYear(entry.value))
+      .sortedBy((face) => face.creationTimeMicros)
+      .map((face) => face.toJson())
+      .toList();
 
-  if (eligibleEntries.length < minYears) {
-    return {
-      "status": "ineligible",
-      "eligibleYearCount": eligibleEntries.length,
-    };
-  }
+  final years = eligible.map((entry) => entry.key).toList();
 
-  final selected = <_TimelineFaceData>[];
-  final years = <int>[];
-  for (final entry in eligibleEntries) {
-    entry.value.sort(
-      (a, b) => a.creationTimeMicros.compareTo(b.creationTimeMicros),
-    );
-    years.add(entry.key);
-    final picks = _pickFacesForYear(entry.value);
-    selected.addAll(picks);
-  }
-
-  selected.sort((a, b) => a.creationTimeMicros.compareTo(b.creationTimeMicros));
-
-  return {
-    "status": "ready",
-    "entries": selected.map((face) => face.toJson()).toList(),
-    "years": years,
-  };
+  return {"status": "ready", "entries": selected, "years": years};
 }
 
 List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
