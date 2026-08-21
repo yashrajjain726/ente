@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:ente_components/ente_components.dart';
@@ -13,6 +14,7 @@ import 'package:locker/services/scanner/auto_capture_controller.dart';
 import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
+import 'package:locker/ui/pages/scanner/capture_flight.dart';
 import 'package:locker/ui/pages/scanner/scan_quad_overlay.dart';
 import 'package:locker/ui/pages/scanner/scanner_review_page.dart';
 import 'package:logging/logging.dart';
@@ -43,6 +45,15 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   bool _torchOn = false;
   bool _autoMode = true;
   bool _scannerInitFailed = false;
+
+  final _previewKey = GlobalKey();
+  final _flightLayerKey = GlobalKey();
+  final _pagesButtonKey = GlobalKey();
+  final List<_PendingCapture> _pending = [];
+  final List<_ActiveFlight> _flights = [];
+  int _captureSeq = 0;
+  ScanQuad? _snapQuad;
+  int _snapId = 0;
 
   @override
   void initState() {
@@ -77,6 +88,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     _session.removeListener(_onSessionChanged);
     unawaited(_camera?.dispose());
     unawaited(_session.disposeSession());
+    for (final capture in _pending) {
+      capture.spec?.image.dispose();
+    }
     unawaited(
       SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]),
     );
@@ -105,6 +119,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     if (error != null) {
       showShortToast(context, context.strings.somethingWentWrong);
     }
+    _reconcilePending(failed: error != null);
+    setState(() {});
   }
 
   Future<void> _startCamera() async {
@@ -237,17 +253,20 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   Future<void> _capture() async {
     final camera = _camera;
     if (camera == null || _takingPicture) return;
+    final quad = _stableQuad ?? ScanQuad.fullFrame();
     _autoCapture.notifyCaptureStarted();
     setState(() {
       _takingPicture = true;
       _stableQuad = null;
+      _snapQuad = quad;
+      _snapId++;
     });
     _stabilizer.reset();
     try {
       final shot = await camera.takePicture();
       final bytes = await shot.readAsBytes();
       unawaited(_deleteQuietly(File(shot.path)));
-      _session.addCapture(bytes);
+      _onShotTaken(bytes, quad);
     } catch (e, s) {
       _logger.severe('Capture failed', e, s);
       if (mounted) {
@@ -262,6 +281,163 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     try {
       if (await file.exists()) await file.delete();
     } catch (_) {}
+  }
+
+  void _onShotTaken(Uint8List bytes, ScanQuad quad) {
+    final capture = _PendingCapture(_captureSeq++);
+    _pending.add(capture);
+    _session.addCapture(bytes);
+    unawaited(_launchFlight(capture, bytes, quad));
+  }
+
+  Future<void> _launchFlight(
+    _PendingCapture capture,
+    Uint8List bytes,
+    ScanQuad quad,
+  ) async {
+    final spec = await _buildFlightSpec(bytes, quad);
+    if (!mounted) {
+      spec?.image.dispose();
+      return;
+    }
+    if (spec == null) {
+      setState(() {
+        capture.landed = true;
+        _purgeResolved();
+      });
+      return;
+    }
+    capture.spec = spec;
+    setState(() => _flights.add(_ActiveFlight(capture: capture, spec: spec)));
+  }
+
+  Future<CaptureFlightSpec?> _buildFlightSpec(
+    Uint8List bytes,
+    ScanQuad quad,
+  ) async {
+    final layer = _renderBox(_flightLayerKey);
+    final preview = _renderBox(_previewKey);
+    final thumb = _renderBox(_pagesButtonKey);
+    if (layer == null || preview == null || thumb == null) return null;
+    final previewRect =
+        preview.localToGlobal(Offset.zero, ancestor: layer) & preview.size;
+    final thumbRect =
+        thumb.localToGlobal(Offset.zero, ancestor: layer) & thumb.size;
+    final targetWidth =
+        (previewRect.width * MediaQuery.devicePixelRatioOf(context)).round();
+    final ui.Image image;
+    try {
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: targetWidth,
+      );
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+      image = frame.image;
+    } catch (e, s) {
+      _logger.warning('Failed to decode capture preview', e, s);
+      return null;
+    }
+    return CaptureFlightSpec(
+      image: image,
+      sourceCorners: [
+        for (final corner in quad.corners)
+          previewRect.topLeft +
+              Offset(
+                corner.dx * previewRect.width,
+                corner.dy * previewRect.height,
+              ),
+      ],
+      imageToLayer: coverImageTransform(
+        Size(image.width.toDouble(), image.height.toDouble()),
+        previewRect,
+      ),
+      target: thumbRect,
+      targetRadius: Radii.md,
+      targetBorder: _PagesButton.borderWidth,
+    );
+  }
+
+  static RenderBox? _renderBox(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject();
+    return box is RenderBox && box.hasSize ? box : null;
+  }
+
+  void _onFlightLanded(_ActiveFlight flight) {
+    if (!mounted) return;
+    setState(() {
+      _flights.remove(flight);
+      flight.capture.landed = true;
+      _purgeResolved();
+    });
+  }
+
+  void _reconcilePending({required bool failed}) {
+    var markFailed = failed;
+    var unresolved = _pending.where((capture) => !capture.resolved).length;
+    while (unresolved > _session.pendingCount) {
+      final oldest = _pending.firstWhere((capture) => !capture.resolved);
+      if (markFailed) {
+        oldest.failed = true;
+        markFailed = false;
+      } else {
+        oldest.processed = true;
+      }
+      unresolved--;
+    }
+    _purgeResolved();
+  }
+
+  void _purgeResolved() {
+    _PendingCapture? newestLanded;
+    for (final capture in _pending) {
+      if (capture.landed) newestLanded = capture;
+    }
+    for (final capture in _pending) {
+      if (capture.landed && (capture.failed || capture != newestLanded)) {
+        _releaseSnapshot(capture);
+      }
+    }
+    _pending.removeWhere(
+      (capture) => capture.landed && capture.resolved && capture.spec == null,
+    );
+  }
+
+  static void _releaseSnapshot(_PendingCapture capture) {
+    final image = capture.spec?.image;
+    capture.spec = null;
+    if (image != null) {
+      unawaited(Future<void>.delayed(Motion.slow * 2, image.dispose));
+    }
+  }
+
+  ({int count, Widget? thumbnail}) _pagesButtonState() {
+    final hiddenPages = _pending
+        .where((capture) => capture.processed && !capture.landed)
+        .length;
+    final shownPages = math.max(0, _session.pageCount - hiddenPages);
+    final landedUnprocessed = _pending
+        .where((capture) => capture.landed && !capture.resolved)
+        .length;
+    final showingSnapshot = [
+      for (final capture in _pending)
+        if (capture.landed && !capture.failed && capture.spec != null) capture,
+    ];
+    Widget? thumbnail;
+    if (showingSnapshot.isNotEmpty) {
+      final capture = showingSnapshot.last;
+      thumbnail = CaptureSnapshotThumbnail(
+        key: ValueKey('capture-${capture.id}'),
+        spec: capture.spec!,
+      );
+    } else if (shownPages > 0) {
+      final page = _session.pages[shownPages - 1];
+      thumbnail = _ProcessedThumbnail(
+        key: ValueKey(page.processedJpeg.path),
+        page: page,
+      );
+    }
+    return (count: shownPages + landedUnprocessed, thumbnail: thumbnail);
   }
 
   void _toggleAutoMode() {
@@ -297,6 +473,12 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     if (saved == true) {
       navigator.pop(true);
     } else {
+      setState(() {
+        for (final capture in _pending) {
+          _releaseSnapshot(capture);
+        }
+        _purgeResolved();
+      });
       unawaited(_startCamera());
     }
   }
@@ -304,6 +486,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
+    final pages = _pagesButtonState();
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -347,44 +530,56 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
                   const Spacer(),
                   SizedBox(
                     height: 88,
-                    child: ListenableBuilder(
-                      listenable: _session,
-                      builder: (context, _) => Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          _ShutterButton(
-                            enabled:
-                                _status == _CameraStatus.ready &&
-                                !_takingPicture &&
-                                _session.isServiceReady,
-                            armingProgress: _autoMode
-                                ? _autoCapture.progress
-                                : 0,
-                            armingColor: colors.primary,
-                            onTap: _capture,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        _ShutterButton(
+                          enabled:
+                              _status == _CameraStatus.ready &&
+                              !_takingPicture &&
+                              _session.isServiceReady,
+                          armingProgress: _autoMode ? _autoCapture.progress : 0,
+                          armingColor: colors.primary,
+                          onTap: _capture,
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _PagesButton(
+                            key: _pagesButtonKey,
+                            count: pages.count,
+                            thumbnail: pages.thumbnail,
+                            accent: colors.primary,
+                            onTap: _openReview,
                           ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: _PagesButton(
-                              session: _session,
-                              accent: colors.primary,
-                              onTap: _openReview,
-                            ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _DoneButton(
+                            visible: pages.count > 0,
+                            accent: colors.primary,
+                            onTap: _openReview,
                           ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: _DoneButton(
-                              session: _session,
-                              accent: colors.primary,
-                              onTap: _openReview,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+          IgnorePointer(
+            child: Stack(
+              key: _flightLayerKey,
+              fit: StackFit.expand,
+              children: [
+                for (final flight in _flights)
+                  CaptureFlightCard(
+                    key: ValueKey(flight.capture.id),
+                    spec: flight.spec,
+                    borderColor: colors.specialWhite,
+                    onLanded: () => _onFlightLanded(flight),
+                  ),
+              ],
             ),
           ),
         ],
@@ -425,13 +620,21 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
           child: AspectRatio(
             aspectRatio: 1 / camera.value.aspectRatio,
             child: ClipRRect(
+              key: _previewKey,
               borderRadius: BorderRadius.circular(Radii.sheet),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   CameraPreview(camera),
                   ScanQuadOverlay(
-                    quad: _takingPicture ? null : _stableQuad,
+                    quad: _takingPicture || _flights.isNotEmpty
+                        ? null
+                        : _stableQuad,
+                    color: colors.primary,
+                  ),
+                  CaptureSnapOverlay(
+                    quad: _snapQuad,
+                    snapId: _snapId,
                     color: colors.primary,
                   ),
                 ],
@@ -441,6 +644,69 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         );
     }
   }
+}
+
+class _ProcessedThumbnail extends StatelessWidget {
+  const _ProcessedThumbnail({super.key, required this.page});
+
+  static const _inset = CaptureFlightSpec.thumbnailInset;
+  static const _zoom = 1 / (1 - 2 * _inset);
+
+  final ScannedPage page;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final box = constraints.biggest;
+        final aspect = page.height == 0 ? 1.0 : page.width / page.height;
+        final size = aspect < 1
+            ? Size(box.width * _zoom, box.width * _zoom / aspect)
+            : Size(box.height * _zoom * aspect, box.height * _zoom);
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topCenter,
+            maxWidth: double.infinity,
+            maxHeight: double.infinity,
+            child: Transform.translate(
+              offset: Offset(0, -size.height * _inset),
+              child: SizedBox.fromSize(
+                size: size,
+                child: Image(
+                  image: ResizeImage(
+                    FileImage(page.processedJpeg),
+                    height:
+                        (size.height * MediaQuery.devicePixelRatioOf(context))
+                            .round(),
+                  ),
+                  fit: BoxFit.fill,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PendingCapture {
+  _PendingCapture(this.id);
+
+  final int id;
+  CaptureFlightSpec? spec;
+  bool landed = false;
+  bool processed = false;
+  bool failed = false;
+
+  bool get resolved => processed || failed;
+}
+
+class _ActiveFlight {
+  const _ActiveFlight({required this.capture, required this.spec});
+
+  final _PendingCapture capture;
+  final CaptureFlightSpec spec;
 }
 
 class _CameraMessage extends StatelessWidget {
@@ -651,7 +917,8 @@ class _AutoToggle extends StatelessWidget {
 
 class _SessionActionReveal extends StatelessWidget {
   const _SessionActionReveal({
-    required this.session,
+    required this.visible,
+    required this.revealDuration,
     required this.tooltip,
     required this.onTap,
     required this.child,
@@ -659,19 +926,19 @@ class _SessionActionReveal extends StatelessWidget {
 
   static const size = 62.0;
 
-  final ScanSessionController session;
+  final bool visible;
+  final Duration revealDuration;
   final String tooltip;
   final VoidCallback onTap;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final visible = session.pageCount > 0 || session.isProcessing;
     return IgnorePointer(
       ignoring: !visible,
       child: AnimatedScale(
         scale: visible ? 1 : 0,
-        duration: Motion.standard,
+        duration: revealDuration,
         curve: visible ? Curves.easeOutBack : Curves.easeIn,
         child: Tooltip(
           message: tooltip,
@@ -685,93 +952,150 @@ class _SessionActionReveal extends StatelessWidget {
   }
 }
 
-class _PagesButton extends StatelessWidget {
+class _PagesButton extends StatefulWidget {
   const _PagesButton({
-    required this.session,
+    super.key,
+    required this.count,
+    required this.thumbnail,
     required this.accent,
     required this.onTap,
   });
 
-  static const _borderWidth = 2.0;
+  static const borderWidth = 2.0;
 
-  final ScanSessionController session;
+  final int count;
+  final Widget? thumbnail;
   final Color accent;
   final VoidCallback onTap;
 
   @override
+  State<_PagesButton> createState() => _PagesButtonState();
+}
+
+class _PagesButtonState extends State<_PagesButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bounce = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  );
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.0,
+        end: 1.12,
+      ).chain(CurveTween(curve: Curves.easeOut)),
+      weight: 40,
+    ),
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.12,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeInOut)),
+      weight: 60,
+    ),
+  ]).animate(_bounce);
+
+  Duration _switchDuration = Duration.zero;
+
+  @override
+  void didUpdateWidget(_PagesButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.count > oldWidget.count) _bounce.forward(from: 0);
+    if (widget.thumbnail?.key != oldWidget.thumbnail?.key) {
+      _switchDuration = widget.thumbnail is CaptureSnapshotThumbnail
+          ? Duration.zero
+          : Motion.standard;
+    }
+  }
+
+  @override
+  void dispose() {
+    _bounce.dispose();
+    super.dispose();
+  }
+
+  static Widget _expandedLayout(Widget? current, List<Widget> previous) =>
+      Stack(fit: StackFit.expand, children: [...previous, ?current]);
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final page = session.lastPage;
     return _SessionActionReveal(
-      session: session,
+      visible: widget.count > 0,
+      revealDuration: Duration.zero,
       tooltip: context.strings.review,
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(Radii.md),
-                color: Colors.black.withValues(alpha: 0.4),
-                border: Border.all(
-                  color: colors.specialWhite,
-                  width: _borderWidth,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(Radii.md - _borderWidth),
-                child: page == null
-                    ? Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: colors.specialWhite,
-                          ),
-                        ),
-                      )
-                    : Image.file(
-                        page.processedJpeg,
-                        key: ValueKey(page.processedJpeg.path),
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                        cacheHeight: (_SessionActionReveal.size * 3).round(),
-                      ),
-              ),
-            ),
-          ),
-          if (session.pageCount > 0)
-            Positioned(
-              top: -Spacing.sm,
-              right: -Spacing.sm,
+      onTap: widget.onTap,
+      child: ScaleTransition(
+        scale: _scale,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
               child: Container(
-                padding: const EdgeInsets.all(Spacing.xs),
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accent,
+                  borderRadius: BorderRadius.circular(Radii.md),
+                  color: Colors.black.withValues(alpha: 0.4),
                   border: Border.all(
                     color: colors.specialWhite,
-                    width: _borderWidth,
+                    width: _PagesButton.borderWidth,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                    ),
+                  ],
                 ),
-                child: Center(
-                  child: Text(
-                    '${session.pageCount}',
-                    style: TextStyles.mini.copyWith(color: colors.specialWhite),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(
+                    Radii.md - _PagesButton.borderWidth,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: _switchDuration,
+                    layoutBuilder: _expandedLayout,
+                    child:
+                        widget.thumbnail ??
+                        const SizedBox.expand(key: ValueKey('empty')),
                   ),
                 ),
               ),
             ),
-        ],
+            if (widget.count > 0)
+              Positioned(
+                top: -Spacing.sm,
+                right: -Spacing.sm,
+                child: Container(
+                  padding: const EdgeInsets.all(Spacing.xs),
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.accent,
+                    border: Border.all(
+                      color: colors.specialWhite,
+                      width: _PagesButton.borderWidth,
+                    ),
+                  ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: Motion.standard,
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                      child: Text(
+                        '${widget.count}',
+                        key: ValueKey(widget.count),
+                        style: TextStyles.mini.copyWith(
+                          color: colors.specialWhite,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -779,12 +1103,12 @@ class _PagesButton extends StatelessWidget {
 
 class _DoneButton extends StatelessWidget {
   const _DoneButton({
-    required this.session,
+    required this.visible,
     required this.accent,
     required this.onTap,
   });
 
-  final ScanSessionController session;
+  final bool visible;
   final Color accent;
   final VoidCallback onTap;
 
@@ -792,7 +1116,8 @@ class _DoneButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     return _SessionActionReveal(
-      session: session,
+      visible: visible,
+      revealDuration: Motion.standard,
       tooltip: context.strings.done,
       onTap: onTap,
       child: Container(
@@ -807,20 +1132,11 @@ class _DoneButton extends StatelessWidget {
           ],
         ),
         child: Center(
-          child: session.isProcessing
-              ? SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: colors.specialWhite,
-                  ),
-                )
-              : HugeIcon(
-                  icon: HugeIcons.strokeRoundedTick02,
-                  color: colors.specialWhite,
-                  size: 30,
-                ),
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedTick02,
+            color: colors.specialWhite,
+            size: 30,
+          ),
         ),
       ),
     );
