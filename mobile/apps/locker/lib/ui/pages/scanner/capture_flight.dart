@@ -6,6 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 
+abstract final class CaptureFlightTuning {
+  static const arcHeight = 0.08;
+  static const tilt = -3 * math.pi / 180;
+  static const lift = 0.02;
+  static const developContrast = 1.16;
+  static const developBrightness = 12.0;
+  static const developSaturation = 0.88;
+  static const thumbnailInset = 0.05;
+}
+
 class CaptureFlightSpec {
   CaptureFlightSpec({
     required this.image,
@@ -15,12 +25,13 @@ class CaptureFlightSpec {
     required this.targetRadius,
     required this.targetBorder,
   }) : clipEnd = _rectCorners(target),
-       zoomedCorners = _insetQuad(sourceCorners, thumbnailInset),
+       zoomedCorners = _insetQuad(
+         sourceCorners,
+         CaptureFlightTuning.thumbnailInset,
+       ),
        imageEnd = _rectCorners(
          _coverRect(target.deflate(targetBorder), _aspectOf(sourceCorners)),
        );
-
-  static const thumbnailInset = 0.05;
 
   final ui.Image image;
   final List<Offset> sourceCorners;
@@ -129,14 +140,10 @@ List<Offset> poseCorners(
   ];
 }
 
-const developContrast = 1.16;
-const developBrightness = 12.0;
-const developSaturation = 0.88;
-
 List<double> developMatrix(double t) {
-  final c = ui.lerpDouble(1, developContrast, t)!;
-  final b = ui.lerpDouble(0, developBrightness, t)!;
-  final s = ui.lerpDouble(1, developSaturation, t)!;
+  final c = ui.lerpDouble(1, CaptureFlightTuning.developContrast, t)!;
+  final b = ui.lerpDouble(0, CaptureFlightTuning.developBrightness, t)!;
+  final s = ui.lerpDouble(1, CaptureFlightTuning.developSaturation, t)!;
   const lr = 0.2126;
   const lg = 0.7152;
   const lb = 0.0722;
@@ -177,10 +184,6 @@ Path roundedPolygonPath(List<Offset> corners, double radius) {
   }
   return path..close();
 }
-
-const flightArcHeight = 0.08;
-const flightTilt = -3 * math.pi / 180;
-const flightLift = 0.02;
 
 class CaptureFlightCard extends StatefulWidget {
   const CaptureFlightCard({
@@ -259,9 +262,15 @@ class _FlightPainter extends CustomPainter {
     final swing = math.sin(math.pi * t);
     final travel = spec.target.center - centroid(spec.sourceCorners);
     final pose = (
-      offset: Offset(0, -travel.distance * flightArcHeight * swing),
-      angle: flightTilt * swing,
-      scale: 1 + flightLift * math.sin(math.pi * (t / 0.35).clamp(0.0, 1.0)),
+      offset: Offset(
+        0,
+        -travel.distance * CaptureFlightTuning.arcHeight * swing,
+      ),
+      angle: CaptureFlightTuning.tilt * swing,
+      scale:
+          1 +
+          CaptureFlightTuning.lift *
+              math.sin(math.pi * (t / 0.35).clamp(0.0, 1.0)),
     );
     final rawClip = lerpCorners(spec.sourceCorners, spec.clipEnd, t);
     final about = centroid(rawClip);
