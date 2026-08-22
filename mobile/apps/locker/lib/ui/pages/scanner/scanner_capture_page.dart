@@ -15,6 +15,7 @@ import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 import 'package:locker/ui/pages/scanner/capture_flight.dart';
+import 'package:locker/ui/pages/scanner/delayed_reveal.dart';
 import 'package:locker/ui/pages/scanner/scan_quad_overlay.dart';
 import 'package:locker/ui/pages/scanner/scanner_review_page.dart';
 import 'package:logging/logging.dart';
@@ -786,44 +787,39 @@ class _PreparingHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    return AnimatedSize(
-      duration: Motion.standard,
-      curve: Curves.easeInOut,
-      child: visible
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: Spacing.md),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.md,
-                  vertical: Spacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colors.specialWhite,
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.sm),
-                    Text(
-                      context.strings.scannerPreparing,
-                      style: TextStyles.mini.copyWith(
-                        color: colors.specialWhite,
-                      ),
-                    ),
-                  ],
+    return DelayedReveal(
+      visible: visible,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: Spacing.md),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.md,
+            vertical: Spacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colors.specialWhite,
                 ),
               ),
-            )
-          : const SizedBox.shrink(),
+              const SizedBox(width: Spacing.sm),
+              Text(
+                context.strings.scannerPreparing,
+                style: TextStyles.mini.copyWith(color: colors.specialWhite),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

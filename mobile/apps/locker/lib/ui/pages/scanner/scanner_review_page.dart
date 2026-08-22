@@ -13,6 +13,7 @@ import 'package:locker/services/scanner/scan_geometry.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 import 'package:locker/ui/components/text_input_sheet.dart';
+import 'package:locker/ui/pages/scanner/delayed_reveal.dart';
 import 'package:locker/ui/pages/scanner/scanner_crop_page.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -364,20 +365,23 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
 
   Widget _buildProcessingState(ColorTokens colors) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 28,
-            height: 28,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
-          const SizedBox(height: Spacing.lg),
-          Text(
-            context.strings.scanProcessing,
-            style: TextStyles.body.copyWith(color: colors.textLighter),
-          ),
-        ],
+      child: DelayedReveal(
+        visible: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            const SizedBox(height: Spacing.lg),
+            Text(
+              context.strings.scanProcessing,
+              style: TextStyles.body.copyWith(color: colors.textLighter),
+            ),
+          ],
+        ),
       ),
     );
   }
