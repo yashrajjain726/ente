@@ -383,6 +383,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       final oldest = _pending.firstWhere((capture) => !capture.resolved);
       if (markFailed) {
         oldest.failed = true;
+        oldest.landed = true;
+        _flights.removeWhere((flight) => flight.capture == oldest);
         markFailed = false;
       } else {
         oldest.processed = true;
