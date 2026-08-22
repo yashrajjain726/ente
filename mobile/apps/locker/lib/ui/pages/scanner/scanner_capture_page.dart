@@ -200,7 +200,10 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   }
 
   void _onFrame(CameraImage image) {
-    if (_analysisInFlight || _takingPicture || !_session.isServiceReady) {
+    if (_reviewActive ||
+        _analysisInFlight ||
+        _takingPicture ||
+        !_session.isServiceReady) {
       return;
     }
     _analysisInFlight = true;
@@ -254,7 +257,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
 
   Future<void> _capture() async {
     final camera = _camera;
-    if (camera == null || _takingPicture) return;
+    if (camera == null || _takingPicture || _reviewActive) return;
     final quad = _stableQuad ?? ScanQuad.fullFrame();
     _autoCapture.notifyCaptureStarted();
     unawaited(HapticFeedback.mediumImpact());
