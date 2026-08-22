@@ -101,6 +101,7 @@ class ScannerPreparingHint extends StatelessWidget {
     final colors = context.componentColors;
     return DelayedReveal(
       visible: visible,
+      delay: const Duration(seconds: 5),
       child: Padding(
         padding: const EdgeInsets.only(bottom: Spacing.md),
         child: Container(

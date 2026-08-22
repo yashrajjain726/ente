@@ -375,6 +375,7 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
     return Center(
       child: DelayedReveal(
         visible: true,
+        delay: const Duration(seconds: 1),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

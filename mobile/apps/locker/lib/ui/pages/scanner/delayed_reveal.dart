@@ -8,7 +8,7 @@ class DelayedReveal extends StatefulWidget {
     super.key,
     required this.visible,
     required this.child,
-    this.delay = const Duration(seconds: 1),
+    required this.delay,
   });
 
   final bool visible;
