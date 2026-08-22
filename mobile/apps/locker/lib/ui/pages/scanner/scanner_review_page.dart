@@ -228,23 +228,31 @@ class _ScannerReviewPageState extends State<ScannerReviewPage>
       _rotatingFile = page.processedJpeg;
       _rotatingAspect = page.height == 0 ? 1 : page.width / page.height;
     });
-    await Future.wait([
-      _rotateController.forward(from: 0),
-      widget.session.rotatePageClockwise(page.id),
-    ]);
-    if (!mounted) return;
-    for (final updated in widget.session.pages) {
-      if (updated.id == page.id) {
-        await precacheImage(FileImage(updated.processedJpeg), context);
-        break;
+    try {
+      await Future.wait([
+        _rotateController.forward(from: 0),
+        widget.session.rotatePageClockwise(page.id),
+      ]);
+      if (!mounted) return;
+      for (final updated in widget.session.pages) {
+        if (updated.id == page.id) {
+          await precacheImage(FileImage(updated.processedJpeg), context);
+          break;
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        showShortToast(context, context.strings.somethingWentWrong);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _rotatingId = null;
+          _rotatingFile = null;
+        });
+        _rotateController.reset();
       }
     }
-    if (!mounted) return;
-    setState(() {
-      _rotatingId = null;
-      _rotatingFile = null;
-    });
-    _rotateController.reset();
   });
 
   Widget _buildRotatingPage(File file, double aspect) {
