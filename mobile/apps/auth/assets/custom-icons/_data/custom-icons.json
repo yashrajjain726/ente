@@ -697,13 +697,6 @@
       "title": "DirectAdmin"
     },
     {
-      "title": "Discogs",
-      "slug": "discogs",
-      "altNames": [
-        "discogs.com"
-      ]
-    },
-    {
       "title": "Discourse"
     },
     {
@@ -1159,6 +1152,14 @@
       ]
     },
     {
+      "title": "Incogni",
+      "slug": "incogni",
+      "hex": "000000",
+      "altNames": [
+        "incogni.com"
+      ]
+    },
+    {
       "title": "Infomaniak"
     },
     {
@@ -1576,6 +1577,13 @@
       "slug": "myheritage",
       "altNames": [
         "MyHeritage"
+      ]
+    },
+    {
+      "title": "myHSA",
+      "slug": "myhsa",
+      "altNames": [
+        "myHSA"
       ]
     },
     {
@@ -2335,14 +2343,6 @@
       ]
     },
     {
-      "title": "tencent cloud",
-      "slug": "tencent_cloud",
-      "altNames": [
-        "\u817e\u8baf\u4e91",
-        "tencentcloud"
-      ]
-    },
-    {
       "title": "Terabit",
       "slug": "terabit",
       "altNames": [
@@ -2539,6 +2539,9 @@
     },
     {
       "title": "Uphold"
+    },
+    {
+      "title": "UPS"
     },
     {
       "title": "Upstox"
