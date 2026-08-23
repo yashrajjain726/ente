@@ -635,94 +635,30 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
 };
 
 const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
-    const measureContainerRef = React.useRef<HTMLDivElement | null>(null);
-    const measureTextRef = React.useRef<HTMLSpanElement | null>(null);
-    const [displayCaption, setDisplayCaption] = useState(caption);
-
-    React.useEffect(() => {
-        const container = measureContainerRef.current;
-        const text = measureTextRef.current;
-        if (!container || !text) return;
-
-        const measure = () => {
-            const fits = (value: string) => {
-                text.textContent = value;
-                return text.getClientRects().length <= 2;
-            };
-            if (fits(caption)) {
-                setDisplayCaption(caption);
-                return;
-            }
-
-            let lower = 0;
-            let upper = caption.length;
-            while (lower < upper) {
-                const middle = Math.ceil((lower + upper) / 2);
-                if (fits(`${caption.slice(0, middle).trimEnd()}…`)) {
-                    lower = middle;
-                } else {
-                    upper = middle - 1;
-                }
-            }
-
-            const prefix = caption.slice(0, lower).trimEnd();
-            const lastSpace = prefix.lastIndexOf(" ");
-            setDisplayCaption(
-                `${lastSpace > 0 ? prefix.slice(0, lastSpace) : prefix}…`,
-            );
-        };
-
-        measure();
-        const observer = new ResizeObserver(measure);
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, [caption]);
-
     return (
-        <>
-            <Box
-                aria-hidden
-                ref={measureContainerRef}
-                sx={{
-                    ...feedPhotoCaptionTextSx,
-                    left: "15%",
-                    position: "absolute",
-                    top: 0,
-                    visibility: "hidden",
-                    width: "70%",
-                }}
-            >
-                <Box
-                    ref={measureTextRef}
-                    component="span"
-                    sx={feedPhotoCaptionBubbleSx}
-                >
-                    {caption}
-                </Box>
+        <Box
+            title={caption}
+            sx={{
+                ...feedPhotoCaptionTextSx,
+                bottom: 20,
+                display: "-webkit-box",
+                left: "50%",
+                maxWidth: "70%",
+                overflow: "hidden",
+                pointerEvents: "none",
+                position: "absolute",
+                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
+                transform: "translateX(-50%)",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: 2,
+                width: "max-content",
+                zIndex: 2,
+            }}
+        >
+            <Box component="span" sx={feedPhotoCaptionBubbleSx}>
+                {caption}
             </Box>
-            <Box
-                title={caption}
-                sx={{
-                    ...feedPhotoCaptionTextSx,
-                    bottom: 20,
-                    display: "-webkit-box",
-                    left: "50%",
-                    maxWidth: "70%",
-                    pointerEvents: "none",
-                    position: "absolute",
-                    textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
-                    transform: "translateX(-50%)",
-                    WebkitBoxOrient: "vertical",
-                    WebkitLineClamp: 2,
-                    width: "max-content",
-                    zIndex: 2,
-                }}
-            >
-                <Box component="span" sx={feedPhotoCaptionBubbleSx}>
-                    {displayCaption}
-                </Box>
-            </Box>
-        </>
+        </Box>
     );
 };
 
