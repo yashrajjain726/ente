@@ -106,7 +106,7 @@ class MemoryLaneService {
     final persons = await PersonService.instance.getPersons();
     for (final person in persons) {
       if (person.data.isIgnored) {
-        await _removeTimeline(person.remoteID);
+        await _invalidateTimeline(person.remoteID);
         continue;
       }
       schedulePersonRecompute(person.remoteID, force: force);
@@ -128,17 +128,24 @@ class MemoryLaneService {
     _pendingRequests[personId] = request;
     _precomputeQueue
         .addTask(personId, () async {
+          final activeRequest = _pendingRequests[personId];
+          if (activeRequest == null) return;
           try {
             await _recomputeTimelineForPerson(
               personId,
               isCluster: isCluster,
-              request: request,
+              request: activeRequest,
             );
           } finally {
-            _pendingRequests.remove(personId);
+            if (identical(_pendingRequests[personId], activeRequest)) {
+              _pendingRequests.remove(personId);
+            }
           }
         })
         .catchError((e, s) {
+          if (identical(_pendingRequests[personId], request)) {
+            _pendingRequests.remove(personId);
+          }
           _logger.severe("Recompute failed for $personId", e, s);
         });
   }
@@ -198,7 +205,7 @@ class MemoryLaneService {
     }
 
     _logger.info("Removing timeline with hidden files for $personId");
-    await _removeTimeline(personId);
+    await _invalidateTimeline(personId);
     schedulePersonRecompute(personId, isCluster: isCluster, force: true);
     return null;
   }
@@ -266,13 +273,13 @@ class MemoryLaneService {
     if (isCluster) {
       final faceIds = await _mlDataDB.getFaceIDsForCluster(personId);
       if (faceIds.isEmpty) {
-        await _removeTimeline(personId);
+        await _invalidateTimeline(personId);
         return;
       }
     } else {
       final person = await PersonService.instance.getPerson(personId);
       if (person == null || person.data.isIgnored) {
-        await _removeTimeline(personId);
+        await _invalidateTimeline(personId);
         return;
       }
     }
@@ -291,8 +298,14 @@ class MemoryLaneService {
     }
   }
 
-  Future<void> _removeTimeline(String id) async {
-    _pendingRequests[id]?.cancelled = true;
+  Future<void> _invalidateTimeline(String id) async {
+    _pendingRequests.remove(id);
+    await _cacheService.removeTimeline(id);
+    await _refreshReadyPersonIds();
+  }
+
+  Future<void> _revokeTimeline(String id) async {
+    _pendingRequests[id]?.isRevoked = true;
     await _cacheService.removeTimeline(id);
     await _refreshReadyPersonIds();
   }
@@ -315,7 +328,7 @@ class MemoryLaneService {
       return;
     }
     if (person.data.isIgnored) {
-      await _removeTimeline(person.remoteID);
+      await _invalidateTimeline(person.remoteID);
       return;
     }
     final logEntry = await _cacheService.getComputeLogEntry(person.remoteID);
@@ -485,7 +498,7 @@ class MemoryLaneService {
     required _TimelineRequest request,
   }) async {
     final force = request.force;
-    if (!isFeatureEnabled) {
+    if (!isFeatureEnabled || request.isRevoked) {
       return;
     }
     if (!isCluster && !PersonService.isInitialized) {
@@ -500,7 +513,7 @@ class MemoryLaneService {
         : await PersonService.instance.getPerson(personId);
     if (!isCluster) {
       if (person == null || person.data.isIgnored) {
-        await _removeTimeline(personId);
+        await _invalidateTimeline(personId);
         return;
       }
     }
@@ -536,7 +549,7 @@ class MemoryLaneService {
       _eligibleCreationTimeCutoffMicros(person?.data.birthDate),
       isCluster: isCluster,
     );
-    if (request.cancelled) {
+    if (request.isRevoked || !identical(_pendingRequests[personId], request)) {
       return;
     }
     await _cacheService.upsertTimeline(timeline);
@@ -870,15 +883,8 @@ class MemoryLaneService {
       if (clusterIDs.isEmpty) {
         return;
       }
-      final cache = await _cacheService.getCache();
-      for (final timeline in cache.allTimelines) {
-        if (!timeline.isCluster) {
-          continue;
-        }
-        if (!clusterIDs.contains(timeline.personId)) {
-          continue;
-        }
-        await _removeTimeline(timeline.personId);
+      for (final clusterID in clusterIDs) {
+        await _revokeTimeline(clusterID);
       }
     } catch (e, s) {
       _logger.severe("_cleanupAssignedClusterTimelines failed", e, s);
@@ -888,7 +894,7 @@ class MemoryLaneService {
 
 class _TimelineRequest {
   final bool force;
-  bool cancelled = false;
+  bool isRevoked = false;
 
   _TimelineRequest(this.force);
 }
