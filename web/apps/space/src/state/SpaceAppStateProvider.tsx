@@ -49,6 +49,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         useState<SpaceLoginCredentials | null>(null);
     const [pendingPasskeyVerification, setPendingPasskeyVerification] =
         useState<PendingSpacePasskeyVerification | null>(null);
+    const [pendingPostPhotoFile, setPendingPostPhotoFile] =
+        useState<File | null>(null);
     const [pendingProfileAvatarFile, setPendingProfileAvatarFile] =
         useState<File | null>(null);
     const [pendingProfileCoverFile, setPendingProfileCoverFile] =
@@ -231,6 +233,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setProfileLoadStatus("ready");
         setPendingLoginCredentials(null);
         setPendingPasskeyVerification(null);
+        setPendingPostPhotoFile(null);
         setPendingProfileAvatarFile(null);
         setPendingProfileCoverFile(null);
         setPendingCreateProfile(null);
@@ -283,6 +286,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             onboardingEntrySource,
             pendingLoginCredentials,
             pendingPasskeyVerification,
+            pendingPostPhotoFile,
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
             pendingCreateProfile,
@@ -298,6 +302,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             setOnboardingEntrySource,
             setPendingLoginCredentials,
             setPendingPasskeyVerification,
+            setPendingPostPhotoFile,
             setPendingProfileAvatarFile,
             setPendingProfileCoverFile,
             setPendingCreateProfile,
@@ -313,6 +318,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             onboardingEntrySource,
             pendingLoginCredentials,
             pendingPasskeyVerification,
+            pendingPostPhotoFile,
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
             pendingCreateProfile,

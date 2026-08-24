@@ -63,6 +63,7 @@ export interface SpaceAppState {
     onboardingEntrySource: OnboardingEntrySource;
     pendingLoginCredentials: SpaceLoginCredentials | null;
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
+    pendingPostPhotoFile: File | null;
     pendingProfileAvatarFile: File | null;
     pendingProfileCoverFile: File | null;
     pendingCreateProfile: PendingCreateProfile | null;
@@ -89,6 +90,7 @@ export interface SpaceAppState {
     setPendingPasskeyVerification: React.Dispatch<
         React.SetStateAction<PendingSpacePasskeyVerification | null>
     >;
+    setPendingPostPhotoFile: React.Dispatch<React.SetStateAction<File | null>>;
     setPendingProfileAvatarFile: React.Dispatch<
         React.SetStateAction<File | null>
     >;

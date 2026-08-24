@@ -53,6 +53,10 @@ func (n *recordingSpaceActivityNotifier) OnSpaceMessageSent(actor SpaceActivityA
 	n.record(spaceActivityMessageSent, actor, recipientUserID)
 }
 
+func (n *recordingSpaceActivityNotifier) OnSpaceWaveSent(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityWaveSent, actor, recipientUserID)
+}
+
 func (n *recordingSpaceActivityNotifier) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {
 	n.record(spaceActivityMessageLiked, actor, recipientUserID)
 }
@@ -238,6 +242,18 @@ func TestMessageActivitiesAndLikeTransition(t *testing.T) {
 		recipientIDs: []int64{bobID},
 	}, requireSpaceActivity(t, notifier))
 
+	waveRequest := request
+	waveRequest.NotificationKind = spaceMessageNotificationKindWave
+	_, err = messages.Create(ctx, aliceSpace, bobSpace.SpaceID, waveRequest)
+	require.NoError(t, err)
+	require.Equal(t, recordedSpaceActivity{
+		event:        spaceActivityWaveSent,
+		actorUserID:  aliceID,
+		actorSpaceID: aliceSpace.SpaceID,
+		actorSlug:    aliceSpace.SpaceSlug,
+		recipientIDs: []int64{bobID},
+	}, requireSpaceActivity(t, notifier))
+
 	_, err = messages.SetLike(ctx, bobSpace, message.MessageID, true)
 	require.NoError(t, err)
 	expectedLike := recordedSpaceActivity{
@@ -314,7 +330,7 @@ func TestFriendActivitiesOnlyOnRelationshipTransitions(t *testing.T) {
 	}, requireSpaceActivity(t, notifier))
 }
 
-func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T) {
+func TestSpaceWebPushSenderUsesWavePayloadAndPrunesDeadEndpoint(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	recipientID := insertSpaceControllerUser(t, repos, "space-push-recipient@example.com", "recipient-public")
 	sessionHash := []byte("space-push-session-hash")
@@ -338,12 +354,12 @@ func TestSpaceWebPushSenderUsesGenericPayloadAndPrunesDeadEndpoint(t *testing.T)
 	}
 
 	sender := NewSpaceWebPushSender(repos.WebPush, config)
-	sender.OnSpacePostReplied(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
+	sender.OnSpaceWaveSent(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
 	require.Equal(t, spaceWebPushPayload{
 		Title:  "Ente Space",
-		Body:   "@alice replied to your post",
-		Action: "Check it out",
-		URL:    "/app/messages/alice_space",
+		Body:   "@alice waved at you 👋",
+		Action: "Post something",
+		URL:    "/app/post",
 	}, payload)
 	var count int
 	require.NoError(t, repos.WebPush.DB.QueryRow(`SELECT COUNT(*) FROM space_web_push_subscriptions`).Scan(&count))

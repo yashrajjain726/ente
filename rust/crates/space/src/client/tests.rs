@@ -1466,6 +1466,72 @@ async fn message_actions_use_message_endpoints() {
     delete.assert_async().await;
 }
 
+#[tokio::test]
+async fn wave_message_requests_special_notification() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key);
+    let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
+
+    let friends = server
+        .mock("GET", "/spaces/space_owner_main/friends")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!([{
+                "friend": {
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "publicKey": b64::encode(&friend_public_key),
+                    "keyVersion": 2
+                },
+                "shareKeyVersion": 2,
+                "createdAt": "2026-04-16T00:00:00Z"
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let wave = server
+        .mock(
+            "POST",
+            "/spaces/space_owner_main/friends/space_friend/messages",
+        )
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"notificationKind\":\"wave\"".into()),
+            Matcher::Regex("\"messageCipher\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"senderEncryptedMessageKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"recipientEncryptedMessageKey\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "messageId": "wmsg_wave",
+                "kind": "regular",
+                "senderSpaceId": "space_owner_main",
+                "recipientSpaceId": "space_friend",
+                "liked": false,
+                "viewerLiked": false,
+                "isDeleted": false,
+                "createdAt": "2026-04-16T00:00:00Z",
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let message = ctx
+        .send_message("space_owner_main", "space_friend", "👋")
+        .await
+        .expect("wave should be sent");
+
+    assert_eq!(message.message_id, "wmsg_wave");
+    friends.assert_async().await;
+    wave.assert_async().await;
+}
+
 #[test]
 fn message_payload_limits_reject_oversized_text_and_payload() {
     let valid = MessagePayload {

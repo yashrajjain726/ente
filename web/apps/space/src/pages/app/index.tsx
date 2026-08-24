@@ -46,11 +46,13 @@ const Page: React.FC = () => {
     const {
         friends,
         localFeedPosts,
+        pendingPostPhotoFile,
         profile,
         profileLoadError,
         profileLoadStatus,
         setFriends,
         setLocalFeedPosts,
+        setPendingPostPhotoFile,
         setSkipNextHomeFeedSkeleton,
         skipNextHomeFeedSkeleton,
     } = useSpaceAppState();
@@ -266,6 +268,7 @@ const Page: React.FC = () => {
                 friendRequestSentToastName={friendRequestSentToastName}
                 hasFeedLoadMoreError={hasFeedLoadMoreError}
                 hasUnreadMessages={hasUnreadMessages}
+                initialPostPhotoFile={pendingPostPhotoFile}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={isHomeFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
@@ -284,6 +287,7 @@ const Page: React.FC = () => {
                 }
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
                 onInviteFriendsToastClose={closeInviteFriendsToast}
+                onInitialPostPhotoConsumed={() => setPendingPostPhotoFile(null)}
                 onCreatePost={
                     profile
                         ? async (image, caption) => {

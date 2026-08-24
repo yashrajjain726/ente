@@ -103,6 +103,7 @@ interface HomeScreenProps {
     hasFeedLoadMoreError?: boolean;
     hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
+    initialPostPhotoFile?: File | null;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
@@ -118,6 +119,7 @@ interface HomeScreenProps {
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
     onInviteFriendsToastClose?: () => void;
+    onInitialPostPhotoConsumed?: () => void;
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -1490,6 +1492,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     hasFeedLoadMoreError = false,
     hasMoreFeedItems = false,
     hasUnreadMessages,
+    initialPostPhotoFile,
     isFeedLoading = false,
     isFeedLoadingMore = false,
     localFeedPosts = [],
@@ -1502,6 +1505,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onLoadPostImage,
     onFriendRequestSentToastClose,
     onInviteFriendsToastClose,
+    onInitialPostPhotoConsumed,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -1530,6 +1534,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     >({});
     const [feedScrollRequest, setFeedScrollRequest] = useState(0);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
+    const initialPostPhotoFileRef = React.useRef<File | null>(null);
     const feedLoadMoreRef = React.useRef<HTMLDivElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
@@ -1874,88 +1879,119 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onLoadMoreFeedItems,
     ]);
 
-    const prepareSelectedPostPhoto = async (file: File) => {
-        if (!profile) return;
+    const prepareSelectedPostPhoto = React.useCallback(
+        async (file: File) => {
+            if (!profile) return;
 
-        const canShowLocalPreview = canPreviewSpaceImageFile(file);
-        if (!canShowLocalPreview) {
-            const timestampMs = Date.now();
-            const draftKey = `pending-preview-${timestampMs}`;
-            activeLocalPostObjectUrlRef.current = draftKey;
+            const canShowLocalPreview = canPreviewSpaceImageFile(file);
+            if (!canShowLocalPreview) {
+                const timestampMs = Date.now();
+                const draftKey = `pending-preview-${timestampMs}`;
+                activeLocalPostObjectUrlRef.current = draftKey;
+                setSelectedViewer({
+                    draftFile: file,
+                    isDraftImagePreviewPending: true,
+                    localObjectUrl: draftKey,
+                    photo: {
+                        alt: `${profileDisplayName || "You"} post`,
+                        avatarUrl: profile.avatarUrl,
+                        imageUrl: "",
+                        name: profileDisplayName || "You",
+                        timestampMs,
+                    },
+                    postActionMode: "draft-post",
+                });
+
+                window.setTimeout(() => {
+                    if (activeLocalPostObjectUrlRef.current != draftKey) return;
+
+                    void spacePostPreviewImageForFile(file)
+                        .then((preview) => {
+                            if (
+                                activeLocalPostObjectUrlRef.current != draftKey
+                            ) {
+                                URL.revokeObjectURL(preview.url);
+                                return;
+                            }
+
+                            localPostObjectUrlsRef.current.add(preview.url);
+                            activeLocalPostObjectUrlRef.current = preview.url;
+                            setSelectedViewer((currentViewer) => {
+                                if (currentViewer?.localObjectUrl != draftKey)
+                                    return currentViewer;
+
+                                return {
+                                    ...currentViewer,
+                                    isDraftImagePreviewPending: false,
+                                    localObjectUrl: preview.url,
+                                    photo: {
+                                        ...currentViewer.photo,
+                                        height: preview.height,
+                                        imageUrl: preview.url,
+                                        width: preview.width,
+                                    },
+                                };
+                            });
+                        })
+                        .catch((error: unknown) => {
+                            log.error("Failed to prepare post preview", error);
+                            const message = spacePostImageErrorMessage(error);
+                            setSelectedViewer((currentViewer) => {
+                                if (currentViewer?.localObjectUrl != draftKey)
+                                    return currentViewer;
+
+                                return {
+                                    ...currentViewer,
+                                    draftImageError: message,
+                                };
+                            });
+                        });
+                }, 0);
+                return;
+            }
+
+            const localPost = await createLoadedLocalPostPhoto({
+                avatarUrl: profile.avatarUrl,
+                file,
+                name: profileDisplayName || "You",
+            });
+            localPostObjectUrlsRef.current.add(localPost.objectUrl);
+            activeLocalPostObjectUrlRef.current = localPost.objectUrl;
             setSelectedViewer({
                 draftFile: file,
-                isDraftImagePreviewPending: true,
-                localObjectUrl: draftKey,
-                photo: {
-                    alt: `${profileDisplayName || "You"} post`,
-                    avatarUrl: profile.avatarUrl,
-                    imageUrl: "",
-                    name: profileDisplayName || "You",
-                    timestampMs,
-                },
+                localObjectUrl: localPost.objectUrl,
+                photo: localPost.photo,
                 postActionMode: "draft-post",
             });
+        },
+        [profile, profileDisplayName],
+    );
 
-            window.setTimeout(() => {
-                if (activeLocalPostObjectUrlRef.current != draftKey) return;
-
-                void spacePostPreviewImageForFile(file)
-                    .then((preview) => {
-                        if (activeLocalPostObjectUrlRef.current != draftKey) {
-                            URL.revokeObjectURL(preview.url);
-                            return;
-                        }
-
-                        localPostObjectUrlsRef.current.add(preview.url);
-                        activeLocalPostObjectUrlRef.current = preview.url;
-                        setSelectedViewer((currentViewer) => {
-                            if (currentViewer?.localObjectUrl != draftKey)
-                                return currentViewer;
-
-                            return {
-                                ...currentViewer,
-                                isDraftImagePreviewPending: false,
-                                localObjectUrl: preview.url,
-                                photo: {
-                                    ...currentViewer.photo,
-                                    height: preview.height,
-                                    imageUrl: preview.url,
-                                    width: preview.width,
-                                },
-                            };
-                        });
-                    })
-                    .catch((error: unknown) => {
-                        log.error("Failed to prepare post preview", error);
-                        const message = spacePostImageErrorMessage(error);
-                        setSelectedViewer((currentViewer) => {
-                            if (currentViewer?.localObjectUrl != draftKey)
-                                return currentViewer;
-
-                            return {
-                                ...currentViewer,
-                                draftImageError: message,
-                            };
-                        });
-                    });
-            }, 0);
+    React.useEffect(() => {
+        if (
+            !initialPostPhotoFile ||
+            initialPostPhotoFileRef.current == initialPostPhotoFile ||
+            isPostPhotoButtonDisabled
+        ) {
             return;
         }
 
-        const localPost = await createLoadedLocalPostPhoto({
-            avatarUrl: profile.avatarUrl,
-            file,
-            name: profileDisplayName || "You",
-        });
-        localPostObjectUrlsRef.current.add(localPost.objectUrl);
-        activeLocalPostObjectUrlRef.current = localPost.objectUrl;
-        setSelectedViewer({
-            draftFile: file,
-            localObjectUrl: localPost.objectUrl,
-            photo: localPost.photo,
-            postActionMode: "draft-post",
-        });
-    };
+        initialPostPhotoFileRef.current = initialPostPhotoFile;
+        setIsPostPhotoOpening(true);
+        void prepareSelectedPostPhoto(initialPostPhotoFile)
+            .catch((error: unknown) => {
+                log.error("Failed to open post photo draft", error);
+            })
+            .finally(() => {
+                onInitialPostPhotoConsumed?.();
+                setIsPostPhotoOpening(false);
+            });
+    }, [
+        initialPostPhotoFile,
+        isPostPhotoButtonDisabled,
+        onInitialPostPhotoConsumed,
+        prepareSelectedPostPhoto,
+    ]);
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
@@ -2246,7 +2282,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         width: "100%",
                     }}
                 >
-                    {hasFeedItems ? (
+                    {initialPostPhotoFile ? null : hasFeedItems ? (
                         <>
                             <FeedMotionList
                                 entries={desiredFeedEntries}
