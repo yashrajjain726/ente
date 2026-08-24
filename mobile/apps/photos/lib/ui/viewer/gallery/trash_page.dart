@@ -9,7 +9,6 @@ import "package:ente_photos_platform/ente_photos_platform.dart"
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/extensions.dart";
 import 'package:flutter/material.dart';
-import "package:hugeicons/hugeicons.dart";
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/event_bus.dart";
@@ -115,6 +114,7 @@ class _TrashPageState extends State<_TrashPage> {
       duration: const Duration(milliseconds: 150),
       child: Gallery(
         key: ValueKey(_isOnEnteTrash ? 'ente_trash_page' : 'device_trash_page'),
+        header: header == null ? const SizedBox(height: 6) : null,
         enableFileGrouping: false,
         appBar: GalleryAppBarWidget.sliverConfig(
           GalleryType.trash,
@@ -164,10 +164,10 @@ class _TrashPageState extends State<_TrashPage> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: FABComponent(
-                  label: l10n.deleteAll,
-                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedDelete02),
+                  label: l10n.emptyTrash,
+                  variant: FABComponentVariant.destructive,
                   onTap: () =>
-                      showConfirmDeleteAllTrashSheet(context, _isOnEnteTrash),
+                      showConfirmEmptyTrashSheet(context, _isOnEnteTrash),
                 ),
               );
             },

@@ -5,7 +5,7 @@ import "package:ente_components/theme/text_styles.dart";
 import "package:ente_components/theme/theme.dart";
 import "package:flutter/material.dart";
 
-enum FABComponentVariant { primary, secondary }
+enum FABComponentVariant { primary, secondary, destructive }
 
 /// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=21843-6537&m=dev
 class FABComponent extends StatefulWidget {
@@ -57,9 +57,12 @@ class _FABComponentState extends State<FABComponent> {
         _isPressed ? colors.primaryDark : colors.primary,
       FABComponentVariant.secondary =>
         _isPressed ? colors.fillDarker : colors.fillDark,
+      FABComponentVariant.destructive =>
+        _isPressed ? colors.warningDark : colors.warning,
     };
     final foregroundColor = switch (widget.variant) {
-      FABComponentVariant.primary => colors.specialWhite,
+      FABComponentVariant.primary ||
+      FABComponentVariant.destructive => colors.specialWhite,
       FABComponentVariant.secondary => colors.primary,
     };
     return GestureDetector(

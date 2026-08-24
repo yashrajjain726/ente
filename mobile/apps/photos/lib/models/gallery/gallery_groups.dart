@@ -314,7 +314,7 @@ class GalleryGroups {
     if (groupType.showGroupHeader()) {
       var start = 0;
       for (final end in _timeGroupEndIndexes()) {
-        _createNewGroup(allFiles.sublist(start, end), yearsInGroups);
+        _createNewGroup(_copyFilesInRange(start, end), yearsInGroups);
         start = end;
       }
     } else {
@@ -324,7 +324,7 @@ class GalleryGroups {
         final end = (i + 10 * crossAxisCount < allFiles.length)
             ? i + 10 * crossAxisCount
             : allFiles.length;
-        final subGroup = allFiles.sublist(i, end);
+        final subGroup = _copyFilesInRange(i, end);
         _createNewGroup(subGroup, yearsInGroups);
       }
     }
@@ -335,22 +335,15 @@ class GalleryGroups {
     stopwatch.stop();
   }
 
+  List<EnteFile> _copyFilesInRange(int start, int end) {
+    // Create a real List<EnteFile> so _createNewGroup can add DummyFiles.
+    // A sublist of List<EnteTrashFile>, for example, only accepts EnteTrashFile.
+    return List<EnteFile>.from(allFiles.getRange(start, end));
+  }
+
   List<int> _timeGroupEndIndexes() {
     final ends = <int>[];
     if (allFiles.isEmpty) {
-      return ends;
-    }
-
-    if (groupType == GroupType.week) {
-      var previousFile = allFiles.first;
-      for (var index = 1; index < allFiles.length; index++) {
-        final file = allFiles[index];
-        if (!groupType.areFromSameGroup(previousFile, file)) {
-          ends.add(index);
-        }
-        previousFile = file;
-      }
-      ends.add(allFiles.length);
       return ends;
     }
 

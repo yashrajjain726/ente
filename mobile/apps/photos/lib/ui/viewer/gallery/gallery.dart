@@ -844,7 +844,7 @@ class GalleryState extends State<Gallery> {
                 scrollController: _scrollController,
                 galleryGroups: groups,
                 inUseNotifier: scrollBarInUseNotifier,
-                heighOfViewport: MediaQuery.sizeOf(context).height,
+                viewportHeight: MediaQuery.sizeOf(context).height,
                 topPadding: widget.disableVerticalPaddingForScrollbar
                     ? 0.0
                     : appBarPinnedHeight + groupHeaderExtent!,
