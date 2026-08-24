@@ -1,14 +1,13 @@
 [package]
-name = "ente-legacy-wasm"
+name = "ente-photos-wasm"
 edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-ente-accounts.workspace = true
+ente-contacts.workspace = true
 ente-core.workspace = true
-ente-legacy.workspace = true
 ente-wasm-log.workspace = true
 js-sys.workspace = true
 serde.workspace = true

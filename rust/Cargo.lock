@@ -2496,17 +2496,12 @@ name = "ente-core-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-accounts",
- "ente-contacts",
  "ente-core",
- "ente-legacy",
  "ente-wasm-log",
  "js-sys",
  "md-5 0.11.0",
- "serde",
- "serde-wasm-bindgen",
  "thiserror 2.0.18",
  "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2611,6 +2606,7 @@ dependencies = [
 name = "ente-legacy-wasm"
 version = "0.0.0"
 dependencies = [
+ "ente-accounts",
  "ente-core",
  "ente-legacy",
  "ente-wasm-log",
@@ -2634,6 +2630,21 @@ dependencies = [
  "ente-legacy",
  "ente-ml",
  "flutter_rust_bridge",
+]
+
+[[package]]
+name = "ente-locker-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-contacts",
+ "ente-core",
+ "ente-wasm-log",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "thiserror 2.0.18",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2726,6 +2737,21 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "ort",
+]
+
+[[package]]
+name = "ente-photos-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-contacts",
+ "ente-core",
+ "ente-wasm-log",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "thiserror 2.0.18",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

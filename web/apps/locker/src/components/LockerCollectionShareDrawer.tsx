@@ -34,7 +34,8 @@ import {
     ensureContactsReady,
     useResolvedContactAvatar,
     useResolvedContactDisplay,
-} from "ente-contacts-web";
+} from "ente-contacts";
+import { openContacts } from "ente-locker-wasm";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -144,10 +145,10 @@ export const LockerCollectionShareDrawer: React.FC<
                 if (!masterKeyB64) {
                     return;
                 }
-                await ensureContactsReady({
-                    userID: currentUser.id,
-                    masterKeyB64,
-                });
+                await ensureContactsReady(
+                    { userID: currentUser.id, masterKeyB64 },
+                    openContacts,
+                );
             } catch (error) {
                 log.warn(
                     "[LockerCollectionShareDrawer] Failed to warm contacts display cache",

@@ -89,7 +89,7 @@ import {
 } from "ente-base/session";
 import { savedAuthToken } from "ente-base/token";
 import type { Location } from "ente-base/types";
-import { ensureContactsReady } from "ente-contacts-web";
+import { ensureContactsReady } from "ente-contacts";
 import { DownloadStatusNotifications } from "ente-gallery/components/DownloadStatusNotifications";
 import { FullScreenDropZone } from "ente-gallery/components/FullScreenDropZone";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
@@ -131,6 +131,7 @@ import {
     addManualFileAssignmentsToPerson,
     isMLEnabled,
 } from "ente-new/photos/services/ml";
+import { openContacts } from "ente-photos-wasm";
 
 import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
@@ -509,10 +510,10 @@ const Page: React.FC = () => {
             const user = ensureLocalUser();
             const masterKey = await masterKeyFromSession();
             if (masterKey) {
-                void ensureContactsReady({
-                    userID: user.id,
-                    masterKeyB64: masterKey,
-                }).catch((error: unknown) => {
+                void ensureContactsReady(
+                    { userID: user.id, masterKeyB64: masterKey },
+                    openContacts,
+                ).catch((error: unknown) => {
                     log.warn(
                         "[gallery] Failed to warm contacts display cache",
                         error,

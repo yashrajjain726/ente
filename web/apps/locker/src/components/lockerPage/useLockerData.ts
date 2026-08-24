@@ -23,7 +23,8 @@ import {
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
-import { ensureContactsReady } from "ente-contacts-web";
+import { ensureContactsReady } from "ente-contacts";
+import { openContacts } from "ente-locker-wasm";
 import { t } from "i18next";
 import type { NextRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -314,10 +315,10 @@ export const useLockerData = ({
                 }
 
                 setMasterKey(mk);
-                void ensureContactsReady({
-                    userID: ensureLocalUser().id,
-                    masterKeyB64: mk,
-                }).catch((error: unknown) => {
+                void ensureContactsReady(
+                    { userID: ensureLocalUser().id, masterKeyB64: mk },
+                    openContacts,
+                ).catch((error: unknown) => {
                     log.warn(
                         "[locker] Failed to warm contacts display cache",
                         error,

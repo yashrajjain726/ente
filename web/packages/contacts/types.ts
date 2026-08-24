@@ -79,8 +79,3 @@ export interface LegacyInfo {
     othersEmergencyContact: LegacyContactRecord[];
     othersRecoverySession: LegacyRecoverySession[];
 }
-
-export interface LegacyRecoveryBundle {
-    recoveryKey: string;
-    userKeyAttributes: Record<string, unknown>;
-}
