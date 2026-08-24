@@ -186,8 +186,16 @@ func (c *Controller) insertOrUpdateCustomDomain(ctx *gin.Context, userID int64, 
 }
 
 func isReservedCustomDomain(value, configuredCNAME string) bool {
+	canonicalValue, err := ente.CanonicalDomain(value)
+	if err != nil {
+		return false
+	}
 	for _, domain := range []string{configuredCNAME, "my.ente.com", "my.ente.io"} {
-		if domain != "" && strings.EqualFold(value, domain) {
+		if domain == "" {
+			continue
+		}
+		canonicalDomain, err := ente.CanonicalDomain(domain)
+		if err == nil && canonicalValue == canonicalDomain {
 			return true
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/ente/museum/ente"
 	"github.com/lib/pq"
@@ -36,7 +37,7 @@ func (r *Repository) BackfillCustomDomainCanonicalValues(ctx context.Context) er
 	defer tx.Rollback()
 
 	rows, err := tx.QueryContext(ctx, `SELECT user_id, key_value, canonical_value FROM remote_store
-		WHERE key_name = $1 AND left(key_value, 1) <> '_' FOR UPDATE`, ente.CustomDomain)
+		WHERE key_name = $1 FOR UPDATE`, ente.CustomDomain)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to fetch custom domains")
 	}
@@ -65,6 +66,9 @@ func (r *Repository) BackfillCustomDomainCanonicalValues(ctx context.Context) er
 	}
 
 	for _, domain := range domains {
+		if strings.HasPrefix(domain.value, "_") {
+			continue
+		}
 		if err := ente.ValidatePublicCustomDomain(domain.value); err != nil {
 			log.WithField("user_id", domain.userID).WithError(err).Warn("Skipping invalid custom domain during backfill")
 			continue
@@ -146,14 +150,17 @@ func (r *Repository) DomainOwner(ctx context.Context, domain string) (*int64, er
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to canonicalize custom domain")
 	}
-	rows := r.DB.QueryRowContext(ctx, `SELECT user_id FROM remote_store
-	   WHERE key_name = $1 AND (canonical_value = $2 OR lower(key_value) = lower($3))`,
+	row := r.DB.QueryRowContext(ctx, `SELECT user_id FROM remote_store
+	   WHERE key_name = $1 AND canonical_value = $2`,
 		ente.CustomDomain,
 		canonicalDomain,
-		domain,
 	)
 	var userID int64
-	err = rows.Scan(&userID)
+	err = row.Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = r.DB.QueryRowContext(ctx, `SELECT user_id FROM remote_store
+			WHERE key_name = $1 AND lower(key_value) = lower($2)`, ente.CustomDomain, domain).Scan(&userID)
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, stacktrace.Propagate(&ente.ErrNotFoundError, "")

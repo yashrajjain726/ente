@@ -44,6 +44,9 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 
 	pointer := ente.BuildFamilyCustomDomainPointer(ownerID, "family.example")
 	require.NoError(t, repository.InsertOrUpdate(t.Context(), ownerID, string(ente.CustomDomain), pointer))
+	_, err = db.ExecContext(t.Context(), `UPDATE remote_store SET canonical_value = 'released.example'
+		WHERE user_id = $1 AND key_name = 'customDomain'`, ownerID)
+	require.NoError(t, err)
 	require.NoError(t, repository.InsertOrUpdateCustomDomain(t.Context(), otherID, "BÜCHER.example"))
 
 	_, err = db.ExecContext(t.Context(), `UPDATE remote_store SET key_value = 'LEGACY.example'
