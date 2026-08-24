@@ -16,24 +16,87 @@ type Repository struct {
 }
 
 func (r *Repository) InsertOrUpdate(ctx context.Context, userID int64, key string, value string) error {
-	_, err := r.DB.ExecContext(ctx, `INSERT INTO remote_store(user_id, key_name, key_value) VALUES ($1,$2,$3)
-						 ON CONFLICT (user_id, key_name) DO UPDATE SET key_value = $3;
+	return r.insertOrUpdate(ctx, userID, key, value, nil)
+}
+
+func (r *Repository) InsertOrUpdateCustomDomain(ctx context.Context, userID int64, value string) error {
+	canonicalDomain, err := ente.CanonicalDomain(value)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to canonicalize custom domain")
+	}
+	return r.insertOrUpdate(ctx, userID, string(ente.CustomDomain), value, &canonicalDomain)
+}
+
+func (r *Repository) BackfillCustomDomainCanonicalValues(ctx context.Context) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to begin custom domain backfill")
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, `SELECT user_id, key_value FROM remote_store
+		WHERE key_name = $1 AND left(key_value, 1) <> '_' FOR UPDATE`, ente.CustomDomain)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to fetch custom domains")
+	}
+	defer rows.Close()
+
+	type domainRow struct {
+		userID int64
+		value  string
+	}
+	var domains []domainRow
+	for rows.Next() {
+		var domain domainRow
+		if err := rows.Scan(&domain.userID, &domain.value); err != nil {
+			return stacktrace.Propagate(err, "failed to scan custom domain")
+		}
+		domains = append(domains, domain)
+	}
+	if err := rows.Err(); err != nil {
+		return stacktrace.Propagate(err, "failed to read custom domains")
+	}
+	if err := rows.Close(); err != nil {
+		return stacktrace.Propagate(err, "failed to close custom domain rows")
+	}
+
+	for _, domain := range domains {
+		if err := ente.ValidatePublicCustomDomain(domain.value); err != nil {
+			return stacktrace.Propagate(err, "invalid stored custom domain")
+		}
+		canonicalDomain, err := ente.CanonicalDomain(domain.value)
+		if err != nil {
+			return stacktrace.Propagate(err, "failed to canonicalize stored custom domain")
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE remote_store SET canonical_value = $1
+			WHERE user_id = $2 AND key_name = $3 AND canonical_value IS DISTINCT FROM $1`,
+			canonicalDomain, domain.userID, ente.CustomDomain); err != nil {
+			return stacktrace.Propagate(err, "failed to backfill custom domain")
+		}
+	}
+	return stacktrace.Propagate(tx.Commit(), "failed to commit custom domain backfill")
+}
+
+func (r *Repository) insertOrUpdate(ctx context.Context, userID int64, key string, value string, canonicalValue *string) error {
+	_, err := r.DB.ExecContext(ctx, `INSERT INTO remote_store(user_id, key_name, key_value, canonical_value) VALUES ($1,$2,$3,$4)
+						 ON CONFLICT (user_id, key_name) DO UPDATE SET key_value = $3, canonical_value = $4;
 						 `,
 		userID,
 		key,
 		value,
+		canonicalValue,
 	)
 
 	if err != nil {
 		var pgErr *pq.Error
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			if pgErr.Constraint == "remote_store_custom_domain_unique_idx" {
+			if pgErr.Constraint == "remote_store_custom_domain_unique_idx" || pgErr.Constraint == "remote_store_custom_domain_canonical_unique_idx" {
 				return ente.NewConflictError("custom domain already exists for another user")
 			}
 		}
 		return stacktrace.Propagate(err, "failed to insert/update")
 	}
-	return stacktrace.Propagate(err, "failed to insert/update")
+	return nil
 }
 
 func (r *Repository) RemoveKey(ctx context.Context, userID int64, key string) error {
@@ -47,7 +110,7 @@ func (r *Repository) RemoveKey(ctx context.Context, userID int64, key string) er
 
 func (r *Repository) DomainOwner(ctx context.Context, domain string) (*int64, error) {
 	rows := r.DB.QueryRowContext(ctx, `SELECT user_id FROM remote_store
-	   WHERE key_name = $1 AND key_value = $2`,
+	   WHERE key_name = $1 AND (canonical_value = $2 OR lower(key_value) = lower($2))`,
 		ente.CustomDomain,
 		domain,
 	)
