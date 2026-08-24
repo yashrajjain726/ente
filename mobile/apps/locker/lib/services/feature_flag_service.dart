@@ -16,6 +16,7 @@ class FeatureFlagService {
   late FlagService _flagService;
 
   bool get internalUser => _flagService.internalUser;
+  bool get documentScanner => internalUser;
 
   void init(SharedPreferences preferences) {
     _preferences = preferences;
