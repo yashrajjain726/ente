@@ -880,12 +880,9 @@ class MemoryLaneService {
       idToLocalId.values.toList(),
       dedupeByLocalID: true,
     );
-    final filesById = <int, EnteFile>{};
-    for (final file in files) {
-      final id = localIdToId[file.localID];
-      if (id != null) filesById[id] = file;
-    }
-    return filesById;
+    return Map.fromEntries(
+      files.map((file) => MapEntry(localIdToId[file.localID]!, file)),
+    );
   }
 
   Future<void> _cleanupAssignedClusterTimelines(
