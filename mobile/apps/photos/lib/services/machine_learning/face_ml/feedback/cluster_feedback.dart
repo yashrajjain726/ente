@@ -1277,7 +1277,7 @@ class ClusterFeedbackService<T> {
         PeopleChangedEvent(
           type: PeopleEventType.automaticallyMergedClustersIntoPerson,
           person: p,
-          clusterIDs: suggestions.map((s) => s.$1).toSet(),
+          newClusterIDs: suggestions.map((s) => s.$1).toSet(),
         ),
       );
     }

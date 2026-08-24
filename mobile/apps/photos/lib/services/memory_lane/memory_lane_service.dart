@@ -864,7 +864,7 @@ class MemoryLaneService {
       if (event.type == PeopleEventType.addedClusterToPerson) {
         clusterIDs.add(event.source);
       }
-      clusterIDs.addAll(event.clusterIDs ?? {});
+      clusterIDs.addAll(event.newClusterIDs ?? {});
       if (event.person case final person?) {
         clusterIDs.addAll(person.data.assigned.map((cluster) => cluster.id));
       }
