@@ -198,7 +198,7 @@ class _ClusterPageState extends State<ClusterPage> {
       "${files.length} memories${widget.appendTitle}",
       _selectedFiles,
       widget.clusterID,
-      memoryLaneReady: flagService.internalUser
+      memoryLaneReady: flagService.internalUser && widget.personID == null
           ? MemoryLaneService.instance.hasReadyTimelineSync(
               widget.clusterID,
               isCluster: true,
