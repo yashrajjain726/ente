@@ -119,12 +119,14 @@ class _ClusterPageState extends State<ClusterPage> {
       if (mounted) setState(() {});
     };
     _timelineNotifier.addListener(_timelineListener);
-    unawaited(
-      MemoryLaneService.instance.ensureTimelineReachability(
-        widget.clusterID,
-        isCluster: true,
-      ),
-    );
+    if (widget.personID == null) {
+      unawaited(
+        MemoryLaneService.instance.ensureTimelineReachability(
+          widget.clusterID,
+          isCluster: true,
+        ),
+      );
+    }
     kDebugMode
         ? ClusterFeedbackService.instance.debugLogClusterBlurValues(
             widget.clusterID,
@@ -172,10 +174,11 @@ class _ClusterPageState extends State<ClusterPage> {
   }
 
   Future<void> _openMemoryLanePage() async {
-    if (MemoryLaneService.instance.hasReadyTimelineSync(
-      widget.clusterID,
-      isCluster: true,
-    )) {
+    if (widget.personID == null &&
+        MemoryLaneService.instance.hasReadyTimelineSync(
+          widget.clusterID,
+          isCluster: true,
+        )) {
       await routeToPage(
         context,
         MemoryLanePage.cluster(clusterID: widget.clusterID),
