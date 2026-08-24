@@ -41,7 +41,7 @@ class MemoryLaneService {
       isLocalGalleryMode ? MLDataDB.localGalleryInstance : MLDataDB.instance;
   final FilesDB _filesDB = FilesDB.instance;
   final OfflineFilesDB _offlineFilesDB = OfflineFilesDB.instance;
-  final TaskQueue<String> _precomputeQueue = TaskQueue(
+  final TaskQueue<_TimelineRequest> _precomputeQueue = TaskQueue(
     maxConcurrentTasks: 1,
     taskTimeout: const Duration(minutes: 5),
     maxQueueSize: 1000,
@@ -125,12 +125,12 @@ class MemoryLaneService {
     if (pendingRequest != null) {
       if (!force) return;
       pendingRequest.isRevoked = true;
-      _precomputeQueue.removeTask(personId);
+      _precomputeQueue.removeTask(pendingRequest);
     }
     final request = _TimelineRequest(force);
     _pendingRequests[personId] = request;
     _precomputeQueue
-        .addTask(personId, () async {
+        .addTask(request, () async {
           try {
             await _recomputeTimelineForPerson(
               personId,
