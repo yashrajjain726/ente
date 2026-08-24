@@ -934,10 +934,11 @@ class _MemoryLanePageState extends State<MemoryLanePage>
     final double slotWidth = samplePainter.width;
     final double slotHeight = samplePainter.height;
     final String formattedCurrent = numberFormat.format(currentRounded);
+    final person = widget.person;
     String fullText;
-    if (captionType == _CaptionType.age) {
+    if (captionType == _CaptionType.age && person != null) {
       fullText = l10n.facesTimelineCaptionYearsOld(
-        name: widget.person?.data.name ?? "",
+        name: person.data.name,
         count: currentRounded,
       );
     } else {
@@ -945,9 +946,8 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       if (fullText.contains("#")) {
         fullText = fullText.replaceAll("#", formattedCurrent);
       }
-      final String name = widget.person?.data.name ?? "";
-      if (name.isNotEmpty) {
-        fullText = "$name $fullText";
+      if (person != null && person.data.name.isNotEmpty) {
+        fullText = "${person.data.name} $fullText";
       }
     }
     final int insertionIndex = fullText.indexOf(formattedCurrent);
