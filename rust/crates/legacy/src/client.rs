@@ -127,15 +127,28 @@ impl LegacyClient {
         emergency_contact_id: i64,
         recovery_notice_in_days: i32,
     ) -> Result<()> {
-        self.api
-            .post("/emergency-contacts/update-recovery-notice")
+        let path = "/emergency-contacts/update-recovery-notice";
+        let response = self
+            .api
+            .post(path)
             .json(&LegacyUpdateRecoveryNoticeRequest {
                 emergency_contact_id,
                 recovery_notice_in_days,
             })
             .send()
-            .await?
-            .error_for_status()?;
+            .await?;
+        if response.status() == 400 {
+            return if response.text().await?.contains("active recovery session") {
+                Err(Error::ActiveRecoverySession)
+            } else {
+                Err(http::Error::Http {
+                    status: 400,
+                    path: path.into(),
+                }
+                .into())
+            };
+        }
+        response.error_for_status()?;
         Ok(())
     }
 

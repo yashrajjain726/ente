@@ -136,6 +136,13 @@ async fn run_legacy_reject_stage(pair: &legacy::LegacyPair) {
         .await
         .unwrap();
 
+    assert!(matches!(
+        pair.owner_ctx
+            .update_recovery_notice(pair.trusted.user_id, 1)
+            .await,
+        Err(ente_legacy::Error::ActiveRecoverySession)
+    ));
+
     let owner_info = pair.owner_ctx.info().await.unwrap();
     let recovery =
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
