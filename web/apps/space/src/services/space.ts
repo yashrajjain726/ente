@@ -167,6 +167,7 @@ type SpaceConversationChatSummaries =
 interface SpaceConversationsResponse {
     chatSummaries?: SpaceConversationChatSummaries;
     friends?: SpaceFriend[];
+    latestPostCreatedAt?: string | null;
     pendingRequests?: SpaceFriendRequestResponse[];
 }
 
@@ -328,6 +329,7 @@ export interface SpaceMessageConversation {
 
 export interface SpaceMessageConversationList {
     items: SpaceMessageConversation[];
+    latestPostCreatedAtMs: number | null;
 }
 
 export interface SpaceFriendRequest {
@@ -980,13 +982,22 @@ const messageActivityFromSpaceActivity = (
     };
 };
 
+const isWaveMessageActivity = (activity: SpaceMessageActivity) =>
+    (activity.type == "message" || activity.type == "post_reply") &&
+    activity.text?.trim() == "👋";
+
 const isPassiveAutoReadMessageActivity = (activity: SpaceMessageActivity) =>
     activity.type == "friend_added" ||
     activity.type == "message_like" ||
-    activity.type == "post_like";
+    activity.type == "post_like" ||
+    isWaveMessageActivity(activity);
 
 const messageConversationUnreadCount = (activities: SpaceMessageActivity[]) => {
-    if (activities.length == 1 && activities[0]?.type == "post_like") {
+    const onlyActivity = activities.length == 1 ? activities[0] : undefined;
+    if (
+        onlyActivity?.type == "post_like" ||
+        (onlyActivity && isWaveMessageActivity(onlyActivity))
+    ) {
         return 0;
     }
 
@@ -1486,19 +1497,25 @@ export const loadCurrentMessageConversations = async (
                     summaries,
                     friendSpaceID,
                 );
+                const latestActivity = summary
+                    ? messageActivityFromSpaceActivity(summary.latestActivity)
+                    : undefined;
                 const unreadActivities = summary
-                    ? (summary.unreadActivities ?? []).map(
-                          messageActivityFromSpaceActivity,
-                      )
+                    ? (summary.unreadActivities ?? [])
+                          .map(messageActivityFromSpaceActivity)
+                          .map((activity) =>
+                              activity.id == latestActivity?.id &&
+                              isWaveMessageActivity(latestActivity)
+                                  ? { ...activity, text: latestActivity.text }
+                                  : activity,
+                          )
                     : [];
                 const unreadCount =
                     messageConversationUnreadCount(unreadActivities);
                 return {
                     friend,
-                    latestActivity: summary
-                        ? messageActivityFromSpaceActivity(
-                              summary.latestActivity,
-                          )
+                    latestActivity: latestActivity
+                        ? latestActivity
                         : {
                               createdAtMs: timestampMsFromSpaceDate(
                                   conversation.createdAt,
@@ -1529,7 +1546,12 @@ export const loadCurrentMessageConversations = async (
                 unreadCount: 1,
             }),
         );
-        return { items: [...requestItems, ...friendItems] };
+        return {
+            items: [...requestItems, ...friendItems],
+            latestPostCreatedAtMs: response.latestPostCreatedAt
+                ? timestampMsFromSpaceDate(response.latestPostCreatedAt)
+                : null,
+        };
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

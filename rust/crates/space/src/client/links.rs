@@ -25,7 +25,7 @@ use crate::{
 const ACCESS_KEY_LENGTH: usize = 12;
 const ACCESS_KEY_ALPHABET: &[u8] =
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-const AUTH_HEADER: &str = "X-Ente-Space-Link-Auth";
+const AUTH_HEADER: &str = "X-Space-Link-Auth";
 const AUTH_CONTEXT: &[u8; 8] = b"spacauth";
 const WRAP_CONTEXT: &[u8; 8] = b"spacwrap";
 
@@ -576,7 +576,7 @@ mod tests {
             .await;
         let profile_request = server
             .mock("GET", format!("{prefix}/profile").as_str())
-            .match_header("x-ente-space-link-auth", auth.as_str())
+            .match_header("x-space-link-auth", auth.as_str())
             .with_status(200)
             .with_body(
                 json!({
@@ -598,7 +598,7 @@ mod tests {
             .await;
         let versions = server
             .mock("GET", format!("{prefix}/versions").as_str())
-            .match_header("x-ente-space-link-auth", auth.as_str())
+            .match_header("x-space-link-auth", auth.as_str())
             .with_status(200)
             .with_body(
                 json!([{
@@ -635,7 +635,7 @@ mod tests {
         let link_auth = "link-auth";
         let subscribe = server
             .mock("PUT", format!("{prefix}/push/subscription").as_str())
-            .match_header("x-ente-space-link-auth", link_auth)
+            .match_header("x-space-link-auth", link_auth)
             .match_body(Matcher::Json(json!({
                 "endpoint": WEB_PUSH_ENDPOINT,
                 "keys": {
@@ -649,7 +649,7 @@ mod tests {
             .await;
         let unsubscribe = server
             .mock("DELETE", format!("{prefix}/push/subscription").as_str())
-            .match_header("x-ente-space-link-auth", link_auth)
+            .match_header("x-space-link-auth", link_auth)
             .match_body(Matcher::Json(json!({
                 "endpoint": WEB_PUSH_ENDPOINT
             })))

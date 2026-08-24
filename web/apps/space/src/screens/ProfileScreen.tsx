@@ -1018,7 +1018,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     const shareProfile = () => {
         if (!profileLink) return;
-        openSpaceShareLinkDialog();
+        openSpaceShareLinkDialog(profileLink);
     };
 
     const deleteSelectedPost = async () => {
