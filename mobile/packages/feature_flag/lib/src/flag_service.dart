@@ -104,7 +104,7 @@ class FlagService {
 
   bool get enableMemoryShareLink => true;
 
-  bool get enableMLInBackground => true;
+  bool get enableMLInBackground => false;
 
   bool get useRustForHeicDecoder => internalUser;
 
