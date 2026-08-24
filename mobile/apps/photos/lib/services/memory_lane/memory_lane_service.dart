@@ -552,8 +552,8 @@ class MemoryLaneService {
     if (request.isRevoked || !identical(_pendingRequests[personId], request)) {
       return;
     }
-    await _cacheService.upsertTimeline(timeline);
-    await _cacheService.upsertComputeLogEntry(
+    await _cacheService.upsertTimelineAndLog(
+      timeline,
       MemoryLaneComputeLogEntry(
         personId: personId,
         name: person?.data.name,

@@ -70,22 +70,16 @@ class MemoryLaneCacheService {
     return Map<String, MemoryLaneComputeLogEntry>.from(cache.computeLog);
   }
 
-  Future<void> upsertTimeline(MemoryLanePersonTimeline timeline) async {
+  Future<void> upsertTimelineAndLog(
+    MemoryLanePersonTimeline timeline,
+    MemoryLaneComputeLogEntry log,
+  ) async {
     await _ensureInitialized();
     await _lock.synchronized(() async {
       final currentCache = await _loadCacheUnsafe();
-      final updatedCache = currentCache.copyWithTimeline(timeline);
-      _cache = updatedCache;
-      await _writeCacheUnsafe();
-    });
-  }
-
-  Future<void> upsertComputeLogEntry(MemoryLaneComputeLogEntry entry) async {
-    await _ensureInitialized();
-    await _lock.synchronized(() async {
-      final currentCache = await _loadCacheUnsafe();
-      final updatedCache = currentCache.copyWithComputeLogEntry(entry);
-      _cache = updatedCache;
+      _cache = currentCache
+          .copyWithTimeline(timeline)
+          .copyWithComputeLogEntry(log);
       await _writeCacheUnsafe();
     });
   }
