@@ -120,13 +120,11 @@ interface MessagesScreenProps {
     ) => Promise<void>;
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
-    previewWaveAnimationActivityIds?: string[];
     profileLink?: string;
     newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
     threadBackLabel?: string;
-    waveAnimationMessageId?: string;
 }
 
 interface MessageContextMenuState {
@@ -247,8 +245,7 @@ const conversationPreview = (conversation: SpaceMessageConversation) => {
 
 const ConversationPreviewLine: React.FC<{
     conversation: SpaceMessageConversation;
-    shouldAnimateWave: boolean;
-}> = ({ conversation, shouldAnimateWave }) => {
+}> = ({ conversation }) => {
     const activity = conversation.latestActivity;
     const previewLineSx = {
         color: textSecondary,
@@ -261,34 +258,6 @@ const ConversationPreviewLine: React.FC<{
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
     };
-
-    if (shouldAnimateWave) {
-        return (
-            <Box sx={previewLineSx}>
-                <Box
-                    component="span"
-                    sx={{
-                        animation:
-                            "spaceConversationPreviewWave 900ms ease-in-out",
-                        display: "inline-block",
-                        transformOrigin: "70% 70%",
-                        "@keyframes spaceConversationPreviewWave": {
-                            "0%, 100%": { transform: "rotate(0deg)" },
-                            "20%": { transform: "rotate(-18deg)" },
-                            "40%": { transform: "rotate(14deg)" },
-                            "60%": { transform: "rotate(-10deg)" },
-                            "80%": { transform: "rotate(6deg)" },
-                        },
-                        "@media (prefers-reduced-motion: reduce)": {
-                            animation: "none",
-                        },
-                    }}
-                >
-                    {waveMessageText}
-                </Box>
-            </Box>
-        );
-    }
 
     if (activity.type == "message_like" && activity.text) {
         return (
@@ -461,7 +430,6 @@ const ConversationListItem: React.FC<{
     activityPost?: SpaceMessageActivityPost;
     conversation: SpaceMessageConversation;
     latestPostCreatedAtMs?: number | null;
-    shouldAnimateWave: boolean;
     onConfirmFriendRequest: (
         conversation: SpaceMessageConversation,
     ) => Promise<void>;
@@ -476,7 +444,6 @@ const ConversationListItem: React.FC<{
     activityPost,
     conversation,
     latestPostCreatedAtMs,
-    shouldAnimateWave,
     onConfirmFriendRequest,
     onDeleteFriendRequest,
     onLoadActivityPost,
@@ -721,10 +688,7 @@ const ConversationListItem: React.FC<{
                                 {timestampLabel}
                             </Box>
                         </Box>
-                        <ConversationPreviewLine
-                            conversation={conversation}
-                            shouldAnimateWave={shouldAnimateWave}
-                        />
+                        <ConversationPreviewLine conversation={conversation} />
                     </Box>
                     {showPostThumbnailSlot &&
                         (postThumbnailUrl ? (
@@ -869,7 +833,6 @@ const ConversationSection: React.FC<{
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     onPostSomething: () => void;
     section: ConversationSection;
-    waveAnimationActivityIds: ReadonlySet<string>;
 }> = ({
     activityPostsByKey,
     latestPostCreatedAtMs,
@@ -880,7 +843,6 @@ const ConversationSection: React.FC<{
     onOpenThread,
     onPostSomething,
     section,
-    waveAnimationActivityIds,
 }) => {
     if (section.items.length == 0) return null;
 
@@ -916,9 +878,6 @@ const ConversationSection: React.FC<{
                         }
                         conversation={conversation}
                         latestPostCreatedAtMs={latestPostCreatedAtMs}
-                        shouldAnimateWave={waveAnimationActivityIds.has(
-                            conversation.latestActivity.id,
-                        )}
                         onConfirmFriendRequest={onConfirmFriendRequest}
                         onDeleteFriendRequest={onDeleteFriendRequest}
                         onLoadActivityPost={onLoadActivityPost}
@@ -1397,7 +1356,6 @@ const MessageBubble: React.FC<{
     ownSpaceID?: string;
     parentMessage?: SpaceMessage;
     profile: SetupProfile;
-    shouldAnimateWave: boolean;
 }> = ({
     activityPost,
     groupsWithNext,
@@ -1410,7 +1368,6 @@ const MessageBubble: React.FC<{
     ownSpaceID,
     parentMessage,
     profile,
-    shouldAnimateWave,
 }) => {
     const isOwn = message.sender.spaceId == ownSpaceID;
     const isUnavailable = Boolean(message.isUnavailable);
@@ -1647,24 +1604,6 @@ const MessageBubble: React.FC<{
                                     fontWeight: 600,
                                     lineHeight: isWave ? "48px" : "21px",
                                     overflowWrap: "anywhere",
-                                    ...(isWave &&
-                                        shouldAnimateWave && {
-                                            animation:
-                                                "spaceMessageBubbleWave 650ms ease-in-out",
-                                            transformOrigin: "70% 70%",
-                                        }),
-                                    "@keyframes spaceMessageBubbleWave": {
-                                        "0%, 100%": {
-                                            transform: "rotate(0deg)",
-                                        },
-                                        "20%": { transform: "rotate(-18deg)" },
-                                        "40%": { transform: "rotate(14deg)" },
-                                        "60%": { transform: "rotate(-10deg)" },
-                                        "80%": { transform: "rotate(6deg)" },
-                                    },
-                                    "@media (prefers-reduced-motion: reduce)": {
-                                        animation: "none",
-                                    },
                                     whiteSpace: "pre-wrap",
                                 }}
                             >
@@ -1726,12 +1665,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onReplyToMessage,
     onSendMessage,
     onSetMessageLiked,
-    previewWaveAnimationActivityIds = [],
     profile,
     profileLink,
     selectedFriend,
     threadBackLabel = "Back to messages",
-    waveAnimationMessageId,
 }) => {
     const [messageText, setMessageText] = React.useState("");
     const [messageContextMenu, setMessageContextMenu] =
@@ -1777,10 +1714,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const conversationSections = React.useMemo(
         () => conversationTimeSections(conversations, newConversationIds),
         [conversations, newConversationIds],
-    );
-    const previewWaveAnimationActivityIdSet = React.useMemo(
-        () => new Set(previewWaveAnimationActivityIds),
-        [previewWaveAnimationActivityIds],
     );
     const loadActivityPost = React.useCallback(
         (post: SpaceMessageActivityPost) => {
@@ -2548,10 +2481,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                                 profile={
                                                                     profile
                                                                 }
-                                                                shouldAnimateWave={
-                                                                    message.id ==
-                                                                    waveAnimationMessageId
-                                                                }
                                                             />
                                                         </React.Fragment>
                                                     );
@@ -3010,9 +2939,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 openPostPhotoPicker
                                             }
                                             section={section}
-                                            waveAnimationActivityIds={
-                                                previewWaveAnimationActivityIdSet
-                                            }
                                         />
                                     ))}
                                 </Box>
