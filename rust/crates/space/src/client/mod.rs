@@ -773,6 +773,7 @@ fn map_create_space_error(error: http::Error) -> Error {
 fn map_space_slug_error(error: http::Error) -> Error {
     match &error {
         http::Error::Api { code, .. } if code == "ALREADY_EXISTS" => Error::SpaceSlugAlreadyExists,
+        http::Error::Api { code, .. } if code == "SPACE_SLUG_RESERVED" => Error::SpaceSlugReserved,
         http::Error::Api { code, .. } if code == "BAD_REQUEST" => Error::InvalidSpaceSlug,
         _ => map_account_error(error),
     }

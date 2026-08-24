@@ -680,6 +680,26 @@ async fn update_space_slug_maps_duplicate_error() {
 }
 
 #[tokio::test]
+async fn update_space_slug_maps_reserved_error() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let update_slug = server
+        .mock("PUT", "/spaces/space_owner_main/slug")
+        .with_status(400)
+        .with_body(json!({ "code": "SPACE_SLUG_RESERVED" }).to_string())
+        .create_async()
+        .await;
+
+    let error = ctx
+        .update_space_slug("space_owner_main", "support")
+        .await
+        .expect_err("slug update should fail");
+
+    assert!(matches!(error, Error::SpaceSlugReserved));
+    update_slug.assert_async().await;
+}
+
+#[tokio::test]
 async fn create_space_updates_loaded_owned_space_cache() {
     let mut server = Server::new_async().await;
     let space_root_key = generate_key();

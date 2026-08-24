@@ -617,6 +617,8 @@ export const spaceProfileErrorMessage = (error: unknown) => {
     }
     if (error.name == "space_slug_already_exists")
         return "This username is already taken.";
+    if (error.name == "space_slug_reserved")
+        return "This username is reserved.";
     if (error.name == "space_limit_reached") {
         return "A Space already exists for this account. Please refresh and try again.";
     }

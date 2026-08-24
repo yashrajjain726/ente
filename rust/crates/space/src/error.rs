@@ -30,6 +30,9 @@ pub enum Error {
     #[error("space slug already exists")]
     SpaceSlugAlreadyExists,
 
+    #[error("space slug is reserved")]
+    SpaceSlugReserved,
+
     #[error("invalid space slug")]
     InvalidSpaceSlug,
 
