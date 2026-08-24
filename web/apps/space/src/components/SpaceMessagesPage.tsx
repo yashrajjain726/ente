@@ -50,22 +50,6 @@ const isFriendRequestConversation = (conversation: SpaceMessageConversation) =>
 let nextLocalMessageID = 0;
 
 const localMessageIdPrefix = "space-local-message-";
-const waveMessageText = "👋";
-
-const isUnreadIncomingWaveConversation = (
-    conversation: SpaceMessageConversation,
-) => {
-    const activity = conversation.latestActivity;
-    return (
-        (activity.type == "message" || activity.type == "post_reply") &&
-        !activity.outgoing &&
-        !activity.isUnavailable &&
-        activity.text?.trim() == waveMessageText &&
-        conversation.unreadActivities.some(
-            (unreadActivity) => unreadActivity.id == activity.id,
-        )
-    );
-};
 
 const createLocalMessageID = () =>
     `${localMessageIdPrefix}${Date.now()}-${nextLocalMessageID++}`;
@@ -147,12 +131,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
-    const [
-        previewWaveAnimationActivityIds,
-        setPreviewWaveAnimationActivityIds,
-    ] = React.useState<string[]>([]);
-    const [waveAnimationMessageId, setWaveAnimationMessageId] =
-        React.useState<string>();
     const [selectedFriendProfile, setSelectedFriendProfile] =
         React.useState<SpaceMessageConversation["friend"]>();
     const [
@@ -167,9 +145,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     );
     const markedReadSpaceIdRef = React.useRef<string | undefined>(undefined);
     const conversationsLoadGenerationRef = React.useRef(0);
-    const animatedPreviewWaveActivityIdsRef = React.useRef<Set<string>>(
-        new Set(),
-    );
     const previousSelectedSpaceIdRef = React.useRef<string | undefined>(
         selectedSpaceId,
     );
@@ -300,26 +275,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     ),
                 )
                 .map(conversationId);
-            const nextPreviewWaveAnimationActivityIds = items
-                .filter(isUnreadIncomingWaveConversation)
-                .map((conversation) => conversation.latestActivity.id)
-                .filter(
-                    (activityId) =>
-                        !animatedPreviewWaveActivityIdsRef.current.has(
-                            activityId,
-                        ),
-                );
-            if (nextPreviewWaveAnimationActivityIds.length > 0) {
-                nextPreviewWaveAnimationActivityIds.forEach((activityId) =>
-                    animatedPreviewWaveActivityIdsRef.current.add(activityId),
-                );
-                setPreviewWaveAnimationActivityIds((currentIds) => [
-                    ...new Set([
-                        ...currentIds,
-                        ...nextPreviewWaveAnimationActivityIds,
-                    ]),
-                ]);
-            }
             setNewConversationIds(unreadConversationIds);
             setConversations(items);
             setLatestPostCreatedAtMs(page.latestPostCreatedAtMs);
@@ -635,7 +590,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     React.useEffect(() => {
         markedReadSpaceIdRef.current = undefined;
-        setWaveAnimationMessageId(undefined);
 
         const actorSpaceId = profile?.spaceId;
         if (!profile || !actorSpaceId || !selectedSpaceId) {
@@ -685,24 +639,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [profile?.spaceId, selectedFriendSpaceId, selectedSpaceId]);
 
-    React.useEffect(() => {
-        if (!waveAnimationMessageId) return;
-        const timeoutID = window.setTimeout(
-            () => setWaveAnimationMessageId(undefined),
-            700,
-        );
-        return () => window.clearTimeout(timeoutID);
-    }, [waveAnimationMessageId]);
-
-    React.useEffect(() => {
-        if (previewWaveAnimationActivityIds.length == 0) return;
-        const timeoutID = window.setTimeout(
-            () => setPreviewWaveAnimationActivityIds([]),
-            950,
-        );
-        return () => window.clearTimeout(timeoutID);
-    }, [previewWaveAnimationActivityIds]);
-
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
@@ -734,10 +670,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 messages={messages}
                 newConversationIds={newConversationIds}
                 latestPostCreatedAtMs={latestPostCreatedAtMs}
-                previewWaveAnimationActivityIds={
-                    previewWaveAnimationActivityIds
-                }
-                waveAnimationMessageId={waveAnimationMessageId}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCloseThread={closeConversation}
                 onConfirmFriendRequest={confirmFriendRequest}
@@ -787,12 +719,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                             sender,
                             recipient,
                         );
-                        if (
-                            text.trim() == waveMessageText &&
-                            selectedFriendSpaceIdRef.current == spaceId
-                        ) {
-                            setWaveAnimationMessageId(message.id);
-                        }
                         replaceMessageIfThreadIsCurrent(
                             spaceId,
                             optimisticMessage.id,
@@ -827,12 +753,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                             sender,
                             recipient,
                         );
-                        if (
-                            text.trim() == waveMessageText &&
-                            selectedFriendSpaceIdRef.current == spaceId
-                        ) {
-                            setWaveAnimationMessageId(message.id);
-                        }
                         replaceMessageIfThreadIsCurrent(
                             spaceId,
                             optimisticMessage.id,
