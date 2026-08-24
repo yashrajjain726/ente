@@ -2378,7 +2378,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     aria-hidden
                                     sx={{
                                         display: "block",
-                                        fontSize: 23,
+                                        fontSize: 20,
                                         lineHeight: 1,
                                     }}
                                 >
