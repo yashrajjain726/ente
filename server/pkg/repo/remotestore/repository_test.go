@@ -57,7 +57,7 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 		($2, 'customDomain', 'xn--bcher-kva.example'),
 		($3, 'customDomain', 'invalid')`, collisionID1, collisionID2, invalidID)
 	require.NoError(t, err)
-	require.NoError(t, repository.BackfillCustomDomainCanonicalValues(t.Context()))
+	require.NoError(t, repository.MigrateCustomDomainCanonicalValues20260824(t.Context()))
 
 	var value string
 	var canonicalValue *string
