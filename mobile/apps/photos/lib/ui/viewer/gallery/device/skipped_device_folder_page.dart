@@ -26,15 +26,8 @@ import "package:photos/ui/viewer/gallery/state/selection_state.dart";
 
 class SkippedDeviceFolderPage extends StatefulWidget {
   final DeviceCollection deviceCollection;
-  final bool shouldBackup;
-  final Future<bool> Function(bool shouldBackup) onBackupChanged;
 
-  const SkippedDeviceFolderPage(
-    this.deviceCollection, {
-    required this.shouldBackup,
-    required this.onBackupChanged,
-    super.key,
-  });
+  const SkippedDeviceFolderPage(this.deviceCollection, {super.key});
 
   @override
   State<SkippedDeviceFolderPage> createState() =>
@@ -48,13 +41,11 @@ class _SkippedDeviceFolderPageState extends State<SkippedDeviceFolderPage> {
   late final StreamSubscription<LocalPhotosUpdatedEvent> _localPhotosSub;
   late Future<List<EnteFile>> _filesInDeviceCollection;
   late Future<Set<IgnoredUploadReasonBucket>> _ignoredUploadBuckets;
-  late bool _shouldBackup;
   IgnoredUploadReasonBucket? _selectedBucket;
 
   @override
   void initState() {
     super.initState();
-    _shouldBackup = widget.shouldBackup;
     _refreshIgnoredState();
     _localPhotosSub = Bus.instance.on<LocalPhotosUpdatedEvent>().listen((_) {
       if (!mounted) {
@@ -98,11 +89,7 @@ class _SkippedDeviceFolderPageState extends State<SkippedDeviceFolderPage> {
       GalleryType.localFolder,
       l10n.skippedFiles,
       _selectedFiles,
-      deviceCollection: widget.deviceCollection,
-      isDeviceFolderBackedUp: _shouldBackup,
-      onDisableDeviceFolderBackup: () async {
-        await _updateBackupStatus(false);
-      },
+      showOverflowMenu: false,
     );
     final gallery = Gallery(
       key: ValueKey("skipped_device_folder:${widget.deviceCollection.id}"),
@@ -170,19 +157,6 @@ class _SkippedDeviceFolderPageState extends State<SkippedDeviceFolderPage> {
     setState(_refreshIgnoredState);
     await _syncSelectedBucket(popIfEmpty: true);
     unawaited(RemoteSyncService.instance.sync(silently: true));
-  }
-
-  Future<void> _updateBackupStatus(bool shouldBackup) async {
-    final updated = await widget.onBackupChanged(shouldBackup);
-    if (!mounted || !updated) {
-      return;
-    }
-    setState(() {
-      _shouldBackup = shouldBackup;
-    });
-    if (!shouldBackup) {
-      await Navigator.of(context).maybePop();
-    }
   }
 
   Future<void> _syncSelectedBucket({required bool popIfEmpty}) async {
