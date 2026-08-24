@@ -18,6 +18,7 @@ import "package:photos/models/selected_files.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/services/machine_learning/face_ml/feedback/cluster_feedback.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/services/memory_lane/memory_lane_service.dart";
 import "package:photos/ui/components/banners/name_face_banner.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
@@ -27,6 +28,7 @@ import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.da
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
 import "package:photos/ui/viewer/people/add_person_action_sheet.dart";
 import "package:photos/ui/viewer/people/cluster_app_bar.dart";
+import "package:photos/ui/viewer/people/memory_lane_page.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 import "package:photos/ui/viewer/people/save_person_banner.dart";
@@ -67,6 +69,8 @@ class _ClusterPageState extends State<ClusterPage> {
   late final StreamSubscription<LocalPhotosUpdatedEvent> _filesUpdatedEvent;
   late final StreamSubscription<PeopleChangedEvent> _peopleChangedEvent;
   late final StreamSubscription<AppModeChangedEvent> _appModeChangedEvent;
+  late final ValueNotifier<Set<String>> _timelineNotifier;
+  late final VoidCallback _timelineListener;
   bool get _localGalleryUiMode =>
       isLocalGalleryMode && !Configuration.instance.hasConfiguredAccount();
 
@@ -110,6 +114,17 @@ class _ClusterPageState extends State<ClusterPage> {
         setState(() {});
       }
     });
+    _timelineNotifier = MemoryLaneService.instance.readyPersonIds;
+    _timelineListener = () {
+      if (mounted) setState(() {});
+    };
+    _timelineNotifier.addListener(_timelineListener);
+    unawaited(
+      MemoryLaneService.instance.ensureTimelineReachability(
+        widget.clusterID,
+        isCluster: true,
+      ),
+    );
     kDebugMode
         ? ClusterFeedbackService.instance.debugLogClusterBlurValues(
             widget.clusterID,
@@ -123,6 +138,7 @@ class _ClusterPageState extends State<ClusterPage> {
     _filesUpdatedEvent.cancel();
     _peopleChangedEvent.cancel();
     _appModeChangedEvent.cancel();
+    _timelineNotifier.removeListener(_timelineListener);
     if (ClusterFeedbackService.lastViewedClusterID == widget.clusterID) {
       ClusterFeedbackService.resetLastViewedClusterID();
     }
@@ -155,6 +171,19 @@ class _ClusterPageState extends State<ClusterPage> {
     }
   }
 
+  Future<void> _openMemoryLanePage() async {
+    if (MemoryLaneService.instance.hasReadyTimelineSync(
+      widget.clusterID,
+      isCluster: true,
+    )) {
+      await routeToPage(
+        context,
+        MemoryLanePage.cluster(clusterID: widget.clusterID),
+      );
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final appBar = ClusterAppBar.sliverConfig(
@@ -162,6 +191,11 @@ class _ClusterPageState extends State<ClusterPage> {
       "${files.length} memories${widget.appendTitle}",
       _selectedFiles,
       widget.clusterID,
+      memoryLaneReady: MemoryLaneService.instance.hasReadyTimelineSync(
+        widget.clusterID,
+        isCluster: true,
+      ),
+      onMemoryLaneTap: _openMemoryLanePage,
     );
     final gallery = Gallery(
       appBar: appBar,
