@@ -1314,7 +1314,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             },
                         }}
                     >
-                        Reply privately to {firstName}...
+                        Reply...
                     </Box>
                     <FeedLikeButton
                         isLiked={isLiked}
