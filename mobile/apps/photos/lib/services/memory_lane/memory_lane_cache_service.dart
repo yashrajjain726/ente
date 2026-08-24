@@ -73,9 +73,11 @@ class MemoryLaneCacheService {
   Future<void> upsertTimelineAndLog(
     MemoryLanePersonTimeline timeline,
     MemoryLaneComputeLogEntry log,
+    bool Function() isCurrent,
   ) async {
     await _ensureInitialized();
     await _lock.synchronized(() async {
+      if (!isCurrent()) return false;
       final currentCache = await _loadCacheUnsafe();
       _cache = currentCache
           .copyWithTimeline(timeline)

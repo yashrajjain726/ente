@@ -549,9 +549,6 @@ class MemoryLaneService {
       _eligibleCreationTimeCutoffMicros(person?.data.birthDate),
       isCluster: isCluster,
     );
-    if (request.isRevoked || !identical(_pendingRequests[personId], request)) {
-      return;
-    }
     await _cacheService.upsertTimelineAndLog(
       timeline,
       MemoryLaneComputeLogEntry(
@@ -563,6 +560,8 @@ class MemoryLaneService {
         logicVersion: _timelineLogicVersion,
         isCluster: isCluster,
       ),
+      () =>
+          !request.isRevoked && identical(_pendingRequests[personId], request),
     );
     if (!timeline.isEligible) {
       await _refreshReadyPersonIds();
