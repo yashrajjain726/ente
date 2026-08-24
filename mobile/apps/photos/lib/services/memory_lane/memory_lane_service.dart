@@ -121,23 +121,24 @@ class MemoryLaneService {
     if (personId.isEmpty) {
       return;
     }
-    if (_pendingRequests.containsKey(personId)) {
-      return;
+    final pendingRequest = _pendingRequests[personId];
+    if (pendingRequest != null) {
+      if (!force) return;
+      pendingRequest.isRevoked = true;
+      _precomputeQueue.removeTask(personId);
     }
     final request = _TimelineRequest(force);
     _pendingRequests[personId] = request;
     _precomputeQueue
         .addTask(personId, () async {
-          final activeRequest = _pendingRequests[personId];
-          if (activeRequest == null) return;
           try {
             await _recomputeTimelineForPerson(
               personId,
               isCluster: isCluster,
-              request: activeRequest,
+              request: request,
             );
           } finally {
-            if (identical(_pendingRequests[personId], activeRequest)) {
+            if (identical(_pendingRequests[personId], request)) {
               _pendingRequests.remove(personId);
             }
           }
@@ -146,7 +147,9 @@ class MemoryLaneService {
           if (identical(_pendingRequests[personId], request)) {
             _pendingRequests.remove(personId);
           }
-          _logger.severe("Recompute failed for $personId", e, s);
+          if (e is! TaskQueueCancelledException) {
+            _logger.severe("Recompute failed for $personId", e, s);
+          }
         });
   }
 
