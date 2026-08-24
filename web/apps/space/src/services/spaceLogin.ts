@@ -16,7 +16,6 @@ import {
 import {
     checkPasskeyVerificationStatus,
     clearInflightPasskeySessionID,
-    passkeySessionExpiredErrorMessage,
 } from "ente-accounts/services/passkey";
 import {
     stashKeyEncryptionKeyInSessionStore,
@@ -24,7 +23,7 @@ import {
 } from "ente-accounts/services/session-storage";
 import {
     getSRPAttributes,
-    srpVerificationUnauthorizedErrorMessage,
+    srpVerificationUnauthorizedErrorName,
     verifySRP,
 } from "ente-accounts/services/srp";
 import {
@@ -73,9 +72,6 @@ export type SpaceLoginResult =
 export type SpaceLoginPasskeyStatusResult =
     | SpaceLoginResult
     | { status: "pending" };
-
-export const spaceLoginPasskeySessionExpiredErrorMessage =
-    passkeySessionExpiredErrorMessage;
 
 let pendingSpaceLoginCredentials: SpaceLoginInput | undefined;
 
@@ -176,7 +172,7 @@ export const beginSpaceLogin = async ({
     } catch (error) {
         if (
             error instanceof Error &&
-            error.message == srpVerificationUnauthorizedErrorMessage
+            error.name == srpVerificationUnauthorizedErrorName
         ) {
             throw spaceAuthError("incorrect_credentials", error);
         }

@@ -1,7 +1,7 @@
 import { Input, TextField } from "@mui/material";
 import { decryptBox, deriveKey } from "ente-accounts/services/crypto";
 import {
-    srpVerificationUnauthorizedErrorMessage,
+    srpVerificationUnauthorizedErrorName,
     type SRPAttributes,
 } from "ente-accounts/services/srp";
 import type { KeyAttributes } from "ente-accounts/services/user";
@@ -124,7 +124,7 @@ export const VerifyMasterPasswordForm: React.FC<
             } catch (e) {
                 if (
                     e instanceof Error &&
-                    e.message == srpVerificationUnauthorizedErrorMessage
+                    e.name == srpVerificationUnauthorizedErrorName
                 ) {
                     log.error("Incorrect password or no account", e);
                     setFieldError(t("incorrect_password_or_no_account"));

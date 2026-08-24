@@ -12,7 +12,6 @@ import {
 import { spaceAuthErrorMessage } from "services/spaceAuthError";
 import {
     checkSpaceLoginPasskeyStatus,
-    spaceLoginPasskeySessionExpiredErrorMessage,
     useSpaceLoginTwoFactorInstead,
 } from "services/spaceLogin";
 import {
@@ -26,19 +25,6 @@ import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
-
-const passkeyErrorMessage = (error: unknown) => {
-    if (
-        error instanceof Error &&
-        error.message == spaceLoginPasskeySessionExpiredErrorMessage
-    ) {
-        return "Passkey session expired. Please sign in again.";
-    }
-    return spaceAuthErrorMessage(
-        error,
-        "Couldn't check passkey status. Please try again.",
-    );
-};
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
@@ -144,5 +130,11 @@ const Page: React.FC = () => {
         </>
     );
 };
+
+const passkeyErrorMessage = (error: unknown) =>
+    spaceAuthErrorMessage(
+        error,
+        "Couldn't check passkey status. Please try again.",
+    );
 
 export default Page;
