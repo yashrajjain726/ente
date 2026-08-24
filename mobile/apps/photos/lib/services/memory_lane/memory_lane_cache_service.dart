@@ -119,16 +119,17 @@ class MemoryLaneCacheService {
     });
   }
 
-  Future<void> removeTimeline(String personId) async {
+  Future<bool> removeTimeline(String personId) async {
     await _ensureInitialized();
-    await _lock.synchronized(() async {
+    return await _lock.synchronized(() async {
       final currentCache = await _loadCacheUnsafe();
       if (!currentCache.timelines.containsKey(personId)) {
-        return;
+        return false;
       }
       final updatedCache = currentCache.copyWithoutPerson(personId);
       _cache = updatedCache;
       await _writeCacheUnsafe();
+      return true;
     });
   }
 

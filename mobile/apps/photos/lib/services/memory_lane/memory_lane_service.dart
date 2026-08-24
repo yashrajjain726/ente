@@ -309,8 +309,10 @@ class MemoryLaneService {
 
   Future<void> _revokeTimeline(String id) async {
     _pendingRequests[id]?.isRevoked = true;
-    await _cacheService.removeTimeline(id);
-    await _refreshReadyPersonIds();
+    final didRemove = await _cacheService.removeTimeline(id);
+    if (didRemove) {
+      await _refreshReadyPersonIds();
+    }
   }
 
   void _handlePeopleChange(PeopleChangedEvent event) {
