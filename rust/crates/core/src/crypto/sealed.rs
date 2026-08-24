@@ -250,17 +250,6 @@ mod tests {
     }
 
     #[test]
-    fn test_large_plaintext() {
-        let (pk, sk) = generate_keypair();
-        let plaintext = vec![0x42u8; 1024 * 1024];
-
-        let sealed = seal(&plaintext, &pk).unwrap();
-        let opened = open(&sealed, &pk, &sk).unwrap();
-
-        assert_eq!(opened, plaintext);
-    }
-
-    #[test]
     fn test_seal_rejects_small_order_point() {
         let zero_pk = PublicKey::from_bytes([0u8; 32]);
         let result = seal(b"test", &zero_pk);

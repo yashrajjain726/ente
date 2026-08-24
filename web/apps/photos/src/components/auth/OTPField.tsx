@@ -2,11 +2,16 @@ import { styled } from "@mui/material";
 import { t } from "i18next";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import { authDisplayFontFamily, authTransientProps } from "./styles";
+import {
+    authDisplayFontFamily,
+    authMiniTypography,
+    authTransientProps,
+} from "./styles";
 
 export interface OTPFieldProps {
     id?: string;
     name?: string;
+    label?: React.ReactNode;
     value: string;
     onChange: (value: string) => void;
     length?: number;
@@ -20,6 +25,7 @@ export interface OTPFieldProps {
 export function OTPField({
     id,
     name,
+    label,
     value,
     onChange,
     length = 6,
@@ -30,6 +36,8 @@ export function OTPField({
     ariaDescribedBy,
 }: OTPFieldProps): React.JSX.Element {
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const wasDisabled = useRef(disabled);
+    const hadError = useRef(error);
 
     useEffect(() => {
         if (autoFocus && value.length === 0) inputRefs.current[0]?.focus();
@@ -48,9 +56,27 @@ export function OTPField({
         }
     }
 
+    useEffect(() => {
+        const shouldRestoreFocus =
+            error && !disabled && (wasDisabled.current || !hadError.current);
+
+        wasDisabled.current = disabled;
+        hadError.current = error;
+
+        if (shouldRestoreFocus) {
+            const index = Math.max(
+                Math.min(value.trimEnd().length - 1, length - 1),
+                0,
+            );
+            const input = inputRefs.current[index];
+            input?.focus();
+            input?.select();
+        }
+    }, [disabled, error, length, value]);
+
     function updateDigit(index: number, digit: string) {
-        const otp = value.split("");
-        otp[index] = digit;
+        const otp = value.padEnd(length, " ").slice(0, length).split("");
+        otp[index] = digit || " ";
         onChange(otp.join(""));
     }
 
@@ -97,7 +123,7 @@ export function OTPField({
         index: number,
         event: React.KeyboardEvent<HTMLInputElement>,
     ) {
-        const otp = value.split("");
+        const otp = value.padEnd(length, " ").slice(0, length).split("");
         if ([event.code, event.key].includes("Backspace")) {
             event.preventDefault();
             updateDigit(index, "");
@@ -111,15 +137,12 @@ export function OTPField({
         } else if (event.code === "ArrowRight") {
             event.preventDefault();
             focusInput(index + 1);
+        } else if (event.code === "Spacebar" || event.code === "Space") {
+            event.preventDefault();
         } else if (event.key === otp[index]) {
             event.preventDefault();
             focusInput(index + 1);
-        } else if (
-            event.code === "Spacebar" ||
-            event.code === "Space" ||
-            event.code === "ArrowUp" ||
-            event.code === "ArrowDown"
-        ) {
+        } else if (event.code === "ArrowUp" || event.code === "ArrowDown") {
             event.preventDefault();
         }
     }
@@ -129,7 +152,7 @@ export function OTPField({
         event: React.ClipboardEvent<HTMLInputElement>,
     ) {
         event.preventDefault();
-        const otp = value.split("");
+        const otp = value.padEnd(length, " ").slice(0, length).split("");
         const pastedData = event.clipboardData
             .getData("text/plain")
             .slice(0, length - index)
@@ -148,36 +171,54 @@ export function OTPField({
     const inputAriaLabel = ariaLabel ?? t("verification_code");
 
     return (
-        <OTPRoot $disabled={disabled}>
-            {Array.from({ length }, (_, index) => (
-                <OTPInput
-                    key={index}
-                    ref={(element) => {
-                        inputRefs.current[index] = element;
-                    }}
-                    id={index === 0 ? id : undefined}
-                    name={index === 0 ? name : undefined}
-                    type="tel"
-                    value={value[index] ?? ""}
-                    onChange={(event) => handleChange(index, event)}
-                    onFocus={(event) => event.currentTarget.select()}
-                    onInput={(event) => handleInput(index, event)}
-                    onKeyDown={(event) => handleKeyDown(index, event)}
-                    onPaste={(event) => handlePaste(index, event)}
-                    disabled={disabled}
-                    autoFocus={autoFocus && index === 0}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    autoComplete={index === 0 ? "one-time-code" : "off"}
-                    aria-label={`${inputAriaLabel} ${index + 1}`}
-                    aria-describedby={ariaDescribedBy}
-                    aria-invalid={error || undefined}
-                    $error={error}
-                />
-            ))}
-        </OTPRoot>
+        <OTPFieldRoot>
+            {label && <OTPLabel>{label}</OTPLabel>}
+            <OTPRoot $disabled={disabled}>
+                {Array.from({ length }, (_, index) => (
+                    <OTPInput
+                        key={index}
+                        ref={(element) => {
+                            inputRefs.current[index] = element;
+                        }}
+                        id={index === 0 ? id : undefined}
+                        name={index === 0 ? name : undefined}
+                        type="tel"
+                        value={value[index]?.trim() ?? ""}
+                        onChange={(event) => handleChange(index, event)}
+                        onFocus={(event) => event.currentTarget.select()}
+                        onInput={(event) => handleInput(index, event)}
+                        onKeyDown={(event) => handleKeyDown(index, event)}
+                        onPaste={(event) => handlePaste(index, event)}
+                        disabled={disabled}
+                        autoFocus={autoFocus && index === 0}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete={index === 0 ? "one-time-code" : "off"}
+                        aria-label={`${inputAriaLabel} ${index + 1}`}
+                        aria-describedby={ariaDescribedBy}
+                        aria-invalid={error || undefined}
+                        $error={error}
+                    />
+                ))}
+            </OTPRoot>
+        </OTPFieldRoot>
     );
 }
+
+const OTPFieldRoot = styled("div")({
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+    "&:focus-within > span": { color: "var(--photos-auth-text)" },
+});
+
+const OTPLabel = styled("span")({
+    ...authMiniTypography,
+    color: "var(--photos-auth-text-muted)",
+    transition: "color 100ms ease-in",
+    "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+});
 
 const OTPRoot = styled(
     "div",

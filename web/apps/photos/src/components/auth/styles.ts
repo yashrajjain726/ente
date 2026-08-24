@@ -15,6 +15,17 @@ export const authColorVariables = {
         "--photos-auth-fill-hover": "#dedede",
         "--photos-auth-fill-active": "#d2d2d2",
         "--photos-auth-stroke": "#e0e0e0",
+        "--photos-auth-button-secondary": "#eaeaea",
+        "--photos-auth-button-secondary-hover": "#dedede",
+        "--photos-auth-button-secondary-active": "#d2d2d2",
+        "--photos-auth-button-secondary-stroke": "transparent",
+        "--photos-auth-button-secondary-stroke-hover": "transparent",
+        "--photos-auth-button-secondary-stroke-active": "transparent",
+        "--photos-auth-button-primary-stroke": "rgba(255, 255, 255, 0.14)",
+        "--photos-auth-button-primary-stroke-hover":
+            "rgba(255, 255, 255, 0.32)",
+        "--photos-auth-button-primary-stroke-active":
+            "rgba(255, 255, 255, 0.2)",
     },
     "*:where(.dark)": {
         "--photos-auth-success": "#08c225",
@@ -26,6 +37,14 @@ export const authColorVariables = {
         "--photos-auth-fill-hover": "#1a1a1a",
         "--photos-auth-fill-active": "#292929",
         "--photos-auth-stroke": "#3e3e3e",
+        "--photos-auth-button-secondary": "#1e1e1e",
+        "--photos-auth-button-secondary-hover": "#1a1a1a",
+        "--photos-auth-button-secondary-active": "#161616",
+        "--photos-auth-button-secondary-stroke": "rgba(255, 255, 255, 0.07)",
+        "--photos-auth-button-secondary-stroke-hover":
+            "rgba(255, 255, 255, 0.18)",
+        "--photos-auth-button-secondary-stroke-active":
+            "rgba(255, 255, 255, 0.12)",
     },
 };
 
@@ -55,3 +74,10 @@ export const authMiniTypography = {
     fontWeight: 500,
     lineHeight: "16px",
 };
+
+export const authDialogContentLayout = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "24px",
+    [authMobileMediaQuery]: { gap: "20px" },
+} as const;

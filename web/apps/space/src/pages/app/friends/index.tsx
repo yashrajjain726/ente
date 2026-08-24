@@ -13,6 +13,7 @@ import {
     loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     removeCurrentSpaceFriend,
+    requestFriendByUsername,
     type SpaceFriendRequest,
 } from "services/space";
 import {
@@ -93,6 +94,35 @@ const Page: React.FC = () => {
                 isLoading={isFriendsLoading}
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onBack={() => void router.push(spaceRoutes.profile)}
+                onAddFriend={async (username) => {
+                    const actorSpaceId = profile.spaceId;
+                    if (!actorSpaceId) throw new Error("Missing space.");
+                    const status = await requestFriendByUsername({
+                        spaceUsername: username,
+                    });
+                    try {
+                        if (status == "friend") {
+                            clearSpaceFriendsCache();
+                            void invalidateCachedSpaceFeed(actorSpaceId);
+                            const [requests, friends] = await Promise.all([
+                                loadCurrentFriendRequests(actorSpaceId),
+                                loadCurrentSpaceFriends(actorSpaceId),
+                            ]);
+                            setFriendRequests(requests);
+                            setFriends(friends);
+                        } else {
+                            setFriendRequests(
+                                await loadCurrentFriendRequests(actorSpaceId),
+                            );
+                        }
+                    } catch (error) {
+                        log.error(
+                            "Failed to refresh friends after sending request",
+                            error,
+                        );
+                    }
+                    return status;
+                }}
                 onMessage={(friendID) => {
                     const friend = friends.find(
                         (candidate) => candidate.id == friendID,
@@ -116,6 +146,7 @@ const Page: React.FC = () => {
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,
                 })}
+                username={profile.username}
                 onAcceptFriendRequest={async (requestID) => {
                     const actorSpaceId = profile.spaceId;
                     if (!actorSpaceId) return;

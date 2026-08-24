@@ -13,6 +13,9 @@ use crate::transport::{
 };
 use ente_core::b64;
 
+const MESSAGE_NOTIFICATION_KIND_WAVE: &str = "wave";
+const WAVE_MESSAGE_TEXT: &str = "👋";
+
 impl AccountSpaceCtx {
     pub async fn list_conversations(&self, space_id: &str) -> Result<ConversationsResponse> {
         let path = format!("/spaces/{space_id}/conversations");
@@ -67,7 +70,13 @@ impl AccountSpaceCtx {
             text: text.to_owned(),
         };
         let request = self
-            .message_request_for_payload(sender_space_id, &friend.public_key, &payload, None)
+            .message_request_for_payload(
+                sender_space_id,
+                &friend.public_key,
+                &payload,
+                None,
+                (text == WAVE_MESSAGE_TEXT).then(|| MESSAGE_NOTIFICATION_KIND_WAVE.to_owned()),
+            )
             .await?;
         let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");
         Ok(self
@@ -106,6 +115,7 @@ impl AccountSpaceCtx {
                 &friend.public_key,
                 &payload,
                 Some(reply_message_id),
+                None,
             )
             .await?;
         let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");
@@ -150,7 +160,13 @@ impl AccountSpaceCtx {
             text: text.to_owned(),
         };
         let request = self
-            .message_request_for_payload(sender_space_id, &post.author.public_key, &payload, None)
+            .message_request_for_payload(
+                sender_space_id,
+                &post.author.public_key,
+                &payload,
+                None,
+                None,
+            )
             .await?;
         let path = format!("/spaces/{sender_space_id}/posts/{post_id}/reply");
         Ok(self
@@ -248,6 +264,7 @@ impl AccountSpaceCtx {
         recipient_public_key: &str,
         payload: &MessagePayload,
         reply_message_id: Option<&str>,
+        notification_kind: Option<String>,
     ) -> Result<CreateMessageRequest> {
         let identity = self.space_identity_for(sender_space_id).await?;
         let recipient_public_key = b64::decode(recipient_public_key)?;
@@ -263,6 +280,7 @@ impl AccountSpaceCtx {
             sender_encrypted_message_key: b64::encode(&sender_key),
             recipient_encrypted_message_key: b64::encode(&recipient_key),
             reply_message_id: reply_message_id.map(ToOwned::to_owned),
+            notification_kind,
         })
     }
 }

@@ -59,19 +59,9 @@ pub struct RustScanResult {
     pub processed_image: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum RustScanErrorKind {
-    InvalidInput,
-    ModelLoad,
-    Codec,
-    Pipeline,
-    Internal,
-}
-
 #[derive(Clone, Debug)]
-pub struct RustScanError {
-    pub kind: RustScanErrorKind,
-    pub message: String,
+pub enum RustScanError {
+    Other { message: String },
 }
 
 #[frb(opaque)]
@@ -100,8 +90,7 @@ impl ScannerSession {
         rotation_degrees: i32,
     ) -> Result<Option<RustQuad>, RustScanError> {
         catch_panic(|| {
-            let row_stride = u32::try_from(row_stride).map_err(|_| RustScanError {
-                kind: RustScanErrorKind::InvalidInput,
+            let row_stride = u32::try_from(row_stride).map_err(|_| RustScanError::Other {
                 message: format!("negative row stride {row_stride}"),
             })?;
             let quad =
@@ -159,8 +148,7 @@ impl ScannerSession {
 
 fn catch_panic<T>(body: impl FnOnce() -> Result<T, RustScanError>) -> Result<T, RustScanError> {
     catch_unwind(AssertUnwindSafe(body)).unwrap_or_else(|panic| {
-        Err(RustScanError {
-            kind: RustScanErrorKind::Internal,
+        Err(RustScanError::Other {
             message: panic_message(&panic),
         })
     })
@@ -178,13 +166,9 @@ fn panic_message(panic: &Box<dyn Any + Send>) -> String {
 
 impl From<scan::ScanError> for RustScanError {
     fn from(value: scan::ScanError) -> Self {
-        let (kind, message) = match value {
-            scan::ScanError::InvalidInput(message) => (RustScanErrorKind::InvalidInput, message),
-            scan::ScanError::ModelLoad(message) => (RustScanErrorKind::ModelLoad, message),
-            scan::ScanError::Codec(message) => (RustScanErrorKind::Codec, message),
-            scan::ScanError::Pipeline(message) => (RustScanErrorKind::Pipeline, message),
-        };
-        RustScanError { kind, message }
+        Self::Other {
+            message: value.to_string(),
+        }
     }
 }
 

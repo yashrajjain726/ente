@@ -1,36 +1,20 @@
 use std::sync::Arc;
 
+use ente_core::{
+    crypto::SecretVec,
+    http::{Api, ApiConfig, Auth, Http},
+};
 use flutter_rust_bridge::frb;
 
 #[frb]
 pub enum ContactsError {
-    Network { message: String },
-    Http { message: String },
-    Parse { message: String },
-    Crypto { message: String },
-    Auth { message: String },
-    InvalidInput { message: String },
-    MissingEncryptedData { message: String },
-    MissingEncryptedKey { message: String },
-    ProfilePictureNotFound { message: String },
-    ActiveRecoverySession { message: String },
+    Other { message: String },
 }
 
 impl From<ente_contacts::Error> for ContactsError {
     fn from(e: ente_contacts::Error) -> Self {
-        use ente_contacts::ErrorKind as K;
-        let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::Auth => Self::Auth { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::MissingEncryptedData => Self::MissingEncryptedData { message },
-            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
-            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
-            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
+        Self::Other {
+            message: ente_core::error::chain(&e),
         }
     }
 }
@@ -156,29 +140,37 @@ pub struct OpenContactsCtxResult {
 #[frb(opaque)]
 #[derive(Clone)]
 pub struct ContactsCtx {
-    inner: Arc<ente_contacts::ContactsCtx>,
+    api: Arc<Api>,
+    contacts: Arc<ente_contacts::ContactsClient>,
 }
 
 #[frb]
 pub async fn open_contacts_ctx(
     input: OpenContactsCtxInput,
 ) -> Result<OpenContactsCtxResult, ContactsError> {
-    let opened = ente_contacts::ContactsCtx::open(ente_contacts::OpenContactsCtxInput {
-        base_url: input.base_url,
-        auth_token: input.auth_token,
-        user_id: input.user_id,
-        master_key: input.master_key,
-        cached_wrapped_root_contact_key: input.cached_wrapped_root_contact_key.map(Into::into),
-        user_agent: input.user_agent,
-        client_package: input.client_package,
-        client_version: input.client_version,
-    })
-    .await
-    .map_err(ContactsError::from)?;
+    let api = Arc::new(Api::new(
+        Http::new().map_err(ente_contacts::Error::from)?,
+        ApiConfig {
+            origin: input.base_url,
+            client_package: input.client_package,
+            client_version: input.client_version,
+            user_agent: input.user_agent,
+            auth: Some(Auth::User(input.auth_token)),
+        },
+    ));
+    let opened = ente_contacts::ContactsClient::open(
+        Arc::clone(&api),
+        Arc::new(SecretVec::new(input.master_key)),
+        ente_contacts::OpenContactsInput {
+            user_id: input.user_id,
+            cached_wrapped_root_contact_key: input.cached_wrapped_root_contact_key.map(Into::into),
+        },
+    )?;
 
     Ok(OpenContactsCtxResult {
         ctx: ContactsCtx {
-            inner: Arc::new(opened.ctx),
+            api,
+            contacts: Arc::new(opened.client),
         },
         wrapped_root_contact_key: opened.wrapped_root_contact_key.map(Into::into),
         root_key_source: opened.root_key_source.into(),
@@ -188,22 +180,22 @@ pub async fn open_contacts_ctx(
 impl ContactsCtx {
     #[frb(sync)]
     pub fn user_id(&self) -> i64 {
-        self.inner.user_id()
+        self.contacts.user_id()
     }
 
     pub fn update_auth_token(&self, auth_token: String) {
-        self.inner.update_auth_token(auth_token);
+        self.api.set_auth(Some(Auth::User(auth_token)));
     }
 
     #[frb(sync)]
     pub fn current_wrapped_root_contact_key(&self) -> Option<WrappedRootContactKey> {
-        self.inner
+        self.contacts
             .current_wrapped_root_contact_key()
             .map(Into::into)
     }
 
     pub async fn create_contact(&self, data: ContactData) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .create_contact(&data.into())
             .await
             .map(Into::into)
@@ -211,7 +203,7 @@ impl ContactsCtx {
     }
 
     pub async fn get_contact(&self, contact_id: String) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .get_contact(&contact_id)
             .await
             .map(Into::into)
@@ -223,7 +215,7 @@ impl ContactsCtx {
         since_time: i64,
         limit: u16,
     ) -> Result<Vec<ContactRecord>, ContactsError> {
-        self.inner
+        self.contacts
             .get_diff(since_time, limit)
             .await
             .map(|records| records.into_iter().map(Into::into).collect())
@@ -235,7 +227,7 @@ impl ContactsCtx {
         contact_id: String,
         data: ContactData,
     ) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .update_contact(&contact_id, &data.into())
             .await
             .map(Into::into)
@@ -243,7 +235,7 @@ impl ContactsCtx {
     }
 
     pub async fn delete_contact(&self, contact_id: String) -> Result<(), ContactsError> {
-        self.inner
+        self.contacts
             .delete_contact(&contact_id)
             .await
             .map_err(Into::into)
@@ -255,7 +247,7 @@ impl ContactsCtx {
         attachment_type: AttachmentType,
         attachment_bytes: Vec<u8>,
     ) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .set_attachment(&contact_id, attachment_type.into(), &attachment_bytes)
             .await
             .map(Into::into)
@@ -267,7 +259,7 @@ impl ContactsCtx {
         contact_id: String,
         attachment_type: AttachmentType,
     ) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .delete_attachment(&contact_id, attachment_type.into())
             .await
             .map(Into::into)
@@ -275,7 +267,7 @@ impl ContactsCtx {
     }
 
     pub async fn get_profile_picture(&self, contact_id: String) -> Result<Vec<u8>, ContactsError> {
-        self.inner
+        self.contacts
             .get_profile_picture(&contact_id)
             .await
             .map_err(Into::into)

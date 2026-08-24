@@ -26,7 +26,7 @@ const (
 	AppContextKey        = "auth.app"
 
 	LinkDeviceTokenHeader         = "X-Auth-Link-Device-Token"
-	LinkDeviceTokenResponseHeader = "X-Ente-Link-Device-Token"
+	LinkDeviceTokenResponseHeader = "X-Link-Device-Token"
 	LinkDeviceTokenResponseKey    = "linkDeviceToken"
 )
 

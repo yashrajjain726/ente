@@ -259,6 +259,7 @@ struct ConversationsJs {
     friends: Vec<FriendJs>,
     pending_requests: Vec<FriendRequestJs>,
     chat_summaries: BTreeMap<String, ConversationChatSummaryJs>,
+    latest_post_created_at: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1369,6 +1370,7 @@ impl SpaceAccountCtxHandle {
             friends,
             pending_requests,
             chat_summaries,
+            latest_post_created_at: response.latest_post_created_at,
         })
         .map_err(Into::into)
     }

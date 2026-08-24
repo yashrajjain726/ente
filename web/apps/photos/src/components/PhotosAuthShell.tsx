@@ -1,13 +1,14 @@
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { GlobalStyles, styled } from "@mui/material";
+import { GlobalStyles, keyframes, styled } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
-import { pt } from "ente-base/i18n";
+import { t } from "i18next";
 import type React from "react";
 import {
     authAboveMobileMediaQuery,
     authColorVariables,
     authDisplayFontFamily,
+    authMobileMediaQuery,
 } from "./auth/styles";
 
 interface PhotosAuthShellProps extends React.PropsWithChildren {
@@ -23,13 +24,22 @@ export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
         <FrameCurves />
         <PageCard>
             <DesktopBrandSlot>
-                <BrandPanel headline={authHeadline} size="desktop" />
+                <BrandPanel
+                    headline={t("photos_auth_headline")}
+                    size="desktop"
+                />
             </DesktopBrandSlot>
             <TabletBrandSlot>
-                <BrandPanel headline={authHeadline} size="tablet" />
+                <BrandPanel
+                    headline={t("photos_auth_headline")}
+                    size="tablet"
+                />
             </TabletBrandSlot>
             <MobileBrandSlot>
-                <BrandPanel headline={authHeadline} size="mobile" />
+                <BrandPanel
+                    headline={t("photos_auth_headline")}
+                    size="mobile"
+                />
             </MobileBrandSlot>
             <ContentSheet>
                 <SheetHandle />
@@ -41,7 +51,51 @@ export const PhotosAuthShell: React.FC<PhotosAuthShellProps> = ({
     </PageRoot>
 );
 
-const authHeadline = pt("Safe home for your photos");
+const shellReveal = keyframes({
+    from: { opacity: 0, transform: "translateY(18px)" },
+    to: { opacity: 1, transform: "translateY(0)" },
+});
+
+const brandCopyReveal = keyframes({
+    from: { opacity: 0, transform: "translateY(12px)" },
+    to: { opacity: 1, transform: "translateY(0)" },
+});
+
+const illustrationReveal = keyframes({
+    from: { opacity: 0, transform: "translateY(18px) scale(0.98)" },
+    to: { opacity: 1, transform: "translateY(0) scale(1)" },
+});
+
+const cameraSparkle = keyframes({
+    from: {
+        opacity: 0,
+        transform: "translate(-50%, -50%) scale(0) rotate(-20deg)",
+    },
+    "35%": {
+        opacity: 1,
+        transform: "translate(-50%, -50%) scale(1) rotate(0)",
+    },
+    "70%": {
+        opacity: 0.85,
+        transform: "translate(-50%, -50%) scale(0.72) rotate(24deg)",
+    },
+    to: {
+        opacity: 0,
+        transform: "translate(-50%, -50%) scale(1.3) rotate(45deg)",
+    },
+});
+
+const brandCurvesDrift = keyframes({
+    "0%, 100%": {
+        backgroundPosition: "0 0, calc(50% - 6px) calc(50% + 4px), 0 0",
+    },
+    "50%": { backgroundPosition: "0 0, calc(50% + 6px) calc(50% - 4px), 0 0" },
+});
+
+const brandCopyAnimation = {
+    animation: `${brandCopyReveal} 520ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+};
 
 interface BrandPanelProps {
     headline: string;
@@ -57,15 +111,15 @@ const BrandPanel: React.FC<BrandPanelProps> = ({ headline, size }) => (
             <PanelHeadline size={size}>{headline}</PanelHeadline>
             {size !== "mobile" && (
                 <PanelSubtitle size={size}>
-                    {pt("End-to-end encrypted. Cross-platform. Open-source.")}
+                    {t("photos_auth_subtitle")}
                 </PanelSubtitle>
             )}
             {size === "desktop" && (
                 <BulletList>
                     {[
-                        pt("10 GB free forever"),
-                        pt("Stored in 3 locations"),
-                        pt("Open source, independently audited"),
+                        t("photos_auth_free_storage"),
+                        t("photos_auth_no_ads_no_spying"),
+                        t("auth_independently_audited"),
                     ].map((bullet) => (
                         <Bullet key={bullet}>
                             <CheckCircle aria-hidden="true">
@@ -130,14 +184,19 @@ const PageCard = styled("div")(({ theme }) => ({
     position: "relative",
     overflow: "hidden",
     backgroundColor: "#fff",
+    animation: `${shellReveal} 620ms cubic-bezier(0.22, 1, 0.36, 1) both`,
     ...theme.applyStyles("dark", { backgroundColor: "#252525" }),
+    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
     [authAboveMobileMediaQuery]: { borderRadius: "24px" },
     "@media (min-width: 1024px)": {
         width: "1032px",
-        height: "740px",
+        height: "min(780px, 100%)",
         flexDirection: "row",
     },
-    "@media (min-width: 1600px)": { width: "1240px", height: "900px" },
+    "@media (min-width: 1600px)": {
+        width: "1240px",
+        height: "min(900px, 100%)",
+    },
 }));
 
 const DesktopBrandSlot = styled("div")({
@@ -175,7 +234,7 @@ const ContentSheet = styled("section")(({ theme }) => ({
     flex: 1,
     minHeight: 0,
     marginTop: "-28px",
-    padding: "12px 24px 24px",
+    padding: "40px 24px 24px",
     display: "flex",
     flexDirection: "column",
     gap: "24px",
@@ -208,6 +267,7 @@ const SheetHandle = styled("div")({
     alignSelf: "center",
     borderRadius: "999px",
     backgroundColor: "var(--photos-auth-fill-active)",
+    [authMobileMediaQuery]: { display: "none" },
     "@media (min-width: 1024px)": { display: "none" },
 });
 
@@ -219,6 +279,7 @@ const ContentColumn = styled("div", {
     display: "flex",
     flexDirection: "column",
     gap: "24px",
+    [authMobileMediaQuery]: { flexGrow: 1 },
     [authAboveMobileMediaQuery]: {
         width: "440px",
         maxWidth: "100%",
@@ -251,7 +312,10 @@ const BrandPanelRoot = styled("div", {
     backgroundColor: "var(--photos-auth-primary)",
     backgroundImage: `url("/images/auth-surface-noise.svg"), url("/images/auth-frame-curves.svg"), url("${greenTileP3}")`,
     backgroundRepeat: "repeat, no-repeat, repeat",
+    backgroundPosition: "0 0, center, 0 0",
     backgroundSize: "auto, cover, auto",
+    animation: `${brandCurvesDrift} 20s ease-in-out infinite`,
+    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
 }));
 
 /* 1x1 Display-P3 PNG tiled so the brand green renders in P3 on capable
@@ -297,6 +361,8 @@ const PanelHeadline = styled("h1", {
         size === "desktop" ? "50px" : size === "tablet" ? "42px" : "34px",
     letterSpacing: "-0.02em",
     textWrap: "pretty",
+    ...brandCopyAnimation,
+    animationDelay: "80ms",
 }));
 
 const PanelSubtitle = styled("p", {
@@ -305,9 +371,11 @@ const PanelSubtitle = styled("p", {
     margin: 0,
     marginTop: size === "desktop" ? "14px" : "10px",
     fontSize: size === "desktop" ? "20px" : "17px",
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: size === "desktop" ? "28px" : "24px",
     color: "rgba(255, 255, 255, 0.88)",
+    ...brandCopyAnimation,
+    animationDelay: "170ms",
 }));
 
 const BulletList = styled("ul")({
@@ -324,8 +392,12 @@ const Bullet = styled("li")({
     alignItems: "center",
     gap: "12px",
     fontSize: "17px",
-    fontWeight: 400,
+    fontWeight: 500,
     lineHeight: "24px",
+    ...brandCopyAnimation,
+    "&:nth-of-type(1)": { animationDelay: "280ms" },
+    "&:nth-of-type(2)": { animationDelay: "350ms" },
+    "&:nth-of-type(3)": { animationDelay: "420ms" },
 });
 
 const CheckCircle = styled("span")({
@@ -346,8 +418,13 @@ const IllustrationClip = styled("div", {
     height:
         size === "desktop" ? "219px" : size === "tablet" ? "172px" : "127px",
     flexShrink: 0,
+    position: "relative",
     overflow: "hidden",
     zIndex: 0,
+    ...(size !== "tablet" && {
+        animation: `${illustrationReveal} 500ms cubic-bezier(0.22, 1, 0.36, 1) ${size === "desktop" ? "840ms" : "130ms"} both`,
+        "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+    }),
     ...(size === "desktop"
         ? {
               marginTop: "auto",
@@ -361,6 +438,23 @@ const IllustrationClip = styled("div", {
               // bottom edge by 32px (tablet) / 28px (mobile).
               bottom: size === "tablet" ? "44px" : "38px",
           }),
+    "&::after": {
+        content: '""',
+        width:
+            size === "desktop" ? "34px" : size === "tablet" ? "26px" : "20px",
+        aspectRatio: "1",
+        position: "absolute",
+        left: "67%",
+        top: size === "desktop" ? "59%" : "57%",
+        zIndex: 1,
+        pointerEvents: "none",
+        backgroundColor: "#fff",
+        clipPath:
+            "polygon(50% 0%, 59% 39%, 100% 50%, 59% 61%, 50% 100%, 41% 61%, 0% 50%, 41% 39%)",
+        filter: "drop-shadow(0 0 7px rgba(255, 245, 168, 0.95))",
+        animation: `${cameraSparkle} 520ms ease-out ${size === "desktop" ? "1400ms" : size === "tablet" ? "740ms" : "690ms"} both`,
+        "@media (prefers-reduced-motion: reduce)": { display: "none" },
+    },
     "& > img": {
         display: "block",
         width: "473.694px",

@@ -54,6 +54,8 @@ impl ProviderUsage {
 
 #[derive(Debug)]
 pub(crate) struct OnnxSession {
+    model_path: String,
+    model_namespace: String,
     mode: ExecutionMode,
     validation: AccelerationValidation,
     provider_plan: Option<ProviderPlan>,
@@ -62,8 +64,10 @@ pub(crate) struct OnnxSession {
 }
 
 impl OnnxSession {
-    pub(crate) fn new(mode: ExecutionMode) -> Self {
+    pub(crate) fn new(model_path: &str, model_namespace: &str, mode: ExecutionMode) -> Self {
         Self {
+            model_path: model_path.to_string(),
+            model_namespace: model_namespace.to_string(),
             mode,
             validation: AccelerationValidation::GoldenRequired,
             provider_plan: None,
@@ -79,9 +83,14 @@ impl OnnxSession {
         self
     }
 
-    pub(crate) fn clear(&mut self) {
+    pub(crate) fn model_path(&self) -> &str {
+        &self.model_path
+    }
+
+    pub(crate) fn unload(&mut self) {
         self.provider_plan = None;
         self.session = None;
+        self.leave_first_run_canary_armed();
     }
 
     #[cfg(test)]
@@ -89,14 +98,26 @@ impl OnnxSession {
         self.session.is_some()
     }
 
+    #[cfg(test)]
+    pub(crate) fn has_load_state(&self) -> bool {
+        self.provider_plan.is_some() || self.session.is_some() || self.first_run_canary.is_some()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn initialize_load_state(&mut self) {
+        self.provider_plan = Some(ProviderPlan::new(
+            self.mode,
+            &self.model_path,
+            self.validation,
+        ));
+    }
+
     pub(crate) fn run<T>(
         &mut self,
-        model_path: &str,
-        model_namespace: &str,
         mut operation: impl FnMut(&mut Session) -> SessionRunResult<T>,
     ) -> MlResult<(T, ProviderUsage)> {
         loop {
-            self.ensure_loaded(model_path, model_namespace)?;
+            self.ensure_loaded()?;
 
             let execution_provider = self
                 .provider_plan
@@ -127,11 +148,13 @@ impl OnnxSession {
         }
     }
 
-    fn ensure_loaded(&mut self, model_path: &str, model_namespace: &str) -> MlResult<()> {
+    fn ensure_loaded(&mut self) -> MlResult<()> {
         if self.session.is_some() {
             return Ok(());
         }
 
+        let model_path = self.model_path.as_str();
+        let model_namespace = self.model_namespace.as_str();
         let provider_plan = self
             .provider_plan
             .get_or_insert_with(|| ProviderPlan::new(self.mode, model_path, self.validation));
@@ -628,7 +651,7 @@ mod tests {
     #[test]
     fn successful_first_run_disarms_the_canary() {
         let temp = tempfile::tempdir().unwrap();
-        let mut session = OnnxSession::new(ExecutionMode::CpuOnly);
+        let mut session = OnnxSession::new("model.onnx", "scanner", ExecutionMode::CpuOnly);
         session.first_run_canary = Some(first_run_canary(&temp));
 
         session.disarm_first_run_canary();
@@ -639,11 +662,31 @@ mod tests {
     #[test]
     fn retryable_first_run_failure_leaves_the_canary_armed() {
         let temp = tempfile::tempdir().unwrap();
-        let mut session = OnnxSession::new(ExecutionMode::CpuOnly);
+        let mut session = OnnxSession::new("model.onnx", "scanner", ExecutionMode::CpuOnly);
         session.first_run_canary = Some(first_run_canary(&temp));
 
         session.leave_first_run_canary_armed();
 
+        assert!(has_canary(&temp));
+    }
+
+    #[test]
+    fn unload_preserves_model_identity_and_armed_canary() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut session = OnnxSession::new(
+            "/models/document.onnx",
+            "document-segmentation",
+            ExecutionMode::CpuOnly,
+        );
+        session.initialize_load_state();
+        session.first_run_canary = Some(first_run_canary(&temp));
+
+        session.unload();
+
+        assert_eq!(session.model_path, "/models/document.onnx");
+        assert_eq!(session.model_namespace, "document-segmentation");
+        assert!(!session.is_loaded());
+        assert!(!session.has_load_state());
         assert!(has_canary(&temp));
     }
 

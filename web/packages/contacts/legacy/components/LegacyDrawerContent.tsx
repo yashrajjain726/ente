@@ -137,9 +137,6 @@ const warningBannerSx = {
     backgroundColor: "rgba(255, 82, 82, 0.14)",
 };
 
-const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : "Something went wrong";
-
 interface LegacyDrawerContentProps {
     open: boolean;
     suggestedUsers?: LegacySuggestedUser[];
@@ -333,8 +330,10 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
             setActiveSheet(undefined);
             await refreshAfterMutation();
         } catch (error) {
-            const message = getErrorMessage(error);
-            if (message.includes("active recovery session")) {
+            if (
+                error instanceof Error &&
+                error.name == "active_recovery_session"
+            ) {
                 showMiniDialog({
                     title: "Recovery in progress",
                     message:

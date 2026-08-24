@@ -5,7 +5,7 @@ import {
     crypto_decrypt_blob_legacy,
 } from "../pkg/ente_core_wasm.js";
 
-test("strict blob decrypt rejects non-final secretstream payloads", () => {
+test("strict blob decrypt identifies truncated secretstream payloads", () => {
     const encryptor = new CryptoStreamEncryptor();
     const ciphertext = encryptor.encrypt_chunk(
         Uint8Array.from([1, 2, 3, 4]),
@@ -13,13 +13,17 @@ test("strict blob decrypt rejects non-final secretstream payloads", () => {
     );
     const encryptedData = Buffer.from(ciphertext).toString("base64");
 
-    expect(() =>
+    try {
         crypto_decrypt_blob(
             encryptedData,
             encryptor.decryption_header,
             encryptor.key,
-        ),
-    ).toThrow();
+        );
+        expect.unreachable();
+    } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect(error).toHaveProperty("name", "stream_truncated");
+    }
 });
 
 test("legacy blob decrypt accepts non-final secretstream payloads", () => {
