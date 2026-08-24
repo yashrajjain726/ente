@@ -267,29 +267,33 @@ class SkippedFilesHeaderWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final bucket in visibleBuckets)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TagChipComponent(
-                          key: ValueKey("ignored_upload_filter_${bucket.name}"),
-                          label: ignoredUploadReasonBucketLabel(
-                            context,
-                            bucket,
+              if (visibleBuckets.length > 1) ...[
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final bucket in visibleBuckets)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TagChipComponent(
+                            key: ValueKey(
+                              "ignored_upload_filter_${bucket.name}",
+                            ),
+                            label: ignoredUploadReasonBucketLabel(
+                              context,
+                              bucket,
+                            ),
+                            state: effectiveSelectedBucket == bucket
+                                ? TagChipComponentState.selected
+                                : TagChipComponentState.unselected,
+                            onTap: () => onBucketChanged(bucket),
                           ),
-                          state: effectiveSelectedBucket == bucket
-                              ? TagChipComponentState.selected
-                              : TagChipComponentState.unselected,
-                          onTap: () => onBucketChanged(bucket),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
+              ],
               _ResetIgnoredFilesSection(
                 onResetIgnoredFiles: onResetIgnoredFiles,
               ),
