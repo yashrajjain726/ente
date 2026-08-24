@@ -544,7 +544,7 @@ class _EditContactPageState extends State<EditContactPage> {
               error,
               stackTrace,
             );
-            return false;
+            return null;
           }),
     );
     _draftLinkedPerson = person;
