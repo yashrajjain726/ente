@@ -168,6 +168,7 @@ class _BodyState extends State<_Body> {
   _captionUpdatedSubscription;
   QrCodeDetectionHelper? _qrHelper;
   final Map<String, File> _renderedFiles = {};
+  final _playbackSpeed = ValueNotifier<double>(1.0);
 
   @override
   void initState() {
@@ -220,6 +221,7 @@ class _BodyState extends State<_Body> {
     _pageController.dispose();
     _selectedIndexNotifier.dispose();
     _qrHelper?.dispose();
+    _playbackSpeed.dispose();
     super.dispose();
 
     SystemChrome.setSystemUIOverlayStyle(
@@ -277,6 +279,7 @@ class _BodyState extends State<_Body> {
                 mode: widget.config.mode,
                 showEditAction: widget.config.showEditAction,
                 onBackPressed: widget.config.onBackPressed,
+                playbackSpeed: _playbackSpeed,
               );
             },
             valueListenable: _selectedIndexNotifier,
@@ -475,6 +478,7 @@ class _BodyState extends State<_Body> {
             }
           },
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
+          playbackSpeed: _playbackSpeed,
           onTextSelectionStart:
               flagService.ocrOverlayEnabled &&
                   widget.config.mode != DetailPageMode.minimalistic &&

@@ -51,6 +51,7 @@ class VideoWidgetNative extends StatefulWidget {
   final void Function()? onStreamChange;
   final PlaylistData? playlistData;
   final bool selectedPreview;
+  final ValueNotifier<double> playbackSpeed;
   final Function({required int memoryDuration})? onFinalFileLoad;
 
   const VideoWidgetNative(
@@ -66,6 +67,7 @@ class VideoWidgetNative extends StatefulWidget {
     this.playlistData,
     this.onFinalFileLoad,
     required this.selectedPreview,
+    required this.playbackSpeed,
   });
 
   @override
@@ -103,6 +105,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
       'initState for ${widget.file.generatedID} with tag ${widget.file.tag} and name ${widget.file.displayName}',
     );
     super.initState();
+    widget.playbackSpeed.addListener(_onPlaybackSpeedChanged);
     WidgetsBinding.instance.addObserver(this);
 
     if (widget.selectedPreview) {
@@ -185,6 +188,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     );
     await _controller?.loadVideo(videoSource);
     await _applyVolume();
+    await _controller?.setPlaybackSpeed(widget.playbackSpeed.value);
     await _syncPlayback();
 
     Bus.instance.fire(SeekbarTriggeredEvent(position: 0));
@@ -251,6 +255,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   @override
   void dispose() {
+    widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     _subscription?.cancel();
     _controller?.stop().ignore();
     _controller?.dispose();
@@ -290,6 +295,10 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
       wakeLockFor: WakeLockFor.videoPlayback,
     );
     super.dispose();
+  }
+
+  void _onPlaybackSpeedChanged() {
+    _controller?.setPlaybackSpeed(widget.playbackSpeed.value);
   }
 
   void _onInteractionLockChanged(bool shouldLock) {
@@ -604,6 +613,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   Future<void> _onPlaybackReady() async {
     if (_isPlaybackReady.value) return;
     await _applyVolume();
+    await _controller?.setPlaybackSpeed(widget.playbackSpeed.value);
     await _syncPlayback();
     final durationInSeconds = durationToSeconds(duration) ?? 10;
     widget.onFinalFileLoad?.call(memoryDuration: durationInSeconds);

@@ -21,6 +21,7 @@ class VideoWidget extends StatefulWidget {
   final bool isFromMemories;
   final void Function() onStreamChange;
   final bool isPreviewPlayer;
+  final ValueNotifier<double> playbackSpeed;
 
   const VideoWidget(
     this.file,
@@ -33,6 +34,7 @@ class VideoWidget extends StatefulWidget {
     // ignore: unused_element
     required this.onStreamChange,
     required this.isPreviewPlayer,
+    required this.playbackSpeed,
   });
 
   @override
@@ -48,6 +50,8 @@ class _VideoWidgetState extends State<VideoWidget> {
   @override
   void initState() {
     super.initState();
+    widget.playbackSpeed.addListener(_onPlaybackSpeedChanged);
+    widget.controller.player.setRate(widget.playbackSpeed.value);
     _isPlayingStreamSubscription = widget.controller.player.stream.playing
         .listen((isPlaying) {
           if (isPlaying && !_isSeekingNotifier.value) {
@@ -66,12 +70,17 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   @override
   void dispose() {
+    widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     showControlsNotifier.dispose();
     _isPlayingStreamSubscription.cancel();
     _hideControlsDebouncer.cancelDebounceTimer();
     _isSeekingNotifier.removeListener(isSeekingListener);
     _isSeekingNotifier.dispose();
     super.dispose();
+  }
+
+  void _onPlaybackSpeedChanged() {
+    widget.controller.player.setRate(widget.playbackSpeed.value);
   }
 
   void isSeekingListener() {
