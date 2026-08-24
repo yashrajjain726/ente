@@ -637,7 +637,7 @@ async fn create_space_with_key_sends_encrypted_space_and_profile_payloads() {
 }
 
 #[tokio::test]
-async fn create_space_preserves_api_error_code() {
+async fn create_space_maps_owner_limit_error() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
     let create_space = server
@@ -655,19 +655,12 @@ async fn create_space_preserves_api_error_code() {
         Err(error) => error,
     };
 
-    assert!(matches!(
-        error,
-        SpaceError::Http(ente_core::http::Error::Api {
-            status: 409,
-            ref code,
-            ..
-        }) if code == "CONFLICT"
-    ));
+    assert!(matches!(error, Error::SpaceLimitReached));
     create_space.assert_async().await;
 }
 
 #[tokio::test]
-async fn update_space_slug_preserves_api_error_code() {
+async fn update_space_slug_maps_duplicate_error() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
     let update_slug = server
@@ -682,14 +675,7 @@ async fn update_space_slug_preserves_api_error_code() {
         .await
         .expect_err("slug update should fail");
 
-    assert!(matches!(
-        error,
-        SpaceError::Http(ente_core::http::Error::Api {
-            status: 409,
-            ref code,
-            ..
-        }) if code == "ALREADY_EXISTS"
-    ));
+    assert!(matches!(error, Error::SpaceSlugAlreadyExists));
     update_slug.assert_async().await;
 }
 
@@ -943,6 +929,41 @@ async fn create_post_includes_space_key_version() {
 }
 
 #[tokio::test]
+async fn create_post_maps_limit_error() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let space_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let spaces = server
+        .mock("GET", "/account/space")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+    let create = server
+        .mock("POST", "/spaces/space_owner_main/posts")
+        .with_status(409)
+        .with_body(json!({ "code": "CONFLICT" }).to_string())
+        .create_async()
+        .await;
+
+    let error = ctx
+        .create_post("space_owner_main", &[], None, None)
+        .await
+        .expect_err("post creation should fail");
+
+    assert!(matches!(error, Error::PostLimitReached));
+    spaces.assert_async().await;
+    create.assert_async().await;
+}
+
+#[tokio::test]
 async fn create_post_rejects_video_object_media_type() {
     let server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
@@ -1172,7 +1193,7 @@ async fn get_space_profile_decrypted_returns_decryption_error() {
         .await
         .expect_err("profile decryption should fail");
 
-    assert!(matches!(error, SpaceError::Crypto(_)));
+    assert!(matches!(error, Error::Crypto(_)));
     profile.assert_async().await;
     spaces.assert_async().await;
 }

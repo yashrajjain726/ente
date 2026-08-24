@@ -366,16 +366,8 @@ interface SpaceConversationsContext {
     listConversations: (spaceId: string) => Promise<SpaceConversationsResponse>;
 }
 
-export const isSpaceContentError = (error: unknown) => {
-    if (!error || typeof error != "object" || !("code" in error)) return false;
-    const code = error.code;
-    return (
-        code == "crypto" ||
-        code == "base64_decode" ||
-        code == "invalid_input" ||
-        code == "missing_friend_sealed_space_key"
-    );
-};
+export const isSpaceContentError = (error: unknown) =>
+    error instanceof Error && error.name == "content_unavailable";
 
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
@@ -1341,12 +1333,8 @@ export const createCurrentPhotoPost = async ({
     }
 };
 
-export const isSpacePostLimitReachedError = (error: unknown) => {
-    if (!error || typeof error != "object" || !("status" in error)) {
-        return false;
-    }
-    return (error as { status?: unknown }).status == 409;
-};
+export const isSpacePostLimitReachedError = (error: unknown) =>
+    error instanceof Error && error.name == "post_limit_reached";
 
 const normalizedImageDimension = (dimension: number | undefined) =>
     typeof dimension == "number" && Number.isFinite(dimension) && dimension > 0
