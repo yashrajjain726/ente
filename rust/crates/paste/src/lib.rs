@@ -66,29 +66,6 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl Error {
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::Http(http::Error::Network(_)) => "network",
-            Self::Http(_) => "request_failed",
-            Self::Crypto(_) => "crypto",
-            Self::Base64Decode(_) | Self::MalformedPayload => "malformed_payload",
-            Self::IncorrectPassword => "incorrect_password",
-            Self::Unavailable => "unavailable",
-            Self::EmptyText => "empty_text",
-            Self::TextTooLong => "text_too_long",
-            Self::InvalidLink => "invalid_link",
-            Self::InvalidAccessToken => "invalid_access_token",
-            Self::InvalidKey => "invalid_key",
-            Self::MissingKey => "missing_key",
-            Self::KeyMismatch => "key_mismatch",
-            Self::PasswordRequired => "password_required",
-            Self::SessionNotOpen => "session_not_open",
-            Self::MissingGuardCookie => "missing_guard_cookie",
-        }
-    }
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct PasteKey {
     fragment_secret: String,

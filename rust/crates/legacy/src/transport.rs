@@ -1,7 +1,7 @@
 use ente_accounts::auth::KeyAttributes;
 use serde::{Deserialize, Serialize};
 
-use crate::legacy_models::{LegacyContactState, LegacyInfo};
+use crate::models::{LegacyContactState, LegacyInfo};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -1,37 +1,34 @@
 use std::sync::Arc;
 
-use ente_contacts::{LegacyKitOwnerRecoverySession, LegacyKitRecoveryInitiator};
+use ente_core::{
+    crypto::SecretVec,
+    http::{Api, ApiConfig, Auth, Http},
+};
+use ente_legacy::{LegacyClient, LegacyKitOwnerRecoverySession, LegacyKitRecoveryInitiator};
 use flutter_rust_bridge::frb;
 
 #[frb]
 pub enum ContactsError {
-    Network { message: String },
-    Http { message: String },
-    Parse { message: String },
-    Crypto { message: String },
-    Auth { message: String },
-    InvalidInput { message: String },
-    MissingEncryptedData { message: String },
-    MissingEncryptedKey { message: String },
-    ProfilePictureNotFound { message: String },
     ActiveRecoverySession { message: String },
+    Other { message: String },
 }
 
 impl From<ente_contacts::Error> for ContactsError {
     fn from(e: ente_contacts::Error) -> Self {
-        use ente_contacts::ErrorKind as K;
+        Self::Other {
+            message: ente_core::error::chain(&e),
+        }
+    }
+}
+
+impl From<ente_legacy::Error> for ContactsError {
+    fn from(e: ente_legacy::Error) -> Self {
+        use ente_legacy::Error as E;
+
         let message = ente_core::error::chain(&e);
-        match e.kind() {
-            K::Network => Self::Network { message },
-            K::Http => Self::Http { message },
-            K::Parse => Self::Parse { message },
-            K::Crypto => Self::Crypto { message },
-            K::Auth => Self::Auth { message },
-            K::InvalidInput => Self::InvalidInput { message },
-            K::MissingEncryptedData => Self::MissingEncryptedData { message },
-            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
-            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
-            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
+        match e {
+            E::ActiveRecoverySession => Self::ActiveRecoverySession { message },
+            _ => Self::Other { message },
         }
     }
 }
@@ -148,10 +145,10 @@ pub enum LegacyKitVariant {
     TwoOfThree,
 }
 
-impl From<ente_contacts::LegacyKitVariant> for LegacyKitVariant {
-    fn from(value: ente_contacts::LegacyKitVariant) -> Self {
+impl From<ente_legacy::LegacyKitVariant> for LegacyKitVariant {
+    fn from(value: ente_legacy::LegacyKitVariant) -> Self {
         match value {
-            ente_contacts::LegacyKitVariant::TwoOfThree => Self::TwoOfThree,
+            ente_legacy::LegacyKitVariant::TwoOfThree => Self::TwoOfThree,
         }
     }
 }
@@ -166,14 +163,14 @@ pub enum LegacyKitRecoveryStatus {
     Recovered,
 }
 
-impl From<ente_contacts::LegacyKitRecoveryStatus> for LegacyKitRecoveryStatus {
-    fn from(value: ente_contacts::LegacyKitRecoveryStatus) -> Self {
+impl From<ente_legacy::LegacyKitRecoveryStatus> for LegacyKitRecoveryStatus {
+    fn from(value: ente_legacy::LegacyKitRecoveryStatus) -> Self {
         match value {
-            ente_contacts::LegacyKitRecoveryStatus::Waiting => Self::Waiting,
-            ente_contacts::LegacyKitRecoveryStatus::Ready => Self::Ready,
-            ente_contacts::LegacyKitRecoveryStatus::Blocked => Self::Blocked,
-            ente_contacts::LegacyKitRecoveryStatus::Cancelled => Self::Cancelled,
-            ente_contacts::LegacyKitRecoveryStatus::Recovered => Self::Recovered,
+            ente_legacy::LegacyKitRecoveryStatus::Waiting => Self::Waiting,
+            ente_legacy::LegacyKitRecoveryStatus::Ready => Self::Ready,
+            ente_legacy::LegacyKitRecoveryStatus::Blocked => Self::Blocked,
+            ente_legacy::LegacyKitRecoveryStatus::Cancelled => Self::Cancelled,
+            ente_legacy::LegacyKitRecoveryStatus::Recovered => Self::Recovered,
         }
     }
 }
@@ -188,8 +185,8 @@ pub struct LegacyKitRecoverySession {
     pub created_at: i64,
 }
 
-impl From<ente_contacts::LegacyKitRecoverySession> for LegacyKitRecoverySession {
-    fn from(value: ente_contacts::LegacyKitRecoverySession) -> Self {
+impl From<ente_legacy::LegacyKitRecoverySession> for LegacyKitRecoverySession {
+    fn from(value: ente_legacy::LegacyKitRecoverySession) -> Self {
         Self {
             id: value.id,
             kit_id: value.kit_id,
@@ -241,8 +238,8 @@ pub struct LegacyKitPart {
     pub name: String,
 }
 
-impl From<ente_contacts::LegacyKitPart> for LegacyKitPart {
-    fn from(value: ente_contacts::LegacyKitPart) -> Self {
+impl From<ente_legacy::LegacyKitPart> for LegacyKitPart {
+    fn from(value: ente_legacy::LegacyKitPart) -> Self {
         Self {
             index: value.index,
             name: value.name,
@@ -256,8 +253,8 @@ pub struct LegacyKitMetadata {
     pub parts: Vec<LegacyKitPart>,
 }
 
-impl From<ente_contacts::LegacyKitMetadata> for LegacyKitMetadata {
-    fn from(value: ente_contacts::LegacyKitMetadata) -> Self {
+impl From<ente_legacy::LegacyKitMetadata> for LegacyKitMetadata {
+    fn from(value: ente_legacy::LegacyKitMetadata) -> Self {
         Self {
             parts: value.parts.into_iter().map(Into::into).collect(),
         }
@@ -277,8 +274,8 @@ pub struct LegacyKit {
     pub active_recovery_session: Option<LegacyKitRecoverySession>,
 }
 
-impl From<ente_contacts::LegacyKit> for LegacyKit {
-    fn from(value: ente_contacts::LegacyKit) -> Self {
+impl From<ente_legacy::LegacyKit> for LegacyKit {
+    fn from(value: ente_legacy::LegacyKit) -> Self {
         Self {
             id: value.id,
             variant: value.variant.into(),
@@ -304,8 +301,8 @@ pub struct LegacyKitShare {
     pub part_name: String,
 }
 
-impl From<ente_contacts::LegacyKitShare> for LegacyKitShare {
-    fn from(value: ente_contacts::LegacyKitShare) -> Self {
+impl From<ente_legacy::LegacyKitShare> for LegacyKitShare {
+    fn from(value: ente_legacy::LegacyKitShare) -> Self {
         Self {
             payload_version: value.payload_version,
             variant: value.variant.into(),
@@ -325,8 +322,8 @@ pub struct LegacyKitCreateResult {
     pub shares: Vec<LegacyKitShare>,
 }
 
-impl From<ente_contacts::LegacyKitCreateResult> for LegacyKitCreateResult {
-    fn from(value: ente_contacts::LegacyKitCreateResult) -> Self {
+impl From<ente_legacy::LegacyKitCreateResult> for LegacyKitCreateResult {
+    fn from(value: ente_legacy::LegacyKitCreateResult) -> Self {
         Self {
             kit: value.kit.into(),
             shares: value.shares.into_iter().map(Into::into).collect(),
@@ -386,29 +383,41 @@ pub struct OpenContactsCtxResult {
 #[frb(opaque)]
 #[derive(Clone)]
 pub struct ContactsCtx {
-    inner: Arc<ente_contacts::ContactsCtx>,
+    api: Arc<Api>,
+    contacts: Arc<ente_contacts::ContactsClient>,
+    legacy: Arc<LegacyClient>,
 }
 
 #[frb]
 pub async fn open_contacts_ctx(
     input: OpenContactsCtxInput,
 ) -> Result<OpenContactsCtxResult, ContactsError> {
-    let opened = ente_contacts::ContactsCtx::open(ente_contacts::OpenContactsCtxInput {
-        base_url: input.base_url,
-        auth_token: input.auth_token,
-        user_id: input.user_id,
-        master_key: input.master_key,
-        cached_wrapped_root_contact_key: input.cached_wrapped_root_contact_key.map(Into::into),
-        user_agent: input.user_agent,
-        client_package: input.client_package,
-        client_version: input.client_version,
-    })
-    .await
-    .map_err(ContactsError::from)?;
+    let api = Arc::new(Api::new(
+        Http::new().map_err(ente_contacts::Error::from)?,
+        ApiConfig {
+            origin: input.base_url,
+            client_package: input.client_package,
+            client_version: input.client_version,
+            user_agent: input.user_agent,
+            auth: Some(Auth::User(input.auth_token)),
+        },
+    ));
+    let master_key = Arc::new(SecretVec::new(input.master_key));
+    let opened = ente_contacts::ContactsClient::open(
+        Arc::clone(&api),
+        Arc::clone(&master_key),
+        ente_contacts::OpenContactsInput {
+            user_id: input.user_id,
+            cached_wrapped_root_contact_key: input.cached_wrapped_root_contact_key.map(Into::into),
+        },
+    )?;
+    let legacy = LegacyClient::new(Arc::clone(&api), master_key);
 
     Ok(OpenContactsCtxResult {
         ctx: ContactsCtx {
-            inner: Arc::new(opened.ctx),
+            api,
+            contacts: Arc::new(opened.client),
+            legacy: Arc::new(legacy),
         },
         wrapped_root_contact_key: opened.wrapped_root_contact_key.map(Into::into),
         root_key_source: opened.root_key_source.into(),
@@ -418,22 +427,22 @@ pub async fn open_contacts_ctx(
 impl ContactsCtx {
     #[frb(sync)]
     pub fn user_id(&self) -> i64 {
-        self.inner.user_id()
+        self.contacts.user_id()
     }
 
     pub fn update_auth_token(&self, auth_token: String) {
-        self.inner.update_auth_token(auth_token);
+        self.api.set_auth(Some(Auth::User(auth_token)));
     }
 
     #[frb(sync)]
     pub fn current_wrapped_root_contact_key(&self) -> Option<WrappedRootContactKey> {
-        self.inner
+        self.contacts
             .current_wrapped_root_contact_key()
             .map(Into::into)
     }
 
     pub async fn create_contact(&self, data: ContactData) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .create_contact(&data.into())
             .await
             .map(Into::into)
@@ -441,7 +450,7 @@ impl ContactsCtx {
     }
 
     pub async fn get_contact(&self, contact_id: String) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .get_contact(&contact_id)
             .await
             .map(Into::into)
@@ -453,7 +462,7 @@ impl ContactsCtx {
         since_time: i64,
         limit: u16,
     ) -> Result<Vec<ContactRecord>, ContactsError> {
-        self.inner
+        self.contacts
             .get_diff(since_time, limit)
             .await
             .map(|records| records.into_iter().map(Into::into).collect())
@@ -465,7 +474,7 @@ impl ContactsCtx {
         contact_id: String,
         data: ContactData,
     ) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .update_contact(&contact_id, &data.into())
             .await
             .map(Into::into)
@@ -473,7 +482,7 @@ impl ContactsCtx {
     }
 
     pub async fn delete_contact(&self, contact_id: String) -> Result<(), ContactsError> {
-        self.inner
+        self.contacts
             .delete_contact(&contact_id)
             .await
             .map_err(Into::into)
@@ -485,7 +494,7 @@ impl ContactsCtx {
         attachment_type: AttachmentType,
         attachment_bytes: Vec<u8>,
     ) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .set_attachment(&contact_id, attachment_type.into(), &attachment_bytes)
             .await
             .map(Into::into)
@@ -497,7 +506,7 @@ impl ContactsCtx {
         contact_id: String,
         attachment_type: AttachmentType,
     ) -> Result<ContactRecord, ContactsError> {
-        self.inner
+        self.contacts
             .delete_attachment(&contact_id, attachment_type.into())
             .await
             .map(Into::into)
@@ -505,15 +514,15 @@ impl ContactsCtx {
     }
 
     pub async fn get_profile_picture(&self, contact_id: String) -> Result<Vec<u8>, ContactsError> {
-        self.inner
+        self.contacts
             .get_profile_picture(&contact_id)
             .await
             .map_err(Into::into)
     }
 
     pub async fn legacy_kits(&self) -> Result<Vec<LegacyKit>, ContactsError> {
-        self.inner
-            .legacy_kits()
+        self.legacy
+            .kits()
             .await
             .map(|kits| kits.into_iter().map(Into::into).collect())
             .map_err(Into::into)
@@ -525,14 +534,11 @@ impl ContactsCtx {
         part_names: Vec<String>,
         notice_period_in_hours: i32,
     ) -> Result<LegacyKitCreateResult, ContactsError> {
-        let part_names: [String; 3] =
-            part_names
-                .try_into()
-                .map_err(|_| ContactsError::InvalidInput {
-                    message: "legacy kit requires exactly three part names".into(),
-                })?;
-        self.inner
-            .legacy_kit_create(
+        let part_names: [String; 3] = part_names.try_into().map_err(|_| ContactsError::Other {
+            message: "legacy kit requires exactly three part names".into(),
+        })?;
+        self.legacy
+            .create_kit(
                 &current_user_key_attrs.into(),
                 part_names,
                 notice_period_in_hours,
@@ -546,8 +552,8 @@ impl ContactsCtx {
         &self,
         kit_id: String,
     ) -> Result<Vec<LegacyKitShare>, ContactsError> {
-        self.inner
-            .legacy_kit_download_shares(&kit_id)
+        self.legacy
+            .download_kit_shares(&kit_id)
             .await
             .map(|shares| shares.into_iter().map(Into::into).collect())
             .map_err(Into::into)
@@ -557,8 +563,8 @@ impl ContactsCtx {
         &self,
         kit_id: String,
     ) -> Result<LegacyKitOwnerRecoverySessionDetails, ContactsError> {
-        self.inner
-            .legacy_kit_recovery_session(&kit_id)
+        self.legacy
+            .kit_recovery_session(&kit_id)
             .await
             .map(Into::into)
             .map_err(Into::into)
@@ -569,23 +575,20 @@ impl ContactsCtx {
         kit_id: String,
         notice_period_in_hours: i32,
     ) -> Result<(), ContactsError> {
-        self.inner
-            .legacy_kit_update_recovery_notice(&kit_id, notice_period_in_hours)
+        self.legacy
+            .update_kit_recovery_notice(&kit_id, notice_period_in_hours)
             .await
             .map_err(Into::into)
     }
 
     pub async fn legacy_kit_block_recovery(&self, kit_id: String) -> Result<(), ContactsError> {
-        self.inner
-            .legacy_kit_block_recovery(&kit_id)
+        self.legacy
+            .block_kit_recovery(&kit_id)
             .await
             .map_err(Into::into)
     }
 
     pub async fn legacy_kit_delete(&self, kit_id: String) -> Result<(), ContactsError> {
-        self.inner
-            .legacy_kit_delete(&kit_id)
-            .await
-            .map_err(Into::into)
+        self.legacy.delete_kit(&kit_id).await.map_err(Into::into)
     }
 }

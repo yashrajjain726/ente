@@ -30,9 +30,6 @@ interface LegacyAddContactContentProps {
     variant?: "page" | "sheet";
 }
 
-const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : "Something went wrong";
-
 const nonEnteDialogAttributes = (email: string) => ({
     title: "Cannot add trusted contact",
     message: `${email} is not linked to an Ente account yet, so it cannot be used as a trusted contact.`,
@@ -176,8 +173,10 @@ export const LegacyAddContactContent: React.FC<
                                     selectedRecoveryDays,
                                 );
                             } catch (error) {
-                                const message = getErrorMessage(error);
-                                if (message.includes("not on Ente")) {
+                                if (
+                                    error instanceof Error &&
+                                    error.name == "contact_not_on_ente"
+                                ) {
                                     setTimeout(() => {
                                         showMiniDialog(
                                             nonEnteDialogAttributes(
@@ -187,9 +186,7 @@ export const LegacyAddContactContent: React.FC<
                                     }, 0);
                                     return;
                                 }
-                                throw error instanceof Error
-                                    ? error
-                                    : new Error(message);
+                                throw error;
                             }
                             await onAdded();
                         },

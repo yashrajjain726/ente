@@ -37,29 +37,7 @@ fn image_thread_error() -> ApiError {
 
 impl From<db::Error> for ApiError {
     fn from(error: db::Error) -> Self {
-        use db::Error as E;
-
-        let code = match &error {
-            E::InvalidKeyLength { .. } => "db_invalid_key_length",
-            E::InvalidBlobLength { .. } => "db_invalid_blob_length",
-            E::InvalidEncryptedField => "db_invalid_encrypted_field",
-            E::UnsupportedValueType(_) => "db_unsupported_value_type",
-            E::Row(_) => "db_row",
-            E::InvalidSender(_) => "db_invalid_sender",
-            E::NotFound { .. } => "db_not_found",
-            E::Crypto(_) => "db_crypto",
-            E::Base64Decode(_) => "db_base64_decode",
-            E::SerdeJson(_) => "db_serde_json",
-            E::Uuid(_) => "db_uuid",
-            E::Utf8(_) => "db_utf8",
-            E::Io(_) => "db_io",
-            E::ReadonlyDatabase => "db_readonly",
-            E::Sqlite(_) => "db_sqlite",
-            E::UnsupportedOperation(_) => "db_unsupported_operation",
-            E::Migration(_) => "db_migration",
-        };
-
-        ApiError::new(code, error.to_string())
+        ApiError::other(ente_core::error::chain(&error))
     }
 }
 
@@ -511,8 +489,13 @@ pub async fn chat_db_compress_attachment_image_file(
         let data = fs::read(canonical_path).map_err(|error| {
             ApiError::new("io", format!("failed to read image file '{path}': {error}"))
         })?;
-        ente_ensu::image::compress_attachment_image(&data)
-            .map_err(|error| ApiError::new("image", error.to_string()))
+        ente_ensu::image::compress_attachment_image(&data).map_err(|error| {
+            let name = match &error {
+                ente_ensu::image::ImageError::TooLarge(_) => "image_too_large",
+                _ => "image",
+            };
+            ApiError::new(name, ente_core::error::chain(&error))
+        })
     })
     .await
     .map_err(|_| image_thread_error())?
@@ -549,7 +532,7 @@ fn finalize_assistant_text(
 }
 
 fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
-    Uuid::parse_str(value).map_err(|error| ApiError::new("uuid", error.to_string()))
+    Ok(Uuid::parse_str(value).map_err(db::Error::from)?)
 }
 
 fn optional_uuid(value: &Option<String>) -> Result<Option<Uuid>, ApiError> {

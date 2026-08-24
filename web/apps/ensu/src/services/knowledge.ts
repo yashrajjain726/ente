@@ -130,10 +130,10 @@ export const saveEnabledKnowledgePacks = (stableIds: Set<string>) => {
 export const knowledgeErrorMessage = (error: unknown) => {
     const record =
         error && typeof error === "object"
-            ? (error as { code?: unknown; message?: unknown })
+            ? (error as { name?: unknown })
             : undefined;
-    const code = typeof record?.code === "string" ? record.code : undefined;
-    switch (code) {
+    const name = typeof record?.name === "string" ? record.name : undefined;
+    switch (name) {
         case "storage_full":
             return "Not enough storage space to download this knowledge pack.";
         case "network":

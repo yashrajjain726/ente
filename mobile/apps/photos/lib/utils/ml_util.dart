@@ -1049,8 +1049,7 @@ String formatExpectedMlSkipReasonForLogs(Object error) {
 }
 
 bool _isRustImageIssue(Object error) {
-  return error is rust_ml.RustMlError_Decode ||
-      error is rust_ml.RustMlError_Image;
+  return error is rust_ml.RustMlError_InvalidImage;
 }
 
 bool _isRustCorruptModelIssue(Object error) {

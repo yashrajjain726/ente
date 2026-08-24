@@ -7,17 +7,17 @@ use ente_accounts::auth::{self, KeyAttributes, SrpSession};
 use ente_core::b64;
 use ente_core::{
     crypto::{self, SecretString, SecretVec, kdf, sealed, secretbox},
-    http::{Api, ApiConfig, Http},
+    http::{Api, ApiConfig, Http, Response},
 };
 use uuid::Uuid;
 
 use crate::{
     Error, Result,
-    legacy_kit_models::{
+    kit_models::{
         LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitRecoveryBundle, LegacyKitRecoverySession,
         LegacyKitShare, LegacyKitVariant,
     },
-    legacy_kit_transport::{
+    kit_transport::{
         CreateLegacyKitRequest, LegacyKitChallengeRequest, LegacyKitChallengeResponse,
         LegacyKitChangePasswordRequest, LegacyKitChangePasswordResponse,
         LegacyKitDownloadContentResponse, LegacyKitInitChangePasswordRequest,
@@ -177,15 +177,15 @@ impl LegacyKitRecoveryClient {
         let first_share = shares.first().ok_or_else(|| {
             Error::InvalidInput("at least two legacy kit shares are required".into())
         })?;
-        let challenge = self
+        let response = self
             .api
             .post("/legacy-kits/recovery/challenge")
             .json(&LegacyKitChallengeRequest {
                 kit_id: first_share.kit_id.clone(),
             })
             .send()
-            .await?
-            .error_for_status()?
+            .await?;
+        let challenge = active_kit_response(response)?
             .json::<LegacyKitChallengeResponse>()
             .await?;
         self.open_from_encrypted_challenge(shares, &challenge.encrypted_challenge, email)
@@ -220,7 +220,7 @@ impl LegacyKitRecoveryHandle {
     }
 
     pub async fn refresh_session(&self) -> Result<LegacyKitRecoverySession> {
-        Ok(self
+        let response = self
             .api
             .post("/legacy-kits/recovery/session")
             .json(&LegacyKitSessionRequest {
@@ -228,10 +228,8 @@ impl LegacyKitRecoveryHandle {
                 session_token: self.session_token.as_ref().to_owned(),
             })
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+            .await?;
+        Ok(response.error_for_status()?.json().await?)
     }
 
     pub async fn recovery_bundle(&self) -> Result<LegacyKitRecoveryBundle> {
@@ -243,7 +241,8 @@ impl LegacyKitRecoveryHandle {
                 session_token: self.session_token.as_ref().to_owned(),
             })
             .send()
-            .await?
+            .await?;
+        let response = response
             .error_for_status()?
             .json::<LegacyKitRecoveryInfoResponse>()
             .await?;
@@ -273,7 +272,7 @@ impl LegacyKitRecoveryHandle {
         let srp_user_id = Uuid::new_v4().to_string();
         let (mut srp_session, setup_request) =
             password_reset_setup_request(&srp_user_id, &login_key)?;
-        let init_response = self
+        let response = self
             .api
             .post("/legacy-kits/recovery/init-change-password")
             .json(&LegacyKitInitChangePasswordRequest {
@@ -282,7 +281,8 @@ impl LegacyKitRecoveryHandle {
                 setup_srp_request: setup_request,
             })
             .send()
-            .await?
+            .await?;
+        let init_response = response
             .error_for_status()?
             .json::<LegacyKitSetupSrpResponse>()
             .await?;
@@ -294,7 +294,7 @@ impl LegacyKitRecoveryHandle {
             mem_limit: updated_key_attrs.mem_limit,
             ops_limit: updated_key_attrs.ops_limit,
         };
-        let change_response = self
+        let response = self
             .api
             .post("/legacy-kits/recovery/change-password")
             .json(&LegacyKitChangePasswordRequest {
@@ -307,7 +307,8 @@ impl LegacyKitRecoveryHandle {
                 },
             })
             .send()
-            .await?
+            .await?;
+        let change_response = response
             .error_for_status()?
             .json::<LegacyKitChangePasswordResponse>()
             .await?;
@@ -338,8 +339,8 @@ impl LegacyKitRecoveryClient {
                 email,
             })
             .send()
-            .await?
-            .error_for_status()?
+            .await?;
+        let response = active_kit_response(response)?
             .json::<LegacyKitOpenRecoveryResponse>()
             .await?;
         Ok(LegacyKitRecoveryHandle {
@@ -348,6 +349,14 @@ impl LegacyKitRecoveryClient {
             session_token: SecretString::new(response.session_token),
             kit_secret,
         })
+    }
+}
+
+fn active_kit_response(response: Response) -> Result<Response> {
+    if response.status() == 404 {
+        Err(Error::LegacyKitInactive)
+    } else {
+        Ok(response.error_for_status()?)
     }
 }
 

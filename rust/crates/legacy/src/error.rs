@@ -12,17 +12,20 @@ pub enum Error {
     #[error("base64 decode error: {0}")]
     Base64Decode(#[from] b64::DecodeError),
 
+    #[error(transparent)]
+    Accounts(#[from] ente_accounts::Error),
+
     #[error("invalid input: {0}")]
     InvalidInput(String),
 
-    #[error("missing encrypted data for live contact")]
-    MissingEncryptedData,
+    #[error("legacy contact is not on Ente")]
+    ContactNotOnEnte,
 
-    #[error("missing encrypted key for live contact")]
-    MissingEncryptedKey,
+    #[error("a recovery is already in progress")]
+    ActiveRecoverySession,
 
-    #[error("profile picture not found")]
-    ProfilePictureNotFound,
+    #[error("legacy kit is inactive")]
+    LegacyKitInactive,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

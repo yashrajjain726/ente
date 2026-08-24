@@ -104,7 +104,7 @@ const MODEL_SETTINGS_STORAGE_KEY = "ensu.modelSettings";
 const SYSTEM_PROMPT_STORAGE_KEY = "ensu.systemPrompt";
 
 interface TauriCommandError {
-    code?: string;
+    name?: string;
     message?: string;
 }
 
@@ -112,15 +112,15 @@ const tauriCommandError = (error: unknown): TauriCommandError => {
     if (!error || typeof error != "object") return {};
     const record = error as Record<string, unknown>;
     return {
-        code: typeof record.code == "string" ? record.code : undefined,
+        name: typeof record.name == "string" ? record.name : undefined,
         message: typeof record.message == "string" ? record.message : undefined,
     };
 };
 
 const formatImageProcessingErrorForLog = (error: unknown) => {
-    const { code, message } = tauriCommandError(error);
-    if (code == "io") return "io: selected image file could not be read";
-    if (code && message) return `${code}: ${message}`;
+    const { name, message } = tauriCommandError(error);
+    if (name == "io") return "io: selected image file could not be read";
+    if (name && message) return `${name}: ${message}`;
     if (message) return message;
     if (error instanceof Error) return error.message;
     if (typeof error == "string") return error;
@@ -131,28 +131,27 @@ const imageProcessingFailureDialog = (
     error: unknown,
     selectedImageCount: number,
 ) => {
-    const { code, message } = tauriCommandError(error);
-    const lowerMessage = message?.toLowerCase() ?? "";
+    const { name } = tauriCommandError(error);
     const subject =
         selectedImageCount == 1
             ? "The selected image"
             : "One of the selected images";
 
-    if (code == "image" && lowerMessage.includes("memory limit")) {
+    if (name == "image_too_large") {
         return {
             title: "Image too large",
             message: `${subject} is too large for Ensu to process. Try resizing it or exporting a smaller copy, then attach it again.`,
         };
     }
 
-    if (code == "image") {
+    if (name == "image") {
         return {
             title: "Image could not be attached",
             message: `${subject} could not be decoded. Try converting it to a different image format, then attach it again.`,
         };
     }
 
-    if (code == "io") {
+    if (name == "io") {
         return {
             title: "Image file could not be read",
             message: `${subject} could not be read. Check that the file still exists and try again.`,
@@ -1886,34 +1885,10 @@ const Page: React.FC = () => {
     );
 
     const formatErrorMessage = useCallback((error: unknown) => {
-        const normalizeErrorMessage = (message: string) => {
-            if (
-                message.toLowerCase().includes("length out of range of buffer")
-            ) {
-                return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
-            }
-            return message;
-        };
-
-        if (error instanceof Error) return normalizeErrorMessage(error.message);
-        if (typeof error === "string") return normalizeErrorMessage(error);
-        if (error && typeof error === "object") {
-            const maybeMessage = (error as { message?: unknown }).message;
-            if (typeof maybeMessage === "string" && maybeMessage.trim()) {
-                return normalizeErrorMessage(maybeMessage);
-            }
-            if ("__wbg_ptr" in error) {
-                return "Model failed to start. Please refresh and try again.";
-            }
+        if (error instanceof Error && error.name == "prompt_too_long") {
+            return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
         }
-        try {
-            const serialized = JSON.stringify(error);
-            return serialized
-                ? normalizeErrorMessage(serialized)
-                : "Unknown model error";
-        } catch {
-            return "Unknown model error";
-        }
+        return error instanceof Error ? error.message : "Unknown model error";
     }, []);
 
     const trimToWords = useCallback((text: string, maxWords: number) => {
@@ -2200,8 +2175,8 @@ const Page: React.FC = () => {
             setModelGateStatus("ready");
         } catch (error) {
             if (!isCurrentRequest()) return;
-            const { code } = tauriCommandError(error);
-            if (code === "model_missing" || code === "not_found") {
+            const { name } = tauriCommandError(error);
+            if (name === "model_missing" || name === "not_found") {
                 setModelGateError(null);
                 setIsDownloading(false);
                 setDownloadStatus(null);
@@ -3124,11 +3099,11 @@ const Page: React.FC = () => {
                             );
                         if (!isActiveGeneration()) return;
                     } catch (error) {
-                        const { code } = tauriCommandError(error);
-                        if (!isActiveGeneration() || code === "cancelled") {
+                        const { name } = tauriCommandError(error);
+                        if (!isActiveGeneration() || name === "cancelled") {
                             return;
                         }
-                        if (code === "embedding_missing") {
+                        if (name === "embedding_missing") {
                             throw error;
                         }
                         log.warn(
@@ -3224,9 +3199,9 @@ const Page: React.FC = () => {
                 try {
                     await generate();
                 } catch (error) {
-                    const { code } = tauriCommandError(error);
+                    const { name } = tauriCommandError(error);
                     if (
-                        code === "prompt_too_long" &&
+                        name === "prompt_too_long" &&
                         !streamingBufferRef.current &&
                         streamingChunksRef.current.length === 0 &&
                         activeCitations.length > 0
@@ -3312,11 +3287,11 @@ const Page: React.FC = () => {
                 if (!isActiveGeneration()) {
                     return;
                 }
-                const { code } = tauriCommandError(error);
+                const { name } = tauriCommandError(error);
                 if (
-                    code === "model_missing" ||
-                    code === "not_found" ||
-                    code === "embedding_missing"
+                    name === "model_missing" ||
+                    name === "not_found" ||
+                    name === "embedding_missing"
                 ) {
                     setModelGateError(null);
                     setDownloadStatus(null);
@@ -3646,8 +3621,8 @@ const Page: React.FC = () => {
                     }
                 })
                 .catch((error: unknown) => {
-                    const { code } = tauriCommandError(error);
-                    if (code !== "cancelled") {
+                    const { name } = tauriCommandError(error);
+                    if (name !== "cancelled") {
                         setKnowledgeErrors((current) => ({
                             ...current,
                             [stableId]: knowledgeErrorMessage(error),
