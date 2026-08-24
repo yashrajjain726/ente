@@ -121,13 +121,13 @@ class MemoryLaneService {
     if (personId.isEmpty) {
       return;
     }
-    _pendingRequests[personId] = _TimelineRequest(
-      (_pendingRequests[personId]?.force ?? false) || force,
-    );
+    if (_pendingRequests.containsKey(personId)) {
+      return;
+    }
+    final request = _TimelineRequest(force);
+    _pendingRequests[personId] = request;
     _precomputeQueue
         .addTask(personId, () async {
-          final request = _pendingRequests[personId];
-          if (request == null) return;
           try {
             await _recomputeTimelineForPerson(
               personId,
@@ -135,9 +135,7 @@ class MemoryLaneService {
               request: request,
             );
           } finally {
-            if (identical(_pendingRequests[personId], request)) {
-              _pendingRequests.remove(personId);
-            }
+            _pendingRequests.remove(personId);
           }
         })
         .catchError((e, s) {
@@ -294,7 +292,7 @@ class MemoryLaneService {
   }
 
   Future<void> _removeTimeline(String id) async {
-    _pendingRequests.remove(id);
+    _pendingRequests[id]?.cancelled = true;
     await _cacheService.removeTimeline(id);
     await _refreshReadyPersonIds();
   }
@@ -538,7 +536,7 @@ class MemoryLaneService {
       _eligibleCreationTimeCutoffMicros(person?.data.birthDate),
       isCluster: isCluster,
     );
-    if (!identical(_pendingRequests[personId], request)) {
+    if (request.cancelled) {
       return;
     }
     await _cacheService.upsertTimeline(timeline);
@@ -890,8 +888,9 @@ class MemoryLaneService {
 
 class _TimelineRequest {
   final bool force;
+  bool cancelled = false;
 
-  const _TimelineRequest(this.force);
+  _TimelineRequest(this.force);
 }
 
 class _TimelineFaceData {
