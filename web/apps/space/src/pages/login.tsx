@@ -5,6 +5,7 @@ import {
     loginBackground,
     type SpaceLoginCredentials,
 } from "screens/LoginScreen";
+import { spaceAuthErrorMessage } from "services/spaceAuthError";
 import { beginSpaceLogin, type SpaceLoginResult } from "services/spaceLogin";
 import { savePendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import { useSpaceAppState } from "state/spaceAppState";
@@ -21,11 +22,6 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [loginError, setLoginError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const loginErrorMessage = (error: unknown) =>
-        error instanceof Error
-            ? error.message
-            : "Couldn't sign in. Please try again.";
 
     const handleLoginResult = async (
         result: SpaceLoginResult,
@@ -80,7 +76,12 @@ const Page: React.FC = () => {
                             credentials,
                         );
                     } catch (error) {
-                        setLoginError(loginErrorMessage(error));
+                        setLoginError(
+                            spaceAuthErrorMessage(
+                                error,
+                                "Couldn't sign in. Please try again.",
+                            ),
+                        );
                         setIsSubmitting(false);
                     }
                 }}

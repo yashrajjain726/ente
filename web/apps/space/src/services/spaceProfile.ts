@@ -631,5 +631,5 @@ export const spaceProfileErrorMessage = (error: unknown) => {
     if (error.name == "permission_denied") {
         return "You do not have access to update this profile.";
     }
-    return error.message;
+    return "Couldn't save your profile. Please try again.";
 };

@@ -7,6 +7,7 @@ import {
     VerifyEmailScreen,
     verifyEmailBackground,
 } from "screens/VerifyEmailScreen";
+import { spaceAuthErrorMessage } from "services/spaceAuthError";
 import {
     completeSpaceLoginEmailVerification,
     resendSpaceLoginCode,
@@ -31,9 +32,10 @@ const verificationErrorMessage = (error: unknown) => {
     if (isHTTPErrorWithStatus(error, 410)) {
         return "This code has expired. Please request a new one.";
     }
-    return error instanceof Error
-        ? error.message
-        : "Couldn't verify this code. Please try again.";
+    return spaceAuthErrorMessage(
+        error,
+        "Couldn't verify this code. Please try again.",
+    );
 };
 
 const isExpectedVerificationError = (error: unknown) =>

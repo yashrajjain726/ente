@@ -167,11 +167,6 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         [applyProfile],
     );
 
-    const profileErrorMessage = (error: unknown) =>
-        error instanceof Error
-            ? error.message
-            : "Couldn't load this page. Please try again later or contact support.";
-
     const refreshProfile = useCallback(
         async (options?: RefreshSpaceProfileOptions) => {
             const generation = ++profileLoadGenerationRef.current;
@@ -210,7 +205,9 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                 }
                 log.error("Failed to load space profile", error);
                 if (profileLoadGenerationRef.current == generation) {
-                    setProfileLoadError(profileErrorMessage(error));
+                    setProfileLoadError(
+                        "Couldn't load this page. Please try again later or contact support.",
+                    );
                     setProfileLoadStatus("error");
                 }
                 if (options?.throwOnError) throw error;

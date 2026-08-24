@@ -9,6 +9,7 @@ import {
     passkeyVerificationBackground,
     type PasskeyVerificationStatus,
 } from "screens/PasskeyVerificationScreen";
+import { spaceAuthErrorMessage } from "services/spaceAuthError";
 import {
     checkSpaceLoginPasskeyStatus,
     spaceLoginPasskeySessionExpiredErrorMessage,
@@ -33,9 +34,10 @@ const passkeyErrorMessage = (error: unknown) => {
     ) {
         return "Passkey session expired. Please sign in again.";
     }
-    return error instanceof Error
-        ? error.message
-        : "Couldn't check passkey status. Please try again.";
+    return spaceAuthErrorMessage(
+        error,
+        "Couldn't check passkey status. Please try again.",
+    );
 };
 
 const Page: React.FC = () => {
