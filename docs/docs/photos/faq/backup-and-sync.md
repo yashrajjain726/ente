@@ -237,7 +237,7 @@ Because they're stored as one file, you won't see them as separate items in your
 **How to view:**
 
 - **On mobile**: Long-press a Live Photo to play the video
-- **On web/Desktop**: Open the photo and click on live photo icon (circle within circle)
+- **On web/Desktop**: Open the photo and click on live photo icon (circle within circle) to pause or replay
 
 **Sharing Live Photos:**
 
