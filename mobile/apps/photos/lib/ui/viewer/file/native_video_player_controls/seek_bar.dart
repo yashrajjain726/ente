@@ -172,6 +172,10 @@ class _NativeVideoProgressControlsState
 
   void _onPlaybackPositionChanged() {
     final target = widget.controller.playbackPosition.inMilliseconds;
+    if (widget.controller.playbackStatus == PlaybackStatus.stopped &&
+        target != 0) {
+      return;
+    }
     final duration = _effectiveDurationInMilliseconds();
     widget.seekController.onPlayerPosition(
       Duration(milliseconds: target),

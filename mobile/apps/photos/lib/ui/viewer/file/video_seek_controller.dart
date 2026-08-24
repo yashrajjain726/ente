@@ -46,7 +46,6 @@ class VideoSeekState {
 }
 
 class VideoSeekController extends ChangeNotifier {
-  static const _seekCommandTimeout = Duration(seconds: 2);
   static const _positionTolerance = Duration(milliseconds: 750);
   static const _reconciliationTimeout = Duration(seconds: 2);
   static const _sliderSeekInterval = Duration(milliseconds: 300);
@@ -165,7 +164,6 @@ class VideoSeekController extends ChangeNotifier {
     _sliderSeekTimer = null;
     _queuedTarget = null;
     _clearReconciliation();
-    _commandInFlight = false;
     _confirmedPosition = position;
     _setState(
       VideoSeekState(
@@ -218,7 +216,7 @@ class VideoSeekController extends ChangeNotifier {
         final requestId = _state.requestId;
         _queuedTarget = null;
         try {
-          await _seek(target).timeout(_seekCommandTimeout);
+          await _seek(target);
           if (!_disposed &&
               sessionId == _sessionId &&
               requestId == _state.requestId &&
@@ -244,11 +242,12 @@ class VideoSeekController extends ChangeNotifier {
         }
       }
     } finally {
-      if (!_disposed && sessionId == _sessionId) {
-        _commandInFlight = false;
+      _commandInFlight = false;
+      if (!_disposed) {
         if (_queuedTarget != null) {
           _startCommandDrain();
-        } else if (_expectedPosition == null &&
+        } else if (sessionId == _sessionId &&
+            _expectedPosition == null &&
             _state.phase != VideoSeekPhase.dragging) {
           _setState(_state.copyWith(phase: VideoSeekPhase.idle));
         }
