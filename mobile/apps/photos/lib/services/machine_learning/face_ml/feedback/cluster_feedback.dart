@@ -2150,7 +2150,6 @@ class ClusterFeedbackService<T> {
       }
       w?.log('calculated distances for cluster $clusterID');
       suggestion.filesInCluster.sort((b, a) {
-        //todo: review with @laurens, added this to avoid null safety issue
         final double distanceA = fileIdToDistanceMap[a.uploadedFileID!] ?? -1;
         final double distanceB = fileIdToDistanceMap[b.uploadedFileID!] ?? -1;
         return distanceA.compareTo(distanceB);
@@ -2218,7 +2217,6 @@ class ClusterFeedbackService<T> {
     _logger.info(
       "Debug logging for cluster $clusterID${clusterSize != null ? ' with $clusterSize photos' : ''}",
     );
-    // todo:(laurens) remove to review
     const String biggestClusterID = 'some random id';
 
     if (logClusterSummary) {
