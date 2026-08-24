@@ -7,6 +7,7 @@ import (
 
 	"github.com/ente/museum/ente"
 	"github.com/lib/pq"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/ente/stacktrace"
 )
@@ -34,7 +35,7 @@ func (r *Repository) BackfillCustomDomainCanonicalValues(ctx context.Context) er
 	}
 	defer tx.Rollback()
 
-	rows, err := tx.QueryContext(ctx, `SELECT user_id, key_value FROM remote_store
+	rows, err := tx.QueryContext(ctx, `SELECT user_id, key_value, canonical_value FROM remote_store
 		WHERE key_name = $1 AND left(key_value, 1) <> '_' FOR UPDATE`, ente.CustomDomain)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to fetch custom domains")
@@ -42,13 +43,16 @@ func (r *Repository) BackfillCustomDomainCanonicalValues(ctx context.Context) er
 	defer rows.Close()
 
 	type domainRow struct {
-		userID int64
-		value  string
+		userID         int64
+		value          string
+		current        sql.NullString
+		canonicalValue string
 	}
-	var domains []domainRow
+	var domains []*domainRow
+	domainsByCanonicalValue := make(map[string][]*domainRow)
 	for rows.Next() {
-		var domain domainRow
-		if err := rows.Scan(&domain.userID, &domain.value); err != nil {
+		domain := &domainRow{}
+		if err := rows.Scan(&domain.userID, &domain.value, &domain.current); err != nil {
 			return stacktrace.Propagate(err, "failed to scan custom domain")
 		}
 		domains = append(domains, domain)
@@ -62,15 +66,44 @@ func (r *Repository) BackfillCustomDomainCanonicalValues(ctx context.Context) er
 
 	for _, domain := range domains {
 		if err := ente.ValidatePublicCustomDomain(domain.value); err != nil {
-			return stacktrace.Propagate(err, "invalid stored custom domain")
+			log.WithField("user_id", domain.userID).WithError(err).Warn("Skipping invalid custom domain during backfill")
+			continue
 		}
 		canonicalDomain, err := ente.CanonicalDomain(domain.value)
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to canonicalize stored custom domain")
+			log.WithField("user_id", domain.userID).WithError(err).Warn("Skipping invalid custom domain during backfill")
+			continue
+		}
+		domain.canonicalValue = canonicalDomain
+		domainsByCanonicalValue[canonicalDomain] = append(domainsByCanonicalValue[canonicalDomain], domain)
+	}
+	for _, group := range domainsByCanonicalValue {
+		if len(group) == 1 {
+			continue
+		}
+		userIDs := make([]int64, len(group))
+		for i, domain := range group {
+			userIDs[i] = domain.userID
+			domain.canonicalValue = ""
+		}
+		log.WithField("user_ids", userIDs).Warn("Skipping colliding custom domains during backfill")
+	}
+
+	for _, domain := range domains {
+		if domain.current.Valid && domain.current.String != domain.canonicalValue {
+			if _, err := tx.ExecContext(ctx, `UPDATE remote_store SET canonical_value = NULL
+				WHERE user_id = $1 AND key_name = $2`, domain.userID, ente.CustomDomain); err != nil {
+				return stacktrace.Propagate(err, "failed to clear stale custom domain")
+			}
+		}
+	}
+	for _, domain := range domains {
+		if domain.canonicalValue == "" || domain.current.Valid && domain.current.String == domain.canonicalValue {
+			continue
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE remote_store SET canonical_value = $1
 			WHERE user_id = $2 AND key_name = $3 AND canonical_value IS DISTINCT FROM $1`,
-			canonicalDomain, domain.userID, ente.CustomDomain); err != nil {
+			domain.canonicalValue, domain.userID, ente.CustomDomain); err != nil {
 			return stacktrace.Propagate(err, "failed to backfill custom domain")
 		}
 	}
@@ -109,13 +142,18 @@ func (r *Repository) RemoveKey(ctx context.Context, userID int64, key string) er
 }
 
 func (r *Repository) DomainOwner(ctx context.Context, domain string) (*int64, error) {
+	canonicalDomain, err := ente.CanonicalDomain(domain)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "failed to canonicalize custom domain")
+	}
 	rows := r.DB.QueryRowContext(ctx, `SELECT user_id FROM remote_store
-	   WHERE key_name = $1 AND (canonical_value = $2 OR lower(key_value) = lower($2))`,
+	   WHERE key_name = $1 AND (canonical_value = $2 OR lower(key_value) = lower($3))`,
 		ente.CustomDomain,
+		canonicalDomain,
 		domain,
 	)
 	var userID int64
-	err := rows.Scan(&userID)
+	err = rows.Scan(&userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, stacktrace.Propagate(&ente.ErrNotFoundError, "")

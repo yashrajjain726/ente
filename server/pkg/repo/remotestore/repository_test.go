@@ -16,6 +16,9 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 
 	ownerID := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 1, Email: "owner@example.com", CreationTime: 1})
 	otherID := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 2, Email: "other@example.com", CreationTime: 1})
+	collisionID1 := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 3, Email: "collision1@example.com", CreationTime: 1})
+	collisionID2 := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 4, Email: "collision2@example.com", CreationTime: 1})
+	invalidID := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 5, Email: "invalid@example.com", CreationTime: 1})
 	repository := &Repository{DB: db}
 
 	require.NoError(t, repository.InsertOrUpdateCustomDomain(t.Context(), ownerID, "BÜCHER.example"))
@@ -23,6 +26,9 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "BÜCHER.example", *domain)
 	resolvedOwnerID, err := repository.DomainOwner(t.Context(), "xn--bcher-kva.example")
+	require.NoError(t, err)
+	require.Equal(t, ownerID, *resolvedOwnerID)
+	resolvedOwnerID, err = repository.DomainOwner(t.Context(), "XN--BCHER-KVA.EXAMPLE")
 	require.NoError(t, err)
 	require.Equal(t, ownerID, *resolvedOwnerID)
 
@@ -43,6 +49,11 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 	_, err = db.ExecContext(t.Context(), `UPDATE remote_store SET key_value = 'LEGACY.example'
 		WHERE user_id = $1 AND key_name = 'customDomain'`, otherID)
 	require.NoError(t, err)
+	_, err = db.ExecContext(t.Context(), `INSERT INTO remote_store (user_id, key_name, key_value) VALUES
+		($1, 'customDomain', 'BÜCHER.example'),
+		($2, 'customDomain', 'xn--bcher-kva.example'),
+		($3, 'customDomain', 'invalid')`, collisionID1, collisionID2, invalidID)
+	require.NoError(t, err)
 	require.NoError(t, repository.BackfillCustomDomainCanonicalValues(t.Context()))
 
 	var value string
@@ -54,4 +65,8 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(t.Context(), `SELECT canonical_value FROM remote_store
 		WHERE user_id = $1 AND key_name = 'customDomain'`, ownerID).Scan(&canonicalValue))
 	require.Nil(t, canonicalValue)
+	var canonicalCount int
+	require.NoError(t, db.QueryRowContext(t.Context(), `SELECT count(canonical_value) FROM remote_store
+		WHERE user_id IN ($1, $2, $3)`, collisionID1, collisionID2, invalidID).Scan(&canonicalCount))
+	require.Zero(t, canonicalCount)
 }
