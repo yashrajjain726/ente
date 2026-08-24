@@ -2,7 +2,6 @@ export type {
     LegacyContactRecord,
     LegacyContactState,
     LegacyInfo,
-    LegacyRecoveryBundle,
     LegacyRecoverySession,
     LegacyRecoveryStatus,
     LegacyUser,

@@ -1,4 +1,14 @@
-use ente_legacy::{LegacyKitRecoveryClient, LegacyKitShare};
+use std::sync::Arc;
+
+use ente_accounts::auth::KeyAttributes;
+use ente_core::{
+    b64,
+    crypto::SecretVec,
+    http::{Api, ApiConfig, Auth, Http},
+};
+use ente_legacy::{
+    LegacyClient as InnerLegacyClient, LegacyContactState, LegacyKitRecoveryClient, LegacyKitShare,
+};
 use serde::Deserialize;
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
@@ -11,12 +21,18 @@ pub enum Error {
     Legacy(#[from] ente_legacy::Error),
     #[error(transparent)]
     Serde(#[from] swb::Error),
+    #[error(transparent)]
+    Decode(#[from] b64::DecodeError),
 }
 
 impl Error {
     fn name(&self) -> Option<&'static str> {
         match self {
             Self::Legacy(ente_legacy::Error::LegacyKitInactive) => Some("legacy_kit_inactive"),
+            Self::Legacy(ente_legacy::Error::ContactNotOnEnte) => Some("contact_not_on_ente"),
+            Self::Legacy(ente_legacy::Error::ActiveRecoverySession) => {
+                Some("active_recovery_session")
+            }
             _ => None,
         }
     }
@@ -33,6 +49,147 @@ impl From<Error> for JsValue {
             js_error.set_name(name);
         }
         js_error.into()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenLegacyInput {
+    base_url: String,
+    auth_token: String,
+    master_key_b64: String,
+    client_package: Option<String>,
+    client_version: Option<String>,
+}
+
+#[wasm_bindgen(js_name = openLegacy)]
+pub fn open_legacy(input: JsValue) -> Result<LegacyClient, Error> {
+    let input: OpenLegacyInput = swb::from_value(input)?;
+    let api = Arc::new(Api::new(
+        Http::new().map_err(ente_legacy::Error::from)?,
+        ApiConfig {
+            origin: input.base_url,
+            client_package: input.client_package,
+            client_version: input.client_version,
+            user_agent: None,
+            auth: Some(Auth::User(input.auth_token)),
+        },
+    ));
+    let master_key = Arc::new(SecretVec::new(b64::decode(&input.master_key_b64)?));
+
+    Ok(LegacyClient(InnerLegacyClient::new(api, master_key)))
+}
+
+#[wasm_bindgen]
+pub struct LegacyClient(InnerLegacyClient);
+
+#[wasm_bindgen]
+impl LegacyClient {
+    #[wasm_bindgen(js_name = getInfo)]
+    pub async fn get_info(&self) -> Result<JsValue, Error> {
+        swb::to_value(&self.0.info().await?).map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = publicKey)]
+    pub async fn public_key(&self, email: String) -> Result<Option<String>, Error> {
+        self.0.public_key(&email).await.map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = verificationID)]
+    pub fn verification_id(&self, public_key_b64: String) -> Result<String, Error> {
+        self.0.verification_id(&public_key_b64).map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = addContact)]
+    pub async fn add_contact(
+        &self,
+        email: String,
+        current_user_key_attrs: JsValue,
+        recovery_notice_in_days: Option<i32>,
+    ) -> Result<(), Error> {
+        let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
+        self.0
+            .add_contact(&email, &current_user_key_attrs, recovery_notice_in_days)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = updateContact)]
+    pub async fn update_contact(
+        &self,
+        user_id: i64,
+        emergency_contact_id: i64,
+        state: JsValue,
+    ) -> Result<(), Error> {
+        let state: LegacyContactState = swb::from_value(state)?;
+        self.0
+            .update_contact(user_id, emergency_contact_id, state)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = updateRecoveryNotice)]
+    pub async fn update_recovery_notice(
+        &self,
+        emergency_contact_id: i64,
+        recovery_notice_in_days: i32,
+    ) -> Result<(), Error> {
+        self.0
+            .update_recovery_notice(emergency_contact_id, recovery_notice_in_days)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = startRecovery)]
+    pub async fn start_recovery(
+        &self,
+        user_id: i64,
+        emergency_contact_id: i64,
+    ) -> Result<(), Error> {
+        self.0
+            .start_recovery(user_id, emergency_contact_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = stopRecovery)]
+    pub async fn stop_recovery(
+        &self,
+        recovery_id: String,
+        user_id: i64,
+        emergency_contact_id: i64,
+    ) -> Result<(), Error> {
+        self.0
+            .stop_recovery(&recovery_id, user_id, emergency_contact_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = rejectRecovery)]
+    pub async fn reject_recovery(
+        &self,
+        recovery_id: String,
+        user_id: i64,
+        emergency_contact_id: i64,
+    ) -> Result<(), Error> {
+        self.0
+            .reject_recovery(&recovery_id, user_id, emergency_contact_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[wasm_bindgen(js_name = changePassword)]
+    pub async fn change_password(
+        &self,
+        recovery_id: String,
+        current_user_key_attrs: JsValue,
+        new_password: String,
+    ) -> Result<(), Error> {
+        let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
+        self.0
+            .change_password(&recovery_id, &current_user_key_attrs, &new_password)
+            .await
+            .map_err(Into::into)
     }
 }
 

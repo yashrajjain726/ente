@@ -1,7 +1,7 @@
 import {
     LegacyDrawerContent,
     type LegacySuggestedUser,
-} from "ente-contacts-web/legacy";
+} from "ente-contacts/legacy";
 import React from "react";
 import {
     LockerTitledNestedSidebarDrawer,

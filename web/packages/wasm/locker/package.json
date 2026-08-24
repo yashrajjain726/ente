@@ -1,21 +1,17 @@
 {
-    "name": "ente-legacy-wasm",
+    "name": "ente-locker-wasm",
     "version": "0.0.0",
     "private": true,
     "exports": {
         ".": {
             "types": "./index.ts",
             "import": "./index.ts"
-        },
-        "./authenticated": {
-            "types": "./authenticated.ts",
-            "import": "./authenticated.ts"
         }
     },
     "module": "./index.ts",
     "types": "./index.ts",
     "scripts": {
-        "build": "wasm-pack build ../../../../rust/bindings/wasm/legacy --target bundler --out-dir ../../../../web/packages/wasm/legacy/pkg --no-pack"
+        "build": "wasm-pack build ../../../../rust/bindings/wasm/locker --target bundler --out-dir ../../../../web/packages/wasm/locker/pkg --no-pack"
     },
     "devDependencies": {
         "ente-build-config": "*",
