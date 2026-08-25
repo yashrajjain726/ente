@@ -168,8 +168,8 @@ class _DoubleTapSeekOverlayState extends State<DoubleTapSeekOverlay>
                       ),
                     ),
                     child: Container(
-                      width: 64,
-                      height: 64,
+                      width: 54,
+                      height: 54,
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.3),
                         shape: BoxShape.circle,
@@ -182,7 +182,7 @@ class _DoubleTapSeekOverlayState extends State<DoubleTapSeekOverlay>
                             icon: _badgeForward
                                 ? HugeIcons.strokeRoundedArrowRightDouble
                                 : HugeIcons.strokeRoundedArrowLeftDouble,
-                            size: 22,
+                            size: 20,
                             color: textBaseDark,
                           ),
                           Text(
