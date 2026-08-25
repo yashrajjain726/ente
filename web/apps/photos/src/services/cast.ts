@@ -22,15 +22,18 @@ const publicKeysForPairingCode = async (code: string) => {
         .parse(await res.json());
 };
 
-// AlbumCastDialog matches this exact message.
-export const unknownDeviceCodeErrorMessage = "Unknown device code";
+export const castDeviceNotFoundErrorName = "cast_device_not_found";
 
 export const publishCastPayload = async (
     deviceCode: string,
     collection: Collection,
 ) => {
     const publicKeys = await publicKeysForPairingCode(deviceCode);
-    if (!publicKeys) throw new Error(unknownDeviceCodeErrorMessage);
+    if (!publicKeys) {
+        const error = new Error("Unknown device code");
+        error.name = castDeviceNotFoundErrorName;
+        throw error;
+    }
 
     const { preparePayload } = await import("ente-cast-wasm");
     const { castToken, encryptedPayload } = preparePayload(

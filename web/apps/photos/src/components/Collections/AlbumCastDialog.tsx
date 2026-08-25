@@ -1,7 +1,7 @@
 import {
+    castDeviceNotFoundErrorName,
     publishCastPayload,
     revokeAllCastTokens,
-    unknownDeviceCodeErrorMessage,
 } from "@/services/cast";
 import { loadCast } from "@/utils/chromecast-sender";
 import { Link, Stack, Typography } from "@mui/material";
@@ -66,7 +66,7 @@ const AlbumCastDialogContents: React.FC<AlbumCastDialogProps> = ({
                 log.error("Failed to cast", e);
                 if (
                     e instanceof Error &&
-                    e.message == unknownDeviceCodeErrorMessage
+                    e.name == castDeviceNotFoundErrorName
                 ) {
                     setFieldError(t("tv_not_found"));
                 } else {

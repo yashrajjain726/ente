@@ -7,6 +7,8 @@ import {
 } from "ente-media/file-type";
 import { fileTypeFromBuffer } from "file-type";
 
+const fileTypeNotSupportedErrorName = "file_type_not_supported";
+
 export const detectFileTypeInfo = async (file: File): Promise<FileTypeInfo> =>
     detectFileTypeInfoFromChunk(() => readInitialChunkOfFile(file), file.name);
 
@@ -27,8 +29,9 @@ export const detectFileTypeInfoFromChunk = async (
         } else if (mimeType.startsWith("video/")) {
             fileType = FileType.video;
         } else {
-            // Keep this prefix in sync with isFileTypeNotSupportedError.
-            throw new Error(`Unsupported file format (MIME type ${mimeType})`);
+            throw fileTypeNotSupportedError(
+                `Unsupported file format (MIME type ${mimeType})`,
+            );
         }
 
         return { fileType, extension: typeResult.ext, mimeType };
@@ -38,8 +41,7 @@ export const detectFileTypeInfoFromChunk = async (
         if (known) return known;
 
         if (extension && KnownNonMediaFileExtensions.includes(extension)) {
-            // Keep this prefix in sync with isFileTypeNotSupportedError.
-            throw new Error(
+            throw fileTypeNotSupportedError(
                 `Unsupported file format (extension ${extension})`,
                 { cause: e },
             );
@@ -50,7 +52,16 @@ export const detectFileTypeInfoFromChunk = async (
 };
 
 export const isFileTypeNotSupportedError = (e: unknown) =>
-    e instanceof Error && e.message.startsWith("Unsupported file format");
+    e instanceof Error && e.name == fileTypeNotSupportedErrorName;
+
+const fileTypeNotSupportedError = (
+    message: string,
+    options?: ErrorOptions,
+) => {
+    const error = new Error(message, options);
+    error.name = fileTypeNotSupportedErrorName;
+    return error;
+};
 
 const readInitialChunkOfFile = async (file: File) => {
     const chunkSizeForTypeDetection = 4100;
