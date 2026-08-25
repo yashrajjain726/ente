@@ -10,6 +10,7 @@ const kVideoProgressRowHeight = 32.0;
 const kVideoCaptionGap = 6.0;
 const kVideoCaptionLineHeight = 16.0;
 const kVideoScrimTopPadding = 12.0;
+const kVideoLongPressPlaybackSpeed = 2.0;
 
 class EqualHeightSliderTrackShape extends RoundedRectSliderTrackShape {
   const EqualHeightSliderTrackShape();

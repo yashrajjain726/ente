@@ -153,6 +153,10 @@ class _VideoWidgetState extends State<VideoWidget> {
                         if (widget.controller.player.state.playing) {
                           widget.controller.player.pause();
                         }
+                      } else {
+                        widget.controller.player
+                            .setRate(kVideoLongPressPlaybackSpeed)
+                            .ignore();
                       }
                     },
                     onLongPressUp: () {
@@ -164,6 +168,10 @@ class _VideoWidgetState extends State<VideoWidget> {
                         if (!widget.controller.player.state.playing) {
                           widget.controller.player.play();
                         }
+                      } else {
+                        widget.controller.player
+                            .setRate(widget.playbackSpeed.value)
+                            .ignore();
                       }
                     },
                     child: Container(

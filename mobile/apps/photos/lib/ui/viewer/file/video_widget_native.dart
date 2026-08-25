@@ -398,6 +398,12 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                   FullScreenRequestReason.userInteraction,
                                 );
                                 _controller?.pause();
+                              } else {
+                                _controller
+                                    ?.setPlaybackSpeed(
+                                      kVideoLongPressPlaybackSpeed,
+                                    )
+                                    .ignore();
                               }
                             },
                             onLongPressUp: () {
@@ -407,6 +413,12 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                   FullScreenRequestReason.userInteraction,
                                 );
                                 _controller?.play();
+                              } else if (!widget.isFromMemories) {
+                                _controller
+                                    ?.setPlaybackSpeed(
+                                      widget.playbackSpeed.value,
+                                    )
+                                    .ignore();
                               }
                             },
                             child: Container(
