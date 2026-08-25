@@ -242,7 +242,7 @@ class _VideoWidgetState extends State<VideoWidget> {
         ),
         if (_isLongPressSpeedActive)
           Positioned(
-            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 16,
+            top: videoLongPressSpeedIndicatorTop(context),
             left: 0,
             right: 0,
             child: const Center(child: VideoLongPressSpeedIndicator()),

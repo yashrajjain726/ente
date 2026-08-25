@@ -12,6 +12,13 @@ const kVideoCaptionLineHeight = 16.0;
 const kVideoScrimTopPadding = 12.0;
 const kVideoLongPressPlaybackSpeed = 2.0;
 
+double videoLongPressSpeedIndicatorTop(BuildContext context) {
+  final screenSize = MediaQuery.sizeOf(context);
+  final isLandscape = screenSize.width > screenSize.height;
+  return MediaQuery.paddingOf(context).top +
+      (isLandscape ? 8 : kToolbarHeight + 16);
+}
+
 class VideoLongPressSpeedIndicator extends StatelessWidget {
   const VideoLongPressSpeedIndicator({super.key});
 
