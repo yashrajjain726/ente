@@ -140,7 +140,7 @@ class ReferralWidget extends StatelessWidget {
               shareText(
                 l10n.shareTextReferralCode(
                   referralCode: referralView.code,
-                  referralStorageInGB: referralView.planInfo.storageInGB,
+                  referralStorageInGB: referralView.planInfo.storageInGB * 2,
                 ),
               );
             },

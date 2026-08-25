@@ -124,7 +124,7 @@ class CodeSuccessScreen extends StatelessWidget {
                           l10n.shareTextReferralCode(
                             referralCode: referralView.code,
                             referralStorageInGB:
-                                referralView.planInfo.storageInGB,
+                                referralView.planInfo.storageInGB * 2,
                           ),
                         );
                       },
