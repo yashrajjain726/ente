@@ -550,9 +550,11 @@ class _BodyState extends State<_Body> {
 
   void _preloadFiles(int index) {
     if (index > 0) {
+      preloadThumbnail(_files![index - 1]);
       preloadFile(_files![index - 1]);
     }
     if (index < _files!.length - 1) {
+      preloadThumbnail(_files![index + 1]);
       preloadFile(_files![index + 1]);
     }
   }
