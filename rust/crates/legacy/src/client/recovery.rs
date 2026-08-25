@@ -1,157 +1,19 @@
-use std::sync::Arc;
-
 use ente_accounts::auth::{self, KeyAttributes, SrpSession};
 use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, sealed, secretbox};
-use ente_core::http::{self, Api};
-use sha2::{Digest, Sha256};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::error::{Error, Result};
-use crate::kit::{
-    create_legacy_kit_request, decode_download_content, decode_legacy_kit_record,
-    validate_notice_period,
-};
-use crate::kit_models::{
-    LegacyKit, LegacyKitCreateResult, LegacyKitOwnerRecoverySession, LegacyKitShare,
-};
-use crate::kit_transport::{
-    LegacyKitDownloadContentResponse, LegacyKitOwnerActionRequest,
-    LegacyKitOwnerRecoverySessionResponse, LegacyKitRecordResponse,
-    LegacyKitUpdateRecoveryNoticeRequest, ListLegacyKitsResponse,
-};
-use crate::models::{LegacyContactState, LegacyInfo, LegacyRecoveryBundle};
-use crate::transport::{
-    LegacyAddContactRequest, LegacyChangePasswordRequest, LegacyChangePasswordResponse,
-    LegacyContactIdentifier, LegacyInitChangePasswordRequest, LegacyPublicKeyResponse,
-    LegacyRecoveryIdentifier, LegacyRecoveryInfoResponse, LegacySetupSrpRequest,
-    LegacySetupSrpResponse, LegacyUpdateContactRequest, LegacyUpdateRecoveryNoticeRequest,
-    LegacyUpdateSrpAndKeysRequest, LegacyUpdatedKeyAttr,
-};
+use super::LegacyClient;
+use crate::{Error, Result};
 
-pub struct LegacyClient {
-    api: Arc<Api>,
-    master_key: Arc<SecretVec>,
+#[derive(Debug)]
+pub struct LegacyRecoveryBundle {
+    pub recovery_key: SecretVec,
+    pub user_key_attributes: KeyAttributes,
 }
 
 impl LegacyClient {
-    pub fn new(api: Arc<Api>, master_key: Arc<SecretVec>) -> Self {
-        Self { api, master_key }
-    }
-
-    pub async fn info(&self) -> Result<LegacyInfo> {
-        Ok(self
-            .api
-            .get("/emergency-contacts/info")
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyInfo>()
-            .await?)
-    }
-
-    pub async fn public_key(&self, email: &str) -> Result<Option<String>> {
-        let response = self
-            .api
-            .get("/users/public-key")
-            .query(&[("email", email.trim())])
-            .send()
-            .await?;
-        if response.status() == 404 {
-            return Ok(None);
-        }
-        let response = response
-            .error_for_status()?
-            .json::<LegacyPublicKeyResponse>()
-            .await?;
-        Ok(Some(response.public_key))
-    }
-
-    pub fn verification_id(&self, public_key_b64: &str) -> Result<String> {
-        let public_key = b64::decode(public_key_b64)?;
-        let digest = Sha256::digest(&public_key);
-        auth::recovery_key_to_mnemonic(&b64::encode(digest.as_slice())).map_err(Into::into)
-    }
-
-    pub async fn add_contact(
-        &self,
-        email: &str,
-        current_user_key_attrs: &KeyAttributes,
-        recovery_notice_in_days: Option<i32>,
-    ) -> Result<()> {
-        let public_key = self
-            .public_key(email)
-            .await?
-            .ok_or(Error::ContactNotOnEnte)?;
-        let recovery_key = self.current_recovery_key(current_user_key_attrs)?;
-        let recipient_public_key = b64::decode(&public_key)?;
-        let encrypted_key = sealed::seal(
-            &recovery_key,
-            &crypto::PublicKey::try_from_slice(&recipient_public_key)?,
-        )?;
-
-        self.api
-            .post("/emergency-contacts/add")
-            .json(&LegacyAddContactRequest {
-                email: email.trim().to_string(),
-                encrypted_key: b64::encode(&encrypted_key),
-                recovery_notice_in_days,
-            })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
-
-    pub async fn update_contact(
-        &self,
-        user_id: i64,
-        emergency_contact_id: i64,
-        state: LegacyContactState,
-    ) -> Result<()> {
-        self.api
-            .post("/emergency-contacts/update")
-            .json(&LegacyUpdateContactRequest {
-                user_id,
-                emergency_contact_id,
-                state,
-            })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
-
-    pub async fn update_recovery_notice(
-        &self,
-        emergency_contact_id: i64,
-        recovery_notice_in_days: i32,
-    ) -> Result<()> {
-        let path = "/emergency-contacts/update-recovery-notice";
-        let response = self
-            .api
-            .post(path)
-            .json(&LegacyUpdateRecoveryNoticeRequest {
-                emergency_contact_id,
-                recovery_notice_in_days,
-            })
-            .send()
-            .await?;
-        if response.status() == 400 {
-            return if response.text().await?.contains("active recovery session") {
-                Err(Error::ActiveRecoverySession)
-            } else {
-                Err(http::Error::Http {
-                    status: 400,
-                    path: path.into(),
-                }
-                .into())
-            };
-        }
-        response.error_for_status()?;
-        Ok(())
-    }
-
     pub async fn start_recovery(&self, user_id: i64, emergency_contact_id: i64) -> Result<()> {
         self.contact_action(
             "/emergency-contacts/start-recovery",
@@ -285,130 +147,6 @@ impl LegacyClient {
         Ok(())
     }
 
-    pub async fn kits(&self) -> Result<Vec<LegacyKit>> {
-        let response = self
-            .api
-            .get("/legacy-kits")
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<ListLegacyKitsResponse>()
-            .await?;
-        response
-            .kits
-            .into_iter()
-            .map(|kit| decode_legacy_kit_record(kit, self.master_key.as_ref()))
-            .collect()
-    }
-
-    pub async fn create_kit(
-        &self,
-        current_user_key_attrs: &KeyAttributes,
-        part_names: [String; 3],
-        notice_period_in_hours: i32,
-    ) -> Result<LegacyKitCreateResult> {
-        let (request, shares) = {
-            let recovery_key = self.current_recovery_key(current_user_key_attrs)?;
-            create_legacy_kit_request(
-                &recovery_key,
-                self.master_key.as_ref(),
-                part_names,
-                notice_period_in_hours,
-            )?
-        };
-
-        let response = self
-            .api
-            .post("/legacy-kits")
-            .json(&request)
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyKitRecordResponse>()
-            .await?;
-        let kit = decode_legacy_kit_record(response, self.master_key.as_ref())?;
-        Ok(LegacyKitCreateResult { kit, shares })
-    }
-
-    pub async fn download_kit_shares(&self, kit_id: &str) -> Result<Vec<LegacyKitShare>> {
-        let response = self
-            .api
-            .get(&format!("/legacy-kits/{kit_id}/download-content"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyKitDownloadContentResponse>()
-            .await?;
-        decode_download_content(response, self.master_key.as_ref())
-    }
-
-    pub async fn kit_recovery_session(
-        &self,
-        kit_id: &str,
-    ) -> Result<LegacyKitOwnerRecoverySession> {
-        let response = self
-            .api
-            .get(&format!("/legacy-kits/{kit_id}/recovery-session"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyKitOwnerRecoverySessionResponse>()
-            .await?;
-        Ok(response.into())
-    }
-
-    pub async fn update_kit_recovery_notice(
-        &self,
-        kit_id: &str,
-        notice_period_in_hours: i32,
-    ) -> Result<()> {
-        validate_notice_period(notice_period_in_hours)?;
-        let path = "/legacy-kits/update-recovery-notice";
-        let response = self
-            .api
-            .post(path)
-            .json(&LegacyKitUpdateRecoveryNoticeRequest {
-                kit_id: kit_id.to_string(),
-                notice_period_in_hours,
-            })
-            .send()
-            .await?;
-        if response.status() == 400 {
-            return if response.text().await?.contains("active recovery session") {
-                Err(Error::ActiveRecoverySession)
-            } else {
-                Err(http::Error::Http {
-                    status: 400,
-                    path: path.into(),
-                }
-                .into())
-            };
-        }
-        response.error_for_status()?;
-        Ok(())
-    }
-
-    pub async fn block_kit_recovery(&self, kit_id: &str) -> Result<()> {
-        self.api
-            .post("/legacy-kits/block-recovery")
-            .json(&LegacyKitOwnerActionRequest {
-                kit_id: kit_id.to_string(),
-            })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
-
-    pub async fn delete_kit(&self, kit_id: &str) -> Result<()> {
-        self.api
-            .delete(&format!("/legacy-kits/{kit_id}"))
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
-
     async fn contact_action(
         &self,
         path: &str,
@@ -456,12 +194,6 @@ impl LegacyClient {
             .error_for_status()?
             .json::<LegacyRecoveryInfoResponse>()
             .await?)
-    }
-
-    fn current_recovery_key(&self, current_user_key_attrs: &KeyAttributes) -> Result<SecretVec> {
-        let recovery_key_hex =
-            auth::get_recovery_key(self.master_key.as_ref(), current_user_key_attrs)?;
-        Ok(auth::recovery_key_from_mnemonic_or_hex(&recovery_key_hex)?)
     }
 
     fn decrypt_recovery_key(
@@ -551,4 +283,97 @@ fn srp_session_m1(
     let server_b = b64::decode(&init_response.srp_b)?;
     let client_m1 = srp_session.compute_m1(&server_b)?;
     Ok(b64::encode(&client_m1))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyContactIdentifier {
+    #[serde(rename = "userID")]
+    user_id: i64,
+    #[serde(rename = "emergencyContactID")]
+    emergency_contact_id: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyRecoveryIdentifier {
+    id: String,
+    #[serde(rename = "userID")]
+    user_id: i64,
+    #[serde(rename = "emergencyContactID")]
+    emergency_contact_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyRecoveryInfoResponse {
+    encrypted_key: String,
+    #[serde(rename = "userKeyAttr")]
+    user_key_attr: KeyAttributes,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacySetupSrpRequest {
+    #[serde(rename = "srpUserID")]
+    srp_user_id: String,
+    srp_salt: String,
+    srp_verifier: String,
+    #[serde(rename = "srpA")]
+    srp_a: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyInitChangePasswordRequest {
+    #[serde(rename = "recoveryID")]
+    recovery_id: String,
+    #[serde(rename = "setupSRPRequest")]
+    setup_srp_request: LegacySetupSrpRequest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacySetupSrpResponse {
+    #[serde(rename = "setupID")]
+    setup_id: String,
+    #[serde(rename = "srpB")]
+    srp_b: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyUpdatedKeyAttr {
+    kek_salt: String,
+    encrypted_key: String,
+    key_decryption_nonce: String,
+    mem_limit: u32,
+    ops_limit: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyUpdateSrpAndKeysRequest {
+    #[serde(rename = "setupID")]
+    setup_id: String,
+    #[serde(rename = "srpM1")]
+    srp_m1: String,
+    #[serde(rename = "updatedKeyAttr")]
+    updated_key_attr: LegacyUpdatedKeyAttr,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyChangePasswordRequest {
+    #[serde(rename = "recoveryID")]
+    recovery_id: String,
+    #[serde(rename = "updateSrpAndKeysRequest")]
+    update_srp_and_keys_request: LegacyUpdateSrpAndKeysRequest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyChangePasswordResponse {
+    #[serde(rename = "srpM2")]
+    srp_m2: String,
 }

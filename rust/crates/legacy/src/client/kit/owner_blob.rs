@@ -2,12 +2,10 @@ use ente_core::b64;
 use ente_core::crypto::{self, secretbox};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::{
-    Error, Result,
-    kit_models::{LegacyKitMetadata, LegacyKitPart, LegacyKitShare},
-};
+use crate::kit::{LegacyKitMetadata, LegacyKitPart, LegacyKitShare};
+use crate::{Error, Result};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub(super) struct StoredOwnerPart {
     pub(super) index: u8,
     pub(super) name: String,
@@ -15,7 +13,7 @@ pub(super) struct StoredOwnerPart {
     pub(super) checksum: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub(super) struct StoredOwnerBlob {
     pub(super) parts: Vec<StoredOwnerPart>,
 }
@@ -48,6 +46,19 @@ pub(super) fn decrypt_owner_blob(
     decrypt_blob(encrypted_blob_b64, master_key, "legacy kit owner")
 }
 
+pub(super) fn metadata_from_owner_blob(owner_blob: &StoredOwnerBlob) -> LegacyKitMetadata {
+    LegacyKitMetadata {
+        parts: owner_blob
+            .parts
+            .iter()
+            .map(|part| LegacyKitPart {
+                index: part.index,
+                name: part.name.clone(),
+            })
+            .collect(),
+    }
+}
+
 fn encrypt_blob<T: Serialize>(payload: &T, master_key: &[u8], label: &str) -> Result<String> {
     let payload = serde_json::to_vec(payload).map_err(|error| {
         Error::InvalidInput(format!("failed to encode {label} payload: {error}"))
@@ -67,17 +78,4 @@ fn decrypt_blob<T: DeserializeOwned>(
         secretbox::decrypt_combined(&encrypted_blob, &crypto::Key::try_from_slice(master_key)?)?;
     serde_json::from_slice(&plaintext)
         .map_err(|error| Error::InvalidInput(format!("failed to decode {label} payload: {error}")))
-}
-
-pub(super) fn metadata_from_owner_blob(owner_blob: &StoredOwnerBlob) -> LegacyKitMetadata {
-    LegacyKitMetadata {
-        parts: owner_blob
-            .parts
-            .iter()
-            .map(|part| LegacyKitPart {
-                index: part.index,
-                name: part.name.clone(),
-            })
-            .collect(),
-    }
 }
