@@ -1,4 +1,3 @@
-import { requestFriendByUsername } from "services/space";
 import {
     clearPendingSpaceInvite,
     clearPendingSpaceInviteFriend,
@@ -6,7 +5,8 @@ import {
     saveSentSpaceInviteFriend,
     savedPendingSpaceInvite,
     savedPendingSpaceInviteFriend,
-} from "services/spaceInvite";
+} from "services/invite";
+import { requestFriendByUsername } from "services/space";
 
 export const sendPendingSpaceFriendRequest = async () => {
     const pendingInvite = savedPendingSpaceInvite();

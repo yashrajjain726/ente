@@ -3,8 +3,8 @@ import log from "ente-base/log";
 import {
     clearSpaceBrowserSession,
     revokeSpaceBrowserSessions,
-} from "services/spacePersistentSession";
-import { forgetSpaceWebPushAccountTarget } from "services/spaceWebPush";
+} from "services/persistent-session";
+import { forgetSpaceWebPushAccountTarget } from "services/web-push";
 
 export const spaceLogout = async () => {
     await revokeSpaceBrowserSessions();

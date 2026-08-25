@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { SpacePageMeta } from "components/SpacePageMeta";
+import { SpacePageMeta } from "components/PageMeta";
 import React from "react";
 
 interface SpaceRouteFallbackProps {

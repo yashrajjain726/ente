@@ -1,11 +1,11 @@
 import { Box, Dialog, useMediaQuery } from "@mui/material";
-import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
+import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import log from "ente-base/log";
 import React from "react";
 import {
     onOpenSpaceShareLinkDialog,
     type SpaceShareLinkDialogMode,
-} from "services/spaceShareLink";
+} from "services/share-link";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";

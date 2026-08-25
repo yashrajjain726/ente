@@ -1,6 +1,6 @@
 import { Box } from "@mui/material";
 import React from "react";
-import { sanitizeSpaceOTP, spaceOTPCodeLength } from "utils/spaceOtp";
+import { sanitizeSpaceOTP, spaceOTPCodeLength } from "utils/otp";
 
 const green = "#08C225";
 const activeFill = "rgba(8, 194, 37, 0.08)";

@@ -1,6 +1,6 @@
 import { UserRemove01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { SpaceActionToast } from "components/SpaceActionToast";
+import { SpaceActionToast } from "components/ActionToast";
 import React from "react";
 
 interface SpaceFriendRequestCanceledToastProps {

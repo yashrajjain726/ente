@@ -1,10 +1,11 @@
-import { SpaceFriendRequestCanceledToast } from "components/SpaceFriendRequestCanceledToast";
-import { SpacePageMeta } from "components/SpacePageMeta";
-import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { SpaceFriendRequestCanceledToast } from "components/FriendRequestCanceledToast";
+import { SpacePageMeta } from "components/PageMeta";
+import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { spaceInviteURL } from "services/invite";
 import {
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
@@ -23,10 +24,9 @@ import {
     type SpaceMessage,
     type SpaceMessageConversation,
 } from "services/space";
-import { spaceInviteURL } from "services/spaceInvite";
-import { useSpaceAppState } from "state/spaceAppState";
-import { spaceRoutes } from "utils/spaceRoutes";
-import { useSpaceRouter } from "utils/spaceRouteTransitions";
+import { useSpaceAppState } from "state/app-state";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
 interface SpaceMessagesPageProps {
     selectedSpaceId?: string;

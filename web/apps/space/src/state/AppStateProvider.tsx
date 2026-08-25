@@ -8,13 +8,9 @@ import React, {
 } from "react";
 import type { SpaceLoginCredentials } from "screens/LoginScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import {
-    clearSpaceFriendsCache,
-    clearSpaceMediaURLCache,
-} from "services/space";
-import { clearSpaceFeedMemoryCache } from "services/spaceFeedCache";
-import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
-import { logoutRevokedSpaceSession } from "services/spacePersistentSession";
+import { clearSpaceFeedMemoryCache } from "services/feed-cache";
+import type { PendingSpacePasskeyVerification } from "services/passkey-verification";
+import { logoutRevokedSpaceSession } from "services/persistent-session";
 import {
     clearCurrentSpaceContext,
     isSpaceSessionUnauthorized,
@@ -22,7 +18,11 @@ import {
     loadExistingSpaceAvatar,
     loadExistingSpaceCover,
     loadExistingSpaceProfile,
-} from "services/spaceProfile";
+} from "services/profile";
+import {
+    clearSpaceFriendsCache,
+    clearSpaceMediaURLCache,
+} from "services/space";
 import {
     type LocalSpaceFeedPost,
     type OnboardingEntrySource,
@@ -32,7 +32,7 @@ import {
     SpaceAppStateContext,
     type SpaceProfileLoadStatus,
     initialFriends,
-} from "state/spaceAppState";
+} from "state/app-state";
 
 export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     children,

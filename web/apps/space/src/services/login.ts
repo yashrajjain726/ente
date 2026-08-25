@@ -38,12 +38,12 @@ import { clientPackageName } from "ente-base/app";
 import { HTTPError } from "ente-base/http";
 import log from "ente-base/log";
 import { nullToUndefined } from "ente-utils/transform";
-import { spaceAuthError } from "services/spaceAuthError";
-import { decryptSpaceBootstrapAuthToken } from "services/spaceBootstrapAuth";
+import { spaceAuthError } from "services/auth-error";
+import { decryptSpaceBootstrapAuthToken } from "services/bootstrap-auth";
 import {
     createSpaceBrowserSession,
     getOrCreateSpaceRootKey,
-} from "services/spacePersistentSession";
+} from "services/persistent-session";
 import { z } from "zod";
 
 export interface SpaceLoginInput {

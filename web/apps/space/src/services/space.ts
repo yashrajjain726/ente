@@ -6,7 +6,7 @@ import type {
     SpaceAccountCtxHandle,
     SpaceLinkCtxHandle,
 } from "ente-space-wasm";
-import type { PendingSpaceInvite } from "services/spaceInvite";
+import type { PendingSpaceInvite } from "services/invite";
 import {
     cachedSpaceMediaBlobURL,
     cachedSpaceMediaBlobURLIfPresent,
@@ -14,20 +14,20 @@ import {
     rememberCachedSpaceMediaBlobURL,
     spacePostMediaCacheKey,
     spaceProfileMediaCacheKey,
-} from "services/spaceMediaCache";
+} from "services/media-cache";
 import {
     ensureCurrentSpaceContext,
     loadExistingSpaceProfile,
     persistCurrentOwnedSpaces,
     releaseCurrentSpaceContext,
-} from "services/spaceProfile";
+} from "services/profile";
 import {
     parseSpaceProfilePayload,
     spaceProfileTextField,
-} from "services/spaceProfilePayload";
-import { normalizeSpaceMessageText } from "utils/spaceMessageLimits";
+} from "services/profile-payload";
+import { normalizeSpaceMessageText } from "utils/message-limits";
 
-export { clearSpaceMediaURLCache } from "services/spaceMediaCache";
+export { clearSpaceMediaURLCache } from "services/media-cache";
 
 const currentFeedPageSize = 10;
 

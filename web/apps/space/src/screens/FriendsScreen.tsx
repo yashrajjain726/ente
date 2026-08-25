@@ -15,25 +15,25 @@ import {
     Skeleton,
     useMediaQuery,
 } from "@mui/material";
-import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     SpaceActionFeedbackIcon,
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
-} from "components/SpaceActionFeedback";
-import { SpaceAvatarImage } from "components/SpaceAvatarImage";
-import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
-import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
+} from "components/ActionFeedback";
+import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
+import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
+import { SpaceLoadingSpinner } from "components/RouteFallback";
+import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import React, { useState } from "react";
-import type { SpaceFriendRequest } from "services/space";
 import {
     normalizeSpaceUsername,
     spaceUsernameValidationError,
-} from "services/spaceProfile";
-import { spaceTouchTargetSize } from "styles/touchTargets";
+} from "services/profile";
+import type { SpaceFriendRequest } from "services/space";
+import { spaceTouchTargetSize } from "styles/touch-targets";
 
 export const friendsBackground = "#FFFFFF";
 

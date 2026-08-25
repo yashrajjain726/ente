@@ -1,10 +1,10 @@
 import { ensureOk, publicRequestHeaders } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import type { PublicSpaceLinkSession } from "services/space";
 import {
     savedSpaceSessionToken,
     spaceSessionTokenHeader,
-} from "services/spacePersistentSession";
+} from "services/persistent-session";
+import type { PublicSpaceLinkSession } from "services/space";
 import { z } from "zod";
 
 const SpaceWebPushVAPIDKeyResponse = z.object({ publicKey: z.string() });

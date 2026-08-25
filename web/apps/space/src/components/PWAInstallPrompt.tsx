@@ -11,12 +11,12 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Dialog, useMediaQuery } from "@mui/material";
-import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
-import { SpaceNotificationPermissionInstructions } from "components/SpaceNotificationPermissionInstructions";
-import { useSpacePWAInstallPrompt } from "hooks/useSpacePWAInstallPrompt";
-import { useSpaceWebPushPrompt } from "hooks/useSpaceWebPushPrompt";
+import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
+import { SpaceNotificationPermissionInstructions } from "components/NotificationPermissionInstructions";
+import { useSpacePWAInstallPrompt } from "hooks/use-pwa-install-prompt";
+import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
-import { spaceTouchTargetSize } from "styles/touchTargets";
+import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
 const textBase = "#000";

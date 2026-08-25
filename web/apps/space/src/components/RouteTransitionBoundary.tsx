@@ -1,5 +1,5 @@
 import React from "react";
-import { useSpaceRouteTransitionPopState } from "utils/spaceRouteTransitions";
+import { useSpaceRouteTransitionPopState } from "utils/route-transitions";
 
 interface SpaceRouteTransitionBoundaryProps {
     children: React.ReactNode;

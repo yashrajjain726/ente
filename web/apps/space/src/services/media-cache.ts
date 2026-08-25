@@ -2,7 +2,7 @@ import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { blobCache, clearBlobCache } from "ente-base/blob-cache";
 import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
-import { blobPartForBytes } from "services/spaceProfilePayload";
+import { blobPartForBytes } from "services/profile-payload";
 
 const maxSpaceMediaCacheEntries = 128;
 const spaceMediaURLCache = new Map<string, Promise<string>>();
