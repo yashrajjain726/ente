@@ -2,6 +2,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Box, CircularProgress, Stack, Typography } from "@mui/material";
 import { useBaseContext } from "ente-base/context";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -330,10 +331,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
             setActiveSheet(undefined);
             await refreshAfterMutation();
         } catch (error) {
-            if (
-                error instanceof Error &&
-                error.name == "active_recovery_session"
-            ) {
+            if (isNamedError(error, "active_recovery_session")) {
                 showMiniDialog({
                     title: "Recovery in progress",
                     message:

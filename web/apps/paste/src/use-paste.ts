@@ -4,6 +4,7 @@ import {
     createPasteErrorMessage,
     pasteClient,
 } from "@/paste";
+import { isNamedError } from "ente-base/error";
 import { useEffect, useRef, useState } from "react";
 
 export const usePasteRoute = () => {
@@ -104,10 +105,9 @@ export const useConsumePaste = () => {
             );
             setPasswordRequired(false);
         } catch (error) {
-            const code = error instanceof Error ? error.name : undefined;
-            if (code === "incorrect_password") {
+            if (isNamedError(error, "incorrect_password")) {
                 setPasswordError("Incorrect paste password");
-            } else if (code === "password_required") {
+            } else if (isNamedError(error, "password_required")) {
                 setPasswordError("Enter the paste password");
             } else {
                 setConsumeError(consumePasteErrorMessage(error));

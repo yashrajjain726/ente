@@ -21,11 +21,7 @@ import {
     stashKeyEncryptionKeyInSessionStore,
     unstashKeyEncryptionKeyFromSession,
 } from "ente-accounts/services/session-storage";
-import {
-    getSRPAttributes,
-    srpVerificationUnauthorizedErrorName,
-    verifySRP,
-} from "ente-accounts/services/srp";
+import { getSRPAttributes, verifySRP } from "ente-accounts/services/srp";
 import {
     type EmailOrSRPVerificationResponse,
     generateAndSaveInteractiveKeyAttributes,
@@ -35,6 +31,7 @@ import {
     verifyTwoFactor,
 } from "ente-accounts/services/user";
 import { clientPackageName } from "ente-base/app";
+import { isNamedError } from "ente-base/error";
 import { HTTPError } from "ente-base/http";
 import log from "ente-base/log";
 import { nullToUndefined } from "ente-utils/transform";
@@ -170,10 +167,7 @@ export const beginSpaceLogin = async ({
     try {
         verification = await verifySRP(srpAttributes, kek);
     } catch (error) {
-        if (
-            error instanceof Error &&
-            error.name == srpVerificationUnauthorizedErrorName
-        ) {
+        if (isNamedError(error, "srp_verification_unauthorized")) {
             throw spaceAuthError("incorrect_credentials", error);
         }
         throw error;

@@ -19,6 +19,7 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
 import { isDevBuild } from "ente-base/env";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import type { LegacyKitRecoveryHandle } from "ente-legacy-wasm";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -65,7 +66,7 @@ const getErrorMessage = (error: unknown) =>
           : "Something went wrong.";
 
 const isInactiveLegacyKitError = (error: unknown) =>
-    error instanceof Error && error.name == "legacy_kit_inactive";
+    isNamedError(error, "legacy_kit_inactive");
 
 const parseSlotCode = (rawCode: string): Pick<SheetSlot, "error" | "share"> => {
     if (!rawCode.trim()) {

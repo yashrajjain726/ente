@@ -8,6 +8,7 @@ import {
     TwoFactorAuthorizationResponse,
 } from "ente-accounts/services/user";
 import { clientPackageName, isDesktop } from "ente-base/app";
+import { namedError } from "ente-base/error";
 import {
     authenticatedRequestHeaders,
     ensureOk,
@@ -119,8 +120,6 @@ const getAccountsTokenAndURL = async () => {
         .parse(await res.json());
 };
 
-export const passkeySessionExpiredErrorName = "passkey_session_expired";
-
 export const checkPasskeyVerificationStatus = async (
     sessionID: string,
 ): Promise<TwoFactorAuthorizationResponse | undefined> => {
@@ -130,9 +129,10 @@ export const checkPasskeyVerificationStatus = async (
     );
     if (!res.ok) {
         if (res.status == 404 || res.status == 410) {
-            const error = new Error("Passkey session has expired");
-            error.name = passkeySessionExpiredErrorName;
-            throw error;
+            throw namedError(
+                "passkey_session_expired",
+                "Passkey session has expired",
+            );
         }
         // Remote uses 400 to indicate that verification is still pending.
         if (res.status == 400) return undefined;

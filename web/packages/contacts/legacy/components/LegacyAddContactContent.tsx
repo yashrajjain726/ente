@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { useBaseContext } from "ente-base/context";
+import { isNamedError } from "ente-base/error";
 import React, { useMemo, useState } from "react";
 import {
     legacyAddContact,
@@ -174,8 +175,7 @@ export const LegacyAddContactContent: React.FC<
                                 );
                             } catch (error) {
                                 if (
-                                    error instanceof Error &&
-                                    error.name == "contact_not_on_ente"
+                                    isNamedError(error, "contact_not_on_ente")
                                 ) {
                                     setTimeout(() => {
                                         showMiniDialog(
