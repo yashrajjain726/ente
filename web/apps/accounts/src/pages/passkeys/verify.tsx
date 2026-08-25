@@ -4,7 +4,7 @@ import {
     isWebAuthnSupported,
     parseRedirectURLParam,
     passkeyAuthenticationSuccessRedirectURL,
-    passkeySessionAlreadyClaimedErrorMessage,
+    passkeySessionAlreadyClaimedErrorName,
     redirectToPasskeyRecoverPage,
     signChallenge,
     type BeginPasskeyAuthenticationResponse,
@@ -99,7 +99,7 @@ const Page = () => {
             log.error("Failed to begin passkey authentication", e);
             setStatus(
                 e instanceof Error &&
-                    e.message == passkeySessionAlreadyClaimedErrorMessage
+                    e.name == passkeySessionAlreadyClaimedErrorName
                     ? "sessionAlreadyClaimed"
                     : "failed",
             );

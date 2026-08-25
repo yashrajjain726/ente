@@ -5,7 +5,7 @@ import type { DerivedKey } from "./kdf";
 import * as kdf from "./kdf";
 import type { KDFWorker } from "./kdf.worker";
 
-export { deriveKeyInsufficientMemoryErrorMessage } from "./kdf";
+export { deriveKeyInsufficientMemoryErrorName } from "./kdf";
 export type { DerivedKey } from "./kdf";
 
 export interface EncryptedBox {

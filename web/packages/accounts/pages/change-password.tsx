@@ -4,7 +4,7 @@ import {
     AccountsPageFooter,
     AccountsPageTitle,
 } from "ente-accounts/components/layouts/centered-paper";
-import { deriveKeyInsufficientMemoryErrorMessage } from "ente-accounts/services/crypto";
+import { deriveKeyInsufficientMemoryErrorName } from "ente-accounts/services/crypto";
 import { appHomeRoute, stashRedirect } from "ente-accounts/services/redirect";
 import { changePassword, type LocalUser } from "ente-accounts/services/user";
 import { LinkButton } from "ente-base/components/LinkButton";
@@ -76,7 +76,7 @@ const PageContents: React.FC<PageContentsProps> = ({
                     log.error("Could not change password", e);
                     setPasswordsFieldError(
                         e instanceof Error &&
-                            e.message == deriveKeyInsufficientMemoryErrorMessage
+                            e.name == deriveKeyInsufficientMemoryErrorName
                             ? t("password_generation_failed")
                             : t("generic_error"),
                     );

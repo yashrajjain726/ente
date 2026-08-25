@@ -20,7 +20,7 @@ import {
     stashReferralSource,
     stashSRPSetupAttributes,
 } from "ente-accounts/services/accounts-db";
-import { deriveKeyInsufficientMemoryErrorMessage } from "ente-accounts/services/crypto";
+import { deriveKeyInsufficientMemoryErrorName } from "ente-accounts/services/crypto";
 import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/session-storage";
 import { generateSRPSetupAttributes } from "ente-accounts/services/srp";
 import {
@@ -174,7 +174,7 @@ export const SignUpContents: React.FC<SignUpContentsProps> = ({
                 } catch (e) {
                     if (
                         e instanceof Error &&
-                        e.message == deriveKeyInsufficientMemoryErrorMessage
+                        e.name == deriveKeyInsufficientMemoryErrorName
                     ) {
                         setFieldError(
                             "confirmPassword",

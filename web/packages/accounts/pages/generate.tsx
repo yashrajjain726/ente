@@ -15,7 +15,7 @@ import {
     savedPartialLocalUser,
     saveJustSignedUp,
 } from "ente-accounts/services/accounts-db";
-import { deriveKeyInsufficientMemoryErrorMessage } from "ente-accounts/services/crypto";
+import { deriveKeyInsufficientMemoryErrorName } from "ente-accounts/services/crypto";
 import { appHomeRoute } from "ente-accounts/services/redirect";
 import {
     haveMasterKeyInSession,
@@ -97,7 +97,7 @@ const Page: React.FC<GeneratePageProps> = ({
                 log.error("Could not generate key attributes from password", e);
                 setPasswordsFieldError(
                     e instanceof Error &&
-                        e.message == deriveKeyInsufficientMemoryErrorMessage
+                        e.name == deriveKeyInsufficientMemoryErrorName
                         ? t("password_generation_failed")
                         : t("generic_error"),
                 );
