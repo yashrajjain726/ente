@@ -288,7 +288,7 @@ class MemoryLaneService {
     }
 
     final fileIds = timeline.entries.map((entry) => entry.fileId).toSet();
-    final filesById = await _getFilesById(fileIds);
+    final filesById = await getTimelineFiles(fileIds);
     final cropsReady = await _ensureFaceCrops(
       personId,
       timeline.entries,
@@ -609,7 +609,7 @@ class MemoryLaneService {
         .map(getFileIdFromFaceId<int>)
         .toSet()
         .toList();
-    final fileMap = await _getFilesById(uniqueFileIds);
+    final fileMap = await getTimelineFiles(uniqueFileIds);
     final hiddenFiles = await SearchService.instance.getHiddenFiles();
     final hiddenFileIds = hiddenFiles
         .map((e) => e.uploadedFileID)
@@ -806,7 +806,7 @@ class MemoryLaneService {
           .map((entry) => entry.fileId)
           .toSet()
           .toList();
-      final filesById = await _getFilesById(uniqueFileIds);
+      final filesById = await getTimelineFiles(uniqueFileIds);
       final Map<int, Future<List<Face>?>> facesFutures = {};
       for (final entry in entries) {
         final file = filesById[entry.fileId];
@@ -850,7 +850,7 @@ class MemoryLaneService {
     readyPersonIds.value = current;
   }
 
-  Future<Map<int, EnteFile>> _getFilesById(Iterable<int> fileIds) async {
+  Future<Map<int, EnteFile>> getTimelineFiles(Iterable<int> fileIds) async {
     if (!isLocalGalleryMode) {
       return _filesDB.getFileIDToFileFromIDs(fileIds.toList());
     }
