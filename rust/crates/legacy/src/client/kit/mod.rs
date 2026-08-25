@@ -1,13 +1,13 @@
 mod owner_blob;
 
 use ente_accounts::auth::KeyAttributes;
-use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, secretbox};
 use ente_core::http;
+use ente_core::{Session, b64};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::LegacyClient;
+use super::current_recovery_key;
 use crate::kit::{
     LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitCreateResult, LegacyKitOwnerRecoverySession,
     LegacyKitRecoveryInitiator, LegacyKitRecoverySession, LegacyKitShare, LegacyKitVariant,
@@ -20,130 +20,130 @@ use owner_blob::{
 
 const NOTICE_PERIOD_OPTIONS: [i32; 5] = [0, 24, 168, 360, 720];
 
-impl LegacyClient {
-    pub async fn kits(&self) -> Result<Vec<LegacyKit>> {
-        let response = self
-            .api
-            .get("/legacy-kits")
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<ListLegacyKitsResponse>()
-            .await?;
-        response
-            .kits
-            .into_iter()
-            .map(|kit| decode_kit_record(kit, self.master_key.as_ref()))
-            .collect()
-    }
+pub async fn kits(session: &Session) -> Result<Vec<LegacyKit>> {
+    let response = session
+        .api
+        .get("/legacy-kits")
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<ListLegacyKitsResponse>()
+        .await?;
+    response
+        .kits
+        .into_iter()
+        .map(|kit| decode_kit_record(kit, &session.master_key))
+        .collect()
+}
 
-    pub async fn create_kit(
-        &self,
-        key_attributes: &KeyAttributes,
-        part_names: [String; 3],
-        notice_period_in_hours: i32,
-    ) -> Result<LegacyKitCreateResult> {
-        let (request, shares) = {
-            let recovery_key = self.current_recovery_key(key_attributes)?;
-            create_kit_request(
-                &recovery_key,
-                self.master_key.as_ref(),
-                part_names,
-                notice_period_in_hours,
-            )?
+pub async fn create_kit(
+    session: &Session,
+    key_attributes: &KeyAttributes,
+    part_names: [String; 3],
+    notice_period_in_hours: i32,
+) -> Result<LegacyKitCreateResult> {
+    let (request, shares) = {
+        let recovery_key = current_recovery_key(session, key_attributes)?;
+        create_kit_request(
+            &recovery_key,
+            &session.master_key,
+            part_names,
+            notice_period_in_hours,
+        )?
+    };
+
+    let response = session
+        .api
+        .post("/legacy-kits")
+        .json(&request)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LegacyKitRecordResponse>()
+        .await?;
+    let kit = decode_kit_record(response, &session.master_key)?;
+    Ok(LegacyKitCreateResult { kit, shares })
+}
+
+pub async fn download_kit_shares(session: &Session, kit_id: &str) -> Result<Vec<LegacyKitShare>> {
+    let response = session
+        .api
+        .get(&format!("/legacy-kits/{kit_id}/download-content"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LegacyKitDownloadContentResponse>()
+        .await?;
+    decode_download_content(response, &session.master_key)
+}
+
+pub async fn kit_recovery_session(
+    session: &Session,
+    kit_id: &str,
+) -> Result<LegacyKitOwnerRecoverySession> {
+    let response = session
+        .api
+        .get(&format!("/legacy-kits/{kit_id}/recovery-session"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LegacyKitOwnerRecoverySessionResponse>()
+        .await?;
+    Ok(response.into())
+}
+
+pub async fn update_kit_recovery_notice(
+    session: &Session,
+    kit_id: &str,
+    notice_period_in_hours: i32,
+) -> Result<()> {
+    validate_notice_period(notice_period_in_hours)?;
+    let path = "/legacy-kits/update-recovery-notice";
+    let response = session
+        .api
+        .post(path)
+        .json(&LegacyKitUpdateRecoveryNoticeRequest {
+            kit_id: kit_id.to_string(),
+            notice_period_in_hours,
+        })
+        .send()
+        .await?;
+    if response.status() == 400 {
+        return if response.text().await?.contains("active recovery session") {
+            Err(Error::ActiveRecoverySession)
+        } else {
+            Err(http::Error::Http {
+                status: 400,
+                path: path.into(),
+            }
+            .into())
         };
-
-        let response = self
-            .api
-            .post("/legacy-kits")
-            .json(&request)
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyKitRecordResponse>()
-            .await?;
-        let kit = decode_kit_record(response, self.master_key.as_ref())?;
-        Ok(LegacyKitCreateResult { kit, shares })
     }
+    response.error_for_status()?;
+    Ok(())
+}
 
-    pub async fn download_kit_shares(&self, kit_id: &str) -> Result<Vec<LegacyKitShare>> {
-        let response = self
-            .api
-            .get(&format!("/legacy-kits/{kit_id}/download-content"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyKitDownloadContentResponse>()
-            .await?;
-        decode_download_content(response, self.master_key.as_ref())
-    }
+pub async fn block_kit_recovery(session: &Session, kit_id: &str) -> Result<()> {
+    session
+        .api
+        .post("/legacy-kits/block-recovery")
+        .json(&LegacyKitOwnerActionRequest {
+            kit_id: kit_id.to_string(),
+        })
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
+}
 
-    pub async fn kit_recovery_session(
-        &self,
-        kit_id: &str,
-    ) -> Result<LegacyKitOwnerRecoverySession> {
-        let response = self
-            .api
-            .get(&format!("/legacy-kits/{kit_id}/recovery-session"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyKitOwnerRecoverySessionResponse>()
-            .await?;
-        Ok(response.into())
-    }
-
-    pub async fn update_kit_recovery_notice(
-        &self,
-        kit_id: &str,
-        notice_period_in_hours: i32,
-    ) -> Result<()> {
-        validate_notice_period(notice_period_in_hours)?;
-        let path = "/legacy-kits/update-recovery-notice";
-        let response = self
-            .api
-            .post(path)
-            .json(&LegacyKitUpdateRecoveryNoticeRequest {
-                kit_id: kit_id.to_string(),
-                notice_period_in_hours,
-            })
-            .send()
-            .await?;
-        if response.status() == 400 {
-            return if response.text().await?.contains("active recovery session") {
-                Err(Error::ActiveRecoverySession)
-            } else {
-                Err(http::Error::Http {
-                    status: 400,
-                    path: path.into(),
-                }
-                .into())
-            };
-        }
-        response.error_for_status()?;
-        Ok(())
-    }
-
-    pub async fn block_kit_recovery(&self, kit_id: &str) -> Result<()> {
-        self.api
-            .post("/legacy-kits/block-recovery")
-            .json(&LegacyKitOwnerActionRequest {
-                kit_id: kit_id.to_string(),
-            })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
-
-    pub async fn delete_kit(&self, kit_id: &str) -> Result<()> {
-        self.api
-            .delete(&format!("/legacy-kits/{kit_id}"))
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
+pub async fn delete_kit(session: &Session, kit_id: &str) -> Result<()> {
+    session
+        .api
+        .delete(&format!("/legacy-kits/{kit_id}"))
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
 }
 
 fn create_kit_request(

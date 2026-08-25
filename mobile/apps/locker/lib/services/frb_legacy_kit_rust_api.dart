@@ -4,7 +4,8 @@ import "package:ente_base/models/key_attributes.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_legacy/models/legacy_kit_models.dart";
 import "package:ente_legacy/services/legacy_kit_rust_api.dart";
-import "package:locker/src/rust/api/contacts.dart" as rust;
+import "package:locker/src/rust/api/legacy.dart" as rust;
+import "package:locker/src/rust/api/session.dart" as rust_session;
 
 class FrbLegacyKitRustApi implements LegacyKitRustApi {
   const FrbLegacyKitRustApi();
@@ -14,34 +15,31 @@ class FrbLegacyKitRustApi implements LegacyKitRustApi {
     contacts.ContactsSession session,
     Uint8List accountKey,
   ) async {
-    final opened = await rust.openContactsCtx(
-      input: rust.OpenContactsCtxInput(
-        baseUrl: session.baseUrl,
-        authToken: session.authToken,
-        userId: session.userId,
-        masterKey: accountKey,
-        userAgent: session.userAgent,
-        clientPackage: session.clientPackage,
-        clientVersion: session.clientVersion,
-      ),
+    final opened = rust_session.openSession(
+      baseUrl: session.baseUrl,
+      authToken: session.authToken,
+      masterKey: accountKey,
+      userAgent: session.userAgent,
+      clientPackage: session.clientPackage,
+      clientVersion: session.clientVersion,
     );
-    return _FrbLegacyKitRustContext(opened.ctx);
+    return _FrbLegacyKitRustContext(opened);
   }
 }
 
 class _FrbLegacyKitRustContext implements LegacyKitRustContext {
-  final rust.ContactsCtx _inner;
+  final rust_session.Session _session;
 
-  const _FrbLegacyKitRustContext(this._inner);
+  const _FrbLegacyKitRustContext(this._session);
 
   @override
   Future<void> updateAuthToken(String authToken) {
-    return _run(() => _inner.updateAuthToken(authToken: authToken));
+    return _session.updateAuthToken(authToken: authToken);
   }
 
   @override
   Future<List<LegacyKit>> legacyKits() async {
-    final kits = await _run(_inner.legacyKits);
+    final kits = await _run(() => rust.kits(session: _session));
     return kits.map(_fromRustKit).toList(growable: false);
   }
 
@@ -52,7 +50,8 @@ class _FrbLegacyKitRustContext implements LegacyKitRustContext {
     required int noticePeriodInHours,
   }) async {
     final result = await _run(
-      () => _inner.legacyKitCreate(
+      () => rust.createKit(
+        session: _session,
         currentUserKeyAttrs: _toRustKeyAttributes(currentUserKeyAttrs),
         partNames: partNames,
         noticePeriodInHours: noticePeriodInHours,
@@ -67,7 +66,7 @@ class _FrbLegacyKitRustContext implements LegacyKitRustContext {
   @override
   Future<List<LegacyKitShare>> legacyKitDownloadShares(String kitId) async {
     final shares = await _run(
-      () => _inner.legacyKitDownloadShares(kitId: kitId),
+      () => rust.downloadKitShares(session: _session, kitId: kitId),
     );
     return shares.map(_fromRustShare).toList(growable: false);
   }
@@ -77,7 +76,7 @@ class _FrbLegacyKitRustContext implements LegacyKitRustContext {
     String kitId,
   ) async {
     final details = await _run(
-      () => _inner.legacyKitRecoverySession(kitId: kitId),
+      () => rust.kitRecoverySession(session: _session, kitId: kitId),
     );
     return LegacyKitOwnerRecoverySessionDetails(
       session: details.session == null
@@ -101,7 +100,8 @@ class _FrbLegacyKitRustContext implements LegacyKitRustContext {
     required int noticePeriodInHours,
   }) {
     return _run(
-      () => _inner.legacyKitUpdateRecoveryNotice(
+      () => rust.updateKitRecoveryNotice(
+        session: _session,
         kitId: kitId,
         noticePeriodInHours: noticePeriodInHours,
       ),
@@ -110,19 +110,19 @@ class _FrbLegacyKitRustContext implements LegacyKitRustContext {
 
   @override
   Future<void> legacyKitBlockRecovery(String kitId) {
-    return _run(() => _inner.legacyKitBlockRecovery(kitId: kitId));
+    return _run(() => rust.blockKitRecovery(session: _session, kitId: kitId));
   }
 
   @override
   Future<void> legacyKitDelete(String kitId) {
-    return _run(() => _inner.legacyKitDelete(kitId: kitId));
+    return _run(() => rust.deleteKit(session: _session, kitId: kitId));
   }
 }
 
 Future<T> _run<T>(Future<T> Function() action) async {
   try {
     return await action();
-  } on rust.ContactsError_ActiveRecoverySession {
+  } on rust.LegacyError_ActiveRecoverySession {
     throw LegacyKitActiveRecoverySessionException();
   }
 }

@@ -1,11 +1,5 @@
-use std::sync::Arc;
-
 use ente_contacts::{OpenContactsInput, WrappedRootContactKey};
-use ente_core::{
-    b64,
-    crypto::SecretVec,
-    http::{Api, ApiConfig, Auth, Http},
-};
+use ente_wasm_core::Session;
 use serde::Serialize;
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
@@ -18,8 +12,6 @@ pub enum Error {
     Contacts(#[from] ente_contacts::Error),
     #[error(transparent)]
     Serde(#[from] swb::Error),
-    #[error(transparent)]
-    Decode(#[from] b64::DecodeError),
 }
 
 impl Error {
@@ -71,28 +63,13 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
 
 #[wasm_bindgen(js_name = openContacts)]
 pub fn open_contacts(
-    base_url: String,
-    auth_token: String,
+    session: &Session,
     user_id: i64,
-    master_key_b64: String,
     cached_encrypted_key: Option<String>,
     cached_header: Option<String>,
-    client_package: Option<String>,
-    client_version: Option<String>,
 ) -> Result<ContactsClient, Error> {
-    let api = Arc::new(Api::new(
-        Http::new().map_err(ente_contacts::Error::from)?,
-        ApiConfig {
-            origin: base_url,
-            client_package,
-            client_version,
-            user_agent: None,
-            auth: Some(Auth::User(auth_token)),
-        },
-    ));
     let opened = ente_contacts::ContactsClient::open(
-        Arc::clone(&api),
-        Arc::new(SecretVec::new(b64::decode(&master_key_b64)?)),
+        session.clone_inner(),
         OpenContactsInput {
             user_id,
             cached_wrapped_root_contact_key: cached_encrypted_key.zip(cached_header).map(
@@ -104,34 +81,23 @@ pub fn open_contacts(
         },
     )?;
 
-    Ok(ContactsClient {
-        api,
-        inner: opened.client,
-    })
+    Ok(ContactsClient(opened.client))
 }
 
 #[wasm_bindgen]
-pub struct ContactsClient {
-    api: Arc<Api>,
-    inner: ente_contacts::ContactsClient,
-}
+pub struct ContactsClient(ente_contacts::ContactsClient);
 
 #[wasm_bindgen]
 impl ContactsClient {
-    #[wasm_bindgen(js_name = updateAuthToken)]
-    pub fn update_auth_token(&self, auth_token: String) {
-        self.api.set_auth(Some(Auth::User(auth_token)));
-    }
-
     #[wasm_bindgen(js_name = currentWrappedRootContactKey)]
     pub fn current_wrapped_root_contact_key(&self) -> Result<JsValue, Error> {
-        swb::to_value(&self.inner.current_wrapped_root_contact_key()).map_err(Into::into)
+        swb::to_value(&self.0.current_wrapped_root_contact_key()).map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = getDiff)]
     pub async fn get_diff(&self, since_time: i64, limit: u16) -> Result<JsValue, Error> {
         let diff: Vec<ContactRecordJs> = self
-            .inner
+            .0
             .get_diff(since_time, limit)
             .await?
             .into_iter()
@@ -142,7 +108,7 @@ impl ContactsClient {
 
     #[wasm_bindgen(js_name = getProfilePicture)]
     pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>, Error> {
-        self.inner
+        self.0
             .get_profile_picture(contact_id)
             .await
             .map_err(Into::into)

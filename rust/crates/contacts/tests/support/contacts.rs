@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use ente_contacts::{ContactsClient, OpenContactsInput};
 use ente_core::{
+    Session,
     crypto::SecretVec,
     http::{Api, ApiConfig, Auth, Http},
 };
@@ -21,8 +22,10 @@ pub fn open_client(endpoint: &str, account: &TestAccount) -> ContactsClient {
         },
     );
     ContactsClient::open(
-        Arc::new(api),
-        Arc::new(SecretVec::new(account.master_key.clone())),
+        Arc::new(Session {
+            api,
+            master_key: SecretVec::new(account.master_key.clone()),
+        }),
         OpenContactsInput {
             user_id: account.user_id,
             cached_wrapped_root_contact_key: None,

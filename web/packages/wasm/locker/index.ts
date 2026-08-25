@@ -32,20 +32,24 @@ export const openContacts = async ({
     clientPackage,
     clientVersion,
 }: OpenContactsInput) => {
-    const client = (await import("./pkg/ente_locker_wasm")).openContacts(
+    const wasm = await import("./pkg/ente_locker_wasm");
+    const session = wasm.openSession(
         baseUrl,
         authToken,
-        BigInt(userId),
         masterKeyB64,
-        cachedWrappedRootContactKey?.encryptedKey,
-        cachedWrappedRootContactKey?.header,
         clientPackage,
         clientVersion,
+    );
+    const client = wasm.openContacts(
+        session,
+        BigInt(userId),
+        cachedWrappedRootContactKey?.encryptedKey,
+        cachedWrappedRootContactKey?.header,
     );
 
     return {
         updateAuthToken: (authToken: string) =>
-            client.updateAuthToken(authToken),
+            session.updateAuthToken(authToken),
         currentWrappedRootContactKey: () =>
             client.currentWrappedRootContactKey() as
                 | WrappedRootContactKey

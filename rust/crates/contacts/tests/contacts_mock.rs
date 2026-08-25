@@ -5,7 +5,7 @@ use ente_contacts::{
     RootKeySource, WrappedRootContactKey,
 };
 use ente_core::{
-    b64,
+    Session, b64,
     crypto::{Key, SecretVec, blob, secretbox},
     http::{Api, ApiConfig, Auth, Http},
 };
@@ -34,8 +34,10 @@ fn open(
         },
     );
     ContactsClient::open(
-        Arc::new(api),
-        Arc::new(SecretVec::new(master_key)),
+        Arc::new(Session {
+            api,
+            master_key: SecretVec::new(master_key),
+        }),
         OpenContactsInput {
             user_id: 7,
             cached_wrapped_root_contact_key,

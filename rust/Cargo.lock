@@ -2609,6 +2609,7 @@ dependencies = [
  "ente-accounts",
  "ente-core",
  "ente-legacy",
+ "ente-wasm-core",
  "ente-wasm-log",
  "js-sys",
  "serde",
@@ -2645,6 +2646,7 @@ version = "0.0.0"
 dependencies = [
  "ente-contacts",
  "ente-core",
+ "ente-wasm-core",
  "ente-wasm-log",
  "js-sys",
  "serde",
@@ -2753,6 +2755,7 @@ version = "0.0.0"
 dependencies = [
  "ente-contacts",
  "ente-core",
+ "ente-wasm-core",
  "ente-wasm-log",
  "js-sys",
  "serde",
@@ -2847,6 +2850,16 @@ name = "ente-uniffi-log"
 version = "0.0.0"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "ente-wasm-core"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "js-sys",
+ "thiserror 2.0.18",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@ pub use contact::{ContactData, ContactRecord};
 
 use std::sync::{Arc, RwLock};
 
+use ente_core::Session;
 use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, secretbox};
 use ente_core::http::Api;
@@ -41,23 +42,18 @@ pub struct OpenContactsResult {
 
 pub struct ContactsClient {
     user_id: i64,
-    api: Arc<Api>,
-    master_key: Arc<SecretVec>,
+    session: Arc<Session>,
     root_contact_key: Arc<RwLock<Option<SecretVec>>>,
     wrapped_root_contact_key: Arc<RwLock<Option<WrappedRootContactKey>>>,
 }
 
 impl ContactsClient {
-    pub fn open(
-        api: Arc<Api>,
-        master_key: Arc<SecretVec>,
-        input: OpenContactsInput,
-    ) -> Result<OpenContactsResult> {
+    pub fn open(session: Arc<Session>, input: OpenContactsInput) -> Result<OpenContactsResult> {
         let (root_contact_key, wrapped_root_contact_key, root_key_source) =
             if let Some(cached_wrapped_root_contact_key) = input.cached_wrapped_root_contact_key {
                 let root_contact_key = decrypt_root_contact_key(
                     &cached_wrapped_root_contact_key,
-                    master_key.as_ref(),
+                    &session.master_key,
                 )?;
                 (
                     Some(root_contact_key),
@@ -69,8 +65,7 @@ impl ContactsClient {
             };
         let client = Self {
             user_id: input.user_id,
-            api,
-            master_key,
+            session,
             root_contact_key: Arc::new(RwLock::new(root_contact_key)),
             wrapped_root_contact_key: Arc::new(RwLock::new(wrapped_root_contact_key.clone())),
         };
@@ -91,6 +86,10 @@ impl ContactsClient {
             .read()
             .expect("wrapped root key lock poisoned")
             .clone()
+    }
+
+    fn api(&self) -> &Api {
+        &self.session.api
     }
 
     fn encrypt_contact_key(&self, contact_key: &[u8]) -> Result<String> {
@@ -134,14 +133,14 @@ impl ContactsClient {
             return Ok(());
         }
 
-        if let Some(remote_root_key) = fetch_root_key(&self.api).await? {
+        if let Some(remote_root_key) = fetch_root_key(self.api()).await? {
             self.apply_wrapped_root_contact_key(remote_root_key.into())?;
         } else {
             let generated_root_contact_key = SecretVec::new(crypto::random_bytes(32));
             let generated_wrapped_root_contact_key =
-                encrypt_root_contact_key(&generated_root_contact_key, self.master_key.as_ref())?;
+                encrypt_root_contact_key(&generated_root_contact_key, &self.session.master_key)?;
             if let Some(remote_root_key) =
-                create_root_key(&self.api, &generated_wrapped_root_contact_key).await?
+                create_root_key(self.api(), &generated_wrapped_root_contact_key).await?
             {
                 self.apply_wrapped_root_contact_key(remote_root_key.into())?;
             } else {
@@ -157,7 +156,7 @@ impl ContactsClient {
         wrapped_root_contact_key: WrappedRootContactKey,
     ) -> Result<()> {
         let decrypted_root_key =
-            decrypt_root_contact_key(&wrapped_root_contact_key, self.master_key.as_ref())?;
+            decrypt_root_contact_key(&wrapped_root_contact_key, &self.session.master_key)?;
         *self
             .root_contact_key
             .write()

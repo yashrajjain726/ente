@@ -33,7 +33,7 @@ impl ContactsClient {
         let wrapped_contact_key = self.encrypt_contact_key(&contact_key)?;
         let encrypted_data = encrypt_contact_data(data, &contact_key)?;
         let response = self
-            .api
+            .api()
             .post("/contacts")
             .json(&CreateContactRequest {
                 contact_user_id: data.contact_user_id,
@@ -51,7 +51,7 @@ impl ContactsClient {
 
     pub async fn get_contact(&self, contact_id: &str) -> Result<ContactRecord> {
         let response = self
-            .api
+            .api()
             .get(&format!("/contacts/{contact_id}"))
             .send()
             .await?
@@ -73,7 +73,7 @@ impl ContactsClient {
         self.ensure_confirmed_root_contact_key().await?;
 
         let current = self
-            .api
+            .api()
             .get(&format!("/contacts/{contact_id}"))
             .send()
             .await?
@@ -88,7 +88,7 @@ impl ContactsClient {
         let encrypted_data = encrypt_contact_data(data, &contact_key)?;
 
         let response = self
-            .api
+            .api()
             .put(&format!("/contacts/{contact_id}"))
             .json(&UpdateContactRequest {
                 contact_user_id: data.contact_user_id,
@@ -104,7 +104,7 @@ impl ContactsClient {
     }
 
     pub async fn delete_contact(&self, contact_id: &str) -> Result<()> {
-        self.api
+        self.api()
             .delete(&format!("/contacts/{contact_id}"))
             .send()
             .await?
@@ -114,7 +114,7 @@ impl ContactsClient {
 
     pub async fn get_diff(&self, since_time: i64, limit: u16) -> Result<Vec<ContactRecord>> {
         let response = self
-            .api
+            .api()
             .get("/contacts/diff")
             .query(&[
                 ("sinceTime", since_time.to_string()),

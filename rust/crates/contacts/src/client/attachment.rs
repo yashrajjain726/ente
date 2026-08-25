@@ -34,7 +34,7 @@ impl ContactsClient {
 
     pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>> {
         let current = self
-            .api
+            .api()
             .get(&format!("/contacts/{contact_id}"))
             .send()
             .await?
@@ -75,7 +75,7 @@ impl ContactsClient {
         self.ensure_confirmed_root_contact_key().await?;
 
         let current = self
-            .api
+            .api()
             .get(&format!("/contacts/{contact_id}"))
             .send()
             .await?
@@ -92,7 +92,7 @@ impl ContactsClient {
         let size = encrypted_attachment.len() as i64;
 
         let upload = self
-            .api
+            .api()
             .post(&format!(
                 "/attachments/{}/upload-url",
                 attachment_type.as_str()
@@ -107,7 +107,7 @@ impl ContactsClient {
             .json::<AttachmentUploadUrlResponse>()
             .await?;
 
-        self.api
+        self.api()
             .http()
             .put(&upload.url)
             .header("Content-MD5", &content_md5)
@@ -117,7 +117,7 @@ impl ContactsClient {
             .error_for_status()?;
 
         let response = self
-            .api
+            .api()
             .put(&format!(
                 "/contacts/{contact_id}/attachments/{}",
                 attachment_type.as_str()
@@ -141,7 +141,7 @@ impl ContactsClient {
         attachment_id: &str,
     ) -> Result<Vec<u8>> {
         let download = self
-            .api
+            .api()
             .get(&format!(
                 "/attachments/{}/{attachment_id}",
                 attachment_type.as_str()
@@ -152,7 +152,7 @@ impl ContactsClient {
             .json::<SignedUrlResponse>()
             .await?;
         Ok(self
-            .api
+            .api()
             .http()
             .get(&download.url)
             .send()
@@ -169,7 +169,7 @@ impl ContactsClient {
     ) -> Result<ContactRecord> {
         self.ensure_confirmed_root_contact_key().await?;
         let response = self
-            .api
+            .api()
             .delete(&format!(
                 "/contacts/{contact_id}/attachments/{}",
                 attachment_type.as_str()

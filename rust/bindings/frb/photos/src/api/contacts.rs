@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use ente_core::{
+    Session,
     crypto::SecretVec,
-    http::{Api, ApiConfig, Auth, Http},
+    http::{ApiConfig, Auth},
 };
 use flutter_rust_bridge::frb;
 
@@ -140,7 +141,7 @@ pub struct OpenContactsCtxResult {
 #[frb(opaque)]
 #[derive(Clone)]
 pub struct ContactsCtx {
-    api: Arc<Api>,
+    session: Arc<Session>,
     contacts: Arc<ente_contacts::ContactsClient>,
 }
 
@@ -148,19 +149,21 @@ pub struct ContactsCtx {
 pub async fn open_contacts_ctx(
     input: OpenContactsCtxInput,
 ) -> Result<OpenContactsCtxResult, ContactsError> {
-    let api = Arc::new(Api::new(
-        Http::new().map_err(ente_contacts::Error::from)?,
-        ApiConfig {
-            origin: input.base_url,
-            client_package: input.client_package,
-            client_version: input.client_version,
-            user_agent: input.user_agent,
-            auth: Some(Auth::User(input.auth_token)),
-        },
-    ));
+    let session = Arc::new(
+        Session::new(
+            ApiConfig {
+                origin: input.base_url,
+                client_package: input.client_package,
+                client_version: input.client_version,
+                user_agent: input.user_agent,
+                auth: Some(Auth::User(input.auth_token)),
+            },
+            SecretVec::new(input.master_key),
+        )
+        .map_err(ente_contacts::Error::from)?,
+    );
     let opened = ente_contacts::ContactsClient::open(
-        Arc::clone(&api),
-        Arc::new(SecretVec::new(input.master_key)),
+        Arc::clone(&session),
         ente_contacts::OpenContactsInput {
             user_id: input.user_id,
             cached_wrapped_root_contact_key: input.cached_wrapped_root_contact_key.map(Into::into),
@@ -169,7 +172,7 @@ pub async fn open_contacts_ctx(
 
     Ok(OpenContactsCtxResult {
         ctx: ContactsCtx {
-            api,
+            session,
             contacts: Arc::new(opened.client),
         },
         wrapped_root_contact_key: opened.wrapped_root_contact_key.map(Into::into),
@@ -184,7 +187,7 @@ impl ContactsCtx {
     }
 
     pub fn update_auth_token(&self, auth_token: String) {
-        self.api.set_auth(Some(Auth::User(auth_token)));
+        self.session.api.set_auth(Some(Auth::User(auth_token)));
     }
 
     #[frb(sync)]

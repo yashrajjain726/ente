@@ -1,10 +1,9 @@
 use ente_accounts::auth::{self, KeyAttributes, SrpSession};
-use ente_core::b64;
 use ente_core::crypto::{self, SecretVec, sealed, secretbox};
+use ente_core::{Session, b64};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::LegacyClient;
 use crate::{Error, Result};
 
 #[derive(Debug)]
@@ -13,215 +12,221 @@ pub struct LegacyRecoveryBundle {
     pub user_key_attributes: KeyAttributes,
 }
 
-impl LegacyClient {
-    pub async fn start_recovery(&self, user_id: i64, emergency_contact_id: i64) -> Result<()> {
-        self.contact_action(
-            "/emergency-contacts/start-recovery",
-            user_id,
-            emergency_contact_id,
-        )
-        .await
-    }
+pub async fn start_recovery(
+    session: &Session,
+    user_id: i64,
+    emergency_contact_id: i64,
+) -> Result<()> {
+    contact_action(
+        session,
+        "/emergency-contacts/start-recovery",
+        user_id,
+        emergency_contact_id,
+    )
+    .await
+}
 
-    pub async fn stop_recovery(
-        &self,
-        recovery_id: &str,
-        user_id: i64,
-        emergency_contact_id: i64,
-    ) -> Result<()> {
-        self.recovery_action(
-            "/emergency-contacts/stop-recovery",
-            recovery_id,
-            user_id,
-            emergency_contact_id,
-        )
-        .await
-    }
+pub async fn stop_recovery(
+    session: &Session,
+    recovery_id: &str,
+    user_id: i64,
+    emergency_contact_id: i64,
+) -> Result<()> {
+    recovery_action(
+        session,
+        "/emergency-contacts/stop-recovery",
+        recovery_id,
+        user_id,
+        emergency_contact_id,
+    )
+    .await
+}
 
-    pub async fn reject_recovery(
-        &self,
-        recovery_id: &str,
-        user_id: i64,
-        emergency_contact_id: i64,
-    ) -> Result<()> {
-        self.recovery_action(
-            "/emergency-contacts/reject-recovery",
-            recovery_id,
-            user_id,
-            emergency_contact_id,
-        )
-        .await
-    }
+pub async fn reject_recovery(
+    session: &Session,
+    recovery_id: &str,
+    user_id: i64,
+    emergency_contact_id: i64,
+) -> Result<()> {
+    recovery_action(
+        session,
+        "/emergency-contacts/reject-recovery",
+        recovery_id,
+        user_id,
+        emergency_contact_id,
+    )
+    .await
+}
 
-    pub async fn approve_recovery(
-        &self,
-        recovery_id: &str,
-        user_id: i64,
-        emergency_contact_id: i64,
-    ) -> Result<()> {
-        self.recovery_action(
-            "/emergency-contacts/approve-recovery",
-            recovery_id,
-            user_id,
-            emergency_contact_id,
-        )
-        .await
-    }
+pub async fn approve_recovery(
+    session: &Session,
+    recovery_id: &str,
+    user_id: i64,
+    emergency_contact_id: i64,
+) -> Result<()> {
+    recovery_action(
+        session,
+        "/emergency-contacts/approve-recovery",
+        recovery_id,
+        user_id,
+        emergency_contact_id,
+    )
+    .await
+}
 
-    pub async fn recovery_bundle(
-        &self,
-        recovery_id: &str,
-        current_user_key_attrs: &KeyAttributes,
-    ) -> Result<LegacyRecoveryBundle> {
-        let response = self.recovery_info(recovery_id).await?;
-        let recovery_key =
-            self.decrypt_recovery_key(&response.encrypted_key, current_user_key_attrs)?;
+pub async fn recovery_bundle(
+    session: &Session,
+    recovery_id: &str,
+    current_user_key_attrs: &KeyAttributes,
+) -> Result<LegacyRecoveryBundle> {
+    let response = recovery_info(session, recovery_id).await?;
+    let recovery_key =
+        decrypt_recovery_key(session, &response.encrypted_key, current_user_key_attrs)?;
 
-        Ok(LegacyRecoveryBundle {
-            recovery_key,
-            user_key_attributes: response.user_key_attr,
+    Ok(LegacyRecoveryBundle {
+        recovery_key,
+        user_key_attributes: response.user_key_attr,
+    })
+}
+
+pub async fn change_password(
+    session: &Session,
+    recovery_id: &str,
+    current_user_key_attrs: &KeyAttributes,
+    new_password: &str,
+) -> Result<()> {
+    let bundle = recovery_bundle(session, recovery_id, current_user_key_attrs).await?;
+    let target_master_key =
+        decrypt_master_key_with_recovery_key(&bundle.user_key_attributes, &bundle.recovery_key)?;
+    let (updated_key_attrs, login_key) = auth::generate_key_attributes_for_new_password(
+        &target_master_key,
+        &bundle.user_key_attributes,
+        new_password,
+    )?;
+    let srp_user_id = Uuid::new_v4().to_string();
+    let (mut srp_session, setup_request) = password_reset_setup_request(&srp_user_id, &login_key)?;
+    let init_response = session
+        .api
+        .post("/emergency-contacts/init-change-password")
+        .json(&LegacyInitChangePasswordRequest {
+            recovery_id: recovery_id.to_string(),
+            setup_srp_request: setup_request,
         })
-    }
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LegacySetupSrpResponse>()
+        .await?;
+    let srp_m1 = srp_session_m1(&mut srp_session, &init_response)?;
+    let updated_key_attr = LegacyUpdatedKeyAttr {
+        kek_salt: updated_key_attrs.kek_salt.clone(),
+        encrypted_key: updated_key_attrs.encrypted_key.clone(),
+        key_decryption_nonce: updated_key_attrs.key_decryption_nonce.clone(),
+        mem_limit: updated_key_attrs.mem_limit,
+        ops_limit: updated_key_attrs.ops_limit,
+    };
 
-    pub async fn change_password(
-        &self,
-        recovery_id: &str,
-        current_user_key_attrs: &KeyAttributes,
-        new_password: &str,
-    ) -> Result<()> {
-        let bundle = self
-            .recovery_bundle(recovery_id, current_user_key_attrs)
-            .await?;
-        let target_master_key = decrypt_master_key_with_recovery_key(
-            &bundle.user_key_attributes,
-            &bundle.recovery_key,
-        )?;
-        let (updated_key_attrs, login_key) = auth::generate_key_attributes_for_new_password(
-            &target_master_key,
-            &bundle.user_key_attributes,
-            new_password,
-        )?;
-        let srp_user_id = Uuid::new_v4().to_string();
-        let (mut srp_session, setup_request) =
-            password_reset_setup_request(&srp_user_id, &login_key)?;
-        let init_response = self
-            .api
-            .post("/emergency-contacts/init-change-password")
-            .json(&LegacyInitChangePasswordRequest {
-                recovery_id: recovery_id.to_string(),
-                setup_srp_request: setup_request,
-            })
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacySetupSrpResponse>()
-            .await?;
-        let srp_m1 = srp_session_m1(&mut srp_session, &init_response)?;
-        let updated_key_attr = LegacyUpdatedKeyAttr {
-            kek_salt: updated_key_attrs.kek_salt.clone(),
-            encrypted_key: updated_key_attrs.encrypted_key.clone(),
-            key_decryption_nonce: updated_key_attrs.key_decryption_nonce.clone(),
-            mem_limit: updated_key_attrs.mem_limit,
-            ops_limit: updated_key_attrs.ops_limit,
-        };
+    let change_response = session
+        .api
+        .post("/emergency-contacts/change-password")
+        .json(&LegacyChangePasswordRequest {
+            recovery_id: recovery_id.to_string(),
+            update_srp_and_keys_request: LegacyUpdateSrpAndKeysRequest {
+                setup_id: init_response.setup_id,
+                srp_m1,
+                updated_key_attr,
+            },
+        })
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LegacyChangePasswordResponse>()
+        .await?;
 
-        let change_response = self
-            .api
-            .post("/emergency-contacts/change-password")
-            .json(&LegacyChangePasswordRequest {
-                recovery_id: recovery_id.to_string(),
-                update_srp_and_keys_request: LegacyUpdateSrpAndKeysRequest {
-                    setup_id: init_response.setup_id,
-                    srp_m1,
-                    updated_key_attr,
-                },
-            })
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyChangePasswordResponse>()
-            .await?;
+    let server_m2 = b64::decode(&change_response.srp_m2)?;
+    srp_session.verify_m2(&server_m2)?;
+    Ok(())
+}
 
-        let server_m2 = b64::decode(&change_response.srp_m2)?;
-        srp_session.verify_m2(&server_m2)?;
-        Ok(())
-    }
+async fn contact_action(
+    session: &Session,
+    path: &str,
+    user_id: i64,
+    emergency_contact_id: i64,
+) -> Result<()> {
+    session
+        .api
+        .post(path)
+        .json(&LegacyContactIdentifier {
+            user_id,
+            emergency_contact_id,
+        })
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
+}
 
-    async fn contact_action(
-        &self,
-        path: &str,
-        user_id: i64,
-        emergency_contact_id: i64,
-    ) -> Result<()> {
-        self.api
-            .post(path)
-            .json(&LegacyContactIdentifier {
-                user_id,
-                emergency_contact_id,
-            })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
+async fn recovery_action(
+    session: &Session,
+    path: &str,
+    recovery_id: &str,
+    user_id: i64,
+    emergency_contact_id: i64,
+) -> Result<()> {
+    session
+        .api
+        .post(path)
+        .json(&LegacyRecoveryIdentifier {
+            id: recovery_id.to_string(),
+            user_id,
+            emergency_contact_id,
+        })
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
+}
 
-    async fn recovery_action(
-        &self,
-        path: &str,
-        recovery_id: &str,
-        user_id: i64,
-        emergency_contact_id: i64,
-    ) -> Result<()> {
-        self.api
-            .post(path)
-            .json(&LegacyRecoveryIdentifier {
-                id: recovery_id.to_string(),
-                user_id,
-                emergency_contact_id,
-            })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
-    }
+async fn recovery_info(session: &Session, recovery_id: &str) -> Result<LegacyRecoveryInfoResponse> {
+    Ok(session
+        .api
+        .get(&format!("/emergency-contacts/recovery-info/{recovery_id}"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<LegacyRecoveryInfoResponse>()
+        .await?)
+}
 
-    async fn recovery_info(&self, recovery_id: &str) -> Result<LegacyRecoveryInfoResponse> {
-        Ok(self
-            .api
-            .get(&format!("/emergency-contacts/recovery-info/{recovery_id}"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<LegacyRecoveryInfoResponse>()
-            .await?)
-    }
+fn decrypt_recovery_key(
+    session: &Session,
+    encrypted_key_b64: &str,
+    current_user_key_attrs: &KeyAttributes,
+) -> Result<SecretVec> {
+    let public_key = b64::decode(&current_user_key_attrs.public_key)?;
+    let encrypted_key = b64::decode(encrypted_key_b64)?;
+    let secret_key = current_secret_key(session, current_user_key_attrs)?;
+    let decrypted = sealed::open(
+        &encrypted_key,
+        &crypto::PublicKey::try_from_slice(&public_key)?,
+        &crypto::SecretKey::try_from_slice(&secret_key)?,
+    )?;
+    Ok(SecretVec::new(decrypted))
+}
 
-    fn decrypt_recovery_key(
-        &self,
-        encrypted_key_b64: &str,
-        current_user_key_attrs: &KeyAttributes,
-    ) -> Result<SecretVec> {
-        let public_key = b64::decode(&current_user_key_attrs.public_key)?;
-        let encrypted_key = b64::decode(encrypted_key_b64)?;
-        let secret_key = self.current_secret_key(current_user_key_attrs)?;
-        let decrypted = sealed::open(
-            &encrypted_key,
-            &crypto::PublicKey::try_from_slice(&public_key)?,
-            &crypto::SecretKey::try_from_slice(&secret_key)?,
-        )?;
-        Ok(SecretVec::new(decrypted))
-    }
-
-    fn current_secret_key(&self, current_user_key_attrs: &KeyAttributes) -> Result<SecretVec> {
-        let encrypted_secret_key = b64::decode(&current_user_key_attrs.encrypted_secret_key)?;
-        let secret_key_nonce = b64::decode(&current_user_key_attrs.secret_key_decryption_nonce)?;
-        let secret_key = secretbox::decrypt(
-            &encrypted_secret_key,
-            &crypto::Nonce::try_from_slice(&secret_key_nonce)?,
-            &crypto::Key::try_from_slice(self.master_key.as_ref())?,
-        )?;
-        Ok(SecretVec::new(secret_key))
-    }
+fn current_secret_key(
+    session: &Session,
+    current_user_key_attrs: &KeyAttributes,
+) -> Result<SecretVec> {
+    let encrypted_secret_key = b64::decode(&current_user_key_attrs.encrypted_secret_key)?;
+    let secret_key_nonce = b64::decode(&current_user_key_attrs.secret_key_decryption_nonce)?;
+    let secret_key = secretbox::decrypt(
+        &encrypted_secret_key,
+        &crypto::Nonce::try_from_slice(&secret_key_nonce)?,
+        &crypto::Key::try_from_slice(&session.master_key)?,
+    )?;
+    Ok(SecretVec::new(secret_key))
 }
 
 fn decrypt_master_key_with_recovery_key(
