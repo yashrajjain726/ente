@@ -90,7 +90,8 @@ export const ChatInput = memo(
             >
                 <InputBase
                     multiline
-                    maxRows={5}
+                    inputComponent="textarea"
+                    inputProps={{ rows: 1, type: undefined }}
                     inputRef={inputRef}
                     placeholder={
                         isDownloading
@@ -122,7 +123,13 @@ export const ChatInput = memo(
                         fontSize: "15px",
                         lineHeight: 1.7,
                         color: "text.base",
-                        "& textarea": { padding: 0, margin: 0 },
+                        "& textarea": {
+                            fieldSizing: "content",
+                            maxHeight: "8.5em",
+                            overflowY: "auto",
+                            padding: 0,
+                            margin: 0,
+                        },
                         "& code": {
                             fontFamily:
                                 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
