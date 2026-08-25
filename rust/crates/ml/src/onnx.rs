@@ -230,6 +230,15 @@ impl SessionRunError {
         Self::Retryable(error)
     }
 
+    fn from_inference_error(error: ort::Error) -> Self {
+        match error.code() {
+            ort::ErrorCode::GenericFailure
+            | ort::ErrorCode::RuntimeException
+            | ort::ErrorCode::ExecutionProviderFailure => Self::Retryable(error.into()),
+            _ => Self::Terminal(error.into()),
+        }
+    }
+
     fn is_retryable(&self) -> bool {
         matches!(self, Self::Retryable(_))
     }
@@ -263,12 +272,14 @@ impl From<SessionRunError> for MlError {
 
 impl<R> From<ort::Error<R>> for SessionRunError {
     fn from(error: ort::Error<R>) -> Self {
-        let error = MlError::Ort(error.to_string());
-        if is_execution_provider_run_failure(&error) {
-            Self::Retryable(error)
-        } else {
-            Self::Terminal(error)
-        }
+        Self::Terminal(error.into())
+    }
+}
+
+fn session_load_error<R>(model_path: &str, error: ort::Error<R>) -> MlError {
+    match error.code() {
+        ort::ErrorCode::InvalidProtobuf => MlError::CorruptModel(model_path.to_string()),
+        _ => error.into(),
     }
 }
 
@@ -321,7 +332,10 @@ fn build_next_session(
         Err(errors) => errors,
     };
 
-    if has_protobuf_parse_failure(&errors) {
+    if errors
+        .iter()
+        .any(|error| matches!(error, MlError::CorruptModel(_)))
+    {
         return Err(MlError::CorruptModel(model_path.to_string()));
     }
 
@@ -348,23 +362,6 @@ fn build_cpu_session(model_path: &str) -> MlResult<Session> {
         AccelerationValidation::GoldenRequired,
     )
     .map(|loaded| loaded.session)
-}
-
-fn is_execution_provider_run_failure(error: &MlError) -> bool {
-    let MlError::Ort(message) = error else {
-        return false;
-    };
-    let normalized = message.to_ascii_lowercase();
-    normalized.contains("executionprovider")
-        || normalized.contains("unknown allocation device")
-        || normalized.contains("xnnpackexecutionprovider")
-        || normalized.contains("coremlexecutionprovider")
-        || normalized.contains("webgpu")
-        || normalized.contains("wgpu")
-        || normalized.contains("dawn")
-        || normalized.contains("vulkan")
-        || normalized.contains("vk_error")
-        || normalized.contains("ep error")
 }
 
 // A CoreML self-test failure is treated as construction failure so the caller
@@ -620,24 +617,9 @@ fn model_file_label(model_path: &str) -> &str {
         .unwrap_or(model_path)
 }
 
-fn has_protobuf_parse_failure(errors: &[MlError]) -> bool {
-    errors.iter().any(|error| {
-        matches!(
-            error,
-            MlError::Ort(message)
-                if message
-                    .to_ascii_lowercase()
-                    .contains("protobuf parsing failed")
-        )
-    })
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        ExecutionMode, ExecutionProvider, OnnxSession, SessionRunError, has_protobuf_parse_failure,
-        is_execution_provider_run_failure, provider_attempt_failure_message,
-    };
+    use super::{ExecutionMode, ExecutionProvider, OnnxSession, provider_attempt_failure_message};
 
     fn first_run_canary(temp: &tempfile::TempDir) -> super::webgpu::ArmedCanary {
         let model = temp.path().join("model.onnx");
@@ -688,45 +670,6 @@ mod tests {
         assert!(!session.is_loaded());
         assert!(!session.has_load_state());
         assert!(has_canary(&temp));
-    }
-
-    #[test]
-    fn provider_failure_detection_is_limited_to_ort_execution_errors() {
-        assert!(is_execution_provider_run_failure(&super::MlError::Ort(
-            "WebGPU EP error: VK_ERROR_DEVICE_LOST".to_string()
-        )));
-        assert!(!is_execution_provider_run_failure(&super::MlError::Ort(
-            "invalid tensor shape".to_string()
-        )));
-        assert!(!is_execution_provider_run_failure(
-            &super::MlError::Postprocess("WebGPU".to_string())
-        ));
-    }
-
-    #[test]
-    fn typed_run_errors_control_retryability() {
-        let retryable =
-            SessionRunError::retryable(super::MlError::Ort("non-finite output".to_string()));
-        assert!(retryable.is_retryable());
-
-        let terminal = SessionRunError::from(super::MlError::Ort(
-            "WebGPU text from a typed terminal error".to_string(),
-        ));
-        assert!(!terminal.is_retryable());
-    }
-
-    #[test]
-    fn detects_protobuf_parse_failure() {
-        assert!(has_protobuf_parse_failure(&[super::MlError::Ort(
-            "Load model failed:Protobuf parsing failed.".to_string(),
-        )]));
-    }
-
-    #[test]
-    fn ignores_other_onnx_errors() {
-        assert!(!has_protobuf_parse_failure(&[super::MlError::Ort(
-            "Load model failed: missing initializer".to_string(),
-        )]));
     }
 
     #[test]
