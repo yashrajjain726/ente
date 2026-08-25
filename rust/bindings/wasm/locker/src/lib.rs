@@ -6,7 +6,7 @@ use ente_core::{
     crypto::SecretVec,
     http::{Api, ApiConfig, Auth, Http},
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
@@ -42,18 +42,6 @@ impl From<Error> for JsValue {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OpenContactsJsInput {
-    base_url: String,
-    auth_token: String,
-    user_id: i64,
-    master_key_b64: String,
-    cached_wrapped_root_contact_key: Option<WrappedRootContactKey>,
-    client_package: Option<String>,
-    client_version: Option<String>,
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ContactRecordJs {
@@ -82,24 +70,37 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
 }
 
 #[wasm_bindgen(js_name = openContacts)]
-pub fn open_contacts(input: JsValue) -> Result<ContactsClient, Error> {
-    let input: OpenContactsJsInput = swb::from_value(input)?;
+pub fn open_contacts(
+    base_url: String,
+    auth_token: String,
+    user_id: i64,
+    master_key_b64: String,
+    cached_encrypted_key: Option<String>,
+    cached_header: Option<String>,
+    client_package: Option<String>,
+    client_version: Option<String>,
+) -> Result<ContactsClient, Error> {
     let api = Arc::new(Api::new(
         Http::new().map_err(ente_contacts::Error::from)?,
         ApiConfig {
-            origin: input.base_url,
-            client_package: input.client_package,
-            client_version: input.client_version,
+            origin: base_url,
+            client_package,
+            client_version,
             user_agent: None,
-            auth: Some(Auth::User(input.auth_token)),
+            auth: Some(Auth::User(auth_token)),
         },
     ));
     let opened = ente_contacts::ContactsClient::open(
         Arc::clone(&api),
-        Arc::new(SecretVec::new(b64::decode(&input.master_key_b64)?)),
+        Arc::new(SecretVec::new(b64::decode(&master_key_b64)?)),
         OpenContactsInput {
-            user_id: input.user_id,
-            cached_wrapped_root_contact_key: input.cached_wrapped_root_contact_key,
+            user_id,
+            cached_wrapped_root_contact_key: cached_encrypted_key.zip(cached_header).map(
+                |(encrypted_key, header)| WrappedRootContactKey {
+                    encrypted_key,
+                    header,
+                },
+            ),
         },
     )?;
 

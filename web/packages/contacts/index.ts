@@ -47,13 +47,12 @@ const CONTACTS_CACHE_SCHEMA_VERSION = 2;
 
 export interface RemoteContactRecord {
     id: string;
-    contactUserId: number | bigint;
-    email?: string | null;
-    name?: string | null;
-    profilePictureAttachmentID?: string | null;
-    profilePictureAttachmentId?: string | null;
+    contactUserId: number;
+    email?: string;
+    name?: string;
+    profilePictureAttachmentID?: string;
     isDeleted: boolean;
-    updatedAt: number | bigint;
+    updatedAt: number;
 }
 
 export interface ContactsReadyInput {
@@ -73,7 +72,7 @@ export interface ContactsClient {
     updateAuthToken: (authToken: string) => void;
     currentWrappedRootContactKey: () => WrappedRootContactKey | undefined;
     getDiff: (
-        sinceTime: bigint,
+        sinceTime: number,
         limit: number,
     ) => Promise<RemoteContactRecord[]>;
     getProfilePicture: (contactID: string) => Promise<Uint8Array>;
@@ -257,13 +256,13 @@ const contactDisplayRecordFromRemote = (
     record: RemoteContactRecord,
 ): ContactDisplayRecord => ({
     contactId: record.id,
-    contactUserId: Number(record.contactUserId),
+    contactUserId: record.contactUserId,
     resolvedEmail: knownEmailOrUndefined(record.email),
     displayName: knownEmailOrUndefined(record.name),
     profilePictureAttachmentID: knownEmailOrUndefined(
-        record.profilePictureAttachmentID ?? record.profilePictureAttachmentId,
+        record.profilePictureAttachmentID,
     ),
-    updatedAt: Number(record.updatedAt),
+    updatedAt: record.updatedAt,
 });
 
 export const resolveContactDisplay = (
@@ -411,10 +410,7 @@ const syncContacts = async ({
     let didChange = false;
 
     while (true) {
-        const diff = await client.getDiff(
-            BigInt(sinceTime),
-            CONTACT_DIFF_LIMIT,
-        );
+        const diff = await client.getDiff(sinceTime, CONTACT_DIFF_LIMIT);
         if (!isCurrentSession(sessionKey, generation)) {
             return;
         }
@@ -429,7 +425,7 @@ const syncContacts = async ({
             } else {
                 upsertContact(contactDisplayRecordFromRemote(record));
             }
-            sinceTime = Math.max(sinceTime, Number(record.updatedAt));
+            sinceTime = Math.max(sinceTime, record.updatedAt);
         }
     }
 

@@ -52,30 +52,25 @@ impl From<Error> for JsValue {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OpenLegacyInput {
+#[wasm_bindgen(js_name = openLegacy)]
+pub fn open_legacy(
     base_url: String,
     auth_token: String,
     master_key_b64: String,
     client_package: Option<String>,
     client_version: Option<String>,
-}
-
-#[wasm_bindgen(js_name = openLegacy)]
-pub fn open_legacy(input: JsValue) -> Result<LegacyClient, Error> {
-    let input: OpenLegacyInput = swb::from_value(input)?;
+) -> Result<LegacyClient, Error> {
     let api = Arc::new(Api::new(
         Http::new().map_err(ente_legacy::Error::from)?,
         ApiConfig {
-            origin: input.base_url,
-            client_package: input.client_package,
-            client_version: input.client_version,
+            origin: base_url,
+            client_package,
+            client_version,
             user_agent: None,
-            auth: Some(Auth::User(input.auth_token)),
+            auth: Some(Auth::User(auth_token)),
         },
     ));
-    let master_key = Arc::new(SecretVec::new(b64::decode(&input.master_key_b64)?));
+    let master_key = Arc::new(SecretVec::new(b64::decode(&master_key_b64)?));
 
     Ok(LegacyClient(InnerLegacyClient::new(api, master_key)))
 }
