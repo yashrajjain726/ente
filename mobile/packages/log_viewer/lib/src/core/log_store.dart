@@ -16,7 +16,6 @@ class LogStore {
   final List<LogEntry> _buffer = [];
   Timer? _flushTimer;
   static const int _bufferSize = 10;
-  static const int _maxBufferSize = 200;
 
   bool _initialized = false;
   bool get initialized => _initialized;
@@ -56,23 +55,29 @@ class LogStore {
 
     if (_buffer.length >= _bufferSize) {
       _flush();
-    } else if (_buffer.length >= _maxBufferSize) {
-      _flush();
     }
   }
 
-  Future<void> _flush() async {
-    if (_buffer.isEmpty) return;
+  Future<void>? _flushFuture;
 
-    final toInsert = List<LogEntry>.from(_buffer);
-    _buffer.clear();
+  Future<void> _flush() {
+    return _flushFuture ??= _drainBuffer().whenComplete(() {
+      _flushFuture = null;
+    });
+  }
 
-    unawaited(
-      _database.insertLogs(toInsert).catchError((e) {
+  Future<void> _drainBuffer() async {
+    while (_buffer.isNotEmpty) {
+      final toInsert = List<LogEntry>.from(_buffer);
+      _buffer.clear();
+
+      try {
+        await _database.insertLogs(toInsert);
+      } catch (e) {
         // ignore: avoid_print
         print('Failed to insert logs to database: $e');
-      }),
-    );
+      }
+    }
   }
 
   Future<List<LogEntry>> getLogs({

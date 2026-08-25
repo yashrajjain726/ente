@@ -164,9 +164,14 @@ class SuperLogging {
     EnteWatch.setLogLevel(_terminalLoggerLevel);
     Logger.root.onRecord.listen(onLogRecord);
 
-    if (_preferences.getBool("enable_db_logging") ?? kDebugMode) {
+    // Bg engines killed mid-write can wedge log_viewer.db; keep DB logging
+    // foreground-only and never let startup block on it.
+    if (_getExecutionContext() == 'foreground' &&
+        (_preferences.getBool("enable_db_logging") ?? kDebugMode)) {
       try {
-        await LogViewer.initialize(prefix: appConfig.prefix);
+        await LogViewer.initialize(
+          prefix: appConfig.prefix,
+        ).timeout(const Duration(seconds: 2));
         $.info("Log viewer initialized successfully");
       } catch (e) {
         $.warning("Failed to initialize log viewer: $e");
