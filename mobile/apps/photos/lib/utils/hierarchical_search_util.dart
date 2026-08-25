@@ -217,7 +217,6 @@ Future<void> curateFilters(
         ? <ContactsFilter>[]
         : curateContactsFilters(
             files,
-            initialGalleryFilter: searchFilterDataProvider.initialGalleryFilter,
             currentUser: CollectionsService.instance.resolveUserIdentity(
               currentUserID,
               null,
@@ -385,17 +384,14 @@ Future<List<LocationFilter>> _curateLocationFilters(
 
 List<ContactsFilter> curateContactsFilters(
   List<EnteFile> files, {
-  required HierarchicalSearchFilter initialGalleryFilter,
   required User currentUser,
   required String currentUserLabel,
 }) {
   final contactsFilters = <ContactsFilter>[];
   final ownerIdToOccurrence = <int, int>{};
-  final includeCurrentUser = initialGalleryFilter is AlbumFilter;
 
   for (EnteFile file in files) {
-    if ((!includeCurrentUser && file.ownerID == currentUser.id) ||
-        file.uploadedFileID == null ||
+    if (file.uploadedFileID == null ||
         file.uploadedFileID == -1 ||
         file.ownerID == null) {
       continue;

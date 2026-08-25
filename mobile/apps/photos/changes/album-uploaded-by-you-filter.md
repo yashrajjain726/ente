@@ -1,1 +1,1 @@
-- Added a "You" uploader filter to albums.
+- Added a "You" uploader filter to filtered galleries.
