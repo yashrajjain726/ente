@@ -19,7 +19,6 @@ use ort::ep::{
 #[cfg(target_os = "android")]
 use std::num::NonZeroUsize;
 
-use super::AccelerationValidation;
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 use super::coreml_cache;
 #[cfg(any(
@@ -40,6 +39,7 @@ use super::golden_test;
 use super::model_file_label;
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
 use super::webgpu;
+use super::{AccelerationValidation, session_load_error};
 use crate::error::MlResult;
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -207,7 +207,9 @@ pub(super) fn build_session(model_path: &str, attempt: ProviderAttempt) -> MlRes
     }
     builder = builder.with_execution_providers(attempt.providers)?;
 
-    let session = builder.commit_from_file(model_path)?;
+    let session = builder
+        .commit_from_file(model_path)
+        .map_err(|error| session_load_error(model_path, error))?;
     Ok(session)
 }
 
