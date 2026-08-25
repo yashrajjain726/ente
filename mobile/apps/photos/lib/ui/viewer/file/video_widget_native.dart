@@ -98,6 +98,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   StreamSubscription<DownloadTask>? downloadTaskSubscription;
   final _transformationController = TransformationController();
   bool _isZooming = false;
+  bool _isLongPressSpeedActive = false;
 
   @override
   void initState() {
@@ -301,6 +302,18 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     _controller?.setPlaybackSpeed(widget.playbackSpeed.value);
   }
 
+  void _startLongPressSpeed() {
+    if (_isLongPressSpeedActive) return;
+    _isLongPressSpeedActive = true;
+    _controller?.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
+  }
+
+  void _restorePlaybackSpeed() {
+    if (!_isLongPressSpeedActive) return;
+    _isLongPressSpeedActive = false;
+    _controller?.setPlaybackSpeed(widget.playbackSpeed.value).ignore();
+  }
+
   void _onInteractionLockChanged(bool shouldLock) {
     if (!mounted) return;
     if (_isZooming != shouldLock) {
@@ -399,11 +412,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                 );
                                 _controller?.pause();
                               } else {
-                                _controller
-                                    ?.setPlaybackSpeed(
-                                      kVideoLongPressPlaybackSpeed,
-                                    )
-                                    .ignore();
+                                _startLongPressSpeed();
                               }
                             },
                             onLongPressUp: () {
@@ -414,13 +423,12 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                 );
                                 _controller?.play();
                               } else if (!widget.isFromMemories) {
-                                _controller
-                                    ?.setPlaybackSpeed(
-                                      widget.playbackSpeed.value,
-                                    )
-                                    .ignore();
+                                _restorePlaybackSpeed();
                               }
                             },
+                            onLongPressCancel: widget.isFromMemories
+                                ? null
+                                : _restorePlaybackSpeed,
                             child: Container(
                               constraints: const BoxConstraints.expand(),
                             ),

@@ -46,6 +46,7 @@ class _VideoWidgetState extends State<VideoWidget> {
   final _hideControlsDebouncer = Debouncer(const Duration(milliseconds: 2000));
   final _isSeekingNotifier = ValueNotifier<bool>(false);
   late final StreamSubscription<bool> _isPlayingStreamSubscription;
+  bool _isLongPressSpeedActive = false;
 
   @override
   void initState() {
@@ -81,6 +82,18 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   void _onPlaybackSpeedChanged() {
     widget.controller.player.setRate(widget.playbackSpeed.value);
+  }
+
+  void _startLongPressSpeed() {
+    if (_isLongPressSpeedActive) return;
+    _isLongPressSpeedActive = true;
+    widget.controller.player.setRate(kVideoLongPressPlaybackSpeed).ignore();
+  }
+
+  void _restorePlaybackSpeed() {
+    if (!_isLongPressSpeedActive) return;
+    _isLongPressSpeedActive = false;
+    widget.controller.player.setRate(widget.playbackSpeed.value).ignore();
   }
 
   void isSeekingListener() {
@@ -154,9 +167,7 @@ class _VideoWidgetState extends State<VideoWidget> {
                           widget.controller.player.pause();
                         }
                       } else {
-                        widget.controller.player
-                            .setRate(kVideoLongPressPlaybackSpeed)
-                            .ignore();
+                        _startLongPressSpeed();
                       }
                     },
                     onLongPressUp: () {
@@ -169,11 +180,12 @@ class _VideoWidgetState extends State<VideoWidget> {
                           widget.controller.player.play();
                         }
                       } else {
-                        widget.controller.player
-                            .setRate(widget.playbackSpeed.value)
-                            .ignore();
+                        _restorePlaybackSpeed();
                       }
                     },
+                    onLongPressCancel: widget.isFromMemories
+                        ? null
+                        : _restorePlaybackSpeed,
                     child: Container(
                       constraints: const BoxConstraints.expand(),
                     ),
