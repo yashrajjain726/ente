@@ -455,6 +455,7 @@ class _BodyState extends State<_Body> {
           autoPlay: shouldAutoPlay(),
           tagPrefix: widget.config.tagPrefix,
           shouldDisableScroll: (value) {
+            if (_selectedFile?.tag != file.tag) return;
             if (_shouldDisableScroll != value) {
               setState(() {
                 _logger.info('setState $_shouldDisableScroll to $value');
@@ -505,6 +506,10 @@ class _BodyState extends State<_Body> {
         final file = _fileAt(index);
         if (file == null) {
           return;
+        }
+        final selectedFileChanged = _selectedFile?.tag != file.tag;
+        if (selectedFileChanged) {
+          _clearZoomStateForSelectedFileChange();
         }
         if (_selectedIndexNotifier.value == index) {
           if (kDebugMode) {
@@ -560,12 +565,14 @@ class _BodyState extends State<_Body> {
       return;
     }
     setState(() {
+      _shouldDisableScroll = false;
       _files!.removeAt(_selectedIndexNotifier.value);
       _selectedIndexNotifier.value = min(
         _selectedIndexNotifier.value,
         totalFiles - 2,
       );
     });
+    _clearZoomNotifiers();
     final currentPageIndex = _pageController.page!.round();
     final int targetPageIndex = _files!.length > currentPageIndex
         ? currentPageIndex
@@ -576,6 +583,24 @@ class _BodyState extends State<_Body> {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  void _clearZoomStateForSelectedFileChange() {
+    if (_shouldDisableScroll) {
+      setState(() => _shouldDisableScroll = false);
+    }
+    _clearZoomNotifiers();
+  }
+
+  void _clearZoomNotifiers() {
+    final detailState = InheritedDetailPageState.maybeOf(context);
+    if (detailState == null) return;
+    if (detailState.isZoomedNotifier.value) {
+      detailState.isZoomedNotifier.value = false;
+    }
+    if (detailState.zoomTransformNotifier.value != ZoomTransform.identity) {
+      detailState.zoomTransformNotifier.value = ZoomTransform.identity;
     }
   }
 
