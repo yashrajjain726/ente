@@ -4,9 +4,10 @@ final class ForegroundHeartbeat {
   private let defaults = UserDefaults.standard
   private var timer: Timer?
   private var nativeHeartbeatStartedAt: Int64 = 0
+  private var dartHasTakenOver = false
 
   func start() {
-    guard timer == nil else {
+    guard timer == nil, !dartHasTakenOver else {
       return
     }
 
@@ -21,16 +22,22 @@ final class ForegroundHeartbeat {
   }
 
   func stop() {
-    timer?.invalidate()
-    timer = nil
+    stopTimer()
+    dartHasTakenOver = false
   }
 
   private func heartbeatTimerFired() {
     if hasDartHeartbeatTakenOver() {
-      stop()
+      stopTimer()
+      dartHasTakenOver = true
       return
     }
     writeNativeHeartbeat(currentTimeInMicroseconds())
+  }
+
+  private func stopTimer() {
+    timer?.invalidate()
+    timer = nil
   }
 
   private func hasDartHeartbeatTakenOver() -> Bool {

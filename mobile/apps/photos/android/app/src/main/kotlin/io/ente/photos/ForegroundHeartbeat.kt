@@ -40,6 +40,7 @@ private class ForegroundHeartbeat(private val context: Context) {
     }
     private var nativeHeartbeatStartedAt = 0L
     private var isRunning = false
+    private var dartHasTakenOver = false
     private val heartbeat =
         object : Runnable {
             override fun run() {
@@ -48,6 +49,7 @@ private class ForegroundHeartbeat(private val context: Context) {
                 }
                 if (hasDartHeartbeatTakenOver()) {
                     isRunning = false
+                    dartHasTakenOver = true
                     return
                 }
                 writeNativeHeartbeat()
@@ -56,7 +58,7 @@ private class ForegroundHeartbeat(private val context: Context) {
         }
 
     fun start() {
-        if (isRunning) {
+        if (isRunning || dartHasTakenOver) {
             return
         }
         isRunning = true
@@ -67,6 +69,7 @@ private class ForegroundHeartbeat(private val context: Context) {
 
     fun stop() {
         isRunning = false
+        dartHasTakenOver = false
         handler.removeCallbacks(heartbeat)
     }
 

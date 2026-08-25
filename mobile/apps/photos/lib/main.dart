@@ -728,11 +728,16 @@ Future<void> _handleBackgroundPush(Object message) async {
 }
 
 Future<void> _logFGHeartBeatInfo(SharedPreferences prefs) async {
-  final bool isRunningInFG = await isForegroundEngineActive();
+  final bool isDartEngineActive = await isDartForegroundEngineActive();
+  final bool isNativeForeground = await isNativeForegroundActive();
   await prefs.reload();
   final lastFGTaskHeartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
   final String lastRun = lastFGTaskHeartBeatTime == 0
       ? 'never'
       : DateTime.fromMicrosecondsSinceEpoch(lastFGTaskHeartBeatTime).toString();
-  _logger.info('isAlreadyRunningFG: $isRunningInFG, last Beat: $lastRun');
+  _logger.info(
+    'isDartForegroundEngineActive: $isDartEngineActive, '
+    'isNativeForegroundActive: $isNativeForeground, '
+    'last Dart beat: $lastRun',
+  );
 }

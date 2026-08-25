@@ -9,6 +9,12 @@ const kEngineDeathTimeoutInMicroseconds = 5000000;
 Future<bool> isForegroundEngineActive() =>
     _isEngineActive([kLastFGTaskHeartBeatTime, kLastNativeFGTaskHeartBeatTime]);
 
+Future<bool> isDartForegroundEngineActive() =>
+    _isEngineActive([kLastFGTaskHeartBeatTime]);
+
+Future<bool> isNativeForegroundActive() =>
+    _isEngineActive([kLastNativeFGTaskHeartBeatTime]);
+
 Future<bool> isBackgroundEngineActive() =>
     _isEngineActive([kLastBGTaskHeartBeatTime]);
 
