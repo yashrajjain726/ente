@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ente/museum/ente"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,5 +64,6 @@ func TestValidateSpaceSlugAllowReservedAcceptsReservedSlug(t *testing.T) {
 func TestValidateSpaceSlugRejectsReservedFileSuffix(t *testing.T) {
 	_, err := ValidateSpaceSlug("theme.css")
 	require.Error(t, err)
+	require.Equal(t, spaceSlugReservedErrorCode, err.(*ente.ApiError).Code)
 	require.Contains(t, err.Error(), "spaceSlug is reserved")
 }

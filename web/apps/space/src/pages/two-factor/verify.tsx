@@ -8,6 +8,7 @@ import {
     VerifyTwoFactorScreen,
     verifyTwoFactorBackground,
 } from "screens/VerifyTwoFactorScreen";
+import { spaceAuthErrorMessage } from "services/spaceAuthError";
 import { completeSpaceLoginSecondFactor } from "services/spaceLogin";
 import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
@@ -21,9 +22,10 @@ const twoFactorErrorMessage = (error: unknown) => {
     if (isHTTPErrorWithStatus(error, 404)) {
         return "Login session expired. Please sign in again.";
     }
-    return error instanceof Error
-        ? error.message
-        : "Couldn't verify this code. Please try again.";
+    return spaceAuthErrorMessage(
+        error,
+        "Couldn't verify this code. Please try again.",
+    );
 };
 
 const isExpectedTwoFactorError = (error: unknown) =>

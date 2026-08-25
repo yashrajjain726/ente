@@ -93,24 +93,8 @@ const spaceProfilePayloadFor = (profile: SetupProfileInput) =>
         username: normalizeSpaceUsername(profile.username),
     });
 
-const spaceHTTPStatus = (error: unknown) => {
-    if (!error || typeof error != "object" || !("status" in error)) {
-        return undefined;
-    }
-    const { status } = error as { status?: unknown };
-    return typeof status == "number" ? status : undefined;
-};
-
-const spaceHTTPCode = (error: unknown) => {
-    if (!error || typeof error != "object" || !("code" in error)) {
-        return undefined;
-    }
-    const { code } = error as { code?: unknown };
-    return typeof code == "string" ? code : undefined;
-};
-
 export const isSpaceSessionUnauthorized = (error: unknown) =>
-    spaceHTTPStatus(error) == 401;
+    error instanceof Error && error.name == "session_unauthorized";
 
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
@@ -622,44 +606,30 @@ export const saveSpaceProfile = async (
         currentSpaceProfile = undefined;
         pendingCurrentSpaceProfile = undefined;
         return savedProfile;
-    } catch (error) {
-        if (spaceHTTPCode(error) == "ALREADY_EXISTS") {
-            throw new Error("This username is already taken.", {
-                cause: error,
-            });
-        }
-        if (spaceHTTPCode(error) == "CONFLICT") {
-            throw new Error(
-                "A Space already exists for this account. Please refresh and try again.",
-                { cause: error },
-            );
-        }
-        throw error;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
 };
 
 export const spaceProfileErrorMessage = (error: unknown) => {
-    const code = spaceHTTPCode(error);
-    if (code == "ALREADY_EXISTS") return "This username is already taken.";
-    if (code == "CONFLICT") {
+    if (!(error instanceof Error)) {
+        return "Couldn't save your profile. Please try again.";
+    }
+    if (error.name == "space_slug_already_exists")
+        return "This username is already taken.";
+    if (error.name == "space_slug_reserved")
+        return "This username is reserved.";
+    if (error.name == "space_limit_reached") {
         return "A Space already exists for this account. Please refresh and try again.";
     }
-    const status = spaceHTTPStatus(error);
-    if (status == 409) {
-        return "This profile conflicts with the current account state. Please refresh and try again.";
-    }
-    if (status == 400) {
-        const message = error instanceof Error ? error.message : "";
-        if (message.toLowerCase().includes("reserved")) {
-            return "This username is reserved.";
-        }
+    if (error.name == "invalid_space_slug") {
         return "That username is not available. Please choose another.";
     }
-    if (status == 401) return "Your session expired. Please sign in again.";
-    if (status == 403) return "You do not have access to update this profile.";
-    return error instanceof Error
-        ? error.message
-        : "Couldn't save your profile. Please try again.";
+    if (error.name == "session_unauthorized") {
+        return "Your session expired. Please sign in again.";
+    }
+    if (error.name == "permission_denied") {
+        return "You do not have access to update this profile.";
+    }
+    return "Couldn't save your profile. Please try again.";
 };

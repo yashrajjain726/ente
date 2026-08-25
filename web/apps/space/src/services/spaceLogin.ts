@@ -16,7 +16,6 @@ import {
 import {
     checkPasskeyVerificationStatus,
     clearInflightPasskeySessionID,
-    passkeySessionExpiredErrorMessage,
 } from "ente-accounts/services/passkey";
 import {
     stashKeyEncryptionKeyInSessionStore,
@@ -24,7 +23,7 @@ import {
 } from "ente-accounts/services/session-storage";
 import {
     getSRPAttributes,
-    srpVerificationUnauthorizedErrorMessage,
+    srpVerificationUnauthorizedErrorName,
     verifySRP,
 } from "ente-accounts/services/srp";
 import {
@@ -39,6 +38,7 @@ import { clientPackageName } from "ente-base/app";
 import { HTTPError } from "ente-base/http";
 import log from "ente-base/log";
 import { nullToUndefined } from "ente-utils/transform";
+import { spaceAuthError } from "services/spaceAuthError";
 import { decryptSpaceBootstrapAuthToken } from "services/spaceBootstrapAuth";
 import {
     createSpaceBrowserSession,
@@ -72,9 +72,6 @@ export type SpaceLoginResult =
 export type SpaceLoginPasskeyStatusResult =
     | SpaceLoginResult
     | { status: "pending" };
-
-export const spaceLoginPasskeySessionExpiredErrorMessage =
-    passkeySessionExpiredErrorMessage;
 
 let pendingSpaceLoginCredentials: SpaceLoginInput | undefined;
 
@@ -132,13 +129,10 @@ const sendSpaceLoginOTT = async (email: string) => {
                 log.warn("Ignoring error when parsing error payload", parseErr);
             }
             if (errorCode == "USER_NOT_REGISTERED") {
-                throw new Error("Email not registered", { cause: error });
+                throw spaceAuthError("email_not_registered", error);
             }
             if (errorCode == "USER_SIGNUP_INCOMPLETE") {
-                throw new Error(
-                    "Account setup incomplete. Create account to finish setup.",
-                    { cause: error },
-                );
+                throw spaceAuthError("signup_incomplete", error);
             }
         }
         throw error;
@@ -178,9 +172,9 @@ export const beginSpaceLogin = async ({
     } catch (error) {
         if (
             error instanceof Error &&
-            error.message == srpVerificationUnauthorizedErrorMessage
+            error.name == srpVerificationUnauthorizedErrorName
         ) {
-            throw new Error("Incorrect email or password.", { cause: error });
+            throw spaceAuthError("incorrect_credentials", error);
         }
         throw error;
     }
@@ -292,14 +286,14 @@ const finishSpaceLoginVerification = async ({
         passkeySessionID: undefined,
     });
     if (!keyAttributes) {
-        throw new Error("This account has not finished setup.");
+        throw spaceAuthError("account_setup_incomplete");
     }
 
     const loginKEK =
         kek ??
         (password ? await deriveLoginKEK(password, keyAttributes) : undefined);
     if (!loginKEK) {
-        throw new Error("Login session expired. Please sign in again.");
+        throw spaceAuthError("login_session_expired");
     }
 
     await saveCompletedSpaceLogin({
@@ -377,7 +371,7 @@ const finishSpaceLoginAuthorization = async ({
         (pendingCredentials
             ? await deriveLoginKEK(pendingCredentials.password, keyAttributes)
             : undefined);
-    if (!kek) throw new Error("Login session expired. Please sign in again.");
+    if (!kek) throw spaceAuthError("login_session_expired");
 
     updateSavedLocalUser({
         id,
@@ -412,7 +406,7 @@ const saveCompletedSpaceLogin = async ({
     password?: string;
 }) => {
     if (!keyAttributes) {
-        throw new Error("This account has not finished setup.");
+        throw spaceAuthError("account_setup_incomplete");
     }
 
     saveIsFirstLogin();
@@ -443,7 +437,7 @@ const saveCompletedSpaceLogin = async ({
               )
             : undefined);
     if (!bootstrapAuthToken) {
-        throw new Error("Login session expired. Please sign in again.");
+        throw spaceAuthError("login_session_expired");
     }
     const spaceRootKey = await getOrCreateSpaceRootKey(
         masterKey,

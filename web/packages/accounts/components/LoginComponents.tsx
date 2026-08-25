@@ -2,7 +2,7 @@ import { CircularProgress, Stack, Typography, styled } from "@mui/material";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import {
     checkPasskeyVerificationStatus,
-    passkeySessionExpiredErrorMessage,
+    passkeySessionExpiredErrorName,
     saveCredentialsAndNavigateTo,
 } from "ente-accounts/services/passkey";
 import { LinkButton } from "ente-base/components/LinkButton";
@@ -132,8 +132,7 @@ export const VerifyingPasskey: React.FC<VerifyingPasskeyProps> = ({
         } catch (e) {
             log.error("Passkey verification status check failed", e);
             showMiniDialog(
-                e instanceof Error &&
-                    e.message == passkeySessionExpiredErrorMessage
+                e instanceof Error && e.name == passkeySessionExpiredErrorName
                     ? sessionExpiredDialogAttributes(logout)
                     : genericErrorDialogAttributes(),
             );

@@ -245,14 +245,7 @@ const restoreSpaceBrowserSession = async () => {
             bootstrap.sessionWrapKey,
         );
     } catch (error) {
-        const details =
-            typeof error == "object" &&
-            error &&
-            "code" in error &&
-            "message" in error
-                ? `${String(error.code)}: ${String(error.message)}`
-                : String(error);
-        log.error(`Failed to decrypt Space browser session: ${details}`);
+        log.error(`Failed to decrypt Space browser session: ${String(error)}`);
         clearSpaceBrowserSession();
         return false;
     }

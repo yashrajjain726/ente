@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     crypto::{decrypt_asset_payload, decrypt_secretbox_payload, encrypt_secretbox_payload},
-    error::{Result, SpaceError},
+    error::{Error, Result},
     models::{CreatedSpaceLink, DecryptedPost, DecryptedSpaceProfile, OpenSpaceLinkCtxInput},
     transport::{
         AssetDownloadResponse, PostPage, PostResponse, SpaceKeyVersionResponse,
@@ -81,7 +81,7 @@ impl AccountSpaceCtx {
             });
         }
         if status.link_id <= 0 {
-            return Err(SpaceError::InvalidInput(
+            return Err(Error::InvalidInput(
                 "active space link is missing its ID".into(),
             ));
         }
@@ -118,7 +118,7 @@ impl AccountSpaceCtx {
             .resolve_owned_space_access(space_id)
             .await?
             .ok_or_else(|| {
-                SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
+                Error::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
         let access_key = generate_access_key();
         let salt = Salt::generate();
@@ -178,9 +178,8 @@ impl AccountSpaceCtx {
     fn decrypt_link_access_key(&self, status: &SpaceLinkStatusResponse) -> Result<String> {
         let encrypted = b64::decode(&status.encrypted_access_key)?;
         let plaintext = decrypt_secretbox_payload(self.space_root_key(), &encrypted)?;
-        let access_key = String::from_utf8(plaintext).map_err(|error| {
-            SpaceError::InvalidInput(format!("invalid link access key: {error}"))
-        })?;
+        let access_key = String::from_utf8(plaintext)
+            .map_err(|error| Error::InvalidInput(format!("invalid link access key: {error}")))?;
         validate_access_key(&access_key)?;
         Ok(access_key)
     }
@@ -191,9 +190,7 @@ impl SpaceLinkCtx {
         validate_access_key(&input.access_key)?;
         let space_slug = input.space_slug.trim().to_lowercase();
         if space_slug.is_empty() {
-            return Err(SpaceError::InvalidInput(
-                "space username is required".into(),
-            ));
+            return Err(Error::InvalidInput("space username is required".into()));
         }
         let api = build_api(
             &input.base_url,
@@ -254,7 +251,7 @@ impl SpaceLinkCtx {
             *cache_lock(&self.key_history, "space link key history")? = snapshot.key_history;
         }
         if !self.has_keys_for_posts(&page)? {
-            return Err(SpaceError::InvalidInput(
+            return Err(Error::InvalidInput(
                 "space link changed while posts were being loaded".into(),
             ));
         }
@@ -380,7 +377,7 @@ impl SpaceLinkCtx {
         cache_lock(&self.key_history, "space link key history")?
             .get(&key_version)
             .cloned()
-            .ok_or_else(|| SpaceError::InvalidInput(format!("missing space key for {subject}")))
+            .ok_or_else(|| Error::InvalidInput(format!("missing space key for {subject}")))
     }
 }
 
@@ -392,7 +389,7 @@ async fn fetch_link_snapshot(
 ) -> Result<SpaceLinkSnapshot> {
     for _ in 0..2 {
         let fetch_profile = async {
-            Ok::<SpaceLinkProfileResponse, SpaceError>(
+            Ok::<SpaceLinkProfileResponse, Error>(
                 api.get(&format!("{prefix}/profile"))
                     .header(AUTH_HEADER, auth_key)
                     .send()
@@ -403,7 +400,7 @@ async fn fetch_link_snapshot(
             )
         };
         let fetch_versions = async {
-            Ok::<Vec<SpaceKeyVersionResponse>, SpaceError>(
+            Ok::<Vec<SpaceKeyVersionResponse>, Error>(
                 api.get(&format!("{prefix}/versions"))
                     .header(AUTH_HEADER, auth_key)
                     .send()
@@ -440,7 +437,7 @@ async fn fetch_link_snapshot(
             key_history,
         });
     }
-    Err(SpaceError::InvalidInput(
+    Err(Error::InvalidInput(
         "space link changed while it was being opened".into(),
     ))
 }
@@ -451,7 +448,7 @@ fn validate_access_key(access_key: &str) -> Result<()> {
     {
         Ok(())
     } else {
-        Err(SpaceError::InvalidInput(
+        Err(Error::InvalidInput(
             "space link access key must be 12 alphanumeric characters".into(),
         ))
     }
@@ -486,7 +483,7 @@ fn derive_link_keys(
     if mem_limit != argon::Params::INTERACTIVE.mem_limit
         || ops_limit != argon::Params::INTERACTIVE.ops_limit
     {
-        return Err(SpaceError::InvalidInput(
+        return Err(Error::InvalidInput(
             "unsupported space link KDF parameters".into(),
         ));
     }

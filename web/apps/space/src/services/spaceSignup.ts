@@ -22,6 +22,7 @@ import {
     type KeyAttributes,
 } from "ente-accounts/services/user";
 import { isMuseumHTTPError } from "ente-base/http";
+import { spaceAuthError, spaceAuthErrorMessage } from "services/spaceAuthError";
 import {
     decryptSpaceBootstrapAuthToken,
     putSpaceSignupKeyAttributes,
@@ -90,7 +91,7 @@ const verifiedSignupAuthToken = async ({
             masterKey,
         );
     }
-    throw new Error("Signup session expired. Please sign in.");
+    throw spaceAuthError("signup_session_expired");
 };
 
 export const completeSpaceSignup = async (email: string, code: string) => {
@@ -114,7 +115,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
     replaceSavedLocalUser({ id, email });
 
     const masterKey = authMasterKeyFromSpaceSession();
-    if (!masterKey) throw new Error("Signup session expired. Please sign in.");
+    if (!masterKey) throw spaceAuthError("signup_session_expired");
 
     let bootstrapAuthToken: string;
     if (keyAttributes) {
@@ -129,7 +130,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
     } else {
         const originalKeyAttributes = savedOriginalKeyAttributes();
         if (!originalKeyAttributes) {
-            throw new Error("Signup session expired. Please sign in.");
+            throw spaceAuthError("signup_session_expired");
         }
         bootstrapAuthToken = await verifiedSignupAuthToken({
             encryptedToken,
@@ -163,7 +164,8 @@ export const spaceSignupErrorMessage = async (error: unknown) => {
     if (await isMuseumHTTPError(error, 409, "USER_ALREADY_REGISTERED")) {
         return "This email already has an account. Please sign in.";
     }
-    return error instanceof Error
-        ? error.message
-        : "Couldn't create account. Please try again.";
+    return spaceAuthErrorMessage(
+        error,
+        "Couldn't create account. Please try again.",
+    );
 };

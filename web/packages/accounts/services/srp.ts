@@ -193,8 +193,8 @@ const updateSRPAndKeys = async (
     return UpdateSRPAndKeysResponse.parse(await res.json());
 };
 
-export const srpVerificationUnauthorizedErrorMessage =
-    "SRP verification failed (HTTP 401 Unauthorized)";
+export const srpVerificationUnauthorizedErrorName =
+    "srp_verification_unauthorized";
 
 const deriveSRPLoginSubKey = async (kek: string) => {
     const kekSubKeyBytes = await deriveSubKeyBytes(kek, 32, 1, "loginctx");
@@ -263,7 +263,11 @@ const verifySRPSession = async ({
         body: JSON.stringify({ sessionID, srpUserID, srpM1 }),
     });
     if (res.status == 401) {
-        throw new Error(srpVerificationUnauthorizedErrorMessage);
+        const error = new Error(
+            "SRP verification failed (HTTP 401 Unauthorized)",
+        );
+        error.name = srpVerificationUnauthorizedErrorName;
+        throw error;
     }
     ensureOk(res);
     return RemoteSRPVerificationResponse.parse(await res.json());

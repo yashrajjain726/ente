@@ -18,7 +18,11 @@ interface WasmDerivedKey {
 const normalizeDerivedKeyError = (error: unknown): Error => {
     if (error instanceof Error) {
         if (error.name === "insufficient_memory") {
-            return new Error(deriveKeyInsufficientMemoryErrorMessage);
+            const normalized = new Error(
+                deriveKeyInsufficientMemoryErrorMessage,
+            );
+            normalized.name = error.name;
+            return normalized;
         }
         return error;
     }
