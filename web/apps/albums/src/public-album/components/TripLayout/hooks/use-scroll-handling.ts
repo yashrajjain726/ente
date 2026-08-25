@@ -8,7 +8,7 @@ import {
     scrollTimelineToLocation,
     updateLocationPositions,
     type PositionInfo,
-} from "../utils/scrollUtils";
+} from "../utils/scroll-utils";
 
 export interface UseScrollHandlingParams {
     timelineRef: React.RefObject<HTMLDivElement | null>;

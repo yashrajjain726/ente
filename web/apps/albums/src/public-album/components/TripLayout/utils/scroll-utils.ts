@@ -1,6 +1,6 @@
 import { startTransition } from "react";
 
-import { calculateDistance, getLocationPosition } from "../mapHelpers";
+import { calculateDistance, getLocationPosition } from "../map-helpers";
 import type { JourneyPoint } from "../types";
 
 export interface PositionInfo {

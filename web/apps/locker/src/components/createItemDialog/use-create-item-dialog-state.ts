@@ -31,8 +31,8 @@ import {
     filterNonEmptyUploadItems,
     normalizeCollectionName,
     uploadQueueItemKey,
-} from "./fileUploadHelpers";
-import { getRequiredFields } from "./itemFormFieldsUtils";
+} from "./file-upload-helpers";
+import { getRequiredFields } from "./item-form-fields-utils";
 
 export type CreateOption = LockerItemType;
 const MAX_PARALLEL_UPLOADS = 4;

@@ -2,7 +2,7 @@ import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationFo
 import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "@/components/auth/VerifyEmailForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
 import AccountsVerifyPage, {
     type VerifyEmailPresentationProps,

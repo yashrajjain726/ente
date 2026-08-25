@@ -3,7 +3,7 @@ import type { EnteFile } from "ente-media/file";
 import { useEffect, useRef } from "react";
 
 import type { JourneyPoint } from "../types";
-import { generateNeededThumbnails } from "../utils/dataProcessing";
+import { generateNeededThumbnails } from "../utils/data-processing";
 
 export interface UseThumbnailGenerationParams {
     photoClusters: JourneyPoint[][];

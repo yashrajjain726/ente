@@ -1,7 +1,7 @@
 import { copyTextToClipboard, shareUrlOrCopy } from "@/browser";
 import { MAX_PASTE_CHARS } from "@/paste";
 import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
-import { useCreatePaste } from "@/usePaste";
+import { useCreatePaste } from "@/use-paste";
 import { Navigation06Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
@@ -24,8 +24,8 @@ import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/Passwor
 import type { SubmitEvent } from "react";
 import { useState } from "react";
 import { PasteLinkCard } from "./PasteLinkCard";
-import { downloadPasteQrCode } from "./qrCode";
-import { pasteTextFieldSx } from "./textFieldSx";
+import { downloadPasteQrCode } from "./qr-code";
+import { pasteTextFieldSx } from "./text-field-sx";
 
 export const PasteCreatePanel = () => {
     const {

@@ -14,7 +14,7 @@ import {
     cachedLocalChatKey,
     getOrCreateLocalChatKey,
     initChatKeyStore,
-} from "@/services/chat/chatKey";
+} from "@/services/chat/chat-key";
 import { initializeChatStorePersistence } from "@/services/chat/persistence";
 import {
     addMessage,
