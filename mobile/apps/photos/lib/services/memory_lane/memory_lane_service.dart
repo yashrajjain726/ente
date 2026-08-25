@@ -112,7 +112,7 @@ class MemoryLaneService {
       schedulePersonRecompute(person.remoteID, force: force);
     }
     if (flagService.internalUser) {
-      final clusters = await _mlDataDB.getClustersForMemoryLane();
+      final clusters = await _mlDataDB.getClustersForMemoryLane(persons);
       for (final cluster in clusters) {
         schedulePersonRecompute(cluster, isCluster: true, force: force);
       }

@@ -22,6 +22,7 @@ import "package:photos/main.dart" show isProcessBg;
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
+import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/ml/ml_versions.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/service_locator.dart";
@@ -2784,23 +2785,45 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     await db.execute(sql, params);
   }
 
-  Future<Set<String>> getClustersForMemoryLane() async {
+  Future<Set<String>> getClustersForMemoryLane(
+    List<PersonEntity> persons,
+  ) async {
+    const batchSize = 256;
+    final assigned = <String>{};
+    for (final person in persons) {
+      for (final cluster in person.data.assigned) {
+        assigned.add(cluster.id);
+      }
+    }
+
     final db = await asyncDB;
+    final clusters = <String>{};
+    var offset = 0;
     const String sql =
         '''
-        SELECT fc.$clusterIDColumn, COUNT(*) AS count
-        FROM $faceClustersTable fc
-        WHERE fc.$clusterIDColumn IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1
-            FROM $clusterPersonTable cp
-            WHERE cp.$clusterIDColumn = fc.$clusterIDColumn
-          )
-        GROUP BY fc.$clusterIDColumn
-        ORDER BY count DESC
-        LIMIT 20
+        SELECT $clusterIDColumn, COUNT(*) AS count
+        FROM $faceClustersTable
+        WHERE $clusterIDColumn IS NOT NULL
+        GROUP BY $clusterIDColumn
+        ORDER BY count DESC, $clusterIDColumn
+        LIMIT ? OFFSET ?
         ''';
-    final result = await db.getAll(sql);
-    return result.map((row) => row[clusterIDColumn] as String).toSet();
+    while (clusters.length < 20) {
+      final batch = await db.getAll(sql, [batchSize, offset]);
+      for (final row in batch) {
+        final cluster = row[clusterIDColumn] as String;
+        if (!assigned.contains(cluster)) {
+          clusters.add(cluster);
+          if (clusters.length == 20) {
+            break;
+          }
+        }
+      }
+      if (batch.length < batchSize) {
+        break;
+      }
+      offset += batchSize;
+    }
+    return clusters;
   }
 }
