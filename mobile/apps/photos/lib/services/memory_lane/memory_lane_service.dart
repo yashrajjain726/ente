@@ -320,9 +320,23 @@ class MemoryLaneService {
       return;
     }
     unawaited(_cleanupAssignedClusterTimelines(event));
+    if (event.type == PeopleEventType.removedFilesFromCluster ||
+        event.type == PeopleEventType.removedFaceFromCluster) {
+      unawaited(_processClusterChange(event));
+      return;
+    }
     if (event.type != PeopleEventType.syncDone) {
       unawaited(_processPeopleChange(event));
     }
+  }
+
+  Future<void> _processClusterChange(PeopleChangedEvent event) async {
+    final clusterID = event.source;
+    if (clusterID.isEmpty) return;
+    final timeline = await _cacheService.getTimeline(clusterID);
+    if (timeline == null) return;
+    if (!timeline.isCluster) return;
+    schedulePersonRecompute(clusterID, isCluster: true, force: true);
   }
 
   Future<void> _processPeopleChange(PeopleChangedEvent event) async {
