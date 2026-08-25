@@ -1,1 +1,1 @@
-- Fixed downloading images without file extensions to the Android gallery.
+- Fixed downloading images without file extensions
