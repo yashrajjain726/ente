@@ -59,6 +59,7 @@ class MemoryLaneService {
   final Map<String, int> _lastForcedComputeMicros = {};
   final Map<String, _TimelineRequest> _pendingRequests = {};
   final Set<String> _cropReadinessInFlight = {};
+  Set<String> _topNClusters = {};
 
   bool __isFeatureEnabled = false;
   // TODO: this should be removed, but flagService does not fire MLConsentChangedEvent on remote flags sync
@@ -112,8 +113,8 @@ class MemoryLaneService {
       schedulePersonRecompute(person.remoteID, force: force);
     }
     if (flagService.internalUser) {
-      final clusters = await _mlDataDB.getClustersForMemoryLane(persons);
-      for (final cluster in clusters) {
+      _topNClusters = await _mlDataDB.getClustersForMemoryLane(persons);
+      for (final cluster in _topNClusters) {
         schedulePersonRecompute(cluster, isCluster: true, force: force);
       }
     }
@@ -167,6 +168,9 @@ class MemoryLaneService {
       return;
     }
     if (personId.isEmpty) {
+      return;
+    }
+    if (isCluster && !_topNClusters.contains(personId)) {
       return;
     }
     final timeline = await _cacheService.getTimeline(personId);
@@ -339,9 +343,7 @@ class MemoryLaneService {
   Future<void> _processClusterChange(PeopleChangedEvent event) async {
     final clusterID = event.source;
     if (clusterID.isEmpty) return;
-    final timeline = await _cacheService.getTimeline(clusterID);
-    if (timeline == null) return;
-    if (!timeline.isCluster) return;
+    if (!_topNClusters.contains(clusterID)) return;
     schedulePersonRecompute(clusterID, isCluster: true, force: true);
   }
 
@@ -890,12 +892,6 @@ class MemoryLaneService {
   ) async {
     try {
       final Set<String> clusterIDs = {};
-      if (event.type == PeopleEventType.syncDone) {
-        final person = await PersonService.instance.getPersons();
-        clusterIDs.addAll(
-          person.expand((p) => p.data.assigned).map((c) => c.id),
-        );
-      }
       if (event.type == PeopleEventType.addedClusterToPerson) {
         clusterIDs.add(event.source);
       }
@@ -903,7 +899,14 @@ class MemoryLaneService {
       if (event.person case final person?) {
         clusterIDs.addAll(person.data.assigned.map((cluster) => cluster.id));
       }
-
+      _topNClusters.removeAll(clusterIDs);
+      if (event.type == PeopleEventType.syncDone) {
+        final person = await PersonService.instance.getPersons();
+        clusterIDs.addAll(
+          person.expand((p) => p.data.assigned).map((c) => c.id),
+        );
+      }
+      _topNClusters.removeAll(clusterIDs);
       if (clusterIDs.isEmpty) {
         return;
       }
