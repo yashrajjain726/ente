@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use ente_contacts::crypto as contacts_crypto;
 use ente_contacts::{
     AttachmentType, ContactData, ContactsClient, OpenContactsInput, OpenContactsResult,
     RootKeySource, WrappedRootContactKey,
 };
 use ente_core::{
-    crypto::{Key, SecretVec},
+    b64,
+    crypto::{Key, SecretVec, blob, secretbox},
     http::{Api, ApiConfig, Auth, Http},
 };
 use mockito::{Matcher, Server};
@@ -44,7 +44,11 @@ fn open(
 }
 
 fn wrap_root(root_key: &[u8], master_key: &[u8]) -> WrappedRootContactKey {
-    contacts_crypto::encrypt_root_contact_key(root_key, master_key).unwrap()
+    let encrypted = secretbox::encrypt(root_key, &Key::try_from_slice(master_key).unwrap());
+    WrappedRootContactKey {
+        encrypted_key: b64::encode(&encrypted.encrypted_data),
+        header: b64::encode(encrypted.nonce.as_bytes()),
+    }
 }
 
 fn live_entity_json(
@@ -55,8 +59,13 @@ fn live_entity_json(
     profile_picture_attachment_id: Option<&str>,
 ) -> serde_json::Value {
     let contact_key = Key::generate().as_bytes().to_vec();
-    let encrypted_key = contacts_crypto::wrap_contact_key(&contact_key, root_key).unwrap();
-    let encrypted_data = contacts_crypto::encrypt_contact_data(data, &contact_key).unwrap();
+    let encrypted_key = b64::encode(&secretbox::encrypt_combined(
+        &contact_key,
+        &Key::try_from_slice(root_key).unwrap(),
+    ));
+    let encrypted_data = b64::encode(
+        &blob::encrypt_json_combined(data, &Key::try_from_slice(&contact_key).unwrap()).unwrap(),
+    );
 
     serde_json::json!({
         "id": id,
@@ -360,13 +369,14 @@ async fn get_profile_picture_uses_signed_download_url() {
         &root_key,
         Some("ua_picture1"),
     );
-    let contact_key = contacts_crypto::unwrap_contact_key(
-        attached_entity["encryptedKey"].as_str().unwrap(),
-        &root_key,
+    let contact_key = secretbox::decrypt_combined(
+        &b64::decode(attached_entity["encryptedKey"].as_str().unwrap()).unwrap(),
+        &Key::try_from_slice(&root_key).unwrap(),
     )
     .unwrap();
     let encrypted_picture =
-        contacts_crypto::encrypt_profile_picture(&picture_bytes, &contact_key).unwrap();
+        blob::encrypt_combined(&picture_bytes, &Key::try_from_slice(&contact_key).unwrap())
+            .unwrap();
 
     let get_contact_mock = server
         .mock("GET", "/contacts/ct_picture1")
