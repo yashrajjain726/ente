@@ -473,6 +473,11 @@ class MLService {
         _logRunStopped(control, "before post-run cache scheduling");
         return MlRunDisposition.stopped;
       }
+      await PersonService.instance.sync();
+      if (control.stopRequested) {
+        _logRunStopped(control, "after post-run person sync");
+        return MlRunDisposition.stopped;
+      }
       if (_mlControllerStatus == true) {
         // Persist refreshed caches after ML so foreground can pick them up
         // on the next resume, even when the work ran headlessly in background.
