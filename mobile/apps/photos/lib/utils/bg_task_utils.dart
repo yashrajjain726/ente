@@ -20,26 +20,30 @@ void callbackDispatcher() {
     String? failure = "Task didn't run";
     final prefs = await SharedPreferences.getInstance();
 
-    await runWithLogs(() async {
-      try {
-        BgTaskUtils.$.info('Task started $tlog');
-        await runBackgroundTask(taskName, tlog).timeout(
-          Platform.isIOS ? kBGTaskTimeout : const Duration(hours: 1),
-          onTimeout: () async {
-            BgTaskUtils.$.warning(
-              "TLE, committing seppuku for taskID: $taskName",
-            );
-            await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
-          },
-        );
-        BgTaskUtils.$.info('Task run successful $tlog');
-        failure = null;
-      } catch (e) {
-        BgTaskUtils.$.warning('Task error: $e');
-        await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
-        failure = e.toString();
-      }
-    }, prefix: "[bg]").onError((_, _) {
+    await runWithLogs(
+      () async {
+        try {
+          BgTaskUtils.$.info('Task started $tlog');
+          await runBackgroundTask(taskName, tlog).timeout(
+            Platform.isIOS ? kBGTaskTimeout : const Duration(hours: 1),
+            onTimeout: () async {
+              BgTaskUtils.$.warning(
+                "TLE, committing seppuku for taskID: $taskName",
+              );
+              await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+            },
+          );
+          BgTaskUtils.$.info('Task run successful $tlog');
+          failure = null;
+        } catch (e) {
+          BgTaskUtils.$.warning('Task error: $e');
+          await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+          failure = e.toString();
+        }
+      },
+      prefix: "[bg]",
+      enableSentry: !Platform.isAndroid,
+    ).onError((_, _) {
       failure = "Didn't finished correctly!";
       return;
     });

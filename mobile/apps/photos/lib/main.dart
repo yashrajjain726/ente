@@ -351,13 +351,23 @@ Future<void> _runMinimally(
         );
       } else {
         try {
-          await MLService.instance.init();
-          PersonService.init(entityService, MLDataDB.instance, prefs);
-          final disposition = await MLService.instance.runAllML(
-            force: false,
-            control: mlRunControl,
-          );
-          _logger.info("[BG TASK] ML run disposition: ${disposition.name}");
+          if (await isForegroundEngineActive()) {
+            _logger.info("[BG TASK] skipping ML, foreground became active");
+          } else {
+            await MLService.instance.init();
+            if (await isForegroundEngineActive()) {
+              _logger.info(
+                "[BG TASK] skipping ML run, foreground became active during ML init",
+              );
+            } else {
+              PersonService.init(entityService, MLDataDB.instance, prefs);
+              final disposition = await MLService.instance.runAllML(
+                force: false,
+                control: mlRunControl,
+              );
+              _logger.info("[BG TASK] ML run disposition: ${disposition.name}");
+            }
+          }
         } finally {
           controller.releaseCompute(ml: true);
         }
@@ -631,14 +641,20 @@ Future<void> _sync(String caller) async {
   }
 }
 
-Future runWithLogs(Function() function, {String prefix = ""}) async {
+Future runWithLogs(
+  Function() function, {
+  String prefix = "",
+  bool enableSentry = true,
+}) async {
   await SuperLogging.main(
     LogConfig(
       body: function,
       logDirPath: (await getApplicationSupportDirectory()).path + "/logs",
       maxLogFiles: 5,
-      sentryDsn: kDebugMode ? sentryDebugDSN : sentryDSN,
-      tunnel: sentryTunnel,
+      sentryDsn: enableSentry
+          ? (kDebugMode ? sentryDebugDSN : sentryDSN)
+          : null,
+      tunnel: enableSentry ? sentryTunnel : null,
       enableInDebugMode: true,
       prefix: prefix,
     ),
