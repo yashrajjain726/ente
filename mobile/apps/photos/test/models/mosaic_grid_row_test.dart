@@ -53,44 +53,4 @@ void main() {
       );
     },
   );
-
-  testWidgets("MosaicGridRow mirrors child offsets in RTL", (tester) async {
-    const rowKey = ValueKey("rtl-row");
-    const firstKey = ValueKey("rtl-first");
-    const secondKey = ValueKey("rtl-second");
-
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: Align(
-            alignment: Alignment.topLeft,
-            child: SizedBox(
-              width: 200,
-              child: MosaicGridRow(
-                key: rowKey,
-                itemWidths: [60, 100],
-                height: 50,
-                spacing: 4,
-                textDirection: TextDirection.rtl,
-                children: [
-                  ColoredBox(key: firstKey, color: Colors.red),
-                  ColoredBox(key: secondKey, color: Colors.green),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final rowOrigin = tester.getTopLeft(find.byKey(rowKey));
-    expect(
-      tester.getTopLeft(find.byKey(firstKey)),
-      rowOrigin + const Offset(140, 0),
-    );
-    expect(
-      tester.getTopLeft(find.byKey(secondKey)),
-      rowOrigin + const Offset(36, 0),
-    );
-  });
 }

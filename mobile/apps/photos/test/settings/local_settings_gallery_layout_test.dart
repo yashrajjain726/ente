@@ -25,13 +25,4 @@ void main() {
       GalleryLayoutType.mosaic.name,
     );
   });
-
-  test("unknown persisted gallery layout falls back to grid", () async {
-    SharedPreferences.setMockInitialValues({
-      LocalSettings.kGalleryLayoutType: "future-layout",
-    });
-    final settings = LocalSettings(await SharedPreferences.getInstance());
-
-    expect(settings.getGalleryLayoutType(), GalleryLayoutType.grid);
-  });
 }

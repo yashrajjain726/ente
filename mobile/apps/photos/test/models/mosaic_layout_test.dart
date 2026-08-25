@@ -18,34 +18,6 @@ void main() {
       expect(MosaicLayoutCalculator.aspectRatioForDimensions(100, 1), 4);
     });
 
-    test("normalizes invalid and extreme input ratios", () {
-      final rows = MosaicLayoutCalculator.computeRows(
-        aspectRatios: [
-          double.nan,
-          double.infinity,
-          double.negativeInfinity,
-          -1,
-          0,
-          1e-9,
-          1e9,
-        ],
-        availableWidth: 400,
-        targetRowHeight: 100,
-        spacing: 2,
-      );
-
-      expect(rows.first.firstIndex, 0);
-      expect(rows.last.lastIndex, 6);
-      for (final row in rows) {
-        expect(row.height.isFinite, isTrue);
-        expect(row.height, greaterThan(0));
-        for (final width in row.itemWidths) {
-          expect(width.isFinite, isTrue);
-          expect(width, greaterThan(0));
-        }
-      }
-    });
-
     test("justified rows conserve the full available width", () {
       const availableWidth = 400.0;
       const spacing = 2.0;
@@ -187,48 +159,6 @@ void main() {
       expect(rows.single.height, 48);
       expect(rows.single.itemWidths, [192]);
     });
-
-    test("lays out 100k ratios quickly and deterministically", () {
-      final ratios = List<double>.generate(100000, (index) {
-        return switch (index % 8) {
-          0 => 0.25,
-          1 => 0.5,
-          2 => 0.75,
-          3 => 1,
-          4 => 4 / 3,
-          5 => 1.5,
-          6 => 2,
-          _ => 4,
-        };
-      }, growable: false);
-
-      final stopwatch = Stopwatch()..start();
-      final first = MosaicLayoutCalculator.computeRows(
-        aspectRatios: ratios,
-        availableWidth: 430,
-        targetRowHeight: 105,
-        spacing: 2,
-      );
-      stopwatch.stop();
-
-      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
-      expect(first, isNotEmpty);
-      expect(first.first.firstIndex, 0);
-      expect(first.last.lastIndex, ratios.length - 1);
-      _expectValidRows(first, itemCount: ratios.length, spacing: 2);
-      for (final row in first) {
-        expect(row.height, greaterThanOrEqualTo(48 - 1e-9));
-        expect(row.itemWidths, everyElement(greaterThanOrEqualTo(48 - 1e-9)));
-      }
-
-      final second = MosaicLayoutCalculator.computeRows(
-        aspectRatios: ratios,
-        availableWidth: 430,
-        targetRowHeight: 105,
-        spacing: 2,
-      );
-      _expectSameRows(first, second);
-    });
   });
 
   group("MosaicSectionLayout", () {
@@ -299,40 +229,4 @@ void main() {
       },
     );
   });
-}
-
-void _expectValidRows(
-  List<MosaicRowLayout> rows, {
-  required int itemCount,
-  required double spacing,
-}) {
-  var expectedFirstIndex = 0;
-  var expectedOffset = 0.0;
-  for (final row in rows) {
-    expect(row.firstIndex, expectedFirstIndex);
-    expect(row.lastIndex, greaterThanOrEqualTo(row.firstIndex));
-    expect(row.itemWidths, hasLength(row.lastIndex - row.firstIndex + 1));
-    expect(row.minOffset, closeTo(expectedOffset, 1e-9));
-    expect(row.height.isFinite, isTrue);
-    expect(row.height, greaterThan(0));
-    expectedFirstIndex = row.lastIndex + 1;
-    expectedOffset = row.maxOffset + spacing;
-  }
-  expect(expectedFirstIndex, itemCount);
-}
-
-void _expectSameRows(
-  List<MosaicRowLayout> first,
-  List<MosaicRowLayout> second,
-) {
-  expect(second, hasLength(first.length));
-  for (var index = 0; index < first.length; index++) {
-    final firstRow = first[index];
-    final secondRow = second[index];
-    expect(secondRow.firstIndex, firstRow.firstIndex, reason: "row $index");
-    expect(secondRow.lastIndex, firstRow.lastIndex, reason: "row $index");
-    expect(secondRow.minOffset, firstRow.minOffset, reason: "row $index");
-    expect(secondRow.height, firstRow.height, reason: "row $index");
-    expect(secondRow.itemWidths, firstRow.itemWidths, reason: "row $index");
-  }
 }

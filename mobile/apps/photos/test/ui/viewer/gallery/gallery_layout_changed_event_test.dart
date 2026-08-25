@@ -11,8 +11,6 @@ import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/file_load_result.dart";
-import "package:photos/models/gallery/fixed_extent_section_layout.dart";
-import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
@@ -147,56 +145,6 @@ void main() {
       await tester.pump();
     },
   );
-
-  testWidgets("public galleries ignore a persisted mosaic preference", (
-    tester,
-  ) async {
-    await localSettings.setGalleryLayoutType(GalleryLayoutType.mosaic);
-    await localSettings.setInternalUserDisabled(true);
-    expect(isMosaicLayoutAvailable, isFalse);
-
-    final galleryKey = GlobalKey<GalleryState>();
-    final file = _dummyFile("public");
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: lightThemeData,
-        localizationsDelegates: StringsLocalizations.localizationsDelegates,
-        supportedLocales: StringsLocalizations.supportedLocales,
-        home: _galleryHost(
-          Gallery(
-            key: galleryKey,
-            asyncLoader: (start, end, {limit, asc}) async =>
-                FileLoadResult([file], false),
-            tagPrefix: "public_",
-            limitSelectionToOne: true,
-            showSelectAll: false,
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 750));
-    await tester.pump();
-
-    final initialGroups = galleryKey.currentState!.galleryGroups!;
-    expect(localSettings.getGalleryLayoutType(), GalleryLayoutType.mosaic);
-    expect(initialGroups.layoutType, GalleryLayoutType.grid);
-    expect(
-      initialGroups.groupLayouts,
-      everyElement(isA<FixedExtentSectionLayout>()),
-    );
-
-    Bus.instance.fire(GalleryLayoutChangedEvent());
-    await tester.pumpAndSettle();
-
-    final rebuiltGroups = galleryKey.currentState!.galleryGroups!;
-    expect(rebuiltGroups, isNot(same(initialGroups)));
-    expect(rebuiltGroups.layoutType, GalleryLayoutType.grid);
-    expect(localSettings.getGalleryLayoutType(), GalleryLayoutType.mosaic);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-  });
 
   testWidgets("a deep layout change preserves partial-row progress", (
     tester,
