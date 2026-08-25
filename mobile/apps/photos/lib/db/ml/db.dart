@@ -22,7 +22,6 @@ import "package:photos/main.dart" show isProcessBg;
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
-import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/ml/ml_versions.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/service_locator.dart";
@@ -2785,17 +2784,8 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     await db.execute(sql, params);
   }
 
-  Future<Set<String>> getClustersForMemoryLane(
-    List<PersonEntity> persons,
-  ) async {
+  Future<Set<String>> getClustersForMemoryLane(Set<String> assigned) async {
     const batchSize = 256;
-    final assigned = <String>{};
-    for (final person in persons) {
-      for (final cluster in person.data.assigned) {
-        assigned.add(cluster.id);
-      }
-    }
-
     final db = await asyncDB;
     final clusters = <String>{};
     var offset = 0;
