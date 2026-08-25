@@ -12,11 +12,28 @@ const kVideoCaptionLineHeight = 16.0;
 const kVideoScrimTopPadding = 12.0;
 const kVideoLongPressPlaybackSpeed = 2.0;
 
-double videoLongPressSpeedIndicatorTop(BuildContext context) {
-  final screenSize = MediaQuery.sizeOf(context);
-  final isLandscape = screenSize.width > screenSize.height;
-  return MediaQuery.paddingOf(context).top +
-      (isLandscape ? 8 : kToolbarHeight + 16);
+OverlayEntry showVideoLongPressSpeedIndicator(BuildContext context) {
+  final entry = OverlayEntry(
+    builder: (context) {
+      final screenSize = MediaQuery.sizeOf(context);
+      final isLandscape = screenSize.width > screenSize.height;
+      return Positioned(
+        top:
+            MediaQuery.paddingOf(context).top +
+            (isLandscape ? 12 : kToolbarHeight + 16),
+        left: 0,
+        right: 0,
+        child: const IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Center(child: VideoLongPressSpeedIndicator()),
+          ),
+        ),
+      );
+    },
+  );
+  Overlay.of(context, rootOverlay: true).insert(entry);
+  return entry;
 }
 
 class VideoLongPressSpeedIndicator extends StatelessWidget {

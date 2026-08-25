@@ -99,6 +99,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   final _transformationController = TransformationController();
   bool _isZooming = false;
   bool _isLongPressSpeedActive = false;
+  OverlayEntry? _longPressSpeedIndicatorEntry;
 
   @override
   void initState() {
@@ -256,6 +257,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   @override
   void dispose() {
+    _longPressSpeedIndicatorEntry?.remove();
     widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     _subscription?.cancel();
     _controller?.stop().ignore();
@@ -305,13 +307,16 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   void _startLongPressSpeed() {
     final controller = _controller;
     if (_isLongPressSpeedActive || controller == null) return;
-    setState(() => _isLongPressSpeedActive = true);
+    _isLongPressSpeedActive = true;
+    _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
     controller.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
   }
 
   void _restorePlaybackSpeed() {
     if (!_isLongPressSpeedActive) return;
-    setState(() => _isLongPressSpeedActive = false);
+    _isLongPressSpeedActive = false;
+    _longPressSpeedIndicatorEntry?.remove();
+    _longPressSpeedIndicatorEntry = null;
     _controller?.setPlaybackSpeed(widget.playbackSpeed.value).ignore();
   }
 
@@ -434,15 +439,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                               constraints: const BoxConstraints.expand(),
                             ),
                           ),
-                          if (_isLongPressSpeedActive)
-                            Positioned(
-                              top: videoLongPressSpeedIndicatorTop(context),
-                              left: 0,
-                              right: 0,
-                              child: const Center(
-                                child: VideoLongPressSpeedIndicator(),
-                              ),
-                            ),
                           if (!widget.isFromMemories && isPlaybackReady)
                             Positioned.fill(
                               child: Center(

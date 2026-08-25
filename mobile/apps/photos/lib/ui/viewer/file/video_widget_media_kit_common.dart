@@ -47,6 +47,7 @@ class _VideoWidgetState extends State<VideoWidget> {
   final _isSeekingNotifier = ValueNotifier<bool>(false);
   late final StreamSubscription<bool> _isPlayingStreamSubscription;
   bool _isLongPressSpeedActive = false;
+  OverlayEntry? _longPressSpeedIndicatorEntry;
 
   @override
   void initState() {
@@ -71,6 +72,7 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   @override
   void dispose() {
+    _longPressSpeedIndicatorEntry?.remove();
     widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     showControlsNotifier.dispose();
     _isPlayingStreamSubscription.cancel();
@@ -86,13 +88,16 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   void _startLongPressSpeed() {
     if (_isLongPressSpeedActive) return;
-    setState(() => _isLongPressSpeedActive = true);
+    _isLongPressSpeedActive = true;
+    _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
     widget.controller.player.setRate(kVideoLongPressPlaybackSpeed).ignore();
   }
 
   void _restorePlaybackSpeed() {
     if (!_isLongPressSpeedActive) return;
-    setState(() => _isLongPressSpeedActive = false);
+    _isLongPressSpeedActive = false;
+    _longPressSpeedIndicatorEntry?.remove();
+    _longPressSpeedIndicatorEntry = null;
     widget.controller.player.setRate(widget.playbackSpeed.value).ignore();
   }
 
@@ -240,13 +245,6 @@ class _VideoWidgetState extends State<VideoWidget> {
             );
           },
         ),
-        if (_isLongPressSpeedActive)
-          Positioned(
-            top: videoLongPressSpeedIndicatorTop(context),
-            left: 0,
-            right: 0,
-            child: const Center(child: VideoLongPressSpeedIndicator()),
-          ),
       ],
     );
   }
