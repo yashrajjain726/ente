@@ -4,7 +4,7 @@ import {
 } from "@/components/auth/CredentialsForm";
 import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
 import { AuthShell } from "@/components/AuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import AccountsCredentialsPage, {
     type CredentialsPresentationProps,
 } from "ente-accounts/pages/credentials";

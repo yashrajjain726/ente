@@ -1,6 +1,6 @@
 import { RecoverAccountForm } from "@/components/auth/RecoveryForm";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import AccountsRecoverPage, {
     type RecoverAccountPresentationProps,
 } from "ente-accounts/pages/recover";

@@ -4,7 +4,7 @@ import type { EnteFile } from "ente-media/file";
 import { useEffect, useRef } from "react";
 
 import type { JourneyPoint } from "../types";
-import { loadCoverImage, processPhotosData } from "../utils/dataProcessing";
+import { loadCoverImage, processPhotosData } from "../utils/data-processing";
 
 export interface UseDataProcessingParams {
     files: EnteFile[];

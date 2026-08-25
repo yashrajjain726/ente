@@ -1,6 +1,6 @@
 import { SetPasswordForm } from "@/components/auth/SetPasswordForm";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import type { NewPasswordPresentationProps } from "ente-accounts/components/NewPasswordForm";
 import AccountsChangePasswordPage from "ente-accounts/pages/change-password";
 import type React from "react";

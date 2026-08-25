@@ -1,6 +1,6 @@
 import { LoginForm } from "@/components/auth/LoginForm";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import {
     LoginContents,
     type LoginPresentationProps,

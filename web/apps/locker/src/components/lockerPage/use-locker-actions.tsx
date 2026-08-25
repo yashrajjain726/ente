@@ -41,8 +41,8 @@ import { t } from "i18next";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Trans } from "react-i18next";
-import { filterNonEmptyUploadItems } from "../createItemDialog/fileUploadHelpers";
-import type { CreateItemDialogEditItem } from "../createItemDialog/useCreateItemDialogState";
+import { filterNonEmptyUploadItems } from "../createItemDialog/file-upload-helpers";
+import type { CreateItemDialogEditItem } from "../createItemDialog/use-create-item-dialog-state";
 
 type DragDataTransferItem = DataTransferItem & {
     webkitGetAsEntry?: () => FileSystemEntry | null;

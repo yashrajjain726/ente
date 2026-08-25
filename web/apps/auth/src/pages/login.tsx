@@ -1,7 +1,7 @@
 import { DevSettingsDialog } from "@/components/auth/DevSettingsDialog";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { AuthShell } from "@/components/AuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import { Paper, Stack, styled } from "@mui/material";
 import {
     LoginContents,

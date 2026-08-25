@@ -1,7 +1,7 @@
 import { RecoveryKeyForm } from "@/components/auth/RecoveryKeyForm";
 import { SetPasswordForm } from "@/components/auth/SetPasswordForm";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import type { NewPasswordPresentationProps } from "ente-accounts/components/NewPasswordForm";
 import type { RecoveryKeyPresentationProps } from "ente-accounts/components/RecoveryKey";
 import AccountsGeneratePage from "ente-accounts/pages/generate";

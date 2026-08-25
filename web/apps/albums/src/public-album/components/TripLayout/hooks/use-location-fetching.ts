@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import type { JourneyPoint } from "../types";
-import { fetchLocationNames } from "../utils/dataProcessing";
+import { fetchLocationNames } from "../utils/data-processing";
 
 export interface UseLocationFetchingParams {
     photoClusters: JourneyPoint[][];
