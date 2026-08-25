@@ -1,15 +1,15 @@
 import { Notification02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { SpaceNotificationPermissionInstructions } from "components/SpaceNotificationPermissionInstructions";
+import { SpaceNotificationPermissionInstructions } from "components/NotificationPermissionInstructions";
 import {
     SpacePWAInstallInstructions,
     SpacePWAPromptBanner,
-} from "components/SpacePWAInstallPrompt";
-import { useHideOnScrollDirection } from "hooks/useHideOnScrollDirection";
+} from "components/PWAInstallPrompt";
+import { useHideOnScrollDirection } from "hooks/use-hide-on-scroll-direction";
 import {
     isSpaceIOS,
     isSpaceStandalone,
     useSpacePWAInstallPrompt,
-} from "hooks/useSpacePWAInstallPrompt";
+} from "hooks/use-pwa-install-prompt";
 import React from "react";
 import type { PublicSpaceLinkSession } from "services/space";
 import {
@@ -18,7 +18,7 @@ import {
     reconcilePublicSpaceWebPush,
     subscribeToPublicSpaceWebPush,
     type SpaceWebPushState,
-} from "services/spaceWebPush";
+} from "services/web-push";
 
 type SuccessState = "exiting" | "hidden" | "visible";
 

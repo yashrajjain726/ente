@@ -1,5 +1,5 @@
-import { SpacePageMeta } from "components/SpacePageMeta";
-import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { SpacePageMeta } from "components/PageMeta";
+import { SpaceRouteFallback } from "components/RouteFallback";
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { openPasskeyVerificationURL } from "ente-accounts/services/passkey";
 import log from "ente-base/log";
@@ -9,22 +9,22 @@ import {
     passkeyVerificationBackground,
     type PasskeyVerificationStatus,
 } from "screens/PasskeyVerificationScreen";
-import { spaceAuthErrorMessage } from "services/spaceAuthError";
+import { spaceAuthErrorMessage } from "services/auth-error";
 import {
     checkSpaceLoginPasskeyStatus,
     useSpaceLoginTwoFactorInstead,
-} from "services/spaceLogin";
+} from "services/login";
 import {
     clearPendingSpacePasskeyVerification,
     hasAutoOpenedSpacePasskeyVerification,
     markAutoOpenedSpacePasskeyVerification,
     savedPendingSpacePasskeyVerification,
     type PendingSpacePasskeyVerification,
-} from "services/spacePasskeyVerification";
-import { useSpaceAppState } from "state/spaceAppState";
-import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
-import { spaceRoutes } from "utils/spaceRoutes";
-import { useSpaceRouter } from "utils/spaceRouteTransitions";
+} from "services/passkey-verification";
+import { useSpaceAppState } from "state/app-state";
+import { routeAfterCompletedLogin } from "utils/login-navigation";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();

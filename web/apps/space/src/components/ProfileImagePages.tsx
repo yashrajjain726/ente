@@ -1,5 +1,5 @@
-import { SpacePageMeta } from "components/SpacePageMeta";
-import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { SpacePageMeta } from "components/PageMeta";
+import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect } from "react";
 import {
@@ -8,17 +8,14 @@ import {
 } from "screens/EditProfilePhotoScreen";
 import { ProfileImageViewerScreen } from "screens/ProfileImageViewerScreen";
 import { profileBackground } from "screens/ProfileScreen";
-import {
-    saveSpaceProfile,
-    spaceProfileErrorMessage,
-} from "services/spaceProfile";
-import { useSpaceAppState } from "state/spaceAppState";
+import { saveSpaceProfile, spaceProfileErrorMessage } from "services/profile";
+import { useSpaceAppState } from "state/app-state";
+import { useSpaceRouter } from "utils/route-transitions";
 import {
     type ProfileImageFlowSource,
     profileImageFlowSourceFromQuery,
     spaceRoutes,
-} from "utils/spaceRoutes";
-import { useSpaceRouter } from "utils/spaceRouteTransitions";
+} from "utils/routes";
 
 type ProfileImageVariant = "avatar" | "cover";
 

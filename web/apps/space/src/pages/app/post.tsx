@@ -1,16 +1,16 @@
 import { AddSquareIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
-import { SpaceBackIcon } from "components/SpaceBackIcon";
-import { SpacePageMeta } from "components/SpacePageMeta";
-import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { SpaceBackIcon } from "components/BackIcon";
+import { SpacePageMeta } from "components/PageMeta";
+import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
-import { useSpaceAppState } from "state/spaceAppState";
-import { spaceTouchTargetSize } from "styles/touchTargets";
-import { spacePostImageInputAccept } from "utils/spacePostImage";
-import { spaceRoutes } from "utils/spaceRoutes";
-import { useSpaceRouter } from "utils/spaceRouteTransitions";
+import { useSpaceAppState } from "state/app-state";
+import { spaceTouchTargetSize } from "styles/touch-targets";
+import { spacePostImageInputAccept } from "utils/post-image";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
 const background = "#F5F5F7";
 const green = "#08C225";

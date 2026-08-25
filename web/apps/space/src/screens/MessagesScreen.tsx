@@ -14,9 +14,9 @@ import {
     MenuList,
     Popper,
 } from "@mui/material";
-import { SpaceAvatarImage } from "components/SpaceAvatarImage";
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
-import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
+import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpaceLoadingSpinner } from "components/RouteFallback";
+import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import { formatTimeAgo } from "ente-base/date";
 import log from "ente-base/log";
 import React from "react";
@@ -28,10 +28,10 @@ import type {
     SpaceMessageConversation,
     SpaceMessageQuote,
 } from "services/space";
-import { spaceTouchTargetSize } from "styles/touchTargets";
-import { firstNameFrom } from "utils/spaceDisplay";
-import { clampSpaceMessageText } from "utils/spaceMessageLimits";
-import { spacePostImageInputAccept } from "utils/spacePostImage";
+import { spaceTouchTargetSize } from "styles/touch-targets";
+import { firstNameFrom } from "utils/display";
+import { clampSpaceMessageText } from "utils/message-limits";
+import { spacePostImageInputAccept } from "utils/post-image";
 
 export const messagesBackground = "#FFFFFF";
 

@@ -2,7 +2,7 @@ import { Share08Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, type SxProps, type Theme } from "@mui/material";
 import React from "react";
-import { openSpaceShareLinkDialog } from "services/spaceShareLink";
+import { openSpaceShareLinkDialog } from "services/share-link";
 
 export const SpaceShareIcon: React.FC<{ strokeWidth?: number }> = ({
     strokeWidth = 1.8,

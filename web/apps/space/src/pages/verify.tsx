@@ -1,5 +1,5 @@
-import { SpacePageMeta } from "components/SpacePageMeta";
-import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { SpacePageMeta } from "components/PageMeta";
+import { SpaceRouteFallback } from "components/RouteFallback";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
@@ -7,23 +7,20 @@ import {
     VerifyEmailScreen,
     verifyEmailBackground,
 } from "screens/VerifyEmailScreen";
-import { spaceAuthErrorMessage } from "services/spaceAuthError";
+import { spaceAuthErrorMessage } from "services/auth-error";
 import {
     completeSpaceLoginEmailVerification,
     resendSpaceLoginCode,
     savedPendingSpaceLoginCredentials,
     type SpaceLoginInput,
     type SpaceLoginResult,
-} from "services/spaceLogin";
-import { savePendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
-import {
-    completeSpaceSignup,
-    resendSpaceSignupCode,
-} from "services/spaceSignup";
-import { useSpaceAppState } from "state/spaceAppState";
-import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
-import { spaceRoutes, verifyFlowFromQuery } from "utils/spaceRoutes";
-import { useSpaceRouter } from "utils/spaceRouteTransitions";
+} from "services/login";
+import { savePendingSpacePasskeyVerification } from "services/passkey-verification";
+import { completeSpaceSignup, resendSpaceSignupCode } from "services/signup";
+import { useSpaceAppState } from "state/app-state";
+import { routeAfterCompletedLogin } from "utils/login-navigation";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes, verifyFlowFromQuery } from "utils/routes";
 
 const verificationErrorMessage = (error: unknown) => {
     if (isHTTPErrorWithStatus(error, 401)) {

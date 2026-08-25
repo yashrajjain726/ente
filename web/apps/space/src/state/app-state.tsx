@@ -5,9 +5,9 @@ import type {
     SetupProfile,
     SetupProfileDetails,
 } from "screens/SetupProfileScreen";
+import type { PendingSpacePasskeyVerification } from "services/passkey-verification";
 import type { SpacePost } from "services/space";
-import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
-import type { CreateProfileSource } from "utils/spaceRoutes";
+import type { CreateProfileSource } from "utils/routes";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";

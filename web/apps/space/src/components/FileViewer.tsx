@@ -11,26 +11,26 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
-import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
-} from "components/SpaceActionFeedback";
-import { SpaceAvatarImage } from "components/SpaceAvatarImage";
+} from "components/ActionFeedback";
+import { SpaceAvatarImage } from "components/AvatarImage";
+import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spacePostLikeButtonPop,
     spacePostLikeHeartPop,
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
-} from "components/SpacePostLikeAnimation";
+} from "components/post-like-animation";
 import log from "ente-base/log";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
-import type { SpaceInviteIntent } from "services/spaceInvite";
-import { spaceTouchTargetSize } from "styles/touchTargets";
-import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
-import { clampSpaceMessageText } from "utils/spaceMessageLimits";
-import type { SpaceImageCropArea } from "utils/spacePostImage";
+import type { SpaceInviteIntent } from "services/invite";
+import { spaceTouchTargetSize } from "styles/touch-targets";
+import { firstNameFrom, formatSpaceDate } from "utils/display";
+import { clampSpaceMessageText } from "utils/message-limits";
+import type { SpaceImageCropArea } from "utils/post-image";
 
 const green = "#08C225";
 const textBase = "#F4F4F4";

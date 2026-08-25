@@ -1,8 +1,8 @@
 import log from "ente-base/log";
 import type { NextRouter } from "next/router";
-import type { SpaceAppState } from "state/spaceAppState";
-import { sendPendingSpaceFriendRequest } from "utils/spacePendingFriendRequest";
-import { spaceRoutes } from "utils/spaceRoutes";
+import type { SpaceAppState } from "state/app-state";
+import { sendPendingSpaceFriendRequest } from "utils/pending-friend-request";
+import { spaceRoutes } from "utils/routes";
 
 type RefreshProfile = SpaceAppState["refreshProfile"];
 

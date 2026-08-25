@@ -1,6 +1,6 @@
 import { Box, Dialog, useMediaQuery } from "@mui/material";
-import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
-import { isSpaceIOS } from "hooks/useSpacePWAInstallPrompt";
+import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
+import { isSpaceIOS } from "hooks/use-pwa-install-prompt";
 import React from "react";
 
 const green = "#08C225";

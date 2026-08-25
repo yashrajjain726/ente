@@ -22,21 +22,21 @@ import {
     type KeyAttributes,
 } from "ente-accounts/services/user";
 import { isMuseumHTTPError } from "ente-base/http";
-import { spaceAuthError, spaceAuthErrorMessage } from "services/spaceAuthError";
+import { spaceAuthError, spaceAuthErrorMessage } from "services/auth-error";
 import {
     decryptSpaceBootstrapAuthToken,
     putSpaceSignupKeyAttributes,
     setupSpaceSignupSRP,
-} from "services/spaceBootstrapAuth";
+} from "services/bootstrap-auth";
 import {
     createSpaceBrowserSession,
     getOrCreateSpaceRootKey,
-} from "services/spacePersistentSession";
+} from "services/persistent-session";
 import {
     authMasterKeyFromSpaceSession,
     clearAuthMasterKeyFromSpaceSession,
     saveAuthMasterKeyInSpaceSession,
-} from "services/spaceSecureSessionStorage";
+} from "services/secure-session-storage";
 
 export interface SpaceSignupInput {
     email: string;

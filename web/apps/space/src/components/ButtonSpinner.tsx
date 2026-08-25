@@ -1,4 +1,4 @@
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
+import { SpaceLoadingSpinner } from "components/RouteFallback";
 import React from "react";
 
 export const SpaceButtonSpinner: React.FC = () => (

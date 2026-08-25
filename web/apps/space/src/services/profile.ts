@@ -11,7 +11,7 @@ import {
     cachedSpaceMediaBlobURLIfPresent,
     rememberCachedSpaceMediaBlobURL,
     spaceProfileMediaCacheKey,
-} from "services/spaceMediaCache";
+} from "services/media-cache";
 import {
     restoreSpaceBrowserSessionIfNeeded,
     savedSpaceOwnedSpaces,
@@ -20,12 +20,12 @@ import {
     saveSpaceOwnedSpaces,
     saveSpaceProfileAvatar,
     type OwnedSpace,
-} from "services/spacePersistentSession";
+} from "services/persistent-session";
 import {
     parseSpaceProfilePayload,
     spaceProfileTextField,
-} from "services/spaceProfilePayload";
-import { spaceRootKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
+} from "services/profile-payload";
+import { spaceRootKeyFromSpaceSession } from "services/secure-session-storage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
 const minUsernameLength = 4;

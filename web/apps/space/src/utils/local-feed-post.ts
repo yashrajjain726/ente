@@ -1,9 +1,6 @@
 import type React from "react";
 import type { SpacePost } from "services/space";
-import type {
-    FailedSpaceFeedPost,
-    LocalSpaceFeedPost,
-} from "state/spaceAppState";
+import type { FailedSpaceFeedPost, LocalSpaceFeedPost } from "state/app-state";
 
 let nextLocalFeedPostID = 0;
 

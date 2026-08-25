@@ -1,4 +1,4 @@
-import { isSpaceIOS, isSpaceStandalone } from "hooks/useSpacePWAInstallPrompt";
+import { isSpaceIOS, isSpaceStandalone } from "hooks/use-pwa-install-prompt";
 import React from "react";
 import {
     isBravePushServiceError,
@@ -7,7 +7,7 @@ import {
     subscribeToSpaceWebPush,
     unsubscribeFromSpaceWebPush,
     type SpaceWebPushState,
-} from "services/spaceWebPush";
+} from "services/web-push";
 
 type PromptStatus = "enabling" | "error" | "hidden" | "loading" | "ready";
 

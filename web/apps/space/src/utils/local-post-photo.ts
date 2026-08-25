@@ -1,4 +1,4 @@
-import type { SpaceViewerPhoto } from "components/SpaceFileViewer";
+import type { SpaceViewerPhoto } from "components/FileViewer";
 
 export interface LocalPostPhotoDimensions {
     height: number;

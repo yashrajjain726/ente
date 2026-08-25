@@ -14,12 +14,12 @@ import { ensureOk, publicRequestHeaders } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
 import { removeAuthToken } from "ente-base/token";
-import { spaceBootstrapAuthHeaders } from "services/spaceBootstrapAuth";
+import { spaceBootstrapAuthHeaders } from "services/bootstrap-auth";
 import {
     clearSpaceSecureSessionStorage,
     saveSpaceRootKeyInSpaceSession,
     spaceRootKeyFromSpaceSession,
-} from "services/spaceSecureSessionStorage";
+} from "services/secure-session-storage";
 import { z } from "zod";
 
 const spaceBrowserSessionStorageKey = "spaceBrowserSession";
