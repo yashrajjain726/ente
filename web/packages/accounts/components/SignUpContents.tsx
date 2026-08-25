@@ -20,7 +20,6 @@ import {
     stashReferralSource,
     stashSRPSetupAttributes,
 } from "ente-accounts/services/accounts-db";
-import { deriveKeyInsufficientMemoryErrorName } from "ente-accounts/services/crypto";
 import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/session-storage";
 import { generateSRPSetupAttributes } from "ente-accounts/services/srp";
 import {
@@ -37,6 +36,7 @@ import {
 import { LinkButton } from "ente-base/components/LinkButton";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
+import { isNamedError } from "ente-base/error";
 import { isMuseumHTTPError } from "ente-base/http";
 import { JOIN_ALBUM_CONTEXT_KEY } from "ente-base/join-album";
 import log from "ente-base/log";
@@ -172,10 +172,7 @@ export const SignUpContents: React.FC<SignUpContentsProps> = ({
                 try {
                     gkResult = await generateKeysAndAttributes(password);
                 } catch (e) {
-                    if (
-                        e instanceof Error &&
-                        e.name == deriveKeyInsufficientMemoryErrorName
-                    ) {
+                    if (isNamedError(e, "insufficient_memory")) {
                         setFieldError(
                             "confirmPassword",
                             t("password_generation_failed"),

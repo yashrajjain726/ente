@@ -1,6 +1,7 @@
 import { expose, wrap } from "comlink";
 import { clientIdentifier } from "ente-base/app";
 import { assertionFailed } from "ente-base/assert";
+import { isNamedError, namedError } from "ente-base/error";
 import { lowercaseExtension } from "ente-base/file-name";
 import { isHTTP4xxError, isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
@@ -518,24 +519,21 @@ const analyzeImageWithConversionFallback = async (
                 conversionError instanceof Error
                     ? conversionError.message
                     : String(conversionError);
-            const error = new Error(
+            throw namedError(
+                "ml_image",
                 `JPEG conversion fallback failed: ${message}`,
             );
-            error.name = "ml_image";
-            throw error;
         }
         return await enqueueAnalyzeImage(electron, { ...request, bytes });
     }
 };
 
 const isMLImageError = (e: unknown): e is Error =>
-    e instanceof Error && (e.name == "ml_decode" || e.name == "ml_image");
+    isNamedError(e, "ml_decode") || isNamedError(e, "ml_image");
 
-const isMLDecodeError = (e: unknown) =>
-    e instanceof Error && e.name == "ml_decode";
+const isMLDecodeError = (e: unknown) => isNamedError(e, "ml_decode");
 
-const isMLInitError = (e: unknown): e is Error =>
-    e instanceof Error && e.name == "ml_init";
+const isMLInitError = (e: unknown): e is Error => isNamedError(e, "ml_init");
 
 // Native model sessions serialize anyway; keep only one inference outstanding.
 let _analyzeImageQueue: Promise<unknown> = Promise.resolve();

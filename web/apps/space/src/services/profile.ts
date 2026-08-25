@@ -1,5 +1,6 @@
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
+import { isNamedError } from "ente-base/error";
 import { apiOrigin, apiURL } from "ente-base/origins";
 import type { SpaceAccountCtxHandle } from "ente-space-wasm";
 import type {
@@ -94,7 +95,7 @@ const spaceProfilePayloadFor = (profile: SetupProfileInput) =>
     });
 
 export const isSpaceSessionUnauthorized = (error: unknown) =>
-    error instanceof Error && error.name == "session_unauthorized";
+    isNamedError(error, "session_unauthorized");
 
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 

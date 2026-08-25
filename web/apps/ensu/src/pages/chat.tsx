@@ -74,6 +74,7 @@ import { NavbarBase } from "ente-base/components/Navbar";
 import type { NotificationAttributes } from "ente-base/components/Notification";
 import { useBaseContext } from "ente-base/context";
 import { buildEnvEnsuDesktopVersion } from "ente-base/env";
+import { isNamedError } from "ente-base/error";
 import { getKV, removeKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { savedLogs } from "ente-base/log-web";
@@ -1885,7 +1886,7 @@ const Page: React.FC = () => {
     );
 
     const formatErrorMessage = useCallback((error: unknown) => {
-        if (error instanceof Error && error.name == "prompt_too_long") {
+        if (isNamedError(error, "prompt_too_long")) {
             return "Prompt exceeds the model context window. Reduce history, lower max tokens, or increase context length.";
         }
         return error instanceof Error ? error.message : "Unknown model error";

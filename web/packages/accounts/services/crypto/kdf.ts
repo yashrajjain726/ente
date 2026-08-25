@@ -1,5 +1,3 @@
-export const deriveKeyInsufficientMemoryErrorName = "insufficient_memory";
-
 export interface DerivedKey {
     key: string;
     salt: string;

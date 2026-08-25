@@ -1,3 +1,4 @@
+import { isNamedError, namedError } from "ente-base/error";
 import { lowercaseExtension } from "ente-base/file-name";
 import {
     FileType,
@@ -6,8 +7,6 @@ import {
     type FileTypeInfo,
 } from "ente-media/file-type";
 import { fileTypeFromBuffer } from "file-type";
-
-const fileTypeNotSupportedErrorName = "file_type_not_supported";
 
 export const detectFileTypeInfo = async (file: File): Promise<FileTypeInfo> =>
     detectFileTypeInfoFromChunk(() => readInitialChunkOfFile(file), file.name);
@@ -52,16 +51,10 @@ export const detectFileTypeInfoFromChunk = async (
 };
 
 export const isFileTypeNotSupportedError = (e: unknown) =>
-    e instanceof Error && e.name == fileTypeNotSupportedErrorName;
+    isNamedError(e, "file_type_not_supported");
 
-const fileTypeNotSupportedError = (
-    message: string,
-    options?: ErrorOptions,
-) => {
-    const error = new Error(message, options);
-    error.name = fileTypeNotSupportedErrorName;
-    return error;
-};
+const fileTypeNotSupportedError = (message: string, options?: ErrorOptions) =>
+    namedError("file_type_not_supported", message, options);
 
 const readInitialChunkOfFile = async (file: File) => {
     const chunkSizeForTypeDetection = 4100;

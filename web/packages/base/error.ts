@@ -8,5 +8,5 @@ export const namedError = (
     return error;
 };
 
-export const isNamedError = (error: unknown, name: string) =>
+export const isNamedError = (error: unknown, name: string): error is Error =>
     error instanceof Error && error.name == name;

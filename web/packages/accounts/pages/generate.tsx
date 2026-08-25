@@ -15,7 +15,6 @@ import {
     savedPartialLocalUser,
     saveJustSignedUp,
 } from "ente-accounts/services/accounts-db";
-import { deriveKeyInsufficientMemoryErrorName } from "ente-accounts/services/crypto";
 import { appHomeRoute } from "ente-accounts/services/redirect";
 import {
     haveMasterKeyInSession,
@@ -34,6 +33,7 @@ import {
 import { LinkButton } from "ente-base/components/LinkButton";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import { useBaseContext } from "ente-base/context";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import { t } from "i18next";
 import { useRouter } from "next/router";
@@ -96,8 +96,7 @@ const Page: React.FC<GeneratePageProps> = ({
             } catch (e) {
                 log.error("Could not generate key attributes from password", e);
                 setPasswordsFieldError(
-                    e instanceof Error &&
-                        e.name == deriveKeyInsufficientMemoryErrorName
+                    isNamedError(e, "insufficient_memory")
                         ? t("password_generation_failed")
                         : t("generic_error"),
                 );

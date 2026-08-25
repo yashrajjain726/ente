@@ -5,10 +5,10 @@ import type {
     EncryptedFile,
     KeyPair,
 } from "ente-base/crypto/types";
+import { isNamedError } from "ente-base/error";
 
-const shouldFallbackToLegacyBlobDecrypt = (error: unknown): boolean => {
-    return error instanceof Error && error.name === "stream_truncated";
-};
+const shouldFallbackToLegacyBlobDecrypt = (error: unknown): boolean =>
+    isNamedError(error, "stream_truncated");
 
 const toB64String = (v: Uint8Array | string): string => {
     if (typeof v === "string") return v;

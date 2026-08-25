@@ -1,5 +1,6 @@
 import type { FriendProfile } from "data/friends";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
 import type {
@@ -369,7 +370,7 @@ interface SpaceConversationsContext {
 }
 
 export const isSpaceContentError = (error: unknown) =>
-    error instanceof Error && error.name == "content_unavailable";
+    isNamedError(error, "content_unavailable");
 
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
@@ -1345,7 +1346,7 @@ export const createCurrentPhotoPost = async ({
 };
 
 export const isSpacePostLimitReachedError = (error: unknown) =>
-    error instanceof Error && error.name == "post_limit_reached";
+    isNamedError(error, "post_limit_reached");
 
 const normalizedImageDimension = (dimension: number | undefined) =>
     typeof dimension == "number" && Number.isFinite(dimension) && dimension > 0

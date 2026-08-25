@@ -235,9 +235,6 @@ export interface BeginPasskeyAuthenticationResponse {
     options: { publicKey: PublicKeyCredentialRequestOptions };
 }
 
-export const passkeySessionAlreadyClaimedErrorName =
-    "passkey_session_already_claimed";
-
 export const beginPasskeyAuthentication = async (
     passkeySessionID: string,
 ): Promise<BeginPasskeyAuthenticationResponse> => {
@@ -249,10 +246,8 @@ export const beginPasskeyAuthentication = async (
     });
     if (!res.ok) {
         const error = new HTTPError(res);
-        if (
-            await isMuseumHTTPError(error, 409, "SESSION_ALREADY_CLAIMED")
-        ) {
-            error.name = passkeySessionAlreadyClaimedErrorName;
+        if (await isMuseumHTTPError(error, 409, "SESSION_ALREADY_CLAIMED")) {
+            error.name = "passkey_session_already_claimed";
         }
         throw error;
     }

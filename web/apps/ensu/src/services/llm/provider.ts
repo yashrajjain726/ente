@@ -1,3 +1,4 @@
+import { namedError } from "ente-base/error";
 import log from "ente-base/log";
 import { createInferenceBackend } from "./inference";
 import type {
@@ -134,9 +135,7 @@ const MODEL_INFO_FALLBACKS = [
 ];
 
 const modelMissingError = () =>
-    Object.assign(new Error("Required model assets are not downloaded"), {
-        name: "model_missing",
-    });
+    namedError("model_missing", "Required model assets are not downloaded");
 
 export class LlmProvider {
     private backend = createInferenceBackend({
@@ -465,9 +464,7 @@ export class LlmProvider {
         const retrievalEpoch = await invoke<number>("llm_retrieval_epoch");
         await this.ensureInFlight?.promise.catch(() => undefined);
         if (!shouldContinue()) {
-            throw Object.assign(new Error("Knowledge retrieval cancelled"), {
-                name: "cancelled",
-            });
+            throw namedError("cancelled", "Knowledge retrieval cancelled");
         }
         this.invalidateModelState();
         return operation(retrievalEpoch);

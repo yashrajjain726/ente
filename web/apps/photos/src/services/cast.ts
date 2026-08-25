@@ -1,3 +1,4 @@
+import { namedError } from "ente-base/error";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import type { Collection } from "ente-media/collection";
@@ -22,17 +23,13 @@ const publicKeysForPairingCode = async (code: string) => {
         .parse(await res.json());
 };
 
-export const castDeviceNotFoundErrorName = "cast_device_not_found";
-
 export const publishCastPayload = async (
     deviceCode: string,
     collection: Collection,
 ) => {
     const publicKeys = await publicKeysForPairingCode(deviceCode);
     if (!publicKeys) {
-        const error = new Error("Unknown device code");
-        error.name = castDeviceNotFoundErrorName;
-        throw error;
+        throw namedError("cast_device_not_found", "Unknown device code");
     }
 
     const { preparePayload } = await import("ente-cast-wasm");

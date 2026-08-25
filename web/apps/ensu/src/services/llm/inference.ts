@@ -10,6 +10,7 @@ import {
     WllamaError,
 } from "@wllama/wllama/esm/index.js";
 import wllamaPackage from "@wllama/wllama/package.json";
+import { namedError } from "ente-base/error";
 import log from "ente-base/log";
 import type {
     GenerateChatRequest,
@@ -698,9 +699,7 @@ const normalizeInvokeError = (error: unknown, fallback: string) => {
         const message = typeof value.message === "string" ? value.message : "";
         const payload = message || safeJson(error);
         const text = payload || fallback;
-        const err = new Error(text);
-        if (name) err.name = name;
-        return err;
+        return name ? namedError(name, text) : new Error(text);
     }
     return new Error(fallback);
 };
@@ -719,9 +718,7 @@ const normalizeWllamaError = (error: unknown, fallback: string) => {
     }
 
     if (error instanceof WllamaError && error.type == "kv_cache_full") {
-        const normalized = new Error(error.message, { cause: error });
-        normalized.name = "prompt_too_long";
-        return normalized;
+        return namedError("prompt_too_long", error.message, { cause: error });
     }
     if (error instanceof Error) return error;
     return new Error(typeof error === "string" ? error : fallback);
