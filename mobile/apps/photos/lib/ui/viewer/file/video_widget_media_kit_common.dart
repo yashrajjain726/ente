@@ -86,13 +86,13 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   void _startLongPressSpeed() {
     if (_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = true;
+    setState(() => _isLongPressSpeedActive = true);
     widget.controller.player.setRate(kVideoLongPressPlaybackSpeed).ignore();
   }
 
   void _restorePlaybackSpeed() {
     if (!_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = false;
+    setState(() => _isLongPressSpeedActive = false);
     widget.controller.player.setRate(widget.playbackSpeed.value).ignore();
   }
 
@@ -240,6 +240,13 @@ class _VideoWidgetState extends State<VideoWidget> {
             );
           },
         ),
+        if (_isLongPressSpeedActive)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 16,
+            left: 0,
+            right: 0,
+            child: const Center(child: VideoLongPressSpeedIndicator()),
+          ),
       ],
     );
   }

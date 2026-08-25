@@ -303,14 +303,15 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   }
 
   void _startLongPressSpeed() {
-    if (_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = true;
-    _controller?.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
+    final controller = _controller;
+    if (_isLongPressSpeedActive || controller == null) return;
+    setState(() => _isLongPressSpeedActive = true);
+    controller.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
   }
 
   void _restorePlaybackSpeed() {
     if (!_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = false;
+    setState(() => _isLongPressSpeedActive = false);
     _controller?.setPlaybackSpeed(widget.playbackSpeed.value).ignore();
   }
 
@@ -433,6 +434,18 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                               constraints: const BoxConstraints.expand(),
                             ),
                           ),
+                          if (_isLongPressSpeedActive)
+                            Positioned(
+                              top:
+                                  MediaQuery.paddingOf(context).top +
+                                  kToolbarHeight +
+                                  16,
+                              left: 0,
+                              right: 0,
+                              child: const Center(
+                                child: VideoLongPressSpeedIndicator(),
+                              ),
+                            ),
                           if (!widget.isFromMemories && isPlaybackReady)
                             Positioned.fill(
                               child: Center(

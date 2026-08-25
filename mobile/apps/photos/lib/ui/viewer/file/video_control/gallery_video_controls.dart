@@ -12,6 +12,30 @@ const kVideoCaptionLineHeight = 16.0;
 const kVideoScrimTopPadding = 12.0;
 const kVideoLongPressPlaybackSpeed = 2.0;
 
+class VideoLongPressSpeedIndicator extends StatelessWidget {
+  const VideoLongPressSpeedIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = getEnteTextTheme(context);
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            "2x",
+            style: textTheme.smallBold.copyWith(color: textBaseDark),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class EqualHeightSliderTrackShape extends RoundedRectSliderTrackShape {
   const EqualHeightSliderTrackShape();
 
