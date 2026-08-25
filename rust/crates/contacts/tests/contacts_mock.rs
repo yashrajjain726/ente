@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use ente_contacts::client::{ContactsClient, OpenContactsInput, OpenContactsResult, RootKeySource};
 use ente_contacts::crypto as contacts_crypto;
-use ente_contacts::models::{AttachmentType, ContactData, WrappedRootContactKey};
+use ente_contacts::{
+    AttachmentType, ContactData, ContactsClient, OpenContactsInput, OpenContactsResult,
+    RootKeySource, WrappedRootContactKey,
+};
 use ente_core::{
     crypto::{Key, SecretVec},
     http::{Api, ApiConfig, Auth, Http},

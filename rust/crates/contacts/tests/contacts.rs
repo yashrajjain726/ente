@@ -2,7 +2,7 @@
 
 mod support;
 
-use ente_contacts::models::ContactData;
+use ente_contacts::ContactData;
 use ente_core::http;
 use ente_legacy::{
     LegacyContactState, LegacyKitRecoveryClient, LegacyKitRecoveryStatus, LegacyRecoveryStatus,

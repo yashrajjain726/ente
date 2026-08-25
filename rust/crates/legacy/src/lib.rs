@@ -1,10 +1,10 @@
-pub mod client;
-pub mod error;
-pub mod kit;
-pub mod kit_models;
-pub mod kit_transport;
-pub mod models;
-pub mod transport;
+mod client;
+mod error;
+mod kit;
+mod kit_models;
+mod kit_transport;
+mod models;
+mod transport;
 
 pub use client::LegacyClient;
 pub use error::{Error, Result};

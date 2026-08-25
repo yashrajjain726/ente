@@ -23,10 +23,10 @@ use crate::kit_transport::{
 use crate::models::{LegacyContactState, LegacyInfo, LegacyRecoveryBundle};
 use crate::transport::{
     LegacyAddContactRequest, LegacyChangePasswordRequest, LegacyChangePasswordResponse,
-    LegacyContactIdentifier, LegacyInfoResponse, LegacyInitChangePasswordRequest,
-    LegacyPublicKeyResponse, LegacyRecoveryIdentifier, LegacyRecoveryInfoResponse,
-    LegacySetupSrpRequest, LegacySetupSrpResponse, LegacyUpdateContactRequest,
-    LegacyUpdateRecoveryNoticeRequest, LegacyUpdateSrpAndKeysRequest, LegacyUpdatedKeyAttr,
+    LegacyContactIdentifier, LegacyInitChangePasswordRequest, LegacyPublicKeyResponse,
+    LegacyRecoveryIdentifier, LegacyRecoveryInfoResponse, LegacySetupSrpRequest,
+    LegacySetupSrpResponse, LegacyUpdateContactRequest, LegacyUpdateRecoveryNoticeRequest,
+    LegacyUpdateSrpAndKeysRequest, LegacyUpdatedKeyAttr,
 };
 
 pub struct LegacyClient {
@@ -46,7 +46,7 @@ impl LegacyClient {
             .send()
             .await?
             .error_for_status()?
-            .json::<LegacyInfoResponse>()
+            .json::<LegacyInfo>()
             .await?)
     }
 

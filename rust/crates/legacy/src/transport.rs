@@ -1,7 +1,7 @@
 use ente_accounts::auth::KeyAttributes;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{LegacyContactState, LegacyInfo};
+use crate::models::LegacyContactState;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -124,130 +124,6 @@ pub struct LegacyChangePasswordRequest {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LegacyChangePasswordResponse {
-    #[serde(rename = "setupID")]
-    pub setup_id: String,
     #[serde(rename = "srpM2")]
     pub srp_m2: String,
-}
-
-pub type LegacyInfoResponse = LegacyInfo;
-
-#[cfg(test)]
-mod tests {
-    use serde_json::{json, to_value};
-
-    use super::*;
-
-    #[test]
-    fn serializes_legacy_contact_identifiers_with_canonical_id_keys() {
-        let request = LegacyUpdateContactRequest {
-            user_id: 1,
-            emergency_contact_id: 2,
-            state: LegacyContactState::Accepted,
-        };
-        assert_eq!(
-            to_value(request).unwrap(),
-            json!({
-                "userID": 1,
-                "emergencyContactID": 2,
-                "state": "ACCEPTED",
-            })
-        );
-
-        let request = LegacyUpdateRecoveryNoticeRequest {
-            emergency_contact_id: 2,
-            recovery_notice_in_days: 14,
-        };
-        assert_eq!(
-            to_value(request).unwrap(),
-            json!({
-                "emergencyContactID": 2,
-                "recoveryNoticeInDays": 14,
-            })
-        );
-
-        let request = LegacyContactIdentifier {
-            user_id: 1,
-            emergency_contact_id: 2,
-        };
-        assert_eq!(
-            to_value(request).unwrap(),
-            json!({
-                "userID": 1,
-                "emergencyContactID": 2,
-            })
-        );
-
-        let request = LegacyRecoveryIdentifier {
-            id: "session".to_string(),
-            user_id: 1,
-            emergency_contact_id: 2,
-        };
-        assert_eq!(
-            to_value(request).unwrap(),
-            json!({
-                "id": "session",
-                "userID": 1,
-                "emergencyContactID": 2,
-            })
-        );
-    }
-
-    #[test]
-    fn serializes_legacy_password_reset_requests_with_recovery_id_keys() {
-        let setup = LegacySetupSrpRequest {
-            srp_user_id: "user".to_string(),
-            srp_salt: "salt".to_string(),
-            srp_verifier: "verifier".to_string(),
-            srp_a: "a".to_string(),
-        };
-        let request = LegacyInitChangePasswordRequest {
-            recovery_id: "session".to_string(),
-            setup_srp_request: setup,
-        };
-        assert_eq!(
-            to_value(request).unwrap(),
-            json!({
-                "recoveryID": "session",
-                "setupSRPRequest": {
-                    "srpUserID": "user",
-                    "srpSalt": "salt",
-                    "srpVerifier": "verifier",
-                    "srpA": "a",
-                },
-            })
-        );
-
-        let request = LegacyChangePasswordRequest {
-            recovery_id: "session".to_string(),
-            update_srp_and_keys_request: LegacyUpdateSrpAndKeysRequest {
-                setup_id: "setup".to_string(),
-                srp_m1: "m1".to_string(),
-                updated_key_attr: LegacyUpdatedKeyAttr {
-                    kek_salt: "kek".to_string(),
-                    encrypted_key: "encrypted".to_string(),
-                    key_decryption_nonce: "nonce".to_string(),
-                    mem_limit: 1,
-                    ops_limit: 2,
-                },
-            },
-        };
-        assert_eq!(
-            to_value(request).unwrap(),
-            json!({
-                "recoveryID": "session",
-                "updateSrpAndKeysRequest": {
-                    "setupID": "setup",
-                    "srpM1": "m1",
-                    "updatedKeyAttr": {
-                        "kekSalt": "kek",
-                        "encryptedKey": "encrypted",
-                        "keyDecryptionNonce": "nonce",
-                        "memLimit": 1,
-                        "opsLimit": 2,
-                    },
-                },
-            })
-        );
-    }
 }

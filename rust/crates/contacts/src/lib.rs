@@ -1,8 +1,8 @@
-pub mod client;
+mod client;
 pub mod crypto;
-pub mod error;
-pub mod models;
-pub mod transport;
+mod error;
+mod models;
+mod transport;
 
 pub use client::{ContactsClient, OpenContactsInput, OpenContactsResult, RootKeySource};
 pub use error::{Error, Result};
