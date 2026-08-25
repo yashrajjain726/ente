@@ -5,6 +5,7 @@ import "package:photos/core/configuration.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
+import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -211,7 +212,18 @@ Future<void> curateFilters(
     final albumFilters = await _curateAlbumFilters(files);
     final fileTypeFilters = _curateFileTypeFilters(files, l10n);
     final locationFilters = await _curateLocationFilters(files);
-    final contactsFilters = _curateContactsFilter(files);
+    final currentUserID = Configuration.instance.getUserID();
+    final contactsFilters = currentUserID == null
+        ? <ContactsFilter>[]
+        : curateContactsFilters(
+            files,
+            initialGalleryFilter: searchFilterDataProvider.initialGalleryFilter,
+            currentUser: CollectionsService.instance.resolveUserIdentity(
+              currentUserID,
+              null,
+            ),
+            currentUserLabel: l10n.you,
+          );
     final uploaderFilters = _curateUploaderFilter(files);
     final cameraFilters = _curateCameraFilters(files);
     final faceFilters = await curateFaceFilters(files);
@@ -371,12 +383,18 @@ Future<List<LocationFilter>> _curateLocationFilters(
   return locationFilters;
 }
 
-List<ContactsFilter> _curateContactsFilter(List<EnteFile> files) {
+List<ContactsFilter> curateContactsFilters(
+  List<EnteFile> files, {
+  required HierarchicalSearchFilter initialGalleryFilter,
+  required User currentUser,
+  required String currentUserLabel,
+}) {
   final contactsFilters = <ContactsFilter>[];
   final ownerIdToOccurrence = <int, int>{};
+  final includeCurrentUser = initialGalleryFilter is AlbumFilter;
 
   for (EnteFile file in files) {
-    if (file.ownerID == Configuration.instance.getUserID() ||
+    if ((!includeCurrentUser && file.ownerID == currentUser.id) ||
         file.uploadedFileID == null ||
         file.uploadedFileID == -1 ||
         file.ownerID == null) {
@@ -387,9 +405,16 @@ List<ContactsFilter> _curateContactsFilter(List<EnteFile> files) {
   }
 
   for (int id in ownerIdToOccurrence.keys) {
-    final user = CollectionsService.instance.resolveUserIdentity(id, null);
+    final isCurrentUser = id == currentUser.id;
+    final user = isCurrentUser
+        ? currentUser
+        : CollectionsService.instance.resolveUserIdentity(id, null);
     contactsFilters.add(
-      ContactsFilter(user: user, occurrence: ownerIdToOccurrence[id]!),
+      ContactsFilter(
+        user: user,
+        occurrence: ownerIdToOccurrence[id]!,
+        filterName: isCurrentUser ? currentUserLabel : null,
+      ),
     );
   }
 
