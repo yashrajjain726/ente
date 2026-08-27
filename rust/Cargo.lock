@@ -2663,6 +2663,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "ash",
+ "crc32fast",
  "ente-assets",
  "ente-image",
  "fast_image_resize",
@@ -2671,6 +2672,7 @@ dependencies = [
  "html-escape",
  "image",
  "imageproc",
+ "libc",
  "log",
  "nalgebra 0.33.3",
  "once_cell",
@@ -2686,6 +2688,8 @@ dependencies = [
  "tokio",
  "url",
  "usearch",
+ "wide",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -17,3 +17,4 @@ pub mod scan;
 pub mod types;
 #[cfg(feature = "usearch")]
 pub mod vector_db;
+pub mod vecdb;
