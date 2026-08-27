@@ -429,9 +429,7 @@ class LogDatabase {
     if (databaseFuture != null) {
       final db = await databaseFuture;
       await db.close();
-      if (identical(_databaseFuture, databaseFuture)) {
-        _databaseFuture = null;
-      }
+      _databaseFuture = null;
     }
   }
 

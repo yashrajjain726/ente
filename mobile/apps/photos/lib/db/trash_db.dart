@@ -73,13 +73,10 @@ class TrashDB with SqlDbBase {
   static Future<SqliteDatabase>? _dbFuture;
 
   Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
     try {
-      return await databaseFuture;
+      return await (_dbFuture ??= _initDatabase());
     } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
+      _dbFuture = null;
       rethrow;
     }
   }
