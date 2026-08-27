@@ -113,17 +113,17 @@ class MemoryLaneService {
       schedulePersonRecompute(person.remoteID, force: force);
     }
     if (flagService.internalUser) {
-      _topNClusters = {};
-      final cache = await _cacheService.getCache();
-      for (final timeline in cache.allTimelines) {
-        if (timeline.isCluster) {
-          _topNClusters.add(timeline.personId);
-        }
-      }
       final assigned = <String>{};
       for (final person in persons) {
         for (final cluster in person.data.assigned) {
           assigned.add(cluster.id);
+        }
+      }
+      _topNClusters = {};
+      final cache = await _cacheService.getCache();
+      for (final timeline in cache.allTimelines) {
+        if (timeline.isCluster && !assigned.contains(timeline.personId)) {
+          _topNClusters.add(timeline.personId);
         }
       }
       _topNClusters.addAll(await _mlDataDB.getClustersForMemoryLane(assigned));
