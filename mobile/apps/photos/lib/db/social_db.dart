@@ -404,9 +404,9 @@ class SocialDB with SqlDbBase {
     final db = await database;
     await db.execute(
       '''
-      INSERT OR REPLACE INTO $_syncTimeTable (
-        collection_id, comments_sync_time
-      ) VALUES (?, ?)
+      INSERT INTO $_syncTimeTable (collection_id, comments_sync_time)
+      VALUES (?, ?)
+      ON CONFLICT(collection_id) DO UPDATE SET comments_sync_time = excluded.comments_sync_time
       ''',
       [collectionID, syncTime],
     );
@@ -416,9 +416,9 @@ class SocialDB with SqlDbBase {
     final db = await database;
     await db.execute(
       '''
-      INSERT OR REPLACE INTO $_syncTimeTable (
-        collection_id, reactions_sync_time
-      ) VALUES (?, ?)
+      INSERT INTO $_syncTimeTable (collection_id, reactions_sync_time)
+      VALUES (?, ?)
+      ON CONFLICT(collection_id) DO UPDATE SET reactions_sync_time = excluded.reactions_sync_time
       ''',
       [collectionID, syncTime],
     );
