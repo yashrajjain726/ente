@@ -100,17 +100,20 @@ class MemoryLaneService {
     if (!isFeatureEnabled) {
       return;
     }
-    if (!PersonService.isInitialized) {
-      _logger.warning("Full recompute skipped: PersonService unavailable");
-      return;
-    }
-    final persons = await PersonService.instance.getPersons();
-    for (final person in persons) {
-      if (person.data.isIgnored) {
-        await _invalidateTimeline(person.remoteID);
-        continue;
+    final List<PersonEntity> persons = [];
+    if (!isLocalGalleryMode) {
+      if (!PersonService.isInitialized) {
+        _logger.warning("Full recompute skipped: PersonService unavailable");
+        return;
       }
-      schedulePersonRecompute(person.remoteID, force: force);
+      persons.addAll(await PersonService.instance.getPersons());
+      for (final person in persons) {
+        if (person.data.isIgnored) {
+          await _invalidateTimeline(person.remoteID);
+          continue;
+        }
+        schedulePersonRecompute(person.remoteID, force: force);
+      }
     }
     if (flagService.internalUser) {
       final assigned = <String>{};
