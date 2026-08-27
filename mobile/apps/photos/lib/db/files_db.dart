@@ -29,8 +29,8 @@ class FilesDB with SqlDbBase {
   */
   static const _databaseName = "ente.files.db";
 
-  static const int defaultMaterializationPageSize = 2000;
-  static const Duration _slowMaterializationPage = Duration(seconds: 1);
+  static const int _maxMaterializationPageSize = 2000;
+  static const Duration _slowPageQueryThreshold = Duration(seconds: 1);
 
   static final Logger _logger = Logger("FilesDB");
 
@@ -91,7 +91,7 @@ class FilesDB with SqlDbBase {
     ...updateIndexes(),
     ...createEntityDataTable(),
     ...addAddedTime(),
-    ...addGalleryMaterializationIndex(),
+    ...addFileMaterializationOrderIndex(),
   ];
 
   static const List<String> _columnNames = [
@@ -416,10 +416,10 @@ class FilesDB with SqlDbBase {
     ];
   }
 
-  static List<String> addGalleryMaterializationIndex() {
+  static List<String> addFileMaterializationOrderIndex() {
     return [
       '''
-        CREATE INDEX IF NOT EXISTS gallery_materialization_order_index
+        CREATE INDEX IF NOT EXISTS file_materialization_order_index
         ON $filesTable(
           $columnCreationTime,
           $columnModificationTime,
@@ -724,11 +724,11 @@ class FilesDB with SqlDbBase {
       whereClause: where.join(' AND '),
       whereArguments: args,
       order: asc ?? false
-          ? _MaterializedFileOrder.galleryAscending
-          : _MaterializedFileOrder.galleryDescending,
+          ? _MaterializedFileOrder.creationThenModificationThenIdAscending
+          : _MaterializedFileOrder.creationThenModificationThenIdDescending,
       limit: limit,
       filterOptions: filterOptions,
-      converter: _convertPageOnCallerIsolate,
+      convertPage: _convertPageOnCallerIsolate,
     );
   }
 
@@ -758,11 +758,11 @@ class FilesDB with SqlDbBase {
       whereClause: where.join(' AND '),
       whereArguments: args,
       order: asc ?? false
-          ? _MaterializedFileOrder.galleryAscending
-          : _MaterializedFileOrder.galleryDescending,
+          ? _MaterializedFileOrder.creationThenModificationThenIdAscending
+          : _MaterializedFileOrder.creationThenModificationThenIdDescending,
       limit: limit,
       filterOptions: filterOptions,
-      converter: _convertPageOnCallerIsolate,
+      convertPage: _convertPageOnCallerIsolate,
     );
   }
 
@@ -1919,23 +1919,23 @@ class FilesDB with SqlDbBase {
       queryKind: _MaterializedQueryKind.allFiles,
       whereClause: '1 = 1',
       whereArguments: const [],
-      order: _MaterializedFileOrder.searchDescending,
+      order: _MaterializedFileOrder.creationThenIdDescending,
       filterOptions: DBFilterOptions(
         ignoredCollectionIDs: collectionsToIgnore,
         dedupeUploadID: dedupeByUploadId,
       ),
-      converter: _convertPageWithComputer,
+      convertPage: _convertPageInWorkerIsolate,
     );
     return result.files;
   }
 
-  Future<List<EnteFile>> _convertPageWithComputer(
+  Future<List<EnteFile>> _convertPageInWorkerIsolate(
     List<Map<String, dynamic>> rows,
   ) {
     return Computer.shared().compute(
       _convertFilesDBRowsForIsolate,
       param: {"result": rows},
-      taskName: 'FilesDB.getAllFilesFromDB.page',
+      taskName: 'FilesDB.convertMaterializedFilePage',
     );
   }
 
@@ -1950,17 +1950,17 @@ class FilesDB with SqlDbBase {
     required String whereClause,
     required List<Object?> whereArguments,
     required _MaterializedFileOrder order,
-    required _FilesDBPageConverter converter,
+    required _FilePageConverter convertPage,
     DBFilterOptions? filterOptions,
     int? limit,
   }) async {
     final operation = _FilesDBMaterializationOperation(
       id: ++_nextMaterializationOperationID,
       queryKind: queryKind,
-      pageSize: defaultMaterializationPageSize,
+      pageSize: _maxMaterializationPageSize,
     );
     final files = <EnteFile>[];
-    final boundedLimit = limit != null && limit >= 0 ? limit : null;
+    final normalizedLimit = limit != null && limit >= 0 ? limit : null;
     Object? caughtError;
 
     try {
@@ -1968,13 +1968,13 @@ class FilesDB with SqlDbBase {
       operation.transactionWatch.start();
       try {
         await database.readTransaction((transaction) async {
-          _MaterializedFileCursor? cursor;
-          var remaining = boundedLimit;
+          _FilePageBoundary? pageBoundary;
+          var remaining = normalizedLimit;
 
           while (remaining == null || remaining > 0) {
             final requestedRows = remaining == null
-                ? defaultMaterializationPageSize
-                : min(defaultMaterializationPageSize, remaining);
+                ? _maxMaterializationPageSize
+                : min(_maxMaterializationPageSize, remaining);
             final pageNumber = operation.pageCount + 1;
 
             final queryWatch = Stopwatch()..start();
@@ -1984,11 +1984,11 @@ class FilesDB with SqlDbBase {
                 _buildMaterializedFileQuery(
                   whereClause: whereClause,
                   order: order,
-                  hasCursor: cursor != null,
+                  hasPageBoundary: pageBoundary != null,
                 ),
                 <Object?>[
                   ...whereArguments,
-                  if (cursor != null) ...cursor.arguments,
+                  if (pageBoundary != null) ...pageBoundary.values,
                   requestedRows,
                 ],
               );
@@ -2001,13 +2001,13 @@ class FilesDB with SqlDbBase {
             operation.rawRows += rows.length;
             operation.maxRawPage = max(operation.maxRawPage, rows.length);
             if (rows.length > requestedRows ||
-                rows.length > defaultMaterializationPageSize) {
+                rows.length > _maxMaterializationPageSize) {
               throw StateError(
                 'FilesDB materialization page exceeded its configured bound',
               );
             }
             if (!operation.slowPageLogged &&
-                queryWatch.elapsed >= _slowMaterializationPage) {
+                queryWatch.elapsed >= _slowPageQueryThreshold) {
               operation.slowPageLogged = true;
               _logger.warning(
                 'FilesDBMaterialization slowPage '
@@ -2021,11 +2021,11 @@ class FilesDB with SqlDbBase {
               break;
             }
 
-            cursor = order.cursorFrom(rows.last);
+            pageBoundary = order.boundaryFrom(rows.last);
             final conversionWatch = Stopwatch()..start();
             late final List<EnteFile> convertedPage;
             try {
-              convertedPage = await converter(rows);
+              convertedPage = await convertPage(rows);
             } finally {
               conversionWatch.stop();
               operation.recordConversion(conversionWatch.elapsed);
@@ -2070,14 +2070,14 @@ class FilesDB with SqlDbBase {
   String _buildMaterializedFileQuery({
     required String whereClause,
     required _MaterializedFileOrder order,
-    required bool hasCursor,
+    required bool hasPageBoundary,
   }) {
-    final cursorClause = hasCursor
+    final pageBoundaryClause = hasPageBoundary
         ? ' AND (${order.columns.join(', ')}) ${order.comparison} '
               '(${List.filled(order.columns.length, '?').join(', ')})'
         : '';
     return 'SELECT $_materializedFileProjection FROM $filesTable '
-        'WHERE ($whereClause)$cursorClause '
+        'WHERE ($whereClause)$pageBoundaryClause '
         'ORDER BY ${order.orderByClause} LIMIT ?';
   }
 
@@ -2374,7 +2374,7 @@ class FilesDB with SqlDbBase {
   }
 }
 
-typedef _FilesDBPageConverter =
+typedef _FilePageConverter =
     Future<List<EnteFile>> Function(List<Map<String, dynamic>> rows);
 
 enum _MaterializedQueryKind {
@@ -2457,16 +2457,16 @@ class _FilesDBMaterializationMetrics {
 }
 
 enum _MaterializedFileOrder {
-  searchDescending([
+  creationThenIdDescending([
     FilesDB.columnCreationTime,
     FilesDB.columnGeneratedID,
   ], false),
-  galleryDescending([
+  creationThenModificationThenIdDescending([
     FilesDB.columnCreationTime,
     FilesDB.columnModificationTime,
     FilesDB.columnGeneratedID,
   ], false),
-  galleryAscending([
+  creationThenModificationThenIdAscending([
     FilesDB.columnCreationTime,
     FilesDB.columnModificationTime,
     FilesDB.columnGeneratedID,
@@ -2483,16 +2483,15 @@ enum _MaterializedFileOrder {
       .map((column) => '$column ${ascending ? 'ASC' : 'DESC'}')
       .join(', ');
 
-  _MaterializedFileCursor cursorFrom(Map<String, dynamic> row) =>
-      _MaterializedFileCursor(
-        columns.map<Object?>((column) => row[column]).toList(growable: false),
-      );
+  _FilePageBoundary boundaryFrom(Map<String, dynamic> row) => _FilePageBoundary(
+    columns.map<Object?>((column) => row[column]).toList(growable: false),
+  );
 }
 
-class _MaterializedFileCursor {
-  final List<Object?> arguments;
+class _FilePageBoundary {
+  final List<Object?> values;
 
-  const _MaterializedFileCursor(this.arguments);
+  const _FilePageBoundary(this.values);
 }
 
 class _FilesDBMaterializationOperation {
