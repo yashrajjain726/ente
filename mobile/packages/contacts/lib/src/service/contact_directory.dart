@@ -82,7 +82,11 @@ class ContactDirectory {
   Future<void> resetLocalState() async {
     final service = _active?.service;
     _clear(notify: true);
-    await service?.resetLocalState();
+    try {
+      await service?.resetLocalState();
+    } finally {
+      await service?.close();
+    }
   }
 
   void clearSession({bool notify = true}) => _clear(notify: notify);
