@@ -1,7 +1,6 @@
-use ente_legacy::{LegacyKitOwnerRecoverySession, LegacyKitRecoveryInitiator};
 use flutter_rust_bridge::frb;
 
-use super::session::Session;
+use ente_frb_core::Session;
 
 #[frb]
 pub enum LegacyError {
@@ -116,40 +115,6 @@ impl From<ente_legacy::LegacyKitRecoverySession> for LegacyKitRecoverySession {
 
 #[frb]
 #[derive(Clone)]
-pub struct LegacyKitRecoveryInitiatorHint {
-    pub used_part_indexes: Vec<u8>,
-    pub ip: String,
-    pub user_agent: String,
-}
-
-impl From<LegacyKitRecoveryInitiator> for LegacyKitRecoveryInitiatorHint {
-    fn from(value: LegacyKitRecoveryInitiator) -> Self {
-        Self {
-            used_part_indexes: value.used_part_indexes,
-            ip: value.ip,
-            user_agent: value.user_agent,
-        }
-    }
-}
-
-#[frb]
-#[derive(Clone)]
-pub struct LegacyKitOwnerRecoverySessionDetails {
-    pub session: Option<LegacyKitRecoverySession>,
-    pub initiators: Vec<LegacyKitRecoveryInitiatorHint>,
-}
-
-impl From<LegacyKitOwnerRecoverySession> for LegacyKitOwnerRecoverySessionDetails {
-    fn from(value: LegacyKitOwnerRecoverySession) -> Self {
-        Self {
-            session: value.session.map(Into::into),
-            initiators: value.initiators.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-#[frb]
-#[derive(Clone)]
 pub struct LegacyKitPart {
     pub index: u8,
     pub name: String,
@@ -249,7 +214,7 @@ impl From<ente_legacy::LegacyKitCreateResult> for LegacyKitCreateResult {
 }
 
 pub async fn kits(session: &Session) -> Result<Vec<LegacyKit>, LegacyError> {
-    ente_legacy::kits(session.inner())
+    ente_legacy::kits(session.as_ref())
         .await
         .map(|kits| kits.into_iter().map(Into::into).collect())
         .map_err(Into::into)
@@ -265,7 +230,7 @@ pub async fn create_kit(
         message: "legacy kit requires exactly three part names".into(),
     })?;
     ente_legacy::create_kit(
-        session.inner(),
+        session.as_ref(),
         &current_user_key_attrs.into(),
         part_names,
         notice_period_in_hours,
@@ -279,19 +244,9 @@ pub async fn download_kit_shares(
     session: &Session,
     kit_id: String,
 ) -> Result<Vec<LegacyKitShare>, LegacyError> {
-    ente_legacy::download_kit_shares(session.inner(), &kit_id)
+    ente_legacy::download_kit_shares(session.as_ref(), &kit_id)
         .await
         .map(|shares| shares.into_iter().map(Into::into).collect())
-        .map_err(Into::into)
-}
-
-pub async fn kit_recovery_session(
-    session: &Session,
-    kit_id: String,
-) -> Result<LegacyKitOwnerRecoverySessionDetails, LegacyError> {
-    ente_legacy::kit_recovery_session(session.inner(), &kit_id)
-        .await
-        .map(Into::into)
         .map_err(Into::into)
 }
 
@@ -300,19 +255,19 @@ pub async fn update_kit_recovery_notice(
     kit_id: String,
     notice_period_in_hours: i32,
 ) -> Result<(), LegacyError> {
-    ente_legacy::update_kit_recovery_notice(session.inner(), &kit_id, notice_period_in_hours)
+    ente_legacy::update_kit_recovery_notice(session.as_ref(), &kit_id, notice_period_in_hours)
         .await
         .map_err(Into::into)
 }
 
 pub async fn block_kit_recovery(session: &Session, kit_id: String) -> Result<(), LegacyError> {
-    ente_legacy::block_kit_recovery(session.inner(), &kit_id)
+    ente_legacy::block_kit_recovery(session.as_ref(), &kit_id)
         .await
         .map_err(Into::into)
 }
 
 pub async fn delete_kit(session: &Session, kit_id: String) -> Result<(), LegacyError> {
-    ente_legacy::delete_kit(session.inner(), &kit_id)
+    ente_legacy::delete_kit(session.as_ref(), &kit_id)
         .await
         .map_err(Into::into)
 }

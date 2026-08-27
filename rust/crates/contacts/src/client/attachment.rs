@@ -1,11 +1,12 @@
 use md5::{Digest, Md5};
 
+use ente_core::Session;
 use ente_core::b64;
 use ente_core::crypto::{self, blob};
 use serde::{Deserialize, Serialize};
 
-use super::contact::ContactEntityResponse;
-use super::{ContactRecord, ContactsClient};
+use super::contact::{ContactEntityResponse, decode_contact};
+use super::{ContactOutput, ContactRecord, WrappedRootContactKey, root_contact_key};
 use crate::{Error, Result};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -22,165 +23,187 @@ impl AttachmentType {
     }
 }
 
-impl ContactsClient {
-    pub async fn set_profile_picture(
-        &self,
-        contact_id: &str,
-        profile_picture: &[u8],
-    ) -> Result<ContactRecord> {
-        self.set_attachment(contact_id, AttachmentType::ProfilePicture, profile_picture)
-            .await
+pub async fn set_profile_picture(
+    session: &Session,
+    wrapped_root_contact_key: Option<&WrappedRootContactKey>,
+    contact_id: &str,
+    profile_picture: &[u8],
+) -> Result<ContactOutput<ContactRecord>> {
+    set_attachment(
+        session,
+        wrapped_root_contact_key,
+        contact_id,
+        AttachmentType::ProfilePicture,
+        profile_picture,
+    )
+    .await
+}
+
+pub async fn get_profile_picture(
+    session: &Session,
+    wrapped_root_contact_key: Option<&WrappedRootContactKey>,
+    contact_id: &str,
+) -> Result<ContactOutput<Vec<u8>>> {
+    let current = session
+        .api
+        .get(&format!("/contacts/{contact_id}"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<ContactEntityResponse>()
+        .await?;
+    if current.is_deleted {
+        return Err(Error::ProfilePictureNotFound);
     }
+    let attachment_id = current
+        .profile_picture_attachment_id
+        .as_deref()
+        .ok_or(Error::ProfilePictureNotFound)?;
+    let root_contact_key = root_contact_key(session, wrapped_root_contact_key).await?;
+    let encrypted_key = current
+        .encrypted_key
+        .as_deref()
+        .ok_or(Error::MissingEncryptedKey)?;
+    let contact_key = root_contact_key.decrypt_contact_key(encrypted_key)?;
+    let encrypted_picture =
+        get_attachment_encrypted(session, AttachmentType::ProfilePicture, attachment_id).await?;
+    let picture = decrypt_attachment(&encrypted_picture, &contact_key)?;
 
-    pub async fn get_profile_picture(&self, contact_id: &str) -> Result<Vec<u8>> {
-        let current = self
-            .api()
-            .get(&format!("/contacts/{contact_id}"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<ContactEntityResponse>()
-            .await?;
-        if current.is_deleted {
-            return Err(Error::ProfilePictureNotFound);
-        }
-        let attachment_id = current
-            .profile_picture_attachment_id
-            .as_deref()
-            .ok_or(Error::ProfilePictureNotFound)?;
-        self.ensure_confirmed_root_contact_key().await?;
+    Ok(ContactOutput::new(picture, Some(root_contact_key)))
+}
 
-        let encrypted_key = current
-            .encrypted_key
-            .as_deref()
-            .ok_or(Error::MissingEncryptedKey)?;
-        let contact_key = self.decrypt_contact_key(encrypted_key)?;
-        let encrypted_picture = self
-            .get_attachment_encrypted(AttachmentType::ProfilePicture, attachment_id)
-            .await?;
-        decrypt_attachment(&encrypted_picture, &contact_key)
-    }
+pub async fn delete_profile_picture(
+    session: &Session,
+    wrapped_root_contact_key: Option<&WrappedRootContactKey>,
+    contact_id: &str,
+) -> Result<ContactOutput<ContactRecord>> {
+    delete_attachment(
+        session,
+        wrapped_root_contact_key,
+        contact_id,
+        AttachmentType::ProfilePicture,
+    )
+    .await
+}
 
-    pub async fn delete_profile_picture(&self, contact_id: &str) -> Result<ContactRecord> {
-        self.delete_attachment(contact_id, AttachmentType::ProfilePicture)
-            .await
-    }
+pub async fn set_attachment(
+    session: &Session,
+    wrapped_root_contact_key: Option<&WrappedRootContactKey>,
+    contact_id: &str,
+    attachment_type: AttachmentType,
+    attachment_bytes: &[u8],
+) -> Result<ContactOutput<ContactRecord>> {
+    let root_contact_key = root_contact_key(session, wrapped_root_contact_key).await?;
+    let current = session
+        .api
+        .get(&format!("/contacts/{contact_id}"))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<ContactEntityResponse>()
+        .await?;
+    let encrypted_key = current
+        .encrypted_key
+        .as_deref()
+        .ok_or(Error::MissingEncryptedKey)?;
+    let contact_key = root_contact_key.decrypt_contact_key(encrypted_key)?;
+    let encrypted_attachment = encrypt_attachment(attachment_bytes, &contact_key)?;
+    let content_md5 = content_md5_base64(&encrypted_attachment);
+    let size = encrypted_attachment.len() as i64;
+    let upload = session
+        .api
+        .post(&format!(
+            "/attachments/{}/upload-url",
+            attachment_type.as_str()
+        ))
+        .json(&AttachmentUploadUrlRequest {
+            content_length: size,
+            content_md5: content_md5.clone(),
+        })
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<AttachmentUploadUrlResponse>()
+        .await?;
 
-    pub async fn set_attachment(
-        &self,
-        contact_id: &str,
-        attachment_type: AttachmentType,
-        attachment_bytes: &[u8],
-    ) -> Result<ContactRecord> {
-        self.ensure_confirmed_root_contact_key().await?;
+    session
+        .api
+        .http()
+        .put(&upload.url)
+        .header("Content-MD5", &content_md5)
+        .body(encrypted_attachment)
+        .send()
+        .await?
+        .error_for_status()?;
 
-        let current = self
-            .api()
-            .get(&format!("/contacts/{contact_id}"))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<ContactEntityResponse>()
-            .await?;
-        let encrypted_key = current
-            .encrypted_key
-            .as_deref()
-            .ok_or(Error::MissingEncryptedKey)?;
-        let contact_key = self.decrypt_contact_key(encrypted_key)?;
-        let encrypted_attachment = encrypt_attachment(attachment_bytes, &contact_key)?;
-        let content_md5 = content_md5_base64(&encrypted_attachment);
-        let size = encrypted_attachment.len() as i64;
+    let response = session
+        .api
+        .put(&format!(
+            "/contacts/{contact_id}/attachments/{}",
+            attachment_type.as_str()
+        ))
+        .json(&CommitAttachmentRequest {
+            attachment_id: &upload.attachment_id,
+            size,
+        })
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<ContactEntityResponse>()
+        .await?;
+    let record = decode_contact(response, Some(&root_contact_key))?;
 
-        let upload = self
-            .api()
-            .post(&format!(
-                "/attachments/{}/upload-url",
-                attachment_type.as_str()
-            ))
-            .json(&AttachmentUploadUrlRequest {
-                content_length: size,
-                content_md5: content_md5.clone(),
-            })
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<AttachmentUploadUrlResponse>()
-            .await?;
+    Ok(ContactOutput::new(record, Some(root_contact_key)))
+}
 
-        self.api()
-            .http()
-            .put(&upload.url)
-            .header("Content-MD5", &content_md5)
-            .body(encrypted_attachment)
-            .send()
-            .await?
-            .error_for_status()?;
+pub async fn get_attachment_encrypted(
+    session: &Session,
+    attachment_type: AttachmentType,
+    attachment_id: &str,
+) -> Result<Vec<u8>> {
+    let download = session
+        .api
+        .get(&format!(
+            "/attachments/{}/{attachment_id}",
+            attachment_type.as_str()
+        ))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<SignedUrlResponse>()
+        .await?;
+    Ok(session
+        .api
+        .http()
+        .get(&download.url)
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?)
+}
 
-        let response = self
-            .api()
-            .put(&format!(
-                "/contacts/{contact_id}/attachments/{}",
-                attachment_type.as_str()
-            ))
-            .json(&CommitAttachmentRequest {
-                attachment_id: &upload.attachment_id,
-                size,
-            })
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<ContactEntityResponse>()
-            .await?;
+pub async fn delete_attachment(
+    session: &Session,
+    wrapped_root_contact_key: Option<&WrappedRootContactKey>,
+    contact_id: &str,
+    attachment_type: AttachmentType,
+) -> Result<ContactOutput<ContactRecord>> {
+    let root_contact_key = root_contact_key(session, wrapped_root_contact_key).await?;
+    let response = session
+        .api
+        .delete(&format!(
+            "/contacts/{contact_id}/attachments/{}",
+            attachment_type.as_str()
+        ))
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<ContactEntityResponse>()
+        .await?;
+    let record = decode_contact(response, Some(&root_contact_key))?;
 
-        self.decode_contact(response)
-    }
-
-    pub async fn get_attachment_encrypted(
-        &self,
-        attachment_type: AttachmentType,
-        attachment_id: &str,
-    ) -> Result<Vec<u8>> {
-        let download = self
-            .api()
-            .get(&format!(
-                "/attachments/{}/{attachment_id}",
-                attachment_type.as_str()
-            ))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<SignedUrlResponse>()
-            .await?;
-        Ok(self
-            .api()
-            .http()
-            .get(&download.url)
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?)
-    }
-
-    pub async fn delete_attachment(
-        &self,
-        contact_id: &str,
-        attachment_type: AttachmentType,
-    ) -> Result<ContactRecord> {
-        self.ensure_confirmed_root_contact_key().await?;
-        let response = self
-            .api()
-            .delete(&format!(
-                "/contacts/{contact_id}/attachments/{}",
-                attachment_type.as_str()
-            ))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<ContactEntityResponse>()
-            .await?;
-        self.decode_contact(response)
-    }
+    Ok(ContactOutput::new(record, Some(root_contact_key)))
 }
 
 fn encrypt_attachment(bytes: &[u8], contact_key: &[u8]) -> Result<Vec<u8>> {

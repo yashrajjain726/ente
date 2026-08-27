@@ -3,12 +3,10 @@ interface WrappedRootContactKey {
     header: string;
 }
 
-interface OpenContactsInput {
+interface OpenSessionInput {
     baseUrl: string;
     authToken: string;
-    userId: number;
     masterKeyB64: string;
-    cachedWrappedRootContactKey?: WrappedRootContactKey;
     clientPackage?: string;
     clientVersion?: string;
 }
@@ -23,42 +21,57 @@ interface ContactRecord {
     updatedAt: number;
 }
 
-export const openContacts = async ({
+interface ContactsDiffOutput {
+    records: ContactRecord[];
+    wrappedRootContactKey?: WrappedRootContactKey;
+}
+
+interface ProfilePictureOutput {
+    bytes: Uint8Array;
+    wrappedRootContactKey?: WrappedRootContactKey;
+}
+
+const wasm = () => import("./pkg/ente_locker_wasm");
+
+export type Session = import("./pkg/ente_locker_wasm").Session;
+
+export const openSession = async ({
     baseUrl,
     authToken,
-    userId,
     masterKeyB64,
-    cachedWrappedRootContactKey,
     clientPackage,
     clientVersion,
-}: OpenContactsInput) => {
-    const wasm = await import("./pkg/ente_locker_wasm");
-    const session = wasm.openSession(
+}: OpenSessionInput): Promise<Session> =>
+    (await wasm()).openSession(
         baseUrl,
         authToken,
         masterKeyB64,
         clientPackage,
         clientVersion,
     );
-    const client = wasm.openContacts(
+
+export const contactsGetDiff = async (
+    session: Session,
+    wrappedRootContactKey: WrappedRootContactKey | undefined,
+    sinceTime: number,
+    limit: number,
+): Promise<ContactsDiffOutput> =>
+    (await wasm()).contactsGetDiff(
         session,
-        BigInt(userId),
-        cachedWrappedRootContactKey?.encryptedKey,
-        cachedWrappedRootContactKey?.header,
+        wrappedRootContactKey?.encryptedKey,
+        wrappedRootContactKey?.header,
+        BigInt(sinceTime),
+        limit,
     );
 
-    return {
-        updateAuthToken: (authToken: string) =>
-            session.updateAuthToken(authToken),
-        currentWrappedRootContactKey: () =>
-            client.currentWrappedRootContactKey() as
-                | WrappedRootContactKey
-                | undefined,
-        getDiff: (sinceTime: number, limit: number) =>
-            client.getDiff(BigInt(sinceTime), limit) as Promise<
-                ContactRecord[]
-            >,
-        getProfilePicture: (contactID: string) =>
-            client.getProfilePicture(contactID),
-    };
-};
+export const contactsGetProfilePicture = async (
+    session: Session,
+    wrappedRootContactKey: WrappedRootContactKey | undefined,
+    contactID: string,
+): Promise<ProfilePictureOutput> =>
+    (await wasm()).contactsGetProfilePicture(
+        session,
+        wrappedRootContactKey?.encryptedKey,
+        wrappedRootContactKey?.header,
+        contactID,
+    );

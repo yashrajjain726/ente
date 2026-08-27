@@ -7,7 +7,7 @@ use ente_core::{
 };
 use flutter_rust_bridge::frb;
 
-#[frb]
+#[frb(non_opaque)]
 pub enum SessionError {
     Other { message: String },
 }
@@ -46,11 +46,14 @@ pub fn open_session(
 }
 
 impl Session {
-    pub(crate) fn inner(&self) -> &InnerSession {
-        &self.0
-    }
-
+    #[frb(sync)]
     pub fn update_auth_token(&self, auth_token: String) {
         self.0.api.set_auth(Some(Auth::User(auth_token)));
+    }
+}
+
+impl AsRef<InnerSession> for Session {
+    fn as_ref(&self) -> &InnerSession {
+        &self.0
     }
 }

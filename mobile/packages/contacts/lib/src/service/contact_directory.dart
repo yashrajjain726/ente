@@ -7,7 +7,8 @@ import 'package:ente_contacts/src/service/contacts_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
-typedef ContactsServiceFactory = ContactsService Function();
+typedef ContactsServiceFactory =
+    ContactsService Function(ContactsSession session);
 
 class ContactDirectory {
   ContactDirectory({
@@ -18,7 +19,7 @@ class ContactDirectory {
     Duration profilePictureFailureTtl = const Duration(minutes: 1),
   }) : _contactsServiceFactory =
            contactsServiceFactory ??
-           (contactsService == null ? null : () => contactsService),
+           (contactsService == null ? null : (_) => contactsService),
        _logger = logger ?? Logger('ContactDirectory'),
        _profilePictureFailureTtl = profilePictureFailureTtl,
        _onContactsChanged = onContactsChanged;
@@ -54,7 +55,7 @@ class ContactDirectory {
       active = _ActiveContacts(
         key: key,
         authToken: session.authToken,
-        service: _newContactsService(),
+        service: _newContactsService(session),
       );
       _active = active;
     }
@@ -160,15 +161,16 @@ class ContactDirectory {
     required String name,
   }) async {
     final active = _requireActive();
-    final existing = await active.service.getContactByUserId(
+    final service = active.service;
+    final existing = await service.getContactByUserId(
       contactUserId,
       includeDeleted: true,
     );
     _requireActiveSession(active);
     final data = ContactData(contactUserId: contactUserId, name: name.trim());
     final contact = existing == null
-        ? await active.service.createContact(data)
-        : await active.service.updateContact(existing.id, data);
+        ? await service.createContact(data)
+        : await service.updateContact(existing.id, data);
     _requireActiveSession(active);
     _cacheAndNotify(contact);
     return contact;
@@ -180,7 +182,8 @@ class ContactDirectory {
     required Uint8List bytes,
   }) async {
     final active = _requireActive();
-    final existing = await active.service.getContactByUserId(
+    final service = active.service;
+    final existing = await service.getContactByUserId(
       contactUserId,
       includeDeleted: true,
     );
@@ -190,16 +193,16 @@ class ContactDirectory {
       return existing.isDeleted ? null : existing;
     }
 
-    final created = await active.service.createContact(
+    final created = await service.createContact(
       ContactData(contactUserId: contactUserId, name: name.trim()),
     );
     if (!_isActive(active)) return null;
     late ContactRecord updated;
     try {
-      updated = await active.service.setProfilePicture(created.id, bytes);
+      updated = await service.setProfilePicture(created.id, bytes);
     } catch (_) {
       if (!_isActive(active)) rethrow;
-      updated = await active.service.setProfilePicture(created.id, bytes);
+      updated = await service.setProfilePicture(created.id, bytes);
     }
     if (!_isActive(active)) return null;
     _cachePicture(updated, bytes);
@@ -259,11 +262,12 @@ class ContactDirectory {
   }
 
   Future<void> _hydrate(_ActiveContacts active, ContactsSession session) async {
-    await active.service.open(session);
+    final service = active.service;
+    await service.open(session);
     if (!_isActive(active)) return;
 
     final knownUserIds = _contactsByUserId.keys.toSet();
-    final local = await active.service.getContacts();
+    final local = await service.getContacts();
     if (!_isActive(active)) return;
     final localChanged = _cacheAll(local);
     _hasHydratedCache = true;
@@ -277,7 +281,7 @@ class ContactDirectory {
         .toSet();
 
     try {
-      final diff = await active.service.sync();
+      final diff = await service.sync();
       if (!_isActive(active)) return;
       final diffChanged = _cacheAll(diff);
       if (diffChanged.isNotEmpty) {
@@ -459,12 +463,12 @@ class ContactDirectory {
 
   bool _isActive(_ActiveContacts active) => identical(active, _active);
 
-  ContactsService _newContactsService() {
+  ContactsService _newContactsService(ContactsSession session) {
     final factory = _contactsServiceFactory;
     if (factory == null) {
       throw StateError('ContactDirectory requires a contacts service factory');
     }
-    return factory();
+    return factory(session);
   }
 
   String _sessionKey(ContactsSession session) =>

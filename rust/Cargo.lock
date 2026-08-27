@@ -2568,6 +2568,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-frb-contacts"
+version = "0.0.0"
+dependencies = [
+ "ente-contacts",
+ "ente-core",
+ "ente-frb-core",
+ "flutter_rust_bridge",
+]
+
+[[package]]
+name = "ente-frb-core"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "flutter_rust_bridge",
+]
+
+[[package]]
 name = "ente-frb-log"
 version = "0.0.0"
 dependencies = [
@@ -2632,8 +2650,9 @@ version = "0.0.0"
 dependencies = [
  "ente-accounts",
  "ente-assets",
- "ente-contacts",
  "ente-core",
+ "ente-frb-contacts",
+ "ente-frb-core",
  "ente-frb-log",
  "ente-legacy",
  "ente-ml",
@@ -2644,16 +2663,9 @@ dependencies = [
 name = "ente-locker-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-contacts",
- "ente-core",
+ "ente-wasm-contacts",
  "ente-wasm-core",
  "ente-wasm-log",
- "js-sys",
- "serde",
- "serde-wasm-bindgen",
- "thiserror 2.0.18",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2726,8 +2738,8 @@ name = "ente-photos-frb"
 version = "0.0.0"
 dependencies = [
  "ente-cast",
- "ente-contacts",
- "ente-core",
+ "ente-frb-contacts",
+ "ente-frb-core",
  "ente-frb-log",
  "ente-image",
  "ente-location",
@@ -2753,16 +2765,9 @@ dependencies = [
 name = "ente-photos-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-contacts",
- "ente-core",
+ "ente-wasm-contacts",
  "ente-wasm-core",
  "ente-wasm-log",
- "js-sys",
- "serde",
- "serde-wasm-bindgen",
- "thiserror 2.0.18",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2850,6 +2855,21 @@ name = "ente-uniffi-log"
 version = "0.0.0"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "ente-wasm-contacts"
+version = "0.0.0"
+dependencies = [
+ "ente-contacts",
+ "ente-core",
+ "ente-wasm-core",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "thiserror 2.0.18",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

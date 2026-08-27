@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:ente_contacts/contacts.dart' as contacts;
+import 'package:locker/services/authenticated_session.dart';
 import 'package:locker/services/configuration.dart';
-import 'package:locker/services/frb_contacts_rust_api.dart';
+import 'package:locker/services/contacts.dart';
 import 'package:logging/logging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,8 +18,25 @@ class LockerContactsDisplayService {
     required PackageInfo packageInfo,
   }) async {
     contacts.ContactsDisplayService.instance.init(
-      preferences: preferences,
-      rustApi: const FrbContactsRustApi(),
+      contactsServiceFactory: (account) {
+        final session = authenticatedSession(account);
+        return contacts.ContactsService(
+          preferences: preferences,
+          updateAuthToken: (token) => session.updateAuthToken(authToken: token),
+          createContact: (key, data) => createContact(session, key, data),
+          getDiff: (key, sinceTime, limit) =>
+              getDiff(session, key, sinceTime, limit),
+          updateContact: (key, contactId, data) =>
+              updateContact(session, key, contactId, data),
+          deleteContact: (contactId) => deleteContact(session, contactId),
+          setAttachment: (key, contactId, type, bytes) =>
+              setAttachment(session, key, contactId, type, bytes),
+          deleteAttachment: (key, contactId, type) =>
+              deleteAttachment(session, key, contactId, type),
+          getProfilePicture: (key, contactId) =>
+              getProfilePicture(session, key, contactId),
+        );
+      },
     );
     _packageInfo = packageInfo;
     scheduleEnsureReady();

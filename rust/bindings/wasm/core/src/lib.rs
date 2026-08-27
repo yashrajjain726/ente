@@ -34,10 +34,6 @@ impl Session {
     pub fn inner(&self) -> &InnerSession {
         &self.0
     }
-
-    pub fn clone_inner(&self) -> Arc<InnerSession> {
-        Arc::clone(&self.0)
-    }
 }
 
 #[wasm_bindgen]

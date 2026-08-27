@@ -1,4 +1,3 @@
-import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { ensureArrayBufferBacked } from "ente-base/bytes";
 import { retryAsyncOperation } from "ente-base/http";
 import log from "ente-base/log";
@@ -55,50 +54,28 @@ export interface RemoteContactRecord {
     updatedAt: number;
 }
 
-export interface ContactsReadyInput {
-    userID: number;
-    masterKeyB64: string;
+interface ContactsDiffOutput {
+    records: RemoteContactRecord[];
+    wrappedRootContactKey?: WrappedRootContactKey;
 }
 
-type ContactsSessionInput = ContactsReadyInput & {
-    sessionKey: string;
-    baseURL: string;
-    authToken: string;
-    generation: number;
-    openContacts: OpenContacts;
-};
-
-export interface ContactsClient {
-    updateAuthToken: (authToken: string) => void;
-    currentWrappedRootContactKey: () => WrappedRootContactKey | undefined;
-    getDiff: (
-        sinceTime: number,
-        limit: number,
-    ) => Promise<RemoteContactRecord[]>;
-    getProfilePicture: (contactID: string) => Promise<Uint8Array>;
+interface ProfilePictureOutput {
+    bytes: Uint8Array;
+    wrappedRootContactKey?: WrappedRootContactKey;
 }
 
-export interface OpenContactsInput {
-    baseUrl: string;
-    authToken: string;
-    userId: number;
-    masterKeyB64: string;
-    cachedWrappedRootContactKey?: WrappedRootContactKey;
-    clientPackage?: string;
-    clientVersion?: string;
-}
-
-export type OpenContacts = (
-    input: OpenContactsInput,
-) => Promise<ContactsClient>;
+type LoadProfilePicture = (
+    wrappedRootContactKey: WrappedRootContactKey | undefined,
+    contactID: string,
+) => Promise<ProfilePictureOutput>;
 
 interface ContactsState {
     snapshot: ContactsDisplaySnapshot;
     listeners: Set<() => void>;
     currentSessionKey: string | undefined;
     sessionGeneration: number;
-    currentAuthToken: string | undefined;
-    client: ContactsClient | undefined;
+    getProfilePicture: LoadProfilePicture | undefined;
+    wrappedRootContactKey: WrappedRootContactKey | undefined;
     readyPromise: Promise<void> | undefined;
     contactsByID: Map<string, ContactDisplayRecord>;
     contactIDByUserID: Map<number, string>;
@@ -121,8 +98,8 @@ const state: ContactsState = {
     listeners: new Set(),
     currentSessionKey: undefined,
     sessionGeneration: 0,
-    currentAuthToken: undefined,
-    client: undefined,
+    getProfilePicture: undefined,
+    wrappedRootContactKey: undefined,
     readyPromise: undefined,
     contactsByID: new Map(),
     contactIDByUserID: new Map(),
@@ -167,8 +144,8 @@ const clearInMemoryState = () => {
     for (const avatarURL of state.avatarURLByContactID.values()) {
         URL.revokeObjectURL(avatarURL);
     }
-    state.client = undefined;
-    state.currentAuthToken = undefined;
+    state.getProfilePicture = undefined;
+    state.wrappedRootContactKey = undefined;
     state.readyPromise = undefined;
     state.contactsByID = new Map();
     state.contactIDByUserID = new Map();
@@ -330,90 +307,42 @@ const ensureSessionLoaded = async (sessionKey: string) =>
         ? state.sessionGeneration
         : loadLocalSessionState(sessionKey);
 
-const ensureContactsClientOpen = async ({
-    sessionKey,
-    baseURL,
-    authToken,
-    userID,
-    masterKeyB64,
-    generation,
-    openContacts,
-}: ContactsSessionInput) => {
+const syncContacts = async (
+    sessionKey: string,
+    generation: number,
+    getDiff: (
+        wrappedRootContactKey: WrappedRootContactKey | undefined,
+        sinceTime: number,
+        limit: number,
+    ) => Promise<ContactsDiffOutput>,
+) => {
     if (!isCurrentSession(sessionKey, generation)) {
         return;
     }
-
-    let client = state.client;
-
-    if (!client) {
-        const cachedWrappedRootContactKey =
-            await savedWrappedRootContactKey(sessionKey);
-        if (!isCurrentSession(sessionKey, generation)) {
-            return;
-        }
-        const openedClient = await openContacts({
-            baseUrl: baseURL,
-            authToken,
-            userId: userID,
-            masterKeyB64,
-            cachedWrappedRootContactKey,
-            clientPackage: clientPackageName,
-            clientVersion: isDesktop ? desktopAppVersion : undefined,
-        });
-        if (!isCurrentSession(sessionKey, generation)) {
-            return;
-        }
-        state.client = openedClient;
-        client = openedClient;
-        const wrappedRootContactKey = client.currentWrappedRootContactKey();
-        if (wrappedRootContactKey) {
-            await saveWrappedRootContactKey(sessionKey, wrappedRootContactKey);
-            if (!isCurrentSession(sessionKey, generation)) {
-                return;
-            }
-        }
-    } else if (state.currentAuthToken !== authToken) {
-        client.updateAuthToken(authToken);
-    }
-
+    const cachedWrappedRootContactKey =
+        state.wrappedRootContactKey ??
+        (await savedWrappedRootContactKey(sessionKey));
     if (!isCurrentSession(sessionKey, generation)) {
         return;
     }
-
-    state.currentAuthToken = authToken;
-    return client;
-};
-
-const syncContacts = async ({
-    sessionKey,
-    baseURL,
-    authToken,
-    userID,
-    masterKeyB64,
-    generation,
-    openContacts,
-}: ContactsSessionInput) => {
-    const client = await ensureContactsClientOpen({
-        sessionKey,
-        baseURL,
-        authToken,
-        userID,
-        masterKeyB64,
-        generation,
-        openContacts,
-    });
-    if (!client) {
-        return;
-    }
+    state.wrappedRootContactKey = cachedWrappedRootContactKey;
 
     let sinceTime = (await savedContactsSinceTime(sessionKey)) ?? 0;
     let didChange = false;
 
     while (true) {
-        const diff = await client.getDiff(sinceTime, CONTACT_DIFF_LIMIT);
+        const output = await getDiff(
+            state.wrappedRootContactKey,
+            sinceTime,
+            CONTACT_DIFF_LIMIT,
+        );
         if (!isCurrentSession(sessionKey, generation)) {
             return;
         }
+        if (output.wrappedRootContactKey) {
+            state.wrappedRootContactKey = output.wrappedRootContactKey;
+        }
+        const diff = output.records;
         if (diff.length === 0) {
             break;
         }
@@ -433,7 +362,7 @@ const syncContacts = async ({
         if (!isCurrentSession(sessionKey, generation)) {
             return;
         }
-        const wrappedRootContactKey = client.currentWrappedRootContactKey();
+        const wrappedRootContactKey = state.wrappedRootContactKey;
         if (wrappedRootContactKey) {
             await saveWrappedRootContactKey(sessionKey, wrappedRootContactKey);
             if (!isCurrentSession(sessionKey, generation)) {
@@ -448,12 +377,22 @@ const syncContacts = async ({
     }
 };
 
-export const ensureContactsReady = async (
-    { userID, masterKeyB64 }: ContactsReadyInput,
-    openContacts: OpenContacts,
+export const ensureContactsReady = async <Session>(
+    userID: number,
+    session: Session,
+    getDiff: (
+        session: Session,
+        wrappedRootContactKey: WrappedRootContactKey | undefined,
+        sinceTime: number,
+        limit: number,
+    ) => Promise<ContactsDiffOutput>,
+    getProfilePicture: (
+        session: Session,
+        wrappedRootContactKey: WrappedRootContactKey | undefined,
+        contactID: string,
+    ) => Promise<ProfilePictureOutput>,
 ) => {
-    const authToken = await savedAuthToken();
-    if (!authToken) {
+    if (!(await savedAuthToken())) {
         state.sessionGeneration += 1;
         state.currentSessionKey = undefined;
         clearInMemoryState();
@@ -473,17 +412,13 @@ export const ensureContactsReady = async (
         return state.readyPromise;
     }
 
+    state.getProfilePicture = (key, contactID) =>
+        getProfilePicture(session, key, contactID);
     const readyPromise = retryAsyncOperation(
         () =>
-            syncContacts({
-                sessionKey,
-                baseURL,
-                authToken,
-                userID,
-                masterKeyB64,
-                generation,
-                openContacts,
-            }),
+            syncContacts(sessionKey, generation, (key, sinceTime, limit) =>
+                getDiff(session, key, sinceTime, limit),
+            ),
         { retryProfile: "background" },
     ).finally(() => {
         if (state.readyPromise === readyPromise) {
@@ -545,10 +480,14 @@ const inferImageMimeType = (bytes: Uint8Array) => {
 
 const ensureProfilePictureLoaded = async (contactID: string) => {
     const contact = state.contactsByID.get(contactID);
-    const client = state.client;
+    const getProfilePicture = state.getProfilePicture;
     const sessionKey = state.currentSessionKey;
     const generation = state.sessionGeneration;
-    if (!contact?.profilePictureAttachmentID || !client || !sessionKey) {
+    if (
+        !contact?.profilePictureAttachmentID ||
+        !getProfilePicture ||
+        !sessionKey
+    ) {
         return;
     }
 
@@ -567,15 +506,18 @@ const ensureProfilePictureLoaded = async (contactID: string) => {
         return;
     }
 
-    const load = client
-        .getProfilePicture(contactID)
-        .then((bytes: Uint8Array) => {
+    const load = getProfilePicture(state.wrappedRootContactKey, contactID)
+        .then((output) => {
             if (
                 !isCurrentSession(sessionKey, generation) ||
-                state.client !== client
+                state.getProfilePicture !== getProfilePicture
             ) {
                 return;
             }
+            if (output.wrappedRootContactKey) {
+                state.wrappedRootContactKey = output.wrappedRootContactKey;
+            }
+            const bytes = output.bytes;
             const blob = new Blob([ensureArrayBufferBacked(bytes)], {
                 type: inferImageMimeType(bytes),
             });
@@ -588,7 +530,7 @@ const ensureProfilePictureLoaded = async (contactID: string) => {
         .catch((error: unknown) => {
             if (
                 !isCurrentSession(sessionKey, generation) ||
-                state.client !== client
+                state.getProfilePicture !== getProfilePicture
             ) {
                 return;
             }

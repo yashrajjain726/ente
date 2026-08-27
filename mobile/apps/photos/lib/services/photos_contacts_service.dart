@@ -6,16 +6,33 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/contacts_changed_event.dart";
 import "package:photos/events/user_logged_out_event.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/services/frb_contacts_rust_api.dart";
+import "package:photos/services/authenticated_session.dart";
+import "package:photos/services/contacts.dart";
 
 // Photos-specific session and event adapter for the shared contact directory.
 class PhotosContactsService {
   PhotosContactsService._privateConstructor()
     : _store = contacts.ContactDirectory(
-        contactsServiceFactory: () => contacts.ContactsService(
-          preferences: ServiceLocator.instance.prefs,
-          rustApi: const FrbContactsRustApi(),
-        ),
+        contactsServiceFactory: (account) {
+          final session = authenticatedSession(account);
+          return contacts.ContactsService(
+            preferences: ServiceLocator.instance.prefs,
+            updateAuthToken: (token) =>
+                session.updateAuthToken(authToken: token),
+            createContact: (key, data) => createContact(session, key, data),
+            getDiff: (key, sinceTime, limit) =>
+                getDiff(session, key, sinceTime, limit),
+            updateContact: (key, contactId, data) =>
+                updateContact(session, key, contactId, data),
+            deleteContact: (contactId) => deleteContact(session, contactId),
+            setAttachment: (key, contactId, type, bytes) =>
+                setAttachment(session, key, contactId, type, bytes),
+            deleteAttachment: (key, contactId, type) =>
+                deleteAttachment(session, key, contactId, type),
+            getProfilePicture: (key, contactId) =>
+                getProfilePicture(session, key, contactId),
+          );
+        },
         onContactsChanged: _notifyContactsChanged,
         profilePictureFailureTtl: Duration.zero,
       ) {
@@ -25,7 +42,7 @@ class PhotosContactsService {
   @visibleForTesting
   PhotosContactsService.forTesting({
     contacts.ContactsService? contactsService,
-    contacts.ContactsService Function()? contactsServiceFactory,
+    contacts.ContactsServiceFactory? contactsServiceFactory,
   }) : _store = contacts.ContactDirectory(
          contactsService: contactsService,
          contactsServiceFactory: contactsServiceFactory,

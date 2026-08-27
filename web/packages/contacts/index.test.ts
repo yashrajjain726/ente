@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+const session = {};
+
 beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
@@ -11,9 +13,7 @@ interface SetupOptions {
     diff?: object[];
     getProfilePictureError?: Error;
     getProfilePictureBytes?: Uint8Array;
-    rootKeySource?: "cache" | "unresolved";
-    wrappedRootContactKey?: { encryptedKey: string; header: string };
-    currentWrappedRootContactKey?: { encryptedKey: string; header: string };
+    rootKeyResolved?: boolean;
 }
 
 const setupContactsModule = async (options: SetupOptions = {}) => {
@@ -32,17 +32,11 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
     const info = vi.fn();
     const warn = vi.fn();
     const error = vi.fn();
-    const updateAuthToken = vi.fn();
-    let isRootKeyResolved = options.rootKeySource !== "unresolved";
-    const currentWrappedRootContactKey = vi.fn(() =>
-        isRootKeyResolved
-            ? (options.currentWrappedRootContactKey ??
-              options.wrappedRootContactKey ?? {
-                  encryptedKey: "wrapped-root-key",
-                  header: "wrapped-header",
-              })
-            : undefined,
-    );
+    let isRootKeyResolved = options.rootKeyResolved ?? true;
+    const wrappedRootContactKey = {
+        encryptedKey: "wrapped-root-key",
+        header: "wrapped-header",
+    };
     const diff = options.diff ?? [
         {
             id: "ct_1",
@@ -59,12 +53,25 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
         .fn()
         .mockImplementationOnce(() => {
             if (diff.length > 0) isRootKeyResolved = true;
-            return Promise.resolve(diff);
+            return Promise.resolve({
+                records: diff,
+                wrappedRootContactKey: isRootKeyResolved
+                    ? wrappedRootContactKey
+                    : undefined,
+            });
         })
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce({
+            records: [],
+            wrappedRootContactKey: isRootKeyResolved
+                ? wrappedRootContactKey
+                : undefined,
+        });
     const getProfilePicture = vi.fn(() => {
         if (options.getProfilePictureBytes) {
-            return Promise.resolve(options.getProfilePictureBytes);
+            return Promise.resolve({
+                bytes: options.getProfilePictureBytes,
+                wrappedRootContactKey,
+            });
         }
         return Promise.reject(
             options.getProfilePictureError ?? new Error("boom"),
@@ -77,33 +84,12 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
         default: { info, warn, error },
         logToDisk: vi.fn(),
     }));
-    vi.doMock("ente-accounts/services/session-storage", () => ({
-        masterKeyFromSession: vi.fn(() => "MASTER_KEY"),
-    }));
-    vi.doMock("ente-accounts/services/user", () => ({
-        ensureLocalUser: vi.fn(() => ({ id: 101 })),
-    }));
-    vi.doMock("ente-base/app", () => ({
-        appName: "photos",
-        clientPackageName: "io.ente.photos.web",
-        desktopAppVersion: undefined,
-        isDesktop: false,
-    }));
     const contacts = await import("./index");
-    const openContacts = () =>
-        Promise.resolve({
-            updateAuthToken,
-            currentWrappedRootContactKey,
-            getDiff,
-            getProfilePicture,
-        });
 
     return {
         contacts,
-        openContacts,
         setKV,
         savedAuthToken,
-        updateAuthToken,
         getDiff,
         getProfilePicture,
         info,
@@ -111,12 +97,15 @@ const setupContactsModule = async (options: SetupOptions = {}) => {
 };
 
 describe("ensureContactsReady", () => {
-    test("does not persist auth token or master key in contacts kv", async () => {
-        const { contacts, openContacts, setKV } = await setupContactsModule();
+    test("does not persist the auth token in contacts kv", async () => {
+        const { contacts, getDiff, getProfilePicture, setKV } =
+            await setupContactsModule();
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "MASTER_KEY_SHOULD_NOT_PERSIST" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
 
         const persisted = setKV.mock.calls
@@ -126,7 +115,6 @@ describe("ensureContactsReady", () => {
         expect(persisted).toContain("contacts/");
         expect(persisted).toContain("wrapped-root-key");
         expect(persisted).toContain("Set");
-        expect(persisted).not.toContain("MASTER_KEY_SHOULD_NOT_PERSIST");
         expect(persisted).not.toContain("auth-token-secret");
 
         const resolved = contacts.resolveContactDisplay({ userID: 101 });
@@ -134,14 +122,17 @@ describe("ensureContactsReady", () => {
     });
 
     test("does not persist an unresolved wrapped root contact key", async () => {
-        const { contacts, openContacts, setKV } = await setupContactsModule({
-            rootKeySource: "unresolved",
-            diff: [],
-        });
+        const { contacts, getDiff, getProfilePicture, setKV } =
+            await setupContactsModule({
+                rootKeyResolved: false,
+                diff: [],
+            });
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "MASTER_KEY_SHOULD_NOT_PERSIST" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
 
         const persisted = setKV.mock.calls
@@ -152,13 +143,14 @@ describe("ensureContactsReady", () => {
     });
 
     test("persists a resolved wrapped root contact key after non-empty diff", async () => {
-        const { contacts, openContacts, setKV } = await setupContactsModule({
-            rootKeySource: "unresolved",
-        });
+        const { contacts, getDiff, getProfilePicture, setKV } =
+            await setupContactsModule({ rootKeyResolved: false });
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "MASTER_KEY_SHOULD_NOT_PERSIST" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
 
         const persisted = setKV.mock.calls
@@ -171,14 +163,16 @@ describe("ensureContactsReady", () => {
 
 describe("profile picture loading", () => {
     test("negative-caches failed profile picture fetches and logs at info", async () => {
-        const { contacts, getProfilePicture, info, openContacts } =
+        const { contacts, getDiff, getProfilePicture, info } =
             await setupContactsModule({
                 getProfilePictureError: new Error("network failure"),
             });
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "ignored" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
 
         await contacts.__testing.preloadResolvedContactAvatar({
@@ -205,13 +199,14 @@ describe("profile picture loading", () => {
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
             0x0d,
         ]);
-        const { contacts, openContacts } = await setupContactsModule({
-            getProfilePictureBytes: pngBytes,
-        });
+        const { contacts, getDiff, getProfilePicture } =
+            await setupContactsModule({ getProfilePictureBytes: pngBytes });
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "ignored" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
         await contacts.__testing.preloadResolvedContactAvatar({ userID: 101 });
 
@@ -223,26 +218,33 @@ describe("profile picture loading", () => {
 describe("retry after warm-up failure", () => {
     test("recovers from a transient failure with bounded background retry", async () => {
         vi.useFakeTimers();
-        const { contacts, getDiff, openContacts } = await setupContactsModule();
+        const { contacts, getDiff, getProfilePicture } =
+            await setupContactsModule();
         getDiff.mockReset();
         getDiff
             .mockRejectedValueOnce(new Error("transient"))
-            .mockResolvedValueOnce([
-                {
-                    id: "ct_1",
-                    contactUserId: 101,
-                    email: "set@test.test",
-                    name: "Set",
-                    profilePictureAttachmentID: "ua_1",
-                    isDeleted: false,
-                    updatedAt: 1,
-                },
-            ])
-            .mockResolvedValueOnce([]);
+            .mockResolvedValueOnce({
+                records: [
+                    {
+                        id: "ct_1",
+                        contactUserId: 101,
+                        email: "set@test.test",
+                        name: "Set",
+                        profilePictureAttachmentID: "ua_1",
+                        isDeleted: false,
+                        updatedAt: 1,
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                records: [],
+            });
 
         const ready = contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "ignored" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
         await vi.advanceTimersByTimeAsync(10_001);
         await expect(ready).resolves.toBeUndefined();
@@ -252,14 +254,17 @@ describe("retry after warm-up failure", () => {
 
     test("stops after bounded background retries keep failing", async () => {
         vi.useFakeTimers();
-        const { contacts, getDiff, openContacts } = await setupContactsModule();
+        const { contacts, getDiff, getProfilePicture } =
+            await setupContactsModule();
         getDiff.mockReset();
         getDiff.mockRejectedValue(new Error("down"));
 
         const ready = expect(
             contacts.ensureContactsReady(
-                { userID: 101, masterKeyB64: "ignored" },
-                openContacts,
+                101,
+                session,
+                getDiff,
+                getProfilePicture,
             ),
         ).rejects.toThrow("down");
 
@@ -273,15 +278,10 @@ describe("retry after warm-up failure", () => {
         expect(getDiff).toHaveBeenCalledTimes(4);
     });
 
-    test("stale retry does not update a newer generation context token", async () => {
+    test("a stale retry does not update a newer session", async () => {
         vi.useFakeTimers();
-        const {
-            contacts,
-            savedAuthToken,
-            updateAuthToken,
-            getDiff,
-            openContacts,
-        } = await setupContactsModule();
+        const { contacts, savedAuthToken, getDiff, getProfilePicture } =
+            await setupContactsModule();
         savedAuthToken
             .mockReturnValueOnce("old-token")
             .mockReturnValueOnce(undefined)
@@ -289,31 +289,35 @@ describe("retry after warm-up failure", () => {
         getDiff.mockReset();
         getDiff
             .mockRejectedValueOnce(new Error("transient"))
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([]);
+            .mockResolvedValue({ records: [] });
 
         const staleReady = contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "old-master-key" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
         await vi.advanceTimersByTimeAsync(0);
         expect(getDiff).toHaveBeenCalledTimes(1);
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "clearing-master-key" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
         expect(getDiff).toHaveBeenCalledTimes(1);
 
         await contacts.ensureContactsReady(
-            { userID: 101, masterKeyB64: "new-master-key" },
-            openContacts,
+            101,
+            session,
+            getDiff,
+            getProfilePicture,
         );
         expect(getDiff).toHaveBeenCalledTimes(2);
 
         await vi.advanceTimersByTimeAsync(10_001);
         await expect(staleReady).resolves.toBeUndefined();
-        expect(updateAuthToken).not.toHaveBeenCalled();
         expect(getDiff).toHaveBeenCalledTimes(2);
     });
 });

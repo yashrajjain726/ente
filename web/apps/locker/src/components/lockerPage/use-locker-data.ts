@@ -1,4 +1,8 @@
 import {
+    authenticatedSession,
+    openAuthenticatedSession,
+} from "@/services/authenticated-session";
+import {
     LOCKER_FILE_LIMIT_FREE,
     LOCKER_FILE_LIMIT_PAID,
     type LockerUploadLimitState,
@@ -24,7 +28,7 @@ import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
 import { ensureContactsReady } from "ente-contacts";
-import { openContacts } from "ente-locker-wasm";
+import { contactsGetDiff, contactsGetProfilePicture } from "ente-locker-wasm";
 import { t } from "i18next";
 import type { NextRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -105,6 +109,20 @@ export const useLockerData = ({
     useEffect(() => {
         userDetailsRef.current = userDetails;
     }, [userDetails]);
+
+    const warmContacts = useCallback(async () => {
+        const authToken = await savedAuthToken();
+        if (!authToken) return;
+
+        const session = authenticatedSession();
+        session.updateAuthToken(authToken);
+        await ensureContactsReady(
+            ensureLocalUser().id,
+            session,
+            contactsGetDiff,
+            contactsGetProfilePicture,
+        );
+    }, []);
 
     const loadLockerUsage = useCallback(
         async (
@@ -315,10 +333,8 @@ export const useLockerData = ({
                 }
 
                 setMasterKey(mk);
-                void ensureContactsReady(
-                    { userID: ensureLocalUser().id, masterKeyB64: mk },
-                    openContacts,
-                ).catch((error: unknown) => {
+                await openAuthenticatedSession(ensureLocalUser().id, token, mk);
+                void warmContacts().catch((error: unknown) => {
                     log.warn(
                         "[locker] Failed to warm contacts display cache",
                         error,
@@ -362,7 +378,7 @@ export const useLockerData = ({
         return () => {
             cancelled = true;
         };
-    }, [fetchAndStoreLockerData, logout, router, showMiniDialog]);
+    }, [fetchAndStoreLockerData, logout, router, showMiniDialog, warmContacts]);
 
     const removeCollectionFromState = useCallback((collectionID: number) => {
         setCollections((current) =>
@@ -381,5 +397,6 @@ export const useLockerData = ({
         trashLastUpdatedAt,
         userDetails,
         ensureUploadLimitState,
+        warmContacts,
     };
 };

@@ -10,7 +10,7 @@ import 'package:ente_crypto_api/ente_crypto_api.dart';
 import 'package:ente_crypto_dart_adapter/ente_crypto_dart_adapter.dart';
 import 'package:ente_install_source/ente_install_source.dart';
 import "package:ente_legacy/services/emergency_service.dart";
-import "package:ente_legacy/services/legacy_kit_service.dart";
+import "package:ente_legacy/services/legacy_kit_share_file_service.dart";
 import 'package:ente_lock_screen/lock_screen_settings.dart';
 import 'package:ente_lock_screen/ui/app_lock.dart';
 import 'package:ente_lock_screen/ui/lock_screen.dart';
@@ -34,7 +34,6 @@ import 'package:locker/services/files/download/service_locator.dart';
 import 'package:locker/services/files/links/links_client.dart';
 import 'package:locker/services/files/links/links_service.dart';
 import 'package:locker/services/files/offline/offline_files_service.dart';
-import 'package:locker/services/frb_legacy_kit_rust_api.dart';
 import 'package:locker/services/local_settings.dart';
 import 'package:locker/services/trash/trash_service.dart';
 import 'package:locker/services/update_service.dart';
@@ -228,11 +227,7 @@ Future<void> _init(bool bool, {String? via}) async {
       preferences: preferences,
       packageInfo: packageInfo,
     );
-    await LegacyKitService.instance.init(
-      config: Configuration.instance,
-      sessionProvider: LockerContactsDisplayService.buildSession,
-      rustApi: const FrbLegacyKitRustApi(),
-    );
+    unawaited(cleanStaleLegacyKitShareFiles());
     unawaited(
       Future.delayed(
         const Duration(seconds: 5),
