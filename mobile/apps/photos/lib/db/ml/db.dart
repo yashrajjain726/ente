@@ -104,8 +104,15 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   Future<SqliteDatabase>? _sqliteAsyncDBFuture;
 
   Future<SqliteDatabase> get asyncDB async {
-    _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
-    return _sqliteAsyncDBFuture!;
+    final databaseFuture = _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
+    try {
+      return await databaseFuture;
+    } catch (_) {
+      if (identical(_sqliteAsyncDBFuture, databaseFuture)) {
+        _sqliteAsyncDBFuture = null;
+      }
+      rethrow;
+    }
   }
 
   Future<SqliteDatabase> _initSqliteAsyncDatabase() async {
@@ -119,13 +126,20 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       path: databaseDirectory,
       maxReaders: 2,
     );
-    final stopwatch = Stopwatch()..start();
-    _logger.info("MLDataDB: Starting migration");
-    await migrate(asyncDBConnection, _migrationScripts);
-    _logger.info("MLDataDB Migration took ${stopwatch.elapsedMilliseconds} ms");
-    stopwatch.stop();
+    try {
+      final stopwatch = Stopwatch()..start();
+      _logger.info("MLDataDB: Starting migration");
+      await migrate(asyncDBConnection, _migrationScripts);
+      _logger.info(
+        "MLDataDB Migration took ${stopwatch.elapsedMilliseconds} ms",
+      );
+      stopwatch.stop();
 
-    return asyncDBConnection;
+      return asyncDBConnection;
+    } catch (_) {
+      await asyncDBConnection.close();
+      rethrow;
+    }
   }
 
   Iterable<List<T>> _chunkList<T>(List<T> values, int chunkSize) sync* {

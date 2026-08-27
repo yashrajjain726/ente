@@ -53,8 +53,15 @@ class GalleryDownloadsDB with SqlDbBase {
   static Future<SqliteDatabase>? _sqliteAsyncDBFuture;
 
   Future<SqliteDatabase> get sqliteAsyncDB async {
-    _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
-    return _sqliteAsyncDBFuture!;
+    final databaseFuture = _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
+    try {
+      return await databaseFuture;
+    } catch (_) {
+      if (identical(_sqliteAsyncDBFuture, databaseFuture)) {
+        _sqliteAsyncDBFuture = null;
+      }
+      rethrow;
+    }
   }
 
   Future<SqliteDatabase> _initSqliteAsyncDatabase() async {
@@ -62,8 +69,13 @@ class GalleryDownloadsDB with SqlDbBase {
     final path = join(documentsDirectory.path, _databaseName);
     _logger.info("DB path $path");
     final database = SqliteDatabase(path: path);
-    await migrate(database, _migrationScripts);
-    return database;
+    try {
+      await migrate(database, _migrationScripts);
+      return database;
+    } catch (_) {
+      await database.close();
+      rethrow;
+    }
   }
 
   Future<void> upsertTask(DownloadTask task) async {
