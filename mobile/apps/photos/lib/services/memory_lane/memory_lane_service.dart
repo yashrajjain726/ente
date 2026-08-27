@@ -8,35 +8,19 @@ import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
+import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/ml_consent_changed_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/memory_lane/memory_lane_models.dart";
 import "package:photos/models/ml/face/face.dart";
+import "package:photos/models/ml/face/person.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/memory_lane/memory_lane_cache_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
-
-@visibleForTesting
-int? eligibleCreationTimeCutoffMicros(String? birthDateString) {
-  if (birthDateString == null || birthDateString.isEmpty) {
-    return null;
-  }
-  final birthDate = DateTime.tryParse(birthDateString);
-  if (birthDate == null) {
-    return null;
-  }
-  final year = birthDate.year + 3;
-  final lastDay = DateTime(year, birthDate.month + 1, 0).day;
-  return DateTime(
-    year,
-    birthDate.month,
-    birthDate.day.clamp(1, lastDay),
-  ).microsecondsSinceEpoch;
-}
 
 class MemoryLaneService {
   MemoryLaneService._internal() {
@@ -54,9 +38,11 @@ class MemoryLaneService {
 
   final Logger _logger = Logger("MemoryLaneService");
   final MemoryLaneCacheService _cacheService = MemoryLaneCacheService.instance;
-  final MLDataDB _mlDataDB = MLDataDB.instance;
+  MLDataDB get _mlDataDB =>
+      isLocalGalleryMode ? MLDataDB.localGalleryInstance : MLDataDB.instance;
   final FilesDB _filesDB = FilesDB.instance;
-  final TaskQueue<String> _precomputeQueue = TaskQueue(
+  final OfflineFilesDB _offlineFilesDB = OfflineFilesDB.instance;
+  final TaskQueue<_TimelineRequest> _precomputeQueue = TaskQueue(
     maxConcurrentTasks: 1,
     taskTimeout: const Duration(minutes: 5),
     maxQueueSize: 1000,
@@ -72,8 +58,9 @@ class MemoryLaneService {
   );
 
   final Map<String, int> _lastForcedComputeMicros = {};
-  final Map<String, bool> _pendingRequests = {};
+  final Map<String, _TimelineRequest> _pendingRequests = {};
   final Set<String> _cropReadinessInFlight = {};
+  Set<String> _topNClusters = {};
 
   bool __isFeatureEnabled = false;
   // TODO: this should be removed, but flagService does not fire MLConsentChangedEvent on remote flags sync
@@ -114,47 +101,103 @@ class MemoryLaneService {
     if (!isFeatureEnabled) {
       return;
     }
-    if (!PersonService.isInitialized) {
-      _logger.warning("Full recompute skipped: PersonService unavailable");
-      return;
-    }
-    final persons = await PersonService.instance.getPersons();
-    for (final person in persons) {
-      if (person.data.isIgnored) {
-        await _handleIgnoredPerson(person.remoteID);
-        continue;
+    final List<PersonEntity> persons = [];
+    if (!isLocalGalleryMode) {
+      if (!PersonService.isInitialized) {
+        _logger.warning("Full recompute skipped: PersonService unavailable");
+        return;
       }
-      schedulePersonRecompute(person.remoteID, force: force);
+      persons.addAll(await PersonService.instance.getPersons());
+      for (final person in persons) {
+        if (person.data.isIgnored) {
+          await _invalidateTimeline(person.remoteID);
+          continue;
+        }
+        schedulePersonRecompute(person.remoteID, force: force);
+      }
+    }
+    if (flagService.internalUser) {
+      final assigned = <String>{};
+      for (final person in persons) {
+        for (final cluster in person.data.assigned) {
+          assigned.add(cluster.id);
+        }
+      }
+      _topNClusters = await _mlDataDB.getClustersForMemoryLane(assigned);
+      final cache = await _cacheService.getCache();
+      final List<Future<void>> tasks = [];
+      for (final timeline in cache.allTimelines) {
+        if (timeline.isCluster && !_topNClusters.contains(timeline.personId)) {
+          tasks.add(_cacheService.removeTimeline(timeline.personId));
+          tasks.add(_cacheService.removeComputeLogEntry(timeline.personId));
+        }
+      }
+      if (tasks.isNotEmpty) {
+        unawaited(Future.wait(tasks).then((_) => _refreshReadyPersonIds()));
+      }
+      for (final cluster in _topNClusters) {
+        schedulePersonRecompute(cluster, isCluster: true, force: force);
+      }
     }
   }
 
-  void schedulePersonRecompute(String personId, {bool force = false}) {
+  void schedulePersonRecompute(
+    String personId, {
+    bool isCluster = false,
+    bool force = false,
+  }) {
     if (personId.isEmpty) {
       return;
     }
-    _pendingRequests[personId] = (_pendingRequests[personId] ?? false) || force;
+    final pendingRequest = _pendingRequests[personId];
+    if (pendingRequest != null) {
+      if (!force) return;
+      pendingRequest.isRevoked = true;
+      _precomputeQueue.removeTask(pendingRequest);
+    }
+    final request = _TimelineRequest(force);
+    _pendingRequests[personId] = request;
     _precomputeQueue
-        .addTask(personId, () async {
-          final requestForce = _pendingRequests.remove(personId) ?? force;
-          await _recomputeTimelineForPerson(personId, force: requestForce);
+        .addTask(request, () async {
+          try {
+            await _recomputeTimelineForPerson(
+              personId,
+              isCluster: isCluster,
+              request: request,
+            );
+          } finally {
+            if (identical(_pendingRequests[personId], request)) {
+              _pendingRequests.remove(personId);
+            }
+          }
         })
         .catchError((e, s) {
-          _pendingRequests.remove(personId);
-          _logger.severe("Recompute failed for $personId", e, s);
+          if (identical(_pendingRequests[personId], request)) {
+            _pendingRequests.remove(personId);
+          }
+          if (e is! TaskQueueCancelledException) {
+            _logger.severe("Recompute failed for $personId", e, s);
+          }
         });
   }
 
-  Future<void> ensureTimelineReachability(String personId) async {
+  Future<void> ensureTimelineReachability(
+    String personId, {
+    bool isCluster = false,
+  }) async {
     if (!isFeatureEnabled) {
       return;
     }
     if (personId.isEmpty) {
       return;
     }
+    if (isCluster && !_topNClusters.contains(personId)) {
+      return;
+    }
     final timeline = await _cacheService.getTimeline(personId);
     if (timeline == null || !timeline.isEligible || timeline.entries.isEmpty) {
       await _refreshReadyPersonIds();
-      schedulePersonRecompute(personId);
+      schedulePersonRecompute(personId, isCluster: isCluster);
       return;
     }
     if (await _areTimelineFaceCropsCached(timeline)) {
@@ -162,10 +205,13 @@ class MemoryLaneService {
       return;
     }
     await _refreshReadyPersonIds();
-    _queueTimelineCropReadiness(personId);
+    _queueTimelineCropReadiness(personId, isCluster: isCluster);
   }
 
-  Future<MemoryLanePersonTimeline?> getTimeline(String personId) async {
+  Future<MemoryLanePersonTimeline?> getTimeline(
+    String personId, {
+    bool isCluster = false,
+  }) async {
     if (!isFeatureEnabled) {
       return null;
     }
@@ -185,7 +231,7 @@ class MemoryLaneService {
     if (!containsHiddenEntry) {
       if (timeline.isEligible && !await _areTimelineFaceCropsCached(timeline)) {
         _logger.info("Missing face crops for $personId");
-        _queueTimelineCropReadiness(personId);
+        _queueTimelineCropReadiness(personId, isCluster: isCluster);
         await _refreshReadyPersonIds();
         return null;
       }
@@ -193,13 +239,12 @@ class MemoryLaneService {
     }
 
     _logger.info("Removing timeline with hidden files for $personId");
-    await _cacheService.removeTimeline(personId);
-    await _refreshReadyPersonIds();
-    schedulePersonRecompute(personId, force: true);
+    await _invalidateTimeline(personId);
+    schedulePersonRecompute(personId, isCluster: isCluster, force: true);
     return null;
   }
 
-  bool hasReadyTimelineSync(String personId) {
+  bool hasReadyTimelineSync(String personId, {bool isCluster = false}) {
     if (!isFeatureEnabled) {
       return false;
     }
@@ -218,7 +263,7 @@ class MemoryLaneService {
     );
   }
 
-  void _queueTimelineCropReadiness(String personId) {
+  void _queueTimelineCropReadiness(String personId, {required bool isCluster}) {
     if (_cropReadinessInFlight.contains(personId)) {
       return;
     }
@@ -226,7 +271,7 @@ class MemoryLaneService {
     _cropReadinessQueue
         .addTask(personId, () async {
           try {
-            await _repairTimelineCropReadiness(personId);
+            await _repairTimelineCropReadiness(personId, isCluster: isCluster);
           } finally {
             _cropReadinessInFlight.remove(personId);
           }
@@ -237,11 +282,14 @@ class MemoryLaneService {
         });
   }
 
-  Future<void> _repairTimelineCropReadiness(String personId) async {
+  Future<void> _repairTimelineCropReadiness(
+    String personId, {
+    required bool isCluster,
+  }) async {
     if (!isFeatureEnabled) {
       return;
     }
-    if (!PersonService.isInitialized) {
+    if (!isCluster && !PersonService.isInitialized) {
       _logger.warning(
         "Crop repair skipped for $personId: PersonService unavailable",
       );
@@ -256,23 +304,27 @@ class MemoryLaneService {
       await _refreshReadyPersonIds();
       return;
     }
-    final person = await PersonService.instance.getPerson(personId);
-    if (person == null) {
-      await _cacheService.removeTimeline(personId);
-      await _refreshReadyPersonIds();
-      return;
-    }
-    if (person.data.isIgnored) {
-      await _handleIgnoredPerson(personId);
-      return;
+    if (isCluster) {
+      final faceIds = await _mlDataDB.getFaceIDsForCluster(personId);
+      if (faceIds.isEmpty) {
+        await _invalidateTimeline(personId);
+        return;
+      }
+    } else {
+      final person = await PersonService.instance.getPerson(personId);
+      if (person == null || person.data.isIgnored) {
+        await _invalidateTimeline(personId);
+        return;
+      }
     }
 
     final fileIds = timeline.entries.map((entry) => entry.fileId).toSet();
-    final filesById = await _filesDB.getFileIDToFileFromIDs(fileIds.toList());
+    final filesById = await getTimelineFiles(fileIds);
     final cropsReady = await _ensureFaceCrops(
       personId,
       timeline.entries,
       filesById,
+      isCluster: isCluster,
     );
     await _refreshReadyPersonIds();
     if (!cropsReady) {
@@ -280,20 +332,40 @@ class MemoryLaneService {
     }
   }
 
-  Future<void> _handleIgnoredPerson(String personId) async {
-    _pendingRequests.remove(personId);
-    await _cacheService.removeTimeline(personId);
+  Future<void> _invalidateTimeline(String id) async {
+    _pendingRequests.remove(id);
+    await _cacheService.removeTimeline(id);
     await _refreshReadyPersonIds();
+  }
+
+  Future<void> _revokeTimeline(String id) async {
+    _pendingRequests[id]?.isRevoked = true;
+    final didRemove = await _cacheService.removeTimeline(id);
+    if (didRemove) {
+      await _refreshReadyPersonIds();
+    }
   }
 
   void _handlePeopleChange(PeopleChangedEvent event) {
     if (!isFeatureEnabled) {
       return;
     }
-    if (event.type == PeopleEventType.syncDone) {
+    unawaited(_cleanupAssignedClusterTimelines(event));
+    if (event.type == PeopleEventType.removedFilesFromCluster ||
+        event.type == PeopleEventType.removedFaceFromCluster) {
+      unawaited(_processClusterChange(event));
       return;
     }
-    unawaited(_processPeopleChange(event));
+    if (event.type != PeopleEventType.syncDone) {
+      unawaited(_processPeopleChange(event));
+    }
+  }
+
+  Future<void> _processClusterChange(PeopleChangedEvent event) async {
+    final clusterID = event.source;
+    if (clusterID.isEmpty) return;
+    if (!_topNClusters.contains(clusterID)) return;
+    schedulePersonRecompute(clusterID, isCluster: true, force: true);
   }
 
   Future<void> _processPeopleChange(PeopleChangedEvent event) async {
@@ -304,7 +376,7 @@ class MemoryLaneService {
       return;
     }
     if (person.data.isIgnored) {
-      await _handleIgnoredPerson(person.remoteID);
+      await _invalidateTimeline(person.remoteID);
       return;
     }
     final logEntry = await _cacheService.getComputeLogEntry(person.remoteID);
@@ -344,7 +416,7 @@ class MemoryLaneService {
 
     final facesPerYear = await _countEligibleFacesByYear(
       faceIds,
-      eligibleCreationTimeCutoffMicros(person.data.birthDate),
+      _eligibleCreationTimeCutoffMicros(person.data.birthDate),
     );
     if (_hasNewYearWithTenFaces(timeline, facesPerYear)) {
       schedulePersonRecompute(person.remoteID);
@@ -470,27 +542,28 @@ class MemoryLaneService {
 
   Future<void> _recomputeTimelineForPerson(
     String personId, {
-    required bool force,
+    required bool isCluster,
+    required _TimelineRequest request,
   }) async {
-    if (!isFeatureEnabled) {
+    final force = request.force;
+    if (!isFeatureEnabled || request.isRevoked) {
       return;
     }
-    if (!PersonService.isInitialized) {
+    if (!isCluster && !PersonService.isInitialized) {
       _logger.warning(
         "Recompute skipped for $personId: PersonService unavailable",
       );
       return;
     }
 
-    final person = await PersonService.instance.getPerson(personId);
-    if (person == null) {
-      await _cacheService.removeTimeline(personId);
-      await _refreshReadyPersonIds();
-      return;
-    }
-    if (person.data.isIgnored) {
-      await _handleIgnoredPerson(personId);
-      return;
+    final person = isCluster
+        ? null
+        : await PersonService.instance.getPerson(personId);
+    if (!isCluster) {
+      if (person == null || person.data.isIgnored) {
+        await _invalidateTimeline(personId);
+        return;
+      }
     }
 
     final nowMicros = DateTime.now().microsecondsSinceEpoch;
@@ -514,23 +587,29 @@ class MemoryLaneService {
       _lastForcedComputeMicros[personId] = nowMicros;
     }
 
-    final faceIds = await _mlDataDB.getFaceIDsForPerson(personId);
+    final faceIds = isCluster
+        ? await _mlDataDB.getFaceIDsForCluster(personId)
+        : await _mlDataDB.getFaceIDsForPerson(personId);
     final (timeline, filesById) = await _computeTimeline(
       faceIds,
       personId,
       nowMicros,
-      eligibleCreationTimeCutoffMicros(person.data.birthDate),
+      _eligibleCreationTimeCutoffMicros(person?.data.birthDate),
+      isCluster: isCluster,
     );
-    await _cacheService.upsertTimeline(timeline);
-    await _cacheService.upsertComputeLogEntry(
+    await _cacheService.upsertTimelineAndLog(
+      timeline,
       MemoryLaneComputeLogEntry(
         personId: personId,
-        name: person.data.name,
-        birthDate: person.data.birthDate,
+        name: person?.data.name,
+        birthDate: person?.data.birthDate,
         faceCount: faceIds.length,
         lastComputedMicros: nowMicros,
         logicVersion: _timelineLogicVersion,
+        isCluster: isCluster,
       ),
+      () =>
+          !request.isRevoked && identical(_pendingRequests[personId], request),
     );
     if (!timeline.isEligible) {
       await _refreshReadyPersonIds();
@@ -540,20 +619,22 @@ class MemoryLaneService {
       personId,
       timeline.entries,
       filesById,
+      isCluster: isCluster,
     );
     await _refreshReadyPersonIds();
     if (!cropsReady) {
       _logger.warning("Crop repair failed for $personId");
-      _queueTimelineCropReadiness(personId);
+      _queueTimelineCropReadiness(personId, isCluster: isCluster);
     }
   }
 
   Future<(MemoryLanePersonTimeline, Map<int, EnteFile>)> _computeTimeline(
-    Set<String> faceIds,
+    Iterable<String> faceIds,
     String personId,
     int nowMicros,
-    int? minCreationTimeMicros,
-  ) async {
+    int? minCreationTimeMicros, {
+    required bool isCluster,
+  }) async {
     if (faceIds.isEmpty) {
       return (
         MemoryLanePersonTimeline(
@@ -561,6 +642,7 @@ class MemoryLaneService {
           isEligible: false,
           updatedAtMicros: nowMicros,
           entries: const [],
+          isCluster: isCluster,
         ),
         const <int, EnteFile>{},
       );
@@ -570,7 +652,7 @@ class MemoryLaneService {
         .map(getFileIdFromFaceId<int>)
         .toSet()
         .toList();
-    final fileMap = await _filesDB.getFileIDToFileFromIDs(uniqueFileIds);
+    final fileMap = await getTimelineFiles(uniqueFileIds);
     final hiddenFiles = await SearchService.instance.getHiddenFiles();
     final hiddenFileIds = hiddenFiles
         .map((e) => e.uploadedFileID)
@@ -631,6 +713,7 @@ class MemoryLaneService {
           isEligible: false,
           updatedAtMicros: nowMicros,
           entries: const [],
+          isCluster: isCluster,
         ),
         fileMap,
       );
@@ -654,6 +737,7 @@ class MemoryLaneService {
           isEligible: false,
           updatedAtMicros: nowMicros,
           entries: const [],
+          isCluster: isCluster,
         ),
         fileMap,
       );
@@ -678,6 +762,7 @@ class MemoryLaneService {
         isEligible: true,
         updatedAtMicros: nowMicros,
         entries: entries,
+        isCluster: isCluster,
       ),
       fileMap,
     );
@@ -686,8 +771,9 @@ class MemoryLaneService {
   Future<bool> _ensureFaceCrops(
     String personId,
     List<MemoryLaneEntry> entries,
-    Map<int, EnteFile> fileMap,
-  ) async {
+    Map<int, EnteFile> fileMap, {
+    required bool isCluster,
+  }) async {
     if (entries.isEmpty) {
       return false;
     }
@@ -742,6 +828,7 @@ class MemoryLaneService {
 
   Future<void> prewarmTimelineFrames(
     String personId, {
+    bool isCluster = false,
     int frameCount = 6,
   }) async {
     if (!isFeatureEnabled) {
@@ -762,7 +849,7 @@ class MemoryLaneService {
           .map((entry) => entry.fileId)
           .toSet()
           .toList();
-      final filesById = await _filesDB.getFileIDToFileFromIDs(uniqueFileIds);
+      final filesById = await getTimelineFiles(uniqueFileIds);
       final Map<int, Future<List<Face>?>> facesFutures = {};
       for (final entry in entries) {
         final file = filesById[entry.fileId];
@@ -805,6 +892,59 @@ class MemoryLaneService {
     }
     readyPersonIds.value = current;
   }
+
+  Future<Map<int, EnteFile>> getTimelineFiles(Iterable<int> fileIds) async {
+    if (!isLocalGalleryMode) {
+      return _filesDB.getFileIDToFileFromIDs(fileIds.toList());
+    }
+    final idToLocalId = await _offlineFilesDB.getLocalIdsForIntIds(fileIds);
+    final localIdToId = idToLocalId.map((id, localId) => MapEntry(localId, id));
+    final files = await _filesDB.getLocalFiles(
+      idToLocalId.values.toList(),
+      dedupeByLocalID: true,
+    );
+    return Map.fromEntries(
+      files.map((file) => MapEntry(localIdToId[file.localID]!, file)),
+    );
+  }
+
+  Future<void> _cleanupAssignedClusterTimelines(
+    PeopleChangedEvent event,
+  ) async {
+    try {
+      final Set<String> clusterIDs = {};
+      if (event.type == PeopleEventType.addedClusterToPerson) {
+        clusterIDs.add(event.source);
+      }
+      clusterIDs.addAll(event.newClusterIDs ?? {});
+      if (event.person case final person?) {
+        clusterIDs.addAll(person.data.assigned.map((cluster) => cluster.id));
+      }
+      _topNClusters.removeAll(clusterIDs);
+      if (event.type == PeopleEventType.syncDone) {
+        final person = await PersonService.instance.getPersons();
+        clusterIDs.addAll(
+          person.expand((p) => p.data.assigned).map((c) => c.id),
+        );
+      }
+      _topNClusters.removeAll(clusterIDs);
+      if (clusterIDs.isEmpty) {
+        return;
+      }
+      for (final clusterID in clusterIDs) {
+        await _revokeTimeline(clusterID);
+      }
+    } catch (e, s) {
+      _logger.severe("_cleanupAssignedClusterTimelines failed", e, s);
+    }
+  }
+}
+
+class _TimelineRequest {
+  final bool force;
+  bool isRevoked = false;
+
+  _TimelineRequest(this.force);
 }
 
 class _TimelineFaceData {
@@ -929,4 +1069,18 @@ List<_TimelineFaceData> _pickFacesForYear(List<_TimelineFaceData> faces) {
   );
 
   return picks;
+}
+
+int? _eligibleCreationTimeCutoffMicros(String? birthDateString) {
+  final birthDate = DateTime.tryParse(birthDateString ?? "");
+  if (birthDate == null) {
+    return null;
+  }
+  final year = birthDate.year + 3;
+  final lastDay = DateTime(year, birthDate.month + 1, 0).day;
+  return DateTime(
+    year,
+    birthDate.month,
+    birthDate.day.clamp(1, lastDay),
+  ).microsecondsSinceEpoch;
 }

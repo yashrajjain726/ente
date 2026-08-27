@@ -28,9 +28,16 @@ import "package:photos/utils/face_crop_util.dart";
 import "package:photos/utils/share_util.dart";
 
 class MemoryLanePage extends StatefulWidget {
-  final PersonEntity person;
+  final PersonEntity? person;
+  final String? clusterID;
 
-  const MemoryLanePage({required this.person, super.key});
+  const MemoryLanePage({required this.person, super.key}) : clusterID = null;
+
+  const MemoryLanePage.cluster({required this.clusterID, super.key})
+    : person = null;
+
+  String get timelineId => person?.remoteID ?? clusterID ?? "";
+  bool get isCluster => clusterID != null;
 
   @override
   State<MemoryLanePage> createState() => _MemoryLanePageState();
@@ -81,6 +88,8 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   static const int _frameBuildConcurrency = 6;
 
   final Logger _logger = Logger("MemoryLanePage");
+  MLDataDB get _mlDataDB =>
+      isLocalGalleryMode ? MLDataDB.localGalleryInstance : MLDataDB.instance;
   late final AnimationController _cardTransitionController;
   double _stackProgress = 0;
   late final ValueNotifier<double> _stackProgressNotifier;
@@ -110,6 +119,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   _CaptionType _currentCaptionType = _CaptionType.yearsAgo;
   int _maxCaptionDigits = 1;
   bool get _showShareAction =>
+      !widget.isCluster &&
       MemoryLaneService.instance.isFeatureEnabled &&
       flagService.enableMemoryShareLink &&
       !isLocalGalleryMode;
@@ -150,9 +160,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   }
 
   Future<void> _loadFrames() async {
-    _hasMarkedTimelineSeen = localSettings.hasSeenMemoryLane(
-      widget.person.remoteID,
-    );
+    _hasMarkedTimelineSeen = localSettings.hasSeenMemoryLane(widget.timelineId);
     _playTimer?.cancel();
     if (mounted) {
       setState(() {
@@ -161,7 +169,8 @@ class _MemoryLanePageState extends State<MemoryLanePage>
     }
     try {
       final timeline = await MemoryLaneService.instance.getTimeline(
-        widget.person.remoteID,
+        widget.timelineId,
+        isCluster: widget.isCluster,
       );
       if (!mounted) {
         return;
@@ -218,7 +227,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
           .map((entry) => entry.fileId)
           .toSet()
           .toList();
-      final filesById = await FilesDB.instance.getFileIDToFileFromIDs(
+      final filesById = await MemoryLaneService.instance.getTimelineFiles(
         uniqueFileIds,
       );
       final Map<int, Future<List<Face>?>> facesFutures = {};
@@ -273,7 +282,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       return;
     }
     _hasMarkedTimelineSeen = true;
-    unawaited(localSettings.markMemoryLaneSeen(widget.person.remoteID));
+    unawaited(localSettings.markMemoryLaneSeen(widget.timelineId));
   }
 
   void _handleFrameLoaded(_TimelineFrame frame, int loadedCount) {
@@ -348,7 +357,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
         final entry = entries[index];
         final facesFuture = facesFutures.putIfAbsent(
           entry.fileId,
-          () => MLDataDB.instance.getFacesForGivenFileID(entry.fileId),
+          () => _mlDataDB.getFacesForGivenFileID(entry.fileId),
         );
         _buildFrame(
               entry,
@@ -389,7 +398,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       if (facesFuture != null) {
         faces = await facesFuture;
       } else {
-        faces = await MLDataDB.instance.getFacesForGivenFileID(entry.fileId);
+        faces = await _mlDataDB.getFacesForGivenFileID(entry.fileId);
       }
       final Face? face = faces?.firstWhereOrNull(
         (element) => element.faceID == entry.faceId,
@@ -437,12 +446,12 @@ class _MemoryLanePageState extends State<MemoryLanePage>
     final creationDate = DateTime.fromMicrosecondsSinceEpoch(
       entry.creationTimeMicros,
     );
-    final captionType = widget.person.data.birthDate != null
+    final birthDateString = widget.person?.data.birthDate;
+    final captionType = birthDateString != null
         ? _CaptionType.age
         : _CaptionType.yearsAgo;
     int captionValue;
-    if (captionType == _CaptionType.age) {
-      final birthDateString = widget.person.data.birthDate!;
+    if (birthDateString != null) {
       final birthDate = DateTime.tryParse(birthDateString);
       if (birthDate == null) {
         captionValue = wholeYearsBetween(creationDate, DateTime.now());
@@ -506,7 +515,7 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   void _logPlaybackStart(int frameCount) {
     if (_loggedPlaybackStart) return;
     _logger.info(
-      "playback_start person=${widget.person.remoteID} frames=$frameCount",
+      "playback_start person=${widget.timelineId} frames=$frameCount",
     );
     _loggedPlaybackStart = true;
   }
@@ -925,10 +934,11 @@ class _MemoryLanePageState extends State<MemoryLanePage>
     final double slotWidth = samplePainter.width;
     final double slotHeight = samplePainter.height;
     final String formattedCurrent = numberFormat.format(currentRounded);
+    final person = widget.person;
     String fullText;
-    if (captionType == _CaptionType.age) {
+    if (captionType == _CaptionType.age && person != null) {
       fullText = l10n.facesTimelineCaptionYearsOld(
-        name: widget.person.data.name,
+        name: person.data.name,
         count: currentRounded,
       );
     } else {
@@ -936,9 +946,8 @@ class _MemoryLanePageState extends State<MemoryLanePage>
       if (fullText.contains("#")) {
         fullText = fullText.replaceAll("#", formattedCurrent);
       }
-      final String name = widget.person.data.name;
-      if (name.isNotEmpty) {
-        fullText = "$name $fullText";
+      if (person != null && person.data.name.isNotEmpty) {
+        fullText = "${person.data.name} $fullText";
       }
     }
     final int insertionIndex = fullText.indexOf(formattedCurrent);
@@ -1120,12 +1129,14 @@ class _MemoryLanePageState extends State<MemoryLanePage>
   Future<(String, int)?> _getOrCreateMemoryLaneLinkData(
     BuildContext context,
   ) async {
+    final person = widget.person;
+    if (person == null) return null;
     final l10n = context.strings;
     final dialog = createProgressDialog(context, l10n.creatingLink);
     await dialog.show();
     try {
       final timeline = await MemoryLaneService.instance.getTimeline(
-        widget.person.remoteID,
+        person.remoteID,
       );
       if (timeline == null ||
           !timeline.isEligible ||
@@ -1140,9 +1151,9 @@ class _MemoryLanePageState extends State<MemoryLanePage>
           .getOrCreateMemoryLaneLink(
             entries: timeline.entries,
             title: l10n.facesTimelineAppBarTitle,
-            personId: widget.person.remoteID,
-            personName: widget.person.data.name,
-            birthDate: widget.person.data.birthDate,
+            personId: person.remoteID,
+            personName: person.data.name,
+            birthDate: person.data.birthDate,
           );
       await dialog.hide();
       return shareLinkData;
