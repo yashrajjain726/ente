@@ -24,11 +24,15 @@ class LogDatabase {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = join(documentsDirectory.path, _databaseName);
 
-    return await openDatabase(
+    return await databaseFactory.openDatabase(
       path,
-      version: _databaseVersion,
-      onCreate: _onCreate,
-      onOpen: _onOpen,
+      options: OpenDatabaseOptions(
+        version: _databaseVersion,
+        onCreate: _onCreate,
+        onOpen: _onOpen,
+        // Transactions orphaned by killed engines must not block later opens.
+        rollbackActiveTransactionOnOpen: true,
+      ),
     );
   }
 
