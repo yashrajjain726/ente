@@ -251,42 +251,44 @@ class ContactsDatabase {
         );
       }
 
-      await tx.execute('''
-        CREATE TABLE $_contactsTable (
-          id TEXT PRIMARY KEY,
-          contact_user_id INTEGER NOT NULL,
-          email TEXT,
-          data_json TEXT,
-          profile_picture_attachment_id TEXT,
-          is_deleted INTEGER NOT NULL DEFAULT 0,
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
-        )
-      ''');
-      await tx.execute(
-        'CREATE UNIQUE INDEX idx_contacts_contact_user_id '
-        'ON $_contactsTable(contact_user_id)',
-      );
-      await tx.execute(
-        'CREATE INDEX idx_contacts_updated_at '
-        'ON $_contactsTable(updated_at)',
-      );
-      await tx.execute('''
-        CREATE TABLE $_attachmentsTable (
-          attachment_id TEXT PRIMARY KEY,
-          bytes BLOB NOT NULL,
-          cached_at INTEGER NOT NULL
-        )
-      ''');
-      await tx.execute('''
-        CREATE TABLE $_stateTable (
-          id INTEGER PRIMARY KEY CHECK (id = 1),
-          last_synced_updated_at INTEGER NOT NULL DEFAULT 0
-        )
-      ''');
-      await tx.execute(
-        'INSERT INTO $_stateTable (id, last_synced_updated_at) VALUES (1, 0)',
-      );
+      if (currentVersion < 1) {
+        await tx.execute('''
+          CREATE TABLE $_contactsTable (
+            id TEXT PRIMARY KEY,
+            contact_user_id INTEGER NOT NULL,
+            email TEXT,
+            data_json TEXT,
+            profile_picture_attachment_id TEXT,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        ''');
+        await tx.execute(
+          'CREATE UNIQUE INDEX idx_contacts_contact_user_id '
+          'ON $_contactsTable(contact_user_id)',
+        );
+        await tx.execute(
+          'CREATE INDEX idx_contacts_updated_at '
+          'ON $_contactsTable(updated_at)',
+        );
+        await tx.execute('''
+          CREATE TABLE $_attachmentsTable (
+            attachment_id TEXT PRIMARY KEY,
+            bytes BLOB NOT NULL,
+            cached_at INTEGER NOT NULL
+          )
+        ''');
+        await tx.execute('''
+          CREATE TABLE $_stateTable (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            last_synced_updated_at INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
+        await tx.execute(
+          'INSERT INTO $_stateTable (id, last_synced_updated_at) VALUES (1, 0)',
+        );
+      }
       await tx.execute('PRAGMA user_version = $_databaseVersion');
       return true;
     });

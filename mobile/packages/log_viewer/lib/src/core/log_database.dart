@@ -49,21 +49,23 @@ class LogDatabase {
         );
       }
 
-      await tx.execute('''
-        CREATE TABLE $_tableName(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          message TEXT NOT NULL,
-          level TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          logger_name TEXT NOT NULL,
-          error TEXT,
-          stack_trace TEXT,
-          process_prefix TEXT NOT NULL DEFAULT ''
-        )
-      ''');
-      await tx.execute(
-        'CREATE INDEX idx_timestamp ON $_tableName(timestamp DESC)',
-      );
+      if (currentVersion < 1) {
+        await tx.execute('''
+          CREATE TABLE $_tableName(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT NOT NULL,
+            level TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            logger_name TEXT NOT NULL,
+            error TEXT,
+            stack_trace TEXT,
+            process_prefix TEXT NOT NULL DEFAULT ''
+          )
+        ''');
+        await tx.execute(
+          'CREATE INDEX idx_timestamp ON $_tableName(timestamp DESC)',
+        );
+      }
       await tx.execute('PRAGMA user_version = $_databaseVersion');
       return true;
     });
