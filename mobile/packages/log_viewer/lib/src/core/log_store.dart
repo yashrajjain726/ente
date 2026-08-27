@@ -61,9 +61,6 @@ class LogStore {
   Future<void>? _activeFlush;
   Future<void>? _queuedFlush;
 
-  // At most one drain runs and one is queued; arrivals share the queued one.
-  // Its snapshot is taken after the active drain, so every caller sees the
-  // records buffered before its call, yet waits at most two batch inserts.
   Future<void> _flush() {
     final active = _activeFlush;
     if (active == null) {
