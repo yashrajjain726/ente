@@ -2727,6 +2727,7 @@ name = "ente-photos-frb"
 version = "0.0.0"
 dependencies = [
  "ente-cast",
+ "ente-core",
  "ente-frb-lib",
  "ente-frb-log",
  "ente-image",
