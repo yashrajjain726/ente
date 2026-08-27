@@ -720,7 +720,7 @@ class FilesDB with SqlDbBase {
     }
 
     return _loadMaterializedFiles(
-      family: 'gallery_pending_or_uploaded',
+      queryKind: _MaterializedQueryKind.pendingOrUploadedFiles,
       whereClause: where.join(' AND '),
       whereArguments: args,
       order: asc ?? false
@@ -728,7 +728,7 @@ class FilesDB with SqlDbBase {
           : _MaterializedFileOrder.galleryDescending,
       limit: limit,
       filterOptions: filterOptions,
-      converter: _convertGalleryPage,
+      converter: _convertPageOnCallerIsolate,
     );
   }
 
@@ -754,7 +754,7 @@ class FilesDB with SqlDbBase {
     }
 
     return _loadMaterializedFiles(
-      family: 'gallery_local_and_uploaded',
+      queryKind: _MaterializedQueryKind.localAndUploadedFiles,
       whereClause: where.join(' AND '),
       whereArguments: args,
       order: asc ?? false
@@ -762,7 +762,7 @@ class FilesDB with SqlDbBase {
           : _MaterializedFileOrder.galleryDescending,
       limit: limit,
       filterOptions: filterOptions,
-      converter: _convertGalleryPage,
+      converter: _convertPageOnCallerIsolate,
     );
   }
 
@@ -1916,7 +1916,7 @@ class FilesDB with SqlDbBase {
     bool dedupeByUploadId = true,
   }) async {
     final result = await _loadMaterializedFiles(
-      family: 'search_all_files',
+      queryKind: _MaterializedQueryKind.allFiles,
       whereClause: '1 = 1',
       whereArguments: const [],
       order: _MaterializedFileOrder.searchDescending,
@@ -1924,12 +1924,14 @@ class FilesDB with SqlDbBase {
         ignoredCollectionIDs: collectionsToIgnore,
         dedupeUploadID: dedupeByUploadId,
       ),
-      converter: _convertSearchPage,
+      converter: _convertPageWithComputer,
     );
     return result.files;
   }
 
-  Future<List<EnteFile>> _convertSearchPage(List<Map<String, dynamic>> rows) {
+  Future<List<EnteFile>> _convertPageWithComputer(
+    List<Map<String, dynamic>> rows,
+  ) {
     return Computer.shared().compute(
       _convertFilesDBRowsForIsolate,
       param: {"result": rows},
@@ -1937,14 +1939,14 @@ class FilesDB with SqlDbBase {
     );
   }
 
-  Future<List<EnteFile>> _convertGalleryPage(
+  Future<List<EnteFile>> _convertPageOnCallerIsolate(
     List<Map<String, dynamic>> rows,
   ) async {
     return convertToFiles(rows);
   }
 
   Future<FileLoadResult> _loadMaterializedFiles({
-    required String family,
+    required _MaterializedQueryKind queryKind,
     required String whereClause,
     required List<Object?> whereArguments,
     required _MaterializedFileOrder order,
@@ -1954,7 +1956,7 @@ class FilesDB with SqlDbBase {
   }) async {
     final operation = _FilesDBMaterializationOperation(
       id: ++_nextMaterializationOperationID,
-      family: family,
+      queryKind: queryKind,
       pageSize: defaultMaterializationPageSize,
     );
     final files = <EnteFile>[];
@@ -2009,7 +2011,8 @@ class FilesDB with SqlDbBase {
               operation.slowPageLogged = true;
               _logger.warning(
                 'FilesDBMaterialization slowPage '
-                'op=${operation.id} family=$family page=$pageNumber '
+                'op=${operation.id} '
+                'queryKind=${queryKind.telemetryName} page=$pageNumber '
                 'queryMs=${queryWatch.elapsedMilliseconds}',
               );
             }
@@ -2374,9 +2377,19 @@ class FilesDB with SqlDbBase {
 typedef _FilesDBPageConverter =
     Future<List<EnteFile>> Function(List<Map<String, dynamic>> rows);
 
+enum _MaterializedQueryKind {
+  allFiles('all_files'),
+  pendingOrUploadedFiles('pending_or_uploaded_files'),
+  localAndUploadedFiles('local_and_uploaded_files');
+
+  final String telemetryName;
+
+  const _MaterializedQueryKind(this.telemetryName);
+}
+
 class _FilesDBMaterializationMetrics {
   final int operationID;
-  final String family;
+  final _MaterializedQueryKind queryKind;
   final int pageSize;
   final int pageCount;
   final int rawRows;
@@ -2398,7 +2411,7 @@ class _FilesDBMaterializationMetrics {
 
   const _FilesDBMaterializationMetrics({
     required this.operationID,
-    required this.family,
+    required this.queryKind,
     required this.pageSize,
     required this.pageCount,
     required this.rawRows,
@@ -2421,7 +2434,7 @@ class _FilesDBMaterializationMetrics {
 
   String toLogString() => <String>[
     'op=$operationID',
-    'family=$family',
+    'queryKind=${queryKind.telemetryName}',
     'status=${success ? 'success' : 'error'}',
     if (errorType != null) 'errorType=$errorType',
     'pageSize=$pageSize',
@@ -2484,7 +2497,7 @@ class _MaterializedFileCursor {
 
 class _FilesDBMaterializationOperation {
   final int id;
-  final String family;
+  final _MaterializedQueryKind queryKind;
   final int pageSize;
   final Stopwatch totalWatch = Stopwatch()..start();
   final Stopwatch transactionWatch = Stopwatch();
@@ -2508,7 +2521,7 @@ class _FilesDBMaterializationOperation {
 
   _FilesDBMaterializationOperation({
     required this.id,
-    required this.family,
+    required this.queryKind,
     required this.pageSize,
   });
 
@@ -2534,7 +2547,7 @@ class _FilesDBMaterializationOperation {
 
   _FilesDBMaterializationMetrics get metrics => _FilesDBMaterializationMetrics(
     operationID: id,
-    family: family,
+    queryKind: queryKind,
     pageSize: pageSize,
     pageCount: pageCount,
     rawRows: rawRows,
