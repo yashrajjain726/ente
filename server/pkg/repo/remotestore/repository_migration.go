@@ -11,7 +11,8 @@ import (
 	"github.com/ente/stacktrace"
 )
 
-func (r *Repository) MigrateCustomDomainCanonicalValues20260824(ctx context.Context) error {
+// MigrateCustomDomainCanonicalValues backfills canonical domains (2026-08-24).
+func (r *Repository) MigrateCustomDomainCanonicalValues(ctx context.Context) error {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to begin custom domain backfill")

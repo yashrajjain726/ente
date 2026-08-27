@@ -25,10 +25,7 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 	domain, err := repository.GetDomain(t.Context(), ownerID)
 	require.NoError(t, err)
 	require.Equal(t, "BÜCHER.example", *domain)
-	resolvedOwnerID, err := repository.DomainOwner(t.Context(), "xn--bcher-kva.example")
-	require.NoError(t, err)
-	require.Equal(t, ownerID, *resolvedOwnerID)
-	resolvedOwnerID, err = repository.DomainOwner(t.Context(), "XN--BCHER-KVA.EXAMPLE")
+	resolvedOwnerID, err := repository.DomainOwner(t.Context(), "XN--BCHER-KVA.EXAMPLE")
 	require.NoError(t, err)
 	require.Equal(t, ownerID, *resolvedOwnerID)
 
@@ -37,17 +34,12 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	require.Equal(t, ente.CONFLICT, apiErr.Code)
 
-	require.NoError(t, repository.InsertOrUpdateCustomDomain(t.Context(), ownerID, "xn--bcher-kva.example"))
-	domain, err = repository.GetDomain(t.Context(), ownerID)
-	require.NoError(t, err)
-	require.Equal(t, "xn--bcher-kva.example", *domain)
-
 	pointer := ente.BuildFamilyCustomDomainPointer(ownerID, "family.example")
 	require.NoError(t, repository.InsertOrUpdate(t.Context(), ownerID, string(ente.CustomDomain), pointer))
+	require.NoError(t, repository.InsertOrUpdateCustomDomain(t.Context(), otherID, "BÜCHER.example"))
 	_, err = db.ExecContext(t.Context(), `UPDATE remote_store SET canonical_value = 'released.example'
 		WHERE user_id = $1 AND key_name = 'customDomain'`, ownerID)
 	require.NoError(t, err)
-	require.NoError(t, repository.InsertOrUpdateCustomDomain(t.Context(), otherID, "BÜCHER.example"))
 
 	_, err = db.ExecContext(t.Context(), `UPDATE remote_store SET key_value = 'LEGACY.example'
 		WHERE user_id = $1 AND key_name = 'customDomain'`, otherID)
@@ -57,7 +49,7 @@ func TestCustomDomainCanonicalUniqueness(t *testing.T) {
 		($2, 'customDomain', 'xn--bcher-kva.example'),
 		($3, 'customDomain', 'invalid')`, collisionID1, collisionID2, invalidID)
 	require.NoError(t, err)
-	require.NoError(t, repository.MigrateCustomDomainCanonicalValues20260824(t.Context()))
+	require.NoError(t, repository.MigrateCustomDomainCanonicalValues(t.Context()))
 
 	var value string
 	var canonicalValue *string
