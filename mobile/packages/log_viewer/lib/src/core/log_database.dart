@@ -36,19 +36,19 @@ class LogDatabase {
   }
 
   Future<void> _migrate(SqliteDatabase database) async {
-    final result = await database.execute('PRAGMA user_version');
-    final currentVersion = result.first['user_version'] as int;
-    if (currentVersion == _databaseVersion) {
-      return;
-    }
-    if (currentVersion > _databaseVersion) {
-      throw StateError(
-        'Log database version $currentVersion is newer than supported version '
-        '$_databaseVersion',
-      );
-    }
+    final didMigrate = await database.writeTransaction((tx) async {
+      final result = await tx.get('PRAGMA user_version');
+      final currentVersion = result['user_version'] as int;
+      if (currentVersion == _databaseVersion) {
+        return false;
+      }
+      if (currentVersion > _databaseVersion) {
+        throw StateError(
+          'Log database version $currentVersion is newer than supported '
+          'version $_databaseVersion',
+        );
+      }
 
-    await database.writeTransaction((tx) async {
       await tx.execute('''
         CREATE TABLE $_tableName(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,8 +65,11 @@ class LogDatabase {
         'CREATE INDEX idx_timestamp ON $_tableName(timestamp DESC)',
       );
       await tx.execute('PRAGMA user_version = $_databaseVersion');
+      return true;
     });
-    await database.refreshSchema();
+    if (didMigrate) {
+      await database.refreshSchema();
+    }
   }
 
   Future<int> insertLog(LogEntry entry) async {
@@ -184,7 +187,8 @@ class LogDatabase {
   Future<List<String>> getUniqueProcesses() async {
     final db = await database;
     final results = await db.getAll(
-      'SELECT DISTINCT process_prefix FROM $_tableName WHERE process_prefix != "" ORDER BY process_prefix',
+      'SELECT DISTINCT process_prefix FROM $_tableName WHERE process_prefix != ? ORDER BY process_prefix',
+      [''],
     );
 
     final prefixes = results

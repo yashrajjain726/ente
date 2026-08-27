@@ -39,8 +39,15 @@ class IgnoredFilesDB with SqlDbBase {
   static Future<SqliteDatabase>? _dbFuture;
 
   Future<SqliteDatabase> get database async {
-    _dbFuture ??= _initDatabase();
-    return _dbFuture!;
+    final databaseFuture = _dbFuture ??= _initDatabase();
+    try {
+      return await databaseFuture;
+    } catch (_) {
+      if (identical(_dbFuture, databaseFuture)) {
+        _dbFuture = null;
+      }
+      rethrow;
+    }
   }
 
   Future<SqliteDatabase> _initDatabase() async {
@@ -48,8 +55,13 @@ class IgnoredFilesDB with SqlDbBase {
         await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _databaseName);
     final database = SqliteDatabase(path: path);
-    await migrate(database, _migrationScripts);
-    return database;
+    try {
+      await migrate(database, _migrationScripts);
+      return database;
+    } catch (_) {
+      await database.close();
+      rethrow;
+    }
   }
 
   Future<void> clearTable() async {

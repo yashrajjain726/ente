@@ -151,6 +151,8 @@ class PhotosContactsService {
   @visibleForTesting
   void debugReset({bool notify = false}) => _store.clearSession(notify: notify);
 
+  Future<void> close() => _store.close();
+
   contacts.ContactsSession? _buildSession() {
     final config = Configuration.instance;
     final userId = config.getUserID();

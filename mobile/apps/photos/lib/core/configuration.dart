@@ -48,6 +48,7 @@ import "package:photos/services/machine_learning/ml_service.dart";
 import "package:photos/services/machine_learning/similar_images_service.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/services/notification_service.dart";
+import 'package:photos/services/photos_contacts_service.dart';
 import 'package:photos/services/search_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
 import 'package:photos/services/video_preview_service.dart';
@@ -231,6 +232,7 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
     await MLDataDB.instance.clearTable();
     await UploadLocksDB.instance.clearTable();
     await TrashDB.instance.clearTable();
+    await PhotosContactsService.instance.close();
     await ContactsDatabase().clearTable();
     await SocialDB.instance.clearAllData();
 

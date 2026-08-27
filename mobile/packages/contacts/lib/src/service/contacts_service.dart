@@ -262,6 +262,12 @@ class ContactsService {
     await _database.resetState();
   }
 
+  Future<void> close() async {
+    _ctx = null;
+    _session = null;
+    await _database.close();
+  }
+
   int _nextSyncCursor(List<ContactRecord> diff, int maxUpdatedAt, int limit) {
     if (diff.length < limit || maxUpdatedAt <= 0) {
       return maxUpdatedAt;

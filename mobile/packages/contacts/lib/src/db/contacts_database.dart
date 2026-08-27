@@ -24,7 +24,6 @@ class ContactsDatabase {
 
   final ContactsDatabaseDirectoryResolver? _directoryResolver;
 
-  SqliteDatabase? _database;
   Future<SqliteDatabase>? _dbFuture;
   int? _configuredUserId;
 
@@ -32,12 +31,25 @@ class ContactsDatabase {
     if (_configuredUserId == userId && _dbFuture != null) {
       return;
     }
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
-    }
+    final previousDatabaseFuture = _dbFuture;
     _dbFuture = null;
     _configuredUserId = userId;
+    if (previousDatabaseFuture != null) {
+      try {
+        await (await previousDatabaseFuture).close();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> close() async {
+    final databaseFuture = _dbFuture;
+    _dbFuture = null;
+    _configuredUserId = null;
+    if (databaseFuture != null) {
+      try {
+        await (await databaseFuture).close();
+      } catch (_) {}
+    }
   }
 
   Future<SqliteDatabase> get database async {
@@ -47,9 +59,15 @@ class ContactsDatabase {
         'ContactsDatabase.configure(userId: ...) must be called first',
       );
     }
-    _dbFuture ??= _initDatabase(userId);
-    _database ??= await _dbFuture!;
-    return _database!;
+    final databaseFuture = _dbFuture ??= _initDatabase(userId);
+    try {
+      return await databaseFuture;
+    } catch (_) {
+      if (identical(_dbFuture, databaseFuture)) {
+        _dbFuture = null;
+      }
+      rethrow;
+    }
   }
 
   Future<void> upsertContacts(List<ContactRecord> contacts) async {
@@ -188,11 +206,7 @@ class ContactsDatabase {
   }
 
   Future<void> clearTable() async {
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
-      _dbFuture = null;
-    }
+    await close();
     final directory = await _resolvedDirectory();
     if (!directory.existsSync()) {
       return;
@@ -224,19 +238,19 @@ class ContactsDatabase {
   }
 
   Future<void> _migrate(SqliteDatabase database) async {
-    final result = await database.execute('PRAGMA user_version');
-    final currentVersion = result.first['user_version'] as int;
-    if (currentVersion == _databaseVersion) {
-      return;
-    }
-    if (currentVersion > _databaseVersion) {
-      throw StateError(
-        'Contacts database version $currentVersion is newer than supported '
-        'version $_databaseVersion',
-      );
-    }
+    final didMigrate = await database.writeTransaction((tx) async {
+      final result = await tx.get('PRAGMA user_version');
+      final currentVersion = result['user_version'] as int;
+      if (currentVersion == _databaseVersion) {
+        return false;
+      }
+      if (currentVersion > _databaseVersion) {
+        throw StateError(
+          'Contacts database version $currentVersion is newer than supported '
+          'version $_databaseVersion',
+        );
+      }
 
-    await database.writeTransaction((tx) async {
       await tx.execute('''
         CREATE TABLE $_contactsTable (
           id TEXT PRIMARY KEY,
@@ -274,8 +288,11 @@ class ContactsDatabase {
         'INSERT INTO $_stateTable (id, last_synced_updated_at) VALUES (1, 0)',
       );
       await tx.execute('PRAGMA user_version = $_databaseVersion');
+      return true;
     });
-    await database.refreshSchema();
+    if (didMigrate) {
+      await database.refreshSchema();
+    }
   }
 
   Future<Directory> _resolvedDirectory() async {
