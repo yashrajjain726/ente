@@ -49,10 +49,13 @@ class FileUpdationDB with SqlDbBase {
   static Future<SqliteDatabase>? _dbFuture;
 
   Future<SqliteDatabase> get database async {
+    final databaseFuture = _dbFuture ??= _initDatabase();
     try {
-      return await (_dbFuture ??= _initDatabase());
+      return await databaseFuture;
     } catch (_) {
-      _dbFuture = null;
+      if (identical(_dbFuture, databaseFuture)) {
+        _dbFuture = null;
+      }
       rethrow;
     }
   }
