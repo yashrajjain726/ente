@@ -181,7 +181,12 @@ pub(crate) fn bgr_to_lab(src: &ImageU8) -> OpResult<ImageU8> {
 
     let mut data = vec![0u8; src.data.len()];
     super::pointwise(&mut data, 3, &src.data, 3, |data, srcd| {
-        for (out, px) in data.chunks_exact_mut(3).zip(srcd.chunks_exact(3)) {
+        for (out, px) in data
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .zip(srcd.as_chunks::<3>().0.iter())
+        {
             let v0 = t.srgb_gamma[px[0] as usize] as i32;
             let v1 = t.srgb_gamma[px[1] as usize] as i32;
             let v2 = t.srgb_gamma[px[2] as usize] as i32;
@@ -210,7 +215,12 @@ pub(crate) fn lab_to_bgr(src: &ImageU8) -> OpResult<ImageU8> {
 
     let mut data = vec![0u8; src.data.len()];
     super::pointwise(&mut data, 3, &src.data, 3, |data, srcd| {
-        for (out, px) in data.chunks_exact_mut(3).zip(srcd.chunks_exact(3)) {
+        for (out, px) in data
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .zip(srcd.as_chunks::<3>().0.iter())
+        {
             let y = t.lab_to_yf[px[0] as usize * 2] as i32;
             let ify = t.lab_to_yf[px[0] as usize * 2 + 1] as i32;
 
