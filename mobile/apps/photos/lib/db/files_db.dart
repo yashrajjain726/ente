@@ -130,55 +130,16 @@ class FilesDB with SqlDbBase {
   static final String _materializedFileProjection = _columnNames.join(", ");
   static int _nextMaterializationOperationID = 0;
 
-  final Future<SqliteDatabase>? _databaseOverride;
-  final int materializationPageSize;
-  final FilesDBMaterializationHooks? _materializationHooks;
-  final FilesDBPageConverter? _searchPageConverterOverride;
-  final FilesDBPageConverter? _galleryPageConverterOverride;
-  final FilesDBFilter? _filterOverride;
-
-  FilesDB._privateConstructor()
-    : _databaseOverride = null,
-      materializationPageSize = defaultMaterializationPageSize,
-      _materializationHooks = null,
-      _searchPageConverterOverride = null,
-      _galleryPageConverterOverride = null,
-      _filterOverride = null;
-
-  @visibleForTesting
-  FilesDB.forTesting({
-    required SqliteDatabase database,
-    this.materializationPageSize = defaultMaterializationPageSize,
-    FilesDBMaterializationHooks? materializationHooks,
-    FilesDBPageConverter? searchPageConverter,
-    FilesDBPageConverter? galleryPageConverter,
-    FilesDBFilter? filter,
-  }) : assert(materializationPageSize > 0),
-       _databaseOverride = Future.value(database),
-       _materializationHooks = materializationHooks,
-       _searchPageConverterOverride = searchPageConverter,
-       _galleryPageConverterOverride = galleryPageConverter,
-       _filterOverride = filter;
+  FilesDB._privateConstructor();
 
   static final FilesDB instance = FilesDB._privateConstructor();
 
   static Future<SqliteDatabase>? _sqliteAsyncDBFuture;
 
   Future<SqliteDatabase> get sqliteAsyncDB async {
-    if (_databaseOverride != null) {
-      return _databaseOverride;
-    }
     _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
     return _sqliteAsyncDBFuture!;
   }
-
-  @visibleForTesting
-  static List<String> get materializedFileColumns =>
-      List.unmodifiable(_columnNames);
-
-  @visibleForTesting
-  static Future<void> migrateTestDatabase(SqliteDatabase database) =>
-      instance.migrate(database, _migrationScripts);
 
   Future<SqliteDatabase> _initSqliteAsyncDatabase() async {
     final Directory documentsDirectory =
@@ -1969,10 +1930,6 @@ class FilesDB with SqlDbBase {
   }
 
   Future<List<EnteFile>> _convertSearchPage(List<Map<String, dynamic>> rows) {
-    final override = _searchPageConverterOverride;
-    if (override != null) {
-      return override(rows);
-    }
     return Computer.shared().compute(
       _convertFilesDBRowsForIsolate,
       param: {"result": rows},
@@ -1983,10 +1940,6 @@ class FilesDB with SqlDbBase {
   Future<List<EnteFile>> _convertGalleryPage(
     List<Map<String, dynamic>> rows,
   ) async {
-    final override = _galleryPageConverterOverride;
-    if (override != null) {
-      return override(rows);
-    }
     return convertToFiles(rows);
   }
 
@@ -1995,14 +1948,14 @@ class FilesDB with SqlDbBase {
     required String whereClause,
     required List<Object?> whereArguments,
     required _MaterializedFileOrder order,
-    required FilesDBPageConverter converter,
+    required _FilesDBPageConverter converter,
     DBFilterOptions? filterOptions,
     int? limit,
   }) async {
     final operation = _FilesDBMaterializationOperation(
       id: ++_nextMaterializationOperationID,
       family: family,
-      pageSize: materializationPageSize,
+      pageSize: defaultMaterializationPageSize,
     );
     final files = <EnteFile>[];
     final boundedLimit = limit != null && limit >= 0 ? limit : null;
@@ -2018,13 +1971,9 @@ class FilesDB with SqlDbBase {
 
           while (remaining == null || remaining > 0) {
             final requestedRows = remaining == null
-                ? materializationPageSize
-                : min(materializationPageSize, remaining);
+                ? defaultMaterializationPageSize
+                : min(defaultMaterializationPageSize, remaining);
             final pageNumber = operation.pageCount + 1;
-            await _materializationHooks?.beforePageQuery?.call(
-              pageNumber,
-              transaction,
-            );
 
             final queryWatch = Stopwatch()..start();
             late final List<Map<String, dynamic>> rows;
@@ -2050,7 +1999,7 @@ class FilesDB with SqlDbBase {
             operation.rawRows += rows.length;
             operation.maxRawPage = max(operation.maxRawPage, rows.length);
             if (rows.length > requestedRows ||
-                rows.length > materializationPageSize) {
+                rows.length > defaultMaterializationPageSize) {
               throw StateError(
                 'FilesDB materialization page exceeded its configured bound',
               );
@@ -2065,21 +2014,11 @@ class FilesDB with SqlDbBase {
               );
             }
 
-            await _materializationHooks?.afterPageQuery?.call(
-              pageNumber,
-              rows.length,
-              transaction,
-            );
-
             if (rows.isEmpty) {
               break;
             }
 
             cursor = order.cursorFrom(rows.last);
-            await _materializationHooks?.beforePageConversion?.call(
-              pageNumber,
-              rows.length,
-            );
             final conversionWatch = Stopwatch()..start();
             late final List<EnteFile> convertedPage;
             try {
@@ -2088,10 +2027,6 @@ class FilesDB with SqlDbBase {
               conversionWatch.stop();
               operation.recordConversion(conversionWatch.elapsed);
             }
-            await _materializationHooks?.afterPageConversion?.call(
-              pageNumber,
-              rows.length,
-            );
             files.addAll(convertedPage);
 
             if (remaining != null) {
@@ -2109,8 +2044,7 @@ class FilesDB with SqlDbBase {
       operation.filterWatch.start();
       late final List<EnteFile> filteredFiles;
       try {
-        final filter = _filterOverride ?? applyDBFilters;
-        filteredFiles = await filter(files, filterOptions);
+        filteredFiles = await applyDBFilters(files, filterOptions);
       } finally {
         operation.filterWatch.stop();
       }
@@ -2154,15 +2088,6 @@ class FilesDB with SqlDbBase {
       _logger.info(message);
     } else {
       _logger.warning(message);
-    }
-    try {
-      _materializationHooks?.onComplete?.call(metrics);
-    } catch (hookError, hookStackTrace) {
-      _logger.warning(
-        'FilesDBMaterialization metrics hook failed',
-        hookError,
-        hookStackTrace,
-      );
     }
   }
 
@@ -2446,42 +2371,10 @@ class FilesDB with SqlDbBase {
   }
 }
 
-typedef FilesDBPageConverter =
+typedef _FilesDBPageConverter =
     Future<List<EnteFile>> Function(List<Map<String, dynamic>> rows);
 
-typedef FilesDBFilter =
-    Future<List<EnteFile>> Function(
-      List<EnteFile> files,
-      DBFilterOptions? options,
-    );
-
-@visibleForTesting
-class FilesDBMaterializationHooks {
-  final Future<void> Function(int pageNumber, SqliteReadContext transaction)?
-  beforePageQuery;
-  final Future<void> Function(
-    int pageNumber,
-    int rowCount,
-    SqliteReadContext transaction,
-  )?
-  afterPageQuery;
-  final Future<void> Function(int pageNumber, int rowCount)?
-  beforePageConversion;
-  final Future<void> Function(int pageNumber, int rowCount)?
-  afterPageConversion;
-  final void Function(FilesDBMaterializationMetrics metrics)? onComplete;
-
-  const FilesDBMaterializationHooks({
-    this.beforePageQuery,
-    this.afterPageQuery,
-    this.beforePageConversion,
-    this.afterPageConversion,
-    this.onComplete,
-  });
-}
-
-@visibleForTesting
-class FilesDBMaterializationMetrics {
+class _FilesDBMaterializationMetrics {
   final int operationID;
   final String family;
   final int pageSize;
@@ -2503,7 +2396,7 @@ class FilesDBMaterializationMetrics {
   final int? startMaxRss;
   final int? endMaxRss;
 
-  const FilesDBMaterializationMetrics({
+  const _FilesDBMaterializationMetrics({
     required this.operationID,
     required this.family,
     required this.pageSize,
@@ -2548,29 +2441,6 @@ class FilesDBMaterializationMetrics {
     'startMaxRss=${startMaxRss ?? 'unavailable'}',
     'endMaxRss=${endMaxRss ?? 'unavailable'}',
   ].join(' ');
-
-  Map<String, Object?> toJson() => {
-    'operationID': operationID,
-    'family': family,
-    'status': success ? 'success' : 'error',
-    'errorType': errorType,
-    'pageSize': pageSize,
-    'pageCount': pageCount,
-    'rawRows': rawRows,
-    'finalRows': finalRows,
-    'maxRawPage': maxRawPage,
-    'queryMicros': queryDuration.inMicroseconds,
-    'maxQueryMicros': maxQueryDuration.inMicroseconds,
-    'conversionMicros': conversionDuration.inMicroseconds,
-    'maxConversionMicros': maxConversionDuration.inMicroseconds,
-    'filterMicros': filterDuration.inMicroseconds,
-    'transactionMicros': transactionDuration.inMicroseconds,
-    'totalMicros': totalDuration.inMicroseconds,
-    'startCurrentRss': startCurrentRss,
-    'endCurrentRss': endCurrentRss,
-    'startMaxRss': startMaxRss,
-    'endMaxRss': endMaxRss,
-  };
 }
 
 enum _MaterializedFileOrder {
@@ -2662,7 +2532,7 @@ class _FilesDBMaterializationOperation {
     endMaxRss = _readMaxRss();
   }
 
-  FilesDBMaterializationMetrics get metrics => FilesDBMaterializationMetrics(
+  _FilesDBMaterializationMetrics get metrics => _FilesDBMaterializationMetrics(
     operationID: id,
     family: family,
     pageSize: pageSize,
