@@ -92,6 +92,9 @@ func (c *UserController) updateSrpAndKeyAttributes(context *gin.Context,
 	shouldClearTokens bool,
 	revocationScope sessionRevocationScope,
 ) (*ente.UpdateSRPSetupResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, stacktrace.Propagate(err, "invalid request")
+	}
 	setup, err := c.UserAuthRepo.GetTempSRPSetupEntity(context, req.SetupID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -105,7 +108,7 @@ func (c *UserController) updateSrpAndKeyAttributes(context *gin.Context,
 			return nil, err
 		}
 	}
-	err = c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, req, setup)
+	err = c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, *req.UpdateAttributes, setup)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to add entry in srp auth")
 	}
