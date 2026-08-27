@@ -30,7 +30,6 @@ class FilesDB with SqlDbBase {
   static const _databaseName = "ente.files.db";
 
   static const int _maxMaterializationPageSize = 2000;
-  static const Duration _slowPageQueryThreshold = Duration(seconds: 1);
 
   static final Logger _logger = Logger("FilesDB");
 
@@ -128,7 +127,6 @@ class FilesDB with SqlDbBase {
   ];
 
   static final String _materializedFileProjection = _columnNames.join(", ");
-  static int _nextMaterializationOperationID = 0;
 
   FilesDB._privateConstructor();
 
@@ -720,7 +718,6 @@ class FilesDB with SqlDbBase {
     }
 
     return _loadMaterializedFiles(
-      queryKind: _MaterializedQueryKind.pendingOrUploadedFiles,
       whereClause: where.join(' AND '),
       whereArguments: args,
       order: asc ?? false
@@ -754,7 +751,6 @@ class FilesDB with SqlDbBase {
     }
 
     return _loadMaterializedFiles(
-      queryKind: _MaterializedQueryKind.localAndUploadedFiles,
       whereClause: where.join(' AND '),
       whereArguments: args,
       order: asc ?? false
@@ -1916,7 +1912,6 @@ class FilesDB with SqlDbBase {
     bool dedupeByUploadId = true,
   }) async {
     final result = await _loadMaterializedFiles(
-      queryKind: _MaterializedQueryKind.allFiles,
       whereClause: '1 = 1',
       whereArguments: const [],
       order: _MaterializedFileOrder.creationThenIdDescending,
@@ -1935,7 +1930,6 @@ class FilesDB with SqlDbBase {
     return Computer.shared().compute(
       _convertFilesDBRowsForIsolate,
       param: {"result": rows},
-      taskName: 'FilesDB.convertMaterializedFilePage',
     );
   }
 
@@ -1946,7 +1940,6 @@ class FilesDB with SqlDbBase {
   }
 
   Future<FileLoadResult> _loadMaterializedFiles({
-    required _MaterializedQueryKind queryKind,
     required String whereClause,
     required List<Object?> whereArguments,
     required _MaterializedFileOrder order,
@@ -1954,122 +1947,60 @@ class FilesDB with SqlDbBase {
     DBFilterOptions? filterOptions,
     int? limit,
   }) async {
-    final operation = _FilesDBMaterializationOperation(
-      id: ++_nextMaterializationOperationID,
-      queryKind: queryKind,
-      pageSize: _maxMaterializationPageSize,
-    );
     final files = <EnteFile>[];
     final normalizedLimit = limit != null && limit >= 0 ? limit : null;
-    Object? caughtError;
+    var rawRowCount = 0;
 
-    try {
-      final database = await sqliteAsyncDB;
-      operation.transactionWatch.start();
-      try {
-        await database.readTransaction((transaction) async {
-          _FilePageBoundary? pageBoundary;
-          var remaining = normalizedLimit;
+    final database = await sqliteAsyncDB;
+    await database.readTransaction((transaction) async {
+      _FilePageBoundary? pageBoundary;
+      var remaining = normalizedLimit;
 
-          while (remaining == null || remaining > 0) {
-            final requestedRows = remaining == null
-                ? _maxMaterializationPageSize
-                : min(_maxMaterializationPageSize, remaining);
-            final pageNumber = operation.pageCount + 1;
+      while (remaining == null || remaining > 0) {
+        final requestedRows = remaining == null
+            ? _maxMaterializationPageSize
+            : min(_maxMaterializationPageSize, remaining);
 
-            final queryWatch = Stopwatch()..start();
-            late final List<Map<String, dynamic>> rows;
-            try {
-              rows = await transaction.getAll(
-                _buildMaterializedFileQuery(
-                  whereClause: whereClause,
-                  order: order,
-                  hasPageBoundary: pageBoundary != null,
-                ),
-                <Object?>[
-                  ...whereArguments,
-                  if (pageBoundary != null) ...pageBoundary.values,
-                  requestedRows,
-                ],
-              );
-            } finally {
-              queryWatch.stop();
-              operation.recordQuery(queryWatch.elapsed);
-            }
+        final rows = await transaction.getAll(
+          _buildMaterializedFileQuery(
+            whereClause: whereClause,
+            order: order,
+            hasPageBoundary: pageBoundary != null,
+          ),
+          <Object?>[
+            ...whereArguments,
+            if (pageBoundary != null) ...pageBoundary.values,
+            requestedRows,
+          ],
+        );
 
-            operation.pageCount++;
-            operation.rawRows += rows.length;
-            operation.maxRawPage = max(operation.maxRawPage, rows.length);
-            if (rows.length > requestedRows ||
-                rows.length > _maxMaterializationPageSize) {
-              throw StateError(
-                'FilesDB materialization page exceeded its configured bound',
-              );
-            }
-            if (!operation.slowPageLogged &&
-                queryWatch.elapsed >= _slowPageQueryThreshold) {
-              operation.slowPageLogged = true;
-              _logger.warning(
-                'FilesDBMaterialization slowPage '
-                'op=${operation.id} '
-                'queryKind=${queryKind.telemetryName} page=$pageNumber '
-                'queryMs=${queryWatch.elapsedMilliseconds}',
-              );
-            }
+        rawRowCount += rows.length;
+        if (rows.length > requestedRows ||
+            rows.length > _maxMaterializationPageSize) {
+          throw StateError(
+            'FilesDB materialization page exceeded its configured bound',
+          );
+        }
 
-            if (rows.isEmpty) {
-              break;
-            }
+        if (rows.isEmpty) {
+          break;
+        }
 
-            pageBoundary = order.boundaryFrom(rows.last);
-            final conversionWatch = Stopwatch()..start();
-            late final List<EnteFile> convertedPage;
-            try {
-              convertedPage = await convertPage(rows);
-            } finally {
-              conversionWatch.stop();
-              operation.recordConversion(conversionWatch.elapsed);
-            }
-            files.addAll(convertedPage);
+        pageBoundary = order.boundaryFrom(rows.last);
+        final convertedPage = await convertPage(rows);
+        files.addAll(convertedPage);
 
-            if (remaining != null) {
-              remaining -= rows.length;
-            }
-            if (rows.length < requestedRows) {
-              break;
-            }
-          }
-        });
-      } finally {
-        operation.transactionWatch.stop();
+        if (remaining != null) {
+          remaining -= rows.length;
+        }
+        if (rows.length < requestedRows) {
+          break;
+        }
       }
+    });
 
-      operation.filterWatch.start();
-      late final List<EnteFile> filteredFiles;
-      try {
-        filteredFiles = await applyDBFilters(files, filterOptions);
-      } finally {
-        operation.filterWatch.stop();
-      }
-      operation.finalRows = filteredFiles.length;
-      operation.success = true;
-      return FileLoadResult(
-        filteredFiles,
-        limit != null && operation.rawRows == limit,
-      );
-    } catch (error) {
-      caughtError = error;
-      rethrow;
-    } finally {
-      operation.totalWatch.stop();
-      operation.finish(caughtError);
-      final message = 'FilesDBMaterialization ${operation.toLogString()}';
-      if (caughtError == null) {
-        _logger.info(message);
-      } else {
-        _logger.warning(message);
-      }
-    }
+    final filteredFiles = await applyDBFilters(files, filterOptions);
+    return FileLoadResult(filteredFiles, limit != null && rawRowCount == limit);
   }
 
   String _buildMaterializedFileQuery({
@@ -2369,16 +2300,6 @@ class FilesDB with SqlDbBase {
 typedef _FilePageConverter =
     Future<List<EnteFile>> Function(List<Map<String, dynamic>> rows);
 
-enum _MaterializedQueryKind {
-  allFiles('all_files'),
-  pendingOrUploadedFiles('pending_or_uploaded_files'),
-  localAndUploadedFiles('local_and_uploaded_files');
-
-  final String telemetryName;
-
-  const _MaterializedQueryKind(this.telemetryName);
-}
-
 enum _MaterializedFileOrder {
   creationThenIdDescending([
     FilesDB.columnCreationTime,
@@ -2415,96 +2336,6 @@ class _FilePageBoundary {
   final List<Object?> values;
 
   const _FilePageBoundary(this.values);
-}
-
-class _FilesDBMaterializationOperation {
-  final int id;
-  final _MaterializedQueryKind queryKind;
-  final int pageSize;
-  final Stopwatch totalWatch = Stopwatch()..start();
-  final Stopwatch transactionWatch = Stopwatch();
-  final Stopwatch filterWatch = Stopwatch();
-  final int? startCurrentRss = _readCurrentRss();
-  final int? startMaxRss = _readMaxRss();
-
-  var pageCount = 0;
-  var rawRows = 0;
-  var finalRows = 0;
-  var maxRawPage = 0;
-  var queryDuration = Duration.zero;
-  var maxQueryDuration = Duration.zero;
-  var conversionDuration = Duration.zero;
-  var maxConversionDuration = Duration.zero;
-  var success = false;
-  var slowPageLogged = false;
-  String? errorType;
-  int? endCurrentRss;
-  int? endMaxRss;
-
-  _FilesDBMaterializationOperation({
-    required this.id,
-    required this.queryKind,
-    required this.pageSize,
-  });
-
-  void recordQuery(Duration duration) {
-    queryDuration += duration;
-    if (duration > maxQueryDuration) {
-      maxQueryDuration = duration;
-    }
-  }
-
-  void recordConversion(Duration duration) {
-    conversionDuration += duration;
-    if (duration > maxConversionDuration) {
-      maxConversionDuration = duration;
-    }
-  }
-
-  void finish(Object? error) {
-    errorType = error?.runtimeType.toString();
-    endCurrentRss = _readCurrentRss();
-    endMaxRss = _readMaxRss();
-  }
-
-  String toLogString() => <String>[
-    'op=$id',
-    'queryKind=${queryKind.telemetryName}',
-    'status=${success ? 'success' : 'error'}',
-    if (errorType != null) 'errorType=$errorType',
-    'pageSize=$pageSize',
-    'pages=$pageCount',
-    'rawRows=$rawRows',
-    'finalRows=$finalRows',
-    'maxRawPage=$maxRawPage',
-    'queryMs=${queryDuration.inMilliseconds}',
-    'maxQueryMs=${maxQueryDuration.inMilliseconds}',
-    'conversionMs=${conversionDuration.inMilliseconds}',
-    'maxConversionMs=${maxConversionDuration.inMilliseconds}',
-    'filterMs=${filterWatch.elapsed.inMilliseconds}',
-    'transactionMs=${transactionWatch.elapsed.inMilliseconds}',
-    'totalMs=${totalWatch.elapsed.inMilliseconds}',
-    'startCurrentRss=${startCurrentRss ?? 'unavailable'}',
-    'endCurrentRss=${endCurrentRss ?? 'unavailable'}',
-    'startMaxRss=${startMaxRss ?? 'unavailable'}',
-    'endMaxRss=${endMaxRss ?? 'unavailable'}',
-  ].join(' ');
-}
-
-int? _readCurrentRss() {
-  try {
-    return ProcessInfo.currentRss;
-  } catch (_) {
-    return null;
-  }
-}
-
-int? _readMaxRss() {
-  try {
-    return ProcessInfo.maxRss;
-  } catch (_) {
-    return null;
-  }
 }
 
 List<EnteFile> _convertFilesDBRowsForIsolate(Map<dynamic, dynamic> arguments) =>
