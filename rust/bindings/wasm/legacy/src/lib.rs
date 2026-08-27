@@ -169,7 +169,6 @@ struct OpenLegacyKitRecoveryInput {
     email: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
-    user_agent: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -179,7 +178,7 @@ pub async fn legacy_kit_open_recovery(input: JsValue) -> Result<LegacyKitRecover
         input.base_url,
         input.client_package,
         input.client_version,
-        input.user_agent,
+        None,
     )?;
     let handle = client
         .open_from_shares(&input.shares, input.email.as_deref())

@@ -34,8 +34,6 @@ export const openLegacyKitRecovery = async (
         email: email?.trim() || undefined,
         clientPackage: clientPackageName,
         clientVersion: isDesktop ? desktopAppVersion : undefined,
-        userAgent:
-            typeof navigator === "undefined" ? undefined : navigator.userAgent,
     });
 
     return {

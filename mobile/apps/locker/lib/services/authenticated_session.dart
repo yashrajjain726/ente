@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:locker/service_locator.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/src/rust/third_party/ente_frb_lib/session.dart';
@@ -21,13 +23,15 @@ Session authenticatedSession() {
     return current;
   }
 
-  final packageInfo = ServiceLocator.instance.packageInfo;
+  final services = ServiceLocator.instance;
   final opened = openSession(
     baseUrl: baseUrl,
     authToken: authToken,
     masterKey: masterKey,
-    clientPackage: packageInfo.packageName,
-    clientVersion: packageInfo.version,
+    userAgent:
+        services.enteDio.options.headers[HttpHeaders.userAgentHeader] as String,
+    clientPackage: services.packageInfo.packageName,
+    clientVersion: services.packageInfo.version,
   );
   clearAuthenticatedSession();
   _session = opened;
