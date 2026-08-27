@@ -19,7 +19,6 @@ import 'package:photos/events/subscription_purchased_event.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/device_collection.dart';
 import "package:photos/models/file/file.dart";
-import "package:photos/models/file/file_type.dart";
 import 'package:photos/models/freeable_space_info.dart';
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/metadata/common_keys.dart";
@@ -28,7 +27,6 @@ import 'package:photos/module/download/gallery.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/files_service.dart";
-import "package:photos/services/ignored_files_service.dart";
 import "package:photos/services/review_service.dart";
 import "package:photos/states/location_screen_state.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -46,7 +44,7 @@ import 'package:photos/ui/sharing/album_participants_page.dart';
 import "package:photos/ui/sharing/manage_links_widget.dart";
 import 'package:photos/ui/sharing/share_collection_page.dart';
 import 'package:photos/ui/tools/free_space_page.dart';
-import "package:photos/ui/viewer/album_slideshow/album_slideshow_page.dart";
+import "package:photos/ui/viewer/album_slideshow/album_slideshow.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/ui/viewer/gallery/component/album_description_header.dart";
 import "package:photos/ui/viewer/gallery/gallery_app_bar_actions.dart";
@@ -827,7 +825,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       if (_isAlbumSlideshowAvailable)
         _menuOption(
           AlbumPopupAction.albumSlideshow,
-          pendingTranslation("(i) Slideshow"),
+          strings.slideshow,
           galleryAppBarMenuIcon(
             HugeIcons.strokeRoundedPresentation03,
             iconColor,
@@ -923,8 +921,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       _isDeviceFolderBackedUp &&
       widget.onDisableDeviceFolderBackup != null;
 
-  bool get _isAlbumSlideshowAvailable =>
-      flagService.internalUser && widget.collection != null;
+  bool get _isAlbumSlideshowAvailable => widget.collection != null;
 
   EntePopupMenuOption<AlbumPopupAction> _menuOption(
     AlbumPopupAction value,
@@ -990,32 +987,10 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       return;
     }
 
-    final ignoredIDs = await IgnoredFilesService.instance.idToIgnoreReasonMap;
-    if (!mounted) return;
-    final imageFiles = galleryFiles
-        .where(
-          (file) =>
-              (file.uploadedFileID != null ||
-                  !IgnoredFilesService.instance.shouldSkipUpload(
-                    ignoredIDs,
-                    file,
-                  )) &&
-              (file.fileType == FileType.image ||
-                  file.fileType == FileType.livePhoto),
-        )
-        .toList(growable: false);
-    if (imageFiles.isEmpty) {
-      showToast(context, context.strings.noPhotosFoundHere);
-      return;
-    }
-
-    await routeToPage(
+    await showAlbumSlideshow(
       context,
-      AlbumSlideshowPage(
-        files: imageFiles,
-        albumName: widget.collection!.displayName,
-      ),
-      forceCustomPageRoute: true,
+      files: galleryFiles,
+      title: widget.collection!.displayName,
     );
   }
 
