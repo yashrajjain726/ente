@@ -338,19 +338,10 @@ class MemoryLaneService {
     await _refreshReadyPersonIds();
   }
 
-  Future<void> _revokeTimeline(String id) async {
-    _pendingRequests[id]?.isRevoked = true;
-    final didRemove = await _cacheService.removeTimeline(id);
-    if (didRemove) {
-      await _refreshReadyPersonIds();
-    }
-  }
-
   void _handlePeopleChange(PeopleChangedEvent event) {
     if (!isFeatureEnabled) {
       return;
     }
-    unawaited(_cleanupAssignedClusterTimelines(event));
     if (event.type == PeopleEventType.removedFilesFromCluster ||
         event.type == PeopleEventType.removedFaceFromCluster) {
       unawaited(_processClusterChange(event));
@@ -906,37 +897,6 @@ class MemoryLaneService {
     return Map.fromEntries(
       files.map((file) => MapEntry(localIdToId[file.localID]!, file)),
     );
-  }
-
-  Future<void> _cleanupAssignedClusterTimelines(
-    PeopleChangedEvent event,
-  ) async {
-    try {
-      final Set<String> clusterIDs = {};
-      if (event.type == PeopleEventType.addedClusterToPerson) {
-        clusterIDs.add(event.source);
-      }
-      clusterIDs.addAll(event.newClusterIDs ?? {});
-      if (event.person case final person?) {
-        clusterIDs.addAll(person.data.assigned.map((cluster) => cluster.id));
-      }
-      _topNClusters.removeAll(clusterIDs);
-      if (event.type == PeopleEventType.syncDone) {
-        final person = await PersonService.instance.getPersons();
-        clusterIDs.addAll(
-          person.expand((p) => p.data.assigned).map((c) => c.id),
-        );
-      }
-      _topNClusters.removeAll(clusterIDs);
-      if (clusterIDs.isEmpty) {
-        return;
-      }
-      for (final clusterID in clusterIDs) {
-        await _revokeTimeline(clusterID);
-      }
-    } catch (e, s) {
-      _logger.severe("_cleanupAssignedClusterTimelines failed", e, s);
-    }
   }
 }
 
