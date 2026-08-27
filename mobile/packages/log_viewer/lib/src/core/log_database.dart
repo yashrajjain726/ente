@@ -11,21 +11,28 @@ class LogDatabase {
   static const int _databaseVersion = 1;
 
   final int maxEntries;
-  SqliteDatabase? _database;
+  Future<SqliteDatabase>? _databaseFuture;
 
   LogDatabase({this.maxEntries = 10000});
 
-  Future<SqliteDatabase> get database async {
-    _database ??= await _initDatabase();
-    return _database!;
+  Future<SqliteDatabase> get database {
+    _databaseFuture ??= _initDatabase();
+    return _databaseFuture!;
   }
 
   Future<SqliteDatabase> _initDatabase() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final path = join(documentsDirectory.path, _databaseName);
-    final database = SqliteDatabase(path: path);
-    await _migrate(database);
-    return database;
+    SqliteDatabase? database;
+    try {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final path = join(documentsDirectory.path, _databaseName);
+      database = SqliteDatabase(path: path);
+      await _migrate(database);
+      return database;
+    } catch (_) {
+      _databaseFuture = null;
+      await database?.close();
+      rethrow;
+    }
   }
 
   Future<void> _migrate(SqliteDatabase database) async {
@@ -414,10 +421,13 @@ class LogDatabase {
   }
 
   Future<void> close() async {
-    final db = _database;
-    if (db != null) {
+    final databaseFuture = _databaseFuture;
+    if (databaseFuture != null) {
+      final db = await databaseFuture;
       await db.close();
-      _database = null;
+      if (identical(_databaseFuture, databaseFuture)) {
+        _databaseFuture = null;
+      }
     }
   }
 
