@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
     Box,
     Button,
+    CircularProgress,
     IconButton,
     LinearProgress,
     Menu,
@@ -63,6 +64,7 @@ export interface ChatComposerProps {
     handleCancelEdit: () => void;
     pendingDocuments: DocumentAttachment[];
     pendingImages: ImageAttachment[];
+    isAttachingImages: boolean;
     pendingImagePreviews: Record<string, string>;
     removePendingDocument: (id: string) => void;
     removePendingImage: (id: string) => void;
@@ -103,6 +105,7 @@ export const ChatComposer = memo(
             handleCancelEdit,
             pendingDocuments,
             pendingImages,
+            isAttachingImages,
             pendingImagePreviews,
             removePendingDocument,
             removePendingImage,
@@ -149,13 +152,22 @@ export const ChatComposer = memo(
             modelGateStatus === "downloading";
         const disableAttachmentButton =
             isGenerating ||
+            isAttachingImages ||
             isModelPreparationActive ||
             isDownloading ||
             (showImageAttachment && isImageAttachmentLimitReached);
 
         const pendingImagePreviewRow =
-            pendingImages.length > 0 ? (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, pb: 1 }}>
+            pendingImages.length > 0 || isAttachingImages ? (
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 1,
+                        pb: 1,
+                    }}
+                >
                     {pendingImages.map((img) => {
                         const preview = pendingImagePreviews[img.id];
                         return (
@@ -224,6 +236,19 @@ export const ChatComposer = memo(
                             </Box>
                         );
                     })}
+                    {isAttachingImages && (
+                        <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{ alignItems: "center", color: "text.muted" }}
+                            role="status"
+                        >
+                            <CircularProgress size={16} color="inherit" />
+                            <Typography variant="small">
+                                Attaching images...
+                            </Typography>
+                        </Stack>
+                    )}
                 </Box>
             ) : null;
 
@@ -536,6 +561,7 @@ export const ChatComposer = memo(
                                             pendingImages.length > 0
                                         }
                                         isDownloading={isDownloading}
+                                        isAttachingImages={isAttachingImages}
                                         isGenerating={isGenerating}
                                         isModelPreparationActive={
                                             isModelPreparationActive

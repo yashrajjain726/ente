@@ -28,6 +28,7 @@ interface ChatInputProps {
     handleStopGeneration: () => void;
     hasPendingAttachments: boolean;
     initialText: string;
+    isAttachingImages: boolean;
     isDownloading: boolean;
     isGenerating: boolean;
     isModelPreparationActive: boolean;
@@ -47,6 +48,7 @@ export const ChatInput = memo(
             handleStopGeneration,
             hasPendingAttachments,
             initialText,
+            isAttachingImages,
             isDownloading,
             isGenerating,
             isModelPreparationActive,
@@ -73,7 +75,9 @@ export const ChatInput = memo(
         const disableSend =
             isModelPreparationActive ||
             isDownloading ||
-            (!isGenerating && !input.trim() && !hasPendingAttachments);
+            (!isGenerating &&
+                (isAttachingImages ||
+                    (!input.trim() && !hasPendingAttachments)));
 
         return (
             <Box

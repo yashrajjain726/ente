@@ -598,8 +598,7 @@ const Page: React.FC = () => {
         Record<string, string>
     >({});
     const [isImageDragActive, setIsImageDragActive] = useState(false);
-    const [isProcessingDroppedImages, setIsProcessingDroppedImages] =
-        useState(false);
+    const [isAttachingImages, setIsAttachingImages] = useState(false);
     const [imagePreview, setImagePreview] = useState<{
         url: string;
         name: string;
@@ -667,6 +666,7 @@ const Page: React.FC = () => {
     const sessionSearchRef = useRef("");
     const attachmentPreviewUrlsRef = useRef<Record<string, string>>({});
     const pendingPreviewUrlsRef = useRef<Record<string, string>>({});
+    const imageAttachmentEpochRef = useRef(0);
     const imagePreviewUrlRef = useRef<string | null>(null);
     const attachmentPreviewInFlightRef = useRef(
         new Map<string, Promise<void>>(),
@@ -1479,6 +1479,12 @@ const Page: React.FC = () => {
         sessions,
     ]);
 
+    const resetPendingImages = useCallback(() => {
+        imageAttachmentEpochRef.current += 1;
+        setPendingImages([]);
+        setIsAttachingImages(false);
+    }, []);
+
     useEffect(() => {
         setStreamingParentId(null);
         setStreamingText("");
@@ -1487,10 +1493,11 @@ const Page: React.FC = () => {
         streamingCreatedAtRef.current = null;
         setIsGenerating(false);
         setIsStreamingOutro(false);
-        setPendingImages([]);
+        resetPendingImages();
+        setEditingMessage(null);
         setStickToBottom(true);
         currentJobIdRef.current = null;
-    }, [currentSessionId]);
+    }, [currentSessionId, resetPendingImages]);
 
     useEffect(() => {
         if (!isGenerating || streamingText.trim().length > 0) {
@@ -2384,7 +2391,7 @@ const Page: React.FC = () => {
         setAllMessages([]);
         composerRef.current?.setText("");
         setEditingMessage(null);
-        setPendingImages([]);
+        resetPendingImages();
         setStreamingParentId(null);
         setStreamingText("");
         streamingBufferRef.current = "";
@@ -2401,6 +2408,7 @@ const Page: React.FC = () => {
         cancelActiveGenerationForNavigation,
         focusInput,
         isSmall,
+        resetPendingImages,
         updateRouteSession,
     ]);
 
@@ -2526,6 +2534,8 @@ const Page: React.FC = () => {
 
     const handleEditMessage = useCallback(
         async (message: ChatMessage) => {
+            resetPendingImages();
+            const epoch = imageAttachmentEpochRef.current;
             const parsed = parseDocumentBlocks(message.text);
             setEditingMessage(message);
             composerRef.current?.setText(parsed.text);
@@ -2536,7 +2546,6 @@ const Page: React.FC = () => {
             );
 
             if (imageAttachments.length === 0) {
-                setPendingImages([]);
                 return;
             }
 
@@ -2546,10 +2555,10 @@ const Page: React.FC = () => {
                     message:
                         "Attachments are unavailable until encryption is ready.",
                 });
-                setPendingImages([]);
                 return;
             }
 
+            setIsAttachingImages(true);
             try {
                 const images = await Promise.all(
                     imageAttachments.map(async (attachment) => {
@@ -2572,26 +2581,31 @@ const Page: React.FC = () => {
                     }),
                 );
 
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 setPendingImages(images);
             } catch (error) {
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 log.error("Failed to load attachment contents", error);
                 showMiniDialog({
                     title: "Attachment error",
                     message:
                         "We could not load attachment contents for editing.",
                 });
-                setPendingImages([]);
+            } finally {
+                if (epoch === imageAttachmentEpochRef.current) {
+                    setIsAttachingImages(false);
+                }
             }
         },
-        [chatKey, showMiniDialog, inferImageMime],
+        [chatKey, showMiniDialog, inferImageMime, resetPendingImages],
     );
 
     const handleCancelEdit = useCallback(() => {
         setEditingMessage(null);
         composerRef.current?.setText("");
         setPendingDocuments([]);
-        setPendingImages([]);
-    }, []);
+        resetPendingImages();
+    }, [resetPendingImages]);
 
     const handleCopyMessage = useCallback(
         async (text: string) => {
@@ -3762,18 +3776,12 @@ const Page: React.FC = () => {
         showImageAttachment &&
         !isGenerating &&
         !isDownloading &&
-        !showModelGate;
-    const canAttachDroppedImages =
-        canHandleImageDrop &&
-        !isImageAttachmentLimitReached &&
-        !isProcessingDroppedImages;
-    const showImageDropOverlay =
-        canHandleImageDrop && (isImageDragActive || isProcessingDroppedImages);
-    const imageDropOverlayTitle = isProcessingDroppedImages
-        ? "Attaching images..."
-        : isImageAttachmentLimitReached
-          ? "Image limit reached"
-          : "Drop images to attach";
+        !showModelGate &&
+        !isAttachingImages;
+    const showImageDropOverlay = canHandleImageDrop && isImageDragActive;
+    const imageDropOverlayTitle = isImageAttachmentLimitReached
+        ? "Image limit reached"
+        : "Drop images to attach";
     const imageDropOverlayDescription = isImageAttachmentLimitReached
         ? `You can attach up to ${MAX_IMAGE_ATTACHMENTS_PER_MESSAGE} images per message.`
         : "PNG, JPG, WebP, GIF, BMP, HEIC, HEIF, AVIF";
@@ -3834,8 +3842,8 @@ const Page: React.FC = () => {
                 return;
             }
 
-            const isDrop = source === "drop";
-            if (isDrop) setIsProcessingDroppedImages(true);
+            const epoch = imageAttachmentEpochRef.current;
+            setIsAttachingImages(true);
 
             try {
                 const { invoke } = await import("@tauri-apps/api/core");
@@ -3858,6 +3866,8 @@ const Page: React.FC = () => {
                     }),
                 );
 
+                if (epoch !== imageAttachmentEpochRef.current) return;
+
                 log.info(
                     `Compressed ${source === "drop" ? "dropped" : "selected"} image attachments`,
                     {
@@ -3876,6 +3886,7 @@ const Page: React.FC = () => {
                     handleImageCancel();
                 }
             } catch (error) {
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 log.error(
                     `Failed to process ${source === "drop" ? "dropped" : "selected"} image attachment: ${formatImageProcessingErrorForLog(error)}`,
                 );
@@ -3884,7 +3895,9 @@ const Page: React.FC = () => {
                 );
                 return;
             } finally {
-                if (isDrop) setIsProcessingDroppedImages(false);
+                if (epoch === imageAttachmentEpochRef.current) {
+                    setIsAttachingImages(false);
+                }
             }
         },
         [
@@ -3972,7 +3985,6 @@ const Page: React.FC = () => {
                         });
                         return;
                     }
-                    if (!canAttachDroppedImages) return;
 
                     const imagePaths = event.payload.paths.filter((path) => {
                         const lowerPath = path.toLowerCase();
@@ -4011,7 +4023,6 @@ const Page: React.FC = () => {
             unlisten?.();
         };
     }, [
-        canAttachDroppedImages,
         canHandleImageDrop,
         isImageAttachmentLimitReached,
         isTauriRuntime,
@@ -4063,6 +4074,7 @@ const Page: React.FC = () => {
     }, []);
 
     const handleSend = async (input: string) => {
+        if (isAttachingImages) return;
         const trimmed = input.trim();
         const hasDocuments = pendingDocuments.length > 0;
         const hasImages = pendingImages.length > 0;
@@ -4305,6 +4317,7 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         return () => {
+            imageAttachmentEpochRef.current += 1;
             if (streamingFlushTimerRef.current) {
                 window.clearTimeout(streamingFlushTimerRef.current);
             }
@@ -4533,6 +4546,7 @@ const Page: React.FC = () => {
                         handleCancelEdit={handleCancelEdit}
                         pendingDocuments={pendingDocuments}
                         pendingImages={pendingImages}
+                        isAttachingImages={isAttachingImages}
                         pendingImagePreviews={pendingImagePreviews}
                         removePendingDocument={removePendingDocument}
                         removePendingImage={removePendingImage}
