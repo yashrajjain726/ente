@@ -71,16 +71,23 @@ class ContactsService {
 
   Future<void> updateAuthToken(String authToken) async {
     final ctx = _requireCtx();
+    final session = _session;
+    if (session == null) {
+      return;
+    }
     await ctx.updateAuthToken(authToken);
+    if (_session == null || _ctx == null) {
+      return;
+    }
     _session = ContactsSession(
-      baseUrl: _session!.baseUrl,
+      baseUrl: session.baseUrl,
       authToken: authToken,
-      userId: _session!.userId,
-      accountKey: _session!.accountKey,
-      accountKeyProvider: _session!.accountKeyProvider,
-      userAgent: _session!.userAgent,
-      clientPackage: _session!.clientPackage,
-      clientVersion: _session!.clientVersion,
+      userId: session.userId,
+      accountKey: session.accountKey,
+      accountKeyProvider: session.accountKeyProvider,
+      userAgent: session.userAgent,
+      clientPackage: session.clientPackage,
+      clientVersion: session.clientVersion,
     );
   }
 
