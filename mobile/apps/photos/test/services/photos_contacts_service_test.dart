@@ -32,7 +32,7 @@ void main() {
 
   late FakeContactsService contactsService;
   late PhotosContactsService service;
-  late contacts.ContactsSession session;
+  const baseUrl = 'http://localhost:8080';
 
   setUp(() {
     contactsService = FakeContactsService(
@@ -41,7 +41,7 @@ void main() {
           id: 'ct_1',
           contactUserId: 7,
           email: 'alice@test.test',
-          data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
+          name: 'Alice',
           profilePictureAttachmentId: null,
           isDeleted: false,
           createdAt: 1,
@@ -53,23 +53,17 @@ void main() {
     service = PhotosContactsService.forTesting(
       contactsService: contactsService,
     );
-    session = contacts.ContactsSession(
-      baseUrl: 'http://localhost:8080',
-      authToken: 'token',
-      userId: 1,
-      accountKey: Uint8List.fromList([1, 2, 3]),
-    );
   });
 
   test('deletion tombstone evicts contact indexes', () async {
-    await service.debugOpenAndSync(session);
+    await service.debugOpenAndSync(baseUrl: baseUrl, userId: 1);
 
     service.debugHydrateContacts(const [
       contacts.ContactRecord(
         id: 'ct_1',
         contactUserId: 7,
         email: 'alice@test.test',
-        data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
+        name: 'Alice',
         profilePictureAttachmentId: null,
         isDeleted: true,
         createdAt: 1,
@@ -89,7 +83,7 @@ void main() {
           id: 'ct_old',
           contactUserId: 7,
           email: 'alice@test.test',
-          data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
+          name: 'Alice',
           profilePictureAttachmentId: null,
           isDeleted: false,
           createdAt: 1,
@@ -103,7 +97,7 @@ void main() {
           id: 'ct_new',
           contactUserId: 9,
           email: 'bob@test.test',
-          data: contacts.ContactData(contactUserId: 9, name: 'Bob'),
+          name: 'Bob',
           profilePictureAttachmentId: null,
           isDeleted: false,
           createdAt: 3,
@@ -120,16 +114,13 @@ void main() {
     );
 
     firstService.openBarrier = Completer<void>();
-    final oldOpenAndSync = service.debugOpenAndSync(session);
+    final oldOpenAndSync = service.debugOpenAndSync(
+      baseUrl: baseUrl,
+      userId: 1,
+    );
     await firstService.openStarted!.future;
 
-    final nextSession = contacts.ContactsSession(
-      baseUrl: session.baseUrl,
-      authToken: 'token-2',
-      userId: 2,
-      accountKey: Uint8List.fromList([9, 9, 9]),
-    );
-    await service.debugOpenAndSync(nextSession);
+    await service.debugOpenAndSync(baseUrl: baseUrl, userId: 2);
 
     expect(service.getCachedSavedName(contactUserId: 9), 'Bob');
     expect(service.getCachedSavedName(contactUserId: 7), isNull);
@@ -151,7 +142,7 @@ void main() {
         contactsService: contactsService,
       );
 
-      await service.debugOpenAndSync(session);
+      await service.debugOpenAndSync(baseUrl: baseUrl, userId: 1);
       expect(await service.getProfilePictureBytesByUserId(7), isNull);
 
       contactsService.profilePictureBytesByContactId['ct_1'] =
@@ -161,7 +152,7 @@ void main() {
           id: 'ct_1',
           contactUserId: 7,
           email: 'alice@test.test',
-          data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
+          name: 'Alice',
           profilePictureAttachmentId: 'att_1',
           isDeleted: false,
           createdAt: 1,
@@ -182,7 +173,7 @@ void main() {
   );
 
   test('logout event clears hydrated contact cache immediately', () async {
-    await service.debugOpenAndSync(session);
+    await service.debugOpenAndSync(baseUrl: baseUrl, userId: 1);
 
     expect(service.getCachedSavedName(contactUserId: 7), 'Alice');
 
@@ -213,7 +204,7 @@ class FakeContactsService extends Fake implements contacts.ContactsService {
   int getProfilePictureCalls = 0;
 
   @override
-  Future<void> open(contacts.ContactsSession session) async {
+  Future<void> open({required int userId}) async {
     openCalls += 1;
     final started = openStarted ??= Completer<void>();
     if (!started.isCompleted) {

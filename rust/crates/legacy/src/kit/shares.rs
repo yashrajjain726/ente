@@ -2,12 +2,11 @@ use ente_core::b64;
 use ente_core::crypto::{self, SecretVec};
 use sha2::{Digest, Sha256};
 
-use crate::{
-    Error, Result,
-    kit_models::{LEGACY_KIT_PAYLOAD_VERSION, LegacyKitShare, LegacyKitVariant},
-};
+use crate::{Error, Result};
 
-pub(super) fn checksum(
+use super::models::{LEGACY_KIT_PAYLOAD_VERSION, LegacyKitShare, LegacyKitVariant};
+
+pub(crate) fn checksum(
     payload_version: u8,
     variant: LegacyKitVariant,
     kit_id: &str,
@@ -21,7 +20,7 @@ pub(super) fn checksum(
     b64::encode(&hash[..8])
 }
 
-pub(super) fn split_secret_2_of_3(secret: &[u8]) -> Result<Vec<Vec<u8>>> {
+pub(crate) fn split_secret_2_of_3(secret: &[u8]) -> Result<Vec<Vec<u8>>> {
     if secret.len() != 32 {
         return Err(Error::InvalidInput(
             "legacy kit secret must be 32 bytes".into(),
@@ -41,7 +40,7 @@ pub(super) fn split_secret_2_of_3(secret: &[u8]) -> Result<Vec<Vec<u8>>> {
     Ok(shares)
 }
 
-pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<SecretVec> {
+pub(crate) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<SecretVec> {
     if shares.len() < 2 {
         return Err(Error::InvalidInput(
             "at least two legacy kit shares are required".into(),
@@ -107,7 +106,7 @@ pub(super) fn reconstruct_secret_2_of_3(shares: &[LegacyKitShare]) -> Result<Sec
     Ok(SecretVec::new(secret))
 }
 
-pub(super) fn used_part_indexes(shares: &[LegacyKitShare]) -> Result<Vec<u8>> {
+pub(crate) fn used_part_indexes(shares: &[LegacyKitShare]) -> Result<Vec<u8>> {
     let first = shares
         .first()
         .ok_or_else(|| Error::InvalidInput("at least two legacy kit shares are required".into()))?;

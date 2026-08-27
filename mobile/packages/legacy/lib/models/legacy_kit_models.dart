@@ -20,28 +20,6 @@ class LegacyKitRecoverySession {
   });
 }
 
-class LegacyKitRecoveryInitiatorHint {
-  final List<int> usedPartIndexes;
-  final String ip;
-  final String userAgent;
-
-  const LegacyKitRecoveryInitiatorHint({
-    required this.usedPartIndexes,
-    required this.ip,
-    required this.userAgent,
-  });
-}
-
-class LegacyKitOwnerRecoverySessionDetails {
-  final LegacyKitRecoverySession? session;
-  final List<LegacyKitRecoveryInitiatorHint> initiators;
-
-  const LegacyKitOwnerRecoverySessionDetails({
-    required this.session,
-    required this.initiators,
-  });
-}
-
 class LegacyKitPart {
   final int index;
   final String name;

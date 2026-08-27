@@ -48,6 +48,8 @@ dependencies:
     path: ../../packages/ente_crypto_api
   ente_feature_flag:
     path: ../../packages/feature_flag
+  ente_frb:
+    path: ../../packages/frb
   ente_icons:
     path: ../../packages/ente_icons
   ente_install_source:

@@ -183,7 +183,7 @@ class FamilyDashboard extends StatelessWidget {
       member.email.split('@').first;
 
   String? _savedNameFor(FamilyMember member) {
-    final savedName = contactsByUserId[member.userID]?.data?.name.trim();
+    final savedName = contactsByUserId[member.userID]?.name?.trim();
     return savedName == null || savedName.isEmpty ? null : savedName;
   }
 
