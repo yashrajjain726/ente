@@ -29,6 +29,10 @@ import {
 } from "services/space";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
+import {
+    homeCirclePlacements,
+    type HomeCirclePlacement,
+} from "utils/home-circle-layout";
 import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
 import {
     canPreviewSpaceImageFile,
@@ -55,7 +59,6 @@ const headerHeight = 64;
 const headerIconSize = 22;
 const headerSideWidth = 36;
 const homeHorizontalPadding = "16px";
-const postCircleAvatarSize = "clamp(18px, 19%, 32px)";
 const postCircleMediaLoadRootMargin = "640px 0px";
 const avatarFadeSx = {
     "@keyframes spaceAvatarFade": { from: { opacity: 0 }, to: { opacity: 1 } },
@@ -98,6 +101,11 @@ interface DecodedImageState {
     ready: boolean;
     src?: string | null;
     width?: number;
+}
+
+interface PostCircleCanvasSize {
+    height: number;
+    width: number;
 }
 
 interface SelectedHomeViewer {
@@ -202,177 +210,7 @@ const useDecodedImage = (
     return { ready: !src, src };
 };
 
-interface PostCirclePlacement {
-    size: number;
-    x: number;
-    y: number;
-}
-
-interface PostCircleLayout {
-    canvasHeight: number;
-    placements: PostCirclePlacement[];
-}
-
-const placedCircles = (
-    size: number,
-    canvasHeight: number,
-    points: [number, number][],
-): PostCircleLayout => ({
-    canvasHeight,
-    placements: points.map(([x, y]) => ({ size, x, y })),
-});
-
-const diceCircleLayouts: Record<number, PostCircleLayout> = {
-    1: placedCircles(1, 1, [[0, 0]]),
-    2: placedCircles(0.82, 1.66, [
-        [0.09, 0],
-        [0.09, 0.84],
-    ]),
-    3: placedCircles(0.48, 0.91, [
-        [0.26, 0],
-        [0, 0.43],
-        [0.52, 0.43],
-    ]),
-    4: placedCircles(0.44, 1, [
-        [0, 0],
-        [0.56, 0],
-        [0, 0.56],
-        [0.56, 0.56],
-    ]),
-    5: placedCircles(0.34, 1, [
-        [0, 0],
-        [0.66, 0],
-        [0.33, 0.33],
-        [0, 0.66],
-        [0.66, 0.66],
-    ]),
-    6: placedCircles(0.31, 1, [
-        [0, 0],
-        [0.69, 0],
-        [0, 0.345],
-        [0.69, 0.345],
-        [0, 0.69],
-        [0.69, 0.69],
-    ]),
-    7: placedCircles(0.29, 1, [
-        [0, 0],
-        [0.71, 0],
-        [0, 0.355],
-        [0.355, 0.355],
-        [0.71, 0.355],
-        [0, 0.71],
-        [0.71, 0.71],
-    ]),
-};
-
-const balancedConstellationRowSizes = (count: number) => {
-    const rowCount = Math.ceil(count / 3);
-    const rowSizes = Array<number>(rowCount).fill(Math.floor(count / rowCount));
-    const outerInRowOrder: number[] = [];
-    for (let offset = 0; outerInRowOrder.length < rowCount; offset++) {
-        outerInRowOrder.push(offset);
-        const opposite = rowCount - offset - 1;
-        if (opposite != offset) outerInRowOrder.push(opposite);
-    }
-    const extraCircles = count - rowSizes[0]! * rowCount;
-    for (let index = 0; index < extraCircles; index++) {
-        rowSizes[outerInRowOrder[index]!]! += 1;
-    }
-    return rowSizes;
-};
-
-const constellationCircleLayout = (count: number): PostCircleLayout => {
-    const rowSizes = balancedConstellationRowSizes(count);
-    const size = Math.max(0.2, 0.29 - (rowSizes.length - 3) * 0.0125);
-    const verticalGap = size * 0.16;
-    const placements: PostCirclePlacement[] = [];
-    rowSizes.forEach((rowSize, rowIndex) => {
-        const y = rowIndex * (size + verticalGap);
-        if (rowSize == 3) {
-            placements.push(
-                { size, x: 0, y },
-                { size, x: (1 - size) / 2, y },
-                { size, x: 1 - size, y },
-            );
-            return;
-        }
-
-        const horizontalGap = size * 0.18;
-        const rowStart = (1 - (size * 2 + horizontalGap)) / 2;
-        placements.push(
-            { size, x: rowStart, y },
-            { size, x: rowStart + size + horizontalGap, y },
-        );
-    });
-    return {
-        canvasHeight:
-            rowSizes.length * size + (rowSizes.length - 1) * verticalGap,
-        placements,
-    };
-};
-
-const postCircleLayoutForCount = (count: number): PostCircleLayout =>
-    diceCircleLayouts[count] ??
-    (count > 7
-        ? constellationCircleLayout(count)
-        : { canvasHeight: 1, placements: [] });
-
-const avatarAttachmentAngleFor = (
-    placement: PostCirclePlacement,
-    placementIndex: number,
-    layout: PostCircleLayout,
-) => {
-    if (layout.placements.length == 1) return -135;
-
-    const centerX = placement.x + placement.size / 2;
-    const centerY = placement.y + placement.size / 2;
-    const layoutCenterX = 0.5;
-    const layoutCenterY = layout.canvasHeight / 2;
-    const outwardX = centerX - layoutCenterX;
-    const outwardY = centerY - layoutCenterY;
-    const outwardLength = Math.hypot(outwardX, outwardY);
-    const radius = placement.size / 2;
-    const avatarRadius = placement.size * 0.095;
-    const candidateAngles = [-90, 90, 180, 0, -135, -45, 135, 45];
-
-    return candidateAngles.reduce((bestAngle, angle) => {
-        const scoreFor = (candidateAngle: number) => {
-            const radians = (candidateAngle * Math.PI) / 180;
-            const directionX = Math.cos(radians);
-            const directionY = Math.sin(radians);
-            const avatarCenterX = centerX + directionX * radius;
-            const avatarCenterY = centerY + directionY * radius;
-            const nearestCircleClearance = layout.placements.reduce(
-                (nearest, otherPlacement, otherIndex) => {
-                    if (otherIndex == placementIndex) return nearest;
-                    const otherCenterX =
-                        otherPlacement.x + otherPlacement.size / 2;
-                    const otherCenterY =
-                        otherPlacement.y + otherPlacement.size / 2;
-                    const clearance =
-                        Math.hypot(
-                            avatarCenterX - otherCenterX,
-                            avatarCenterY - otherCenterY,
-                        ) -
-                        otherPlacement.size / 2 -
-                        avatarRadius;
-                    return Math.min(nearest, clearance);
-                },
-                Number.POSITIVE_INFINITY,
-            );
-            const outwardAlignment = outwardLength
-                ? (directionX * outwardX + directionY * outwardY) /
-                  outwardLength
-                : 0;
-            return nearestCircleClearance + outwardAlignment * placement.size;
-        };
-
-        return scoreFor(angle) > scoreFor(bestAngle) ? angle : bestAngle;
-    }, candidateAngles[0]!);
-};
-
 interface FriendPostCircleProps {
-    avatarAttachmentAngle: number;
     avatarUrl?: string | null;
     friend: FriendProfile;
     imageUrl?: string;
@@ -383,13 +221,11 @@ interface FriendPostCircleProps {
     onLoadImage?: () => Promise<string | undefined>;
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenPhoto: (photo: SpaceViewerPhoto) => void;
-    placement: PostCirclePlacement;
-    placementCanvasHeight: number;
+    placement: HomeCirclePlacement;
     post?: SpacePost;
 }
 
 const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
-    avatarAttachmentAngle,
     avatarUrl,
     friend,
     imageUrl,
@@ -401,7 +237,6 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     onOpenFriend,
     onOpenPhoto,
     placement,
-    placementCanvasHeight,
     post,
 }) => {
     const rootRef = React.useRef<HTMLLIElement | null>(null);
@@ -435,10 +270,12 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     const canOpenPost = Boolean(post) && !postUnavailable && isPhotoReady;
     const isCircleDisabled =
         isLoading || Boolean(post && !postUnavailable && !isPhotoReady);
-    const avatarAttachmentRadians = (avatarAttachmentAngle * Math.PI) / 180;
-    const avatarAttachmentX = 50 + Math.cos(avatarAttachmentRadians) * 50;
-    const avatarAttachmentY = 50 + Math.sin(avatarAttachmentRadians) * 50;
-    const avatarCutoutMask = `radial-gradient(circle at ${avatarAttachmentX}% ${avatarAttachmentY}%, transparent calc(clamp(9px, 9.5%, 16px) + 3px), #000 calc(clamp(9px, 9.5%, 16px) + 3.5px))`;
+    const avatarSize = Math.min(32, placement.size * 0.2);
+    const cutoutGap = Math.max(1, Math.min(3, placement.size * 0.02));
+    const cutoutRadius = avatarSize / 2 + cutoutGap;
+    const circleBorderWidth = Math.max(1, Math.min(3, placement.size * 0.018));
+    const circlePadding = Math.max(1.5, Math.min(4, placement.size * 0.025));
+    const avatarCutoutMask = `radial-gradient(circle at 14.645% 14.645%, transparent ${cutoutRadius}px, #000 ${cutoutRadius + 0.5}px)`;
 
     React.useEffect(() => {
         if (isLoading || !post || postUnavailable || shouldLoadMedia) return;
@@ -508,14 +345,14 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             component="li"
             sx={{
                 aspectRatio: "1",
-                left: `${placement.x * 100}%`,
+                left: placement.x,
                 listStyle: "none",
                 minWidth: 0,
                 position: "absolute",
-                top: `${(placement.y / placementCanvasHeight) * 100}%`,
+                top: placement.y,
                 transition:
                     "left 420ms cubic-bezier(0.2, 0.8, 0.2, 1), top 420ms cubic-bezier(0.2, 0.8, 0.2, 1), width 420ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-                width: `${placement.size * 100}%`,
+                width: placement.size,
                 "@media (prefers-reduced-motion: reduce)": {
                     transition: "none",
                 },
@@ -524,12 +361,12 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             <Box
                 sx={{
                     aspectRatio: "1",
-                    border: `3px solid ${inactivePostCircleBorderColor}`,
+                    border: `${circleBorderWidth}px solid ${inactivePostCircleBorderColor}`,
                     borderRadius: "50%",
                     boxSizing: "border-box",
                     height: "100%",
                     maskImage: avatarCutoutMask,
-                    p: "4px",
+                    p: `${circlePadding}px`,
                     position: "relative",
                     WebkitMaskImage: avatarCutoutMask,
                     width: "100%",
@@ -652,13 +489,13 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     border: 0,
                     borderRadius: "50%",
                     boxSizing: "border-box",
-                    left: `${avatarAttachmentX}%`,
+                    left: "14.645%",
                     overflow: "hidden",
                     pointerEvents: "none",
                     position: "absolute",
-                    top: `${avatarAttachmentY}%`,
+                    top: "14.645%",
                     transform: "translate(-50%, -50%)",
-                    width: postCircleAvatarSize,
+                    width: avatarSize,
                     zIndex: 2,
                 }}
             >
@@ -792,6 +629,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [postCircleCanvasSize, setPostCircleCanvasSize] =
+        useState<PostCircleCanvasSize>({ height: 0, width: 0 });
     const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
         useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
@@ -805,6 +644,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [unavailablePostsByKey, setUnavailablePostsByKey] = useState<
         Record<string, true>
     >({});
+    const postCircleCanvasRef = React.useRef<HTMLDivElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const initialPostPhotoFileRef = React.useRef<File | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
@@ -835,9 +675,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             ),
         [friends],
     );
-    const postCircleLayout = React.useMemo(
-        () => postCircleLayoutForCount(orderedFriends.length),
-        [orderedFriends.length],
+    React.useEffect(() => {
+        const canvas = postCircleCanvasRef.current;
+        if (!canvas) return;
+
+        const updateSize = () => {
+            const { height, width } = canvas.getBoundingClientRect();
+            setPostCircleCanvasSize({ height, width });
+        };
+        const observer = new ResizeObserver(updateSize);
+        observer.observe(canvas);
+        updateSize();
+        return () => observer.disconnect();
+    }, []);
+    const postCirclePlacements = homeCirclePlacements(
+        orderedFriends.length,
+        postCircleCanvasSize.width,
+        postCircleCanvasSize.height,
     );
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
@@ -997,11 +851,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         return (
             <FriendPostCircle
                 key={friend.id}
-                avatarAttachmentAngle={avatarAttachmentAngleFor(
-                    postCircleLayout.placements[index]!,
-                    index,
-                    postCircleLayout,
-                )}
                 avatarUrl={avatarUrl}
                 friend={friend}
                 imageUrl={imageUrl}
@@ -1020,8 +869,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
                 onOpenFriend={onOpenFriend}
                 onOpenPhoto={openPostPhoto}
-                placement={postCircleLayout.placements[index]!}
-                placementCanvasHeight={postCircleLayout.canvasHeight}
+                placement={postCirclePlacements[index]!}
                 post={item}
             />
         );
@@ -1412,63 +1260,75 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent:
-                            orderedFriends.length <= 12
-                                ? "center"
-                                : "flex-start",
-                        minHeight: "calc(100svh - 64px)",
+                        height: `calc(100svh - ${headerHeight}px)`,
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 112px)",
                         px: homeHorizontalPadding,
-                        pt: "12px",
+                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${headerHeight}px)`,
                         width: "100%",
                     }}
                 >
-                    {initialPostPhotoFile ? null : isFriendsLoading &&
-                      orderedFriends.length == 0 ? (
-                        <Box
-                            sx={{
-                                alignItems: "center",
-                                display: "flex",
-                                justifyContent: "center",
-                                width: "100%",
-                            }}
-                        >
-                            <SpaceLoadingSpinner ariaLabel="Loading friends" />
-                        </Box>
-                    ) : orderedFriends.length > 0 ? (
-                        <Box
-                            component="ul"
-                            aria-label="Friends' latest posts"
-                            sx={{
-                                aspectRatio: `1 / ${postCircleLayout.canvasHeight}`,
-                                flexShrink: 0,
-                                m: 0,
-                                p: 0,
-                                position: "relative",
-                                width: "100%",
-                            }}
-                        >
-                            {orderedFriends.map(friendPostCircleFor)}
-                        </Box>
-                    ) : (
-                        <Box
-                            component="p"
-                            sx={{
-                                color: textSecondary,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 14,
-                                fontWeight: 500,
-                                lineHeight: "20px",
-                                m: 0,
-                                px: 3,
-                                textAlign: "center",
-                            }}
-                        >
-                            Your friends’ latest posts will show up here.
-                        </Box>
-                    )}
+                    <Box
+                        ref={postCircleCanvasRef}
+                        sx={{
+                            flex: "1 1 auto",
+                            minHeight: 0,
+                            position: "relative",
+                            width: "100%",
+                        }}
+                    >
+                        {initialPostPhotoFile ? null : isFriendsLoading &&
+                          orderedFriends.length == 0 ? (
+                            <Box
+                                sx={{
+                                    alignItems: "center",
+                                    display: "flex",
+                                    height: "100%",
+                                    justifyContent: "center",
+                                    width: "100%",
+                                }}
+                            >
+                                <SpaceLoadingSpinner ariaLabel="Loading friends" />
+                            </Box>
+                        ) : orderedFriends.length > 0 ? (
+                            <Box
+                                component="ul"
+                                aria-label="Friends' latest posts"
+                                sx={{
+                                    height: "100%",
+                                    m: 0,
+                                    p: 0,
+                                    position: "relative",
+                                    width: "100%",
+                                }}
+                            >
+                                {postCirclePlacements.length ==
+                                    orderedFriends.length &&
+                                    orderedFriends.map(friendPostCircleFor)}
+                            </Box>
+                        ) : (
+                            <Box
+                                component="p"
+                                sx={{
+                                    alignItems: "center",
+                                    color: textSecondary,
+                                    display: "flex",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    height: "100%",
+                                    justifyContent: "center",
+                                    lineHeight: "20px",
+                                    m: 0,
+                                    px: 3,
+                                    textAlign: "center",
+                                }}
+                            >
+                                Your friends’ latest posts will show up here.
+                            </Box>
+                        )}
+                    </Box>
                 </Box>
                 <SpacePostFloatingActionButton
                     disabled={isPostPhotoButtonDisabled}
