@@ -20,6 +20,7 @@ import 'package:locker/models/selected_files.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
 import 'package:locker/services/configuration.dart';
+import 'package:locker/services/feature_flag_service.dart';
 import 'package:locker/services/files/sync/models/file.dart';
 import 'package:locker/services/local_settings.dart';
 import "package:locker/states/user_details_state.dart";
@@ -654,16 +655,28 @@ class _HomePageState extends UploaderPageState<HomePage>
                           if (_selectedFiles.files.isNotEmpty) {
                             return const SizedBox.shrink();
                           }
-                          return FloatingActionButton(
-                            tooltip: 'Add item',
-                            onPressed: _openSavePage,
-                            shape: const CircleBorder(),
-                            backgroundColor: colors.primary,
-                            elevation: 0,
-                            child: HugeIcon(
-                              icon: HugeIcons.strokeRoundedPlusSign,
-                              color: colors.specialWhite,
-                            ),
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (FeatureFlagService
+                                  .instance
+                                  .documentScanner) ...[
+                                _buildScannerFab(colors),
+                                const SizedBox(height: 14),
+                              ],
+                              FloatingActionButton(
+                                tooltip: 'Add item',
+                                onPressed: _openSavePage,
+                                shape: const CircleBorder(),
+                                backgroundColor: colors.primary,
+                                elevation: 0,
+                                child: HugeIcon(
+                                  icon: HugeIcons.strokeRoundedPlusSign,
+                                  color: colors.specialWhite,
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -836,6 +849,36 @@ class _HomePageState extends UploaderPageState<HomePage>
   void _openSavePage() {
     showSaveBottomSheet(
       context,
+      onUploadDocument: addFile,
+      onUploadFiles: uploadFiles,
+    );
+  }
+
+  Widget _buildScannerFab(ColorTokens colors) {
+    return SizedBox(
+      width: 56,
+      child: Center(
+        child: Semantics(
+          button: true,
+          label: context.strings.scanDocumentTitle,
+          child: FABComponent(
+            variant: FABComponentVariant.secondary,
+            icon: HugeIcon(
+              icon: HugeIcons.strokeRoundedCamera01,
+              color: colors.primary,
+              size: 24,
+            ),
+            onTap: _openScanner,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openScanner() {
+    handleSaveOption(
+      context,
+      SaveOptionType.scanDocument,
       onUploadDocument: addFile,
       onUploadFiles: uploadFiles,
     );

@@ -29,7 +29,7 @@ class SaveToLockerEmptyStateWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SaveToLockerBanner(),
-        for (final option in saveOptions(context)) ...[
+        for (final option in saveOptions(context, includeScanner: true)) ...[
           const SizedBox(height: _optionSpacing),
           _SaveOptionTile(
             title: option.title,

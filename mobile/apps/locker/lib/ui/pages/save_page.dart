@@ -28,10 +28,13 @@ class SaveOption {
   final String description;
 }
 
-List<SaveOption> saveOptions(BuildContext context) {
+List<SaveOption> saveOptions(
+  BuildContext context, {
+  bool includeScanner = false,
+}) {
   final l10n = context.strings;
   return [
-    if (FeatureFlagService.instance.documentScanner)
+    if (includeScanner && FeatureFlagService.instance.documentScanner)
       SaveOption(
         type: SaveOptionType.scanDocument,
         icon: HugeIcons.strokeRoundedFileScan,
