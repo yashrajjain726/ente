@@ -123,10 +123,7 @@ describe("ensureContactsReady", () => {
 
     test("does not persist an unresolved wrapped root contact key", async () => {
         const { contacts, getDiff, getProfilePicture, setKV } =
-            await setupContactsModule({
-                rootKeyResolved: false,
-                diff: [],
-            });
+            await setupContactsModule({ rootKeyResolved: false, diff: [] });
 
         await contacts.ensureContactsReady(
             101,
@@ -213,6 +210,65 @@ describe("profile picture loading", () => {
         const blobArg = createObjectURL.mock.calls[0]?.[0] as Blob | undefined;
         expect(blobArg?.type).toBe("image/png");
     });
+
+    test.each(["refresh", "account change", "avatar change"])(
+        "handles an in-flight avatar during a contacts %s",
+        async (change) => {
+            const createObjectURL = vi
+                .spyOn(URL, "createObjectURL")
+                .mockReturnValue("blob:contact");
+            const { contacts, getDiff, getProfilePicture } =
+                await setupContactsModule();
+            await contacts.ensureContactsReady(
+                101,
+                session,
+                getDiff,
+                getProfilePicture,
+            );
+
+            const picture =
+                Promise.withResolvers<
+                    Awaited<ReturnType<typeof getProfilePicture>>
+                >();
+            getProfilePicture.mockReturnValueOnce(picture.promise);
+            const loading = contacts.__testing.preloadResolvedContactAvatar({
+                userID: 101,
+            });
+
+            getDiff.mockResolvedValue({ records: [] });
+            if (change === "avatar change") {
+                getDiff.mockResolvedValueOnce({
+                    records: [
+                        {
+                            id: "ct_1",
+                            contactUserId: 101,
+                            profilePictureAttachmentID: "ua_2",
+                            isDeleted: false,
+                            updatedAt: 2,
+                        },
+                    ],
+                });
+            }
+            await contacts.ensureContactsReady(
+                change === "account change" ? 202 : 101,
+                session,
+                getDiff,
+                getProfilePicture,
+            );
+
+            picture.resolve({
+                bytes: new Uint8Array([1, 2, 3]),
+                wrappedRootContactKey: {
+                    encryptedKey: "wrapped-root-key",
+                    header: "wrapped-header",
+                },
+            });
+            await loading;
+            expect(createObjectURL).toHaveBeenCalledTimes(
+                change === "refresh" ? 1 : 0,
+            );
+        },
+    );
 });
 
 describe("retry after warm-up failure", () => {
@@ -236,9 +292,7 @@ describe("retry after warm-up failure", () => {
                     },
                 ],
             })
-            .mockResolvedValueOnce({
-                records: [],
-            });
+            .mockResolvedValueOnce({ records: [] });
 
         const ready = contacts.ensureContactsReady(
             101,

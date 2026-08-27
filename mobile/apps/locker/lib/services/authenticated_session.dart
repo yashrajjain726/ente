@@ -11,8 +11,7 @@ Session authenticatedSession() {
   final config = Configuration.instance;
   final authToken = config.getToken();
   final userId = config.getUserID();
-  final masterKey = config.getKey();
-  if (authToken == null || userId == null || masterKey == null) {
+  if (authToken == null || userId == null || !config.hasConfiguredAccount()) {
     throw StateError('Authenticated session is not available');
   }
   final baseUrl = config.getHttpEndpoint();
@@ -27,7 +26,7 @@ Session authenticatedSession() {
   final opened = openSession(
     baseUrl: baseUrl,
     authToken: authToken,
-    masterKey: masterKey,
+    masterKey: config.getKey()!,
     userAgent:
         services.enteDio.options.headers[HttpHeaders.userAgentHeader] as String,
     clientPackage: services.packageInfo.packageName,

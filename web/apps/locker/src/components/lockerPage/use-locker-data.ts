@@ -1,7 +1,4 @@
-import {
-    authenticatedSession,
-    openAuthenticatedSession,
-} from "@/services/authenticated-session";
+import { openAuthenticatedSession } from "@/services/authenticated-session";
 import {
     LOCKER_FILE_LIMIT_FREE,
     LOCKER_FILE_LIMIT_PAID,
@@ -111,13 +108,20 @@ export const useLockerData = ({
     }, [userDetails]);
 
     const warmContacts = useCallback(async () => {
-        const authToken = await savedAuthToken();
-        if (!authToken) return;
+        const [authToken, masterKey] = await Promise.all([
+            savedAuthToken(),
+            masterKeyFromSession(),
+        ]);
+        if (!authToken || !masterKey) return;
 
-        const session = authenticatedSession();
-        session.updateAuthToken(authToken);
+        const userID = ensureLocalUser().id;
+        const session = await openAuthenticatedSession(
+            userID,
+            authToken,
+            masterKey,
+        );
         await ensureContactsReady(
-            ensureLocalUser().id,
+            userID,
             session,
             contactsGetDiff,
             contactsGetProfilePicture,
@@ -333,7 +337,6 @@ export const useLockerData = ({
                 }
 
                 setMasterKey(mk);
-                await openAuthenticatedSession(ensureLocalUser().id, token, mk);
                 void warmContacts().catch((error: unknown) => {
                     log.warn(
                         "[locker] Failed to warm contacts display cache",

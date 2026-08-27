@@ -512,22 +512,21 @@ const Page: React.FC = () => {
             const user = ensureLocalUser();
             const masterKey = await masterKeyFromSession();
             if (masterKey) {
-                const session = await openAuthenticatedSession(
-                    user.id,
-                    authToken,
-                    masterKey,
-                );
-                void ensureContactsReady(
-                    user.id,
-                    session,
-                    contactsGetDiff,
-                    contactsGetProfilePicture,
-                ).catch((error: unknown) => {
-                    log.warn(
-                        "[gallery] Failed to warm contacts display cache",
-                        error,
-                    );
-                });
+                void openAuthenticatedSession(user.id, authToken, masterKey)
+                    .then((session) =>
+                        ensureContactsReady(
+                            user.id,
+                            session,
+                            contactsGetDiff,
+                            contactsGetProfilePicture,
+                        ),
+                    )
+                    .catch((error: unknown) => {
+                        log.warn(
+                            "[gallery] Failed to warm contacts display cache",
+                            error,
+                        );
+                    });
             }
             const userDetails = await savedUserDetailsOrTriggerPull();
             dispatch({

@@ -510,7 +510,7 @@ const ensureProfilePictureLoaded = async (contactID: string) => {
         .then((output) => {
             if (
                 !isCurrentSession(sessionKey, generation) ||
-                state.getProfilePicture !== getProfilePicture
+                state.avatarLoadsByContactID.get(contactID) !== load
             ) {
                 return;
             }
@@ -530,7 +530,7 @@ const ensureProfilePictureLoaded = async (contactID: string) => {
         .catch((error: unknown) => {
             if (
                 !isCurrentSession(sessionKey, generation) ||
-                state.getProfilePicture !== getProfilePicture
+                state.avatarLoadsByContactID.get(contactID) !== load
             ) {
                 return;
             }
