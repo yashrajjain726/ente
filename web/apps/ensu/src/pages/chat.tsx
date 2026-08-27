@@ -598,8 +598,7 @@ const Page: React.FC = () => {
         Record<string, string>
     >({});
     const [isImageDragActive, setIsImageDragActive] = useState(false);
-    const [isProcessingDroppedImages, setIsProcessingDroppedImages] =
-        useState(false);
+    const [isAttachingImages, setIsAttachingImages] = useState(false);
     const [imagePreview, setImagePreview] = useState<{
         url: string;
         name: string;
@@ -3762,18 +3761,12 @@ const Page: React.FC = () => {
         showImageAttachment &&
         !isGenerating &&
         !isDownloading &&
-        !showModelGate;
-    const canAttachDroppedImages =
-        canHandleImageDrop &&
-        !isImageAttachmentLimitReached &&
-        !isProcessingDroppedImages;
-    const showImageDropOverlay =
-        canHandleImageDrop && (isImageDragActive || isProcessingDroppedImages);
-    const imageDropOverlayTitle = isProcessingDroppedImages
-        ? "Attaching images..."
-        : isImageAttachmentLimitReached
-          ? "Image limit reached"
-          : "Drop images to attach";
+        !showModelGate &&
+        !isAttachingImages;
+    const showImageDropOverlay = canHandleImageDrop && isImageDragActive;
+    const imageDropOverlayTitle = isImageAttachmentLimitReached
+        ? "Image limit reached"
+        : "Drop images to attach";
     const imageDropOverlayDescription = isImageAttachmentLimitReached
         ? `You can attach up to ${MAX_IMAGE_ATTACHMENTS_PER_MESSAGE} images per message.`
         : "PNG, JPG, WebP, GIF, BMP, HEIC, HEIF, AVIF";
@@ -3834,8 +3827,7 @@ const Page: React.FC = () => {
                 return;
             }
 
-            const isDrop = source === "drop";
-            if (isDrop) setIsProcessingDroppedImages(true);
+            setIsAttachingImages(true);
 
             try {
                 const { invoke } = await import("@tauri-apps/api/core");
@@ -3884,7 +3876,7 @@ const Page: React.FC = () => {
                 );
                 return;
             } finally {
-                if (isDrop) setIsProcessingDroppedImages(false);
+                setIsAttachingImages(false);
             }
         },
         [
@@ -3972,7 +3964,6 @@ const Page: React.FC = () => {
                         });
                         return;
                     }
-                    if (!canAttachDroppedImages) return;
 
                     const imagePaths = event.payload.paths.filter((path) => {
                         const lowerPath = path.toLowerCase();
@@ -4011,7 +4002,6 @@ const Page: React.FC = () => {
             unlisten?.();
         };
     }, [
-        canAttachDroppedImages,
         canHandleImageDrop,
         isImageAttachmentLimitReached,
         isTauriRuntime,
@@ -4063,6 +4053,7 @@ const Page: React.FC = () => {
     }, []);
 
     const handleSend = async (input: string) => {
+        if (isAttachingImages) return;
         const trimmed = input.trim();
         const hasDocuments = pendingDocuments.length > 0;
         const hasImages = pendingImages.length > 0;
@@ -4533,6 +4524,7 @@ const Page: React.FC = () => {
                         handleCancelEdit={handleCancelEdit}
                         pendingDocuments={pendingDocuments}
                         pendingImages={pendingImages}
+                        isAttachingImages={isAttachingImages}
                         pendingImagePreviews={pendingImagePreviews}
                         removePendingDocument={removePendingDocument}
                         removePendingImage={removePendingImage}
