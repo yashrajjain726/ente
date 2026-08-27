@@ -121,10 +121,19 @@ class MemoryLaneService {
       }
       _topNClusters = {};
       final cache = await _cacheService.getCache();
+      final List<Future<void>> tasks = [];
       for (final timeline in cache.allTimelines) {
-        if (timeline.isCluster && !assigned.contains(timeline.personId)) {
-          _topNClusters.add(timeline.personId);
+        if (timeline.isCluster) {
+          if (assigned.contains(timeline.personId)) {
+            tasks.add(_cacheService.removeTimeline(timeline.personId));
+            tasks.add(_cacheService.removeComputeLogEntry(timeline.personId));
+          } else {
+            _topNClusters.add(timeline.personId);
+          }
         }
+      }
+      if (tasks.isNotEmpty) {
+        unawaited(Future.wait(tasks).then((_) => _refreshReadyPersonIds()));
       }
       _topNClusters.addAll(await _mlDataDB.getClustersForMemoryLane(assigned));
       for (final cluster in _topNClusters) {
