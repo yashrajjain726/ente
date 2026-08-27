@@ -78,6 +78,7 @@ const LayoutDemoPage: React.FC = () => {
     );
     const circleSize = placements[0]?.size ?? 0;
     const ringWidth = Math.max(1, Math.min(3, circleSize * 0.018));
+    const circlePadding = Math.max(3, Math.min(7, circleSize * 0.04));
 
     return (
         <Box
@@ -227,19 +228,30 @@ const LayoutDemoPage: React.FC = () => {
                                 >
                                     <Box
                                         sx={{
-                                            bgcolor: "#1A211F",
+                                            aspectRatio: "1",
                                             border: 0,
                                             borderRadius: "50%",
                                             boxSizing: "border-box",
                                             height: "100%",
+                                            p: `${ringWidth + circlePadding}px`,
                                             position: "relative",
                                             width: "100%",
                                             zIndex: 1,
                                         }}
-                                    />
+                                    >
+                                        <Box
+                                            sx={{
+                                                bgcolor: "#1A211F",
+                                                borderRadius: "50%",
+                                                height: "100%",
+                                                width: "100%",
+                                            }}
+                                        />
+                                    </Box>
                                     <SpaceCircleNameArc
                                         id={`layout-name-arc-${index}`}
                                         name={sampleNames[index]!}
+                                        nameInset={circlePadding * 0.45}
                                         position={
                                             Math.abs(
                                                 x +

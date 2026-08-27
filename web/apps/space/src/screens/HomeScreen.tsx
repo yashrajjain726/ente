@@ -278,7 +278,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     const isCircleDisabled =
         isLoading || Boolean(post && !postUnavailable && !isPhotoReady);
     const circleBorderWidth = Math.max(1, Math.min(3, placement.size * 0.018));
-    const circlePadding = Math.max(1.5, Math.min(4, placement.size * 0.025));
+    const circlePadding = Math.max(3, Math.min(7, placement.size * 0.04));
 
     React.useEffect(() => {
         if (isLoading || !post || postUnavailable || shouldLoadMedia) return;
@@ -483,6 +483,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             <SpaceCircleNameArc
                 id={nameArcID}
                 name={firstName}
+                nameInset={circlePadding * 0.45}
                 position={nameArcPosition}
                 ringColor={inactivePostCircleBorderColor}
                 ringWidth={circleBorderWidth}

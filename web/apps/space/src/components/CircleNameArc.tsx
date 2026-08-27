@@ -5,6 +5,7 @@ export type SpaceCircleNameArcPosition = "upper-left" | "top" | "upper-right";
 interface SpaceCircleNameArcProps {
     id: string;
     name: string;
+    nameInset: number;
     position: SpaceCircleNameArcPosition;
     ringColor: string;
     ringWidth: number;
@@ -14,6 +15,7 @@ interface SpaceCircleNameArcProps {
 export const SpaceCircleNameArc: React.FC<SpaceCircleNameArcProps> = ({
     id,
     name,
+    nameInset,
     position,
     ringColor,
     ringWidth,
@@ -21,7 +23,7 @@ export const SpaceCircleNameArc: React.FC<SpaceCircleNameArcProps> = ({
 }) => {
     const center = size / 2;
     const fontSize = Math.max(8, Math.min(11, size * 0.065));
-    const radius = center - fontSize * 0.2;
+    const radius = center - fontSize * 0.2 - nameInset;
     const arcCenterAngle =
         position == "upper-left"
             ? (Math.PI * 5) / 4
