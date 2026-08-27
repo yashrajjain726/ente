@@ -32,6 +32,7 @@ members = [
     "crates/image",
     "crates/legacy",
     "crates/location",
+    "crates/location-dataset",
     "crates/ml",
     "crates/paste",
     "crates/photos",
