@@ -17,6 +17,20 @@ mixin SqlDbBase {
     List<String> migrationScripts,
   ) async {
     final toVersion = migrationScripts.length;
+    final probe = await database.writeLock(
+      (tx) => tx.get('PRAGMA user_version'),
+    );
+    final probedVersion = probe['user_version'] as int;
+
+    if (probedVersion > toVersion) {
+      throw AssertionError(
+        "currentVersion($probedVersion) cannot be greater than toVersion($toVersion)",
+      );
+    }
+    if (probedVersion == toVersion) {
+      return;
+    }
+
     final didMigrate = await database.writeTransaction((tx) async {
       final result = await tx.get('PRAGMA user_version');
       final currentVersion = result['user_version'] as int;
