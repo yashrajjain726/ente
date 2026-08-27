@@ -49,9 +49,11 @@ func (c *ClICtrl) createLocalFolderForRemoteAlbums(ctx context.Context, account 
 		}
 
 		albumFolderName := filepath.Clean(album.AlbumName)
-		albumFolderName = strings.ReplaceAll(albumFolderName, ":", "_")
-		albumFolderName = strings.ReplaceAll(albumFolderName, "/", "_")
+		albumFolderName = strings.NewReplacer(":", "_", "/", "_", "\\", "_").Replace(albumFolderName)
 		albumFolderName = strings.TrimSpace(albumFolderName)
+		if albumFolderName == "" || albumFolderName == "." || albumFolderName == ".." {
+			albumFolderName = "_"
+		}
 
 		albumID := album.ID
 
