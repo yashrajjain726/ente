@@ -7,7 +7,7 @@ import 'package:ente_contacts/src/models/contact_data.dart';
 import 'package:ente_contacts/src/models/contact_record.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
 typedef ContactsDatabaseDirectoryResolver = Future<Directory> Function();
 
@@ -24,8 +24,8 @@ class ContactsDatabase {
 
   final ContactsDatabaseDirectoryResolver? _directoryResolver;
 
-  Database? _database;
-  Future<Database>? _dbFuture;
+  SqliteDatabase? _database;
+  Future<SqliteDatabase>? _dbFuture;
   int? _configuredUserId;
 
   Future<void> configure({required int userId}) async {
@@ -40,7 +40,7 @@ class ContactsDatabase {
     _configuredUserId = userId;
   }
 
-  Future<Database> get database async {
+  Future<SqliteDatabase> get database async {
     final userId = _configuredUserId;
     if (userId == null) {
       throw StateError(
@@ -57,31 +57,22 @@ class ContactsDatabase {
       return;
     }
     final db = await database;
-    final batch = db.batch();
-    for (final contact in contacts) {
-      batch.insert(_contactsTable, {
-        'id': contact.id,
-        'contact_user_id': contact.contactUserId,
-        'email': contact.email,
-        'data_json': contact.data == null
-            ? null
-            : jsonEncode(contact.data!.toJson()),
-        'profile_picture_attachment_id': contact.profilePictureAttachmentId,
-        'is_deleted': contact.isDeleted ? 1 : 0,
-        'created_at': contact.createdAt,
-        'updated_at': contact.updatedAt,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
+    await db.executeBatch(
+      '''
+      INSERT OR REPLACE INTO $_contactsTable (
+        id, contact_user_id, email, data_json,
+        profile_picture_attachment_id, is_deleted, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ''',
+      [for (final contact in contacts) _contactParameters(contact)],
+    );
   }
 
   Future<ContactRecord?> getContact(String id) async {
     final db = await database;
-    final rows = await db.query(
-      _contactsTable,
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
+    final rows = await db.getAll(
+      'SELECT * FROM $_contactsTable WHERE id = ? LIMIT 1',
+      [id],
     );
     if (rows.isEmpty) {
       return null;
@@ -94,13 +85,13 @@ class ContactsDatabase {
     bool includeDeleted = false,
   }) async {
     final db = await database;
-    final rows = await db.query(
-      _contactsTable,
-      where: includeDeleted
-          ? 'contact_user_id = ?'
-          : 'contact_user_id = ? AND is_deleted = 0',
-      whereArgs: [contactUserId],
-      limit: 1,
+    final rows = await db.getAll(
+      '''
+      SELECT * FROM $_contactsTable
+      WHERE contact_user_id = ?${includeDeleted ? '' : ' AND is_deleted = 0'}
+      LIMIT 1
+      ''',
+      [contactUserId],
     );
     if (rows.isEmpty) {
       return null;
@@ -110,17 +101,17 @@ class ContactsDatabase {
 
   Future<List<ContactRecord>> getContacts({bool includeDeleted = false}) async {
     final db = await database;
-    final rows = await db.query(
-      _contactsTable,
-      where: includeDeleted ? null : 'is_deleted = 0',
-      orderBy: 'updated_at DESC',
-    );
+    final rows = await db.getAll('''
+      SELECT * FROM $_contactsTable
+      ${includeDeleted ? '' : 'WHERE is_deleted = 0'}
+      ORDER BY updated_at DESC
+      ''');
     return rows.map(_fromRow).toList(growable: false);
   }
 
   Future<int> getLastSyncedUpdatedAt() async {
     final db = await database;
-    final rows = await db.query(_stateTable, limit: 1);
+    final rows = await db.getAll('SELECT * FROM $_stateTable LIMIT 1');
     if (rows.isEmpty) {
       return 0;
     }
@@ -129,27 +120,32 @@ class ContactsDatabase {
 
   Future<void> setLastSyncedUpdatedAt(int value) async {
     final db = await database;
-    await db.update(_stateTable, {
-      'id': 1,
-      'last_synced_updated_at': value,
-    }, where: 'id = 1');
+    await db.execute(
+      'UPDATE $_stateTable SET last_synced_updated_at = ? WHERE id = 1',
+      [value],
+    );
   }
 
   Future<void> resetState() async {
     final db = await database;
-    await db.delete(_contactsTable);
-    await db.delete(_attachmentsTable);
-    await setLastSyncedUpdatedAt(0);
+    await db.writeTransaction((tx) async {
+      await tx.execute('DELETE FROM $_contactsTable');
+      await tx.execute('DELETE FROM $_attachmentsTable');
+      await tx.execute(
+        'UPDATE $_stateTable SET last_synced_updated_at = 0 WHERE id = 1',
+      );
+    });
   }
 
   Future<Uint8List?> getCachedAttachment(String attachmentId) async {
     final db = await database;
-    final rows = await db.query(
-      _attachmentsTable,
-      columns: const ['bytes'],
-      where: 'attachment_id = ?',
-      whereArgs: [attachmentId],
-      limit: 1,
+    final rows = await db.getAll(
+      '''
+      SELECT bytes FROM $_attachmentsTable
+      WHERE attachment_id = ?
+      LIMIT 1
+      ''',
+      [attachmentId],
     );
     if (rows.isEmpty) {
       return null;
@@ -162,35 +158,33 @@ class ContactsDatabase {
     Uint8List bytes,
   ) async {
     final db = await database;
-    await db.insert(_attachmentsTable, {
-      'attachment_id': attachmentId,
-      'bytes': bytes,
-      'cached_at': DateTime.now().millisecondsSinceEpoch,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.execute(
+      '''
+      INSERT OR REPLACE INTO $_attachmentsTable (
+        attachment_id, bytes, cached_at
+      ) VALUES (?, ?, ?)
+      ''',
+      [attachmentId, bytes, DateTime.now().millisecondsSinceEpoch],
+    );
   }
 
   Future<void> deleteCachedAttachment(String attachmentId) async {
     final db = await database;
-    await db.delete(
-      _attachmentsTable,
-      where: 'attachment_id = ?',
-      whereArgs: [attachmentId],
-    );
+    await db.execute('DELETE FROM $_attachmentsTable WHERE attachment_id = ?', [
+      attachmentId,
+    ]);
   }
 
   Future<void> deleteUnreferencedCachedAttachments() async {
     final db = await database;
-    await db.delete(
-      _attachmentsTable,
-      where:
-          '''
-        attachment_id NOT IN (
-          SELECT profile_picture_attachment_id
-          FROM $_contactsTable
-          WHERE profile_picture_attachment_id IS NOT NULL
-        )
-      ''',
-    );
+    await db.execute('''
+      DELETE FROM $_attachmentsTable
+      WHERE attachment_id NOT IN (
+        SELECT profile_picture_attachment_id
+        FROM $_contactsTable
+        WHERE profile_picture_attachment_id IS NOT NULL
+      )
+    ''');
   }
 
   Future<void> clearTable() async {
@@ -213,60 +207,75 @@ class ContactsDatabase {
     }
   }
 
-  Future<Database> _initDatabase(int userId) async {
+  Future<SqliteDatabase> _initDatabase(int userId) async {
     final path = p.join(
       (await _resolvedDirectory()).path,
       '$_databasePrefix$userId$_databaseSuffix',
     );
 
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      final databaseFactory = databaseFactoryFfi;
-      return databaseFactory.openDatabase(
-        path,
-        options: OpenDatabaseOptions(
-          version: _databaseVersion,
-          onCreate: _onCreate,
-        ),
+    final database = SqliteDatabase(path: path);
+    try {
+      await _migrate(database);
+      return database;
+    } catch (_) {
+      await database.close();
+      rethrow;
+    }
+  }
+
+  Future<void> _migrate(SqliteDatabase database) async {
+    final result = await database.execute('PRAGMA user_version');
+    final currentVersion = result.first['user_version'] as int;
+    if (currentVersion == _databaseVersion) {
+      return;
+    }
+    if (currentVersion > _databaseVersion) {
+      throw StateError(
+        'Contacts database version $currentVersion is newer than supported '
+        'version $_databaseVersion',
       );
     }
 
-    return openDatabase(path, version: _databaseVersion, onCreate: _onCreate);
-  }
-
-  Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE $_contactsTable (
-        id TEXT PRIMARY KEY,
-        contact_user_id INTEGER NOT NULL,
-        email TEXT,
-        data_json TEXT,
-        profile_picture_attachment_id TEXT,
-        is_deleted INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )
-    ''');
-    await db.execute(
-      'CREATE UNIQUE INDEX idx_contacts_contact_user_id ON $_contactsTable(contact_user_id)',
-    );
-    await db.execute(
-      'CREATE INDEX idx_contacts_updated_at ON $_contactsTable(updated_at)',
-    );
-    await db.execute('''
-      CREATE TABLE $_attachmentsTable (
-        attachment_id TEXT PRIMARY KEY,
-        bytes BLOB NOT NULL,
-        cached_at INTEGER NOT NULL
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE $_stateTable (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        last_synced_updated_at INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-    await db.insert(_stateTable, {'id': 1, 'last_synced_updated_at': 0});
+    await database.writeTransaction((tx) async {
+      await tx.execute('''
+        CREATE TABLE $_contactsTable (
+          id TEXT PRIMARY KEY,
+          contact_user_id INTEGER NOT NULL,
+          email TEXT,
+          data_json TEXT,
+          profile_picture_attachment_id TEXT,
+          is_deleted INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      await tx.execute(
+        'CREATE UNIQUE INDEX idx_contacts_contact_user_id '
+        'ON $_contactsTable(contact_user_id)',
+      );
+      await tx.execute(
+        'CREATE INDEX idx_contacts_updated_at '
+        'ON $_contactsTable(updated_at)',
+      );
+      await tx.execute('''
+        CREATE TABLE $_attachmentsTable (
+          attachment_id TEXT PRIMARY KEY,
+          bytes BLOB NOT NULL,
+          cached_at INTEGER NOT NULL
+        )
+      ''');
+      await tx.execute('''
+        CREATE TABLE $_stateTable (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          last_synced_updated_at INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+      await tx.execute(
+        'INSERT INTO $_stateTable (id, last_synced_updated_at) VALUES (1, 0)',
+      );
+      await tx.execute('PRAGMA user_version = $_databaseVersion');
+    });
+    await database.refreshSchema();
   }
 
   Future<Directory> _resolvedDirectory() async {
@@ -305,4 +314,15 @@ class ContactsDatabase {
       updatedAt: row['updated_at']! as int,
     );
   }
+
+  List<Object?> _contactParameters(ContactRecord contact) => [
+    contact.id,
+    contact.contactUserId,
+    contact.email,
+    contact.data == null ? null : jsonEncode(contact.data!.toJson()),
+    contact.profilePictureAttachmentId,
+    contact.isDeleted ? 1 : 0,
+    contact.createdAt,
+    contact.updatedAt,
+  ];
 }
