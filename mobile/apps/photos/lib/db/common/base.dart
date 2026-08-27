@@ -16,33 +16,40 @@ mixin SqlDbBase {
     SqliteDatabase database,
     List<String> migrationScripts,
   ) async {
-    final result = await database.execute('PRAGMA user_version');
-    final currentVersion = result.first['user_version'] as int;
     final toVersion = migrationScripts.length;
+    final didMigrate = await database.writeTransaction((tx) async {
+      final result = await tx.get('PRAGMA user_version');
+      final currentVersion = result['user_version'] as int;
 
-    if (currentVersion < toVersion) {
+      if (currentVersion > toVersion) {
+        throw AssertionError(
+          "currentVersion($currentVersion) cannot be greater than toVersion($toVersion)",
+        );
+      }
+      if (currentVersion == toVersion) {
+        return false;
+      }
+
       debugPrint(
         "$runtimeType migrating database from $currentVersion to $toVersion",
       );
-      await database.writeTransaction((tx) async {
-        for (int i = currentVersion + 1; i <= toVersion; i++) {
-          try {
-            final script = migrationScripts[i - 1];
-            await tx.computeWithDatabase(_scriptExecutor(script));
-          } catch (e) {
-            debugPrint(
-              "$runtimeType Error running migration script index ${i - 1} $e",
-            );
-            rethrow;
-          }
+      for (int i = currentVersion + 1; i <= toVersion; i++) {
+        try {
+          final script = migrationScripts[i - 1];
+          await tx.computeWithDatabase(_scriptExecutor(script));
+        } catch (e) {
+          debugPrint(
+            "$runtimeType Error running migration script index ${i - 1} $e",
+          );
+          rethrow;
         }
-        await tx.execute('PRAGMA user_version = $toVersion');
-      });
+      }
+      await tx.execute('PRAGMA user_version = $toVersion');
+      return true;
+    });
+
+    if (didMigrate) {
       await database.refreshSchema();
-    } else if (currentVersion > toVersion) {
-      throw AssertionError(
-        "currentVersion($currentVersion) cannot be greater than toVersion($toVersion)",
-      );
     }
   }
 }
