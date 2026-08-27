@@ -31,14 +31,8 @@ class ContactsDatabase {
     if (_configuredUserId == userId && _dbFuture != null) {
       return;
     }
-    final previousDatabaseFuture = _dbFuture;
-    _dbFuture = null;
+    await close();
     _configuredUserId = userId;
-    if (previousDatabaseFuture != null) {
-      try {
-        await (await previousDatabaseFuture).close();
-      } catch (_) {}
-    }
   }
 
   Future<void> close() async {

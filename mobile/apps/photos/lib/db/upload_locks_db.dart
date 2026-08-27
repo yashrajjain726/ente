@@ -1,9 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import "package:photos/core/errors.dart";
 import 'package:photos/db/common/base.dart';
 import "package:photos/module/upload/model/multipart.dart";
@@ -87,33 +84,12 @@ class UploadLocksDB with SqlDbBase {
   UploadLocksDB._privateConstructor();
   static final UploadLocksDB instance = UploadLocksDB._privateConstructor();
 
-  static Future<SqliteDatabase>? _dbFuture;
-  Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<SqliteDatabase> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-
-    final database = SqliteDatabase(path: path);
-    try {
-      await migrate(database, [...initializationScript, ...migrationScripts]);
-      return database;
-    } catch (_) {
-      await database.close();
-      rethrow;
-    }
-  }
+  Future<SqliteDatabase> get database => getOrOpenDatabase(
+    () => openMigratedDatabase(_databaseName, [
+      ...initializationScript,
+      ...migrationScripts,
+    ]),
+  );
 
   static List<String> _createUploadLocksTable() {
     return [

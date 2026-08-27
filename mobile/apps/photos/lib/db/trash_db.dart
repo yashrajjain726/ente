@@ -1,9 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:logging/logging.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
 import 'package:photos/models/file/trash_file.dart';
 import 'package:photos/models/file_load_result.dart';
@@ -70,34 +67,13 @@ class TrashDB with SqlDbBase {
 
   static final TrashDB instance = TrashDB._privateConstructor();
 
-  static Future<SqliteDatabase>? _dbFuture;
-
-  Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<SqliteDatabase> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-    _logger.info("DB path " + path);
-    final database = SqliteDatabase(path: path);
-    try {
-      await migrate(database, _migrationScripts);
-      return database;
-    } catch (_) {
-      await database.close();
-      rethrow;
-    }
-  }
+  Future<SqliteDatabase> get database => getOrOpenDatabase(
+    () => openMigratedDatabase(
+      _databaseName,
+      _migrationScripts,
+      logPath: (path) => _logger.info("DB path " + path),
+    ),
+  );
 
   Future<void> clearTable() async {
     final db = await instance.database;
@@ -270,7 +246,7 @@ class TrashDB with SqlDbBase {
         $columnLocalID, $columnCreationTime, $columnFileMetadata,
         $columnMMdVersion, $columnMMdEncodedJson, $columnPubMMdVersion,
         $columnPubMMdEncodedJson
-      ) VALUES (${List.filled(18, '?').join(', ')})
+      ) VALUES (${SqlDbBase.getParams(18)})
       ''', parameterSets);
   }
 

@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
 import 'package:photos/models/social/anon_profile.dart';
 import 'package:photos/models/social/comment.dart';
@@ -95,34 +92,13 @@ class SocialDB with SqlDbBase {
   SocialDB._();
   static final SocialDB instance = SocialDB._();
 
-  static Future<SqliteDatabase>? _dbFuture;
-
-  Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<SqliteDatabase> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-    _logger.info("DB path: $path");
-    final database = SqliteDatabase(path: path);
-    try {
-      await migrate(database, _migrationScripts);
-      return database;
-    } catch (_) {
-      await database.close();
-      rethrow;
-    }
-  }
+  Future<SqliteDatabase> get database => getOrOpenDatabase(
+    () => openMigratedDatabase(
+      _databaseName,
+      _migrationScripts,
+      logPath: (path) => _logger.info("DB path: $path"),
+    ),
+  );
 
   Future<void> addComment(Comment comment) async {
     final db = await database;

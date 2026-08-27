@@ -101,19 +101,8 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     ..._defaultMigrationScripts,
   ];
 
-  Future<SqliteDatabase>? _sqliteAsyncDBFuture;
-
-  Future<SqliteDatabase> get asyncDB async {
-    final databaseFuture = _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_sqliteAsyncDBFuture, databaseFuture)) {
-        _sqliteAsyncDBFuture = null;
-      }
-      rethrow;
-    }
-  }
+  Future<SqliteDatabase> get asyncDB =>
+      getOrOpenDatabase(_initSqliteAsyncDatabase);
 
   Future<SqliteDatabase> _initSqliteAsyncDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();

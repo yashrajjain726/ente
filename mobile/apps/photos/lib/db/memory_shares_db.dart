@@ -1,7 +1,3 @@
-import 'dart:io';
-
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
 import 'package:photos/models/api/memory_share/memory_share.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -26,31 +22,8 @@ class MemorySharesDB with SqlDbBase {
   static const _columnPreviewUploadedFileID = 'preview_uploaded_file_id';
   static const _columnFileCount = 'file_count';
 
-  MemorySharesDB._();
-  static final MemorySharesDB instance = MemorySharesDB._();
-
-  static Future<SqliteDatabase>? _dbFuture;
-
-  Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<SqliteDatabase> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-    final database = SqliteDatabase(path: path);
-    try {
-      await migrate(database, [
-        '''
+  static const _migrationScripts = [
+    '''
       CREATE TABLE $_table (
         $_columnID INTEGER PRIMARY KEY NOT NULL,
         $_columnType TEXT NOT NULL,
@@ -68,13 +41,14 @@ class MemorySharesDB with SqlDbBase {
         $_columnFileCount INTEGER
       )
     ''',
-      ]);
-      return database;
-    } catch (_) {
-      await database.close();
-      rethrow;
-    }
-  }
+  ];
+
+  MemorySharesDB._();
+  static final MemorySharesDB instance = MemorySharesDB._();
+
+  Future<SqliteDatabase> get database => getOrOpenDatabase(
+    () => openMigratedDatabase(_databaseName, _migrationScripts),
+  );
 
   Future<void> upsert(MemoryShare share) async {
     final db = await database;
@@ -85,7 +59,7 @@ class MemorySharesDB with SqlDbBase {
         $_columnMemKeyDecryptionNonce, $_columnAccessToken,
         $_columnIsDeleted, $_columnCreatedAt, $_columnUpdatedAt, $_columnUrl,
         $_columnMemoryHash, $_columnPreviewUploadedFileID, $_columnFileCount
-      ) VALUES (${List.filled(14, '?').join(', ')})
+      ) VALUES (${SqlDbBase.getParams(14)})
       ''', _toParameters(share));
   }
 

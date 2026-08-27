@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
 import 'package:photos/models/memories/memory.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -15,6 +12,15 @@ class MemoriesDB with SqlDbBase {
   static const columnFileID = 'file_id';
   static const columnSeenTime = 'seen_time';
 
+  static const _migrationScripts = [
+    '''
+      CREATE TABLE $table (
+        $columnFileID INTEGER PRIMARY KEY NOT NULL,
+        $columnSeenTime TEXT NOT NULL
+      )
+      ''',
+  ];
+
   final String _dbName;
 
   MemoriesDB._privateConstructor({String dbName = _databaseName})
@@ -24,39 +30,8 @@ class MemoriesDB with SqlDbBase {
     dbName: "ente.memories.offline.db",
   );
 
-  Future<SqliteDatabase>? _dbFuture;
-  Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<SqliteDatabase> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _dbName);
-    final database = SqliteDatabase(path: path);
-    try {
-      await migrate(database, [
-        '''
-                CREATE TABLE $table (
-                  $columnFileID INTEGER PRIMARY KEY NOT NULL,
-                  $columnSeenTime TEXT NOT NULL
-                )
-                ''',
-      ]);
-      return database;
-    } catch (_) {
-      await database.close();
-      rethrow;
-    }
-  }
+  Future<SqliteDatabase> get database =>
+      getOrOpenDatabase(() => openMigratedDatabase(_dbName, _migrationScripts));
 
   Future<void> clearTable() async {
     final db = await database;

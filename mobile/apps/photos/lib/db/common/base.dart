@@ -1,15 +1,58 @@
 import "package:flutter/foundation.dart";
+import "package:path/path.dart";
+import "package:path_provider/path_provider.dart";
 import "package:sqlite_async/sqlite3_common.dart";
 import "package:sqlite_async/sqlite_async.dart";
 
 mixin SqlDbBase {
   static final Map<int, String> _params = <int, String>{};
 
+  Future<SqliteDatabase>? _dbFuture;
+
   static String getParams(int count) {
     if (count <= 0) {
       throw ArgumentError.value(count, "count", "must be greater than 0");
     }
     return _params.putIfAbsent(count, () => List.filled(count, "?").join(", "));
+  }
+
+  Future<SqliteDatabase> getOrOpenDatabase(
+    Future<SqliteDatabase> Function() openDatabase,
+  ) async {
+    final future = _dbFuture ??= openDatabase();
+    try {
+      return await future;
+    } catch (_) {
+      if (identical(_dbFuture, future)) {
+        _dbFuture = null;
+      }
+      rethrow;
+    }
+  }
+
+  @protected
+  void resetDatabaseFuture() {
+    _dbFuture = null;
+  }
+
+  Future<SqliteDatabase> openMigratedDatabase(
+    String dbName,
+    List<String> migrationScripts, {
+    void Function(String path)? logPath,
+  }) async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final String path = join(documentsDirectory.path, dbName);
+    logPath?.call(path);
+    final database = SqliteDatabase(path: path);
+    try {
+      await migrate(database, migrationScripts);
+      return database;
+    } catch (_) {
+      try {
+        await database.close();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   Future<void> migrate(

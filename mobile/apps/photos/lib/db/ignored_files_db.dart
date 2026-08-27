@@ -1,8 +1,6 @@
 import 'dart:io';
 
 import 'package:logging/logging.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
 import 'package:photos/models/ignored_file.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -36,33 +34,9 @@ class IgnoredFilesDB with SqlDbBase {
 
   static final IgnoredFilesDB instance = IgnoredFilesDB._privateConstructor();
 
-  static Future<SqliteDatabase>? _dbFuture;
-
-  Future<SqliteDatabase> get database async {
-    final databaseFuture = _dbFuture ??= _initDatabase();
-    try {
-      return await databaseFuture;
-    } catch (_) {
-      if (identical(_dbFuture, databaseFuture)) {
-        _dbFuture = null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<SqliteDatabase> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-    final database = SqliteDatabase(path: path);
-    try {
-      await migrate(database, _migrationScripts);
-      return database;
-    } catch (_) {
-      await database.close();
-      rethrow;
-    }
-  }
+  Future<SqliteDatabase> get database => getOrOpenDatabase(
+    () => openMigratedDatabase(_databaseName, _migrationScripts),
+  );
 
   Future<void> clearTable() async {
     final db = await instance.database;
