@@ -38,6 +38,7 @@ import 'package:photos/gateways/users/models/key_gen_result.dart';
 import 'package:photos/gateways/users/models/private_key_attributes.dart';
 import 'package:photos/module/upload/upload_artifact.dart';
 import 'package:photos/service_locator.dart';
+import 'package:photos/services/authenticated_session.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/favorites_service.dart';
 import "package:photos/services/home_widget_service.dart";
@@ -218,6 +219,7 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
     _cachedToken = null;
     _secretKey = null;
     _volatilePassword = null;
+    clearAuthenticatedSession();
 
     await NotificationService.instance.clearAllScheduledNotifications(
       logLines: false,

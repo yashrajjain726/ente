@@ -12,7 +12,7 @@ void main() {
 
   late Directory tempDir;
   late SharedPreferences preferences;
-  late FakeContactsRustApi rustApi;
+  late FakeContacts remote;
   late ContactsDatabase database;
   late ContactsService service;
 
@@ -22,11 +22,17 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp(
       'ente_contacts_service_test',
     );
-    rustApi = FakeContactsRustApi();
+    remote = FakeContacts();
     database = ContactsDatabase(directoryResolver: () async => tempDir);
     service = ContactsService(
       preferences: preferences,
-      rustApi: rustApi,
+      createContact: remote.createContact,
+      getDiff: remote.getDiff,
+      updateContact: remote.updateContact,
+      deleteContact: remote.deleteContact,
+      setAttachment: remote.setAttachment,
+      deleteAttachment: remote.deleteAttachment,
+      getProfilePicture: remote.getProfilePicture,
       database: database,
     );
   });
@@ -38,9 +44,11 @@ void main() {
     }
   });
 
-  test('open persists wrapped root key and sync caches contacts', () async {
-    rustApi.rootKeySource = RootKeySource.cache;
-    rustApi.diffPages = [
+  test('sync reuses the cached root key and caches contacts', () async {
+    await preferences.setString('entity_key_contact_1', 'cached-key');
+    await preferences.setString('entity_key_header_contact_1', 'cached-header');
+
+    remote.diffPages = [
       [
         const ContactRecord(
           id: 'ct_1',
@@ -56,19 +64,14 @@ void main() {
       const [],
     ];
 
-    await service.open(
-      ContactsSession(
-        baseUrl: 'http://localhost:8080',
-        authToken: 'token',
-        userId: 1,
-        accountKey: Uint8List.fromList([1, 2, 3]),
-      ),
-    );
-
-    expect(preferences.getString('entity_key_contact_1'), 'enc-key');
-    expect(preferences.getString('entity_key_header_contact_1'), 'enc-header');
+    await service.open(userId: 1);
 
     final synced = await service.sync();
+
+    expect(remote.lastWrappedRootContactKey?.encryptedKey, 'cached-key');
+    expect(remote.lastWrappedRootContactKey?.header, 'cached-header');
+    expect(preferences.getString('entity_key_contact_1'), 'enc-key');
+    expect(preferences.getString('entity_key_header_contact_1'), 'enc-header');
     expect(synced, hasLength(1));
     final cached = await service.getContacts();
     expect(cached.single.email, 'b@test.test');
@@ -76,31 +79,9 @@ void main() {
   });
 
   test(
-    'open does not persist an unresolved wrapped root contact key',
-    () async {
-      rustApi.rootKeySource = RootKeySource.unresolved;
-      rustApi.openWrappedRootContactKey = null;
-
-      await service.open(
-        ContactsSession(
-          baseUrl: 'http://localhost:8080',
-          authToken: 'token',
-          userId: 1,
-          accountKey: Uint8List.fromList([1, 2, 3]),
-        ),
-      );
-
-      expect(preferences.getString('entity_key_contact_1'), isNull);
-      expect(preferences.getString('entity_key_header_contact_1'), isNull);
-    },
-  );
-
-  test(
     'sync persists a resolved wrapped root contact key after unresolved open',
     () async {
-      rustApi.rootKeySource = RootKeySource.unresolved;
-      rustApi.openWrappedRootContactKey = null;
-      rustApi.diffPages = [
+      remote.diffPages = [
         [
           const ContactRecord(
             id: 'ct_1',
@@ -116,15 +97,9 @@ void main() {
         const [],
       ];
 
-      await service.open(
-        ContactsSession(
-          baseUrl: 'http://localhost:8080',
-          authToken: 'token',
-          userId: 1,
-          accountKey: Uint8List.fromList([1, 2, 3]),
-        ),
-      );
+      await service.open(userId: 1);
       expect(preferences.getString('entity_key_contact_1'), isNull);
+      expect(preferences.getString('entity_key_header_contact_1'), isNull);
 
       await service.sync();
 
@@ -137,16 +112,7 @@ void main() {
   );
 
   test('create and profile-picture changes update local cache', () async {
-    rustApi.rootKeySource = RootKeySource.unresolved;
-    rustApi.openWrappedRootContactKey = null;
-    await service.open(
-      ContactsSession(
-        baseUrl: 'http://localhost:8080',
-        authToken: 'token',
-        userId: 1,
-        accountKey: Uint8List.fromList([1, 2, 3]),
-      ),
-    );
+    await service.open(userId: 1);
     expect(preferences.getString('entity_key_contact_1'), isNull);
     expect(preferences.getString('entity_key_header_contact_1'), isNull);
 
@@ -180,21 +146,8 @@ void main() {
     expect(await database.getCachedAttachment('att_profile'), isNull);
   });
 
-  test('open can resolve account key from provider', () async {
-    await service.open(
-      ContactsSession(
-        baseUrl: 'http://localhost:8080',
-        authToken: 'token',
-        userId: 1,
-        accountKeyProvider: () async => Uint8List.fromList([9, 8, 7]),
-      ),
-    );
-
-    expect(rustApi.lastAccountKey, Uint8List.fromList([9, 8, 7]));
-  });
-
-  test('getProfilePicture caches rust response on cache miss', () async {
-    rustApi.diffPages = [
+  test('getProfilePicture caches remote response on cache miss', () async {
+    remote.diffPages = [
       [
         const ContactRecord(
           id: 'ct_1',
@@ -209,40 +162,26 @@ void main() {
       ],
       const [],
     ];
-    rustApi.ctx.attachments['att_1'] = Uint8List.fromList([99, 88, 77]);
-    rustApi.ctx.profilePictures['ct_1'] = Uint8List.fromList([7, 8, 9]);
+    remote.attachments['att_1'] = Uint8List.fromList([99, 88, 77]);
+    remote.profilePictures['ct_1'] = Uint8List.fromList([7, 8, 9]);
 
-    await service.open(
-      ContactsSession(
-        baseUrl: 'http://localhost:8080',
-        authToken: 'token',
-        userId: 1,
-        accountKey: Uint8List.fromList([1, 2, 3]),
-      ),
-    );
+    await service.open(userId: 1);
     await service.sync();
 
     expect(
       await service.getProfilePicture('ct_1'),
       Uint8List.fromList([7, 8, 9]),
     );
-    expect(rustApi.ctx.getProfilePictureCalls, 1);
+    expect(remote.getProfilePictureCalls, 1);
     expect(
       await service.getProfilePicture('ct_1'),
       Uint8List.fromList([7, 8, 9]),
     );
-    expect(rustApi.ctx.getProfilePictureCalls, 1);
+    expect(remote.getProfilePictureCalls, 1);
   });
 
   test('replacing profile picture removes stale cached bytes', () async {
-    await service.open(
-      ContactsSession(
-        baseUrl: 'http://localhost:8080',
-        authToken: 'token',
-        userId: 1,
-        accountKey: Uint8List.fromList([1, 2, 3]),
-      ),
-    );
+    await service.open(userId: 1);
 
     final created = await service.createContact(
       const ContactData(contactUserId: 2, name: 'B'),
@@ -253,7 +192,7 @@ void main() {
       Uint8List.fromList([1, 2, 3]),
     );
 
-    rustApi.ctx.nextAttachmentId = 'att_profile_v2';
+    remote.nextAttachmentId = 'att_profile_v2';
     final replaced = await service.setProfilePicture(
       created.id,
       Uint8List.fromList([4, 5, 6]),
@@ -274,7 +213,7 @@ void main() {
   test(
     'sync prunes cached attachments no longer referenced by contacts',
     () async {
-      rustApi.diffPages = [
+      remote.diffPages = [
         [
           const ContactRecord(
             id: 'ct_1',
@@ -290,14 +229,7 @@ void main() {
         const [],
       ];
 
-      await service.open(
-        ContactsSession(
-          baseUrl: 'http://localhost:8080',
-          authToken: 'token',
-          userId: 1,
-          accountKey: Uint8List.fromList([1, 2, 3]),
-        ),
-      );
+      await service.open(userId: 1);
       await database.upsertCachedAttachment(
         'att_keep',
         Uint8List.fromList([1]),
@@ -331,7 +263,7 @@ void main() {
           updatedAt: 20,
         ),
     ];
-    rustApi.ctx.diffHandler = (sinceTime, limit) async {
+    remote.diffHandler = (sinceTime, limit) async {
       if (sinceTime == 0) {
         return firstPage;
       }
@@ -341,52 +273,19 @@ void main() {
       return const [];
     };
 
-    await service.open(
-      ContactsSession(
-        baseUrl: 'http://localhost:8080',
-        authToken: 'token',
-        userId: 1,
-        accountKey: Uint8List.fromList([1, 2, 3]),
-      ),
-    );
+    await service.open(userId: 1);
 
     await expectLater(service.sync(), throwsStateError);
 
-    expect(rustApi.ctx.diffSinceTimes.first, 0);
-    expect(rustApi.ctx.diffSinceTimes.skip(1), everyElement(19));
-    expect(rustApi.ctx.diffLimits.first, 5000);
-    expect(rustApi.ctx.diffLimits.where((limit) => limit == 5000), isNotEmpty);
-    expect(rustApi.ctx.diffLimits.every((limit) => limit <= 5000), isTrue);
-    expect((await service.getContact('ct_overflow'))?.data?.name, isNull);
+    expect(remote.diffSinceTimes.first, 0);
+    expect(remote.diffSinceTimes.skip(1), everyElement(19));
+    expect(remote.diffLimits.first, 5000);
+    expect(remote.diffLimits.every((limit) => limit <= 5000), isTrue);
   });
 }
 
-class FakeContactsRustApi implements ContactsRustApi {
-  FakeContactsRustContext ctx = FakeContactsRustContext();
-  List<List<ContactRecord>> diffPages = const [];
-  Uint8List? lastAccountKey;
-  RootKeySource rootKeySource = RootKeySource.cache;
-  WrappedRootContactKey? openWrappedRootContactKey =
-      const WrappedRootContactKey(
-        encryptedKey: 'enc-key',
-        header: 'enc-header',
-      );
-
-  @override
-  Future<OpenContactsContextResult> open(OpenContactsContextInput input) async {
-    ctx.userIdValue = input.userId;
-    ctx.diffPages = List<List<ContactRecord>>.from(diffPages);
-    lastAccountKey = input.accountKey;
-    return OpenContactsContextResult(
-      ctx: ctx,
-      wrappedRootContactKey: openWrappedRootContactKey,
-      rootKeySource: rootKeySource,
-    );
-  }
-}
-
-class FakeContactsRustContext implements ContactsRustContext {
-  int userIdValue = 0;
+class FakeContacts {
+  WrappedRootContactKey? lastWrappedRootContactKey;
   final Map<String, ContactRecord> records = {};
   final Map<String, Uint8List> attachments = {};
   final Map<String, Uint8List> profilePictures = {};
@@ -397,8 +296,10 @@ class FakeContactsRustContext implements ContactsRustContext {
   int getProfilePictureCalls = 0;
   String nextAttachmentId = 'att_profile';
 
-  @override
-  Future<ContactRecord> createContact(ContactData data) async {
+  Future<ContactOutput<ContactRecord>> createContact(
+    WrappedRootContactKey? wrappedRootContactKey,
+    ContactData data,
+  ) async {
     final record = ContactRecord(
       id: 'ct_created',
       contactUserId: data.contactUserId,
@@ -410,17 +311,9 @@ class FakeContactsRustContext implements ContactsRustContext {
       updatedAt: 1,
     );
     records[record.id] = record;
-    return record;
+    return _output(record);
   }
 
-  @override
-  WrappedRootContactKey currentWrappedRootContactKey() =>
-      const WrappedRootContactKey(
-        encryptedKey: 'enc-key',
-        header: 'enc-header',
-      );
-
-  @override
   Future<void> deleteContact(String contactId) async {
     final existing = records[contactId];
     if (existing != null) {
@@ -437,8 +330,8 @@ class FakeContactsRustContext implements ContactsRustContext {
     }
   }
 
-  @override
-  Future<ContactRecord> deleteAttachment(
+  Future<ContactOutput<ContactRecord>> deleteAttachment(
+    WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
     ContactAttachmentType attachmentType,
   ) async {
@@ -458,15 +351,15 @@ class FakeContactsRustContext implements ContactsRustContext {
     if (previousAttachmentId != null) {
       attachments.remove(previousAttachmentId);
     }
-    return updated;
+    return _output(updated);
   }
 
-  @override
-  Future<ContactRecord> getContact(String contactId) async =>
-      records[contactId]!;
-
-  @override
-  Future<List<ContactRecord>> getDiff(int sinceTime, int limit) async {
+  Future<ContactOutput<List<ContactRecord>>> getDiff(
+    WrappedRootContactKey? wrappedRootContactKey,
+    int sinceTime,
+    int limit,
+  ) async {
+    lastWrappedRootContactKey = wrappedRootContactKey;
     diffSinceTimes.add(sinceTime);
     diffLimits.add(limit);
     final handler = diffHandler;
@@ -475,32 +368,34 @@ class FakeContactsRustContext implements ContactsRustContext {
       for (final record in page) {
         records[record.id] = record;
       }
-      return page;
+      return _output(page);
     }
     if (diffPages.isEmpty) {
-      return const [];
+      return _output(const []);
     }
     final first = diffPages.first;
     diffPages = diffPages.sublist(1);
     for (final record in first) {
       records[record.id] = record;
     }
-    return first;
+    return _output(first);
   }
 
-  @override
-  Future<Uint8List> getProfilePicture(String contactId) {
+  Future<ContactOutput<Uint8List>> getProfilePicture(
+    WrappedRootContactKey? wrappedRootContactKey,
+    String contactId,
+  ) async {
     getProfilePictureCalls += 1;
     final picture = profilePictures[contactId];
     if (picture != null) {
-      return Future.value(picture);
+      return _output(picture);
     }
     final attachmentId = records[contactId]!.profilePictureAttachmentId!;
-    return Future.value(attachments[attachmentId]!);
+    return _output(attachments[attachmentId]!);
   }
 
-  @override
-  Future<ContactRecord> setAttachment(
+  Future<ContactOutput<ContactRecord>> setAttachment(
+    WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
     ContactAttachmentType attachmentType,
     Uint8List attachmentBytes,
@@ -519,14 +414,11 @@ class FakeContactsRustContext implements ContactsRustContext {
     records[contactId] = updated;
     attachments[nextAttachmentId] = attachmentBytes;
     profilePictures[contactId] = attachmentBytes;
-    return updated;
+    return _output(updated);
   }
 
-  @override
-  Future<void> updateAuthToken(String authToken) async {}
-
-  @override
-  Future<ContactRecord> updateContact(
+  Future<ContactOutput<ContactRecord>> updateContact(
+    WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
     ContactData data,
   ) async {
@@ -542,9 +434,14 @@ class FakeContactsRustContext implements ContactsRustContext {
       updatedAt: existing.updatedAt + 1,
     );
     records[contactId] = updated;
-    return updated;
+    return _output(updated);
   }
 
-  @override
-  int userId() => userIdValue;
+  ContactOutput<T> _output<T>(T value) => ContactOutput(
+    value: value,
+    wrappedRootContactKey: const WrappedRootContactKey(
+      encryptedKey: 'enc-key',
+      header: 'enc-header',
+    ),
+  );
 }

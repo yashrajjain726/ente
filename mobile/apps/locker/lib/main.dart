@@ -23,6 +23,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:locker/app.dart';
 import 'package:locker/core/locale.dart';
+import 'package:locker/service_locator.dart';
 import 'package:locker/services/collections/collections_api_client.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/configuration.dart';
@@ -30,7 +31,6 @@ import "package:locker/services/contacts_display_service.dart";
 import 'package:locker/services/db/locker_db.dart';
 import 'package:locker/services/favorites_service.dart';
 import 'package:locker/services/feature_flag_service.dart';
-import 'package:locker/services/files/download/service_locator.dart';
 import 'package:locker/services/files/links/links_client.dart';
 import 'package:locker/services/files/links/links_service.dart';
 import 'package:locker/services/files/offline/offline_files_service.dart';
@@ -223,10 +223,7 @@ Future<void> _init(bool bool, {String? via}) async {
       UserService.instance,
       Configuration.instance,
     );
-    await LockerContactsDisplayService.init(
-      preferences: preferences,
-      packageInfo: packageInfo,
-    );
+    await LockerContactsDisplayService.init(preferences: preferences);
     unawaited(cleanStaleLegacyKitShareFiles());
     unawaited(
       Future.delayed(

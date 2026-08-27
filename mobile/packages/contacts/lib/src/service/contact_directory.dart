@@ -2,13 +2,11 @@ import 'dart:async';
 
 import 'package:ente_contacts/src/models/contact_data.dart';
 import 'package:ente_contacts/src/models/contact_record.dart';
-import 'package:ente_contacts/src/models/contacts_session.dart';
 import 'package:ente_contacts/src/service/contacts_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
-typedef ContactsServiceFactory =
-    ContactsService Function(ContactsSession session);
+typedef ContactsServiceFactory = ContactsService Function();
 
 class ContactDirectory {
   ContactDirectory({
@@ -19,7 +17,7 @@ class ContactDirectory {
     Duration profilePictureFailureTtl = const Duration(minutes: 1),
   }) : _contactsServiceFactory =
            contactsServiceFactory ??
-           (contactsService == null ? null : (_) => contactsService),
+           (contactsService == null ? null : () => contactsService),
        _logger = logger ?? Logger('ContactDirectory'),
        _profilePictureFailureTtl = profilePictureFailureTtl,
        _onContactsChanged = onContactsChanged;
@@ -47,22 +45,21 @@ class ContactDirectory {
   bool get hasHydratedCache => _hasHydratedCache;
   bool get needsWarmup => !_hasHydratedCache || _active?.ready == null;
 
-  Future<void> ensureReady(ContactsSession session) async {
-    final key = _sessionKey(session);
+  Future<void> ensureReady({
+    required String baseUrl,
+    required int userId,
+  }) async {
+    final key = '$baseUrl|$userId';
     var active = _active;
     if (active?.key != key) {
       _clear(notify: true);
-      active = _ActiveContacts(
-        key: key,
-        authToken: session.authToken,
-        service: _newContactsService(session),
-      );
+      active = _ActiveContacts(key: key, service: _newContactsService());
       _active = active;
     }
 
     final ready = active!.ready;
     if (ready == null) {
-      final opening = _hydrate(active, session);
+      final opening = _hydrate(active, userId);
       active.ready = opening;
       try {
         await opening;
@@ -74,10 +71,6 @@ class ContactDirectory {
     } else {
       await ready;
     }
-
-    if (!_isActive(active) || active.authToken == session.authToken) return;
-    await active.service.updateAuthToken(session.authToken);
-    if (_isActive(active)) active.authToken = session.authToken;
   }
 
   Future<void> resetLocalState() async {
@@ -261,9 +254,9 @@ class ContactDirectory {
     _revision.value = 0;
   }
 
-  Future<void> _hydrate(_ActiveContacts active, ContactsSession session) async {
+  Future<void> _hydrate(_ActiveContacts active, int userId) async {
     final service = active.service;
-    await service.open(session);
+    await service.open(userId: userId);
     if (!_isActive(active)) return;
 
     final knownUserIds = _contactsByUserId.keys.toSet();
@@ -463,16 +456,13 @@ class ContactDirectory {
 
   bool _isActive(_ActiveContacts active) => identical(active, _active);
 
-  ContactsService _newContactsService(ContactsSession session) {
+  ContactsService _newContactsService() {
     final factory = _contactsServiceFactory;
     if (factory == null) {
       throw StateError('ContactDirectory requires a contacts service factory');
     }
-    return factory(session);
+    return factory();
   }
-
-  String _sessionKey(ContactsSession session) =>
-      '${session.baseUrl}|${session.userId}';
 
   String? _normalizeEmail(String? value) {
     final normalized = value?.trim().toLowerCase();
@@ -486,14 +476,9 @@ class ContactDirectory {
 }
 
 class _ActiveContacts {
-  _ActiveContacts({
-    required this.key,
-    required this.authToken,
-    required this.service,
-  });
+  _ActiveContacts({required this.key, required this.service});
 
   final String key;
   final ContactsService service;
-  String authToken;
   Future<void>? ready;
 }

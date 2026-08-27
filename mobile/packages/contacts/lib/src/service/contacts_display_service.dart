@@ -1,5 +1,4 @@
 import 'package:ente_contacts/src/models/contact_record.dart';
-import 'package:ente_contacts/src/models/contacts_session.dart';
 import 'package:ente_contacts/src/service/contact_directory.dart';
 import 'package:ente_contacts/src/service/contacts_service.dart';
 import 'package:flutter/foundation.dart';
@@ -37,8 +36,8 @@ class ContactsDisplayService {
     );
   }
 
-  Future<void> ensureReady(ContactsSession session) =>
-      _store.ensureReady(session);
+  Future<void> ensureReady({required String baseUrl, required int userId}) =>
+      _store.ensureReady(baseUrl: baseUrl, userId: userId);
 
   Future<void> resetLocalState() => _store.resetLocalState();
 

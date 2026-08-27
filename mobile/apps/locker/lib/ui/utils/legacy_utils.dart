@@ -9,7 +9,6 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:locker/services/authenticated_session.dart";
 import "package:locker/services/configuration.dart";
-import "package:locker/services/contacts_display_service.dart";
 import "package:locker/services/legacy_kit.dart" as legacy;
 import "package:logging/logging.dart";
 
@@ -103,9 +102,8 @@ Future<bool?> hasLegacyKit() async {
   }
 }
 
-Future<List<LegacyKit>> _getLegacyKits() => legacy.getLegacyKits(
-  authenticatedSession(LockerContactsDisplayService.buildSession()),
-);
+Future<List<LegacyKit>> _getLegacyKits() =>
+    legacy.getLegacyKits(authenticatedSession());
 
 Future<LegacyKitCreateResult> _createLegacyKit(
   List<String> partNames,
@@ -116,7 +114,7 @@ Future<LegacyKitCreateResult> _createLegacyKit(
     throw StateError("Missing account key attributes");
   }
   final result = await legacy.createLegacyKit(
-    authenticatedSession(LockerContactsDisplayService.buildSession()),
+    authenticatedSession(),
     keyAttributes,
     partNames,
     noticePeriodInHours,
@@ -126,30 +124,22 @@ Future<LegacyKitCreateResult> _createLegacyKit(
 }
 
 Future<List<LegacyKitShare>> _downloadLegacyKitShares(String kitId) =>
-    legacy.downloadLegacyKitShares(
-      authenticatedSession(LockerContactsDisplayService.buildSession()),
-      kitId,
-    );
+    legacy.downloadLegacyKitShares(authenticatedSession(), kitId);
 
 Future<void> _updateLegacyKitRecoveryNotice(
   String kitId,
   int noticePeriodInHours,
 ) => legacy.updateLegacyKitRecoveryNotice(
-  authenticatedSession(LockerContactsDisplayService.buildSession()),
+  authenticatedSession(),
   kitId,
   noticePeriodInHours,
 );
 
 Future<void> _blockLegacyKitRecovery(String kitId) =>
-    legacy.blockLegacyKitRecovery(
-      authenticatedSession(LockerContactsDisplayService.buildSession()),
-      kitId,
-    );
+    legacy.blockLegacyKitRecovery(authenticatedSession(), kitId);
 
-Future<void> _deleteLegacyKit(String kitId) => legacy.deleteLegacyKit(
-  authenticatedSession(LockerContactsDisplayService.buildSession()),
-  kitId,
-);
+Future<void> _deleteLegacyKit(String kitId) =>
+    legacy.deleteLegacyKit(authenticatedSession(), kitId);
 
 Future<bool> _authenticateForLegacyFlow(BuildContext context, String reason) {
   return LocalAuthenticationService.instance.requestLocalAuthentication(

@@ -5,13 +5,11 @@ import 'package:ente_contacts/src/db/contacts_database.dart';
 import 'package:ente_contacts/src/models/contact_data.dart';
 import 'package:ente_contacts/src/models/contact_output.dart';
 import 'package:ente_contacts/src/models/contact_record.dart';
-import 'package:ente_contacts/src/models/contacts_session.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum ContactAttachmentType { profilePicture }
 
-typedef UpdateAuthToken = void Function(String authToken);
 typedef CreateContact =
     Future<ContactOutput<ContactRecord>> Function(
       WrappedRootContactKey? wrappedRootContactKey,
@@ -55,7 +53,6 @@ class ContactsService {
 
   ContactsService({
     required SharedPreferences preferences,
-    required UpdateAuthToken updateAuthToken,
     required CreateContact createContact,
     required GetContactDiff getDiff,
     required UpdateContact updateContact,
@@ -66,7 +63,6 @@ class ContactsService {
     ContactsDatabase? database,
   }) : _preferences = preferences,
        _database = database ?? ContactsDatabase(),
-       _updateRemoteAuthToken = updateAuthToken,
        _createRemoteContact = createContact,
        _getRemoteDiff = getDiff,
        _updateRemoteContact = updateContact,
@@ -77,7 +73,6 @@ class ContactsService {
 
   final SharedPreferences _preferences;
   final ContactsDatabase _database;
-  final UpdateAuthToken _updateRemoteAuthToken;
   final CreateContact _createRemoteContact;
   final GetContactDiff _getRemoteDiff;
   final UpdateContact _updateRemoteContact;
@@ -88,26 +83,13 @@ class ContactsService {
   final Logger _logger = Logger('ContactsService');
 
   WrappedRootContactKey? _wrappedRootContactKey;
-  ContactsSession? _session;
+  int? _userId;
 
-  Future<void> open(ContactsSession session) async {
-    _wrappedRootContactKey = _cachedWrappedRootContactKey(session.userId);
-    _session = session;
-    await _database.configure(userId: session.userId);
-    _logger.info('Opened contacts store for user ${session.userId}');
-  }
-
-  Future<void> updateAuthToken(String authToken) async {
-    _updateRemoteAuthToken(authToken);
-    _session = ContactsSession(
-      baseUrl: _session!.baseUrl,
-      authToken: authToken,
-      userId: _session!.userId,
-      accountKey: _session!.accountKey,
-      userAgent: _session!.userAgent,
-      clientPackage: _session!.clientPackage,
-      clientVersion: _session!.clientVersion,
-    );
+  Future<void> open({required int userId}) async {
+    _wrappedRootContactKey = _cachedWrappedRootContactKey(userId);
+    _userId = userId;
+    await _database.configure(userId: userId);
+    _logger.info('Opened contacts store for user $userId');
   }
 
   Future<List<ContactRecord>> sync() async {
@@ -323,7 +305,7 @@ class ContactsService {
   }
 
   void _requireOpen() {
-    if (_session == null) {
+    if (_userId == null) {
       throw StateError('ContactsService.open(...) must be called before use');
     }
   }
@@ -346,11 +328,11 @@ class ContactsService {
   }
 
   Future<T> _value<T>(ContactOutput<T> output) async {
-    final session = _session;
+    final userId = _userId;
     final key = output.wrappedRootContactKey;
-    if (session != null && key != null) {
+    if (userId != null && key != null) {
       _wrappedRootContactKey = key;
-      await _persistWrappedRootContactKey(session.userId, key);
+      await _persistWrappedRootContactKey(userId, key);
     }
     return output.value;
   }

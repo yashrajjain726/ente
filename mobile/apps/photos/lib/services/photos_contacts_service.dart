@@ -13,12 +13,10 @@ import "package:photos/services/contacts.dart";
 class PhotosContactsService {
   PhotosContactsService._privateConstructor()
     : _store = contacts.ContactDirectory(
-        contactsServiceFactory: (account) {
-          final session = authenticatedSession(account);
+        contactsServiceFactory: () {
+          final session = authenticatedSession();
           return contacts.ContactsService(
             preferences: ServiceLocator.instance.prefs,
-            updateAuthToken: (token) =>
-                session.updateAuthToken(authToken: token),
             createContact: (key, data) => createContact(session, key, data),
             getDiff: (key, sinceTime, limit) =>
                 getDiff(session, key, sinceTime, limit),
@@ -63,12 +61,14 @@ class PhotosContactsService {
   bool get needsWarmup => _store.needsWarmup;
 
   Future<void> ensureReady() async {
-    final session = _buildSession();
-    if (session == null) {
+    final config = Configuration.instance;
+    final userId = config.getUserID();
+    if (userId == null || !config.hasConfiguredAccount()) {
       _store.clearSession();
       return;
     }
-    await _store.ensureReady(session);
+    authenticatedSession();
+    await _store.ensureReady(baseUrl: endpointConfig.endpoint, userId: userId);
   }
 
   Future<contacts.ContactRecord?> getContact({
@@ -156,8 +156,10 @@ class PhotosContactsService {
   }
 
   @visibleForTesting
-  Future<void> debugOpenAndSync(contacts.ContactsSession session) =>
-      _store.ensureReady(session);
+  Future<void> debugOpenAndSync({
+    required String baseUrl,
+    required int userId,
+  }) => _store.ensureReady(baseUrl: baseUrl, userId: userId);
 
   @visibleForTesting
   void debugHydrateContacts(
@@ -167,25 +169,6 @@ class PhotosContactsService {
 
   @visibleForTesting
   void debugReset({bool notify = false}) => _store.clearSession(notify: notify);
-
-  contacts.ContactsSession? _buildSession() {
-    final config = Configuration.instance;
-    final userId = config.getUserID();
-    final accountKey = config.getKey();
-    final token = config.getToken();
-    if (token == null || userId == null || accountKey == null) {
-      return null;
-    }
-    final packageInfo = ServiceLocator.instance.packageInfo;
-    return contacts.ContactsSession(
-      baseUrl: endpointConfig.endpoint,
-      authToken: token,
-      userId: userId,
-      accountKey: accountKey,
-      clientPackage: packageInfo.packageName,
-      clientVersion: packageInfo.version,
-    );
-  }
 
   Future<T?> _runReadSafely<T>(
     Future<T?> Function() task, {
