@@ -90,10 +90,10 @@ const feedPhotoCaptionTextSx = {
     textWrap: "balance",
 } as const;
 const feedPhotoCaptionBubbleSx = {
-    bgcolor: "rgba(48, 48, 48, 0.86)",
-    borderRadius: "10px",
+    bgcolor: "rgba(48, 48, 48, 0.79)",
+    borderRadius: "5px",
     boxDecorationBreak: "clone",
-    px: "8px",
+    px: "7px",
     py: "2px",
     WebkitBoxDecorationBreak: "clone",
 } as const;
@@ -645,7 +645,7 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
                 bottom: 20,
                 display: "-webkit-box",
                 left: "50%",
-                maxWidth: "70%",
+                maxWidth: "78%",
                 overflow: "hidden",
                 pointerEvents: "none",
                 position: "absolute",

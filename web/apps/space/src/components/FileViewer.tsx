@@ -318,10 +318,10 @@ const viewerCaptionTextSx = {
     whiteSpace: "pre-wrap",
 } as const;
 const viewerCaptionBubbleSx = {
-    bgcolor: "rgba(48, 48, 48, 0.86)",
-    borderRadius: "10px",
+    bgcolor: "rgba(48, 48, 48, 0.79)",
+    borderRadius: "5px",
     boxDecorationBreak: "clone",
-    px: "8px",
+    px: "7px",
     py: "2px",
     WebkitBoxDecorationBreak: "clone",
 } as const;
@@ -337,13 +337,13 @@ const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
                 bottom: "14%",
                 left: "50%",
                 m: 0,
-                maxWidth: "70vw",
+                maxWidth: "78vw",
                 minWidth: 0,
                 overflowWrap: "break-word",
                 position: "fixed",
                 textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                 transform: "translateX(-50%)",
-                width: "70vw",
+                width: "78vw",
                 zIndex: 2,
             }}
         >
