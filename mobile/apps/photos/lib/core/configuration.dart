@@ -232,7 +232,13 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
     await MLDataDB.instance.clearTable();
     await UploadLocksDB.instance.clearTable();
     await TrashDB.instance.clearTable();
-    await PhotosContactsService.instance.close();
+    try {
+      await PhotosContactsService.instance.close().timeout(
+        const Duration(seconds: 5),
+      );
+    } catch (e) {
+      _logger.warning("Failed to close contacts service", e);
+    }
     await ContactsDatabase().clearTable();
     await SocialDB.instance.clearAllData();
 
