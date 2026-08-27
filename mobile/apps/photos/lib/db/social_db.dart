@@ -5,45 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photos/db/common/base.dart';
+import 'package:photos/db/common/conflict_algo.dart';
 import 'package:photos/models/social/anon_profile.dart';
 import 'package:photos/models/social/comment.dart';
 import 'package:photos/models/social/reaction.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
-class SocialDB {
+class SocialDB with SqlDbBase {
   static final Logger _logger = Logger("SocialDB");
   static const _databaseName = "ente.social.db";
-  static const _databaseVersion = 1;
 
   static const _commentsTable = 'comments';
   static const _reactionsTable = 'reactions';
   static const _syncTimeTable = 'sync_time';
   static const _anonProfilesTable = 'anon_profiles';
 
-  SocialDB._();
-  static final SocialDB instance = SocialDB._();
-
-  static Future<Database>? _dbFuture;
-
-  Future<Database> get database async {
-    _dbFuture ??= _initDatabase();
-    return _dbFuture!;
-  }
-
-  Future<Database> _initDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-    _logger.info("DB path: $path");
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: _onCreate,
-    );
-  }
-
-  Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
+  static const _migrationScripts = [
+    '''
       CREATE TABLE $_commentsTable (
         id TEXT PRIMARY KEY NOT NULL,
         collection_id INTEGER NOT NULL,
@@ -56,10 +35,7 @@ class SocialDB {
         anon_user_id TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
-      )
-    ''');
-
-    await db.execute('''
+      );
       CREATE TABLE $_reactionsTable (
         id TEXT PRIMARY KEY NOT NULL,
         collection_id INTEGER NOT NULL,
@@ -71,19 +47,13 @@ class SocialDB {
         anon_user_id TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
-      )
-    ''');
-
-    await db.execute('''
+      );
       CREATE TABLE $_syncTimeTable (
         collection_id INTEGER PRIMARY KEY NOT NULL,
         comments_sync_time INTEGER NOT NULL DEFAULT 0,
         reactions_sync_time INTEGER NOT NULL DEFAULT 0,
         anon_profiles_sync_time INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
+      );
       CREATE TABLE $_anonProfilesTable (
         anon_user_id TEXT NOT NULL,
         collection_id INTEGER NOT NULL,
@@ -91,15 +61,32 @@ class SocialDB {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (anon_user_id, collection_id)
-      )
-    ''');
+      );
+      CREATE INDEX idx_comments_file_collection
+        ON $_commentsTable(file_id, collection_id);
+      CREATE INDEX idx_reactions_file_collection
+        ON $_reactionsTable(file_id, collection_id);
+    ''',
+  ];
 
-    await db.execute(
-      'CREATE INDEX idx_comments_file_collection ON $_commentsTable(file_id, collection_id)',
-    );
-    await db.execute(
-      'CREATE INDEX idx_reactions_file_collection ON $_reactionsTable(file_id, collection_id)',
-    );
+  SocialDB._();
+  static final SocialDB instance = SocialDB._();
+
+  static Future<SqliteDatabase>? _dbFuture;
+
+  Future<SqliteDatabase> get database async {
+    _dbFuture ??= _initDatabase();
+    return _dbFuture!;
+  }
+
+  Future<SqliteDatabase> _initDatabase() async {
+    final Directory documentsDirectory =
+        await getApplicationDocumentsDirectory();
+    final String path = join(documentsDirectory.path, _databaseName);
+    _logger.info("DB path: $path");
+    final database = SqliteDatabase(path: path);
+    await migrate(database, _migrationScripts);
+    return database;
   }
 
   Future<void> addComment(Comment comment) async {
@@ -107,7 +94,7 @@ class SocialDB {
     await db.insert(
       _commentsTable,
       _commentToRow(comment),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
     );
   }
 
@@ -192,7 +179,7 @@ class SocialDB {
       'AND is_deleted = 0',
       [fileID, ...collectionIDs],
     );
-    return Sqflite.firstIntValue(result) ?? 0;
+    return result.first['count'] as int;
   }
 
   Future<int> getCommentCountForFileInCollection(
@@ -205,7 +192,7 @@ class SocialDB {
       'WHERE file_id = ? AND collection_id = ? AND is_deleted = 0',
       [fileID, collectionID],
     );
-    return Sqflite.firstIntValue(result) ?? 0;
+    return result.first['count'] as int;
   }
 
   Future<List<Comment>> getCommentsForCollection(int collectionID) async {
@@ -385,7 +372,7 @@ class SocialDB {
     await db.insert(_syncTimeTable, {
       'collection_id': collectionID,
       'comments_sync_time': syncTime,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }, conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace);
   }
 
   Future<void> setReactionsSyncTime(int collectionID, int syncTime) async {
@@ -393,7 +380,7 @@ class SocialDB {
     await db.insert(_syncTimeTable, {
       'collection_id': collectionID,
       'reactions_sync_time': syncTime,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }, conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace);
   }
 
   Future<void> clearSyncTime(int collectionID) async {
@@ -446,7 +433,7 @@ class SocialDB {
       batch.insert(
         _commentsTable,
         _commentToRow(comment),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
       );
     }
     await batch.commit(noResult: true);
@@ -476,7 +463,7 @@ class SocialDB {
       batch.insert(
         _reactionsTable,
         _reactionToRow(reaction),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
       );
     }
     await batch.commit(noResult: true);
@@ -490,7 +477,7 @@ class SocialDB {
       batch.insert(
         _anonProfilesTable,
         _anonProfileToRow(profile),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
       );
     }
     await batch.commit(noResult: true);

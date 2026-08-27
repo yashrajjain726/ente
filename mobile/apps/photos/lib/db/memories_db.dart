@@ -3,12 +3,13 @@ import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photos/db/common/base.dart';
+import 'package:photos/db/common/conflict_algo.dart';
 import 'package:photos/models/memories/memory.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
-class MemoriesDB {
+class MemoriesDB with SqlDbBase {
   static const _databaseName = "ente.memories.db";
-  static const _databaseVersion = 1;
 
   static const table = 'memories';
 
@@ -24,30 +25,26 @@ class MemoriesDB {
     dbName: "ente.memories.offline.db",
   );
 
-  Future<Database>? _dbFuture;
-  Future<Database> get database async {
+  Future<SqliteDatabase>? _dbFuture;
+  Future<SqliteDatabase> get database async {
     _dbFuture ??= _initDatabase();
     return _dbFuture!;
   }
 
-  Future<Database> _initDatabase() async {
+  Future<SqliteDatabase> _initDatabase() async {
     final Directory documentsDirectory =
         await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _dbName);
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: _onCreate,
-    );
-  }
-
-  Future _onCreate(Database db, int version) async {
-    await db.execute('''
+    final database = SqliteDatabase(path: path);
+    await migrate(database, [
+      '''
                 CREATE TABLE $table (
                   $columnFileID INTEGER PRIMARY KEY NOT NULL,
                   $columnSeenTime TEXT NOT NULL
                 )
-                ''');
+                ''',
+    ]);
+    return database;
   }
 
   Future<void> clearTable() async {
@@ -73,7 +70,7 @@ class MemoriesDB {
     return await db.insert(
       table,
       _getRowForSeenMemory(memory, timestamp, seenTimeKey: seenTimeKey),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
     );
   }
 

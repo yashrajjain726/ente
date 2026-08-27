@@ -3,13 +3,14 @@ import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photos/db/common/base.dart';
+import 'package:photos/db/common/conflict_algo.dart';
 import "package:photos/gateways/collections/models/public_url.dart";
 import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/collection/collection.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_migration/sqflite_migration.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
-class CollectionsDB {
+class CollectionsDB with SqlDbBase {
   static const _databaseName = "ente.collections.db";
   static const table = 'collections';
   static const tempTable = 'temp_collections';
@@ -56,27 +57,24 @@ class CollectionsDB {
     ...addSharedAt(),
   ];
 
-  final dbConfig = MigrationConfig(
-    initializationScript: intitialScript,
-    migrationScripts: migrationScripts,
-  );
-
   CollectionsDB._privateConstructor();
 
   static final CollectionsDB instance = CollectionsDB._privateConstructor();
 
-  static Future<Database>? _dbFuture;
+  static Future<SqliteDatabase>? _dbFuture;
 
-  Future<Database> get database async {
+  Future<SqliteDatabase> get database async {
     _dbFuture ??= _initDatabase();
     return _dbFuture!;
   }
 
-  Future<Database> _initDatabase() async {
+  Future<SqliteDatabase> _initDatabase() async {
     final Directory documentsDirectory =
         await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _databaseName);
-    return await openDatabaseWithMigration(path, dbConfig);
+    final database = SqliteDatabase(path: path);
+    await migrate(database, [...intitialScript, ...migrationScripts]);
+    return database;
   }
 
   Future<void> clearTable() async {
@@ -214,7 +212,7 @@ class CollectionsDB {
       batch.insert(
         table,
         _getRowForCollection(collection),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
       );
       batchCounter++;
     }

@@ -2,12 +2,13 @@ import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photos/db/common/base.dart';
+import 'package:photos/db/common/conflict_algo.dart';
 import 'package:photos/models/api/memory_share/memory_share.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
-class MemorySharesDB {
+class MemorySharesDB with SqlDbBase {
   static const _databaseName = "ente.memory_shares.db";
-  static const _databaseVersion = 1;
 
   static const _table = 'memory_shares';
 
@@ -29,26 +30,20 @@ class MemorySharesDB {
   MemorySharesDB._();
   static final MemorySharesDB instance = MemorySharesDB._();
 
-  static Future<Database>? _dbFuture;
+  static Future<SqliteDatabase>? _dbFuture;
 
-  Future<Database> get database async {
+  Future<SqliteDatabase> get database async {
     _dbFuture ??= _initDatabase();
     return _dbFuture!;
   }
 
-  Future<Database> _initDatabase() async {
+  Future<SqliteDatabase> _initDatabase() async {
     final Directory documentsDirectory =
         await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _databaseName);
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: _onCreate,
-    );
-  }
-
-  Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
+    final database = SqliteDatabase(path: path);
+    await migrate(database, [
+      '''
       CREATE TABLE $_table (
         $_columnID INTEGER PRIMARY KEY NOT NULL,
         $_columnType TEXT NOT NULL,
@@ -65,7 +60,9 @@ class MemorySharesDB {
         $_columnPreviewUploadedFileID INTEGER,
         $_columnFileCount INTEGER
       )
-    ''');
+    ''',
+    ]);
+    return database;
   }
 
   Future<void> upsert(MemoryShare share) async {
@@ -73,7 +70,7 @@ class MemorySharesDB {
     await db.insert(
       _table,
       _toRow(share),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
     );
   }
 

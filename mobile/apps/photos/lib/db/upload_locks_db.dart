@@ -5,11 +5,13 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import "package:photos/core/errors.dart";
+import 'package:photos/db/common/base.dart';
+import 'package:photos/db/common/conflict_algo.dart';
 import "package:photos/module/upload/model/multipart.dart";
-import 'package:sqflite/sqflite.dart';
-import "package:sqflite_migration/sqflite_migration.dart";
+import 'package:sqlite_async/sqlite3_common.dart';
+import 'package:sqlite_async/sqlite_async.dart';
 
-class UploadLocksDB {
+class UploadLocksDB with SqlDbBase {
   static const _databaseName = "ente.upload_locks.db";
 
   static const _uploadLocksTable = (
@@ -83,26 +85,23 @@ class UploadLocksDB {
     ];
   }
 
-  final dbConfig = MigrationConfig(
-    initializationScript: initializationScript,
-    migrationScripts: migrationScripts,
-  );
-
   UploadLocksDB._privateConstructor();
   static final UploadLocksDB instance = UploadLocksDB._privateConstructor();
 
-  static Future<Database>? _dbFuture;
-  Future<Database> get database async {
+  static Future<SqliteDatabase>? _dbFuture;
+  Future<SqliteDatabase> get database async {
     _dbFuture ??= _initDatabase();
     return _dbFuture!;
   }
 
-  Future<Database> _initDatabase() async {
+  Future<SqliteDatabase> _initDatabase() async {
     final Directory documentsDirectory =
         await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _databaseName);
 
-    return await openDatabaseWithMigration(path, dbConfig);
+    final database = SqliteDatabase(path: path);
+    await migrate(database, [...initializationScript, ...migrationScripts]);
+    return database;
   }
 
   static List<String> _createUploadLocksTable() {
@@ -184,13 +183,13 @@ class UploadLocksDB {
       await db.insert(
         _uploadLocksTable.table,
         row,
-        conflictAlgorithm: ConflictAlgorithm.fail,
+        conflictAlgorithm: SqliteAsyncConflictAlgorithm.fail,
       );
       return true;
-    } on DatabaseException catch (e) {
-      final lockIDColumn =
-          '${_uploadLocksTable.table}.${_uploadLocksTable.columnID}';
-      if (e.isUniqueConstraintError(lockIDColumn)) {
+    } on SqliteException catch (e) {
+      if (e.extendedResultCode ==
+              SqlExtendedError.SQLITE_CONSTRAINT_PRIMARYKEY ||
+          e.extendedResultCode == SqlExtendedError.SQLITE_CONSTRAINT_UNIQUE) {
         return false;
       }
       rethrow;
@@ -398,12 +397,16 @@ class UploadLocksDB {
   ) async {
     final db = await database;
 
-    await db.insert(_streamUploadErrorTable.table, {
-      _streamUploadErrorTable.columnUploadedFileID: uploadedFileID,
-      _streamUploadErrorTable.columnErrorMessage: errorMessage,
-      _streamUploadErrorTable.columnLastAttemptedAt:
-          DateTime.now().millisecondsSinceEpoch,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      _streamUploadErrorTable.table,
+      {
+        _streamUploadErrorTable.columnUploadedFileID: uploadedFileID,
+        _streamUploadErrorTable.columnErrorMessage: errorMessage,
+        _streamUploadErrorTable.columnLastAttemptedAt:
+            DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
+    );
   }
 
   Future<void> updateStreamStatus(
@@ -592,10 +595,14 @@ class UploadLocksDB {
     String queueType, // 'create' or 'recreate'
   ) async {
     final db = await database;
-    await db.insert(_streamQueueTable.table, {
-      _streamQueueTable.columnUploadedFileID: uploadedFileID,
-      _streamQueueTable.columnQueueType: queueType,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      _streamQueueTable.table,
+      {
+        _streamQueueTable.columnUploadedFileID: uploadedFileID,
+        _streamQueueTable.columnQueueType: queueType,
+      },
+      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
+    );
   }
 
   Future<void> removeFromStreamQueue(int uploadedFileID) async {
