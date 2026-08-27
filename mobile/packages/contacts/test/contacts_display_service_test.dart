@@ -256,7 +256,7 @@ ContactRecord _contact({
   id: id,
   contactUserId: userID,
   email: email,
-  data: ContactData(contactUserId: userID, name: name),
+  name: name,
   profilePictureAttachmentId: attachmentID,
   isDeleted: false,
   createdAt: 1,
@@ -264,6 +264,11 @@ ContactRecord _contact({
 );
 
 class FakeContacts {
+  static const _key = WrappedRootContactKey(
+    encryptedKey: 'enc-key',
+    header: 'enc-header',
+  );
+
   final Map<String, Uint8List> profilePictureBytesByContactId = {};
   List<List<ContactRecord>> diffPages = [];
   int getProfilePictureCalls = 0;
@@ -289,25 +294,26 @@ class FakeContacts {
     deleteAttachment: (_, _, _) => throw UnimplementedError(),
   );
 
-  Future<ContactOutput<ContactRecord>> createContact(
+  Future<ContactRecordOutput> createContact(
     WrappedRootContactKey? wrappedRootContactKey,
     ContactData data,
   ) async {
-    return _output(
-      ContactRecord(
+    return ContactRecordOutput(
+      record: ContactRecord(
         id: 'ct_created',
         contactUserId: data.contactUserId,
         email: 'b@test.test',
-        data: data,
+        name: data.name,
         profilePictureAttachmentId: null,
         isDeleted: false,
         createdAt: 1,
         updatedAt: 1,
       ),
+      wrappedRootContactKey: _key,
     );
   }
 
-  Future<ContactOutput<List<ContactRecord>>> getDiff(
+  Future<ContactDiffOutput> getDiff(
     WrappedRootContactKey? wrappedRootContactKey,
     int sinceTime,
     int limit,
@@ -324,14 +330,14 @@ class FakeContacts {
       throw error;
     }
     if (diffPages.isEmpty) {
-      return _output(const []);
+      return const ContactDiffOutput(records: [], wrappedRootContactKey: _key);
     }
     final first = diffPages.first;
     diffPages = diffPages.sublist(1);
-    return _output(first);
+    return ContactDiffOutput(records: first, wrappedRootContactKey: _key);
   }
 
-  Future<ContactOutput<Uint8List>> getProfilePicture(
+  Future<ProfilePictureOutput> getProfilePicture(
     WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
   ) async {
@@ -344,14 +350,9 @@ class FakeContacts {
     if (error != null) {
       throw error;
     }
-    return _output(profilePictureBytesByContactId[contactId]!);
+    return ProfilePictureOutput(
+      bytes: profilePictureBytesByContactId[contactId]!,
+      wrappedRootContactKey: _key,
+    );
   }
-
-  ContactOutput<T> _output<T>(T value) => ContactOutput(
-    value: value,
-    wrappedRootContactKey: const WrappedRootContactKey(
-      encryptedKey: 'enc-key',
-      header: 'enc-header',
-    ),
-  );
 }

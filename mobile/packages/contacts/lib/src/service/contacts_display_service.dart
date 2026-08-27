@@ -1,6 +1,6 @@
-import 'package:ente_contacts/src/models/contact_record.dart';
 import 'package:ente_contacts/src/service/contact_directory.dart';
 import 'package:ente_contacts/src/service/contacts_service.dart';
+import 'package:ente_frb/contacts.dart';
 import 'package:flutter/foundation.dart';
 
 class ContactsDisplayService {

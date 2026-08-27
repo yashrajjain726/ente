@@ -3,8 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:ente_contacts/src/models/contact_data.dart';
-import 'package:ente_contacts/src/models/contact_record.dart';
+import 'package:ente_frb/contacts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -63,9 +62,12 @@ class ContactsDatabase {
         'id': contact.id,
         'contact_user_id': contact.contactUserId,
         'email': contact.email,
-        'data_json': contact.data == null
+        'data_json': contact.name == null
             ? null
-            : jsonEncode(contact.data!.toJson()),
+            : jsonEncode({
+                'contactUserId': contact.contactUserId,
+                'name': contact.name,
+              }),
         'profile_picture_attachment_id': contact.profilePictureAttachmentId,
         'is_deleted': contact.isDeleted ? 1 : 0,
         'created_at': contact.createdAt,
@@ -295,9 +297,9 @@ class ContactsDatabase {
       id: row['id']! as String,
       contactUserId: row['contact_user_id']! as int,
       email: row['email'] as String?,
-      data: dataJson == null
+      name: dataJson == null
           ? null
-          : ContactData.fromJson(jsonDecode(dataJson) as Map<String, dynamic>),
+          : (jsonDecode(dataJson) as Map<String, dynamic>)['name'] as String,
       profilePictureAttachmentId:
           row['profile_picture_attachment_id'] as String?,
       isDeleted: (row['is_deleted'] as int? ?? 0) == 1,

@@ -17,18 +17,43 @@ class PhotosContactsService {
           final session = authenticatedSession();
           return contacts.ContactsService(
             preferences: ServiceLocator.instance.prefs,
-            createContact: (key, data) => createContact(session, key, data),
-            getDiff: (key, sinceTime, limit) =>
-                getDiff(session, key, sinceTime, limit),
-            updateContact: (key, contactId, data) =>
-                updateContact(session, key, contactId, data),
-            deleteContact: (contactId) => deleteContact(session, contactId),
-            setAttachment: (key, contactId, type, bytes) =>
-                setAttachment(session, key, contactId, type, bytes),
-            deleteAttachment: (key, contactId, type) =>
-                deleteAttachment(session, key, contactId, type),
-            getProfilePicture: (key, contactId) =>
-                getProfilePicture(session, key, contactId),
+            createContact: (key, data) => createContact(
+              session: session,
+              wrappedRootContactKey: key,
+              data: data,
+            ),
+            getDiff: (key, sinceTime, limit) => getDiff(
+              session: session,
+              wrappedRootContactKey: key,
+              sinceTime: sinceTime,
+              limit: limit,
+            ),
+            updateContact: (key, contactId, data) => updateContact(
+              session: session,
+              wrappedRootContactKey: key,
+              contactId: contactId,
+              data: data,
+            ),
+            deleteContact: (contactId) =>
+                deleteContact(session: session, contactId: contactId),
+            setAttachment: (key, contactId, type, bytes) => setAttachment(
+              session: session,
+              wrappedRootContactKey: key,
+              contactId: contactId,
+              attachmentType: type,
+              attachmentBytes: bytes,
+            ),
+            deleteAttachment: (key, contactId, type) => deleteAttachment(
+              session: session,
+              wrappedRootContactKey: key,
+              contactId: contactId,
+              attachmentType: type,
+            ),
+            getProfilePicture: (key, contactId) => getProfilePicture(
+              session: session,
+              wrappedRootContactKey: key,
+              contactId: contactId,
+            ),
           );
         },
         onContactsChanged: _notifyContactsChanged,

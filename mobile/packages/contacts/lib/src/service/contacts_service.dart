@@ -2,47 +2,43 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:ente_contacts/src/db/contacts_database.dart';
-import 'package:ente_contacts/src/models/contact_data.dart';
-import 'package:ente_contacts/src/models/contact_output.dart';
-import 'package:ente_contacts/src/models/contact_record.dart';
+import 'package:ente_frb/contacts.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum ContactAttachmentType { profilePicture }
-
 typedef CreateContact =
-    Future<ContactOutput<ContactRecord>> Function(
+    Future<ContactRecordOutput> Function(
       WrappedRootContactKey? wrappedRootContactKey,
       ContactData data,
     );
 typedef GetContactDiff =
-    Future<ContactOutput<List<ContactRecord>>> Function(
+    Future<ContactDiffOutput> Function(
       WrappedRootContactKey? wrappedRootContactKey,
       int sinceTime,
       int limit,
     );
 typedef UpdateContact =
-    Future<ContactOutput<ContactRecord>> Function(
+    Future<ContactRecordOutput> Function(
       WrappedRootContactKey? wrappedRootContactKey,
       String contactId,
       ContactData data,
     );
 typedef DeleteContact = Future<void> Function(String contactId);
 typedef SetContactAttachment =
-    Future<ContactOutput<ContactRecord>> Function(
+    Future<ContactRecordOutput> Function(
       WrappedRootContactKey? wrappedRootContactKey,
       String contactId,
-      ContactAttachmentType attachmentType,
+      AttachmentType attachmentType,
       Uint8List attachmentBytes,
     );
 typedef DeleteContactAttachment =
-    Future<ContactOutput<ContactRecord>> Function(
+    Future<ContactRecordOutput> Function(
       WrappedRootContactKey? wrappedRootContactKey,
       String contactId,
-      ContactAttachmentType attachmentType,
+      AttachmentType attachmentType,
     );
 typedef GetContactProfilePicture =
-    Future<ContactOutput<Uint8List>> Function(
+    Future<ProfilePictureOutput> Function(
       WrappedRootContactKey? wrappedRootContactKey,
       String contactId,
     );
@@ -101,9 +97,13 @@ class ContactsService {
     var previousSinceTime = -1;
     List<String>? previousPageIds;
     while (true) {
-      final diff = await _value(
-        await _getRemoteDiff(_wrappedRootContactKey, sinceTime, limit),
+      final output = await _getRemoteDiff(
+        _wrappedRootContactKey,
+        sinceTime,
+        limit,
       );
+      await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+      final diff = output.records;
       if (diff.isEmpty) {
         break;
       }
@@ -159,9 +159,9 @@ class ContactsService {
 
   Future<ContactRecord> createContact(ContactData data) async {
     _requireOpen();
-    final created = await _value(
-      await _createRemoteContact(_wrappedRootContactKey, data),
-    );
+    final output = await _createRemoteContact(_wrappedRootContactKey, data);
+    await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+    final created = output.record;
     await _database.upsertContacts([created]);
     return created;
   }
@@ -171,9 +171,13 @@ class ContactsService {
     ContactData data,
   ) async {
     _requireOpen();
-    final updated = await _value(
-      await _updateRemoteContact(_wrappedRootContactKey, contactId, data),
+    final output = await _updateRemoteContact(
+      _wrappedRootContactKey,
+      contactId,
+      data,
     );
+    await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+    final updated = output.record;
     await _database.upsertContacts([updated]);
     return updated;
   }
@@ -181,9 +185,9 @@ class ContactsService {
   Future<void> deleteContact(String contactId) async {
     _requireOpen();
     await _deleteRemoteContact(contactId);
-    final deleted = await _value(
-      await _getRemoteDiff(_wrappedRootContactKey, 0, _syncLimit),
-    );
+    final output = await _getRemoteDiff(_wrappedRootContactKey, 0, _syncLimit);
+    await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+    final deleted = output.records;
     final matching = deleted
         .where((element) => element.id == contactId)
         .toList();
@@ -195,11 +199,7 @@ class ContactsService {
   }
 
   Future<ContactRecord> setProfilePicture(String contactId, Uint8List bytes) {
-    return _setAttachment(
-      contactId,
-      ContactAttachmentType.profilePicture,
-      bytes,
-    );
+    return _setAttachment(contactId, AttachmentType.profilePicture, bytes);
   }
 
   Future<Uint8List> getProfilePicture(String contactId) {
@@ -207,26 +207,26 @@ class ContactsService {
   }
 
   Future<ContactRecord> deleteProfilePicture(String contactId) {
-    return _deleteAttachment(contactId, ContactAttachmentType.profilePicture);
+    return _deleteAttachment(contactId, AttachmentType.profilePicture);
   }
 
   Future<ContactRecord> _setAttachment(
     String contactId,
-    ContactAttachmentType attachmentType,
+    AttachmentType attachmentType,
     Uint8List bytes,
   ) async {
     final previousAttachmentId = (await _database.getContact(
       contactId,
     ))?.profilePictureAttachmentId;
     _requireOpen();
-    final updated = await _value(
-      await _setRemoteAttachment(
-        _wrappedRootContactKey,
-        contactId,
-        attachmentType,
-        bytes,
-      ),
+    final output = await _setRemoteAttachment(
+      _wrappedRootContactKey,
+      contactId,
+      attachmentType,
+      bytes,
     );
+    await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+    final updated = output.record;
     await _database.upsertContacts([updated]);
     final nextAttachmentId = updated.profilePictureAttachmentId;
     if (nextAttachmentId != null) {
@@ -250,28 +250,31 @@ class ContactsService {
       return cached;
     }
     _requireOpen();
-    final bytes = await _value(
-      await _getRemoteProfilePicture(_wrappedRootContactKey, contactId),
+    final output = await _getRemoteProfilePicture(
+      _wrappedRootContactKey,
+      contactId,
     );
+    await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+    final bytes = output.bytes;
     await _database.upsertCachedAttachment(attachmentId, bytes);
     return bytes;
   }
 
   Future<ContactRecord> _deleteAttachment(
     String contactId,
-    ContactAttachmentType attachmentType,
+    AttachmentType attachmentType,
   ) async {
     final previousAttachmentId = (await _database.getContact(
       contactId,
     ))?.profilePictureAttachmentId;
     _requireOpen();
-    final updated = await _value(
-      await _deleteRemoteAttachment(
-        _wrappedRootContactKey,
-        contactId,
-        attachmentType,
-      ),
+    final output = await _deleteRemoteAttachment(
+      _wrappedRootContactKey,
+      contactId,
+      attachmentType,
     );
+    await _saveWrappedRootContactKey(output.wrappedRootContactKey);
+    final updated = output.record;
     await _database.upsertContacts([updated]);
     if (previousAttachmentId != null) {
       await _database.deleteCachedAttachment(previousAttachmentId);
@@ -319,22 +322,13 @@ class ContactsService {
     return WrappedRootContactKey(encryptedKey: encryptedKey, header: header);
   }
 
-  Future<void> _persistWrappedRootContactKey(
-    int userId,
-    WrappedRootContactKey key,
-  ) async {
+  Future<void> _saveWrappedRootContactKey(WrappedRootContactKey? key) async {
+    final userId = _userId;
+    if (userId == null || key == null) return;
+
+    _wrappedRootContactKey = key;
     await _preferences.setString(_entityKeyPref(userId), key.encryptedKey);
     await _preferences.setString(_entityHeaderPref(userId), key.header);
-  }
-
-  Future<T> _value<T>(ContactOutput<T> output) async {
-    final userId = _userId;
-    final key = output.wrappedRootContactKey;
-    if (userId != null && key != null) {
-      _wrappedRootContactKey = key;
-      await _persistWrappedRootContactKey(userId, key);
-    }
-    return output.value;
   }
 
   String _entityKeyPref(int userId) => 'entity_key_contact_$userId';

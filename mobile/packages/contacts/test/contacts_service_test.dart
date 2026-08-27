@@ -54,7 +54,7 @@ void main() {
           id: 'ct_1',
           contactUserId: 2,
           email: 'b@test.test',
-          data: ContactData(contactUserId: 2, name: 'B'),
+          name: 'B',
           profilePictureAttachmentId: 'att_1',
           isDeleted: false,
           createdAt: 10,
@@ -87,7 +87,7 @@ void main() {
             id: 'ct_1',
             contactUserId: 2,
             email: 'b@test.test',
-            data: ContactData(contactUserId: 2, name: 'B'),
+            name: 'B',
             profilePictureAttachmentId: null,
             isDeleted: false,
             createdAt: 10,
@@ -121,7 +121,7 @@ void main() {
     );
     expect(preferences.getString('entity_key_contact_1'), 'enc-key');
     expect(preferences.getString('entity_key_header_contact_1'), 'enc-header');
-    expect((await service.getContact(created.id))!.data!.name, 'B');
+    expect((await service.getContact(created.id))!.name, 'B');
     expect((await service.getContactByUserId(2))!.id, created.id);
 
     final updated = await service.setProfilePicture(
@@ -153,7 +153,7 @@ void main() {
           id: 'ct_1',
           contactUserId: 2,
           email: 'b@test.test',
-          data: ContactData(contactUserId: 2, name: 'B'),
+          name: 'B',
           profilePictureAttachmentId: 'att_1',
           isDeleted: false,
           createdAt: 10,
@@ -219,7 +219,7 @@ void main() {
             id: 'ct_1',
             contactUserId: 2,
             email: 'b@test.test',
-            data: ContactData(contactUserId: 2, name: 'B'),
+            name: 'B',
             profilePictureAttachmentId: 'att_keep',
             isDeleted: false,
             createdAt: 10,
@@ -256,7 +256,7 @@ void main() {
           id: 'ct_$i',
           contactUserId: i + 2,
           email: 'user$i@test.test',
-          data: ContactData(contactUserId: i + 2, name: 'User $i'),
+          name: 'User $i',
           profilePictureAttachmentId: null,
           isDeleted: false,
           createdAt: 10,
@@ -285,6 +285,11 @@ void main() {
 }
 
 class FakeContacts {
+  static const _key = WrappedRootContactKey(
+    encryptedKey: 'enc-key',
+    header: 'enc-header',
+  );
+
   WrappedRootContactKey? lastWrappedRootContactKey;
   final Map<String, ContactRecord> records = {};
   final Map<String, Uint8List> attachments = {};
@@ -296,7 +301,7 @@ class FakeContacts {
   int getProfilePictureCalls = 0;
   String nextAttachmentId = 'att_profile';
 
-  Future<ContactOutput<ContactRecord>> createContact(
+  Future<ContactRecordOutput> createContact(
     WrappedRootContactKey? wrappedRootContactKey,
     ContactData data,
   ) async {
@@ -304,14 +309,14 @@ class FakeContacts {
       id: 'ct_created',
       contactUserId: data.contactUserId,
       email: 'b@test.test',
-      data: data,
+      name: data.name,
       profilePictureAttachmentId: null,
       isDeleted: false,
       createdAt: 1,
       updatedAt: 1,
     );
     records[record.id] = record;
-    return _output(record);
+    return ContactRecordOutput(record: record, wrappedRootContactKey: _key);
   }
 
   Future<void> deleteContact(String contactId) async {
@@ -321,7 +326,7 @@ class FakeContacts {
         id: existing.id,
         contactUserId: existing.contactUserId,
         email: existing.email,
-        data: null,
+        name: null,
         profilePictureAttachmentId: null,
         isDeleted: true,
         createdAt: existing.createdAt,
@@ -330,17 +335,17 @@ class FakeContacts {
     }
   }
 
-  Future<ContactOutput<ContactRecord>> deleteAttachment(
+  Future<ContactRecordOutput> deleteAttachment(
     WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
-    ContactAttachmentType attachmentType,
+    AttachmentType attachmentType,
   ) async {
     final existing = records[contactId]!;
     final updated = ContactRecord(
       id: existing.id,
       contactUserId: existing.contactUserId,
       email: existing.email,
-      data: existing.data,
+      name: existing.name,
       profilePictureAttachmentId: null,
       isDeleted: existing.isDeleted,
       createdAt: existing.createdAt,
@@ -351,10 +356,10 @@ class FakeContacts {
     if (previousAttachmentId != null) {
       attachments.remove(previousAttachmentId);
     }
-    return _output(updated);
+    return ContactRecordOutput(record: updated, wrappedRootContactKey: _key);
   }
 
-  Future<ContactOutput<List<ContactRecord>>> getDiff(
+  Future<ContactDiffOutput> getDiff(
     WrappedRootContactKey? wrappedRootContactKey,
     int sinceTime,
     int limit,
@@ -368,36 +373,39 @@ class FakeContacts {
       for (final record in page) {
         records[record.id] = record;
       }
-      return _output(page);
+      return ContactDiffOutput(records: page, wrappedRootContactKey: _key);
     }
     if (diffPages.isEmpty) {
-      return _output(const []);
+      return const ContactDiffOutput(records: [], wrappedRootContactKey: _key);
     }
     final first = diffPages.first;
     diffPages = diffPages.sublist(1);
     for (final record in first) {
       records[record.id] = record;
     }
-    return _output(first);
+    return ContactDiffOutput(records: first, wrappedRootContactKey: _key);
   }
 
-  Future<ContactOutput<Uint8List>> getProfilePicture(
+  Future<ProfilePictureOutput> getProfilePicture(
     WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
   ) async {
     getProfilePictureCalls += 1;
     final picture = profilePictures[contactId];
     if (picture != null) {
-      return _output(picture);
+      return ProfilePictureOutput(bytes: picture, wrappedRootContactKey: _key);
     }
     final attachmentId = records[contactId]!.profilePictureAttachmentId!;
-    return _output(attachments[attachmentId]!);
+    return ProfilePictureOutput(
+      bytes: attachments[attachmentId]!,
+      wrappedRootContactKey: _key,
+    );
   }
 
-  Future<ContactOutput<ContactRecord>> setAttachment(
+  Future<ContactRecordOutput> setAttachment(
     WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
-    ContactAttachmentType attachmentType,
+    AttachmentType attachmentType,
     Uint8List attachmentBytes,
   ) async {
     final existing = records[contactId]!;
@@ -405,7 +413,7 @@ class FakeContacts {
       id: existing.id,
       contactUserId: existing.contactUserId,
       email: existing.email,
-      data: existing.data,
+      name: existing.name,
       profilePictureAttachmentId: nextAttachmentId,
       isDeleted: existing.isDeleted,
       createdAt: existing.createdAt,
@@ -414,10 +422,10 @@ class FakeContacts {
     records[contactId] = updated;
     attachments[nextAttachmentId] = attachmentBytes;
     profilePictures[contactId] = attachmentBytes;
-    return _output(updated);
+    return ContactRecordOutput(record: updated, wrappedRootContactKey: _key);
   }
 
-  Future<ContactOutput<ContactRecord>> updateContact(
+  Future<ContactRecordOutput> updateContact(
     WrappedRootContactKey? wrappedRootContactKey,
     String contactId,
     ContactData data,
@@ -427,21 +435,13 @@ class FakeContacts {
       id: existing.id,
       contactUserId: existing.contactUserId,
       email: existing.email,
-      data: data,
+      name: data.name,
       profilePictureAttachmentId: existing.profilePictureAttachmentId,
       isDeleted: existing.isDeleted,
       createdAt: existing.createdAt,
       updatedAt: existing.updatedAt + 1,
     );
     records[contactId] = updated;
-    return _output(updated);
+    return ContactRecordOutput(record: updated, wrappedRootContactKey: _key);
   }
-
-  ContactOutput<T> _output<T>(T value) => ContactOutput(
-    value: value,
-    wrappedRootContactKey: const WrappedRootContactKey(
-      encryptedKey: 'enc-key',
-      header: 'enc-header',
-    ),
-  );
 }

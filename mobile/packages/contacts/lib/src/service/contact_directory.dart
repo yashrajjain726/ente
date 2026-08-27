@@ -1,8 +1,7 @@
 import 'dart:async';
 
-import 'package:ente_contacts/src/models/contact_data.dart';
-import 'package:ente_contacts/src/models/contact_record.dart';
 import 'package:ente_contacts/src/service/contacts_service.dart';
+import 'package:ente_frb/contacts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
@@ -92,10 +91,7 @@ class ContactDirectory {
 
   String? getCachedSavedName({int? contactUserId, String? email}) =>
       _trimToNull(
-        getCachedContact(
-          contactUserId: contactUserId,
-          email: email,
-        )?.data?.name,
+        getCachedContact(contactUserId: contactUserId, email: email)?.name,
       );
 
   String? getCachedResolvedEmail({int? contactUserId, String? email}) =>
@@ -372,7 +368,7 @@ class ContactDirectory {
       a.updatedAt == b.updatedAt &&
       a.isDeleted == b.isDeleted &&
       a.email == b.email &&
-      a.data?.name == b.data?.name &&
+      a.name == b.name &&
       a.profilePictureAttachmentId == b.profilePictureAttachmentId;
 
   void _cacheAndNotify(ContactRecord contact) {

@@ -20,7 +20,7 @@ ResolvedUserIdentity resolveSuggestionIdentity(UserSuggestion suggestion) {
       knownContactEmailOrNull(contact?.email) ??
       knownContactEmailOrNull(suggestion.email);
   final resolvedDisplayName =
-      trimToNull(contact?.data?.name) ??
+      trimToNull(contact?.name) ??
       trimToNull(suggestion.displayName) ??
       knownEmail;
   return (
