@@ -1,7 +1,4 @@
-interface WrappedRootContactKey {
-    encryptedKey: string;
-    header: string;
-}
+import type { WrappedRootContactKey } from "./pkg/ente_locker_wasm";
 
 interface OpenSessionInput {
     baseUrl: string;
@@ -9,26 +6,6 @@ interface OpenSessionInput {
     masterKeyB64: string;
     clientPackage?: string;
     clientVersion?: string;
-}
-
-interface ContactRecord {
-    id: string;
-    contactUserId: number;
-    email?: string;
-    name?: string;
-    profilePictureAttachmentID?: string;
-    isDeleted: boolean;
-    updatedAt: number;
-}
-
-interface ContactsDiffOutput {
-    records: ContactRecord[];
-    wrappedRootContactKey?: WrappedRootContactKey;
-}
-
-interface ProfilePictureOutput {
-    bytes: Uint8Array;
-    wrappedRootContactKey?: WrappedRootContactKey;
 }
 
 const wasm = () => import("./pkg/ente_locker_wasm");
@@ -55,7 +32,7 @@ export const contactsGetDiff = async (
     wrappedRootContactKey: WrappedRootContactKey | undefined,
     sinceTime: number,
     limit: number,
-): Promise<ContactsDiffOutput> =>
+) =>
     (await wasm()).contactsGetDiff(
         session,
         wrappedRootContactKey?.encryptedKey,
@@ -68,7 +45,7 @@ export const contactsGetProfilePicture = async (
     session: Session,
     wrappedRootContactKey: WrappedRootContactKey | undefined,
     contactID: string,
-): Promise<ProfilePictureOutput> =>
+) =>
     (await wasm()).contactsGetProfilePicture(
         session,
         wrappedRootContactKey?.encryptedKey,

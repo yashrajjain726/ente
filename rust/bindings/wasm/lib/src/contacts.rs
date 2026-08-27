@@ -1,6 +1,6 @@
-use ente_contacts::WrappedRootContactKey;
 use serde::{Serialize, Serializer};
 use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::session::Session;
@@ -33,9 +33,9 @@ impl From<Error> for JsValue {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct ContactRecordJs {
+struct ContactRecord {
     id: String,
     contact_user_id: i64,
     email: Option<String>,
@@ -46,7 +46,7 @@ struct ContactRecordJs {
     updated_at: i64,
 }
 
-impl From<ente_contacts::ContactRecord> for ContactRecordJs {
+impl From<ente_contacts::ContactRecord> for ContactRecord {
     fn from(value: ente_contacts::ContactRecord) -> Self {
         Self {
             id: value.id,
@@ -60,19 +60,36 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct ContactsDiffJs {
-    records: Vec<ContactRecordJs>,
+pub struct ContactsDiffOutput {
+    records: Vec<ContactRecord>,
     wrapped_root_contact_key: Option<WrappedRootContactKey>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct ProfilePictureJs {
+pub struct ProfilePictureOutput {
     #[serde(serialize_with = "serialize_bytes")]
+    #[tsify(type = "Uint8Array")]
     bytes: Vec<u8>,
     wrapped_root_contact_key: Option<WrappedRootContactKey>,
+}
+
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+struct WrappedRootContactKey {
+    encrypted_key: String,
+    header: String,
+}
+
+impl From<ente_contacts::WrappedRootContactKey> for WrappedRootContactKey {
+    fn from(value: ente_contacts::WrappedRootContactKey) -> Self {
+        Self {
+            encrypted_key: value.encrypted_key,
+            header: value.header,
+        }
+    }
 }
 
 #[wasm_bindgen(js_name = contactsGetDiff)]
@@ -82,15 +99,15 @@ pub async fn contacts_get_diff(
     cached_header: Option<String>,
     since_time: i64,
     limit: u16,
-) -> Result<JsValue, Error> {
+) -> Result<<ContactsDiffOutput as Tsify>::JsType, Error> {
     let cached = wrapped_root_contact_key(cached_encrypted_key, cached_header);
     let output =
         ente_contacts::get_diff(session.inner(), cached.as_ref(), since_time, limit).await?;
-    let output = ContactsDiffJs {
+    let output = ContactsDiffOutput {
         records: output.value.into_iter().map(Into::into).collect(),
-        wrapped_root_contact_key: output.wrapped_root_contact_key,
+        wrapped_root_contact_key: output.wrapped_root_contact_key.map(Into::into),
     };
-    swb::to_value(&output).map_err(Into::into)
+    output.into_js().map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = contactsGetProfilePicture)]
@@ -99,27 +116,28 @@ pub async fn contacts_get_profile_picture(
     cached_encrypted_key: Option<String>,
     cached_header: Option<String>,
     contact_id: &str,
-) -> Result<JsValue, Error> {
+) -> Result<<ProfilePictureOutput as Tsify>::JsType, Error> {
     let cached = wrapped_root_contact_key(cached_encrypted_key, cached_header);
     let output =
         ente_contacts::get_profile_picture(session.inner(), cached.as_ref(), contact_id).await?;
-    swb::to_value(&ProfilePictureJs {
+    ProfilePictureOutput {
         bytes: output.value,
-        wrapped_root_contact_key: output.wrapped_root_contact_key,
-    })
+        wrapped_root_contact_key: output.wrapped_root_contact_key.map(Into::into),
+    }
+    .into_js()
     .map_err(Into::into)
 }
 
 fn wrapped_root_contact_key(
     encrypted_key: Option<String>,
     header: Option<String>,
-) -> Option<WrappedRootContactKey> {
-    encrypted_key
-        .zip(header)
-        .map(|(encrypted_key, header)| WrappedRootContactKey {
+) -> Option<ente_contacts::WrappedRootContactKey> {
+    encrypted_key.zip(header).map(
+        |(encrypted_key, header)| ente_contacts::WrappedRootContactKey {
             encrypted_key,
             header,
-        })
+        },
+    )
 }
 
 fn serialize_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
