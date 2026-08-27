@@ -8,7 +8,7 @@ class AutoCaptureController {
 
   static const armGrace = Duration(milliseconds: 250);
 
-  static const clearHold = Duration(milliseconds: 700);
+  static const clearHold = Duration(milliseconds: 400);
 
   static const maxFrameGap = Duration(milliseconds: 200);
 
