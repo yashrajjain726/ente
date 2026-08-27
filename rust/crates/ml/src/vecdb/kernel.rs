@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use wide::f32x8;
 
 pub(crate) const LANE_WIDTH: usize = 8;

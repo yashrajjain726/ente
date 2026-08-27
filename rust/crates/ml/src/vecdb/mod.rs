@@ -10,6 +10,23 @@ mod log;
 mod snapshot;
 mod store;
 
+#[allow(unused_imports)]
+pub(crate) use graph::{Graph, GraphNodeParts, search};
+
+#[derive(Debug, Clone, Default)]
+pub struct SearchParams {
+    pub limit: Option<usize>,
+    pub max_distance: Option<f32>,
+    pub exact: bool,
+    pub allowed_keys: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Match {
+    pub key: String,
+    pub distance: f32,
+}
+
 #[derive(Debug, Error)]
 pub enum VecDbError {
     #[error("{}: {source}", path.display())]

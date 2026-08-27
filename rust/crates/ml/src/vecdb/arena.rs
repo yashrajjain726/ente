@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 
 use wide::f32x8;
@@ -19,6 +17,7 @@ pub(crate) enum UpsertOutcome {
     ReplacedInPlace(u32),
 }
 
+#[allow(dead_code)]
 impl UpsertOutcome {
     pub(crate) fn slot(self) -> u32 {
         match self {
@@ -53,6 +52,7 @@ pub(crate) struct VectorArena {
     live_count: usize,
 }
 
+#[allow(dead_code)]
 impl VectorArena {
     pub(crate) fn new(dims: usize) -> Result<Self, VecDbError> {
         if dims == 0 || !dims.is_multiple_of(LANE_WIDTH) {
