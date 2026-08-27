@@ -5,7 +5,6 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
-import 'package:photos/db/common/conflict_algo.dart';
 import 'package:photos/models/file/trash_file.dart';
 import 'package:photos/models/file_load_result.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -90,7 +89,7 @@ class TrashDB with SqlDbBase {
 
   Future<void> clearTable() async {
     final db = await instance.database;
-    await db.delete(tableName);
+    await db.execute('DELETE FROM $tableName');
   }
 
   Future<int> count() async {
@@ -102,22 +101,15 @@ class TrashDB with SqlDbBase {
   Future<void> insertMultiple(List<EnteTrashFile> trashFiles) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    var batch = db.batch();
-    int batchCounter = 0;
+    final parameterSets = <List<Object?>>[];
     for (final trash in trashFiles) {
-      if (batchCounter == 400) {
-        await batch.commit(noResult: true);
-        batch = db.batch();
-        batchCounter = 0;
+      parameterSets.add(_getParametersForTrash(trash));
+      if (parameterSets.length == 400) {
+        await _insertBatch(db, parameterSets);
+        parameterSets.clear();
       }
-      batch.insert(
-        tableName,
-        _getRowForTrash(trash),
-        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
-      );
-      batchCounter++;
     }
-    await batch.commit(noResult: true);
+    await _insertBatch(db, parameterSets);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:
@@ -143,24 +135,36 @@ class TrashDB with SqlDbBase {
           ? start + 400
           : uploadedFileIDs.length;
       final ids = uploadedFileIDs.sublist(start, end);
-      deletedRows += await db.delete(
-        tableName,
-        where:
-            '$columnUploadedFileID IN (${List.filled(ids.length, '?').join(', ')})',
-        whereArgs: ids,
-      );
+      final rows = await db.execute('''
+        DELETE FROM $tableName
+        WHERE $columnUploadedFileID IN (${List.filled(ids.length, '?').join(', ')})
+        RETURNING $columnUploadedFileID
+        ''', ids);
+      deletedRows += rows.length;
     }
     return deletedRows;
   }
 
   Future<int> update(EnteTrashFile file) async {
     final db = await instance.database;
-    return await db.update(
-      tableName,
-      _getRowForTrash(file),
-      where: '$columnUploadedFileID = ?',
-      whereArgs: [file.uploadedFileID],
+    final rows = await db.execute(
+      '''
+      UPDATE $tableName SET
+        $columnTrashUpdatedAt = ?, $columnTrashDeleteBy = ?,
+        $columnUploadedFileID = ?, $columnCollectionID = ?,
+        $columnOwnerID = ?, $columnEncryptedKey = ?,
+        $columnKeyDecryptionNonce = ?, $columnFileDecryptionHeader = ?,
+        $columnThumbnailDecryptionHeader = ?, $columnUpdationTime = ?,
+        $columnFileSize = ?, $columnLocalID = ?, $columnCreationTime = ?,
+        $columnFileMetadata = ?, $columnMMdVersion = ?,
+        $columnMMdEncodedJson = ?, $columnPubMMdVersion = ?,
+        $columnPubMMdEncodedJson = ?
+      WHERE $columnUploadedFileID = ?
+      RETURNING $columnUploadedFileID
+      ''',
+      [..._getParametersForTrash(file), file.uploadedFileID],
     );
+    return rows.length;
   }
 
   Future<FileLoadResult> getTrashedFiles(
@@ -170,12 +174,14 @@ class TrashDB with SqlDbBase {
     bool? asc,
   }) async {
     final db = await instance.database;
-    final results = await db.query(
-      tableName,
-      where: '$columnCreationTime >= ? AND $columnCreationTime <= ?',
-      whereArgs: [startTime, endTime],
-      orderBy: '$columnTrashDeleteBy DESC',
-      limit: limit,
+    final results = await db.getAll(
+      '''
+      SELECT * FROM $tableName
+      WHERE $columnCreationTime >= ? AND $columnCreationTime <= ?
+      ORDER BY $columnTrashDeleteBy DESC
+      ${limit == null ? '' : 'LIMIT ?'}
+      ''',
+      [startTime, endTime, ?limit],
     );
     final files = results
         .map((row) => _getTrashFromRow(row))
@@ -221,29 +227,44 @@ class TrashDB with SqlDbBase {
     return trashFile;
   }
 
-  Map<String, dynamic> _getRowForTrash(EnteTrashFile trash) {
-    final row = <String, dynamic>{};
-    row[columnTrashUpdatedAt] = trash.updateAt;
-    row[columnTrashDeleteBy] = trash.deleteBy;
-    row[columnUploadedFileID] = trash.uploadedFileID;
-    row[columnCollectionID] = trash.collectionID;
-    row[columnOwnerID] = trash.ownerID;
-    row[columnEncryptedKey] = trash.encryptedKey;
-    row[columnKeyDecryptionNonce] = trash.keyDecryptionNonce;
-    row[columnFileDecryptionHeader] = trash.fileDecryptionHeader;
-    row[columnThumbnailDecryptionHeader] = trash.thumbnailDecryptionHeader;
-    row[columnUpdationTime] = trash.updationTime;
-    row[columnFileSize] = trash.fileSize;
+  Future<void> _insertBatch(
+    SqliteDatabase db,
+    List<List<Object?>> parameterSets,
+  ) async {
+    if (parameterSets.isEmpty) return;
+    await db.executeBatch('''
+      INSERT OR REPLACE INTO $tableName (
+        $columnTrashUpdatedAt, $columnTrashDeleteBy, $columnUploadedFileID,
+        $columnCollectionID, $columnOwnerID, $columnEncryptedKey,
+        $columnKeyDecryptionNonce, $columnFileDecryptionHeader,
+        $columnThumbnailDecryptionHeader, $columnUpdationTime, $columnFileSize,
+        $columnLocalID, $columnCreationTime, $columnFileMetadata,
+        $columnMMdVersion, $columnMMdEncodedJson, $columnPubMMdVersion,
+        $columnPubMMdEncodedJson
+      ) VALUES (${List.filled(18, '?').join(', ')})
+      ''', parameterSets);
+  }
 
-    row[columnLocalID] = trash.localID;
-    row[columnCreationTime] = trash.creationTime;
-    row[columnFileMetadata] = jsonEncode(trash.metadata);
-
-    row[columnMMdVersion] = trash.mMdVersion;
-    row[columnMMdEncodedJson] = trash.mMdEncodedJson ?? '{}';
-
-    row[columnPubMMdVersion] = trash.pubMmdVersion;
-    row[columnPubMMdEncodedJson] = trash.pubMmdEncodedJson ?? '{}';
-    return row;
+  List<Object?> _getParametersForTrash(EnteTrashFile trash) {
+    return [
+      trash.updateAt,
+      trash.deleteBy,
+      trash.uploadedFileID,
+      trash.collectionID,
+      trash.ownerID,
+      trash.encryptedKey,
+      trash.keyDecryptionNonce,
+      trash.fileDecryptionHeader,
+      trash.thumbnailDecryptionHeader,
+      trash.updationTime,
+      trash.fileSize,
+      trash.localID,
+      trash.creationTime,
+      jsonEncode(trash.metadata),
+      trash.mMdVersion,
+      trash.mMdEncodedJson ?? '{}',
+      trash.pubMmdVersion,
+      trash.pubMmdEncodedJson ?? '{}',
+    ];
   }
 }

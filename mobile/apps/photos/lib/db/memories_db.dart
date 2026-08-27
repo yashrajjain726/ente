@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
-import 'package:photos/db/common/conflict_algo.dart';
 import 'package:photos/models/memories/memory.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
@@ -49,16 +48,16 @@ class MemoriesDB with SqlDbBase {
 
   Future<void> clearTable() async {
     final db = await database;
-    await db.delete(table);
+    await db.execute('DELETE FROM $table');
   }
 
   Future<int> clearMemoriesSeenBeforeTime(int timestamp) async {
     final db = await database;
-    return db.delete(
-      table,
-      where: '$columnSeenTime < ?',
-      whereArgs: [timestamp],
+    final rows = await db.execute(
+      'DELETE FROM $table WHERE $columnSeenTime < ? RETURNING $columnFileID',
+      [timestamp],
     );
+    return rows.length;
   }
 
   Future<int> markMemoryAsSeen(
@@ -67,27 +66,20 @@ class MemoriesDB with SqlDbBase {
     int? seenTimeKey,
   }) async {
     final db = await database;
-    return await db.insert(
-      table,
-      _getRowForSeenMemory(memory, timestamp, seenTimeKey: seenTimeKey),
-      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
+    final rows = await db.execute(
+      '''
+      INSERT OR REPLACE INTO $table ($columnFileID, $columnSeenTime)
+      VALUES (?, ?)
+      RETURNING $columnFileID
+      ''',
+      [seenTimeKey ?? memory.file.generatedID, timestamp],
     );
+    return rows.first[columnFileID] as int;
   }
 
   Future<Map<int, int>> getSeenTimes() async {
     final db = await database;
-    return _convertToSeenTimes(await db.query(table));
-  }
-
-  Map<String, dynamic> _getRowForSeenMemory(
-    Memory memory,
-    int timestamp, {
-    int? seenTimeKey,
-  }) {
-    final row = <String, dynamic>{};
-    row[columnFileID] = seenTimeKey ?? memory.file.generatedID;
-    row[columnSeenTime] = timestamp;
-    return row;
+    return _convertToSeenTimes(await db.getAll('SELECT * FROM $table'));
   }
 
   Map<int, int> _convertToSeenTimes(List<Map<String, dynamic>> rows) {

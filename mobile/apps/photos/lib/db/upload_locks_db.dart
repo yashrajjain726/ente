@@ -6,7 +6,6 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import "package:photos/core/errors.dart";
 import 'package:photos/db/common/base.dart';
-import 'package:photos/db/common/conflict_algo.dart';
 import "package:photos/module/upload/model/multipart.dart";
 import 'package:sqlite_async/sqlite3_common.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -167,23 +166,26 @@ class UploadLocksDB with SqlDbBase {
 
   Future<void> clearTable() async {
     final db = await database;
-    await db.delete(_uploadLocksTable.table);
-    await db.delete(_trackUploadTable.table);
-    await db.delete(_partsTable.table);
-    await db.delete(_streamQueueTable.table);
+    await db.writeTransaction((tx) async {
+      await tx.execute('DELETE FROM ${_uploadLocksTable.table}');
+      await tx.execute('DELETE FROM ${_trackUploadTable.table}');
+      await tx.execute('DELETE FROM ${_partsTable.table}');
+      await tx.execute('DELETE FROM ${_streamQueueTable.table}');
+    });
   }
 
   Future<bool> tryAcquireLock(String id, String owner, int time) async {
     final db = await database;
-    final row = <String, dynamic>{};
-    row[_uploadLocksTable.columnID] = id;
-    row[_uploadLocksTable.columnOwner] = owner;
-    row[_uploadLocksTable.columnTime] = time;
     try {
-      await db.insert(
-        _uploadLocksTable.table,
-        row,
-        conflictAlgorithm: SqliteAsyncConflictAlgorithm.fail,
+      await db.execute(
+        '''
+        INSERT OR FAIL INTO ${_uploadLocksTable.table} (
+          ${_uploadLocksTable.columnID},
+          ${_uploadLocksTable.columnOwner},
+          ${_uploadLocksTable.columnTime}
+        ) VALUES (?, ?, ?)
+        ''',
+        [id, owner, time],
       );
       return true;
     } on SqliteException catch (e) {
@@ -198,10 +200,12 @@ class UploadLocksDB with SqlDbBase {
 
   Future<String> getLockData(String id) async {
     final db = await database;
-    final rows = await db.query(
-      _uploadLocksTable.table,
-      where: '${_uploadLocksTable.columnID} = ?',
-      whereArgs: [id],
+    final rows = await db.getAll(
+      '''
+      SELECT * FROM ${_uploadLocksTable.table}
+      WHERE ${_uploadLocksTable.columnID} = ?
+      ''',
+      [id],
     );
     if (rows.isEmpty) {
       return "No lock found for $id";
@@ -216,42 +220,56 @@ class UploadLocksDB with SqlDbBase {
 
   Future<bool> isLocked(String id, String owner) async {
     final db = await database;
-    final rows = await db.query(
-      _uploadLocksTable.table,
-      where:
-          '${_uploadLocksTable.columnID} = ? AND ${_uploadLocksTable.columnOwner} = ?',
-      whereArgs: [id, owner],
+    final rows = await db.getAll(
+      '''
+      SELECT 1 FROM ${_uploadLocksTable.table}
+      WHERE ${_uploadLocksTable.columnID} = ?
+        AND ${_uploadLocksTable.columnOwner} = ?
+      ''',
+      [id, owner],
     );
     return rows.length == 1;
   }
 
   Future<int> releaseLock(String id, String owner) async {
     final db = await database;
-    return db.delete(
-      _uploadLocksTable.table,
-      where:
-          '${_uploadLocksTable.columnID} = ? AND ${_uploadLocksTable.columnOwner} = ?',
-      whereArgs: [id, owner],
+    final rows = await db.execute(
+      '''
+      DELETE FROM ${_uploadLocksTable.table}
+      WHERE ${_uploadLocksTable.columnID} = ?
+        AND ${_uploadLocksTable.columnOwner} = ?
+      RETURNING ${_uploadLocksTable.columnID}
+      ''',
+      [id, owner],
     );
+    return rows.length;
   }
 
   Future<int> releaseLocksAcquiredByOwnerBefore(String owner, int time) async {
     final db = await database;
-    return db.delete(
-      _uploadLocksTable.table,
-      where:
-          '${_uploadLocksTable.columnOwner} = ? AND ${_uploadLocksTable.columnTime} < ?',
-      whereArgs: [owner, time],
+    final rows = await db.execute(
+      '''
+      DELETE FROM ${_uploadLocksTable.table}
+      WHERE ${_uploadLocksTable.columnOwner} = ?
+        AND ${_uploadLocksTable.columnTime} < ?
+      RETURNING ${_uploadLocksTable.columnID}
+      ''',
+      [owner, time],
     );
+    return rows.length;
   }
 
   Future<int> releaseAllLocksAcquiredBefore(int time) async {
     final db = await database;
-    return db.delete(
-      _uploadLocksTable.table,
-      where: '${_uploadLocksTable.columnTime} < ?',
-      whereArgs: [time],
+    final rows = await db.execute(
+      '''
+      DELETE FROM ${_uploadLocksTable.table}
+      WHERE ${_uploadLocksTable.columnTime} < ?
+      RETURNING ${_uploadLocksTable.columnID}
+      ''',
+      [time],
     );
+    return rows.length;
   }
 
   Future<({String encryptedFileKey, String fileNonce, String keyNonce})>
@@ -263,13 +281,14 @@ class UploadLocksDB with SqlDbBase {
   ) async {
     final db = await database;
 
-    final rows = await db.query(
-      _trackUploadTable.table,
-      where:
-          '${_trackUploadTable.columnLocalID} = ?'
-          ' AND ${_trackUploadTable.columnFileHash} = ?'
-          ' AND ${_trackUploadTable.columnCollectionID} = ?',
-      whereArgs: [localId, fileHash, collectionID],
+    final rows = await db.getAll(
+      '''
+      SELECT * FROM ${_trackUploadTable.table}
+      WHERE ${_trackUploadTable.columnLocalID} = ?
+        AND ${_trackUploadTable.columnFileHash} = ?
+        AND ${_trackUploadTable.columnCollectionID} = ?
+      ''',
+      [localId, fileHash, collectionID],
     );
 
     _validateResume(rows, localId, encryptedFileName);
@@ -288,17 +307,15 @@ class UploadLocksDB with SqlDbBase {
     int collectionID,
   ) async {
     final db = await database;
-    await db.update(
-      _trackUploadTable.table,
-      {
-        _trackUploadTable.columnLastAttemptedAt:
-            DateTime.now().millisecondsSinceEpoch,
-      },
-      where:
-          '${_trackUploadTable.columnLocalID} = ?'
-          ' AND ${_trackUploadTable.columnFileHash} = ?'
-          ' AND ${_trackUploadTable.columnCollectionID} = ?',
-      whereArgs: [localId, fileHash, collectionID],
+    await db.execute(
+      '''
+      UPDATE ${_trackUploadTable.table}
+      SET ${_trackUploadTable.columnLastAttemptedAt} = ?
+      WHERE ${_trackUploadTable.columnLocalID} = ?
+        AND ${_trackUploadTable.columnFileHash} = ?
+        AND ${_trackUploadTable.columnCollectionID} = ?
+      ''',
+      [DateTime.now().millisecondsSinceEpoch, localId, fileHash, collectionID],
     );
   }
 
@@ -309,23 +326,26 @@ class UploadLocksDB with SqlDbBase {
     String encryptedFileName,
   ) async {
     final db = await database;
-    final rows = await db.query(
-      _trackUploadTable.table,
-      where:
-          '${_trackUploadTable.columnLocalID} = ?'
-          ' AND ${_trackUploadTable.columnFileHash} = ?'
-          ' AND ${_trackUploadTable.columnCollectionID} = ?',
-      whereArgs: [localId, fileHash, collectionID],
+    final rows = await db.getAll(
+      '''
+      SELECT * FROM ${_trackUploadTable.table}
+      WHERE ${_trackUploadTable.columnLocalID} = ?
+        AND ${_trackUploadTable.columnFileHash} = ?
+        AND ${_trackUploadTable.columnCollectionID} = ?
+      ''',
+      [localId, fileHash, collectionID],
     );
     _validateResume(rows, localId, encryptedFileName);
     final row = rows.first;
 
     final objectKey = row[_trackUploadTable.columnObjectKey] as String;
     final encFileSize = row[_trackUploadTable.columnEncryptedFileSize] as int;
-    final partsStatus = await db.query(
-      _partsTable.table,
-      where: '${_partsTable.columnObjectKey} = ?',
-      whereArgs: [objectKey],
+    final partsStatus = await db.getAll(
+      '''
+      SELECT * FROM ${_partsTable.table}
+      WHERE ${_partsTable.columnObjectKey} = ?
+      ''',
+      [objectKey],
     );
 
     final List<bool> partUploadStatus = [];
@@ -373,7 +393,7 @@ class UploadLocksDB with SqlDbBase {
   }
 
   void _validateResume(
-    List<Map<String, Object?>> rows,
+    Iterable<Map<String, Object?>> rows,
     String localId,
     String encryptedFileName,
   ) {
@@ -397,15 +417,15 @@ class UploadLocksDB with SqlDbBase {
   ) async {
     final db = await database;
 
-    await db.insert(
-      _streamUploadErrorTable.table,
-      {
-        _streamUploadErrorTable.columnUploadedFileID: uploadedFileID,
-        _streamUploadErrorTable.columnErrorMessage: errorMessage,
-        _streamUploadErrorTable.columnLastAttemptedAt:
-            DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
+    await db.execute(
+      '''
+      INSERT OR REPLACE INTO ${_streamUploadErrorTable.table} (
+        ${_streamUploadErrorTable.columnUploadedFileID},
+        ${_streamUploadErrorTable.columnErrorMessage},
+        ${_streamUploadErrorTable.columnLastAttemptedAt}
+      ) VALUES (?, ?, ?)
+      ''',
+      [uploadedFileID, errorMessage, DateTime.now().millisecondsSinceEpoch],
     );
   }
 
@@ -414,36 +434,37 @@ class UploadLocksDB with SqlDbBase {
     String errorMessage,
   ) async {
     final db = await database;
-    await db.update(
-      _streamUploadErrorTable.table,
-      {
-        _streamUploadErrorTable.columnErrorMessage: errorMessage,
-        _streamUploadErrorTable.columnLastAttemptedAt:
-            DateTime.now().millisecondsSinceEpoch,
-      },
-      where: '${_streamUploadErrorTable.columnUploadedFileID} = ?',
-      whereArgs: [uploadedFileID],
+    await db.execute(
+      '''
+      UPDATE ${_streamUploadErrorTable.table}
+      SET ${_streamUploadErrorTable.columnErrorMessage} = ?,
+          ${_streamUploadErrorTable.columnLastAttemptedAt} = ?
+      WHERE ${_streamUploadErrorTable.columnUploadedFileID} = ?
+      ''',
+      [errorMessage, DateTime.now().millisecondsSinceEpoch, uploadedFileID],
     );
   }
 
   Future<int> deleteStreamUploadErrorEntry(int uploadedFileID) async {
     final db = await database;
-    return await db.delete(
-      _streamUploadErrorTable.table,
-      where: '${_streamUploadErrorTable.columnUploadedFileID} = ?',
-      whereArgs: [uploadedFileID],
+    final rows = await db.execute(
+      '''
+      DELETE FROM ${_streamUploadErrorTable.table}
+      WHERE ${_streamUploadErrorTable.columnUploadedFileID} = ?
+      RETURNING ${_streamUploadErrorTable.columnUploadedFileID}
+      ''',
+      [uploadedFileID],
     );
+    return rows.length;
   }
 
   Future<Map<int, String>> getStreamUploadError() {
     return database.then((db) async {
-      final rows = await db.query(
-        _streamUploadErrorTable.table,
-        columns: [
-          _streamUploadErrorTable.columnUploadedFileID,
-          _streamUploadErrorTable.columnErrorMessage,
-        ],
-      );
+      final rows = await db.getAll('''
+        SELECT ${_streamUploadErrorTable.columnUploadedFileID},
+               ${_streamUploadErrorTable.columnErrorMessage}
+        FROM ${_streamUploadErrorTable.table}
+        ''');
       final map = <int, String>{};
       for (final row in rows) {
         map[row[_streamUploadErrorTable.columnUploadedFileID] as int] =
@@ -469,37 +490,62 @@ class UploadLocksDB with SqlDbBase {
   }) async {
     final db = await database;
     final objectKey = urls.objectKey;
-
-    await db.insert(_trackUploadTable.table, {
-      _trackUploadTable.columnLocalID: localId,
-      _trackUploadTable.columnFileHash: fileHash,
-      _trackUploadTable.columnCollectionID: collectionID,
-      _trackUploadTable.columnObjectKey: objectKey,
-      _trackUploadTable.columnCompleteUrl: urls.completeURL,
-      _trackUploadTable.columnEncryptedFileName: encryptedFileName,
-      _trackUploadTable.columnEncryptedFileSize: fileSize,
-      _trackUploadTable.columnEncryptedFileKey: fileKey,
-      _trackUploadTable.columnFileEncryptionNonce: fileNonce,
-      _trackUploadTable.columnKeyEncryptionNonce: keyNonce,
-      _trackUploadTable.columnPartSize: partSize,
-      _trackUploadTable.columnLastAttemptedAt:
-          DateTime.now().millisecondsSinceEpoch,
-      _trackUploadTable.columnFileMd5: ?fileMd5,
-      if (partMd5s != null)
-        _trackUploadTable.columnPartMd5s: jsonEncode(partMd5s),
-    });
-
     final partsURLs = urls.partsURLs;
-    final partsLength = partsURLs.length;
+    await db.writeTransaction((tx) async {
+      await tx.execute(
+        '''
+        INSERT INTO ${_trackUploadTable.table} (
+          ${_trackUploadTable.columnLocalID},
+          ${_trackUploadTable.columnFileHash},
+          ${_trackUploadTable.columnCollectionID},
+          ${_trackUploadTable.columnObjectKey},
+          ${_trackUploadTable.columnCompleteUrl},
+          ${_trackUploadTable.columnEncryptedFileName},
+          ${_trackUploadTable.columnEncryptedFileSize},
+          ${_trackUploadTable.columnEncryptedFileKey},
+          ${_trackUploadTable.columnFileEncryptionNonce},
+          ${_trackUploadTable.columnKeyEncryptionNonce},
+          ${_trackUploadTable.columnPartSize},
+          ${_trackUploadTable.columnLastAttemptedAt},
+          ${_trackUploadTable.columnFileMd5},
+          ${_trackUploadTable.columnPartMd5s}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          localId,
+          fileHash,
+          collectionID,
+          objectKey,
+          urls.completeURL,
+          encryptedFileName,
+          fileSize,
+          fileKey,
+          fileNonce,
+          keyNonce,
+          partSize,
+          DateTime.now().millisecondsSinceEpoch,
+          fileMd5,
+          partMd5s == null ? null : jsonEncode(partMd5s),
+        ],
+      );
 
-    for (int i = 0; i < partsLength; i++) {
-      await db.insert(_partsTable.table, {
-        _partsTable.columnObjectKey: objectKey,
-        _partsTable.columnPartNumber: i,
-        _partsTable.columnPartUrl: partsURLs[i],
-        _partsTable.columnPartStatus: PartStatus.pending.name,
-      });
-    }
+      if (partsURLs.isNotEmpty) {
+        await tx.executeBatch(
+          '''
+          INSERT INTO ${_partsTable.table} (
+            ${_partsTable.columnObjectKey},
+            ${_partsTable.columnPartNumber},
+            ${_partsTable.columnPartUrl},
+            ${_partsTable.columnPartStatus}
+          ) VALUES (?, ?, ?, ?)
+          ''',
+          [
+            for (int i = 0; i < partsURLs.length; i++)
+              [objectKey, i, partsURLs[i], PartStatus.pending.name],
+          ],
+        );
+      }
+    });
   }
 
   Future<void> updatePartStatus(
@@ -508,15 +554,15 @@ class UploadLocksDB with SqlDbBase {
     String etag,
   ) async {
     final db = await database;
-    await db.update(
-      _partsTable.table,
-      {
-        _partsTable.columnPartStatus: PartStatus.uploaded.name,
-        _partsTable.columnPartETag: etag,
-      },
-      where:
-          '${_partsTable.columnObjectKey} = ? AND ${_partsTable.columnPartNumber} = ?',
-      whereArgs: [objectKey, partNumber],
+    await db.execute(
+      '''
+      UPDATE ${_partsTable.table}
+      SET ${_partsTable.columnPartStatus} = ?,
+          ${_partsTable.columnPartETag} = ?
+      WHERE ${_partsTable.columnObjectKey} = ?
+        AND ${_partsTable.columnPartNumber} = ?
+      ''',
+      [PartStatus.uploaded.name, etag, objectKey, partNumber],
     );
   }
 
@@ -525,32 +571,36 @@ class UploadLocksDB with SqlDbBase {
     MultipartStatus status,
   ) async {
     final db = await database;
-    await db.update(
-      _trackUploadTable.table,
-      {_trackUploadTable.columnStatus: status.name},
-      where: '${_trackUploadTable.columnObjectKey} = ?',
-      whereArgs: [objectKey],
+    await db.execute(
+      '''
+      UPDATE ${_trackUploadTable.table}
+      SET ${_trackUploadTable.columnStatus} = ?
+      WHERE ${_trackUploadTable.columnObjectKey} = ?
+      ''',
+      [status.name, objectKey],
     );
   }
 
   Future<int> deleteMultipartTrack(String localId) async {
     final db = await database;
-    return await db.delete(
-      _trackUploadTable.table,
-      where: '${_trackUploadTable.columnLocalID} = ?',
-      whereArgs: [localId],
+    final rows = await db.execute(
+      '''
+      DELETE FROM ${_trackUploadTable.table}
+      WHERE ${_trackUploadTable.columnLocalID} = ?
+      RETURNING ${_trackUploadTable.columnID}
+      ''',
+      [localId],
     );
+    return rows.length;
   }
 
   Future<Map<String, int>> getFileNameToLastAttemptedAtMap() {
     return database.then((db) async {
-      final rows = await db.query(
-        _trackUploadTable.table,
-        columns: [
-          _trackUploadTable.columnEncryptedFileName,
-          _trackUploadTable.columnLastAttemptedAt,
-        ],
-      );
+      final rows = await db.getAll('''
+        SELECT ${_trackUploadTable.columnEncryptedFileName},
+               ${_trackUploadTable.columnLastAttemptedAt}
+        FROM ${_trackUploadTable.table}
+        ''');
       final map = <String, int>{};
       for (final row in rows) {
         map[row[_trackUploadTable.columnEncryptedFileName] as String] =
@@ -566,22 +616,25 @@ class UploadLocksDB with SqlDbBase {
     int collectionID,
   ) {
     return database.then((db) async {
-      final rows = await db.query(
-        _trackUploadTable.table,
-        where:
-            '${_trackUploadTable.columnLocalID} = ?'
-            ' AND ${_trackUploadTable.columnFileHash} = ?'
-            ' AND ${_trackUploadTable.columnCollectionID} = ?',
-        whereArgs: [localId, fileHash, collectionID],
+      final rows = await db.getAll(
+        '''
+        SELECT * FROM ${_trackUploadTable.table}
+        WHERE ${_trackUploadTable.columnLocalID} = ?
+          AND ${_trackUploadTable.columnFileHash} = ?
+          AND ${_trackUploadTable.columnCollectionID} = ?
+        ''',
+        [localId, fileHash, collectionID],
       );
       if (rows.isEmpty) {
         return null;
       }
       if (rows.length > 1) {
-        await db.delete(
-          _trackUploadTable.table,
-          where: '${_trackUploadTable.columnLocalID} = ?',
-          whereArgs: [localId],
+        await db.execute(
+          '''
+          DELETE FROM ${_trackUploadTable.table}
+          WHERE ${_trackUploadTable.columnLocalID} = ?
+          ''',
+          [localId],
         );
         throw MultiPartError("Multiple entries found for localID: $localId");
       }
@@ -595,34 +648,35 @@ class UploadLocksDB with SqlDbBase {
     String queueType, // 'create' or 'recreate'
   ) async {
     final db = await database;
-    await db.insert(
-      _streamQueueTable.table,
-      {
-        _streamQueueTable.columnUploadedFileID: uploadedFileID,
-        _streamQueueTable.columnQueueType: queueType,
-      },
-      conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
+    await db.execute(
+      '''
+      INSERT OR REPLACE INTO ${_streamQueueTable.table} (
+        ${_streamQueueTable.columnUploadedFileID},
+        ${_streamQueueTable.columnQueueType}
+      ) VALUES (?, ?)
+      ''',
+      [uploadedFileID, queueType],
     );
   }
 
   Future<void> removeFromStreamQueue(int uploadedFileID) async {
     final db = await database;
-    await db.delete(
-      _streamQueueTable.table,
-      where: '${_streamQueueTable.columnUploadedFileID} = ?',
-      whereArgs: [uploadedFileID],
+    await db.execute(
+      '''
+      DELETE FROM ${_streamQueueTable.table}
+      WHERE ${_streamQueueTable.columnUploadedFileID} = ?
+      ''',
+      [uploadedFileID],
     );
   }
 
   Future<Map<int, String>> getStreamQueue() async {
     final db = await database;
-    final rows = await db.query(
-      _streamQueueTable.table,
-      columns: [
-        _streamQueueTable.columnUploadedFileID,
-        _streamQueueTable.columnQueueType,
-      ],
-    );
+    final rows = await db.getAll('''
+      SELECT ${_streamQueueTable.columnUploadedFileID},
+             ${_streamQueueTable.columnQueueType}
+      FROM ${_streamQueueTable.table}
+      ''');
     final map = <int, String>{};
     for (final row in rows) {
       map[row[_streamQueueTable.columnUploadedFileID] as int] =
@@ -633,10 +687,12 @@ class UploadLocksDB with SqlDbBase {
 
   Future<bool> isInStreamQueue(int uploadedFileID) async {
     final db = await database;
-    final rows = await db.query(
-      _streamQueueTable.table,
-      where: '${_streamQueueTable.columnUploadedFileID} = ?',
-      whereArgs: [uploadedFileID],
+    final rows = await db.getAll(
+      '''
+      SELECT 1 FROM ${_streamQueueTable.table}
+      WHERE ${_streamQueueTable.columnUploadedFileID} = ?
+      ''',
+      [uploadedFileID],
     );
     return rows.isNotEmpty;
   }

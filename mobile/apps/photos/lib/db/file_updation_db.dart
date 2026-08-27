@@ -5,7 +5,6 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
-import 'package:photos/db/common/conflict_algo.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
 class FileUpdationDB with SqlDbBase {
@@ -66,28 +65,21 @@ class FileUpdationDB with SqlDbBase {
 
   Future<void> clearTable() async {
     final db = await instance.database;
-    await db.delete(tableName);
+    await db.execute('DELETE FROM $tableName');
   }
 
   Future<void> insertMultiple(List<String> fileLocalIDs, String reason) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    var batch = db.batch();
-    int batchCounter = 0;
-    for (String localID in fileLocalIDs) {
-      if (batchCounter == 400) {
-        await batch.commit(noResult: true);
-        batch = db.batch();
-        batchCounter = 0;
+    final parameterSets = <List<Object?>>[];
+    for (final localID in fileLocalIDs) {
+      parameterSets.add([localID, reason]);
+      if (parameterSets.length == 400) {
+        await _insertBatch(db, parameterSets);
+        parameterSets.clear();
       }
-      batch.insert(
-        tableName,
-        _getRowForReUploadTable(localID, reason),
-        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
-      );
-      batchCounter++;
     }
-    await batch.commit(noResult: true);
+    await _insertBatch(db, parameterSets);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:
@@ -117,10 +109,13 @@ class FileUpdationDB with SqlDbBase {
 
   Future<bool> isExisting(String localID, String reason) async {
     final db = await instance.database;
-    final rows = await db.query(
-      tableName,
-      where: '$columnLocalID = ? AND $columnReason = ?',
-      whereArgs: [localID, reason],
+    final rows = await db.getAll(
+      '''
+      SELECT 1 FROM $tableName
+      WHERE $columnLocalID = ? AND $columnReason = ?
+      LIMIT 1
+      ''',
+      [localID, reason],
     );
     return rows.isNotEmpty;
   }
@@ -130,11 +125,13 @@ class FileUpdationDB with SqlDbBase {
     String reason,
   ) async {
     final db = await instance.database;
-    final rows = await db.query(
-      tableName,
-      limit: limit,
-      where: '$columnReason = ?',
-      whereArgs: [reason],
+    final rows = await db.getAll(
+      '''
+      SELECT $columnLocalID FROM $tableName
+      WHERE $columnReason = ?
+      LIMIT ?
+      ''',
+      [reason, limit],
     );
     final result = <String>[];
     for (final row in rows) {
@@ -159,10 +156,14 @@ class FileUpdationDB with SqlDbBase {
     );
   }
 
-  Map<String, dynamic> _getRowForReUploadTable(String localID, String reason) {
-    final row = <String, dynamic>{};
-    row[columnLocalID] = localID;
-    row[columnReason] = reason;
-    return row;
+  Future<void> _insertBatch(
+    SqliteDatabase db,
+    List<List<Object?>> parameterSets,
+  ) async {
+    if (parameterSets.isEmpty) return;
+    await db.executeBatch('''
+      INSERT OR REPLACE INTO $tableName ($columnLocalID, $columnReason)
+      VALUES (?, ?)
+      ''', parameterSets);
   }
 }

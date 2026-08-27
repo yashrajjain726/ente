@@ -4,7 +4,6 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photos/db/common/base.dart';
-import 'package:photos/db/common/conflict_algo.dart';
 import 'package:photos/models/ignored_file.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
@@ -55,28 +54,26 @@ class IgnoredFilesDB with SqlDbBase {
 
   Future<void> clearTable() async {
     final db = await instance.database;
-    await db.delete(tableName);
+    await db.execute('DELETE FROM $tableName');
   }
 
   Future<void> insertMultiple(List<IgnoredFile> ignoredFiles) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    var batch = db.batch();
-    int batchCounter = 0;
-    for (IgnoredFile file in ignoredFiles) {
-      if (batchCounter == 400) {
-        await batch.commit(noResult: true);
-        batch = db.batch();
-        batchCounter = 0;
+    final parameterSets = <List<Object?>>[];
+    for (final file in ignoredFiles) {
+      parameterSets.add([
+        file.localID,
+        file.title,
+        file.deviceFolder,
+        file.reason,
+      ]);
+      if (parameterSets.length == 400) {
+        await _insertBatch(db, parameterSets);
+        parameterSets.clear();
       }
-      batch.insert(
-        tableName,
-        _getRowForIgnoredFile(file),
-        conflictAlgorithm: SqliteAsyncConflictAlgorithm.replace,
-      );
-      batchCounter++;
     }
-    await batch.commit(noResult: true);
+    await _insertBatch(db, parameterSets);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:
@@ -90,7 +87,7 @@ class IgnoredFilesDB with SqlDbBase {
 
   Future<List<IgnoredFile>> getAll() async {
     final db = await instance.database;
-    final rows = await db.query(tableName);
+    final rows = await db.getAll('SELECT * FROM $tableName');
     final result = <IgnoredFile>[];
     for (final row in rows) {
       result.add(_getIgnoredFileFromRow(row));
@@ -101,29 +98,17 @@ class IgnoredFilesDB with SqlDbBase {
   Future<void> removeIgnoredEntries(List<IgnoredFile> ignoredFiles) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    var batch = db.batch();
-    int batchCounter = 0;
-    for (IgnoredFile file in ignoredFiles) {
-      if (batchCounter == 400) {
-        await batch.commit(noResult: true);
-        batch = db.batch();
-        batchCounter = 0;
+    final parameterSets = <List<Object?>>[];
+    for (final file in ignoredFiles) {
+      parameterSets.add(
+        Platform.isAndroid ? [file.deviceFolder, file.title] : [file.localID],
+      );
+      if (parameterSets.length == 400) {
+        await _deleteBatch(db, parameterSets);
+        parameterSets.clear();
       }
-      // on Android, we track device folder and title to track files to ignore.
-      // See IgnoredFileService#_getIgnoreID method for more detail
-      if (Platform.isAndroid) {
-        batch.rawDelete(
-          "DELETE FROM $tableName WHERE $columnDeviceFolder = ? AND $columnTitle = ?",
-          [file.deviceFolder, file.title],
-        );
-      } else {
-        batch.rawDelete("DELETE FROM $tableName WHERE $columnLocalID = ?", [
-          file.localID,
-        ]);
-      }
-      batchCounter++;
     }
-    await batch.commit(noResult: true);
+    await _deleteBatch(db, parameterSets);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:
@@ -144,14 +129,26 @@ class IgnoredFilesDB with SqlDbBase {
     );
   }
 
-  Map<String, dynamic> _getRowForIgnoredFile(IgnoredFile ignoredFile) {
-    assert(ignoredFile.title != null);
-    assert(ignoredFile.localID != null);
-    final row = <String, dynamic>{};
-    row[columnLocalID] = ignoredFile.localID;
-    row[columnTitle] = ignoredFile.title;
-    row[columnDeviceFolder] = ignoredFile.deviceFolder;
-    row[columnReason] = ignoredFile.reason;
-    return row;
+  Future<void> _insertBatch(
+    SqliteDatabase db,
+    List<List<Object?>> parameterSets,
+  ) async {
+    if (parameterSets.isEmpty) return;
+    await db.executeBatch('''
+      INSERT OR REPLACE INTO $tableName (
+        $columnLocalID, $columnTitle, $columnDeviceFolder, $columnReason
+      ) VALUES (?, ?, ?, ?)
+      ''', parameterSets);
+  }
+
+  Future<void> _deleteBatch(
+    SqliteDatabase db,
+    List<List<Object?>> parameterSets,
+  ) async {
+    if (parameterSets.isEmpty) return;
+    final sql = Platform.isAndroid
+        ? 'DELETE FROM $tableName WHERE $columnDeviceFolder = ? AND $columnTitle = ?'
+        : 'DELETE FROM $tableName WHERE $columnLocalID = ?';
+    await db.executeBatch(sql, parameterSets);
   }
 }
