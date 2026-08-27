@@ -2,7 +2,7 @@ import 'package:ente_base/models/key_attributes.dart';
 import 'package:ente_legacy/errors.dart';
 import 'package:ente_legacy/models/legacy_kit_models.dart';
 import 'package:locker/src/rust/api/legacy.dart' as rust;
-import 'package:locker/src/rust/third_party/ente_frb_core.dart';
+import 'package:locker/src/rust/third_party/ente_frb_lib/session.dart';
 
 Future<List<LegacyKit>> getLegacyKits(Session session) async {
   final kits = await rust.kits(session: session);

@@ -1,9 +1,0 @@
-[package]
-name = "ente-wasm-core"
-edition = "2024"
-
-[dependencies]
-ente-core.workspace = true
-js-sys.workspace = true
-thiserror.workspace = true
-wasm-bindgen.workspace = true

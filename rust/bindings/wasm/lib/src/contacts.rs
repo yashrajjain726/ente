@@ -1,8 +1,9 @@
 use ente_contacts::WrappedRootContactKey;
-use ente_wasm_core::Session;
 use serde::{Serialize, Serializer};
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
+
+use crate::session::Session;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

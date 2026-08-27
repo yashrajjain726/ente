@@ -1,6 +1,6 @@
 use flutter_rust_bridge::frb;
 
-use ente_frb_core::Session;
+use ente_frb_lib::session::Session;
 
 #[frb]
 pub enum LegacyError {

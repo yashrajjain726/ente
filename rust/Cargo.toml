@@ -4,8 +4,7 @@ members = [
     "apps/cli",
     "apps/codegen",
     "apps/ensu/src-tauri",
-    "bindings/frb/contacts",
-    "bindings/frb/core",
+    "bindings/frb/lib",
     "bindings/frb/locker",
     "bindings/frb/log",
     "bindings/frb/photos",
@@ -14,11 +13,10 @@ members = [
     "bindings/uniffi/ensu",
     "bindings/uniffi/log",
     "bindings/wasm/cast",
-    "bindings/wasm/contacts",
-    "bindings/wasm/core",
     "bindings/wasm/core-wasm",
     "bindings/wasm/ensu",
     "bindings/wasm/legacy",
+    "bindings/wasm/lib",
     "bindings/wasm/log",
     "bindings/wasm/locker",
     "bindings/wasm/paste",
@@ -49,8 +47,7 @@ ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-ensu = { path = "crates/ensu" }
 ente-ensu-crypto = { path = "crates/ensu-crypto" }
-ente-frb-contacts = { path = "bindings/frb/contacts" }
-ente-frb-core = { path = "bindings/frb/core" }
+ente-frb-lib = { path = "bindings/frb/lib" }
 ente-frb-log = { path = "bindings/frb/log" }
 ente-image = { path = "crates/image" }
 ente-legacy = { path = "crates/legacy" }
@@ -61,8 +58,7 @@ ente-photos = { path = "crates/photos" }
 ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
 ente-uniffi-log = { path = "bindings/uniffi/log" }
-ente-wasm-core = { path = "bindings/wasm/core" }
-ente-wasm-contacts = { path = "bindings/wasm/contacts" }
+ente-wasm-lib = { path = "bindings/wasm/lib" }
 ente-wasm-log = { path = "bindings/wasm/log" }
 flutter_rust_bridge = "=2.12.0"
 flutter_rust_bridge_codegen = "=2.12.0"

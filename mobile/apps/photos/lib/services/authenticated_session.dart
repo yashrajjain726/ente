@@ -1,5 +1,5 @@
 import 'package:ente_contacts/contacts.dart';
-import 'package:photos/src/rust/third_party/ente_frb_core.dart';
+import 'package:photos/src/rust/third_party/ente_frb_lib/session.dart';
 
 Session? _session;
 String? _sessionKey;

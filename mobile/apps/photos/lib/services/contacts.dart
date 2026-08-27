@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:ente_contacts/contacts.dart';
-import 'package:photos/src/rust/third_party/ente_frb_contacts.dart' as rust;
-import 'package:photos/src/rust/third_party/ente_frb_core.dart';
+import 'package:photos/src/rust/third_party/ente_frb_lib/contacts.dart' as rust;
+import 'package:photos/src/rust/third_party/ente_frb_lib/session.dart';
 
 Future<ContactOutput<ContactRecord>> createContact(
   Session session,

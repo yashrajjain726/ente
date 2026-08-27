@@ -9,8 +9,7 @@ crate-type = ["cdylib", "staticlib"]
 ente-accounts.workspace = true
 ente-assets.workspace = true
 ente-core.workspace = true
-ente-frb-contacts.workspace = true
-ente-frb-core.workspace = true
+ente-frb-lib = { workspace = true, features = ["contacts"] }
 ente-frb-log.workspace = true
 ente-legacy.workspace = true
 ente-ml.workspace = true

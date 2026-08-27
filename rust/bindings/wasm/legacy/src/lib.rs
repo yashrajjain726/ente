@@ -1,7 +1,7 @@
 use ente_accounts::auth::KeyAttributes;
 use ente_core::b64;
 use ente_legacy::{LegacyContactState, LegacyKitRecoveryClient, LegacyKitShare};
-use ente_wasm_core::Session;
+use ente_wasm_lib::session::Session;
 use serde::Deserialize;
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;

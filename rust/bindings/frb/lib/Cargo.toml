@@ -1,11 +1,13 @@
 [package]
-name = "ente-frb-contacts"
+name = "ente-frb-lib"
 edition = "2024"
 
+[features]
+contacts = ["dep:ente-contacts"]
+
 [dependencies]
-ente-contacts.workspace = true
+ente-contacts = { workspace = true, optional = true }
 ente-core.workspace = true
-ente-frb-core.workspace = true
 flutter_rust_bridge.workspace = true
 
 [lints.rust]

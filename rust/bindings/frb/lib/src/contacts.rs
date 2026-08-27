@@ -1,6 +1,6 @@
 use flutter_rust_bridge::frb;
 
-use ente_frb_core::Session;
+use crate::session::Session;
 
 #[frb(non_opaque)]
 pub enum ContactsError {
@@ -122,7 +122,8 @@ pub async fn create_contact(
     data: ContactData,
 ) -> Result<ContactRecordOutput, ContactsError> {
     let key = wrapped_root_contact_key.map(Into::into);
-    let output = ente_contacts::create_contact(session.as_ref(), key.as_ref(), &data.into()).await?;
+    let output =
+        ente_contacts::create_contact(session.as_ref(), key.as_ref(), &data.into()).await?;
     Ok(ContactRecordOutput {
         record: output.value.into(),
         wrapped_root_contact_key: output.wrapped_root_contact_key.map(Into::into),
