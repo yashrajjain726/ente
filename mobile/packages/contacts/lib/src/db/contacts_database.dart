@@ -238,6 +238,19 @@ class ContactsDatabase {
   }
 
   Future<void> _migrate(SqliteDatabase database) async {
+    final probe = await database.writeLock(
+      (tx) => tx.get('PRAGMA user_version'),
+    );
+    final probedVersion = probe['user_version'] as int;
+    if (probedVersion == _databaseVersion) {
+      return;
+    }
+    if (probedVersion > _databaseVersion) {
+      throw StateError(
+        'Contacts database version $probedVersion is newer than supported '
+        'version $_databaseVersion',
+      );
+    }
     final didMigrate = await database.writeTransaction((tx) async {
       final result = await tx.get('PRAGMA user_version');
       final currentVersion = result['user_version'] as int;

@@ -36,6 +36,21 @@ class LogDatabase {
   }
 
   Future<void> _migrate(SqliteDatabase database) async {
+    // Opens must not take the write lock when no migration is pending: a
+    // write lock orphaned by a killed engine must never block later opens.
+    final probe = await database.writeLock(
+      (tx) => tx.get('PRAGMA user_version'),
+    );
+    final probedVersion = probe['user_version'] as int;
+    if (probedVersion == _databaseVersion) {
+      return;
+    }
+    if (probedVersion > _databaseVersion) {
+      throw StateError(
+        'Log database version $probedVersion is newer than supported '
+        'version $_databaseVersion',
+      );
+    }
     final didMigrate = await database.writeTransaction((tx) async {
       final result = await tx.get('PRAGMA user_version');
       final currentVersion = result['user_version'] as int;
