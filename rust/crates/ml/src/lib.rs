@@ -15,6 +15,6 @@ mod preprocess;
 mod runtime;
 pub mod scan;
 pub mod types;
+pub mod vecdb;
 #[cfg(feature = "usearch")]
 pub mod vector_db;
-pub mod vecdb;
