@@ -2621,6 +2621,9 @@ dependencies = [
 [[package]]
 name = "ente-location"
 version = "0.0.0"
+dependencies = [
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "ente-locker-frb"
