@@ -73,10 +73,11 @@ export const ChatInput = memo(
 
         const send = () => void handleSend(input);
         const disableSend =
-            isAttachingImages ||
             isModelPreparationActive ||
             isDownloading ||
-            (!isGenerating && !input.trim() && !hasPendingAttachments);
+            (!isGenerating &&
+                (isAttachingImages ||
+                    (!input.trim() && !hasPendingAttachments)));
 
         return (
             <Box

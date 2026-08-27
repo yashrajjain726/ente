@@ -666,6 +666,7 @@ const Page: React.FC = () => {
     const sessionSearchRef = useRef("");
     const attachmentPreviewUrlsRef = useRef<Record<string, string>>({});
     const pendingPreviewUrlsRef = useRef<Record<string, string>>({});
+    const imageAttachmentEpochRef = useRef(0);
     const imagePreviewUrlRef = useRef<string | null>(null);
     const attachmentPreviewInFlightRef = useRef(
         new Map<string, Promise<void>>(),
@@ -1478,6 +1479,12 @@ const Page: React.FC = () => {
         sessions,
     ]);
 
+    const resetPendingImages = useCallback(() => {
+        imageAttachmentEpochRef.current += 1;
+        setPendingImages([]);
+        setIsAttachingImages(false);
+    }, []);
+
     useEffect(() => {
         setStreamingParentId(null);
         setStreamingText("");
@@ -1486,10 +1493,11 @@ const Page: React.FC = () => {
         streamingCreatedAtRef.current = null;
         setIsGenerating(false);
         setIsStreamingOutro(false);
-        setPendingImages([]);
+        resetPendingImages();
+        setEditingMessage(null);
         setStickToBottom(true);
         currentJobIdRef.current = null;
-    }, [currentSessionId]);
+    }, [currentSessionId, resetPendingImages]);
 
     useEffect(() => {
         if (!isGenerating || streamingText.trim().length > 0) {
@@ -2383,7 +2391,7 @@ const Page: React.FC = () => {
         setAllMessages([]);
         composerRef.current?.setText("");
         setEditingMessage(null);
-        setPendingImages([]);
+        resetPendingImages();
         setStreamingParentId(null);
         setStreamingText("");
         streamingBufferRef.current = "";
@@ -2400,6 +2408,7 @@ const Page: React.FC = () => {
         cancelActiveGenerationForNavigation,
         focusInput,
         isSmall,
+        resetPendingImages,
         updateRouteSession,
     ]);
 
@@ -2525,6 +2534,8 @@ const Page: React.FC = () => {
 
     const handleEditMessage = useCallback(
         async (message: ChatMessage) => {
+            resetPendingImages();
+            const epoch = imageAttachmentEpochRef.current;
             const parsed = parseDocumentBlocks(message.text);
             setEditingMessage(message);
             composerRef.current?.setText(parsed.text);
@@ -2535,7 +2546,6 @@ const Page: React.FC = () => {
             );
 
             if (imageAttachments.length === 0) {
-                setPendingImages([]);
                 return;
             }
 
@@ -2545,10 +2555,10 @@ const Page: React.FC = () => {
                     message:
                         "Attachments are unavailable until encryption is ready.",
                 });
-                setPendingImages([]);
                 return;
             }
 
+            setIsAttachingImages(true);
             try {
                 const images = await Promise.all(
                     imageAttachments.map(async (attachment) => {
@@ -2571,26 +2581,31 @@ const Page: React.FC = () => {
                     }),
                 );
 
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 setPendingImages(images);
             } catch (error) {
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 log.error("Failed to load attachment contents", error);
                 showMiniDialog({
                     title: "Attachment error",
                     message:
                         "We could not load attachment contents for editing.",
                 });
-                setPendingImages([]);
+            } finally {
+                if (epoch === imageAttachmentEpochRef.current) {
+                    setIsAttachingImages(false);
+                }
             }
         },
-        [chatKey, showMiniDialog, inferImageMime],
+        [chatKey, showMiniDialog, inferImageMime, resetPendingImages],
     );
 
     const handleCancelEdit = useCallback(() => {
         setEditingMessage(null);
         composerRef.current?.setText("");
         setPendingDocuments([]);
-        setPendingImages([]);
-    }, []);
+        resetPendingImages();
+    }, [resetPendingImages]);
 
     const handleCopyMessage = useCallback(
         async (text: string) => {
@@ -3827,6 +3842,7 @@ const Page: React.FC = () => {
                 return;
             }
 
+            const epoch = imageAttachmentEpochRef.current;
             setIsAttachingImages(true);
 
             try {
@@ -3850,6 +3866,8 @@ const Page: React.FC = () => {
                     }),
                 );
 
+                if (epoch !== imageAttachmentEpochRef.current) return;
+
                 log.info(
                     `Compressed ${source === "drop" ? "dropped" : "selected"} image attachments`,
                     {
@@ -3868,6 +3886,7 @@ const Page: React.FC = () => {
                     handleImageCancel();
                 }
             } catch (error) {
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 log.error(
                     `Failed to process ${source === "drop" ? "dropped" : "selected"} image attachment: ${formatImageProcessingErrorForLog(error)}`,
                 );
@@ -3876,7 +3895,9 @@ const Page: React.FC = () => {
                 );
                 return;
             } finally {
-                setIsAttachingImages(false);
+                if (epoch === imageAttachmentEpochRef.current) {
+                    setIsAttachingImages(false);
+                }
             }
         },
         [
@@ -4296,6 +4317,7 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         return () => {
+            imageAttachmentEpochRef.current += 1;
             if (streamingFlushTimerRef.current) {
                 window.clearTimeout(streamingFlushTimerRef.current);
             }
