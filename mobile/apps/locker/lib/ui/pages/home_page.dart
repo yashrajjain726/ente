@@ -667,7 +667,8 @@ class _HomePageState extends UploaderPageState<HomePage>
                               ],
                               FloatingActionButton(
                                 tooltip: 'Add item',
-                                onPressed: _openSavePage,
+                                onPressed: () =>
+                                    _openSavePage(includeScanner: false),
                                 shape: const CircleBorder(),
                                 backgroundColor: colors.primary,
                                 elevation: 0,
@@ -779,7 +780,7 @@ class _HomePageState extends UploaderPageState<HomePage>
           child: HomeEmptyStateWidget(
             isLoading: _isSyncing,
             onSetupLegacy: () => openLegacyFromHome(context),
-            onSaveToLocker: _openSavePage,
+            onSaveToLocker: () => _openSavePage(includeScanner: true),
           ),
         ),
       ),
@@ -846,11 +847,12 @@ class _HomePageState extends UploaderPageState<HomePage>
     );
   }
 
-  void _openSavePage() {
+  void _openSavePage({required bool includeScanner}) {
     showSaveBottomSheet(
       context,
       onUploadDocument: addFile,
       onUploadFiles: uploadFiles,
+      includeScanner: includeScanner,
     );
   }
 
