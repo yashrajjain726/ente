@@ -44,6 +44,20 @@ func TestKeyRequestValidation(t *testing.T) {
 	}
 }
 
+func TestUpdateSRPAndKeysRequestValidation(t *testing.T) {
+	request := UpdateSRPAndKeysRequest{}
+	assertBadRequestMessage(t, request.Validate(), "updatedKeyAttr is required")
+
+	request.UpdateAttributes = &UpdateKeysRequest{
+		MemLimit: validArgonMemLimit,
+		OpsLimit: validArgonOpsLimit - 1,
+	}
+	assertBadRequestMessage(t, request.Validate(), "Unexpected KDF strength")
+
+	request.UpdateAttributes.OpsLimit = validArgonOpsLimit
+	require.NoError(t, request.Validate())
+}
+
 func assertBadRequestMessage(t *testing.T, err error, wantMessage string) {
 	t.Helper()
 
