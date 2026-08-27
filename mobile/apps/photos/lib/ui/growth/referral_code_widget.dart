@@ -84,14 +84,14 @@ class _ReferralCodeWidgetState extends State<ReferralCodeWidget> {
     });
   }
 
-  String get _trimmedInput => _controller.text.trim();
+  String get _normalizedInput => _controller.text.trim().toUpperCase();
 
   bool get _canSave {
-    final input = _trimmedInput;
+    final input = _normalizedInput;
     return !_isSaving &&
         _errorText == null &&
         input.length >= 4 &&
-        input != widget.code;
+        input != widget.code.trim().toUpperCase();
   }
 
   void _handleEditTap() {
@@ -122,7 +122,7 @@ class _ReferralCodeWidgetState extends State<ReferralCodeWidget> {
     if (!_canSave) {
       return;
     }
-    final newCode = _trimmedInput.toUpperCase();
+    final newCode = _normalizedInput;
     setState(() {
       _isSaving = true;
     });
