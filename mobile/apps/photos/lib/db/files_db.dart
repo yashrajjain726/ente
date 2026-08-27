@@ -2063,7 +2063,12 @@ class FilesDB with SqlDbBase {
     } finally {
       operation.totalWatch.stop();
       operation.finish(caughtError);
-      _logMaterializationSummary(operation, caughtError);
+      final message = 'FilesDBMaterialization ${operation.toLogString()}';
+      if (caughtError == null) {
+        _logger.info(message);
+      } else {
+        _logger.warning(message);
+      }
     }
   }
 
@@ -2079,19 +2084,6 @@ class FilesDB with SqlDbBase {
     return 'SELECT $_materializedFileProjection FROM $filesTable '
         'WHERE ($whereClause)$pageBoundaryClause '
         'ORDER BY ${order.orderByClause} LIMIT ?';
-  }
-
-  void _logMaterializationSummary(
-    _FilesDBMaterializationOperation operation,
-    Object? error,
-  ) {
-    final metrics = operation.metrics;
-    final message = 'FilesDBMaterialization ${metrics.toLogString()}';
-    if (error == null) {
-      _logger.info(message);
-    } else {
-      _logger.warning(message);
-    }
   }
 
   Future<bool> hasAnyFile() async {
@@ -2387,75 +2379,6 @@ enum _MaterializedQueryKind {
   const _MaterializedQueryKind(this.telemetryName);
 }
 
-class _FilesDBMaterializationMetrics {
-  final int operationID;
-  final _MaterializedQueryKind queryKind;
-  final int pageSize;
-  final int pageCount;
-  final int rawRows;
-  final int finalRows;
-  final int maxRawPage;
-  final Duration queryDuration;
-  final Duration maxQueryDuration;
-  final Duration conversionDuration;
-  final Duration maxConversionDuration;
-  final Duration filterDuration;
-  final Duration transactionDuration;
-  final Duration totalDuration;
-  final bool success;
-  final String? errorType;
-  final int? startCurrentRss;
-  final int? endCurrentRss;
-  final int? startMaxRss;
-  final int? endMaxRss;
-
-  const _FilesDBMaterializationMetrics({
-    required this.operationID,
-    required this.queryKind,
-    required this.pageSize,
-    required this.pageCount,
-    required this.rawRows,
-    required this.finalRows,
-    required this.maxRawPage,
-    required this.queryDuration,
-    required this.maxQueryDuration,
-    required this.conversionDuration,
-    required this.maxConversionDuration,
-    required this.filterDuration,
-    required this.transactionDuration,
-    required this.totalDuration,
-    required this.success,
-    required this.errorType,
-    required this.startCurrentRss,
-    required this.endCurrentRss,
-    required this.startMaxRss,
-    required this.endMaxRss,
-  });
-
-  String toLogString() => <String>[
-    'op=$operationID',
-    'queryKind=${queryKind.telemetryName}',
-    'status=${success ? 'success' : 'error'}',
-    if (errorType != null) 'errorType=$errorType',
-    'pageSize=$pageSize',
-    'pages=$pageCount',
-    'rawRows=$rawRows',
-    'finalRows=$finalRows',
-    'maxRawPage=$maxRawPage',
-    'queryMs=${queryDuration.inMilliseconds}',
-    'maxQueryMs=${maxQueryDuration.inMilliseconds}',
-    'conversionMs=${conversionDuration.inMilliseconds}',
-    'maxConversionMs=${maxConversionDuration.inMilliseconds}',
-    'filterMs=${filterDuration.inMilliseconds}',
-    'transactionMs=${transactionDuration.inMilliseconds}',
-    'totalMs=${totalDuration.inMilliseconds}',
-    'startCurrentRss=${startCurrentRss ?? 'unavailable'}',
-    'endCurrentRss=${endCurrentRss ?? 'unavailable'}',
-    'startMaxRss=${startMaxRss ?? 'unavailable'}',
-    'endMaxRss=${endMaxRss ?? 'unavailable'}',
-  ].join(' ');
-}
-
 enum _MaterializedFileOrder {
   creationThenIdDescending([
     FilesDB.columnCreationTime,
@@ -2544,28 +2467,28 @@ class _FilesDBMaterializationOperation {
     endMaxRss = _readMaxRss();
   }
 
-  _FilesDBMaterializationMetrics get metrics => _FilesDBMaterializationMetrics(
-    operationID: id,
-    queryKind: queryKind,
-    pageSize: pageSize,
-    pageCount: pageCount,
-    rawRows: rawRows,
-    finalRows: finalRows,
-    maxRawPage: maxRawPage,
-    queryDuration: queryDuration,
-    maxQueryDuration: maxQueryDuration,
-    conversionDuration: conversionDuration,
-    maxConversionDuration: maxConversionDuration,
-    filterDuration: filterWatch.elapsed,
-    transactionDuration: transactionWatch.elapsed,
-    totalDuration: totalWatch.elapsed,
-    success: success,
-    errorType: errorType,
-    startCurrentRss: startCurrentRss,
-    endCurrentRss: endCurrentRss,
-    startMaxRss: startMaxRss,
-    endMaxRss: endMaxRss,
-  );
+  String toLogString() => <String>[
+    'op=$id',
+    'queryKind=${queryKind.telemetryName}',
+    'status=${success ? 'success' : 'error'}',
+    if (errorType != null) 'errorType=$errorType',
+    'pageSize=$pageSize',
+    'pages=$pageCount',
+    'rawRows=$rawRows',
+    'finalRows=$finalRows',
+    'maxRawPage=$maxRawPage',
+    'queryMs=${queryDuration.inMilliseconds}',
+    'maxQueryMs=${maxQueryDuration.inMilliseconds}',
+    'conversionMs=${conversionDuration.inMilliseconds}',
+    'maxConversionMs=${maxConversionDuration.inMilliseconds}',
+    'filterMs=${filterWatch.elapsed.inMilliseconds}',
+    'transactionMs=${transactionWatch.elapsed.inMilliseconds}',
+    'totalMs=${totalWatch.elapsed.inMilliseconds}',
+    'startCurrentRss=${startCurrentRss ?? 'unavailable'}',
+    'endCurrentRss=${endCurrentRss ?? 'unavailable'}',
+    'startMaxRss=${startMaxRss ?? 'unavailable'}',
+    'endMaxRss=${endMaxRss ?? 'unavailable'}',
+  ].join(' ');
 }
 
 int? _readCurrentRss() {
