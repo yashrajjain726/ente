@@ -28,10 +28,13 @@ class SaveOption {
   final String description;
 }
 
-List<SaveOption> saveOptions(BuildContext context) {
+List<SaveOption> saveOptions(
+  BuildContext context, {
+  bool includeScanner = true,
+}) {
   final l10n = context.strings;
   return [
-    if (FeatureFlagService.instance.documentScanner)
+    if (includeScanner && FeatureFlagService.instance.documentScanner)
       SaveOption(
         type: SaveOptionType.scanDocument,
         icon: HugeIcons.strokeRoundedFileScan,
@@ -135,6 +138,7 @@ Future<void> showSaveBottomSheet(
   BuildContext context, {
   required Future<bool> Function() onUploadDocument,
   required Future<bool> Function(List<File> files) onUploadFiles,
+  bool includeScanner = true,
 }) {
   return showBottomSheetComponent<void>(
     context: context,
@@ -142,6 +146,7 @@ Future<void> showSaveBottomSheet(
       rootContext: context,
       onUploadDocument: onUploadDocument,
       onUploadFiles: onUploadFiles,
+      includeScanner: includeScanner,
     ),
   );
 }
@@ -152,17 +157,19 @@ class SaveBottomSheet extends StatelessWidget {
     required this.rootContext,
     required this.onUploadDocument,
     required this.onUploadFiles,
+    this.includeScanner = true,
   });
 
   final BuildContext rootContext;
   final Future<bool> Function() onUploadDocument;
   final Future<bool> Function(List<File> files) onUploadFiles;
+  final bool includeScanner;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final maxHeight = MediaQuery.of(context).size.height * 0.75;
-    final options = saveOptions(context);
+    final options = saveOptions(context, includeScanner: includeScanner);
 
     return BottomSheetComponent(
       title: context.strings.saveToLocker,
@@ -230,6 +237,7 @@ class SaveBottomSheet extends StatelessWidget {
           navigator.context,
           onUploadDocument: onUploadDocument,
           onUploadFiles: onUploadFiles,
+          includeScanner: includeScanner,
         );
       });
     }
