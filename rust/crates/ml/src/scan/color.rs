@@ -134,7 +134,7 @@ pub(crate) fn apply_gray_world_to_document(img: &ImageU8, doc_mask: &ImageU8) ->
     let scales = [mean_gray / mean_b, mean_gray / mean_g, mean_gray / mean_r];
 
     let mut scaled = img.clone();
-    for pixel in scaled.data.chunks_exact_mut(3) {
+    for pixel in scaled.data.as_chunks_mut::<3>().0 {
         for (channel, scale) in pixel.iter_mut().zip(scales) {
             *channel = cv::saturate_u8_f32((*channel as f64 * scale) as f32);
         }

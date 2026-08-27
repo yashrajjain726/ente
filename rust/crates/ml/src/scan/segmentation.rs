@@ -62,7 +62,12 @@ impl Segmenter {
         let resized = cv::resize_u8(bgr, MASK_SIDE, MASK_SIDE, cv::Interp::Bilinear)?;
 
         let mut input = vec![0.0f32; resized.data.len()];
-        for (out, px) in input.chunks_exact_mut(3).zip(resized.data.chunks_exact(3)) {
+        for (out, px) in input
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .zip(resized.data.as_chunks::<3>().0.iter())
+        {
             out[0] = (px[2] as f32 - 127.5) / 127.5;
             out[1] = (px[1] as f32 - 127.5) / 127.5;
             out[2] = (px[0] as f32 - 127.5) / 127.5;

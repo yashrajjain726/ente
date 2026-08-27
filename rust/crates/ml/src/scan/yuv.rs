@@ -162,7 +162,9 @@ pub(crate) fn yuv420_to_bgr(
 
     let mut out = vec![0u8; width as usize * height as usize * 3];
     for (pixel, ((&y, &u), &v)) in out
-        .chunks_exact_mut(3)
+        .as_chunks_mut::<3>()
+        .0
+        .iter_mut()
         .zip(y.data.iter().zip(u.data.iter()).zip(v.data.iter()))
     {
         let (b, g, r) = yuv_to_bgr(y, u, v);
@@ -201,7 +203,12 @@ pub(crate) fn bgra_to_bgr(
     let mut out = vec![0u8; width as usize * height as usize * 3];
     for (row, dst_row) in out.chunks_exact_mut(width as usize * 3).enumerate() {
         let src_row = &bgra[row * row_stride..row * row_stride + row_bytes];
-        for (dst, src) in dst_row.chunks_exact_mut(3).zip(src_row.chunks_exact(4)) {
+        for (dst, src) in dst_row
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .zip(src_row.as_chunks::<4>().0.iter())
+        {
             dst[0] = src[0];
             dst[1] = src[1];
             dst[2] = src[2];
