@@ -154,7 +154,7 @@ func (c *Controller) insertOrUpdateCustomDomain(ctx *gin.Context, userID int64, 
 	ownerID, err := c.DomainOwner(ctx, value)
 	if err == nil {
 		if ownerID != nil && *ownerID == userID {
-			if err := c.Repo.InsertOrUpdate(ctx, userID, string(ente.CustomDomain), value); err != nil {
+			if err := c.Repo.InsertOrUpdateCustomDomain(ctx, userID, value); err != nil {
 				return err
 			}
 			return c.updateFamilyCustomDomainsIfAdmin(ctx, userID, value)
@@ -179,15 +179,23 @@ func (c *Controller) insertOrUpdateCustomDomain(ctx *gin.Context, userID int64, 
 	if !errors.Is(err, &ente.ErrNotFoundError) {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := c.Repo.InsertOrUpdate(ctx, userID, string(ente.CustomDomain), value); err != nil {
+	if err := c.Repo.InsertOrUpdateCustomDomain(ctx, userID, value); err != nil {
 		return err
 	}
 	return c.updateFamilyCustomDomainsIfAdmin(ctx, userID, value)
 }
 
 func isReservedCustomDomain(value, configuredCNAME string) bool {
+	canonicalValue, err := ente.CanonicalDomain(value)
+	if err != nil {
+		return false
+	}
 	for _, domain := range []string{configuredCNAME, "my.ente.com", "my.ente.io"} {
-		if domain != "" && strings.EqualFold(value, domain) {
+		if domain == "" {
+			continue
+		}
+		canonicalDomain, err := ente.CanonicalDomain(domain)
+		if err == nil && canonicalValue == canonicalDomain {
 			return true
 		}
 	}
@@ -301,10 +309,10 @@ func (c *Controller) DomainOwner(ctx *gin.Context, domain string) (*int64, error
 
 	// Retry with ASCII/Unicode variants so IDN domains stored in either form still resolve.
 	var candidates []string
-	if asciiDomain, convErr := idna.ToASCII(domain); convErr == nil && asciiDomain != domain {
+	if asciiDomain, convErr := ente.CanonicalDomain(domain); convErr == nil && !strings.EqualFold(asciiDomain, domain) {
 		candidates = append(candidates, asciiDomain)
 	}
-	if unicodeDomain, convErr := idna.ToUnicode(domain); convErr == nil && unicodeDomain != domain {
+	if unicodeDomain, convErr := idna.Lookup.ToUnicode(domain); convErr == nil && !strings.EqualFold(unicodeDomain, domain) {
 		candidates = append(candidates, unicodeDomain)
 	}
 

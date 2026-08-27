@@ -78,6 +78,7 @@ class GalleryAppBarWidget extends StatefulWidget {
     Collection? collection,
     List<EnteFile>? files,
     PreferredSizeWidget? bottom,
+    bool showOverflowMenu = true,
   }) {
     return GalleryAppBarConfig(
       sliverBuilder: (_) => GalleryAppBarWidget._(
@@ -91,6 +92,7 @@ class GalleryAppBarWidget extends StatefulWidget {
         collection: collection,
         files: files,
         bottom: bottom,
+        showOverflowMenu: showOverflowMenu,
       ),
       geometryBuilder: (context) => _resolveSliverGeometry(
         context,
@@ -140,6 +142,7 @@ class GalleryAppBarWidget extends StatefulWidget {
   final Collection? collection;
   final List<EnteFile>? files;
   final PreferredSizeWidget? bottom;
+  final bool showOverflowMenu;
 
   const GalleryAppBarWidget._(
     this.type,
@@ -152,6 +155,7 @@ class GalleryAppBarWidget extends StatefulWidget {
     this.collection,
     this.files,
     this.bottom,
+    required this.showOverflowMenu,
   });
 
   @override
@@ -571,7 +575,8 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     final bool isArchived = widget.collection?.isArchived() ?? false;
     final bool isHidden = widget.collection?.isHidden() ?? false;
 
-    if (!_hasOverflowMenuActions(userId, isArchived, isHidden)) {
+    if (!widget.showOverflowMenu ||
+        !_hasOverflowMenuActions(userId, isArchived, isHidden)) {
       return actions;
     }
 

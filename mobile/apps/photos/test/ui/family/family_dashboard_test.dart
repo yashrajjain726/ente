@@ -220,7 +220,7 @@ contacts.ContactRecord _contact(FamilyMember member, {required String name}) {
     id: 'contact-${member.userID}',
     contactUserId: member.userID!,
     email: member.email,
-    data: contacts.ContactData(contactUserId: member.userID!, name: name),
+    name: name,
     profilePictureAttachmentId: null,
     isDeleted: false,
     createdAt: 1,

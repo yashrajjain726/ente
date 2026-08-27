@@ -26,7 +26,7 @@ pub(crate) fn mean_u8c3_masked(src: &ImageU8, mask: &ImageU8) -> OpResult<[f64; 
     }
     let mut sums = [0i64; 3];
     let mut count = 0i64;
-    for (px, &m) in src.data.chunks_exact(3).zip(mask.data.iter()) {
+    for (px, &m) in src.data.as_chunks::<3>().0.iter().zip(mask.data.iter()) {
         if m != 0 {
             sums[0] += px[0] as i64;
             sums[1] += px[1] as i64;

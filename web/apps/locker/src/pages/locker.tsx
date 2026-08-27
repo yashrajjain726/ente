@@ -53,6 +53,7 @@ export const LockerPage: React.FC = () => {
         trashItems,
         trashLastUpdatedAt,
         userDetails,
+        warmContacts,
     } = useLockerData({ router, logout, showMiniDialog });
 
     const {
@@ -230,6 +231,7 @@ export const LockerPage: React.FC = () => {
                 onUnshareCollection={handleUnshareCollection}
                 onLeaveCollection={handleLeaveCollection}
                 onRefreshSharees={fetchCollectionSharees}
+                warmContacts={warmContacts}
             />
             <DeleteCollectionDialog
                 dialogState={deleteCollectionDialog}

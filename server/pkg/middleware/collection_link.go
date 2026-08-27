@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/net/idna"
-
 	"github.com/ente/museum/pkg/repo/remotestore"
 	"github.com/gin-contrib/requestid"
 	"github.com/spf13/viper"
@@ -319,7 +317,7 @@ func (m *CollectionLinkMiddleware) validateOrigin(c *gin.Context, ownerID int64)
 		logger.WithError(err).Error("originParseFailedL")
 		return ente.NewPermissionDeniedError("unknown custom domain")
 	}
-	asciiDomain, err := idna.ToASCII(*domain)
+	asciiDomain, err := ente.CanonicalDomain(*domain)
 	if err != nil {
 		logger.WithError(err).Error("domainToASCIIFailed")
 		m.DiscordController.NotifyPotentialAbuse(alertMessage + " - domainToASCIIFailed")

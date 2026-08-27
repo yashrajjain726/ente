@@ -1093,6 +1093,11 @@ func main() {
 
 	setKnownAPIs(server.Routes())
 	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController, spaceModule)
+	time.AfterFunc(10*time.Minute, func() {
+		if err := remoteStoreRepository.MigrateCustomDomainCanonicalValues(context.Background()); err != nil {
+			log.WithError(err).Error("Failed to backfill custom domain canonical values")
+		}
+	})
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,

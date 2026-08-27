@@ -9,7 +9,6 @@ museum = []
 ente-core.workspace = true
 md-5.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
@@ -19,6 +18,7 @@ ente-test-support.workspace = true
 hmac = "0.13"
 mockito.workspace = true
 reqwest = { workspace = true, features = ["json"] }
+serde_json.workspace = true
 sha1 = "0.11"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 uuid = { version = "1", features = ["v4", "js"] }

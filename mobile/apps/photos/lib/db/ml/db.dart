@@ -2786,4 +2786,37 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     final List<Object?> params = [personOrClusterID];
     await db.execute(sql, params);
   }
+
+  Future<Set<String>> getClustersForMemoryLane(Set<String> assigned) async {
+    const batchSize = 256;
+    final db = await asyncDB;
+    final clusters = <String>{};
+    var offset = 0;
+    const String sql =
+        '''
+        SELECT $clusterIDColumn, COUNT(*) AS count
+        FROM $faceClustersTable
+        WHERE $clusterIDColumn IS NOT NULL
+        GROUP BY $clusterIDColumn
+        ORDER BY count DESC, $clusterIDColumn
+        LIMIT ? OFFSET ?
+        ''';
+    while (clusters.length < 20) {
+      final batch = await db.getAll(sql, [batchSize, offset]);
+      for (final row in batch) {
+        final cluster = row[clusterIDColumn] as String;
+        if (!assigned.contains(cluster)) {
+          clusters.add(cluster);
+          if (clusters.length == 20) {
+            break;
+          }
+        }
+      }
+      if (batch.length < batchSize) {
+        break;
+      }
+      offset += batchSize;
+    }
+    return clusters;
+  }
 }

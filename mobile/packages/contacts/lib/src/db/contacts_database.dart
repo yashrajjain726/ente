@@ -3,8 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:ente_contacts/src/models/contact_data.dart';
-import 'package:ente_contacts/src/models/contact_record.dart';
+import 'package:ente_frb/contacts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -330,9 +329,9 @@ class ContactsDatabase {
       id: row['id']! as String,
       contactUserId: row['contact_user_id']! as int,
       email: row['email'] as String?,
-      data: dataJson == null
+      name: dataJson == null
           ? null
-          : ContactData.fromJson(jsonDecode(dataJson) as Map<String, dynamic>),
+          : (jsonDecode(dataJson) as Map<String, dynamic>)['name'] as String,
       profilePictureAttachmentId:
           row['profile_picture_attachment_id'] as String?,
       isDeleted: (row['is_deleted'] as int? ?? 0) == 1,
@@ -345,7 +344,12 @@ class ContactsDatabase {
     contact.id,
     contact.contactUserId,
     contact.email,
-    contact.data == null ? null : jsonEncode(contact.data!.toJson()),
+    contact.name == null
+        ? null
+        : jsonEncode({
+            'contactUserId': contact.contactUserId,
+            'name': contact.name,
+          }),
     contact.profilePictureAttachmentId,
     contact.isDeleted ? 1 : 0,
     contact.createdAt,

@@ -63,7 +63,6 @@ struct OpenAccountSpaceCtxJsInput {
     space_root_key_b64: String,
     #[serde(default)]
     owned_spaces: Option<Vec<SpaceKeyResponse>>,
-    user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
 }
@@ -74,7 +73,6 @@ struct OpenSpaceLinkCtxJsInput {
     base_url: String,
     space_username: String,
     access_key: String,
-    user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
 }
@@ -647,7 +645,7 @@ pub async fn space_open_account_ctx(input: JsValue) -> Result<SpaceAccountCtxHan
         space_session_token: input.space_session_token,
         space_root_key,
         initial_owned_spaces: input.owned_spaces,
-        user_agent: input.user_agent,
+        user_agent: None,
         client_package: input.client_package,
         client_version: input.client_version,
     })?;
@@ -661,7 +659,7 @@ pub async fn space_open_link_ctx(input: JsValue) -> Result<SpaceLinkCtxHandle, E
         base_url: input.base_url,
         space_slug: input.space_username,
         access_key: input.access_key,
-        user_agent: input.user_agent,
+        user_agent: None,
         client_package: input.client_package,
         client_version: input.client_version,
     })

@@ -21,7 +21,7 @@ pub(crate) fn gray_to_bgr(src: &ImageU8) -> OpResult<ImageU8> {
     require_channels(src, 1, "gray_to_bgr")?;
     let mut data = vec![0u8; src.data.len() * 3];
     super::pointwise(&mut data, 3, &src.data, 1, |data, srcd| {
-        for (out, &v) in data.chunks_exact_mut(3).zip(srcd.iter()) {
+        for (out, &v) in data.as_chunks_mut::<3>().0.iter_mut().zip(srcd.iter()) {
             out[0] = v;
             out[1] = v;
             out[2] = v;
@@ -35,7 +35,7 @@ pub(crate) fn bgr_to_gray(src: &ImageU8) -> OpResult<ImageU8> {
     let round = 1i32 << (GRAY_SHIFT - 1);
     let mut data = vec![0u8; src.data.len() / 3];
     super::pointwise(&mut data, 1, &src.data, 3, |data, srcd| {
-        for (out, px) in data.iter_mut().zip(srcd.chunks_exact(3)) {
+        for (out, px) in data.iter_mut().zip(srcd.as_chunks::<3>().0.iter()) {
             let sum = px[0] as i32 * BY15 + px[1] as i32 * GY15 + px[2] as i32 * RY15;
             *out = ((sum + round) >> GRAY_SHIFT) as u8;
         }

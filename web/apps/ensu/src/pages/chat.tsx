@@ -1,4 +1,7 @@
-import { ChatComposer } from "@/components/chat/ChatComposer";
+import {
+    ChatComposer,
+    type ChatComposerHandle,
+} from "@/components/chat/ChatComposer";
 import { ChatDialogs } from "@/components/chat/ChatDialogs";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
@@ -358,69 +361,6 @@ const formatBytes = (bytes: number) => {
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[idx]}`;
 };
 
-type SessionGroupLabel =
-    | "TODAY"
-    | "YESTERDAY"
-    | "THIS WEEK"
-    | "LAST WEEK"
-    | "THIS MONTH"
-    | "OLDER";
-
-const groupSessionsByDate = (sessions: ChatSession[]) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const thisWeekStart = new Date(today);
-    thisWeekStart.setDate(
-        thisWeekStart.getDate() - (thisWeekStart.getDay() || 7) + 1,
-    );
-
-    const lastWeekStart = new Date(thisWeekStart);
-    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const grouped: Record<SessionGroupLabel, ChatSession[]> = {
-        TODAY: [],
-        YESTERDAY: [],
-        "THIS WEEK": [],
-        "LAST WEEK": [],
-        "THIS MONTH": [],
-        OLDER: [],
-    };
-
-    sessions.forEach((session) => {
-        const sessionDate = new Date(Math.floor(session.updatedAt / 1000));
-        const sessionDay = new Date(
-            sessionDate.getFullYear(),
-            sessionDate.getMonth(),
-            sessionDate.getDate(),
-        );
-
-        let category: SessionGroupLabel = "OLDER";
-
-        if (sessionDay >= today) {
-            category = "TODAY";
-        } else if (sessionDay.getTime() === yesterday.getTime()) {
-            category = "YESTERDAY";
-        } else if (sessionDay >= thisWeekStart) {
-            category = "THIS WEEK";
-        } else if (sessionDay >= lastWeekStart) {
-            category = "LAST WEEK";
-        } else if (sessionDay >= thisMonthStart) {
-            category = "THIS MONTH";
-        }
-
-        grouped[category].push(session);
-    });
-
-    return (
-        Object.entries(grouped) as [SessionGroupLabel, ChatSession[]][]
-    ).filter(([, group]) => group.length > 0);
-};
-
 const detectTauriRuntime = () => detectTauriAppRuntime();
 
 const Page: React.FC = () => {
@@ -590,13 +530,11 @@ const Page: React.FC = () => {
     const [currentSessionId, setCurrentSessionId] = useState<
         string | undefined
     >();
-    const [input, setInput] = useState("");
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [drawerCollapsed, setDrawerCollapsed] = useState(false);
     const [chatViewportWidth, setChatViewportWidth] = useState(() =>
         typeof window !== "undefined" ? window.innerWidth : 0,
     );
-    const [sessionSearch, setSessionSearch] = useState("");
     const [showSessionSearch, setShowSessionSearch] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [advancedUnlocked, setAdvancedUnlocked] = useState(false);
@@ -660,8 +598,7 @@ const Page: React.FC = () => {
         Record<string, string>
     >({});
     const [isImageDragActive, setIsImageDragActive] = useState(false);
-    const [isProcessingDroppedImages, setIsProcessingDroppedImages] =
-        useState(false);
+    const [isAttachingImages, setIsAttachingImages] = useState(false);
     const [imagePreview, setImagePreview] = useState<{
         url: string;
         name: string;
@@ -725,9 +662,11 @@ const Page: React.FC = () => {
             generationStoppingRef.current = false;
         }
     }, []);
-    const inputRef = useRef<HTMLTextAreaElement | null>(null);
+    const composerRef = useRef<ChatComposerHandle | null>(null);
+    const sessionSearchRef = useRef("");
     const attachmentPreviewUrlsRef = useRef<Record<string, string>>({});
     const pendingPreviewUrlsRef = useRef<Record<string, string>>({});
+    const imageAttachmentEpochRef = useRef(0);
     const imagePreviewUrlRef = useRef<string | null>(null);
     const attachmentPreviewInFlightRef = useRef(
         new Map<string, Promise<void>>(),
@@ -1540,6 +1479,12 @@ const Page: React.FC = () => {
         sessions,
     ]);
 
+    const resetPendingImages = useCallback(() => {
+        imageAttachmentEpochRef.current += 1;
+        setPendingImages([]);
+        setIsAttachingImages(false);
+    }, []);
+
     useEffect(() => {
         setStreamingParentId(null);
         setStreamingText("");
@@ -1548,10 +1493,11 @@ const Page: React.FC = () => {
         streamingCreatedAtRef.current = null;
         setIsGenerating(false);
         setIsStreamingOutro(false);
-        setPendingImages([]);
+        resetPendingImages();
+        setEditingMessage(null);
         setStickToBottom(true);
         currentJobIdRef.current = null;
-    }, [currentSessionId]);
+    }, [currentSessionId, resetPendingImages]);
 
     useEffect(() => {
         if (!isGenerating || streamingText.trim().length > 0) {
@@ -1677,21 +1623,6 @@ const Page: React.FC = () => {
             cancelled = true;
         };
     }, [currentRootSessionUuid]);
-
-    const filteredSessions = useMemo(() => {
-        const query = sessionSearch.trim().toLowerCase();
-        if (!query) return sessions;
-        return sessions.filter((session) => {
-            const title = session.title.toLowerCase();
-            const preview = session.lastMessagePreview?.toLowerCase() ?? "";
-            return title.includes(query) || preview.includes(query);
-        });
-    }, [sessionSearch, sessions]);
-
-    const groupedSessions = useMemo(
-        () => groupSessionsByDate(filteredSessions),
-        [filteredSessions],
-    );
 
     const rootSessionUuid = currentSession?.rootSessionUuid ?? currentSessionId;
 
@@ -1838,7 +1769,7 @@ const Page: React.FC = () => {
     const focusInput = useCallback(() => {
         if (showModelGate) return;
         if (typeof window === "undefined") return;
-        const target = inputRef.current;
+        const target = composerRef.current;
         if (!target) return;
         window.requestAnimationFrame(() => {
             target.focus();
@@ -2458,9 +2389,9 @@ const Page: React.FC = () => {
         setCurrentSessionId(undefined);
         currentSessionIdRef.current = undefined;
         setAllMessages([]);
-        setInput("");
+        composerRef.current?.setText("");
         setEditingMessage(null);
-        setPendingImages([]);
+        resetPendingImages();
         setStreamingParentId(null);
         setStreamingText("");
         streamingBufferRef.current = "";
@@ -2477,6 +2408,7 @@ const Page: React.FC = () => {
         cancelActiveGenerationForNavigation,
         focusInput,
         isSmall,
+        resetPendingImages,
         updateRouteSession,
     ]);
 
@@ -2602,9 +2534,11 @@ const Page: React.FC = () => {
 
     const handleEditMessage = useCallback(
         async (message: ChatMessage) => {
+            resetPendingImages();
+            const epoch = imageAttachmentEpochRef.current;
             const parsed = parseDocumentBlocks(message.text);
             setEditingMessage(message);
-            setInput(parsed.text);
+            composerRef.current?.setText(parsed.text);
 
             const attachments = message.attachments ?? [];
             const imageAttachments = attachments.filter(
@@ -2612,7 +2546,6 @@ const Page: React.FC = () => {
             );
 
             if (imageAttachments.length === 0) {
-                setPendingImages([]);
                 return;
             }
 
@@ -2622,10 +2555,10 @@ const Page: React.FC = () => {
                     message:
                         "Attachments are unavailable until encryption is ready.",
                 });
-                setPendingImages([]);
                 return;
             }
 
+            setIsAttachingImages(true);
             try {
                 const images = await Promise.all(
                     imageAttachments.map(async (attachment) => {
@@ -2648,26 +2581,31 @@ const Page: React.FC = () => {
                     }),
                 );
 
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 setPendingImages(images);
             } catch (error) {
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 log.error("Failed to load attachment contents", error);
                 showMiniDialog({
                     title: "Attachment error",
                     message:
                         "We could not load attachment contents for editing.",
                 });
-                setPendingImages([]);
+            } finally {
+                if (epoch === imageAttachmentEpochRef.current) {
+                    setIsAttachingImages(false);
+                }
             }
         },
-        [chatKey, showMiniDialog, inferImageMime],
+        [chatKey, showMiniDialog, inferImageMime, resetPendingImages],
     );
 
     const handleCancelEdit = useCallback(() => {
         setEditingMessage(null);
-        setInput("");
+        composerRef.current?.setText("");
         setPendingDocuments([]);
-        setPendingImages([]);
-    }, []);
+        resetPendingImages();
+    }, [resetPendingImages]);
 
     const handleCopyMessage = useCallback(
         async (text: string) => {
@@ -3523,7 +3461,6 @@ const Page: React.FC = () => {
         setShowSessionSearch(true);
     }, []);
     const handleCloseSessionSearch = useCallback(() => {
-        setSessionSearch("");
         setShowSessionSearch(false);
     }, []);
 
@@ -3839,18 +3776,12 @@ const Page: React.FC = () => {
         showImageAttachment &&
         !isGenerating &&
         !isDownloading &&
-        !showModelGate;
-    const canAttachDroppedImages =
-        canHandleImageDrop &&
-        !isImageAttachmentLimitReached &&
-        !isProcessingDroppedImages;
-    const showImageDropOverlay =
-        canHandleImageDrop && (isImageDragActive || isProcessingDroppedImages);
-    const imageDropOverlayTitle = isProcessingDroppedImages
-        ? "Attaching images..."
-        : isImageAttachmentLimitReached
-          ? "Image limit reached"
-          : "Drop images to attach";
+        !showModelGate &&
+        !isAttachingImages;
+    const showImageDropOverlay = canHandleImageDrop && isImageDragActive;
+    const imageDropOverlayTitle = isImageAttachmentLimitReached
+        ? "Image limit reached"
+        : "Drop images to attach";
     const imageDropOverlayDescription = isImageAttachmentLimitReached
         ? `You can attach up to ${MAX_IMAGE_ATTACHMENTS_PER_MESSAGE} images per message.`
         : "PNG, JPG, WebP, GIF, BMP, HEIC, HEIF, AVIF";
@@ -3911,8 +3842,8 @@ const Page: React.FC = () => {
                 return;
             }
 
-            const isDrop = source === "drop";
-            if (isDrop) setIsProcessingDroppedImages(true);
+            const epoch = imageAttachmentEpochRef.current;
+            setIsAttachingImages(true);
 
             try {
                 const { invoke } = await import("@tauri-apps/api/core");
@@ -3935,6 +3866,8 @@ const Page: React.FC = () => {
                     }),
                 );
 
+                if (epoch !== imageAttachmentEpochRef.current) return;
+
                 log.info(
                     `Compressed ${source === "drop" ? "dropped" : "selected"} image attachments`,
                     {
@@ -3953,6 +3886,7 @@ const Page: React.FC = () => {
                     handleImageCancel();
                 }
             } catch (error) {
+                if (epoch !== imageAttachmentEpochRef.current) return;
                 log.error(
                     `Failed to process ${source === "drop" ? "dropped" : "selected"} image attachment: ${formatImageProcessingErrorForLog(error)}`,
                 );
@@ -3961,7 +3895,9 @@ const Page: React.FC = () => {
                 );
                 return;
             } finally {
-                if (isDrop) setIsProcessingDroppedImages(false);
+                if (epoch === imageAttachmentEpochRef.current) {
+                    setIsAttachingImages(false);
+                }
             }
         },
         [
@@ -4049,7 +3985,6 @@ const Page: React.FC = () => {
                         });
                         return;
                     }
-                    if (!canAttachDroppedImages) return;
 
                     const imagePaths = event.payload.paths.filter((path) => {
                         const lowerPath = path.toLowerCase();
@@ -4088,7 +4023,6 @@ const Page: React.FC = () => {
             unlisten?.();
         };
     }, [
-        canAttachDroppedImages,
         canHandleImageDrop,
         isImageAttachmentLimitReached,
         isTauriRuntime,
@@ -4139,7 +4073,8 @@ const Page: React.FC = () => {
         setPendingImages((prev) => prev.filter((img) => img.id !== id));
     }, []);
 
-    const handleSend = useCallback(async () => {
+    const handleSend = async (input: string) => {
+        if (isAttachingImages) return;
         const trimmed = input.trim();
         const hasDocuments = pendingDocuments.length > 0;
         const hasImages = pendingImages.length > 0;
@@ -4298,7 +4233,7 @@ const Page: React.FC = () => {
             inferenceImagePaths.length,
         );
 
-        setInput("");
+        composerRef.current?.setText("");
 
         let messageStored = false;
         try {
@@ -4378,33 +4313,11 @@ const Page: React.FC = () => {
         } finally {
             await cleanupInferenceImages(inferenceImagePaths);
         }
-    }, [
-        input,
-        chatKey,
-        currentSessionId,
-        editingMessage,
-        isDownloading,
-        isGenerating,
-        isModelPreparationActive,
-        messageState.path,
-        pendingDocuments,
-        pendingImages,
-        showModelGate,
-        showMiniDialog,
-        onGenericError,
-        slicePathUntil,
-        startGeneration,
-        writeInferenceImages,
-        cleanupInferenceImages,
-        updateBranchSelectionState,
-        updateRouteSession,
-        appendMessageToState,
-        updateSessionAfterMessage,
-        refreshSessions,
-    ]);
+    };
 
     useEffect(() => {
         return () => {
+            imageAttachmentEpochRef.current += 1;
             if (streamingFlushTimerRef.current) {
                 window.clearTimeout(streamingFlushTimerRef.current);
             }
@@ -4426,14 +4339,13 @@ const Page: React.FC = () => {
             tinyIconProps={tinyIconProps}
             actionIconProps={actionIconProps}
             showSessionSearch={showSessionSearch}
-            sessionSearch={sessionSearch}
-            setSessionSearch={setSessionSearch}
+            sessionSearchRef={sessionSearchRef}
             handleOpenSessionSearch={handleOpenSessionSearch}
             handleCloseSessionSearch={handleCloseSessionSearch}
             handleNewChat={handleNewChat}
             handleOpenDrawer={handleOpenDrawer}
             handleCollapseDrawer={handleCollapseDrawer}
-            groupedSessions={groupedSessions}
+            sessions={sessions}
             currentSessionId={currentSessionId}
             handleSelectSession={handleSelectSession}
             requestRenameSession={requestRenameSession}
@@ -4620,6 +4532,7 @@ const Page: React.FC = () => {
                     )}
 
                     <ChatComposer
+                        ref={composerRef}
                         showModelGate={showModelGate}
                         showDownloadProgress={showDownloadProgress}
                         downloadStatus={downloadStatus}
@@ -4633,13 +4546,11 @@ const Page: React.FC = () => {
                         handleCancelEdit={handleCancelEdit}
                         pendingDocuments={pendingDocuments}
                         pendingImages={pendingImages}
+                        isAttachingImages={isAttachingImages}
                         pendingImagePreviews={pendingImagePreviews}
                         removePendingDocument={removePendingDocument}
                         removePendingImage={removePendingImage}
                         formatBytes={formatBytes}
-                        input={input}
-                        onInputChange={setInput}
-                        inputRef={inputRef}
                         isGenerating={isGenerating}
                         handleSend={handleSend}
                         handleStopGeneration={handleStopGeneration}

@@ -81,11 +81,10 @@ func (c *ObjectCleanupController) removeUnreportedObjects() int {
 
 	tx, tempObjects, err := c.Repo.GetAndLockExpiredObjects()
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			logger.Error(err)
-		}
+		logger.Error(err)
 		return count
 	}
+	defer tx.Rollback()
 
 	for _, tempObject := range tempObjects {
 		err = c.removeUnreportedObject(tx, tempObject)

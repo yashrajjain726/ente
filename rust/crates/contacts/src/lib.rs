@@ -1,9 +1,10 @@
-pub mod client;
-pub mod crypto;
-pub mod error;
-pub mod models;
-pub mod transport;
+mod client;
+mod error;
 
-pub use client::{ContactsClient, OpenContactsInput, OpenContactsResult, RootKeySource};
+pub use client::{
+    AttachmentType, ContactData, ContactOutput, ContactRecord, WrappedRootContactKey,
+    create_contact, delete_attachment, delete_contact, delete_profile_picture,
+    get_attachment_encrypted, get_contact, get_diff, get_profile_picture, set_attachment,
+    set_profile_picture, update_contact,
+};
 pub use error::{Error, Result};
-pub use models::{AttachmentType, ContactData, ContactRecord, WrappedRootContactKey};

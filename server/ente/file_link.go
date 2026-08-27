@@ -53,6 +53,9 @@ func (ut *UpdateFileUrl) Validate() error {
 	if !(allPassParamsMissing || allPassParamsPresent) {
 		return NewBadRequestWithMessage("all password params should be either present or missing")
 	}
+	if err := validatePublicLinkKDFParams(ut.MemLimit, ut.OpsLimit); err != nil {
+		return err
+	}
 
 	if allPassParamsPresent && ut.DisablePassword != nil && *ut.DisablePassword {
 		return NewBadRequestWithMessage("can not set and disable password in same request")

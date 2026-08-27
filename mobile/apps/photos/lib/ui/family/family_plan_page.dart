@@ -526,7 +526,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
       return;
     }
 
-    final savedContactName = savedContact?.data?.name.trim();
+    final savedContactName = savedContact?.name?.trim();
     final displayName = savedContactName == null || savedContactName.isEmpty
         ? fallbackDisplayName
         : savedContactName;

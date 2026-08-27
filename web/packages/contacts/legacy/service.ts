@@ -4,86 +4,22 @@ import { masterKeyFromSession } from "ente-accounts/services/session-storage";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
-import { openLegacy } from "ente-legacy-wasm/authenticated";
-import type {
-    LegacyContactState,
-    LegacyInfo,
-    LegacyRecoveryStatus,
-} from "./types";
+import {
+    addContact,
+    changePassword,
+    getInfo,
+    publicKey,
+    rejectRecovery,
+    startRecovery,
+    stopRecovery,
+    updateContact,
+    updateRecoveryNotice,
+    verificationID,
+    type SessionInput,
+} from "ente-legacy-wasm/authenticated";
+import type { LegacyContactState, LegacyInfo } from "./types";
 
-type KeyAttributes = NonNullable<ReturnType<typeof savedKeyAttributes>>;
-
-interface RemoteLegacyUser {
-    id: number | bigint;
-    email: string;
-}
-
-interface RemoteLegacyContactRecord {
-    user: RemoteLegacyUser;
-    emergencyContact: RemoteLegacyUser;
-    state: LegacyContactState;
-    recoveryNoticeInDays: number | bigint;
-}
-
-interface RemoteLegacyRecoverySession {
-    id: string;
-    user: RemoteLegacyUser;
-    emergencyContact: RemoteLegacyUser;
-    status: LegacyRecoveryStatus;
-    waitTill: number | bigint;
-    createdAt: number | bigint;
-}
-
-interface RemoteLegacyInfo {
-    contacts: RemoteLegacyContactRecord[];
-    recoverSessions: RemoteLegacyRecoverySession[];
-    othersEmergencyContact: RemoteLegacyContactRecord[];
-    othersRecoverySession: RemoteLegacyRecoverySession[];
-}
-
-interface LegacyClient {
-    free: () => void;
-    getInfo: () => Promise<RemoteLegacyInfo>;
-    publicKey: (email: string) => Promise<string | undefined>;
-    verificationID: (publicKeyB64: string) => string;
-    addContact: (
-        email: string,
-        currentUserKeyAttributes: KeyAttributes,
-        recoveryNoticeInDays?: number,
-    ) => Promise<void>;
-    updateContact: (
-        userID: bigint,
-        emergencyContactID: bigint,
-        state: LegacyContactState,
-    ) => Promise<void>;
-    updateRecoveryNotice: (
-        emergencyContactID: bigint,
-        recoveryNoticeInDays: number,
-    ) => Promise<void>;
-    startRecovery: (
-        userID: bigint,
-        emergencyContactID: bigint,
-    ) => Promise<void>;
-    stopRecovery: (
-        recoveryID: string,
-        userID: bigint,
-        emergencyContactID: bigint,
-    ) => Promise<void>;
-    rejectRecovery: (
-        recoveryID: string,
-        userID: bigint,
-        emergencyContactID: bigint,
-    ) => Promise<void>;
-    changePassword: (
-        recoveryID: string,
-        currentUserKeyAttributes: KeyAttributes,
-        newPassword: string,
-    ) => Promise<void>;
-}
-
-const withLegacyClient = async <T>(
-    operation: (client: LegacyClient) => T | Promise<T>,
-) => {
+const sessionInput = async (): Promise<SessionInput> => {
     const masterKeyB64 = await masterKeyFromSession();
     if (!masterKeyB64) {
         throw new Error("Missing current master key");
@@ -92,18 +28,13 @@ const withLegacyClient = async <T>(
     if (!authToken) {
         throw new Error("Missing auth token");
     }
-    const client: LegacyClient = await openLegacy({
+    return {
         baseUrl: await apiOrigin(),
         authToken,
         masterKeyB64,
         clientPackage: clientPackageName,
         clientVersion: isDesktop ? desktopAppVersion : undefined,
-    });
-    try {
-        return await operation(client);
-    } finally {
-        client.free();
-    }
+    };
 };
 
 const currentKeyAttributes = () => {
@@ -114,119 +45,76 @@ const currentKeyAttributes = () => {
     return keyAttributes;
 };
 
-const normalizeLegacyUser = (user: RemoteLegacyUser) => ({
-    id: Number(user.id),
-    email: user.email,
-});
+export const legacyGetInfo = async (): Promise<LegacyInfo> =>
+    getInfo(await sessionInput());
 
-const normalizeLegacyContactRecord = (record: RemoteLegacyContactRecord) => ({
-    user: normalizeLegacyUser(record.user),
-    emergencyContact: normalizeLegacyUser(record.emergencyContact),
-    state: record.state,
-    recoveryNoticeInDays: Number(record.recoveryNoticeInDays),
-});
+export const legacyPublicKey = async (email: string) =>
+    publicKey(await sessionInput(), email);
 
-const normalizeLegacyRecoverySession = (
-    session: RemoteLegacyRecoverySession,
-) => ({
-    id: session.id,
-    user: normalizeLegacyUser(session.user),
-    emergencyContact: normalizeLegacyUser(session.emergencyContact),
-    status: session.status,
-    waitTill: Number(session.waitTill),
-    createdAt: Number(session.createdAt),
-});
-
-const normalizeLegacyInfo = (info: RemoteLegacyInfo): LegacyInfo => ({
-    contacts: info.contacts.map(normalizeLegacyContactRecord),
-    recoverSessions: info.recoverSessions.map(normalizeLegacyRecoverySession),
-    othersEmergencyContact: info.othersEmergencyContact.map(
-        normalizeLegacyContactRecord,
-    ),
-    othersRecoverySession: info.othersRecoverySession.map(
-        normalizeLegacyRecoverySession,
-    ),
-});
-
-export const legacyGetInfo = () =>
-    withLegacyClient(async (client) =>
-        normalizeLegacyInfo(await client.getInfo()),
-    );
-
-export const legacyPublicKey = (email: string) =>
-    withLegacyClient((client) => client.publicKey(email));
-
-export const legacyVerificationID = (email: string) =>
-    withLegacyClient(async (client) => {
-        const publicKey = await client.publicKey(email);
-        return publicKey ? client.verificationID(publicKey) : undefined;
-    });
+export const legacyVerificationID = async (email: string) => {
+    const key = await publicKey(await sessionInput(), email);
+    return key ? verificationID(key) : undefined;
+};
 
 export const legacyAddContact = async (
     email: string,
     recoveryNoticeInDays?: number,
 ) => {
     await getUserRecoveryKey();
-    return withLegacyClient((client) =>
-        client.addContact(email, currentKeyAttributes(), recoveryNoticeInDays),
+    return addContact(
+        await sessionInput(),
+        email,
+        currentKeyAttributes(),
+        recoveryNoticeInDays,
     );
 };
 
-export const legacyUpdateContact = (
+export const legacyUpdateContact = async (
     userID: number,
     emergencyContactID: number,
     state: LegacyContactState,
-) =>
-    withLegacyClient((client) =>
-        client.updateContact(BigInt(userID), BigInt(emergencyContactID), state),
-    );
+) => updateContact(await sessionInput(), userID, emergencyContactID, state);
 
-export const legacyUpdateRecoveryNotice = (
+export const legacyUpdateRecoveryNotice = async (
     emergencyContactID: number,
     recoveryNoticeInDays: number,
 ) =>
-    withLegacyClient((client) =>
-        client.updateRecoveryNotice(
-            BigInt(emergencyContactID),
-            recoveryNoticeInDays,
-        ),
+    updateRecoveryNotice(
+        await sessionInput(),
+        emergencyContactID,
+        recoveryNoticeInDays,
     );
 
-export const legacyStartRecovery = (
+export const legacyStartRecovery = async (
     userID: number,
     emergencyContactID: number,
-) =>
-    withLegacyClient((client) =>
-        client.startRecovery(BigInt(userID), BigInt(emergencyContactID)),
-    );
+) => startRecovery(await sessionInput(), userID, emergencyContactID);
 
-export const legacyStopRecovery = (
+export const legacyStopRecovery = async (
+    recoveryID: string,
+    userID: number,
+    emergencyContactID: number,
+) => stopRecovery(await sessionInput(), recoveryID, userID, emergencyContactID);
+
+export const legacyRejectRecovery = async (
     recoveryID: string,
     userID: number,
     emergencyContactID: number,
 ) =>
-    withLegacyClient((client) =>
-        client.stopRecovery(
-            recoveryID,
-            BigInt(userID),
-            BigInt(emergencyContactID),
-        ),
+    rejectRecovery(
+        await sessionInput(),
+        recoveryID,
+        userID,
+        emergencyContactID,
     );
 
-export const legacyRejectRecovery = (
+export const legacyChangePassword = async (
     recoveryID: string,
-    userID: number,
-    emergencyContactID: number,
+    newPassword: string,
 ) =>
-    withLegacyClient((client) =>
-        client.rejectRecovery(
-            recoveryID,
-            BigInt(userID),
-            BigInt(emergencyContactID),
-        ),
-    );
-
-export const legacyChangePassword = (recoveryID: string, newPassword: string) =>
-    withLegacyClient((client) =>
-        client.changePassword(recoveryID, currentKeyAttributes(), newPassword),
+    changePassword(
+        await sessionInput(),
+        recoveryID,
+        currentKeyAttributes(),
+        newPassword,
     );
