@@ -24,6 +24,7 @@ import "package:photos/models/search/hierarchical/top_level_generic_filter.dart"
 import "package:photos/models/search/hierarchical/uploader_filter.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
+import "package:photos/services/contacts/contact_identity_resolver.dart";
 import "package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/magic_cache_service.dart";
@@ -389,28 +390,55 @@ List<ContactsFilter> curateContactsFilters(
 }) {
   final contactsFilters = <ContactsFilter>[];
   final ownerIdToOccurrence = <int, int>{};
+  final ownerIdToCollectionIDs = <int, Set<int>>{};
 
-  for (EnteFile file in files) {
+  for (final file in files) {
     if (file.uploadedFileID == null ||
         file.uploadedFileID == -1 ||
         file.ownerID == null) {
       continue;
     }
-    ownerIdToOccurrence[file.ownerID!] =
-        (ownerIdToOccurrence[file.ownerID] ?? 0) + 1;
+    final ownerID = file.ownerID!;
+    ownerIdToOccurrence[ownerID] = (ownerIdToOccurrence[ownerID] ?? 0) + 1;
+    if (file.collectionID != null) {
+      ownerIdToCollectionIDs
+          .putIfAbsent(ownerID, () => <int>{})
+          .add(file.collectionID!);
+    }
   }
 
-  for (int id in ownerIdToOccurrence.keys) {
-    final isCurrentUser = id == currentUser.id;
-    final user = isCurrentUser
-        ? currentUser
-        : CollectionsService.instance.resolveUserIdentity(id, null);
+  for (final entry in ownerIdToOccurrence.entries) {
+    final ownerID = entry.key;
+    if (ownerID == currentUser.id) {
+      contactsFilters.add(
+        ContactsFilter(
+          user: currentUser,
+          occurrence: entry.value,
+          filterName: currentUserLabel,
+        ),
+      );
+      continue;
+    }
+
+    User? resolvedUser;
+    final collectionIDs = ownerIdToCollectionIDs[ownerID] ?? const <int>{};
+    for (final collectionID in [...collectionIDs, null]) {
+      final user = CollectionsService.instance.resolveUserIdentity(
+        ownerID,
+        collectionID,
+      );
+      final identity = resolveSuggestionIdentity(UserSuggestion.fromUser(user));
+      if (identity.isResolved) {
+        resolvedUser = user;
+        break;
+      }
+    }
+    if (resolvedUser == null) {
+      continue;
+    }
+
     contactsFilters.add(
-      ContactsFilter(
-        user: user,
-        occurrence: ownerIdToOccurrence[id]!,
-        filterName: isCurrentUser ? currentUserLabel : null,
-      ),
+      ContactsFilter(user: resolvedUser, occurrence: entry.value),
     );
   }
 
