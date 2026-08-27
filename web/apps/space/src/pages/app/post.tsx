@@ -24,7 +24,6 @@ const Page: React.FC = () => {
         profileLoadError,
         profileLoadStatus,
         setPendingPostPhotoFile,
-        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const inputRef = React.useRef<HTMLInputElement | null>(null);
     const [isOpeningPost, setIsOpeningPost] = React.useState(false);
@@ -53,7 +52,6 @@ const Page: React.FC = () => {
 
         setIsOpeningPost(true);
         setPendingPostPhotoFile(file);
-        setSkipNextHomeFeedSkeleton(true);
         void router.push(spaceRoutes.home).catch((error: unknown) => {
             log.error("Failed to open post photo draft", error);
             setPendingPostPhotoFile(null);

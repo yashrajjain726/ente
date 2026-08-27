@@ -1214,6 +1214,25 @@ export const loadCurrentSpaceProfilePostsPage = async (
     }
 };
 
+export const loadCurrentSpaceLatestPost = async (
+    spaceId: string,
+    viewerSpaceId: string,
+): Promise<SpacePost | null> => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        const page = (await ctx.listPosts(
+            spaceId,
+            viewerSpaceId,
+            null,
+            1,
+        )) as SpacePostPageResponse;
+        const post = page.items?.[0];
+        return post ? profilePostFromPost(post) : null;
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
 export const loadCurrentSpacePost = async (
     spaceId: string,
     postId: number,

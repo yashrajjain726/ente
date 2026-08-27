@@ -20,7 +20,6 @@ const Page: React.FC = () => {
         profileLoadStatus,
         setPendingCreateProfile,
         setProfile,
-        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const createProfileSource = pendingCreateProfile?.source ?? "verify";
     const [setupError, setSetupError] = useState<string>();
@@ -82,11 +81,7 @@ const Page: React.FC = () => {
                         );
                         setProfile(savedProfile);
                         setPendingCreateProfile(null);
-                        const handledPendingFriendRequest =
-                            await sendPendingSpaceFriendRequest();
-                        if (!handledPendingFriendRequest) {
-                            setSkipNextHomeFeedSkeleton(true);
-                        }
+                        await sendPendingSpaceFriendRequest();
                         await router.push(spaceRoutes.home);
                     } catch (error) {
                         log.error("Space profile setup failed", error);

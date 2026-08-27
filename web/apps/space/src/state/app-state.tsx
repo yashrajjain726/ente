@@ -70,7 +70,6 @@ export interface SpaceAppState {
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
-    skipNextHomeFeedSkeleton: boolean;
     signupEmail: string;
     refreshProfile: (
         options?: RefreshSpaceProfileOptions,
@@ -101,7 +100,6 @@ export interface SpaceAppState {
         React.SetStateAction<PendingCreateProfile | null>
     >;
     setProfile: (profile: SetupProfile | null) => void;
-    setSkipNextHomeFeedSkeleton: React.Dispatch<React.SetStateAction<boolean>>;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;
 }
 

@@ -117,7 +117,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         profileLoadStatus,
         setFriends,
         setPendingPostPhotoFile,
-        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const [conversations, setConversations] = React.useState<
         SpaceMessageConversation[]
@@ -690,7 +689,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 onOpenThread={openConversation}
                 onPostPhotoSelect={(file) => {
                     setPendingPostPhotoFile(file);
-                    setSkipNextHomeFeedSkeleton(true);
                     void router
                         .push(spaceRoutes.home)
                         .catch((error: unknown) => {
