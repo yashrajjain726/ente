@@ -7,10 +7,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import {
-    SpaceCircleNameArc,
-    type SpaceCircleNameArcPosition,
-} from "components/CircleNameArc";
-import {
     SpaceFileViewer,
     SpaceViewerFeedBackdrop,
     type SpaceViewerDraftPostEdit,
@@ -223,7 +219,6 @@ interface FriendPostCircleProps {
     isUnavailable: boolean;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
-    nameArcPosition: SpaceCircleNameArcPosition;
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenPhoto: (photo: SpaceViewerPhoto) => void;
     placement: HomeCirclePlacement;
@@ -237,7 +232,6 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     isAvatarPending,
     isLoading,
     isUnavailable,
-    nameArcPosition,
     onLoadAvatar,
     onLoadImage,
     onOpenFriend,
@@ -245,7 +239,6 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     placement,
     post,
 }) => {
-    const nameArcID = React.useId();
     const rootRef = React.useRef<HTMLLIElement | null>(null);
     const [shouldLoadMedia, setShouldLoadMedia] = useState(Boolean(imageUrl));
     const decodedPhoto = useDecodedImage(imageUrl, true);
@@ -278,7 +271,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     const isCircleDisabled =
         isLoading || Boolean(post && !postUnavailable && !isPhotoReady);
     const circleBorderWidth = Math.max(1, Math.min(3, placement.size * 0.018));
-    const circlePadding = Math.max(3, Math.min(7, placement.size * 0.04));
+    const circlePadding = Math.max(1.5, Math.min(4, placement.size * 0.025));
 
     React.useEffect(() => {
         if (isLoading || !post || postUnavailable || shouldLoadMedia) return;
@@ -364,11 +357,11 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             <Box
                 sx={{
                     aspectRatio: "1",
-                    border: 0,
+                    border: `${circleBorderWidth}px solid ${inactivePostCircleBorderColor}`,
                     borderRadius: "50%",
                     boxSizing: "border-box",
                     height: "100%",
-                    p: `${circleBorderWidth + circlePadding}px`,
+                    p: `${circlePadding}px`,
                     position: "relative",
                     width: "100%",
                     zIndex: 1,
@@ -480,15 +473,6 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     )}
                 </Box>
             </Box>
-            <SpaceCircleNameArc
-                id={nameArcID}
-                name={firstName}
-                nameInset={circlePadding * 0.45}
-                position={nameArcPosition}
-                ringColor={inactivePostCircleBorderColor}
-                ringWidth={circleBorderWidth}
-                size={placement.size}
-            />
         </Box>
     );
 };
@@ -842,18 +826,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isAvatarPending={isAvatarPending}
                 isLoading={isFriendsLoading || isLatestPostsLoading}
                 isUnavailable={isUnavailable}
-                nameArcPosition={
-                    Math.abs(
-                        placement.x +
-                            placement.size / 2 -
-                            postCircleCanvasSize.width / 2,
-                    ) < 1
-                        ? "top"
-                        : placement.x + placement.size / 2 <
-                            postCircleCanvasSize.width / 2
-                          ? "upper-left"
-                          : "upper-right"
-                }
                 onLoadAvatar={
                     item && isAvatarPending
                         ? () => loadPostAvatar(item)

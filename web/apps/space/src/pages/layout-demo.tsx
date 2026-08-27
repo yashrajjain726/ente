@@ -1,7 +1,6 @@
 import { ArrowLeft02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
-import { SpaceCircleNameArc } from "components/CircleNameArc";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import React from "react";
 import { homeCirclePlacements } from "utils/home-circle-layout";
@@ -12,23 +11,6 @@ const headerHeight = 64;
 const layoutVerticalInset =
     "calc(112px + max(env(safe-area-inset-top, 0px), env(safe-area-inset-bottom, 0px)))";
 const maximumFriendCount = 15;
-const sampleNames = [
-    "Maya",
-    "Noah",
-    "Ari",
-    "Zoya",
-    "Leo",
-    "Mina",
-    "Ira",
-    "Omar",
-    "Nina",
-    "Theo",
-    "Rhea",
-    "Eli",
-    "Lina",
-    "Jai",
-    "Ada",
-];
 
 interface CanvasSize {
     height: number;
@@ -78,7 +60,7 @@ const LayoutDemoPage: React.FC = () => {
     );
     const circleSize = placements[0]?.size ?? 0;
     const ringWidth = Math.max(1, Math.min(3, circleSize * 0.018));
-    const circlePadding = Math.max(3, Math.min(7, circleSize * 0.04));
+    const circlePadding = Math.max(1.5, Math.min(4, circleSize * 0.025));
 
     return (
         <Box
@@ -229,11 +211,11 @@ const LayoutDemoPage: React.FC = () => {
                                     <Box
                                         sx={{
                                             aspectRatio: "1",
-                                            border: 0,
+                                            border: `${ringWidth}px solid #2A3430`,
                                             borderRadius: "50%",
                                             boxSizing: "border-box",
                                             height: "100%",
-                                            p: `${ringWidth + circlePadding}px`,
+                                            p: `${circlePadding}px`,
                                             position: "relative",
                                             width: "100%",
                                             zIndex: 1,
@@ -248,26 +230,6 @@ const LayoutDemoPage: React.FC = () => {
                                             }}
                                         />
                                     </Box>
-                                    <SpaceCircleNameArc
-                                        id={`layout-name-arc-${index}`}
-                                        name={sampleNames[index]!}
-                                        nameInset={circlePadding * 0.45}
-                                        position={
-                                            Math.abs(
-                                                x +
-                                                    size / 2 -
-                                                    canvasSize.width / 2,
-                                            ) < 1
-                                                ? "top"
-                                                : x + size / 2 <
-                                                    canvasSize.width / 2
-                                                  ? "upper-left"
-                                                  : "upper-right"
-                                        }
-                                        ringColor="#2A3430"
-                                        ringWidth={ringWidth}
-                                        size={size}
-                                    />
                                 </Box>
                             ))}
                     </Box>
