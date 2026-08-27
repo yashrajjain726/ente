@@ -2619,6 +2619,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-location"
+version = "0.0.0"
+
+[[package]]
 name = "ente-locker-frb"
 version = "0.0.0"
 dependencies = [
@@ -2721,6 +2725,7 @@ dependencies = [
  "ente-core",
  "ente-frb-log",
  "ente-image",
+ "ente-location",
  "ente-ml",
  "ente-photos",
  "flutter_rust_bridge",

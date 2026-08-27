@@ -209,3 +209,4 @@ fn add_to_marker_group(
     groups.push(ProjectedMarkerGroup::new(point));
     groups_by_cell.entry(cell).or_default().push(group_index);
 }
+

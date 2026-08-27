@@ -29,6 +29,7 @@ members = [
     "crates/ensu-crypto",
     "crates/image",
     "crates/legacy",
+    "crates/location",
     "crates/ml",
     "crates/paste",
     "crates/photos",
@@ -47,6 +48,7 @@ ente-ensu-crypto = { path = "crates/ensu-crypto" }
 ente-frb-log = { path = "bindings/frb/log" }
 ente-image = { path = "crates/image" }
 ente-legacy = { path = "crates/legacy" }
+ente-location = { path = "crates/location" }
 ente-ml = { path = "crates/ml" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }

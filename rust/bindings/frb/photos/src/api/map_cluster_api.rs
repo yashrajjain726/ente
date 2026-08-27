@@ -1,4 +1,4 @@
-use ente_photos::map_cluster as core;
+use ente_location::cluster as core;
 use flutter_rust_bridge::frb;
 
 pub struct MapPoint {
