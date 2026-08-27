@@ -3946,11 +3946,10 @@
   "shareTextRecommendUsingEnte": "Download Ente so we can easily share original quality files\n\nhttps://ente.com",
   "shareTextRecommendUsingEnteForFamily": "Download Ente so I can add you to my family plan\n\nhttps://ente.com",
   "shareTextRecommendUsingEnteForPhotos": "Download Ente so we can easily share original quality photos and videos\n\nhttps://ente.com",
-  "shareTextReferralCode": "Get {referralStorageInGB} GB free!\nDownload Ente Photos from https://ente.com/app and apply code {referralCode}.",
-  "@shareTextReferralCode": {
+  "shareTextReferralInvite": "Get 20 GB free with Ente Photos! Download the app at https://ente.com/invite and use code {referralCode}.",
+  "@shareTextReferralInvite": {
     "placeholders": {
-      "referralCode": {},
-      "referralStorageInGB": {}
+      "referralCode": {}
     }
   },
   "shareThisLink": "This link allows anyone who receives it to access your item. You can remove access at any time by deleting the link.",

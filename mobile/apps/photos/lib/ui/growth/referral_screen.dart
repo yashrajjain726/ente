@@ -138,10 +138,7 @@ class ReferralWidget extends StatelessWidget {
             shouldSurfaceExecutionStates: false,
             onTap: () {
               shareText(
-                l10n.shareTextReferralCode(
-                  referralCode: referralView.code,
-                  referralStorageInGB: referralView.planInfo.storageInGB * 2,
-                ),
+                l10n.shareTextReferralInvite(referralCode: referralView.code),
               );
             },
           ),
