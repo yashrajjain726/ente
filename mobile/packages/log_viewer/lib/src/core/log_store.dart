@@ -58,25 +58,36 @@ class LogStore {
     }
   }
 
-  Future<void>? _flushFuture;
+  Future<void>? _activeFlush;
+  Future<void>? _queuedFlush;
 
+  // At most one drain runs and one is queued; arrivals share the queued one.
+  // Its snapshot is taken after the active drain, so every caller sees the
+  // records buffered before its call, yet waits at most two batch inserts.
   Future<void> _flush() {
-    return _flushFuture ??= _drainBuffer().whenComplete(() {
-      _flushFuture = null;
+    final active = _activeFlush;
+    if (active == null) {
+      return _activeFlush = _drainOnce().whenComplete(() {
+        _activeFlush = null;
+      });
+    }
+    return _queuedFlush ??= active.then((_) {
+      _queuedFlush = null;
+      return _flush();
     });
   }
 
-  Future<void> _drainBuffer() async {
-    while (_buffer.isNotEmpty) {
-      final toInsert = List<LogEntry>.from(_buffer);
-      _buffer.clear();
+  Future<void> _drainOnce() async {
+    if (_buffer.isEmpty) return;
 
-      try {
-        await _database.insertLogs(toInsert);
-      } catch (e) {
-        // ignore: avoid_print
-        print('Failed to insert logs to database: $e');
-      }
+    final toInsert = List<LogEntry>.from(_buffer);
+    _buffer.clear();
+
+    try {
+      await _database.insertLogs(toInsert);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to insert logs to database: $e');
     }
   }
 
@@ -191,10 +202,10 @@ class LogStore {
   }
 
   Future<void> dispose() async {
+    _initialized = false;
     _flushTimer?.cancel();
     await _flush();
     await _database.close();
     await _logStreamController.close();
-    _initialized = false;
   }
 }
