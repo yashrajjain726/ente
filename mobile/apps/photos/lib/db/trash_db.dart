@@ -157,26 +157,43 @@ class TrashDB with SqlDbBase {
     return deletedRows;
   }
 
-  Future<int> update(EnteTrashFile file) async {
+  Future<void> update(EnteTrashFile file) async {
     final db = await instance.database;
-    final rows = await db.execute(
+    await db.execute(
       '''
       UPDATE $tableName SET
         $columnTrashUpdatedAt = ?, $columnTrashDeleteBy = ?,
-        $columnUploadedFileID = ?, $columnCollectionID = ?,
-        $columnOwnerID = ?, $columnEncryptedKey = ?,
-        $columnKeyDecryptionNonce = ?, $columnFileDecryptionHeader = ?,
-        $columnThumbnailDecryptionHeader = ?, $columnUpdationTime = ?,
-        $columnFileSize = ?, $columnLocalID = ?, $columnCreationTime = ?,
+        $columnCollectionID = ?, $columnOwnerID = ?,
+        $columnEncryptedKey = ?, $columnKeyDecryptionNonce = ?,
+        $columnFileDecryptionHeader = ?, $columnThumbnailDecryptionHeader = ?,
+        $columnUpdationTime = ?, $columnFileSize = ?,
+        $columnLocalID = ?, $columnCreationTime = ?,
         $columnFileMetadata = ?, $columnMMdVersion = ?,
         $columnMMdEncodedJson = ?, $columnPubMMdVersion = ?,
         $columnPubMMdEncodedJson = ?
       WHERE $columnUploadedFileID = ?
-      RETURNING $columnUploadedFileID
       ''',
-      [..._getParametersForTrash(file), file.uploadedFileID],
+      [
+        file.updateAt,
+        file.deleteBy,
+        file.collectionID,
+        file.ownerID,
+        file.encryptedKey,
+        file.keyDecryptionNonce,
+        file.fileDecryptionHeader,
+        file.thumbnailDecryptionHeader,
+        file.updationTime,
+        file.fileSize,
+        file.localID,
+        file.creationTime,
+        jsonEncode(file.metadata),
+        file.mMdVersion,
+        file.mMdEncodedJson ?? '{}',
+        file.pubMmdVersion,
+        file.pubMmdEncodedJson ?? '{}',
+        file.uploadedFileID,
+      ],
     );
-    return rows.length;
   }
 
   Future<FileLoadResult> getTrashedFiles(

@@ -63,30 +63,26 @@ class MemoriesDB with SqlDbBase {
     await db.execute('DELETE FROM $table');
   }
 
-  Future<int> clearMemoriesSeenBeforeTime(int timestamp) async {
+  Future<void> clearMemoriesSeenBeforeTime(int timestamp) async {
     final db = await database;
-    final rows = await db.execute(
-      'DELETE FROM $table WHERE $columnSeenTime < ? RETURNING $columnFileID',
-      [timestamp],
-    );
-    return rows.length;
+    await db.execute('DELETE FROM $table WHERE $columnSeenTime < ?', [
+      timestamp,
+    ]);
   }
 
-  Future<int> markMemoryAsSeen(
+  Future<void> markMemoryAsSeen(
     Memory memory,
     int timestamp, {
     int? seenTimeKey,
   }) async {
     final db = await database;
-    final rows = await db.execute(
+    await db.execute(
       '''
       INSERT OR REPLACE INTO $table ($columnFileID, $columnSeenTime)
       VALUES (?, ?)
-      RETURNING $columnFileID
       ''',
       [seenTimeKey ?? memory.file.generatedID, timestamp],
     );
-    return rows.first[columnFileID] as int;
   }
 
   Future<Map<int, int>> getSeenTimes() async {

@@ -257,31 +257,27 @@ class UploadLocksDB with SqlDbBase {
     return rows.length;
   }
 
-  Future<int> releaseLocksAcquiredByOwnerBefore(String owner, int time) async {
+  Future<void> releaseLocksAcquiredByOwnerBefore(String owner, int time) async {
     final db = await database;
-    final rows = await db.execute(
+    await db.execute(
       '''
       DELETE FROM ${_uploadLocksTable.table}
       WHERE ${_uploadLocksTable.columnOwner} = ?
         AND ${_uploadLocksTable.columnTime} < ?
-      RETURNING ${_uploadLocksTable.columnID}
       ''',
       [owner, time],
     );
-    return rows.length;
   }
 
-  Future<int> releaseAllLocksAcquiredBefore(int time) async {
+  Future<void> releaseAllLocksAcquiredBefore(int time) async {
     final db = await database;
-    final rows = await db.execute(
+    await db.execute(
       '''
       DELETE FROM ${_uploadLocksTable.table}
       WHERE ${_uploadLocksTable.columnTime} < ?
-      RETURNING ${_uploadLocksTable.columnID}
       ''',
       [time],
     );
-    return rows.length;
   }
 
   Future<({String encryptedFileKey, String fileNonce, String keyNonce})>
@@ -457,17 +453,15 @@ class UploadLocksDB with SqlDbBase {
     );
   }
 
-  Future<int> deleteStreamUploadErrorEntry(int uploadedFileID) async {
+  Future<void> deleteStreamUploadErrorEntry(int uploadedFileID) async {
     final db = await database;
-    final rows = await db.execute(
+    await db.execute(
       '''
       DELETE FROM ${_streamUploadErrorTable.table}
       WHERE ${_streamUploadErrorTable.columnUploadedFileID} = ?
-      RETURNING ${_streamUploadErrorTable.columnUploadedFileID}
       ''',
       [uploadedFileID],
     );
-    return rows.length;
   }
 
   Future<Map<int, String>> getStreamUploadError() {
@@ -593,17 +587,15 @@ class UploadLocksDB with SqlDbBase {
     );
   }
 
-  Future<int> deleteMultipartTrack(String localId) async {
+  Future<void> deleteMultipartTrack(String localId) async {
     final db = await database;
-    final rows = await db.execute(
+    await db.execute(
       '''
       DELETE FROM ${_trackUploadTable.table}
       WHERE ${_trackUploadTable.columnLocalID} = ?
-      RETURNING ${_trackUploadTable.columnID}
       ''',
       [localId],
     );
-    return rows.length;
   }
 
   Future<Map<String, int>> getFileNameToLastAttemptedAtMap() {

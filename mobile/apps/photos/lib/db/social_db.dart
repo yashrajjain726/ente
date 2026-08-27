@@ -698,14 +698,20 @@ class SocialDB with SqlDbBase {
 
   Future<int> deleteAllComments() async {
     final db = await database;
-    final rows = await db.execute('DELETE FROM $_commentsTable RETURNING id');
-    return rows.length;
+    return db.writeTransaction((tx) async {
+      await tx.execute('DELETE FROM $_commentsTable');
+      final row = await tx.get('SELECT changes() AS count');
+      return row['count'] as int;
+    });
   }
 
   Future<int> deleteAllReactions() async {
     final db = await database;
-    final rows = await db.execute('DELETE FROM $_reactionsTable RETURNING id');
-    return rows.length;
+    return db.writeTransaction((tx) async {
+      await tx.execute('DELETE FROM $_reactionsTable');
+      final row = await tx.get('SELECT changes() AS count');
+      return row['count'] as int;
+    });
   }
 
   Future<void> seedExampleData() async {}
