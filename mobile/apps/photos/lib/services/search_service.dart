@@ -8,7 +8,6 @@ import "package:hugeicons/hugeicons.dart";
 import 'package:logging/logging.dart';
 import "package:path_provider/path_provider.dart";
 import "package:photos/core/configuration.dart";
-import "package:photos/core/constants.dart";
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/data/holidays.dart';
 import 'package:photos/data/months.dart';
@@ -27,7 +26,6 @@ import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import "package:photos/models/local_entity_data.dart";
-import "package:photos/models/location/location.dart";
 import "package:photos/models/location_tag/location_tag.dart";
 import "package:photos/models/memories/memories_cache.dart";
 import "package:photos/models/memories/memory.dart";
@@ -60,7 +58,6 @@ import 'package:photos/services/machine_learning/semantic_search/semantic_search
 import "package:photos/services/memories_cache_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/states/location_screen_state.dart";
-import "package:photos/ui/viewer/location/add_location_sheet.dart";
 import "package:photos/ui/viewer/location/location_screen.dart";
 import "package:photos/ui/viewer/people/cluster_page.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
@@ -1204,23 +1201,15 @@ class SearchService {
       ..sort((a, b) => results[b]!.length.compareTo(results[a]!.length));
     for (final city in sortedByResultCount) {
       if (!locationTagNames.contains(city.city)) {
-        final a =
-            (defaultCityRadius * scaleFactor(city.lat)) / kilometersPerDegree;
-        const b = defaultCityRadius / kilometersPerDegree;
         searchResults.add(
           GenericSearchResult(
             ResultType.location,
             city.city,
             results[city]!,
-            hierarchicalSearchFilter: LocationFilter(
-              locationTag: LocationTag(
-                name: city.city,
-                radius: defaultCityRadius,
-                centerPoint: Location(latitude: city.lat, longitude: city.lng),
-                aSquare: a * a,
-                bSquare: b * b,
-              ),
+            hierarchicalSearchFilter: TopLevelGenericFilter(
+              filterName: city.city,
               occurrence: kMostRelevantFilter,
+              filterResultType: ResultType.location,
               matchedUploadedIDs: filesToUploadedFileIDs(results[city]!),
             ),
           ),
@@ -1713,34 +1702,15 @@ class SearchService {
           ..sort((a, b) => results[b]!.length.compareTo(results[a]!.length));
         for (final city in sortedByResultCount) {
           if (results[city]!.length <= 1) continue;
-          final a =
-              (defaultCityRadius * scaleFactor(city.lat)) / kilometersPerDegree;
-          const b = defaultCityRadius / kilometersPerDegree;
           tagSearchResults.add(
             GenericSearchResult(
               ResultType.locationSuggestion,
               city.city,
               results[city]!,
-              onResultTap: (ctx) {
-                showAddLocationSheet(
-                  ctx,
-                  Location(latitude: city.lat, longitude: city.lng),
-                  name: city.city,
-                  radius: defaultCityRadius,
-                );
-              },
-              hierarchicalSearchFilter: LocationFilter(
-                locationTag: LocationTag(
-                  name: city.city,
-                  radius: defaultCityRadius,
-                  centerPoint: Location(
-                    latitude: city.lat,
-                    longitude: city.lng,
-                  ),
-                  aSquare: a * a,
-                  bSquare: b * b,
-                ),
+              hierarchicalSearchFilter: TopLevelGenericFilter(
+                filterName: city.city,
                 occurrence: kMostRelevantFilter,
+                filterResultType: ResultType.locationSuggestion,
                 matchedUploadedIDs: filesToUploadedFileIDs(results[city]!),
               ),
             ),
