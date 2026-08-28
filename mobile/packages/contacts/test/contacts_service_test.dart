@@ -4,11 +4,9 @@ import 'dart:typed_data';
 import 'package:ente_contacts/contacts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  sqfliteFfiInit();
 
   late Directory tempDir;
   late SharedPreferences preferences;

@@ -126,22 +126,14 @@ class FilesDB with SqlDbBase {
 
   static final FilesDB instance = FilesDB._privateConstructor();
 
-  static Future<SqliteDatabase>? _sqliteAsyncDBFuture;
-
-  Future<SqliteDatabase> get sqliteAsyncDB async {
-    _sqliteAsyncDBFuture ??= _initSqliteAsyncDatabase();
-    return _sqliteAsyncDBFuture!;
-  }
-
-  Future<SqliteDatabase> _initSqliteAsyncDatabase() async {
-    final Directory documentsDirectory =
-        await getApplicationDocumentsDirectory();
-    final String path = join(documentsDirectory.path, _databaseName);
-    _logger.info("DB path " + path);
-    final database = SqliteDatabase(path: path);
-    await migrate(database, _migrationScripts);
-    return database;
-  }
+  Future<SqliteDatabase> get sqliteAsyncDB => getOrOpenDatabase(
+    () => openMigratedDatabase(
+      _databaseName,
+      _migrationScripts,
+      maxReaders: 5,
+      logPath: (path) => _logger.info("DB path " + path),
+    ),
+  );
 
   static List<String> createTable(String tableName) {
     return [
@@ -423,7 +415,7 @@ class FilesDB with SqlDbBase {
           await getApplicationDocumentsDirectory();
       final String path = join(documentsDirectory.path, _databaseName);
       File(path).deleteSync(recursive: true);
-      _sqliteAsyncDBFuture = null;
+      resetDatabaseFuture();
     }
   }
 

@@ -75,10 +75,26 @@ class ContactDirectory {
   Future<void> resetLocalState() async {
     final service = _active?.service;
     _clear(notify: true);
-    await service?.resetLocalState();
+    try {
+      await service?.resetLocalState();
+    } finally {
+      await service?.close();
+    }
   }
 
   void clearSession({bool notify = true}) => _clear(notify: notify);
+
+  Future<void> close({bool notify = true}) async {
+    final active = _active;
+    _clear(notify: notify);
+    final ready = active?.ready;
+    if (ready != null) {
+      try {
+        await ready;
+      } catch (_) {}
+    }
+    await active?.service.close();
+  }
 
   // Positive account IDs are authoritative and never fall back to email.
   ContactRecord? getCachedContact({int? contactUserId, String? email}) {

@@ -195,6 +195,8 @@ class PhotosContactsService {
   @visibleForTesting
   void debugReset({bool notify = false}) => _store.clearSession(notify: notify);
 
+  Future<void> close() => _store.close();
+
   Future<T?> _runReadSafely<T>(
     Future<T?> Function() task, {
     required String description,

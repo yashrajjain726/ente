@@ -87,7 +87,9 @@ void main() {
     expect(contact.profilePictureAttachmentId, 'att_old');
     await database.upsertContacts([contact]);
 
-    final rows = await (await database.database).query('contacts');
+    final rows = await (await database.database).getAll(
+      'SELECT * FROM contacts',
+    );
     expect(rows.single, {
       'id': 'ct_old',
       'contact_user_id': 200,
