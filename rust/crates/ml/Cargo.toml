@@ -8,7 +8,6 @@ ml-assets = []
 usearch = ["dep:usearch"]
 
 [dependencies]
-crc32fast = "1.5"
 ente-assets.workspace = true
 ente-image.workspace = true
 fast_image_resize = { version = "5.5.0", features = ["image", "rayon"] }

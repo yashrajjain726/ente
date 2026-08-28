@@ -2663,7 +2663,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "ash",
- "crc32fast",
  "ente-assets",
  "ente-image",
  "fast_image_resize",

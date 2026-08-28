@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 mod arena;
+mod crc;
 mod graph;
 mod kernel;
 mod lock;

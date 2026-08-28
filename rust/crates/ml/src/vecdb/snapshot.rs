@@ -3,6 +3,7 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 use super::VecDbError;
+use super::crc::crc32;
 use super::graph::{Graph, GraphNodeParts};
 use super::log::{remove_if_present, rename_with_windows_fallback, sync_parent_dir};
 
@@ -92,7 +93,7 @@ fn encode_snapshot(generation: &[u8; 16], covered_log_offset: u64, graph: &Graph
             }
         }
     }
-    let crc = crc32fast::hash(&bytes[MAGIC.len()..]);
+    let crc = crc32(&bytes[MAGIC.len()..]);
     bytes.extend_from_slice(&crc.to_le_bytes());
     bytes
 }
@@ -118,7 +119,7 @@ fn decode_snapshot(
         bytes[body_end + 2],
         bytes[body_end + 3],
     ]);
-    let computed_crc = crc32fast::hash(&bytes[MAGIC.len()..body_end]);
+    let computed_crc = crc32(&bytes[MAGIC.len()..body_end]);
     if stored_crc != computed_crc {
         return Err(format!(
             "crc mismatch: stored {stored_crc:08x}, computed {computed_crc:08x}"
@@ -315,7 +316,7 @@ mod tests {
 
     fn refresh_crc(bytes: &mut [u8]) {
         let body_end = bytes.len() - CRC_LEN;
-        let crc = crc32fast::hash(&bytes[MAGIC.len()..body_end]);
+        let crc = crc32(&bytes[MAGIC.len()..body_end]);
         bytes[body_end..].copy_from_slice(&crc.to_le_bytes());
     }
 
@@ -588,7 +589,7 @@ mod tests {
         bytes.extend_from_slice(&slot.to_le_bytes());
         bytes.push(0);
         bytes.extend_from_slice(&0u16.to_le_bytes());
-        let crc = crc32fast::hash(&bytes[MAGIC.len()..]);
+        let crc = crc32(&bytes[MAGIC.len()..]);
         bytes.extend_from_slice(&crc.to_le_bytes());
         let loaded = decode_snapshot(&bytes, &golden_generation(), 300).unwrap();
         assert_eq!(loaded.entry_point, Some(slot));

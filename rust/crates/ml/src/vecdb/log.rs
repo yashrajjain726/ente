@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::VecDbError;
 use super::arena::{MAX_KEY_BYTES, validate_key};
+use super::crc::{Crc32, crc32};
 use super::kernel::{LANE_WIDTH, splitmix64};
 
 pub(crate) const HEADER_LEN: usize = 32;
@@ -280,7 +281,7 @@ impl LogScanner<'_> {
             stored_crc_bytes[2],
             stored_crc_bytes[3],
         ]);
-        let mut hasher = crc32fast::Hasher::new();
+        let mut hasher = Crc32::new();
         hasher.update(&prefix);
         hasher.update(body);
         if hasher.finalize() != stored_crc {
@@ -338,7 +339,7 @@ fn encode_header(dims: u32, generation: &[u8; 16]) -> [u8; HEADER_LEN] {
     bytes[7] = METRIC_TAG_INNER_PRODUCT;
     bytes[8..12].copy_from_slice(&dims.to_le_bytes());
     bytes[12..28].copy_from_slice(generation);
-    let crc = crc32fast::hash(&bytes[0..28]);
+    let crc = crc32(&bytes[0..28]);
     bytes[28..32].copy_from_slice(&crc.to_le_bytes());
     bytes
 }
@@ -351,7 +352,7 @@ fn decode_header(bytes: &[u8; HEADER_LEN], expected_dims: usize) -> Result<[u8; 
         )));
     }
     let stored_crc = u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]);
-    let computed_crc = crc32fast::hash(&bytes[0..28]);
+    let computed_crc = crc32(&bytes[0..28]);
     if stored_crc != computed_crc {
         return Err(VecDbError::Corrupt(format!(
             "log header crc mismatch: stored {stored_crc:08x}, computed {computed_crc:08x}"
@@ -422,7 +423,7 @@ fn encode_record_into(buffer: &mut Vec<u8>, entry: &LogEntry<'_>) {
     for value in payload {
         buffer.extend_from_slice(&value.to_le_bytes());
     }
-    let crc = crc32fast::hash(&buffer[start..]);
+    let crc = crc32(&buffer[start..]);
     buffer.extend_from_slice(&crc.to_le_bytes());
 }
 
@@ -550,7 +551,7 @@ mod tests {
         bytes.extend_from_slice(&key_len.to_le_bytes());
         bytes.extend_from_slice(key);
         bytes.extend_from_slice(payload);
-        let crc = crc32fast::hash(&bytes);
+        let crc = crc32(&bytes);
         bytes.extend_from_slice(&crc.to_le_bytes());
         bytes
     }
@@ -562,7 +563,7 @@ mod tests {
     }
 
     fn refresh_crc(bytes: &mut [u8; HEADER_LEN]) {
-        let crc = crc32fast::hash(&bytes[0..28]);
+        let crc = crc32(&bytes[0..28]);
         bytes[28..32].copy_from_slice(&crc.to_le_bytes());
     }
 
