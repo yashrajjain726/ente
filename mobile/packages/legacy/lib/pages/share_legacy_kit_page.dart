@@ -6,7 +6,6 @@ import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_legacy/components/legacy_kit_card_preview.dart";
 import "package:ente_legacy/components/legacy_kit_recovery_wait_time_sheet.dart";
-import "package:ente_legacy/errors.dart";
 import "package:ente_legacy/models/legacy_kit_models.dart";
 import "package:ente_legacy/pages/legacy_congratulations_page.dart";
 import "package:ente_legacy/services/legacy_kit_local_settings.dart";
@@ -501,7 +500,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
     }
     if (updateError == null) {
       showShortToast(context, context.strings.recoveryTimeUpdated);
-    } else if (updateError is LegacyKitActiveRecoverySessionException) {
+    } else if (updateError is LegacyError_ActiveRecoverySession) {
       try {
         await _refreshKit();
       } catch (_) {

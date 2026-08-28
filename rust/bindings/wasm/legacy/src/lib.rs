@@ -1,9 +1,13 @@
-use ente_accounts::auth::KeyAttributes;
+mod types;
+
 use ente_core::b64;
-use ente_legacy::{LegacyContactState, LegacyKitRecoveryClient, LegacyKitShare};
+use ente_legacy::LegacyKitRecoveryClient;
 use ente_wasm_lib::session::Session;
-use serde::Deserialize;
 use serde_wasm_bindgen as swb;
+use tsify::Tsify;
+use types::{
+    KeyAttributes, LegacyContactState, LegacyInfo, LegacyKitRecoverySession, OpenKitRecoveryInput,
+};
 use wasm_bindgen::prelude::*;
 
 use ente_wasm_log as _;
@@ -46,8 +50,10 @@ impl From<Error> for JsValue {
 }
 
 #[wasm_bindgen(js_name = legacyGetInfo)]
-pub async fn legacy_get_info(session: &Session) -> Result<JsValue, Error> {
-    swb::to_value(&ente_legacy::info(session.inner()).await?).map_err(Into::into)
+pub async fn legacy_get_info(session: &Session) -> Result<<LegacyInfo as Tsify>::JsType, Error> {
+    LegacyInfo::from(ente_legacy::info(session.inner()).await?)
+        .into_js()
+        .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = legacyPublicKey)]
@@ -66,14 +72,14 @@ pub fn legacy_verification_id(public_key_b64: String) -> Result<String, Error> {
 pub async fn legacy_add_contact(
     session: &Session,
     email: String,
-    current_user_key_attrs: JsValue,
+    current_user_key_attrs: <KeyAttributes as Tsify>::JsType,
     recovery_notice_in_days: Option<i32>,
 ) -> Result<(), Error> {
-    let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
+    let current_user_key_attrs = KeyAttributes::from_js(current_user_key_attrs)?;
     ente_legacy::add_contact(
         session.inner(),
         &email,
-        &current_user_key_attrs,
+        &current_user_key_attrs.into(),
         recovery_notice_in_days,
     )
     .await
@@ -85,10 +91,10 @@ pub async fn legacy_update_contact(
     session: &Session,
     user_id: i64,
     emergency_contact_id: i64,
-    state: JsValue,
+    state: <LegacyContactState as Tsify>::JsType,
 ) -> Result<(), Error> {
-    let state: LegacyContactState = swb::from_value(state)?;
-    ente_legacy::update_contact(session.inner(), user_id, emergency_contact_id, state)
+    let state = LegacyContactState::from_js(state)?;
+    ente_legacy::update_contact(session.inner(), user_id, emergency_contact_id, state.into())
         .await
         .map_err(Into::into)
 }
@@ -147,41 +153,34 @@ pub async fn legacy_reject_recovery(
 pub async fn legacy_change_password(
     session: &Session,
     recovery_id: String,
-    current_user_key_attrs: JsValue,
+    current_user_key_attrs: <KeyAttributes as Tsify>::JsType,
     new_password: String,
 ) -> Result<(), Error> {
-    let current_user_key_attrs: KeyAttributes = swb::from_value(current_user_key_attrs)?;
+    let current_user_key_attrs = KeyAttributes::from_js(current_user_key_attrs)?;
     ente_legacy::change_password(
         session.inner(),
         &recovery_id,
-        &current_user_key_attrs,
+        &current_user_key_attrs.into(),
         &new_password,
     )
     .await
     .map_err(Into::into)
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OpenLegacyKitRecoveryInput {
-    base_url: String,
-    shares: Vec<LegacyKitShare>,
-    email: Option<String>,
-    client_package: Option<String>,
-    client_version: Option<String>,
-}
-
-#[wasm_bindgen]
-pub async fn legacy_kit_open_recovery(input: JsValue) -> Result<LegacyKitRecoveryHandle, Error> {
-    let input: OpenLegacyKitRecoveryInput = swb::from_value(input)?;
+#[wasm_bindgen(js_name = openKitRecovery)]
+pub async fn open_kit_recovery(
+    input: <OpenKitRecoveryInput as Tsify>::JsType,
+) -> Result<LegacyKitRecoveryHandle, Error> {
+    let input = OpenKitRecoveryInput::from_js(input)?;
     let client = LegacyKitRecoveryClient::new_with_headers(
         input.base_url,
         input.client_package,
         input.client_version,
         None,
     )?;
+    let shares = input.shares.into_iter().map(Into::into).collect::<Vec<_>>();
     let handle = client
-        .open_from_shares(&input.shares, input.email.as_deref())
+        .open_from_shares(&shares, input.email.as_deref())
         .await?;
     Ok(LegacyKitRecoveryHandle { inner: handle })
 }
@@ -193,15 +192,22 @@ pub struct LegacyKitRecoveryHandle {
 
 #[wasm_bindgen]
 impl LegacyKitRecoveryHandle {
-    pub fn session(&self) -> Result<JsValue, Error> {
-        Ok(swb::to_value(self.inner.session())?)
+    pub fn session(&self) -> Result<<LegacyKitRecoverySession as Tsify>::JsType, Error> {
+        LegacyKitRecoverySession::from(self.inner.session().clone())
+            .into_js()
+            .map_err(Into::into)
     }
 
-    pub async fn refresh_session(&self) -> Result<JsValue, Error> {
-        let session = self.inner.refresh_session().await?;
-        Ok(swb::to_value(&session)?)
+    #[wasm_bindgen(js_name = refreshSession)]
+    pub async fn refresh_session(
+        &self,
+    ) -> Result<<LegacyKitRecoverySession as Tsify>::JsType, Error> {
+        LegacyKitRecoverySession::from(self.inner.refresh_session().await?)
+            .into_js()
+            .map_err(Into::into)
     }
 
+    #[wasm_bindgen(js_name = changePassword)]
     pub async fn change_password(&self, new_password: String) -> Result<(), Error> {
         Ok(self.inner.change_password(&new_password).await?)
     }

@@ -2,6 +2,9 @@
     "name": "locker",
     "version": "0.0.0",
     "private": true,
+    "scripts": {
+        "test": "vitest --run"
+    },
     "dependencies": {
         "@fontsource-variable/outfit": "5.2.8",
         "@hugeicons/core-free-icons": "1.2.1",
@@ -10,9 +13,11 @@
         "ente-base": "*",
         "ente-contacts": "*",
         "ente-core-wasm": "*",
+        "ente-legacy-wasm": "*",
         "ente-locker-wasm": "*"
     },
     "devDependencies": {
-        "ente-build-config": "*"
+        "ente-build-config": "*",
+        "vitest": "4.1.8"
     }
 }

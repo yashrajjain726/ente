@@ -15,20 +15,20 @@ import {
     Typography,
 } from "@mui/material";
 import { isWeakPassword } from "ente-accounts/utils/password";
+import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
 import { isDevBuild } from "ente-base/env";
 import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
-import type { LegacyKitRecoveryHandle } from "ente-legacy-wasm";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { apiOrigin } from "ente-base/origins";
 import {
-    changeLegacyKitPassword,
-    openLegacyKitRecovery,
-    refreshLegacyKitRecoverySession,
+    openKitRecovery,
+    type LegacyKitRecoveryHandle,
     type LegacyKitRecoverySession,
-} from "../features/legacy-kit/recovery";
+} from "ente-legacy-wasm";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     LegacyKitQRDecodeError,
     readLegacyKitCodeFromFile,
@@ -246,9 +246,14 @@ const Page: React.FC = () => {
         setOpenError(undefined);
 
         try {
-            const opened = await openLegacyKitRecovery(shares);
-            setHandle(opened.handle);
-            setSession(opened.session);
+            const opened = await openKitRecovery({
+                baseUrl: await apiOrigin(),
+                shares,
+                clientPackage: clientPackageName,
+                clientVersion: isDesktop ? desktopAppVersion : undefined,
+            });
+            setSession(opened.session());
+            setHandle(opened);
         } catch (error) {
             log.error("Legacy kit recovery open failed", error);
             if (isInactiveLegacyKitError(error)) {
@@ -268,7 +273,7 @@ const Page: React.FC = () => {
         setIsRefreshing(true);
         setOpenError(undefined);
         try {
-            setSession(await refreshLegacyKitRecoverySession(handle));
+            setSession(await handle.refreshSession());
         } catch (error) {
             log.error("Legacy kit recovery refresh failed", error);
             if (isInactiveLegacyKitError(error)) {
@@ -299,7 +304,7 @@ const Page: React.FC = () => {
                 return;
             }
             try {
-                await changeLegacyKitPassword(handle, password);
+                await handle.changePassword(password);
                 setSession((current) =>
                     current ? { ...current, status: "RECOVERED" } : current,
                 );

@@ -1,75 +1,16 @@
 import "dart:convert";
 
-enum LegacyKitRecoveryStatus { waiting, ready, blocked, cancelled, recovered }
+import "package:ente_frb/legacy.dart";
 
-class LegacyKitRecoverySession {
-  final String id;
-  final String kitId;
-  final LegacyKitRecoveryStatus status;
-  // Remaining microseconds until recovery becomes ready, matching the existing
-  // legacy contact recovery API contract.
-  final int waitTill;
-  final int createdAt;
+export "package:ente_frb/legacy.dart";
 
-  const LegacyKitRecoverySession({
-    required this.id,
-    required this.kitId,
-    required this.status,
-    required this.waitTill,
-    required this.createdAt,
-  });
-}
-
-class LegacyKitPart {
-  final int index;
-  final String name;
-
-  const LegacyKitPart({required this.index, required this.name});
-}
-
-class LegacyKit {
-  final String id;
-  final int noticePeriodInHours;
-  final String legacyUrl;
-  final List<LegacyKitPart> parts;
-  final int createdAt;
-  final int updatedAt;
-  final LegacyKitRecoverySession? activeRecoverySession;
-
-  const LegacyKit({
-    required this.id,
-    required this.noticePeriodInHours,
-    required this.legacyUrl,
-    required this.parts,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.activeRecoverySession,
-  });
-
+extension LegacyKitDisplay on LegacyKit {
   String get displayName => parts.map((part) => part.name).join(" · ");
 
   bool get hasActiveRecoverySession => activeRecoverySession != null;
 }
 
-class LegacyKitShare {
-  final int payloadVersion;
-  final int variant;
-  final String kitId;
-  final int shareIndex;
-  final String share;
-  final String checksum;
-  final String partName;
-
-  const LegacyKitShare({
-    required this.payloadVersion,
-    required this.variant,
-    required this.kitId,
-    required this.shareIndex,
-    required this.share,
-    required this.checksum,
-    required this.partName,
-  });
-
+extension LegacyKitShareEncoding on LegacyKitShare {
   String toQrPayload() {
     return jsonEncode({
       "pv": payloadVersion,
@@ -89,11 +30,4 @@ class LegacyKitShare {
   String _withoutWhitespace(String value) {
     return value.replaceAll(RegExp(r"\s+"), "");
   }
-}
-
-class LegacyKitCreateResult {
-  final LegacyKit kit;
-  final List<LegacyKitShare> shares;
-
-  const LegacyKitCreateResult({required this.kit, required this.shares});
 }
