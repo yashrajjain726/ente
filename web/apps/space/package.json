@@ -3,7 +3,8 @@
     "version": "0.0.0",
     "private": true,
     "scripts": {
-        "build:post": "rm -f out/404.html"
+        "build:post": "rm -f out/404.html",
+        "test": "vitest --run"
     },
     "dependencies": {
         "@fontsource-variable/inter": "5.2.8",
@@ -20,6 +21,7 @@
         "thumbhash": "0.1.1"
     },
     "devDependencies": {
-        "ente-build-config": "*"
+        "ente-build-config": "*",
+        "vitest": "4.1.8"
     }
 }

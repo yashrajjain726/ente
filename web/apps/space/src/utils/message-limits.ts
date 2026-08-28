@@ -1,4 +1,5 @@
 export const spaceMessageTextMaxLength = 1000;
+export const spaceWaveMessageText = "👋";
 
 export const clampSpaceMessageText = (text: string) =>
     Array.from(text).slice(0, spaceMessageTextMaxLength).join("");
