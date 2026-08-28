@@ -131,6 +131,8 @@ class SuperLogging {
 
   static late SharedPreferences _preferences;
 
+  static bool _isRootLogListenerRegistered = false;
+
   static const keyShouldReportCrashes = "should_report_crashes";
 
   static Future<void> main([LogConfig? appConfig]) async {
@@ -164,7 +166,10 @@ class SuperLogging {
 
     Logger.root.level = rootLoggerLevel;
     EnteWatch.setLogLevel(_terminalLoggerLevel);
-    Logger.root.onRecord.listen(onLogRecord);
+    if (!_isRootLogListenerRegistered) {
+      Logger.root.onRecord.listen(onLogRecord);
+      _isRootLogListenerRegistered = true;
+    }
 
     if (isFDroidClient) {
       assert(
