@@ -33,7 +33,6 @@ import "package:photos/services/machine_learning/ml_process_lock.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/machine_learning/ml_run_control.dart";
 import "package:photos/services/machine_learning/semantic_search/semantic_search_service.dart";
-import "package:photos/services/process_activity.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/services/video_preview_service.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
@@ -64,12 +63,10 @@ class MLService {
   bool _mlControllerStatus = false;
   final Set<MlRunControl> _runControls = {};
   MlRunControl? _activeRunControl;
-  Timer? _bgYieldPollTimer;
   Timer? _deniedRunRetryTimer;
   Timer? _predownloadLocalModelsTimer;
 
   static const _kPredownloadLocalModelsDelay = Duration(seconds: 10);
-  static const _kBgYieldPollInterval = Duration(seconds: 3);
   static const _kDeniedRunRetryDelay = Duration(seconds: 15);
 
   bool get _isRunningML =>
@@ -517,23 +514,11 @@ class MLService {
     control.attachOnStop(() {
       MLIndexingIsolate.instance.shouldPauseIndexingAndClustering = true;
     });
-    // BG always yields to FG: while a BG run holds the lock, watch for the
-    // foreground engine's heartbeat and wind down as soon as it appears.
-    if (isProcessBg) {
-      _bgYieldPollTimer = Timer.periodic(_kBgYieldPollInterval, (_) async {
-        if (control.stopRequested) return;
-        if (await isForegroundEngineActive()) {
-          control.requestStop(MlStopReason.foregroundActive);
-        }
-      });
-    }
   }
 
   // The isolate stop flag is cleared here, from the outer run cleanup, and
   // nowhere else: a durable stop must survive stage-level finally blocks.
   void _clearRunControl(MlRunControl control) {
-    _bgYieldPollTimer?.cancel();
-    _bgYieldPollTimer = null;
     control.detachOnStop();
     if (identical(_activeRunControl, control)) {
       _activeRunControl = null;

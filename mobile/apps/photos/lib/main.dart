@@ -238,14 +238,15 @@ Future<void> runBackgroundTask(
     Platform.isIOS ? kBGTaskMLSelfStopIOS : kBGTaskMLSelfStopAndroid,
     () => mlRunControl.requestStop(MlStopReason.backgroundDeadline),
   );
-  final mlForegroundWatchTimer = Timer.periodic(const Duration(seconds: 1), (
-    _,
-  ) async {
-    if (mlRunControl.stopRequested) return;
-    if (await isForegroundEngineActive()) {
-      mlRunControl.requestStop(MlStopReason.foregroundActive);
-    }
-  });
+  final mlForegroundWatchTimer = Timer.periodic(
+    const Duration(milliseconds: 500),
+    (_) async {
+      if (mlRunControl.stopRequested) return;
+      if (await isForegroundEngineActive()) {
+        mlRunControl.requestStop(MlStopReason.foregroundActive);
+      }
+    },
+  );
 
   try {
     final isRunningInFG = await isForegroundEngineActive();
