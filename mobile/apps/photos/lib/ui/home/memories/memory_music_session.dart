@@ -2,9 +2,10 @@ import "dart:async";
 
 import "package:flutter/material.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/services/memories/bundled_memory_music_tracks.dart";
+import "package:photos/services/memories/just_audio_memory_music_player.dart";
 import "package:photos/services/memories/memory_music_controller.dart";
 import "package:photos/services/memories/memory_music_selector.dart";
+import "package:photos/services/memories/memory_music_tracks.dart";
 
 class MemoryMusicSession extends StatefulWidget {
   final List<String> memoryIDs;
@@ -30,12 +31,13 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
     WidgetsBinding.instance.addObserver(this);
     final assignments = assignMemoryMusicTracks(
       memoryIDs: widget.memoryIDs,
-      tracks: bundledMemoryMusicTracks,
+      tracks: memoryMusicTracks,
     );
     _controller = MemoryMusicController(
       assignments: assignments,
       initiallyMuted: localSettings.isMemoriesAudioMuted(),
       persistMuted: localSettings.setMemoriesAudioMuted,
+      player: JustAudioMemoryMusicPlayer(),
     );
   }
 

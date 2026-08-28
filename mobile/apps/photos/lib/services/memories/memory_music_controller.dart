@@ -29,11 +29,11 @@ class MemoryMusicController extends ChangeNotifier {
     required Map<String, MemoryMusicTrack> assignments,
     required bool initiallyMuted,
     required Future<void> Function(bool isMuted) persistMuted,
-    MemoryMusicPlayer? player,
+    required MemoryMusicPlayer player,
   }) : _assignments = assignments,
        _isMuted = initiallyMuted,
        _persistMuted = persistMuted,
-       _player = player ?? JustAudioMemoryMusicPlayer();
+       _player = player;
 
   bool get isMuted => _isMuted;
 
@@ -65,7 +65,7 @@ class MemoryMusicController extends ChangeNotifier {
     try {
       await _ensureAudioSessionInitialized();
       if (!_isCurrentLoad(generation)) return;
-      await _player.loadAsset(track.assetPath);
+      await _player.load(track);
       if (!_isCurrentLoad(generation)) return;
       await _player.setLooping();
       if (!_isCurrentLoad(generation)) return;

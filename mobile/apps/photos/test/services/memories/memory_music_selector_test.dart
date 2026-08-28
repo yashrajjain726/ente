@@ -4,9 +4,21 @@ import "package:photos/services/memories/memory_music_selector.dart";
 
 void main() {
   const tracks = <MemoryMusicTrack>[
-    MemoryMusicTrack(id: "track-1", assetPath: "assets/track-1.mp3"),
-    MemoryMusicTrack(id: "track-2", assetPath: "assets/track-2.mp3"),
-    MemoryMusicTrack(id: "track-3", assetPath: "assets/track-3.mp3"),
+    MemoryMusicTrack(
+      id: "track-1",
+      url: "https://example.com/track-1.mp3",
+      cacheFileName: "track-1.mp3",
+    ),
+    MemoryMusicTrack(
+      id: "track-2",
+      url: "https://example.com/track-2.mp3",
+      cacheFileName: "track-2.mp3",
+    ),
+    MemoryMusicTrack(
+      id: "track-3",
+      url: "https://example.com/track-3.mp3",
+      cacheFileName: "track-3.mp3",
+    ),
   ];
   const memoryIDs = <String>["memory-a", "memory-b", "memory-c", "memory-d"];
 
@@ -28,7 +40,11 @@ void main() {
     final assignments = assignMemoryMusicTracks(
       memoryIDs: memoryIDs,
       tracks: const <MemoryMusicTrack>[
-        MemoryMusicTrack(id: "track-1", assetPath: "assets/track-1.mp3"),
+        MemoryMusicTrack(
+          id: "track-1",
+          url: "https://example.com/track-1.mp3",
+          cacheFileName: "track-1.mp3",
+        ),
       ],
     );
 

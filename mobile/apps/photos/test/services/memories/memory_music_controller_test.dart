@@ -15,11 +15,13 @@ void main() {
       assignments: const <String, MemoryMusicTrack>{
         "memory-1": MemoryMusicTrack(
           id: "track-1",
-          assetPath: "assets/track-1.mp3",
+          url: "https://example.com/track-1.mp3",
+          cacheFileName: "track-1.mp3",
         ),
         "memory-2": MemoryMusicTrack(
           id: "track-2",
-          assetPath: "assets/track-2.mp3",
+          url: "https://example.com/track-2.mp3",
+          cacheFileName: "track-2.mp3",
         ),
       },
       initiallyMuted: initiallyMuted,
@@ -41,7 +43,7 @@ void main() {
   test("activating a photo memory loads, loops, and plays its track", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
-    expect(player.loadedAssets, <String>["assets/track-1.mp3"]);
+    expect(player.loadedTracks.map((track) => track.id), <String>["track-1"]);
     expect(player.looping, isTrue);
     expect(player.playing, isTrue);
   });
@@ -100,9 +102,9 @@ void main() {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
     await controller.activateMemory("memory-2", currentItemIsVideo: false);
 
-    expect(player.loadedAssets, <String>[
-      "assets/track-1.mp3",
-      "assets/track-2.mp3",
+    expect(player.loadedTracks.map((track) => track.id), <String>[
+      "track-1",
+      "track-2",
     ]);
   });
 
@@ -123,9 +125,9 @@ void main() {
     releaseFirstLoad.complete();
     await firstActivation;
 
-    expect(player.loadedAssets, <String>[
-      "assets/track-1.mp3",
-      "assets/track-2.mp3",
+    expect(player.loadedTracks.map((track) => track.id), <String>[
+      "track-1",
+      "track-2",
     ]);
     expect(player.playAttempts, 1);
   });
@@ -157,7 +159,7 @@ void main() {
 }
 
 class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
-  final List<String> loadedAssets = <String>[];
+  final List<MemoryMusicTrack> loadedTracks = <MemoryMusicTrack>[];
   bool looping = false;
   bool playing = false;
   bool playedImmediately = false;
@@ -171,13 +173,13 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   Future<void> configureAudioSession() async {}
 
   @override
-  Future<void> loadAsset(String assetPath) async {
+  Future<void> load(MemoryMusicTrack track) async {
     loadAttempts++;
     if (failNextLoad) {
       failNextLoad = false;
       throw StateError("load failed");
     }
-    loadedAssets.add(assetPath);
+    loadedTracks.add(track);
     final beforeCompleting = beforeNextLoadCompletes;
     beforeNextLoadCompletes = null;
     await beforeCompleting?.call();
