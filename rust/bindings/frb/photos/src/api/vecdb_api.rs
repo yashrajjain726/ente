@@ -9,6 +9,7 @@ pub enum RustVecDbError {
     Corrupt { message: String },
     Locked { message: String },
     ReadOnly { message: String },
+    Closed { message: String },
     InvalidKey { message: String },
     InvalidVector { message: String },
     DimensionMismatch { message: String },
@@ -25,6 +26,7 @@ impl From<vecdb::VecDbError> for RustVecDbError {
             vecdb::VecDbError::Corrupt(_) => Self::Corrupt { message },
             vecdb::VecDbError::Locked(_) => Self::Locked { message },
             vecdb::VecDbError::ReadOnly => Self::ReadOnly { message },
+            vecdb::VecDbError::Closed => Self::Closed { message },
             vecdb::VecDbError::InvalidKey(_) => Self::InvalidKey { message },
             vecdb::VecDbError::InvalidVector(_) => Self::InvalidVector { message },
             vecdb::VecDbError::DimensionMismatch { .. } => Self::DimensionMismatch { message },
@@ -108,12 +110,12 @@ impl VecDb {
         Ok(matches.into_iter().map(to_api_match).collect())
     }
 
-    pub fn add_vector(&mut self, key: String, vector: Vec<f32>) -> Result<(), RustVecDbError> {
+    pub fn add_vector(&self, key: String, vector: Vec<f32>) -> Result<(), RustVecDbError> {
         Ok(self.inner.add(&key, &vector)?)
     }
 
     pub fn bulk_add_vectors(
-        &mut self,
+        &self,
         keys: Vec<String>,
         vectors: Vec<Vec<f32>>,
     ) -> Result<(), RustVecDbError> {
@@ -244,19 +246,19 @@ impl VecDb {
         keys.iter().map(|key| self.inner.get(key)).collect()
     }
 
-    pub fn remove_vector(&mut self, key: String) -> Result<usize, RustVecDbError> {
+    pub fn remove_vector(&self, key: String) -> Result<usize, RustVecDbError> {
         Ok(usize::from(self.inner.remove(&key)?))
     }
 
-    pub fn bulk_remove_vectors(&mut self, keys: Vec<String>) -> Result<usize, RustVecDbError> {
+    pub fn bulk_remove_vectors(&self, keys: Vec<String>) -> Result<usize, RustVecDbError> {
         Ok(self.inner.bulk_remove(&keys)?)
     }
 
-    pub fn flush(&mut self) -> Result<(), RustVecDbError> {
+    pub fn flush(&self) -> Result<(), RustVecDbError> {
         Ok(self.inner.flush()?)
     }
 
-    pub fn reset_index(&mut self) -> Result<(), RustVecDbError> {
+    pub fn reset_index(&self) -> Result<(), RustVecDbError> {
         Ok(self.inner.reset()?)
     }
 
@@ -265,14 +267,23 @@ impl VecDb {
     }
 
     pub fn get_index_stats(&self) -> VecDbStats {
-        let stats = self.inner.stats();
-        VecDbStats {
-            live_count: stats.live_count,
-            dead_count: stats.dead_count,
-            dims: stats.dims,
-            log_bytes: stats.log_bytes,
-            records_since_snapshot: stats.records_since_snapshot,
-            approximate_memory_bytes: stats.approximate_memory_bytes,
+        match self.inner.stats() {
+            Ok(stats) => VecDbStats {
+                live_count: stats.live_count,
+                dead_count: stats.dead_count,
+                dims: stats.dims,
+                log_bytes: stats.log_bytes,
+                records_since_snapshot: stats.records_since_snapshot,
+                approximate_memory_bytes: stats.approximate_memory_bytes,
+            },
+            Err(_) => VecDbStats {
+                live_count: 0,
+                dead_count: 0,
+                dims: 0,
+                log_bytes: 0,
+                records_since_snapshot: 0,
+                approximate_memory_bytes: 0,
+            },
         }
     }
 
@@ -334,7 +345,7 @@ mod tests {
     #[test]
     fn add_search_stats_round_trip() {
         let dir = TestDir::create();
-        let mut db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
         db.bulk_add_vectors(vec![key("b"), key("c")], vec![basis(1), basis(2)])
             .unwrap();
@@ -380,7 +391,7 @@ mod tests {
         assert!(!db.is_empty());
         db.flush().unwrap();
         assert_eq!(db.get_index_stats().records_since_snapshot, 0);
-        let mut read_only = VecDb::open_read_only(dir.db_path(), DIMS).unwrap();
+        let read_only = VecDb::open_read_only(dir.db_path(), DIMS).unwrap();
         assert_eq!(read_only.len(), 3);
         assert!(matches!(
             read_only.add_vector(key("x"), basis(3)),
@@ -403,7 +414,7 @@ mod tests {
     #[test]
     fn bulk_add_rejects_length_mismatch() {
         let dir = TestDir::create();
-        let mut db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
         let error = db
             .bulk_add_vectors(vec![key("a")], vec![basis(0), basis(1)])
             .unwrap_err();
@@ -414,7 +425,7 @@ mod tests {
     #[test]
     fn similarity_threshold_conversion_edges() {
         let dir = TestDir::create();
-        let mut db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
         db.add_vector(key("b"), basis(1)).unwrap();
         let close = db
@@ -438,7 +449,7 @@ mod tests {
     #[test]
     fn bulk_filtered_search_stays_query_aligned() {
         let dir = TestDir::create();
-        let mut db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
         db.bulk_add_vectors(
             vec![key("a"), key("b"), key("c")],
             vec![basis(0), basis(1), basis(2)],
@@ -492,7 +503,7 @@ mod tests {
     #[test]
     fn bulk_search_keys_includes_self_match_and_skips_absent() {
         let dir = TestDir::create();
-        let mut db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
         db.bulk_add_vectors(vec![key("a"), key("b")], vec![basis(0), basis(1)])
             .unwrap();
         let results = db

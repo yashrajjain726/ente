@@ -41,6 +41,8 @@ pub enum VecDbError {
     Locked(PathBuf),
     #[error("vector db was opened read-only")]
     ReadOnly,
+    #[error("vector db was deleted")]
+    Closed,
     #[error("invalid key: {0}")]
     InvalidKey(String),
     #[error("invalid vector: {0}")]

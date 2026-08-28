@@ -1,7 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    Arc, LazyLock, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak,
+};
 use std::time::{Duration, Instant};
 
 use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
@@ -25,6 +29,13 @@ const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
 const GRAPH_NODE_OVERHEAD_BYTES: usize = 48;
 const NEIGHBOR_LIST_OVERHEAD_BYTES: usize = 24;
 
+static REGISTRY: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<PathSlot>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+struct PathSlot {
+    live: Weak<Shared>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stats {
     pub live_count: usize,
@@ -36,16 +47,32 @@ pub struct Stats {
 }
 
 pub struct VecDb {
+    shared: Arc<Shared>,
+    read_only: bool,
+}
+
+struct Shared {
     path: PathBuf,
+    dims: usize,
+    registry_key: Option<PathBuf>,
+    closed: AtomicBool,
+    writer: Mutex<WriterHalf>,
+    state: RwLock<SearchState>,
+}
+
+struct SearchState {
     arena: VectorArena,
     graph: Graph,
     total_records: u64,
-    compaction_retry_at_dead: u64,
-    mode: Mode,
 }
 
-enum Mode {
-    Writer(WriterState),
+struct WriterHalf {
+    compaction_retry_at_dead: u64,
+    mode: WriterMode,
+}
+
+enum WriterMode {
+    Active(WriterState),
     ReadOnly { log_bytes: u64 },
 }
 
@@ -56,113 +83,165 @@ struct WriterState {
     last_write: Option<Instant>,
 }
 
+impl Shared {
+    fn writer_half(&self) -> MutexGuard<'_, WriterHalf> {
+        self.writer.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn state_read(&self) -> RwLockReadGuard<'_, SearchState> {
+        self.state.read().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn state_write(&self) -> RwLockWriteGuard<'_, SearchState> {
+        self.state.write().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn ensure_open(&self) -> Result<(), VecDbError> {
+        if self.closed.load(Ordering::Acquire) {
+            Err(VecDbError::Closed)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for Shared {
+    fn drop(&mut self) {
+        let Some(key) = &self.registry_key else {
+            return;
+        };
+        let mut registry = registry();
+        let Some(slot) = registry.get(key).map(Arc::clone) else {
+            return;
+        };
+        let mut guard = lock_slot(&slot);
+        if std::ptr::eq(guard.live.as_ptr(), self) {
+            guard.live = Weak::new();
+        }
+        let removable = guard.live.strong_count() == 0 && Arc::strong_count(&slot) == 2;
+        drop(guard);
+        if removable {
+            registry.remove(key);
+        }
+    }
+}
+
+fn registry() -> MutexGuard<'static, HashMap<PathBuf, Arc<Mutex<PathSlot>>>> {
+    REGISTRY.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn lock_slot(slot: &Mutex<PathSlot>) -> MutexGuard<'_, PathSlot> {
+    slot.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn path_slot(key: &Path) -> Arc<Mutex<PathSlot>> {
+    let mut registry = registry();
+    match registry.get(key) {
+        Some(slot) => Arc::clone(slot),
+        None => {
+            let slot = Arc::new(Mutex::new(PathSlot { live: Weak::new() }));
+            registry.insert(key.to_path_buf(), Arc::clone(&slot));
+            slot
+        }
+    }
+}
+
+fn existing_path_slot(key: &Path) -> Option<Arc<Mutex<PathSlot>>> {
+    registry().get(key).map(Arc::clone)
+}
+
+fn remove_path_slot_if_unused(key: &Path) {
+    let mut registry = registry();
+    let Some(slot) = registry.get(key).map(Arc::clone) else {
+        return;
+    };
+    let removable = lock_slot(&slot).live.strong_count() == 0 && Arc::strong_count(&slot) == 2;
+    if removable {
+        registry.remove(key);
+    }
+}
+
+fn registry_key_for(path: &Path) -> Result<PathBuf, VecDbError> {
+    let file_name = path.file_name().ok_or_else(|| {
+        VecDbError::io(
+            path,
+            std::io::Error::new(ErrorKind::InvalidInput, "path has no file name"),
+        )
+    })?;
+    let parent = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    let canonical_parent =
+        std::fs::canonicalize(parent).map_err(|source| VecDbError::io(path, source))?;
+    Ok(canonical_parent.join(file_name))
+}
+
+fn join_live(shared: Arc<Shared>, dims: usize, read_only: bool) -> Result<VecDb, VecDbError> {
+    if shared.dims != dims {
+        return Err(VecDbError::DimensionMismatch {
+            expected: dims,
+            actual: shared.dims,
+        });
+    }
+    Ok(VecDb { shared, read_only })
+}
+
 impl VecDb {
     pub fn open(path: &Path, dims: usize) -> Result<Self, VecDbError> {
-        let lock = WriterLock::acquire(path)?;
-        let mut log = match Log::create(path, dims) {
-            Ok(created) => created,
-            Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
-                reopen_log(path, dims)?
-            }
-            Err(error) => return Err(error),
-        };
-        remove_stale_temp_sibling(path)?;
-        let snapshot_present = std::fs::metadata(snapshot_path(path)).is_ok();
-        let replayed = replay(&mut log, dims)?;
-        if replayed.recoverable_end < log.current_end_offset() {
-            log.truncate_to(replayed.recoverable_end)?;
+        let key = registry_key_for(path)?;
+        let slot = path_slot(&key);
+        let mut guard = lock_slot(&slot);
+        if let Some(shared) = guard.live.upgrade() {
+            drop(guard);
+            return join_live(shared, dims, false);
         }
-        let snapshot_stale = if replayed.used_snapshot {
-            replayed.tail_records > 0
-        } else {
-            replayed.total_records > 0 || snapshot_present
-        };
-        let pending_records = if replayed.used_snapshot {
-            replayed.tail_records
-        } else {
-            replayed.total_records
-        } as usize;
-        let mut db = Self {
-            path: path.to_path_buf(),
-            arena: replayed.arena,
-            graph: replayed.graph,
-            total_records: replayed.total_records,
-            compaction_retry_at_dead: 0,
-            mode: Mode::Writer(WriterState {
-                lock,
-                log,
-                mutations_since_snapshot: 0,
-                last_write: None,
-            }),
-        };
-        if snapshot_stale && let Err(error) = db.write_snapshot_now() {
-            log::warn!(
-                "continuing without an open-time snapshot for {}: {error}",
-                path.display()
-            );
-            if let Mode::Writer(state) = &mut db.mode {
-                state.mutations_since_snapshot = pending_records.max(1);
+        let shared = match build_writer(path, key.clone(), dims) {
+            Ok(built) => Arc::new(built),
+            Err(error) => {
+                drop(guard);
+                drop(slot);
+                remove_path_slot_if_unused(&key);
+                return Err(error);
             }
-        }
-        Ok(db)
+        };
+        guard.live = Arc::downgrade(&shared);
+        drop(guard);
+        Ok(Self {
+            shared,
+            read_only: false,
+        })
     }
 
     pub fn open_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
-        let file = match File::open(path) {
-            Ok(file) => file,
-            Err(error) if error.kind() == ErrorKind::NotFound => {
-                return Self::empty_read_only(path, dims);
+        if let Ok(key) = registry_key_for(path)
+            && let Some(slot) = existing_path_slot(&key)
+        {
+            let live = lock_slot(&slot).live.upgrade();
+            if let Some(shared) = live {
+                return join_live(shared, dims, true);
             }
-            Err(source) => return Err(VecDbError::io(path, source)),
-        };
-        let file_len = file
-            .metadata()
-            .map_err(|source| VecDbError::io(path, source))?
-            .len();
-        if file_len < HEADER_LEN as u64 {
-            return Self::empty_read_only(path, dims);
         }
-        let mut log = Log::open(file, path, dims)?;
-        let replayed = replay(&mut log, dims)?;
-        drop(log);
         Ok(Self {
-            path: path.to_path_buf(),
-            arena: replayed.arena,
-            graph: replayed.graph,
-            total_records: replayed.total_records,
-            compaction_retry_at_dead: 0,
-            mode: Mode::ReadOnly {
-                log_bytes: replayed.recoverable_end,
-            },
+            shared: Arc::new(build_read_only(path, dims)?),
+            read_only: true,
         })
     }
 
-    fn empty_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
-        Ok(Self {
-            path: path.to_path_buf(),
-            arena: VectorArena::new(dims)?,
-            graph: Graph::new(),
-            total_records: 0,
-            compaction_retry_at_dead: 0,
-            mode: Mode::ReadOnly { log_bytes: 0 },
-        })
-    }
-
-    pub fn add(&mut self, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
+    pub fn add(&self, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
         let now = Instant::now();
-        self.ensure_writer()?;
+        let mut half = self.writable_half()?;
+        let state = active_state(&mut half)?;
         ensure_finite(key, vector)?;
-        self.writer_state()?
-            .log
-            .append(&[LogEntry::Add { key, vector }])?;
-        let outcome = self.arena.upsert(key, vector)?;
-        apply_outcome(&mut self.graph, &self.arena, outcome);
-        self.record_mutations(1, now)
+        state.log.append(&[LogEntry::Add { key, vector }])?;
+        apply_add(&self.shared, key, vector)?;
+        apply_policy(&self.shared, &mut half, 1, now)
     }
 
-    pub fn bulk_add(&mut self, entries: &[(String, Vec<f32>)]) -> Result<(), VecDbError> {
+    pub fn bulk_add(&self, entries: &[(String, Vec<f32>)]) -> Result<(), VecDbError> {
         let now = Instant::now();
-        self.ensure_writer()?;
+        let mut half = self.writable_half()?;
+        let state = active_state(&mut half)?;
         if entries.is_empty() {
             return Ok(());
         }
@@ -173,38 +252,41 @@ impl VecDb {
             .iter()
             .map(|(key, vector)| LogEntry::Add { key, vector })
             .collect();
-        self.writer_state()?.log.append(&records)?;
+        state.log.append(&records)?;
         for (key, vector) in entries {
-            let outcome = self.arena.upsert(key, vector)?;
-            apply_outcome(&mut self.graph, &self.arena, outcome);
+            apply_add(&self.shared, key, vector)?;
         }
-        self.record_mutations(entries.len(), now)
+        apply_policy(&self.shared, &mut half, entries.len(), now)
     }
 
-    pub fn remove(&mut self, key: &str) -> Result<bool, VecDbError> {
+    pub fn remove(&self, key: &str) -> Result<bool, VecDbError> {
         let now = Instant::now();
-        self.ensure_writer()?;
-        if self.arena.slot_of_key(key).is_none() {
+        let mut half = self.writable_half()?;
+        let state = active_state(&mut half)?;
+        if self.shared.state_read().arena.slot_of_key(key).is_none() {
             return Ok(false);
         }
-        self.writer_state()?
-            .log
-            .append(&[LogEntry::Tombstone { key }])?;
-        self.arena.remove(key);
-        self.record_mutations(1, now)?;
+        state.log.append(&[LogEntry::Tombstone { key }])?;
+        apply_remove(&self.shared, key);
+        apply_policy(&self.shared, &mut half, 1, now)?;
         Ok(true)
     }
 
-    pub fn bulk_remove(&mut self, keys: &[String]) -> Result<usize, VecDbError> {
+    pub fn bulk_remove(&self, keys: &[String]) -> Result<usize, VecDbError> {
         let now = Instant::now();
-        self.ensure_writer()?;
-        let mut scheduled: Vec<&str> = Vec::new();
-        let mut seen: HashSet<&str> = HashSet::new();
-        for key in keys {
-            if self.arena.slot_of_key(key).is_some() && seen.insert(key.as_str()) {
-                scheduled.push(key);
+        let mut half = self.writable_half()?;
+        let state = active_state(&mut half)?;
+        let scheduled: Vec<&str> = {
+            let st = self.shared.state_read();
+            let mut scheduled: Vec<&str> = Vec::new();
+            let mut seen: HashSet<&str> = HashSet::new();
+            for key in keys {
+                if st.arena.slot_of_key(key).is_some() && seen.insert(key.as_str()) {
+                    scheduled.push(key);
+                }
             }
-        }
+            scheduled
+        };
         if scheduled.is_empty() {
             return Ok(0);
         }
@@ -212,25 +294,27 @@ impl VecDb {
             .iter()
             .map(|key| LogEntry::Tombstone { key })
             .collect();
-        self.writer_state()?.log.append(&records)?;
+        state.log.append(&records)?;
         for key in &scheduled {
-            self.arena.remove(key);
+            apply_remove(&self.shared, key);
         }
         let count = scheduled.len();
-        self.record_mutations(count, now)?;
+        apply_policy(&self.shared, &mut half, count, now)?;
         Ok(count)
     }
 
     pub fn contains(&self, key: &str) -> bool {
-        self.arena.slot_of_key(key).is_some()
+        self.shared.state_read().arena.slot_of_key(key).is_some()
     }
 
     pub fn get(&self, key: &str) -> Option<Vec<f32>> {
-        let slot = self.arena.slot_of_key(key)?;
-        Some(self.arena.vector_values(slot))
+        let st = self.shared.state_read();
+        let slot = st.arena.slot_of_key(key)?;
+        Some(st.arena.vector_values(slot))
     }
 
     pub fn search(&self, query: &[f32], params: &SearchParams) -> Result<Vec<Match>, VecDbError> {
+        self.shared.ensure_open()?;
         if params.limit.is_none() && params.max_distance.is_none() {
             return Err(VecDbError::UnboundedSearch);
         }
@@ -239,47 +323,55 @@ impl VecDb {
         {
             return Ok(Vec::new());
         }
-        let packed = self.arena.pack_query(query)?;
+        let st = self.shared.state_read();
+        let packed = st.arena.pack_query(query)?;
         let allowed_slots: Option<HashSet<u32>> = params.allowed_keys.as_ref().map(|keys| {
             keys.iter()
-                .filter_map(|key| self.arena.slot_of_key(key))
+                .filter_map(|key| st.arena.slot_of_key(key))
                 .collect()
         });
         Ok(graph_search(
-            &self.graph,
-            &self.arena,
+            &st.graph,
+            &st.arena,
             &packed,
             params,
             allowed_slots.as_ref(),
         ))
     }
 
-    pub fn flush(&mut self) -> Result<(), VecDbError> {
-        let state = self.writer_state()?;
+    pub fn flush(&self) -> Result<(), VecDbError> {
+        let mut half = self.writable_half()?;
+        let state = active_state(&mut half)?;
         if state.mutations_since_snapshot == 0 {
             return Ok(());
         }
-        self.write_snapshot_now()
+        write_snapshot_now(&self.shared, &mut half)
     }
 
-    pub fn reset(&mut self) -> Result<(), VecDbError> {
-        let WriterState { lock, log, .. } = self.take_writer_state()?;
+    pub fn reset(&self) -> Result<(), VecDbError> {
+        let mut half = self.writable_half()?;
+        let WriterState { lock, log, .. } = take_writer_state(&mut half)?;
         let old_generation = log.generation();
         drop(log);
-        let dims = self.arena.dims();
-        let recreated = remove_data_files(&self.path).and_then(|()| Log::create(&self.path, dims));
+        let dims = self.shared.dims;
+        let recreated = remove_data_files(&self.shared.path)
+            .and_then(|()| Log::create(&self.shared.path, dims));
         let log = match recreated {
             Ok(log) => log,
             Err(error) => {
-                self.recover_after_failed_reset(lock, dims, old_generation);
+                recover_after_failed_reset(&self.shared, &mut half, lock, old_generation);
                 return Err(error);
             }
         };
-        self.arena = VectorArena::new(dims)?;
-        self.graph = Graph::new();
-        self.total_records = 0;
-        self.compaction_retry_at_dead = 0;
-        self.mode = Mode::Writer(WriterState {
+        let arena = VectorArena::new(dims)?;
+        {
+            let mut st = self.shared.state_write();
+            st.arena = arena;
+            st.graph = Graph::new();
+            st.total_records = 0;
+        }
+        half.compaction_retry_at_dead = 0;
+        half.mode = WriterMode::Active(WriterState {
             lock,
             log,
             mutations_since_snapshot: 0,
@@ -289,230 +381,420 @@ impl VecDb {
     }
 
     pub fn delete(self) -> Result<(), VecDbError> {
-        let Mode::Writer(state) = self.mode else {
+        self.shared.ensure_open()?;
+        if self.read_only {
             return Err(VecDbError::ReadOnly);
-        };
-        let WriterState { lock, log, .. } = state;
+        }
+        let mut half = self.shared.writer_half();
+        self.shared.ensure_open()?;
+        let WriterState { lock, log, .. } = take_writer_state(&mut half)?;
+        let mut st = self.shared.state_write();
+        self.shared.closed.store(true, Ordering::Release);
         drop(log);
-        let removed = remove_index_files(&self.path);
+        let removed = remove_index_files(&self.shared.path);
+        if let Ok(empty) = VectorArena::new(self.shared.dims) {
+            st.arena = empty;
+            st.graph = Graph::new();
+            st.total_records = 0;
+        }
+        if let Some(key) = &self.shared.registry_key
+            && let Some(slot) = existing_path_slot(key)
+        {
+            let mut guard = lock_slot(&slot);
+            if std::ptr::eq(guard.live.as_ptr(), Arc::as_ptr(&self.shared)) {
+                guard.live = Weak::new();
+            }
+        }
+        drop(st);
         drop(lock);
+        drop(half);
         removed
     }
 
-    pub fn stats(&self) -> Stats {
-        let live_count = self.arena.live_count();
-        let (log_bytes, records_since_snapshot) = match &self.mode {
-            Mode::Writer(state) => (
-                state.log.current_end_offset(),
-                state.mutations_since_snapshot,
-            ),
-            Mode::ReadOnly { log_bytes } => (*log_bytes, 0),
+    pub fn stats(&self) -> Result<Stats, VecDbError> {
+        self.shared.ensure_open()?;
+        let (log_bytes, records_since_snapshot) = {
+            let half = self.shared.writer_half();
+            self.shared.ensure_open()?;
+            match &half.mode {
+                WriterMode::Active(state) => (
+                    state.log.current_end_offset(),
+                    state.mutations_since_snapshot,
+                ),
+                WriterMode::ReadOnly { log_bytes } => (*log_bytes, 0),
+            }
         };
-        Stats {
+        let st = self.shared.state_read();
+        let live_count = st.arena.live_count();
+        Ok(Stats {
             live_count,
-            dead_count: self.total_records.saturating_sub(live_count as u64) as usize,
-            dims: self.arena.dims(),
+            dead_count: st.total_records.saturating_sub(live_count as u64) as usize,
+            dims: st.arena.dims(),
             log_bytes,
             records_since_snapshot,
-            approximate_memory_bytes: self.approximate_memory_bytes(),
-        }
+            approximate_memory_bytes: approximate_memory_bytes(&st),
+        })
     }
 
     pub fn len(&self) -> usize {
-        self.arena.live_count()
+        self.shared.state_read().arena.live_count()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.arena.is_empty()
+        self.shared.state_read().arena.is_empty()
     }
 
-    fn writer_state(&mut self) -> Result<&mut WriterState, VecDbError> {
-        match &mut self.mode {
-            Mode::Writer(state) => Ok(state),
-            Mode::ReadOnly { .. } => Err(VecDbError::ReadOnly),
-        }
-    }
-
-    fn ensure_writer(&self) -> Result<(), VecDbError> {
-        match &self.mode {
-            Mode::Writer(_) => Ok(()),
-            Mode::ReadOnly { .. } => Err(VecDbError::ReadOnly),
-        }
-    }
-
-    fn take_writer_state(&mut self) -> Result<WriterState, VecDbError> {
-        self.ensure_writer()?;
-        match std::mem::replace(&mut self.mode, Mode::ReadOnly { log_bytes: 0 }) {
-            Mode::Writer(state) => Ok(state),
-            Mode::ReadOnly { .. } => Err(VecDbError::ReadOnly),
-        }
-    }
-
-    fn restore_writer_mode(
-        &mut self,
-        lock: WriterLock,
-        dims: usize,
-        last_write: Option<Instant>,
-    ) -> Result<(), VecDbError> {
-        match reopen_log(&self.path, dims) {
-            Ok(log) => {
-                self.mode = Mode::Writer(WriterState {
-                    lock,
-                    log,
-                    mutations_since_snapshot: 0,
-                    last_write,
-                });
-                Ok(())
-            }
-            Err(error) => {
-                let log_bytes = std::fs::metadata(&self.path)
-                    .map(|meta| meta.len())
-                    .unwrap_or(0);
-                log::warn!(
-                    "degrading {} to read-only after failing to restore its writer: {error}",
-                    self.path.display()
-                );
-                self.mode = Mode::ReadOnly { log_bytes };
-                Err(error)
-            }
-        }
-    }
-
-    fn recover_after_failed_reset(
-        &mut self,
-        lock: WriterLock,
-        dims: usize,
-        old_generation: [u8; 16],
-    ) {
-        let old_log_restored = self.restore_writer_mode(lock, dims, None).is_ok()
-            && matches!(&self.mode, Mode::Writer(state) if state.log.generation() == old_generation);
-        if old_log_restored {
-            return;
-        }
-        if let Ok(empty) = VectorArena::new(dims) {
-            self.arena = empty;
-            self.graph = Graph::new();
-            self.total_records = 0;
-            self.compaction_retry_at_dead = 0;
-        }
-    }
-
-    fn record_mutations(&mut self, count: usize, now: Instant) -> Result<(), VecDbError> {
-        self.total_records += count as u64;
-        let live = self.arena.live_count() as u64;
-        let total = self.total_records;
-        let Mode::Writer(state) = &mut self.mode else {
+    fn writable_half(&self) -> Result<MutexGuard<'_, WriterHalf>, VecDbError> {
+        self.shared.ensure_open()?;
+        if self.read_only {
             return Err(VecDbError::ReadOnly);
-        };
+        }
+        let half = self.shared.writer_half();
+        self.shared.ensure_open()?;
+        Ok(half)
+    }
+}
+
+fn active_state(half: &mut WriterHalf) -> Result<&mut WriterState, VecDbError> {
+    match &mut half.mode {
+        WriterMode::Active(state) => Ok(state),
+        WriterMode::ReadOnly { .. } => Err(VecDbError::ReadOnly),
+    }
+}
+
+fn take_writer_state(half: &mut WriterHalf) -> Result<WriterState, VecDbError> {
+    match std::mem::replace(&mut half.mode, WriterMode::ReadOnly { log_bytes: 0 }) {
+        WriterMode::Active(state) => Ok(state),
+        WriterMode::ReadOnly { log_bytes } => {
+            half.mode = WriterMode::ReadOnly { log_bytes };
+            Err(VecDbError::ReadOnly)
+        }
+    }
+}
+
+fn apply_add(shared: &Shared, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
+    let mut st = shared.state_write();
+    let SearchState {
+        arena,
+        graph,
+        total_records,
+    } = &mut *st;
+    let outcome = arena.upsert(key, vector)?;
+    apply_outcome(graph, arena, outcome);
+    *total_records += 1;
+    Ok(())
+}
+
+fn apply_remove(shared: &Shared, key: &str) {
+    let mut st = shared.state_write();
+    st.arena.remove(key);
+    st.total_records += 1;
+}
+
+fn apply_policy(
+    shared: &Shared,
+    half: &mut WriterHalf,
+    count: usize,
+    now: Instant,
+) -> Result<(), VecDbError> {
+    let (live, total) = {
+        let st = shared.state_read();
+        (st.arena.live_count() as u64, st.total_records)
+    };
+    let (quiet, mutations) = {
+        let state = active_state(half)?;
         state.mutations_since_snapshot += count;
         let quiet = state
             .last_write
             .is_some_and(|previous| now.duration_since(previous) >= SNAPSHOT_QUIET_GAP);
         state.last_write = Some(now);
-        let mutations = state.mutations_since_snapshot;
-        let dead = total.saturating_sub(live);
-        if dead >= COMPACTION_MIN_DEAD_RECORDS
-            && dead.saturating_mul(COMPACTION_DEAD_RATIO) >= total
-            && dead >= self.compaction_retry_at_dead
-        {
-            match self.compact() {
-                Ok(()) => self.compaction_retry_at_dead = 0,
-                Err(error) => {
-                    log::warn!("compaction of {} failed: {error}", self.path.display());
-                    self.compaction_retry_at_dead = dead + COMPACTION_MIN_DEAD_RECORDS;
-                }
+        (quiet, state.mutations_since_snapshot)
+    };
+    let dead = total.saturating_sub(live);
+    if dead >= COMPACTION_MIN_DEAD_RECORDS
+        && dead.saturating_mul(COMPACTION_DEAD_RATIO) >= total
+        && dead >= half.compaction_retry_at_dead
+    {
+        match compact(shared, half) {
+            Ok(()) => half.compaction_retry_at_dead = 0,
+            Err(error) => {
+                log::warn!("compaction of {} failed: {error}", shared.path.display());
+                half.compaction_retry_at_dead = dead + COMPACTION_MIN_DEAD_RECORDS;
             }
-            return Ok(());
         }
-        if (mutations >= SNAPSHOT_HARD_CAP || (mutations >= SNAPSHOT_QUIET_THRESHOLD && quiet))
-            && let Err(error) = self.write_snapshot_now()
-        {
-            log::warn!("snapshot of {} failed: {error}", self.path.display());
-        }
-        Ok(())
+        return Ok(());
     }
+    if (mutations >= SNAPSHOT_HARD_CAP || (mutations >= SNAPSHOT_QUIET_THRESHOLD && quiet))
+        && let Err(error) = write_snapshot_now(shared, half)
+    {
+        log::warn!("snapshot of {} failed: {error}", shared.path.display());
+    }
+    Ok(())
+}
 
-    fn write_snapshot_now(&mut self) -> Result<(), VecDbError> {
-        let graph = &self.graph;
-        let Mode::Writer(state) = &mut self.mode else {
-            return Err(VecDbError::ReadOnly);
-        };
+fn write_snapshot_now(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
+    let state = active_state(half)?;
+    {
+        let st = shared.state_read();
         write_snapshot(
             state.log.path(),
             state.log.generation(),
             state.log.current_end_offset(),
-            graph,
+            &st.graph,
         )?;
-        state.mutations_since_snapshot = 0;
-        Ok(())
     }
+    state.mutations_since_snapshot = 0;
+    Ok(())
+}
 
-    fn compact(&mut self) -> Result<(), VecDbError> {
-        self.ensure_writer()?;
-        let dims = self.arena.dims();
-        let (mut temp_log, temp_path) = Log::create_temp_sibling(&self.path, dims)?;
-        let mut compacted = VectorArena::new(dims)?;
-        if let Err(error) = stage_live_entries(&self.arena, &mut compacted, &mut temp_log) {
-            drop(temp_log);
-            let _ = std::fs::remove_file(&temp_path);
-            return Err(error);
-        }
-        let temp_file = temp_log.into_file();
-        if let Err(source) = temp_file.sync_all() {
-            drop(temp_file);
-            let _ = std::fs::remove_file(&temp_path);
-            return Err(VecDbError::io(&temp_path, source));
-        }
+fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
+    active_state(half)?;
+    let dims = shared.dims;
+    let (mut temp_log, temp_path) = Log::create_temp_sibling(&shared.path, dims)?;
+    let mut compacted = VectorArena::new(dims)?;
+    let staged = {
+        let st = shared.state_read();
+        stage_live_entries(&st.arena, &mut compacted, &mut temp_log)
+    };
+    if let Err(error) = staged {
+        drop(temp_log);
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(error);
+    }
+    let temp_file = temp_log.into_file();
+    if let Err(source) = temp_file.sync_all() {
         drop(temp_file);
-        let WriterState {
-            lock,
-            log,
-            last_write,
-            ..
-        } = self.take_writer_state()?;
-        drop(log);
-        let promoted = promote_compacted_log(&temp_path, &self.path);
-        if temp_path.exists() {
-            let _ = std::fs::remove_file(&temp_path);
-        } else {
-            self.arena = compacted;
-            self.graph = Graph::rebuild(&self.arena);
-            self.total_records = self.arena.live_count() as u64;
-        }
-        let restored = self.restore_writer_mode(lock, dims, last_write);
-        promoted?;
-        restored?;
-        self.write_snapshot_now()
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(VecDbError::io(&temp_path, source));
     }
+    drop(temp_file);
+    let WriterState {
+        lock,
+        log,
+        last_write,
+        ..
+    } = take_writer_state(half)?;
+    drop(log);
+    let promoted = promote_compacted_log(&temp_path, &shared.path);
+    if temp_path.exists() {
+        let _ = std::fs::remove_file(&temp_path);
+    } else {
+        let graph = Graph::rebuild(&compacted);
+        let total_records = compacted.live_count() as u64;
+        let mut st = shared.state_write();
+        st.arena = compacted;
+        st.graph = graph;
+        st.total_records = total_records;
+    }
+    let restored = restore_writer_mode(shared, half, lock, last_write);
+    promoted?;
+    restored?;
+    write_snapshot_now(shared, half)
+}
 
-    fn approximate_memory_bytes(&self) -> usize {
-        let vector_bytes = self.arena.slot_count().div_ceil(VECTORS_PER_CHUNK)
-            * VECTORS_PER_CHUNK
-            * self.arena.dims()
-            * size_of::<f32>();
-        let key_bytes: usize = self
-            .arena
-            .live_slots()
-            .filter_map(|slot| self.arena.key_of_slot(slot))
-            .map(|key| KEY_TABLE_COPIES * (key.len() + KEY_ENTRY_OVERHEAD_BYTES))
-            .sum();
-        let free_list_bytes = self.arena.dead_count() * size_of::<u32>();
-        let graph_bytes: usize = self
-            .graph
-            .slots()
-            .map(|slot| {
-                let level = self.graph.level_of(slot).unwrap_or(0);
-                GRAPH_NODE_OVERHEAD_BYTES
-                    + (0..=level)
-                        .map(|layer| {
-                            NEIGHBOR_LIST_OVERHEAD_BYTES
-                                + size_of_val(self.graph.neighbors_of(slot, layer))
-                        })
-                        .sum::<usize>()
-            })
-            .sum();
-        vector_bytes + key_bytes + free_list_bytes + graph_bytes
+fn restore_writer_mode(
+    shared: &Shared,
+    half: &mut WriterHalf,
+    lock: WriterLock,
+    last_write: Option<Instant>,
+) -> Result<(), VecDbError> {
+    match reopen_log(&shared.path, shared.dims) {
+        Ok(log) => {
+            half.mode = WriterMode::Active(WriterState {
+                lock,
+                log,
+                mutations_since_snapshot: 0,
+                last_write,
+            });
+            Ok(())
+        }
+        Err(error) => {
+            let log_bytes = std::fs::metadata(&shared.path)
+                .map(|meta| meta.len())
+                .unwrap_or(0);
+            log::warn!(
+                "degrading {} to read-only after failing to restore its writer: {error}",
+                shared.path.display()
+            );
+            half.mode = WriterMode::ReadOnly { log_bytes };
+            Err(error)
+        }
     }
+}
+
+fn recover_after_failed_reset(
+    shared: &Shared,
+    half: &mut WriterHalf,
+    lock: WriterLock,
+    old_generation: [u8; 16],
+) {
+    let old_log_restored = restore_writer_mode(shared, half, lock, None).is_ok()
+        && matches!(&half.mode, WriterMode::Active(state) if state.log.generation() == old_generation);
+    if old_log_restored {
+        return;
+    }
+    if let Ok(empty) = VectorArena::new(shared.dims) {
+        let mut st = shared.state_write();
+        st.arena = empty;
+        st.graph = Graph::new();
+        st.total_records = 0;
+        half.compaction_retry_at_dead = 0;
+    }
+}
+
+fn build_writer(path: &Path, registry_key: PathBuf, dims: usize) -> Result<Shared, VecDbError> {
+    let lock = WriterLock::acquire(path)?;
+    let mut log = match Log::create(path, dims) {
+        Ok(created) => created,
+        Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
+            reopen_log(path, dims)?
+        }
+        Err(error) => return Err(error),
+    };
+    remove_stale_temp_sibling(path)?;
+    let snapshot_present = std::fs::metadata(snapshot_path(path)).is_ok();
+    let replayed = replay(&mut log, dims)?;
+    if replayed.recoverable_end < log.current_end_offset() {
+        log.truncate_to(replayed.recoverable_end)?;
+    }
+    let snapshot_stale = if replayed.used_snapshot {
+        replayed.tail_records > 0
+    } else {
+        replayed.total_records > 0 || snapshot_present
+    };
+    let pending_records = if replayed.used_snapshot {
+        replayed.tail_records
+    } else {
+        replayed.total_records
+    } as usize;
+    let mut mutations_since_snapshot = 0;
+    if snapshot_stale
+        && let Err(error) = write_snapshot(
+            log.path(),
+            log.generation(),
+            log.current_end_offset(),
+            &replayed.graph,
+        )
+    {
+        log::warn!(
+            "continuing without an open-time snapshot for {}: {error}",
+            path.display()
+        );
+        mutations_since_snapshot = pending_records.max(1);
+    }
+    Ok(Shared {
+        path: path.to_path_buf(),
+        dims,
+        registry_key: Some(registry_key),
+        closed: AtomicBool::new(false),
+        writer: Mutex::new(WriterHalf {
+            compaction_retry_at_dead: 0,
+            mode: WriterMode::Active(WriterState {
+                lock,
+                log,
+                mutations_since_snapshot,
+                last_write: None,
+            }),
+        }),
+        state: RwLock::new(SearchState {
+            arena: replayed.arena,
+            graph: replayed.graph,
+            total_records: replayed.total_records,
+        }),
+    })
+}
+
+fn build_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return empty_read_only(path, dims);
+        }
+        Err(source) => return Err(VecDbError::io(path, source)),
+    };
+    let file_len = file
+        .metadata()
+        .map_err(|source| VecDbError::io(path, source))?
+        .len();
+    if file_len < HEADER_LEN as u64 {
+        return empty_read_only(path, dims);
+    }
+    let mut log = Log::open(file, path, dims)?;
+    let replayed = replay(&mut log, dims)?;
+    drop(log);
+    Ok(read_only_shared(
+        path,
+        dims,
+        replayed.arena,
+        replayed.graph,
+        replayed.total_records,
+        replayed.recoverable_end,
+    ))
+}
+
+fn empty_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
+    Ok(read_only_shared(
+        path,
+        dims,
+        VectorArena::new(dims)?,
+        Graph::new(),
+        0,
+        0,
+    ))
+}
+
+fn read_only_shared(
+    path: &Path,
+    dims: usize,
+    arena: VectorArena,
+    graph: Graph,
+    total_records: u64,
+    log_bytes: u64,
+) -> Shared {
+    Shared {
+        path: path.to_path_buf(),
+        dims,
+        registry_key: None,
+        closed: AtomicBool::new(false),
+        writer: Mutex::new(WriterHalf {
+            compaction_retry_at_dead: 0,
+            mode: WriterMode::ReadOnly { log_bytes },
+        }),
+        state: RwLock::new(SearchState {
+            arena,
+            graph,
+            total_records,
+        }),
+    }
+}
+
+fn approximate_memory_bytes(state: &SearchState) -> usize {
+    let vector_bytes = state.arena.slot_count().div_ceil(VECTORS_PER_CHUNK)
+        * VECTORS_PER_CHUNK
+        * state.arena.dims()
+        * size_of::<f32>();
+    let key_bytes: usize = state
+        .arena
+        .live_slots()
+        .filter_map(|slot| state.arena.key_of_slot(slot))
+        .map(|key| KEY_TABLE_COPIES * (key.len() + KEY_ENTRY_OVERHEAD_BYTES))
+        .sum();
+    let free_list_bytes = state.arena.dead_count() * size_of::<u32>();
+    let graph_bytes: usize = state
+        .graph
+        .slots()
+        .map(|slot| {
+            let level = state.graph.level_of(slot).unwrap_or(0);
+            GRAPH_NODE_OVERHEAD_BYTES
+                + (0..=level)
+                    .map(|layer| {
+                        NEIGHBOR_LIST_OVERHEAD_BYTES
+                            + size_of_val(state.graph.neighbors_of(slot, layer))
+                    })
+                    .sum::<usize>()
+        })
+        .sum();
+    vector_bytes + key_bytes + free_list_bytes + graph_bytes
 }
 
 struct ReplayedState {
@@ -669,6 +951,8 @@ fn flush_stage_batch(
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::sync::Barrier;
+    use std::thread;
 
     use tempfile::TempDir;
 
@@ -738,11 +1022,34 @@ mod tests {
         snapshot_path(path).exists()
     }
 
-    fn writer(db: &mut VecDb) -> &mut WriterState {
-        match &mut db.mode {
-            Mode::Writer(state) => state,
-            Mode::ReadOnly { .. } => panic!("expected a writer instance"),
+    fn set_mutations(db: &VecDb, value: usize) {
+        let mut half = db.shared.writer_half();
+        match &mut half.mode {
+            WriterMode::Active(state) => state.mutations_since_snapshot = value,
+            WriterMode::ReadOnly { .. } => panic!("expected a writer instance"),
         }
+    }
+
+    fn mutations(db: &VecDb) -> usize {
+        let half = db.shared.writer_half();
+        match &half.mode {
+            WriterMode::Active(state) => state.mutations_since_snapshot,
+            WriterMode::ReadOnly { .. } => panic!("expected a writer instance"),
+        }
+    }
+
+    fn record(db: &VecDb, count: usize, now: Instant) -> Result<(), VecDbError> {
+        let mut half = db.shared.writer_half();
+        apply_policy(&db.shared, &mut half, count, now)
+    }
+
+    fn take_writer(db: &VecDb) -> WriterState {
+        let mut half = db.shared.writer_half();
+        take_writer_state(&mut half).unwrap()
+    }
+
+    fn is_degraded(db: &VecDb) -> bool {
+        matches!(db.shared.writer_half().mode, WriterMode::ReadOnly { .. })
     }
 
     fn assert_own_nearest(db: &VecDb, key: &str, vector: &[f32]) {
@@ -801,7 +1108,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let probe = seeded_unit_vector(777, DIMS);
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 150, 100)).unwrap();
         db.add("probe", &probe).unwrap();
         assert_eq!(db.len(), 151);
@@ -812,7 +1119,7 @@ mod tests {
         assert_eq!(db.get("probe").unwrap(), probe);
         assert_eq!(db.get("key-7").unwrap(), seeded_unit_vector(107, DIMS));
         assert!(db.get("missing").is_none());
-        let stats = db.stats();
+        let stats = db.stats().unwrap();
         assert_eq!(stats.live_count, 151);
         assert_eq!(stats.dead_count, 0);
         assert_eq!(stats.dims, DIMS);
@@ -836,7 +1143,7 @@ mod tests {
         assert!(expected.iter().any(|matches| !matches.is_empty()));
         assert_eq!(db.search(&probe, &limit_params(1)).unwrap()[0].key, "probe");
         db.flush().unwrap();
-        assert_eq!(db.stats().records_since_snapshot, 0);
+        assert_eq!(db.stats().unwrap().records_since_snapshot, 0);
         drop(db);
         let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
         let reopened = open_writer(&path);
@@ -861,7 +1168,7 @@ mod tests {
     fn search_parameter_validation() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 10)).unwrap();
         let query = seeded_unit_vector(1, DIMS);
         assert!(matches!(
@@ -909,7 +1216,7 @@ mod tests {
     fn acknowledged_writes_survive_drop_without_flush() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         for index in 0..4 {
             db.add(
                 &format!("solo-{index}"),
@@ -936,7 +1243,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let copy = dir.path().join("copy");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 6, 60)).unwrap();
         fs::copy(&path, &copy).unwrap();
         let copied = open_writer(&copy);
@@ -956,7 +1263,7 @@ mod tests {
     fn torn_tail_garbage_is_truncated_and_data_survives() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 4, 20)).unwrap();
         drop(db);
         let clean_len = fs::metadata(&path).unwrap().len();
@@ -974,7 +1281,7 @@ mod tests {
     fn torn_tail_partial_record_is_truncated_and_data_survives() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 4, 30)).unwrap();
         db.flush().unwrap();
         drop(db);
@@ -993,7 +1300,7 @@ mod tests {
     fn deleted_snapshot_recovers_by_rebuild() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 8, 50)).unwrap();
         db.flush().unwrap();
         drop(db);
@@ -1008,13 +1315,13 @@ mod tests {
     fn snapshot_from_an_older_generation_is_discarded() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 70)).unwrap();
         db.flush().unwrap();
         drop(db);
         let stale_snapshot = fs::read(snapshot_path(&path)).unwrap();
         fs::remove_file(&path).unwrap();
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         assert!(db.is_empty());
         db.add("fresh", &seeded_unit_vector(1, DIMS)).unwrap();
         drop(db);
@@ -1030,7 +1337,7 @@ mod tests {
     fn snapshot_claiming_offset_beyond_log_end_is_discarded() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 80)).unwrap();
         db.flush().unwrap();
         drop(db);
@@ -1047,7 +1354,7 @@ mod tests {
     fn corrupted_snapshot_bytes_are_discarded() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 90)).unwrap();
         db.flush().unwrap();
         drop(db);
@@ -1063,7 +1370,7 @@ mod tests {
     fn stale_compaction_temp_files_are_removed_at_open() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 110)).unwrap();
         db.flush().unwrap();
         drop(db);
@@ -1080,35 +1387,153 @@ mod tests {
     }
 
     #[test]
-    fn second_writer_is_locked_out() {
+    fn second_open_joins_the_live_instance() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 120)).unwrap();
-        let Err(error) = VecDb::open(&path, DIMS) else {
-            panic!("second writer must not open");
-        };
-        assert!(matches!(error, VecDbError::Locked(locked) if locked == path));
+        let joined = VecDb::open(&path, DIMS).unwrap();
+        assert!(Arc::ptr_eq(&db.shared, &joined.shared));
+        assert_eq!(joined.len(), 3);
+        joined.add("joined", &seeded_unit_vector(9, DIMS)).unwrap();
+        assert!(db.contains("joined"));
+        assert!(matches!(
+            WriterLock::acquire(&path),
+            Err(VecDbError::Locked(_))
+        ));
         drop(db);
+        drop(joined);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 3);
+        assert_eq!(reopened.len(), 4);
+        assert!(reopened.contains("joined"));
+    }
+
+    #[test]
+    fn open_handles_alias_one_live_instance() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let first = open_writer(&path);
+        let second = VecDb::open(&path, DIMS).unwrap();
+        assert!(Arc::ptr_eq(&first.shared, &second.shared));
+        let via_first = seeded_unit_vector(11, DIMS);
+        let via_second = seeded_unit_vector(22, DIMS);
+        first.add("via-first", &via_first).unwrap();
+        assert!(second.contains("via-first"));
+        assert_eq!(second.get("via-first").unwrap(), via_first);
+        assert_eq!(
+            second.search(&via_first, &limit_params(1)).unwrap()[0].key,
+            "via-first"
+        );
+        second.add("via-second", &via_second).unwrap();
+        assert!(first.contains("via-second"));
+        assert_eq!(first.len(), 2);
+        assert!(matches!(
+            VecDb::open(&path, DIMS + 8),
+            Err(VecDbError::DimensionMismatch {
+                expected,
+                actual
+            }) if expected == DIMS + 8 && actual == DIMS
+        ));
+    }
+
+    #[test]
+    fn dotted_and_plain_paths_share_one_instance() {
+        let dir = TempDir::new().unwrap();
+        let subdir = dir.path().join("indexes");
+        fs::create_dir(&subdir).unwrap();
+        let plain = subdir.join("db");
+        let dotted = subdir.join("..").join("indexes").join("db");
+        let first = VecDb::open(&plain, DIMS).unwrap();
+        let second = VecDb::open(&dotted, DIMS).unwrap();
+        assert!(Arc::ptr_eq(&first.shared, &second.shared));
+        let vector = seeded_unit_vector(5, DIMS);
+        first.add("shared", &vector).unwrap();
+        assert!(second.contains("shared"));
+        assert_eq!(second.get("shared").unwrap(), vector);
+    }
+
+    #[test]
+    fn dropping_every_handle_releases_the_instance() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let first = open_writer(&path);
+        let second = VecDb::open(&path, DIMS).unwrap();
+        first.add("kept", &seeded_unit_vector(3, DIMS)).unwrap();
+        drop(first);
+        assert!(second.contains("kept"));
+        second
+            .add("still-open", &seeded_unit_vector(4, DIMS))
+            .unwrap();
+        drop(second);
+        let key = registry_key_for(&path).unwrap();
+        assert!(!registry().contains_key(&key));
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 2);
+        assert!(reopened.contains("kept"));
+        assert!(reopened.contains("still-open"));
+        let again = VecDb::open(&path, DIMS).unwrap();
+        assert!(Arc::ptr_eq(&reopened.shared, &again.shared));
+    }
+
+    #[test]
+    fn a_stalled_open_on_one_path_blocks_neither_other_paths_nor_forks_its_own() {
+        let dir = TempDir::new().unwrap();
+        let stalled_path = dir.path().join("stalled");
+        let other_path = dir.path().join("other");
+        let key = registry_key_for(&stalled_path).unwrap();
+        let slot = path_slot(&key);
+        let build_in_progress = lock_slot(&slot);
+        let stalled_openers: Vec<_> = (0..2)
+            .map(|_| {
+                let path = stalled_path.clone();
+                thread::spawn(move || VecDb::open(&path, DIMS).unwrap())
+            })
+            .collect();
+        let other = VecDb::open(&other_path, DIMS).unwrap();
+        other.add("other", &seeded_unit_vector(1, DIMS)).unwrap();
+        assert_eq!(other.len(), 1);
+        drop(build_in_progress);
+        let handles: Vec<VecDb> = stalled_openers
+            .into_iter()
+            .map(|opener| opener.join().unwrap())
+            .collect();
+        assert!(Arc::ptr_eq(&handles[0].shared, &handles[1].shared));
+        assert!(!Arc::ptr_eq(&handles[0].shared, &other.shared));
+        handles[0]
+            .add("stalled", &seeded_unit_vector(2, DIMS))
+            .unwrap();
+        assert!(handles[1].contains("stalled"));
+        assert!(!other.contains("stalled"));
+    }
+
+    #[test]
+    fn failed_open_leaves_no_registry_residue() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("dir-in-the-way");
+        fs::create_dir(&path).unwrap();
+        let key = registry_key_for(&path).unwrap();
+        assert!(matches!(
+            VecDb::open(&path, DIMS),
+            Err(VecDbError::Io { .. })
+        ));
+        assert!(!registry().contains_key(&key));
     }
 
     #[test]
     fn writer_stays_locked_across_a_completed_compaction() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 120, 340)).unwrap();
         let generation_before = generation_of(&path);
         let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
         assert_ne!(generation_of(&path), generation_before);
-        assert_eq!(db.stats().dead_count, 0);
-        let Err(error) = VecDb::open(&path, DIMS) else {
-            panic!("second writer must not open after compaction");
-        };
-        assert!(matches!(error, VecDbError::Locked(locked) if locked == path));
+        assert_eq!(db.stats().unwrap().dead_count, 0);
+        assert!(matches!(
+            WriterLock::acquire(&path),
+            Err(VecDbError::Locked(_))
+        ));
         db.add("post", &seeded_unit_vector(7, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
@@ -1122,12 +1547,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         fs::write(lock_path(&path), [0xAB; 24]).unwrap();
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
-        let Err(error) = VecDb::open(&path, DIMS) else {
-            panic!("second writer must not open");
-        };
-        assert!(matches!(error, VecDbError::Locked(locked) if locked == path));
+        assert!(matches!(
+            WriterLock::acquire(&path),
+            Err(VecDbError::Locked(_))
+        ));
         drop(db);
         let reopened = open_writer(&path);
         assert_eq!(reopened.len(), 1);
@@ -1135,16 +1560,38 @@ mod tests {
     }
 
     #[test]
-    fn read_only_opens_alongside_a_writer() {
+    fn read_only_open_aliases_a_live_writer() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 130)).unwrap();
         let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert!(Arc::ptr_eq(&db.shared, &read_only.shared));
         assert_eq!(read_only.len(), 3);
         assert!(read_only.contains("key-1"));
-        db.add("later", &seeded_unit_vector(9, DIMS)).unwrap();
-        assert!(!read_only.contains("later"));
+        let later = seeded_unit_vector(9, DIMS);
+        db.add("later", &later).unwrap();
+        assert!(read_only.contains("later"));
+        assert_eq!(read_only.get("later").unwrap(), later);
+        assert_own_nearest(&read_only, "later", &later);
+        assert!(matches!(
+            read_only.add("x", &later),
+            Err(VecDbError::ReadOnly)
+        ));
+        assert!(matches!(
+            read_only.remove("later"),
+            Err(VecDbError::ReadOnly)
+        ));
+        assert!(matches!(
+            read_only.bulk_remove(&["later".to_string()]),
+            Err(VecDbError::ReadOnly)
+        ));
+        assert!(matches!(read_only.flush(), Err(VecDbError::ReadOnly)));
+        assert!(matches!(read_only.reset(), Err(VecDbError::ReadOnly)));
+        let another = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert!(matches!(another.delete(), Err(VecDbError::ReadOnly)));
+        assert!(db.contains("later"));
+        assert!(path.exists());
     }
 
     #[test]
@@ -1162,7 +1609,7 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            db.stats(),
+            db.stats().unwrap(),
             Stats {
                 live_count: 0,
                 dead_count: 0,
@@ -1181,10 +1628,10 @@ mod tests {
     fn read_only_instance_rejects_writes() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("kept", &seeded_unit_vector(3, DIMS)).unwrap();
         drop(db);
-        let mut read_only = VecDb::open_read_only(&path, DIMS).unwrap();
+        let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
         let vector = seeded_unit_vector(4, DIMS);
         assert!(matches!(
             read_only.add("x", &vector),
@@ -1211,26 +1658,32 @@ mod tests {
     }
 
     #[test]
-    fn read_only_view_stays_point_in_time_while_writer_compacts() {
+    fn standalone_read_only_stays_point_in_time() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 100, 140)).unwrap();
+        drop(db);
+        let snapshot_view = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert_eq!(snapshot_view.len(), 100);
+        let db = open_writer(&path);
+        assert!(!Arc::ptr_eq(&snapshot_view.shared, &db.shared));
         let generation_before = generation_of(&path);
-        let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
-        assert_eq!(read_only.len(), 100);
         for index in 0..32 {
             assert!(db.remove(&format!("key-{index}")).unwrap());
         }
         assert_ne!(generation_of(&path), generation_before);
         assert_eq!(db.len(), 68);
-        assert_eq!(db.stats().dead_count, 0);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
         db.add("fresh", &seeded_unit_vector(7, DIMS)).unwrap();
         assert_own_nearest(&db, "key-50", &seeded_unit_vector(190, DIMS));
-        assert_eq!(read_only.len(), 100);
-        assert!(read_only.contains("key-5"));
-        assert!(!read_only.contains("fresh"));
-        assert_own_nearest(&read_only, "key-5", &seeded_unit_vector(145, DIMS));
+        assert_eq!(snapshot_view.len(), 100);
+        assert!(snapshot_view.contains("key-5"));
+        assert!(!snapshot_view.contains("fresh"));
+        assert_own_nearest(&snapshot_view, "key-5", &seeded_unit_vector(145, DIMS));
+        let live_view = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert!(Arc::ptr_eq(&live_view.shared, &db.shared));
+        assert!(live_view.contains("fresh"));
         drop(db);
         let fresh_view = VecDb::open_read_only(&path, DIMS).unwrap();
         assert_eq!(fresh_view.len(), 69);
@@ -1242,7 +1695,7 @@ mod tests {
     fn upsert_changes_search_position_across_reopen() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("near", &basis_vector(0)).unwrap();
         for axis in 1..11 {
             db.add(&format!("other-{axis}"), &basis_vector(axis))
@@ -1280,7 +1733,7 @@ mod tests {
     fn removed_keys_are_hidden_everywhere_and_can_be_readded() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         for axis in 0..10 {
             db.add(&format!("key-{axis}"), &basis_vector(axis)).unwrap();
         }
@@ -1291,7 +1744,7 @@ mod tests {
         assert_eq!(db.len(), 9);
         assert!(!db.contains("key-4"));
         assert!(db.get("key-4").is_none());
-        assert_eq!(db.stats().dead_count, 2);
+        assert_eq!(db.stats().unwrap().dead_count, 2);
         assert_ne!(db.search(&query, &limit_params(1)).unwrap()[0].key, "key-4");
         let exact_all = SearchParams {
             limit: Some(10),
@@ -1325,11 +1778,11 @@ mod tests {
     fn bulk_remove_counts_only_present_keys_and_absent_remove_does_no_io() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 150)).unwrap();
-        let log_bytes = db.stats().log_bytes;
+        let log_bytes = db.stats().unwrap().log_bytes;
         assert!(!db.remove("missing").unwrap());
-        assert_eq!(db.stats().log_bytes, log_bytes);
+        assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
         let removals = vec![
             "key-1".to_string(),
             "key-1".to_string(),
@@ -1340,26 +1793,30 @@ mod tests {
         assert_eq!(db.len(), 3);
         assert!(!db.contains("key-1"));
         assert!(!db.contains("key-3"));
-        assert_eq!(db.stats().log_bytes, log_bytes + 2 * TOMBSTONE_RECORD_LEN);
+        assert_eq!(
+            db.stats().unwrap().log_bytes,
+            log_bytes + 2 * TOMBSTONE_RECORD_LEN
+        );
         assert_eq!(db.bulk_remove(&[]).unwrap(), 0);
         db.bulk_add(&[]).unwrap();
-        assert_eq!(db.stats().log_bytes, log_bytes + 2 * TOMBSTONE_RECORD_LEN);
+        assert_eq!(
+            db.stats().unwrap().log_bytes,
+            log_bytes + 2 * TOMBSTONE_RECORD_LEN
+        );
     }
 
     #[test]
     fn quiet_gap_snapshot_needs_a_thousand_mutations() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("seed", &seeded_unit_vector(1, DIMS)).unwrap();
-        writer(&mut db).mutations_since_snapshot = 998;
-        db.record_mutations(1, Instant::now() + Duration::from_secs(30))
-            .unwrap();
-        assert_eq!(writer(&mut db).mutations_since_snapshot, 999);
+        set_mutations(&db, 998);
+        record(&db, 1, Instant::now() + Duration::from_secs(30)).unwrap();
+        assert_eq!(mutations(&db), 999);
         assert!(!snapshot_exists(&path));
-        db.record_mutations(1, Instant::now() + Duration::from_secs(60))
-            .unwrap();
-        assert_eq!(writer(&mut db).mutations_since_snapshot, 0);
+        record(&db, 1, Instant::now() + Duration::from_secs(60)).unwrap();
+        assert_eq!(mutations(&db), 0);
         assert!(snapshot_exists(&path));
     }
 
@@ -1367,11 +1824,11 @@ mod tests {
     fn thousand_mutations_without_quiet_gap_do_not_snapshot() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("seed", &seeded_unit_vector(1, DIMS)).unwrap();
-        writer(&mut db).mutations_since_snapshot = 999;
-        db.record_mutations(1, Instant::now()).unwrap();
-        assert_eq!(writer(&mut db).mutations_since_snapshot, 1000);
+        set_mutations(&db, 999);
+        record(&db, 1, Instant::now()).unwrap();
+        assert_eq!(mutations(&db), 1000);
         assert!(!snapshot_exists(&path));
     }
 
@@ -1379,11 +1836,11 @@ mod tests {
     fn hard_cap_snapshots_regardless_of_gap() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("seed", &seeded_unit_vector(1, DIMS)).unwrap();
-        writer(&mut db).mutations_since_snapshot = 4999;
-        db.record_mutations(1, Instant::now()).unwrap();
-        assert_eq!(writer(&mut db).mutations_since_snapshot, 0);
+        set_mutations(&db, 4999);
+        record(&db, 1, Instant::now()).unwrap();
+        assert_eq!(mutations(&db), 0);
         assert!(snapshot_exists(&path));
     }
 
@@ -1391,13 +1848,13 @@ mod tests {
     fn flush_snapshots_pending_mutations_and_resets() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 2, 160)).unwrap();
         assert!(!snapshot_exists(&path));
-        assert_eq!(db.stats().records_since_snapshot, 2);
+        assert_eq!(db.stats().unwrap().records_since_snapshot, 2);
         db.flush().unwrap();
         assert!(snapshot_exists(&path));
-        assert_eq!(db.stats().records_since_snapshot, 0);
+        assert_eq!(db.stats().unwrap().records_since_snapshot, 0);
         fs::remove_file(snapshot_path(&path)).unwrap();
         db.flush().unwrap();
         assert!(!snapshot_exists(&path));
@@ -1407,7 +1864,7 @@ mod tests {
     fn open_after_tail_replay_writes_a_fresh_snapshot() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 170)).unwrap();
         drop(db);
         assert!(!snapshot_exists(&path));
@@ -1425,7 +1882,7 @@ mod tests {
     fn compaction_rewrites_log_and_preserves_live_data() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 120, 1000)).unwrap();
         let generation_before = generation_of(&path);
         for index in 0..40u64 {
@@ -1436,11 +1893,11 @@ mod tests {
             .unwrap();
         }
         assert_eq!(generation_of(&path), generation_before);
-        assert_eq!(db.stats().dead_count, 40);
-        let log_bytes_before = db.stats().log_bytes;
+        assert_eq!(db.stats().unwrap().dead_count, 40);
+        let log_bytes_before = db.stats().unwrap().log_bytes;
         let removals: Vec<String> = (90..120).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 30);
-        let stats = db.stats();
+        let stats = db.stats().unwrap();
         assert_eq!(stats.live_count, 90);
         assert_eq!(stats.dead_count, 0);
         assert_eq!(stats.records_since_snapshot, 0);
@@ -1484,13 +1941,13 @@ mod tests {
     fn compaction_streams_multiple_batches() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 1100, 3000)).unwrap();
         let generation_before = generation_of(&path);
         let removals: Vec<String> = (0..58).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 58);
         assert_ne!(generation_of(&path), generation_before);
-        let stats = db.stats();
+        let stats = db.stats().unwrap();
         assert_eq!(stats.live_count, 1042);
         assert_eq!(stats.dead_count, 0);
         for index in (58..1100u64).step_by(97) {
@@ -1511,13 +1968,13 @@ mod tests {
     fn stale_snapshot_left_by_interrupted_compaction_is_discarded_on_open() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 120, 210)).unwrap();
         db.flush().unwrap();
         let stale_snapshot = fs::read(snapshot_path(&path)).unwrap();
         let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
-        assert_eq!(db.stats().dead_count, 0);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
         drop(db);
         fs::write(snapshot_path(&path), &stale_snapshot).unwrap();
         let reopened = open_writer(&path);
@@ -1529,7 +1986,7 @@ mod tests {
             );
         }
         assert_own_nearest(&reopened, "key-100", &seeded_unit_vector(310, DIMS));
-        let stats = reopened.stats();
+        let stats = reopened.stats().unwrap();
         assert_eq!(stats.dead_count, 0);
         let loaded = load_snapshot(&path, generation_of(&path), stats.log_bytes).unwrap();
         assert_eq!(loaded.covered_log_offset, stats.log_bytes);
@@ -1542,9 +1999,9 @@ mod tests {
         let path = dir.path().join("db");
         let partial = [0x45u8, 0x56, 0x44, 0x42, 0x01, 0x00, 0x00];
         fs::write(&path, partial).unwrap();
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         assert!(db.is_empty());
-        assert_eq!(db.stats().log_bytes, 32);
+        assert_eq!(db.stats().unwrap().log_bytes, 32);
         db.add("fresh", &seeded_unit_vector(11, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
@@ -1560,7 +2017,7 @@ mod tests {
         fs::write(&path, partial).unwrap();
         let db = VecDb::open_read_only(&path, DIMS).unwrap();
         assert!(db.is_empty());
-        assert_eq!(db.stats().log_bytes, 0);
+        assert_eq!(db.stats().unwrap().log_bytes, 0);
         assert_eq!(fs::read(&path).unwrap(), partial);
         assert!(!snapshot_exists(&path));
         assert!(!lock_path(&path).exists());
@@ -1593,19 +2050,27 @@ mod tests {
     fn restore_writer_mode_reinstalls_the_kept_lock_and_reenables_writes() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 260)).unwrap();
-        let WriterState { lock, log, .. } = db.take_writer_state().unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
         drop(log);
-        assert!(matches!(db.mode, Mode::ReadOnly { .. }));
+        assert!(is_degraded(&db));
+        let vector = seeded_unit_vector(4, DIMS);
         assert!(matches!(
-            VecDb::open(&path, DIMS),
+            db.add("blocked", &vector),
+            Err(VecDbError::ReadOnly)
+        ));
+        assert!(matches!(
+            WriterLock::acquire(&path),
             Err(VecDbError::Locked(_))
         ));
-        db.restore_writer_mode(lock, DIMS, None).unwrap();
-        db.add("after", &seeded_unit_vector(4, DIMS)).unwrap();
+        {
+            let mut half = db.shared.writer_half();
+            restore_writer_mode(&db.shared, &mut half, lock, None).unwrap();
+        }
+        db.add("after", &vector).unwrap();
         assert!(matches!(
-            VecDb::open(&path, DIMS),
+            WriterLock::acquire(&path),
             Err(VecDbError::Locked(_))
         ));
         assert_eq!(db.len(), 4);
@@ -1619,19 +2084,24 @@ mod tests {
     fn restore_writer_mode_degrades_to_accurate_read_only_when_reopen_fails() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 270)).unwrap();
-        let WriterState { lock, log, .. } = db.take_writer_state().unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
         drop(log);
         let mut bytes = fs::read(&path).unwrap();
         bytes[20] ^= 0x5A;
         fs::write(&path, &bytes).unwrap();
-        assert!(matches!(
-            db.restore_writer_mode(lock, DIMS, None),
-            Err(VecDbError::Corrupt(_))
-        ));
-        assert!(matches!(db.mode, Mode::ReadOnly { log_bytes } if log_bytes == bytes.len() as u64));
-        assert_eq!(db.stats().log_bytes, bytes.len() as u64);
+        {
+            let mut half = db.shared.writer_half();
+            assert!(matches!(
+                restore_writer_mode(&db.shared, &mut half, lock, None),
+                Err(VecDbError::Corrupt(_))
+            ));
+            assert!(
+                matches!(half.mode, WriterMode::ReadOnly { log_bytes } if log_bytes == bytes.len() as u64)
+            );
+        }
+        assert_eq!(db.stats().unwrap().log_bytes, bytes.len() as u64);
         let vector = seeded_unit_vector(5, DIMS);
         assert!(matches!(db.add("x", &vector), Err(VecDbError::ReadOnly)));
     }
@@ -1640,12 +2110,12 @@ mod tests {
     fn snapshot_failure_degrades_the_write_and_flush_still_errors() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("seed", &seeded_unit_vector(1, DIMS)).unwrap();
         fs::create_dir(snapshot_path(&path)).unwrap();
-        writer(&mut db).mutations_since_snapshot = 4999;
-        db.record_mutations(1, Instant::now()).unwrap();
-        assert_eq!(writer(&mut db).mutations_since_snapshot, 5000);
+        set_mutations(&db, 4999);
+        record(&db, 1, Instant::now()).unwrap();
+        assert_eq!(mutations(&db), 5000);
         assert!(matches!(db.flush(), Err(VecDbError::Io { .. })));
         db.add("more", &seeded_unit_vector(2, DIMS)).unwrap();
         drop(db);
@@ -1659,25 +2129,25 @@ mod tests {
     fn failed_compaction_keeps_the_write_ok_and_backs_off() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 100, 280)).unwrap();
         let generation_before = generation_of(&path);
         fs::create_dir(temp_sibling(&path)).unwrap();
         let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
-        assert_eq!(db.stats().dead_count, 128);
+        assert_eq!(db.stats().unwrap().dead_count, 128);
         assert_eq!(generation_of(&path), generation_before);
         db.add("probe", &seeded_unit_vector(7, DIMS)).unwrap();
         assert!(matches!(
-            VecDb::open(&path, DIMS),
+            WriterLock::acquire(&path),
             Err(VecDbError::Locked(_))
         ));
         fs::remove_dir(temp_sibling(&path)).unwrap();
         db.bulk_add(&bulk_entries(64, 36, 290)).unwrap();
-        assert_eq!(db.stats().dead_count, 164);
+        assert_eq!(db.stats().unwrap().dead_count, 164);
         assert_eq!(generation_of(&path), generation_before);
         db.bulk_add(&bulk_entries(64, 28, 295)).unwrap();
-        assert_eq!(db.stats().dead_count, 0);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
         assert_ne!(generation_of(&path), generation_before);
         drop(db);
         let reopened = open_writer(&path);
@@ -1691,11 +2161,11 @@ mod tests {
     fn open_succeeds_and_serves_data_when_the_snapshot_cannot_be_written() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 300)).unwrap();
         drop(db);
         fs::create_dir(snapshot_path(&path)).unwrap();
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         assert_eq!(db.len(), 5);
         assert_own_nearest(&db, "key-2", &seeded_unit_vector(302, DIMS));
         assert!(matches!(db.flush(), Err(VecDbError::Io { .. })));
@@ -1709,7 +2179,7 @@ mod tests {
     fn reset_empties_the_db_and_keeps_it_usable() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 20, 180)).unwrap();
         db.flush().unwrap();
         let generation_before = generation_of(&path);
@@ -1719,7 +2189,7 @@ mod tests {
         assert_ne!(generation_of(&path), generation_before);
         assert_eq!(fs::metadata(&path).unwrap().len(), 32);
         assert_eq!(
-            db.stats(),
+            db.stats().unwrap(),
             Stats {
                 live_count: 0,
                 dead_count: 0,
@@ -1739,10 +2209,28 @@ mod tests {
     }
 
     #[test]
+    fn reset_via_one_handle_keeps_aliases_live() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let first = open_writer(&path);
+        let second = VecDb::open(&path, DIMS).unwrap();
+        first.bulk_add(&bulk_entries(0, 10, 220)).unwrap();
+        assert_eq!(second.len(), 10);
+        second.reset().unwrap();
+        assert!(first.is_empty());
+        assert!(!first.contains("key-0"));
+        let fresh = seeded_unit_vector(6, DIMS);
+        first.add("fresh", &fresh).unwrap();
+        assert!(second.contains("fresh"));
+        assert_eq!(second.len(), 1);
+        assert_own_nearest(&second, "fresh", &fresh);
+    }
+
+    #[test]
     fn failed_reset_with_the_log_gone_becomes_an_accurate_empty_instance() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 310)).unwrap();
         fs::create_dir(snapshot_path(&path)).unwrap();
         assert!(matches!(db.reset(), Err(VecDbError::Io { .. })));
@@ -1750,7 +2238,7 @@ mod tests {
         assert!(db.is_empty());
         assert_eq!(db.len(), 0);
         assert!(!db.contains("key-0"));
-        assert_eq!(db.stats().log_bytes, 0);
+        assert_eq!(db.stats().unwrap().log_bytes, 0);
         let vector = seeded_unit_vector(1, DIMS);
         assert!(matches!(db.add("x", &vector), Err(VecDbError::ReadOnly)));
         assert!(db.search(&vector, &limit_params(3)).unwrap().is_empty());
@@ -1767,7 +2255,7 @@ mod tests {
 
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 320)).unwrap();
         fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
         let outcome = db.reset();
@@ -1789,17 +2277,20 @@ mod tests {
     fn reset_recovery_over_a_recreated_log_clears_memory_to_match_disk() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 330)).unwrap();
         let old_generation = generation_of(&path);
-        let WriterState { lock, log, .. } = db.take_writer_state().unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
         drop(log);
         remove_data_files(&path).unwrap();
         drop(Log::create(&path, DIMS).unwrap().into_file());
-        db.recover_after_failed_reset(lock, DIMS, old_generation);
+        {
+            let mut half = db.shared.writer_half();
+            recover_after_failed_reset(&db.shared, &mut half, lock, old_generation);
+        }
         assert!(db.is_empty());
         assert!(!db.contains("key-0"));
-        assert_eq!(db.stats().log_bytes, 32);
+        assert_eq!(db.stats().unwrap().log_bytes, 32);
         db.add("fresh", &seeded_unit_vector(7, DIMS)).unwrap();
         assert_eq!(db.len(), 1);
         drop(db);
@@ -1813,7 +2304,7 @@ mod tests {
     fn delete_removes_all_files() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 190)).unwrap();
         db.flush().unwrap();
         fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
@@ -1828,12 +2319,164 @@ mod tests {
     }
 
     #[test]
+    fn delete_leaves_surviving_handles_closed() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let first = open_writer(&path);
+        first.bulk_add(&bulk_entries(0, 5, 400)).unwrap();
+        first.flush().unwrap();
+        let survivor = VecDb::open(&path, DIMS).unwrap();
+        let observer = VecDb::open_read_only(&path, DIMS).unwrap();
+        first.delete().unwrap();
+        assert!(!path.exists());
+        assert!(!snapshot_exists(&path));
+        assert!(!lock_path(&path).exists());
+        let query = seeded_unit_vector(1, DIMS);
+        assert!(matches!(
+            survivor.search(&query, &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(survivor.add("x", &query), Err(VecDbError::Closed)));
+        assert!(matches!(
+            survivor.bulk_add(&bulk_entries(0, 2, 401)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(survivor.remove("key-0"), Err(VecDbError::Closed)));
+        assert!(matches!(survivor.stats(), Err(VecDbError::Closed)));
+        assert!(matches!(survivor.flush(), Err(VecDbError::Closed)));
+        assert!(matches!(survivor.reset(), Err(VecDbError::Closed)));
+        assert!(matches!(
+            observer.search(&query, &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert_eq!(survivor.len(), 0);
+        assert!(!survivor.contains("key-0"));
+        assert!(survivor.get("key-0").is_none());
+        assert!(matches!(survivor.delete(), Err(VecDbError::Closed)));
+        let fresh = open_writer(&path);
+        assert!(fresh.is_empty());
+        fresh.add("anew", &query).unwrap();
+        assert_eq!(fresh.len(), 1);
+    }
+
+    #[test]
+    fn concurrent_bulk_add_with_live_readers_and_flush() {
+        const READERS: usize = 3;
+        const BULK: usize = 2000;
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let writer = open_writer(&path);
+        let pre = bulk_entries(10_000, 50, 900);
+        writer.bulk_add(&pre).unwrap();
+        let bulk = bulk_entries(0, BULK, 700);
+        let expected: Arc<HashMap<String, Vec<f32>>> =
+            Arc::new(pre.iter().chain(bulk.iter()).cloned().collect());
+        let stop = Arc::new(AtomicBool::new(false));
+        let barrier = Arc::new(Barrier::new(READERS + 2));
+        let mut readers = Vec::new();
+        for reader_index in 0..READERS {
+            let handle = VecDb::open(&path, DIMS).unwrap();
+            let stop = Arc::clone(&stop);
+            let barrier = Arc::clone(&barrier);
+            let expected = Arc::clone(&expected);
+            readers.push(thread::spawn(move || {
+                let query = seeded_unit_vector(31_337 + reader_index as u64, DIMS);
+                barrier.wait();
+                let mut iterations = 0usize;
+                loop {
+                    let found = handle.search(&query, &limit_params(8)).unwrap();
+                    for entry in &found {
+                        let vector = handle.get(&entry.key).unwrap();
+                        assert_eq!(&vector, expected.get(&entry.key).unwrap());
+                    }
+                    iterations += 1;
+                    if stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+                (handle, iterations)
+            }));
+        }
+        let flusher = {
+            let handle = VecDb::open(&path, DIMS).unwrap();
+            let stop = Arc::clone(&stop);
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                let mut flushes = 0usize;
+                loop {
+                    handle.flush().unwrap();
+                    flushes += 1;
+                    if stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+                flushes
+            })
+        };
+        barrier.wait();
+        writer.bulk_add(&bulk).unwrap();
+        stop.store(true, Ordering::Relaxed);
+        for reader in readers {
+            let (handle, iterations) = reader.join().unwrap();
+            assert!(iterations > 0);
+            assert_eq!(handle.len(), 50 + BULK);
+            assert!(handle.contains("key-0"));
+            assert!(handle.contains(&format!("key-{}", BULK - 1)));
+            assert!(handle.contains("key-10000"));
+        }
+        assert!(flusher.join().unwrap() > 0);
+        assert_eq!(writer.len(), 50 + BULK);
+        assert_eq!(writer.stats().unwrap().live_count, 50 + BULK);
+    }
+
+    #[test]
+    fn searches_continue_while_a_compaction_is_in_flight() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 300, 500)).unwrap();
+        let removals: Vec<String> = (0..30).map(|index| format!("key-{index}")).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 30);
+        assert_eq!(db.stats().unwrap().dead_count, 60);
+        let generation_before = generation_of(&path);
+        let query = seeded_unit_vector(4242, DIMS);
+        let exact = SearchParams {
+            limit: Some(10),
+            exact: true,
+            ..SearchParams::default()
+        };
+        let before = db.search(&query, &exact).unwrap();
+        assert_eq!(before.len(), 10);
+        let held = db.shared.state_read();
+        let shared = Arc::clone(&db.shared);
+        let compactor = thread::spawn(move || {
+            let mut half = shared.writer_half();
+            compact(&shared, &mut half)
+        });
+        let packed = held.arena.pack_query(&query).unwrap();
+        for _ in 0..25 {
+            let during = graph_search(&held.graph, &held.arena, &packed, &exact, None);
+            assert_eq!(during, before);
+        }
+        drop(held);
+        compactor.join().unwrap().unwrap();
+        assert_ne!(generation_of(&path), generation_before);
+        let stats = db.stats().unwrap();
+        assert_eq!(stats.dead_count, 0);
+        assert_eq!(stats.live_count, 270);
+        assert_eq!(db.search(&query, &exact).unwrap(), before);
+        assert!(!db.contains("key-0"));
+        assert!(db.contains("key-30"));
+    }
+
+    #[test]
     fn non_finite_vectors_are_rejected_without_partial_state() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let mut db = open_writer(&path);
+        let db = open_writer(&path);
         db.add("key-0", &seeded_unit_vector(0, DIMS)).unwrap();
-        let log_bytes = db.stats().log_bytes;
+        let log_bytes = db.stats().unwrap().log_bytes;
         for bad_value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             let mut bad = seeded_unit_vector(9, DIMS);
             bad[3] = bad_value;
@@ -1852,7 +2495,7 @@ mod tests {
         assert_eq!(db.len(), 1);
         assert!(!db.contains("key-10"));
         assert!(!db.contains("key-12"));
-        assert_eq!(db.stats().log_bytes, log_bytes);
+        assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
         drop(db);
         let reopened = open_writer(&path);
         assert_eq!(reopened.len(), 1);

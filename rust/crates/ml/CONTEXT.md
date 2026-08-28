@@ -10,7 +10,8 @@ Glossary of terms for the ML crate's domain. Definitions describe meaning, not i
 - **Graph Snapshot** — A persisted copy of the search index (HNSW graph). Purely derived state: losing or corrupting it costs rebuild time, never data.
 - **Tombstone** — A logged record marking a key as removed. Tombstoned entries are dead but still occupy log and graph space until compaction.
 - **Compaction** — Rewriting the vector log to contain only live entries and rebuilding the graph, triggered when dead entries exceed a threshold.
-- **Writer** — The single instance per index file allowed to mutate it, enforced by an OS lock. All other opens are read-only and see a point-in-time view.
+- **Writer** — The single live instance per index path within a process, holding the OS lock that keeps other processes out. Every in-process handle aliases it, so all handles see every write immediately.
+- **Handle** — A caller's reference to a VecDb. Handles to one path share the process's one live instance (writable, or a read-only view of it); a read-only open with no live writer in the process gets its own point-in-time copy instead.
 - **Flush** — Explicitly persisting the current graph snapshot so the next open replays no records into the graph; every open still scans the log to rebuild the arena.
 - **Exact search** — Brute-force scan over all live embeddings; results are ground truth.
 - **Approximate search** — Index-backed (HNSW) search; may miss neighbours in exchange for speed.

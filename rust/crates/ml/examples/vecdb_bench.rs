@@ -275,7 +275,7 @@ fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbRe
     let mut db = VecDb::open(&path, dims).expect("open vecdb");
     let ingest = ingest_phase(&mut db, data, scale);
     let searches = search_phase(&db, data, scale);
-    let stats = db.stats();
+    let stats = db.stats().expect("vecdb stats");
     let snapshot_file = PathBuf::from(format!("{}.graph", path.display()));
     let snapshot_bytes = std::fs::metadata(&snapshot_file)
         .map(|meta| meta.len())
@@ -411,11 +411,11 @@ fn compaction_phase(db: &mut VecDb, data: &BenchData, scale: usize) -> Compactio
     eprintln!("[scale {scale}] vecdb remove {REMOVAL_PERCENT}% + compact");
     let removed = data.entries.len() * REMOVAL_PERCENT / 100;
     let removals: Vec<String> = (0..removed).map(|index| format!("vec-{index}")).collect();
-    let log_before = db.stats().log_bytes;
+    let log_before = db.stats().expect("vecdb stats").log_bytes;
     let started = Instant::now();
     db.bulk_remove(&removals).expect("vecdb bulk remove");
     let remove_and_compact = started.elapsed();
-    let stats_after = db.stats();
+    let stats_after = db.stats().expect("vecdb stats");
     CompactionTimings {
         removed,
         remove_and_compact,
