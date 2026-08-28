@@ -1,36 +1,13 @@
 package io.ente.photos
 
+import android.app.Activity
+import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import io.flutter.embedding.android.FlutterFragmentActivity
 
-abstract class ForegroundHeartbeatActivity : FlutterFragmentActivity() {
-    private val foregroundHeartbeat = ForegroundHeartbeat(this)
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        foregroundHeartbeat.start()
-        super.onCreate(savedInstanceState)
-    }
-
-    override fun onStart() {
-        super.onStart()
-        foregroundHeartbeat.start()
-    }
-
-    override fun onStop() {
-        foregroundHeartbeat.stop()
-        super.onStop()
-    }
-
-    override fun onDestroy() {
-        foregroundHeartbeat.stop()
-        super.onDestroy()
-    }
-}
-
-private class ForegroundHeartbeat(private val context: Context) {
+class ForegroundHeartbeat(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private val preferences by lazy {
         context.getSharedPreferences(
@@ -87,9 +64,59 @@ private class ForegroundHeartbeat(private val context: Context) {
 
     private fun currentTimeInMicroseconds() = System.currentTimeMillis() * 1000L
 
-    private companion object {
-        const val DART_FOREGROUND_HEARTBEAT_KEY = "flutter.fg_task_hb_time"
-        const val NATIVE_FOREGROUND_HEARTBEAT_KEY = "flutter.native_fg_task_hb_time"
-        const val HEARTBEAT_INTERVAL_MS = 1000L
+    companion object {
+        private const val DART_FOREGROUND_HEARTBEAT_KEY = "flutter.fg_task_hb_time"
+        private const val NATIVE_FOREGROUND_HEARTBEAT_KEY = "flutter.native_fg_task_hb_time"
+        private const val HEARTBEAT_INTERVAL_MS = 1000L
+
+        fun install(application: Application) {
+            val heartbeat = ForegroundHeartbeat(application)
+            application.registerActivityLifecycleCallbacks(
+                object : Application.ActivityLifecycleCallbacks {
+                    private var startedActivities = 0
+
+                    override fun onActivityPreCreated(
+                        activity: Activity,
+                        savedInstanceState: Bundle?
+                    ) {
+                        heartbeat.start()
+                    }
+
+                    override fun onActivityCreated(
+                        activity: Activity,
+                        savedInstanceState: Bundle?
+                    ) {
+                        heartbeat.start()
+                    }
+
+                    override fun onActivityStarted(activity: Activity) {
+                        startedActivities++
+                        heartbeat.start()
+                    }
+
+                    override fun onActivityResumed(activity: Activity) {}
+
+                    override fun onActivityPaused(activity: Activity) {}
+
+                    override fun onActivityStopped(activity: Activity) {
+                        startedActivities--
+                        if (startedActivities == 0) {
+                            heartbeat.stop()
+                        }
+                    }
+
+                    override fun onActivitySaveInstanceState(
+                        activity: Activity,
+                        outState: Bundle
+                    ) {}
+
+                    override fun onActivityDestroyed(activity: Activity) {
+                        if (startedActivities == 0) {
+                            heartbeat.stop()
+                        }
+                    }
+                }
+            )
+        }
     }
 }
