@@ -2,11 +2,12 @@ use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
-use ente_location_dataset::{BuildOptions, CITY_FILE, RemoteSources, SourcePaths, build};
+use ente_location_dataset::{BuildOptions, RemoteSources, SourcePaths, build};
 
 const USAGE: &str = concat!(
     "usage: ente-location-dataset build --output <directory> [--cache <directory>] ",
-    "[--cities <file> --country-info <file>]"
+    "[--cities <file> --country-info <file> ",
+    "--countries <shp> --disputes <shp> --admin1 <shp>]"
 );
 
 fn main() {
@@ -22,21 +23,33 @@ fn run() -> Result<(), Box<dyn Error>> {
         cache,
         cities,
         country_info,
+        countries,
+        disputes,
+        admin1,
     } = Arguments::parse()?;
-    let sources = match (cities, country_info) {
-        (None, None) => RemoteSources::new(cache).fetch()?,
-        (Some(cities), Some(country_info)) => SourcePaths {
-            cities,
-            country_info,
-        },
-        _ => return Err("local generation requires both source paths".into()),
+    let sources = match (cities, country_info, countries, disputes, admin1) {
+        (None, None, None, None, None) => RemoteSources::new(cache).fetch()?,
+        (Some(cities), Some(country_info), Some(countries), Some(disputes), Some(admin1)) => {
+            SourcePaths {
+                cities,
+                country_info,
+                countries,
+                disputes,
+                admin1,
+            }
+        }
+        _ => return Err("local generation requires all five source paths".into()),
     };
     let result = build(&BuildOptions { sources, output })?;
     println!("cities: {}", result.city_count);
-    println!(
-        "{CITY_FILE}: {} bytes, sha256 {}",
-        result.byte_length, result.sha256
-    );
+    println!("Priority-1 territories: {}", result.territory_count);
+    println!("bytes: {}", result.byte_length);
+    for file in result.files {
+        println!(
+            "{}: {} bytes, sha256 {}",
+            file.name, file.byte_length, file.sha256
+        );
+    }
     Ok(())
 }
 
@@ -45,6 +58,9 @@ struct Arguments {
     cache: PathBuf,
     cities: Option<PathBuf>,
     country_info: Option<PathBuf>,
+    countries: Option<PathBuf>,
+    disputes: Option<PathBuf>,
+    admin1: Option<PathBuf>,
 }
 
 impl Arguments {
@@ -57,6 +73,9 @@ impl Arguments {
         let mut cache = None;
         let mut cities = None;
         let mut country_info = None;
+        let mut countries = None;
+        let mut disputes = None;
+        let mut admin1 = None;
         while let Some(argument) = args.next() {
             let value = args.next().ok_or(USAGE)?;
             match argument.as_str() {
@@ -64,6 +83,9 @@ impl Arguments {
                 "--cache" => cache = Some(value.into()),
                 "--cities" => cities = Some(value.into()),
                 "--country-info" => country_info = Some(value.into()),
+                "--countries" => countries = Some(value.into()),
+                "--disputes" => disputes = Some(value.into()),
+                "--admin1" => admin1 = Some(value.into()),
                 _ => return Err(USAGE.into()),
             }
         }
@@ -72,6 +94,9 @@ impl Arguments {
             cache: cache.unwrap_or_else(default_cache),
             cities,
             country_info,
+            countries,
+            disputes,
+            admin1,
         })
     }
 }
