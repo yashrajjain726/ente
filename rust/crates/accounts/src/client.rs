@@ -47,8 +47,12 @@ pub struct AccountsClient {
 
 impl AccountsClient {
     pub fn new(config: AccountsClientConfig) -> Result<Self> {
+        Ok(Self::with_http(config, Http::new()?))
+    }
+
+    pub fn with_http(config: AccountsClientConfig, http: Http) -> Self {
         let api = Api::new(
-            Http::new()?,
+            http,
             ApiConfig {
                 origin: config.origin,
                 client_package: Some(config.client_package.clone()),
@@ -57,10 +61,10 @@ impl AccountsClient {
                 auth: config.auth_token.map(Auth::User),
             },
         );
-        Ok(Self {
+        Self {
             api,
             client_package: config.client_package,
-        })
+        }
     }
 
     pub fn set_auth_token(&self, auth_token: Option<String>) {
@@ -69,6 +73,24 @@ impl AccountsClient {
 
     pub fn client_package(&self) -> &str {
         &self.client_package
+    }
+
+    pub async fn email(&self) -> Result<String> {
+        #[derive(serde::Deserialize)]
+        struct Details {
+            email: String,
+        }
+
+        let details: Details = self
+            .api
+            .get("/users/details/v2")
+            .send()
+            .await?
+            .error_for_code()
+            .await?
+            .json()
+            .await?;
+        Ok(details.email)
     }
 
     pub async fn get_srp_attributes(&self, email: &str) -> Result<SrpAttributes> {
@@ -88,13 +110,12 @@ impl AccountsClient {
         Ok(response.attributes)
     }
 
-    pub async fn login_with_srp(
+    pub(crate) async fn login_with_srp(
         &self,
-        email: &str,
         password: &str,
+        srp_attrs: &SrpAttributes,
     ) -> Result<(AuthResponse, SecretVec)> {
-        let srp_attrs = self.get_srp_attributes(email).await?;
-        let creds = auth::derive_srp_credentials(password, &srp_attrs)?;
+        let creds = auth::derive_srp_credentials(password, srp_attrs)?;
         let srp_salt = b64::decode(&srp_attrs.srp_salt)?;
         let mut srp_session = SrpSession::new(
             &srp_attrs.srp_user_id.to_string(),

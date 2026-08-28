@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "apps/cli",
+    "apps/cli-next",
     "apps/ensu/src-tauri",
     "bindings/frb/lib",
     "bindings/frb/locker",
@@ -46,6 +47,10 @@ members = [
 edition = "2024"
 
 [workspace.dependencies]
+anyhow = "1.0.103"
+chrono = { version = "0.4.44", default-features = false }
+clap = "4.6.1"
+dialoguer = { version = "0.11.0", default-features = false }
 dirs = "5.0.1"
 ente-accounts = { path = "crates/accounts" }
 ente-assets = { path = "crates/assets" }
@@ -79,6 +84,7 @@ hkdf = "0.13.0"
 hmac = "0.13.0"
 image = "0.25.10"
 js-sys = "0.3.102"
+keyring = { version = "3.6.3", default-features = false }
 log = "0.4.29"
 md-5 = "0.11.0"
 mockito = "1.7.2"
@@ -107,6 +113,7 @@ urlencoding = "2.1.3"
 uuid = "1.23.1"
 wasm-bindgen = "0.2.125"
 wasm-bindgen-futures = "0.4.75"
+windows-sys = "0.61.2"
 zeroize = { version = "1.9.0", features = ["derive"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 

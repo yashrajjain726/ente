@@ -282,7 +282,7 @@ where
         } else {
             let (response, kek) = self
                 .client
-                .login_with_srp(&params.email, &params.password)
+                .login_with_srp(&params.password, &srp_attrs)
                 .await?;
             let response = self.resolve_second_factor(response).await?;
             (response, kek)

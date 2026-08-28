@@ -11,7 +11,7 @@ ente-assets.workspace = true
 ente-core.workspace = true
 ente-ensu.workspace = true
 ente-ensu-crypto.workspace = true
-keyring = { version = "3.0.0", default-features = false, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
+keyring = { workspace = true, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 log.workspace = true
 notify = "6.1.1"
 serde.workspace = true
@@ -29,7 +29,7 @@ libc = "0.2.0"
 rustix = { version = "1.1.4", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

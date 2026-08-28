@@ -2437,6 +2437,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-cli-next"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "dialoguer",
+ "dirs 5.0.1",
+ "ente-accounts",
+ "ente-core",
+ "ente-photos",
+ "ente-test-support",
+ "keyring",
+ "mockito",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+ "uuid",
+ "windows-sys 0.61.2",
+ "zeroize",
+]
+
+[[package]]
 name = "ente-contacts"
 version = "0.0.0"
 dependencies = [
@@ -2732,12 +2758,15 @@ name = "ente-photos"
 version = "0.0.0"
 dependencies = [
  "ente-assets",
+ "ente-core",
  "ente-exif",
  "ente-location",
  "quick-xml",
  "rusqlite",
+ "serde",
  "tempfile",
  "thiserror 2.0.18",
+ "zeroize",
 ]
 
 [[package]]

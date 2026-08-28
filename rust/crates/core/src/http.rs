@@ -100,6 +100,12 @@ pub struct Http {
     client: reqwest::Client,
 }
 
+impl From<reqwest::Client> for Http {
+    fn from(client: reqwest::Client) -> Self {
+        Self { client }
+    }
+}
+
 impl Http {
     pub fn new() -> Result<Self, Error> {
         let builder = reqwest::Client::builder();
