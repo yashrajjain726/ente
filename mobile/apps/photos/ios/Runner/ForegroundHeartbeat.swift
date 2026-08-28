@@ -2,59 +2,45 @@ import Foundation
 
 final class ForegroundHeartbeat {
   private let defaults = UserDefaults.standard
-  private var timer: Timer?
-  private var nativeHeartbeatStartedAt: Int64 = 0
-  private var dartHasTakenOver = false
+  private let queue = DispatchQueue(
+    label: "io.ente.frame.foreground-heartbeat",
+    qos: .utility
+  )
+  private var timer: DispatchSourceTimer?
 
   func start() {
-    guard timer == nil, !dartHasTakenOver else {
-      return
+    queue.async {
+      if self.timer != nil {
+        return
+      }
+      let timer = DispatchSource.makeTimerSource(queue: self.queue)
+      timer.schedule(
+        deadline: .now(),
+        repeating: self.heartbeatInterval,
+        leeway: .milliseconds(100)
+      )
+      timer.setEventHandler { [weak self] in
+        self?.writeNativeHeartbeat()
+      }
+      timer.resume()
+      self.timer = timer
     }
-
-    nativeHeartbeatStartedAt = currentTimeInMicroseconds()
-    writeNativeHeartbeat(nativeHeartbeatStartedAt)
-
-    let timer = Timer(timeInterval: heartbeatInterval, repeats: true) { [weak self] _ in
-      self?.heartbeatTimerFired()
-    }
-    self.timer = timer
-    RunLoop.main.add(timer, forMode: .common)
   }
 
   func stop() {
-    stopTimer()
-    dartHasTakenOver = false
-  }
-
-  private func heartbeatTimerFired() {
-    if hasDartHeartbeatTakenOver() {
-      stopTimer()
-      dartHasTakenOver = true
-      return
+    queue.async {
+      self.timer?.cancel()
+      self.timer = nil
     }
-    writeNativeHeartbeat(currentTimeInMicroseconds())
   }
 
-  private func stopTimer() {
-    timer?.invalidate()
-    timer = nil
+  private func writeNativeHeartbeat() {
+    defaults.set(
+      Int64(Date().timeIntervalSince1970 * 1_000_000),
+      forKey: nativeForegroundHeartbeatKey
+    )
   }
 
-  private func hasDartHeartbeatTakenOver() -> Bool {
-    let dartHeartbeat =
-      (defaults.object(forKey: dartForegroundHeartbeatKey) as? NSNumber)?.int64Value ?? 0
-    return dartHeartbeat >= nativeHeartbeatStartedAt
-  }
-
-  private func writeNativeHeartbeat(_ heartbeat: Int64) {
-    defaults.set(heartbeat, forKey: nativeForegroundHeartbeatKey)
-  }
-
-  private func currentTimeInMicroseconds() -> Int64 {
-    Int64(Date().timeIntervalSince1970 * 1_000_000)
-  }
-
-  private let dartForegroundHeartbeatKey = "flutter.fg_task_hb_time"
   private let nativeForegroundHeartbeatKey = "flutter.native_fg_task_hb_time"
-  private let heartbeatInterval: TimeInterval = 1
+  private let heartbeatInterval: DispatchTimeInterval = .seconds(1)
 }

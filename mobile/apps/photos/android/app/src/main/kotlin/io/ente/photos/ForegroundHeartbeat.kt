@@ -5,28 +5,25 @@ import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
 
 class ForegroundHeartbeat(private val context: Context) {
-    private val handler = Handler(Looper.getMainLooper())
+    private val handler by lazy {
+        val thread = HandlerThread("ForegroundHeartbeat")
+        thread.start()
+        Handler(thread.looper)
+    }
     private val preferences by lazy {
         context.getSharedPreferences(
             EnteApplication.FLUTTER_SHARED_PREFERENCES,
             Context.MODE_PRIVATE
         )
     }
-    private var nativeHeartbeatStartedAt = 0L
     private var isRunning = false
-    private var dartHasTakenOver = false
     private val heartbeat =
         object : Runnable {
             override fun run() {
                 if (!isRunning) {
-                    return
-                }
-                if (hasDartHeartbeatTakenOver()) {
-                    isRunning = false
-                    dartHasTakenOver = true
                     return
                 }
                 writeNativeHeartbeat()
@@ -35,37 +32,32 @@ class ForegroundHeartbeat(private val context: Context) {
         }
 
     fun start() {
-        if (isRunning || dartHasTakenOver) {
-            return
+        handler.post {
+            if (isRunning) {
+                return@post
+            }
+            isRunning = true
+            heartbeat.run()
         }
-        isRunning = true
-        nativeHeartbeatStartedAt = currentTimeInMicroseconds()
-        writeNativeHeartbeat(nativeHeartbeatStartedAt)
-        handler.postDelayed(heartbeat, HEARTBEAT_INTERVAL_MS)
     }
 
     fun stop() {
-        isRunning = false
-        dartHasTakenOver = false
-        handler.removeCallbacks(heartbeat)
+        handler.post {
+            isRunning = false
+            handler.removeCallbacks(heartbeat)
+        }
     }
 
-    private fun hasDartHeartbeatTakenOver(): Boolean {
-        val dartHeartbeat =
-            preferences.getLong(DART_FOREGROUND_HEARTBEAT_KEY, 0L)
-        return dartHeartbeat >= nativeHeartbeatStartedAt
-    }
-
-    private fun writeNativeHeartbeat(heartbeat: Long = currentTimeInMicroseconds()) {
+    private fun writeNativeHeartbeat() {
         preferences.edit()
-            .putLong(NATIVE_FOREGROUND_HEARTBEAT_KEY, heartbeat)
+            .putLong(
+                NATIVE_FOREGROUND_HEARTBEAT_KEY,
+                System.currentTimeMillis() * 1000L
+            )
             .apply()
     }
 
-    private fun currentTimeInMicroseconds() = System.currentTimeMillis() * 1000L
-
     companion object {
-        private const val DART_FOREGROUND_HEARTBEAT_KEY = "flutter.fg_task_hb_time"
         private const val NATIVE_FOREGROUND_HEARTBEAT_KEY = "flutter.native_fg_task_hb_time"
         private const val HEARTBEAT_INTERVAL_MS = 1000L
 
