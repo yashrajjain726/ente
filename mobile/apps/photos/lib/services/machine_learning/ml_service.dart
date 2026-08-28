@@ -449,12 +449,6 @@ class MLService {
         _logRunStopped(control, "after initial clustering");
         return MlRunDisposition.stopped;
       }
-      if (_mlControllerStatus == true) {
-        // Cache refreshes only read ML stores, so they may safely outlive
-        // this run and the process lock.
-        magicCacheService.updateCache(forced: force).ignore();
-        memoriesCacheService.updateCache(forced: force).ignore();
-      }
       if (control.stopRequested) {
         _logRunStopped(control, "before indexing");
         return MlRunDisposition.stopped;
@@ -474,10 +468,16 @@ class MLService {
         return MlRunDisposition.stopped;
       }
       if (_mlControllerStatus == true) {
-        // Persist refreshed caches after ML so foreground can pick them up
-        // on the next resume, even when the work ran headlessly in background.
-        magicCacheService.updateCache().ignore();
-        memoriesCacheService.updateCache(forced: force).ignore();
+        await magicCacheService.updateCache(forced: force);
+        if (control.stopRequested) {
+          _logRunStopped(control, "after magic cache refresh");
+          return MlRunDisposition.stopped;
+        }
+        await memoriesCacheService.updateCache(forced: force);
+        if (control.stopRequested) {
+          _logRunStopped(control, "after memories cache refresh");
+          return MlRunDisposition.stopped;
+        }
       }
       return MlRunDisposition.completed;
     } finally {
