@@ -10,8 +10,7 @@ mod log;
 mod snapshot;
 mod store;
 
-#[allow(unused_imports)]
-pub(crate) use graph::{Graph, GraphNodeParts, search};
+pub use store::{Stats, VecDb};
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchParams {
@@ -43,6 +42,8 @@ pub enum VecDbError {
     ReadOnly,
     #[error("invalid key: {0}")]
     InvalidKey(String),
+    #[error("invalid vector: {0}")]
+    InvalidVector(String),
     #[error("dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch { expected: usize, actual: usize },
     #[error("invalid dimensions {0}: must be a nonzero multiple of 8")]

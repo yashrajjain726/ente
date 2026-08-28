@@ -13,19 +13,16 @@ const FIXED_PREFIX_LEN: usize = 39;
 const MIN_SNAPSHOT_LEN: usize = FIXED_PREFIX_LEN + CRC_LEN;
 const MIN_NODE_LEN: usize = 7;
 
-#[allow(dead_code)]
 pub(crate) struct LoadedSnapshot {
     pub(crate) covered_log_offset: u64,
     pub(crate) entry_point: Option<u32>,
     pub(crate) parts: Vec<GraphNodeParts>,
 }
 
-#[allow(dead_code)]
 pub(crate) fn snapshot_path(log_path: &Path) -> PathBuf {
     append_suffix(log_path, ".graph")
 }
 
-#[allow(dead_code)]
 pub(crate) fn write_snapshot(
     log_path: &Path,
     generation: [u8; 16],
@@ -40,7 +37,6 @@ pub(crate) fn write_snapshot(
     })
 }
 
-#[allow(dead_code)]
 pub(crate) fn load_snapshot(
     log_path: &Path,
     expected_generation: [u8; 16],
@@ -64,7 +60,6 @@ pub(crate) fn load_snapshot(
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn remove_snapshot(log_path: &Path) -> Result<(), VecDbError> {
     remove_if_present(&snapshot_path(log_path))?;
     remove_if_present(&temp_snapshot_path(log_path))

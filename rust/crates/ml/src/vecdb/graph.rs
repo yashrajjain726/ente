@@ -111,7 +111,6 @@ impl Default for Graph {
     }
 }
 
-#[allow(dead_code)]
 impl Graph {
     pub(crate) fn new() -> Self {
         Self {
@@ -472,7 +471,6 @@ impl QueryContext<'_> {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) fn search(
     graph: Option<&Graph>,
     arena: &VectorArena,

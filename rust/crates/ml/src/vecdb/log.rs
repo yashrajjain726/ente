@@ -22,14 +22,12 @@ const ENCODE_FLUSH_BYTES: usize = 64 * 1024;
 static GENERATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
 pub(crate) enum LogEntry<'a> {
     Add { key: &'a str, vector: &'a [f32] },
     Tombstone { key: &'a str },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub(crate) enum LogRecord {
     Add { key: String, vector: Vec<f32> },
     Tombstone { key: String },
@@ -45,7 +43,6 @@ pub(crate) struct Log {
     encode_buffer: Vec<u8>,
 }
 
-#[allow(dead_code)]
 impl Log {
     pub(crate) fn create(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         validate_dims(dims)?;
@@ -216,7 +213,6 @@ pub(crate) struct LogScanner<'a> {
     done: bool,
 }
 
-#[allow(dead_code)]
 impl LogScanner<'_> {
     pub(crate) fn next_record(&mut self) -> Result<Option<(LogRecord, u64)>, VecDbError> {
         if self.done {
@@ -430,7 +426,6 @@ fn splitmix64(state: &mut u64) -> u64 {
     mixed ^ (mixed >> 31)
 }
 
-#[allow(dead_code)]
 pub(crate) fn remove_stale_temp_sibling(path: &Path) -> Result<(), VecDbError> {
     let temp_path = temp_sibling_path(path);
     match std::fs::remove_file(&temp_path) {
