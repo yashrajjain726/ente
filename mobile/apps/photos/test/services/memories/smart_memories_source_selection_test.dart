@@ -58,22 +58,15 @@ void main() {
         final allFileIdsToFile = {
           for (final file in fullSourceFiles) file.uploadedFileID!: file,
         };
-        final citySearchIndex = CitySearchIndex(
-          cities: [
-            City.fromMap({
-              "city": "Paris",
-              "country": "France",
-              "lat": tripLocation.latitude,
-              "lng": tripLocation.longitude,
-            }),
-          ],
-          nodes: const [
-            [0, -1, -1, 0],
-          ],
-          root: 0,
-          maxLatDelta: 1,
-          maxLngDelta: 1,
+        const city = City(
+          city: "Paris",
+          country: "France",
+          lat: 48.8566,
+          lng: 2.3522,
         );
+        final citySearchIndex = CitySearchIndex({
+          for (final file in fullSourceFiles) file: city,
+        });
 
         final (fullTrips, _) = await TripMemoriesCalculatorV2.compute(
           fullSourceFiles,

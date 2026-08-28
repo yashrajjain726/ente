@@ -356,9 +356,11 @@ class SmartMemoriesService {
         : Configuration.instance.getEmail();
     _logger.info('currentUserEmail: $currentUserEmail $timeLogger');
 
-    final citySearchIndex = await locationService.getCitySearchIndex();
+    final citySearchIndex = await locationService.getCitySearchIndex(
+      allFileIdsToFile.values,
+    );
     _logger.info(
-      'cities has ${citySearchIndex.cities.length} entries $timeLogger',
+      'matched ${citySearchIndex.assignments.length} files to cities $timeLogger',
     );
 
     final Map<int, List<FaceWithoutEmbedding>> fileIdToFaces = mlEnabled
@@ -1484,7 +1486,7 @@ class SmartMemoriesService {
     CitySearchIndex citySearchIndex,
   ) {
     final files = Memory.filesFromMemories(memories);
-    final results = getCityResults(citySearchIndex.searchArgs(files));
+    final results = citySearchIndex.match(files);
     final List<City> sortedByResultCount = results.keys.toList()
       ..sort((a, b) => results[b]!.length.compareTo(results[a]!.length));
     if (sortedByResultCount.isEmpty) return null;
