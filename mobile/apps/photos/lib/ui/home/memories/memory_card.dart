@@ -8,7 +8,7 @@ import "package:photos/ui/home/memories/all_memories_page.dart";
 import "package:photos/ui/home/memories/memory_cover_util.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 
-class MemoryCoverWidget extends StatefulWidget {
+class MemoryCardWidget extends StatefulWidget {
   final SmartMemory smartMemory;
   final List<SmartMemory> allMemories;
   final double height;
@@ -20,7 +20,7 @@ class MemoryCoverWidget extends StatefulWidget {
   static const gap = 5.0;
   final int currentMemoryIndex;
 
-  const MemoryCoverWidget({
+  const MemoryCardWidget({
     required this.smartMemory,
     required this.allMemories,
     required this.height,
@@ -30,10 +30,10 @@ class MemoryCoverWidget extends StatefulWidget {
   });
 
   @override
-  State<MemoryCoverWidget> createState() => _MemoryCoverWidgetState();
+  State<MemoryCardWidget> createState() => _MemoryCardWidgetState();
 }
 
-class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
+class _MemoryCardWidgetState extends State<MemoryCardWidget> {
   @override
   Widget build(BuildContext context) {
     // The list can be empty after deleting every memory and returning here.
@@ -50,7 +50,7 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: MemoryCoverWidget.gap / 2.0,
+        horizontal: MemoryCardWidget.gap / 2.0,
       ),
       child: GestureDetector(
         onTap: () async {
