@@ -4,6 +4,15 @@ import "package:path_provider/path_provider.dart";
 import "package:sqlite_async/sqlite3_common.dart";
 import "package:sqlite_async/sqlite_async.dart";
 
+class DatabaseDowngradeError extends Error {
+  DatabaseDowngradeError(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 mixin SqlDbBase {
   static final Map<int, String> _params = <int, String>{};
 
@@ -22,8 +31,8 @@ mixin SqlDbBase {
     final future = _dbFuture ??= openDatabase();
     try {
       return await future;
-    } catch (_) {
-      if (identical(_dbFuture, future)) {
+    } catch (e) {
+      if (e is! DatabaseDowngradeError && identical(_dbFuture, future)) {
         _dbFuture = null;
       }
       rethrow;
@@ -67,7 +76,7 @@ mixin SqlDbBase {
     final probedVersion = probe['user_version'] as int;
 
     if (probedVersion > toVersion) {
-      throw AssertionError(
+      throw DatabaseDowngradeError(
         "currentVersion($probedVersion) cannot be greater than toVersion($toVersion)",
       );
     }
@@ -80,7 +89,7 @@ mixin SqlDbBase {
       final currentVersion = result['user_version'] as int;
 
       if (currentVersion > toVersion) {
-        throw AssertionError(
+        throw DatabaseDowngradeError(
           "currentVersion($currentVersion) cannot be greater than toVersion($toVersion)",
         );
       }
