@@ -41,7 +41,6 @@ Future<void> showTrashPage(
       .requestLocalAuthentication(context, l10n.authToViewTrashedFiles);
   if (!hasAuthenticated) return;
   final isDeviceTrashSupported =
-      flagService.internalUser &&
       Platform.isAndroid &&
       !await isAndroidSDKVersionLowerThan(android11SDKINT);
   await beforeRouteToPage?.call();
