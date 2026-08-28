@@ -1,4 +1,5 @@
 import {
+    Add01Icon,
     BubbleChatIcon,
     MultiplicationSignIcon,
     UserAdd02Icon,
@@ -13,7 +14,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
-import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpaceHomeOrbit } from "components/HomeOrbit";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import type { FriendProfile } from "data/friends";
@@ -29,10 +30,9 @@ import {
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
 import {
-    homeCircleOrbitGap,
-    homeCirclePlacements,
-    type HomeCirclePlacement,
-} from "utils/home-circle-layout";
+    homeOrbitPlacements,
+    type HomeOrbitPlacement,
+} from "utils/home-orbit-layout";
 import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
 import {
     canPreviewSpaceImageFile,
@@ -57,7 +57,9 @@ const headerHeight = 64;
 const headerIconSize = 22;
 const headerSideWidth = 36;
 const homeHorizontalPadding = "16px";
-const postCircleMediaLoadRootMargin = "640px 0px";
+const orbitMediaLoadRootMargin = "640px 0px";
+const postButtonSize = 64;
+const postButtonIconSize = 34;
 const waveAnimationDurationMs = 900;
 const waveHoldDurationMs = 500;
 const waveHoldMovementTolerancePx = 12;
@@ -106,7 +108,7 @@ interface DecodedImageState {
     width?: number;
 }
 
-interface PostCircleCanvasSize {
+interface OrbitCanvasSize {
     height: number;
     width: number;
 }
@@ -178,14 +180,6 @@ const friendAvatarCacheKey = (friend: FriendProfile) =>
         friend.avatarSize ?? "",
     ].join(":");
 
-const orbitPhaseFor = (value: string) => {
-    let hash = 0;
-    for (const character of value) {
-        hash = (hash * 31 + character.charCodeAt(0)) % 360;
-    }
-    return hash;
-};
-
 const useDecodedImage = (
     src?: string | null,
     keepPreviousUntilReady = false,
@@ -249,7 +243,7 @@ const useDecodedImage = (
     return { ready: !src, src };
 };
 
-interface FriendPostCircleProps {
+interface FriendOrbitProps {
     avatarUrl?: string | null;
     friend: FriendProfile;
     imageUrl?: string;
@@ -266,11 +260,11 @@ interface FriendPostCircleProps {
     ) => void;
     onPostUnavailable?: (friendSpaceID: string, postID: number) => void;
     onWave?: () => Promise<void>;
-    placement: HomeCirclePlacement;
+    placement: HomeOrbitPlacement;
     posts: SpacePost[];
 }
 
-const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
+const FriendOrbit: React.FC<FriendOrbitProps> = ({
     avatarUrl,
     friend,
     imageUrl,
@@ -321,17 +315,8 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
               : avatarUrl) ?? null;
     const isPhotoReady = Boolean(displayImageUrl) && decodedPhoto.ready;
     const canOpenPost = Boolean(post) && !postUnavailable && isPhotoReady;
-    const isCircleDisabled =
+    const isFriendDisabled =
         isLoading || Boolean(post && !postUnavailable && !isPhotoReady);
-    const orbitDotSize = Math.max(8, Math.min(12, placement.size * 0.05));
-    const orbitDurationSeconds = Math.max(
-        30,
-        Math.min(42, placement.size * 0.13),
-    );
-    const orbitGap = homeCircleOrbitGap(placement.size);
-    const orbitAnimationDelaySeconds =
-        -(orbitPhaseFor(friend.spaceId ?? friend.id) / 360) *
-        orbitDurationSeconds;
 
     React.useEffect(() => {
         if (isLoading || !post || postUnavailable || shouldLoadMedia) return;
@@ -352,7 +337,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     observer.disconnect();
                 }
             },
-            { rootMargin: postCircleMediaLoadRootMargin },
+            { rootMargin: orbitMediaLoadRootMargin },
         );
         observer.observe(element);
         return () => observer.disconnect();
@@ -470,7 +455,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
         if (suppressClickRef.current) suppressPendingClick();
     };
 
-    const openCircle = () => {
+    const openFriend = () => {
         if (suppressClickRef.current) {
             suppressClickRef.current = false;
             return;
@@ -499,212 +484,141 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     };
 
     return (
-        <Box
+        <SpaceHomeOrbit
             ref={rootRef}
-            component="li"
-            sx={{
-                aspectRatio: "1",
-                left: placement.x,
-                listStyle: "none",
-                minWidth: 0,
-                position: "absolute",
-                top: placement.y,
-                transition:
-                    "left 420ms cubic-bezier(0.2, 0.8, 0.2, 1), top 420ms cubic-bezier(0.2, 0.8, 0.2, 1), width 420ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-                width: placement.size,
-                "@media (prefers-reduced-motion: reduce)": {
-                    transition: "none",
-                },
-            }}
+            hasNewPost={hasNewPost}
+            placement={placement}
         >
             <Box
+                component="button"
+                type="button"
+                aria-label={
+                    isLoading
+                        ? `Loading ${firstName}`
+                        : post && !postUnavailable
+                          ? `View ${posts.length} new ${posts.length == 1 ? "post" : "posts"} from ${firstName}`
+                          : `View ${firstName}'s profile`
+                }
+                disabled={isFriendDisabled}
+                onClick={openFriend}
+                onContextMenu={(event) => {
+                    if (!hasNewPost) event.preventDefault();
+                }}
+                onPointerCancel={handlePointerEnd}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerEnd}
                 sx={{
+                    alignItems: "center",
+                    appearance: "none",
                     aspectRatio: "1",
+                    bgcolor: "#E5E7EA",
+                    border: 0,
+                    borderRadius: "50%",
+                    boxShadow: isHoldingWave
+                        ? "0 1px 3px rgba(0, 0, 0, 0.22), 0 4px 10px rgba(0, 0, 0, 0.14)"
+                        : "0 3px 8px rgba(0, 0, 0, 0.2), 0 12px 24px rgba(0, 0, 0, 0.14)",
+                    color: textBase,
+                    cursor: isFriendDisabled ? "default" : "pointer",
+                    display: "flex",
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
                     height: "100%",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    p: 0,
                     position: "relative",
+                    transform: isHoldingWave ? "scale(0.98)" : "scale(1)",
+                    transition:
+                        "box-shadow 160ms ease-out, transform 160ms ease-out",
+                    userSelect: "none",
+                    WebkitTouchCallout: "none",
                     width: "100%",
-                    zIndex: 1,
+                    "@media (prefers-reduced-motion: reduce)": {
+                        transform: "none",
+                        transition: "box-shadow 160ms ease-out",
+                    },
                 }}
             >
-                {hasNewPost && (
-                    <Box
-                        aria-hidden
+                {isLoading || isAvatarPending ? (
+                    <Skeleton
+                        variant="circular"
                         sx={{
-                            "@keyframes spaceUnreadPostOrbit": {
-                                from: { transform: "rotate(0deg)" },
-                                to: { transform: "rotate(360deg)" },
-                            },
-                            animation: `spaceUnreadPostOrbit ${orbitDurationSeconds}s linear infinite`,
-                            animationDelay: `${orbitAnimationDelaySeconds}s`,
-                            border: "1px solid rgba(159, 181, 164, 0.3)",
-                            borderRadius: "50%",
-                            boxSizing: "border-box",
-                            inset: `-${orbitGap}px`,
-                            pointerEvents: "none",
-                            position: "absolute",
-                            zIndex: 3,
-                            "@media (prefers-reduced-motion: reduce)": {
-                                animation: "none",
-                                transform: `rotate(${orbitPhaseFor(friend.spaceId ?? friend.id)}deg)`,
-                            },
-                        }}
-                    >
-                        {posts.map((item, index) => {
-                            const angle =
-                                -Math.PI / 2 +
-                                (index * Math.PI * 2) / posts.length;
-                            return (
-                                <Box
-                                    key={item.postId}
-                                    component="span"
-                                    sx={{
-                                        bgcolor: green,
-                                        borderRadius: "50%",
-                                        boxShadow:
-                                            "0 2px 6px rgba(0, 0, 0, 0.5), 0 0 10px rgba(8, 194, 37, 0.8)",
-                                        height: orbitDotSize,
-                                        left: `${50 + Math.cos(angle) * 50}%`,
-                                        position: "absolute",
-                                        top: `${50 + Math.sin(angle) * 50}%`,
-                                        transform: "translate(-50%, -50%)",
-                                        width: orbitDotSize,
-                                    }}
-                                />
-                            );
-                        })}
-                    </Box>
-                )}
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={
-                        isLoading
-                            ? `Loading ${firstName}`
-                            : post && !postUnavailable
-                              ? `View ${posts.length} new ${posts.length == 1 ? "post" : "posts"} from ${firstName}`
-                              : `View ${firstName}'s profile`
-                    }
-                    disabled={isCircleDisabled}
-                    onClick={openCircle}
-                    onContextMenu={(event) => {
-                        if (!hasNewPost) event.preventDefault();
-                    }}
-                    onPointerCancel={handlePointerEnd}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerEnd}
-                    sx={{
-                        alignItems: "center",
-                        appearance: "none",
-                        aspectRatio: "1",
-                        bgcolor: "#E5E7EA",
-                        border: 0,
-                        borderRadius: "50%",
-                        boxShadow: isHoldingWave
-                            ? "0 1px 3px rgba(0, 0, 0, 0.22), 0 4px 10px rgba(0, 0, 0, 0.14)"
-                            : "0 3px 8px rgba(0, 0, 0, 0.2), 0 12px 24px rgba(0, 0, 0, 0.14)",
-                        color: textBase,
-                        cursor: isCircleDisabled ? "default" : "pointer",
-                        display: "flex",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        height: "100%",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                        p: 0,
-                        position: "relative",
-                        transform: isHoldingWave ? "scale(0.98)" : "scale(1)",
-                        transition:
-                            "box-shadow 160ms ease-out, transform 160ms ease-out",
-                        userSelect: "none",
-                        WebkitTouchCallout: "none",
-                        width: "100%",
-                        "@media (prefers-reduced-motion: reduce)": {
+                            bgcolor: mediaSkeletonElementBackground,
+                            height: "100%",
                             transform: "none",
-                            transition: "box-shadow 160ms ease-out",
+                            width: "100%",
+                        }}
+                    />
+                ) : (
+                    <SpaceAvatarImage
+                        alt={`${displayName} profile photo`}
+                        src={displayAvatarUrl}
+                    />
+                )}
+            </Box>
+            {waveAnimationID > 0 && (
+                <Box
+                    key={waveAnimationID}
+                    component="span"
+                    aria-hidden
+                    sx={{
+                        "@keyframes spaceWaveSent": {
+                            "0%": {
+                                opacity: 0,
+                                transform:
+                                    "translateY(8px) scale(0.7) rotate(0deg)",
+                            },
+                            "15%": {
+                                opacity: 1,
+                                transform:
+                                    "translateY(0) scale(1) rotate(-18deg)",
+                            },
+                            "35%": {
+                                opacity: 1,
+                                transform:
+                                    "translateY(-1px) scale(1) rotate(16deg)",
+                            },
+                            "55%": {
+                                opacity: 1,
+                                transform:
+                                    "translateY(-3px) scale(1) rotate(-14deg)",
+                            },
+                            "75%": {
+                                opacity: 1,
+                                transform:
+                                    "translateY(-6px) scale(1) rotate(12deg)",
+                            },
+                            "100%": {
+                                opacity: 0,
+                                transform:
+                                    "translateY(-12px) scale(0.95) rotate(0deg)",
+                            },
+                        },
+                        "@keyframes spaceWaveSentReduced": {
+                            "0%, 80%": { opacity: 1 },
+                            "100%": { opacity: 0 },
+                        },
+                        animation: `spaceWaveSent ${waveAnimationDurationMs}ms ease-out both`,
+                        fontSize: Math.max(
+                            24,
+                            Math.min(40, placement.avatarSize * 0.6),
+                        ),
+                        lineHeight: 1,
+                        bottom: "8%",
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: "8%",
+                        transformOrigin: "70% 75%",
+                        zIndex: 2,
+                        "@media (prefers-reduced-motion: reduce)": {
+                            animation: `spaceWaveSentReduced ${waveAnimationDurationMs}ms ease-out both`,
                         },
                     }}
                 >
-                    {isLoading || isAvatarPending ? (
-                        <Skeleton
-                            variant="circular"
-                            sx={{
-                                bgcolor: mediaSkeletonElementBackground,
-                                height: "100%",
-                                transform: "none",
-                                width: "100%",
-                            }}
-                        />
-                    ) : (
-                        <SpaceAvatarImage
-                            alt={`${displayName} profile photo`}
-                            src={displayAvatarUrl}
-                        />
-                    )}
+                    👋
                 </Box>
-                {waveAnimationID > 0 && (
-                    <Box
-                        key={waveAnimationID}
-                        component="span"
-                        aria-hidden
-                        sx={{
-                            "@keyframes spaceWaveSent": {
-                                "0%": {
-                                    opacity: 0,
-                                    transform:
-                                        "translateY(8px) scale(0.7) rotate(0deg)",
-                                },
-                                "15%": {
-                                    opacity: 1,
-                                    transform:
-                                        "translateY(0) scale(1) rotate(-18deg)",
-                                },
-                                "35%": {
-                                    opacity: 1,
-                                    transform:
-                                        "translateY(-1px) scale(1) rotate(16deg)",
-                                },
-                                "55%": {
-                                    opacity: 1,
-                                    transform:
-                                        "translateY(-3px) scale(1) rotate(-14deg)",
-                                },
-                                "75%": {
-                                    opacity: 1,
-                                    transform:
-                                        "translateY(-6px) scale(1) rotate(12deg)",
-                                },
-                                "100%": {
-                                    opacity: 0,
-                                    transform:
-                                        "translateY(-12px) scale(0.95) rotate(0deg)",
-                                },
-                            },
-                            "@keyframes spaceWaveSentReduced": {
-                                "0%, 80%": { opacity: 1 },
-                                "100%": { opacity: 0 },
-                            },
-                            animation: `spaceWaveSent ${waveAnimationDurationMs}ms ease-out both`,
-                            fontSize: Math.max(
-                                28,
-                                Math.min(48, placement.size * 0.23),
-                            ),
-                            lineHeight: 1,
-                            bottom: "8%",
-                            pointerEvents: "none",
-                            position: "absolute",
-                            right: "8%",
-                            transformOrigin: "70% 75%",
-                            zIndex: 2,
-                            "@media (prefers-reduced-motion: reduce)": {
-                                animation: `spaceWaveSentReduced ${waveAnimationDurationMs}ms ease-out both`,
-                            },
-                        }}
-                    >
-                        👋
-                    </Box>
-                )}
-            </Box>
-        </Box>
+            )}
+        </SpaceHomeOrbit>
     );
 };
 
@@ -830,8 +744,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
-    const [postCircleCanvasSize, setPostCircleCanvasSize] =
-        useState<PostCircleCanvasSize>({ height: 0, width: 0 });
+    const [orbitCanvasSize, setOrbitCanvasSize] = useState<OrbitCanvasSize>({
+        height: 0,
+        width: 0,
+    });
     const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
         useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
@@ -844,7 +760,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [unavailablePostsByKey, setUnavailablePostsByKey] = useState<
         Record<string, true>
     >({});
-    const postCircleCanvasRef = React.useRef<HTMLDivElement | null>(null);
+    const orbitCanvasRef = React.useRef<HTMLDivElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const initialPostPhotoFileRef = React.useRef<File | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
@@ -884,22 +800,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         [friends],
     );
     React.useEffect(() => {
-        const canvas = postCircleCanvasRef.current;
+        const canvas = orbitCanvasRef.current;
         if (!canvas) return;
 
         const updateSize = () => {
             const { height, width } = canvas.getBoundingClientRect();
-            setPostCircleCanvasSize({ height, width });
+            setOrbitCanvasSize({ height, width });
         };
         const observer = new ResizeObserver(updateSize);
         observer.observe(canvas);
         updateSize();
         return () => observer.disconnect();
     }, []);
-    const postCirclePlacements = homeCirclePlacements(
+    const orbitPlacements = homeOrbitPlacements(
         orderedFriends.length,
-        postCircleCanvasSize.width,
-        postCircleCanvasSize.height,
+        orbitCanvasSize.width,
+        orbitCanvasSize.height,
     );
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
@@ -1167,8 +1083,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         selectedViewerPostIndex,
         selectedViewerPosts,
     ]);
-    const friendPostCircleFor = (friend: FriendProfile, index: number) => {
-        const placement = postCirclePlacements[index]!;
+    const friendOrbitFor = (friend: FriendProfile, index: number) => {
+        const placement = orbitPlacements[index]!;
         const posts = (
             unseenPostsByFriendID.get(friend.spaceId ?? friend.id) ?? []
         ).filter(
@@ -1190,7 +1106,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 unavailablePostsByKey[postImageCacheKey(item)]),
         );
         return (
-            <FriendPostCircle
+            <FriendOrbit
                 key={friend.id}
                 avatarUrl={avatarUrl}
                 friend={friend}
@@ -1363,8 +1279,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     "radial-gradient(ellipse 120% 95% at 50% 58%, rgba(38, 78, 52, 0.16), transparent 72%), #0C1014",
                 color: textBase,
                 display: "grid",
-                minHeight: "100svh",
-                overflowX: "hidden",
+                height: "100svh",
+                overflow: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
                 position: "relative",
             }}
@@ -1376,11 +1292,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 sx={{
                     bgcolor: "transparent",
                     boxSizing: "border-box",
+                    height: "100svh",
                     maxWidth: "100%",
-                    minHeight: "100svh",
                     minWidth: 0,
                     mx: "auto",
-                    overflowX: "hidden",
+                    overflow: "hidden",
+                    position: "relative",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
@@ -1598,22 +1515,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Box>
                 <Box
                     sx={{
-                        boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column",
-                        height: `calc(100svh - ${headerHeight}px)`,
-                        minWidth: 0,
-                        pb: "calc(env(safe-area-inset-bottom) + 112px)",
-                        px: homeHorizontalPadding,
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${headerHeight}px)`,
+                        height: "100%",
+                        inset: 0,
+                        position: "absolute",
                         width: "100%",
                     }}
                 >
                     <Box
-                        ref={postCircleCanvasRef}
+                        ref={orbitCanvasRef}
                         sx={{
-                            flex: "1 1 auto",
-                            minHeight: 0,
+                            height: "100%",
                             position: "relative",
                             width: "100%",
                         }}
@@ -1643,9 +1554,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     width: "100%",
                                 }}
                             >
-                                {postCirclePlacements.length ==
+                                {orbitPlacements.length ==
                                     orderedFriends.length &&
-                                    orderedFriends.map(friendPostCircleFor)}
+                                    orderedFriends.map(friendOrbitFor)}
                             </Box>
                         ) : (
                             <Box
@@ -1671,10 +1582,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         )}
                     </Box>
                 </Box>
-                <SpacePostFloatingActionButton
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label="Post photo"
                     disabled={isPostPhotoButtonDisabled}
                     onClick={openPostPhotoPicker}
-                />
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: green,
+                        border: 0,
+                        borderRadius: "50%",
+                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.36)",
+                        boxSizing: "border-box",
+                        color: "#FFF",
+                        cursor: isPostPhotoButtonDisabled
+                            ? "default"
+                            : "pointer",
+                        display: "flex",
+                        height: postButtonSize,
+                        justifyContent: "center",
+                        opacity: isPostPhotoButtonDisabled ? 0.72 : 1,
+                        p: 0,
+                        position: "fixed",
+                        right: "max(20px, calc((100vw - 390px) / 2 + 20px))",
+                        width: postButtonSize,
+                        zIndex: 5,
+                        "&:focus-visible": {
+                            outline: "3px solid #FFF",
+                            outlineOffset: 3,
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={Add01Icon}
+                        size={postButtonIconSize}
+                        strokeWidth={2.1}
+                    />
+                </Box>
                 {selectedViewer && (
                     <SpaceFileViewer
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
