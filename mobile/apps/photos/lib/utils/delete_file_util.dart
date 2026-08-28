@@ -47,8 +47,7 @@ _tryTrashOrDeleteFiles(List<String> assetIDs) async {
     return (deletedIDs: <String>{}, trashedIDs: <String>{});
   }
   try {
-    if (flagService.internalUser &&
-        Platform.isAndroid &&
+    if (Platform.isAndroid &&
         !await isAndroidSDKVersionLowerThan(android11SDKINT)) {
       final assets = (await Future.wait(
         assetIDs.map(AssetEntity.fromId),
