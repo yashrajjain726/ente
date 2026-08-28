@@ -4,6 +4,7 @@ use std::collections::{BinaryHeap, HashSet};
 use wide::f32x8;
 
 use super::arena::VectorArena;
+use super::kernel::splitmix64;
 use super::{Match, SearchParams, VecDbError};
 
 const M: usize = 16;
@@ -16,14 +17,6 @@ const SMALL_FILTER_FLOOR: usize = 1024;
 const SMALL_FILTER_LIMIT_FACTOR: usize = 4;
 const THRESHOLD_STEP_COUNTS: [usize; 5] = [200, 500, 2000, 5000, 10000];
 const LEVEL_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
-
-fn splitmix64(state: &mut u64) -> u64 {
-    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-    let mut z = *state;
-    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    z ^ (z >> 31)
-}
 
 fn neighbor_cap(level: usize) -> usize {
     if level == 0 {
@@ -103,12 +96,6 @@ pub(crate) struct Graph {
     nodes: Vec<Option<Node>>,
     entry_point: Option<u32>,
     level_state: u64,
-}
-
-impl Default for Graph {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl Graph {
@@ -472,7 +459,7 @@ impl QueryContext<'_> {
 }
 
 pub(crate) fn search(
-    graph: Option<&Graph>,
+    graph: &Graph,
     arena: &VectorArena,
     query: &[f32x8],
     params: &SearchParams,
@@ -497,9 +484,9 @@ pub(crate) fn search(
     {
         return brute_force(arena, query, params, allowed_slots);
     }
-    let Some(graph) = graph.filter(|graph| graph.entry_point.is_some()) else {
+    if graph.entry_point.is_none() {
         return brute_force(arena, query, params, allowed_slots);
-    };
+    }
     let context = QueryContext {
         graph,
         arena,
@@ -523,7 +510,9 @@ fn query_is_finite(query: &[f32x8]) -> bool {
 
 fn small_filter_cap(limit: Option<usize>) -> usize {
     limit.map_or(SMALL_FILTER_FLOOR, |limit| {
-        (SMALL_FILTER_LIMIT_FACTOR * limit).max(SMALL_FILTER_FLOOR)
+        limit
+            .saturating_mul(SMALL_FILTER_LIMIT_FACTOR)
+            .max(SMALL_FILTER_FLOOR)
     })
 }
 
@@ -660,17 +649,17 @@ fn to_matches(
 #[cfg(test)]
 mod tests {
     use std::f32::consts::FRAC_1_SQRT_2;
-
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
 
     use super::super::arena::UpsertOutcome;
+    use super::super::test_support::{assert_identical_graphs, stale_downward_edge_exists};
     use super::*;
 
     const FIXTURE_DIMS: usize = 16;
     const FIXTURE_COUNT: usize = 1500;
 
-    static FIXTURE: Lazy<(VectorArena, Graph)> =
-        Lazy::new(|| build_fixture(FIXTURE_COUNT, FIXTURE_DIMS, 0x00F1_0000));
+    static FIXTURE: LazyLock<(VectorArena, Graph)> =
+        LazyLock::new(|| build_fixture(FIXTURE_COUNT, FIXTURE_DIMS, 0x00F1_0000));
 
     fn normalized(mut values: Vec<f32>) -> Vec<f32> {
         let norm = values.iter().map(|value| value * value).sum::<f32>().sqrt();
@@ -850,18 +839,6 @@ mod tests {
             .collect()
     }
 
-    fn stale_downward_edge_exists(graph: &Graph) -> bool {
-        graph.slots().any(|slot| {
-            let level = graph.level_of(slot).unwrap();
-            (0..=level).any(|layer| {
-                graph
-                    .neighbors_of(slot, layer)
-                    .iter()
-                    .any(|&neighbor| graph.level_of(neighbor).unwrap() < layer)
-            })
-        })
-    }
-
     fn assert_graph_invariants(graph: &Graph) {
         for slot in graph.slots() {
             let level = graph.level_of(slot).unwrap();
@@ -872,24 +849,6 @@ mod tests {
                     assert_ne!(neighbor, slot);
                     assert!(graph.level_of(neighbor).is_some());
                 }
-            }
-        }
-    }
-
-    fn assert_identical_graphs(first: &Graph, second: &Graph) {
-        assert_eq!(first.entry_point(), second.entry_point());
-        assert_eq!(
-            first.slots().collect::<Vec<_>>(),
-            second.slots().collect::<Vec<_>>()
-        );
-        for slot in first.slots() {
-            assert_eq!(first.level_of(slot), second.level_of(slot));
-            let level = first.level_of(slot).unwrap();
-            for layer in 0..=level {
-                assert_eq!(
-                    first.neighbors_of(slot, layer),
-                    second.neighbors_of(slot, layer)
-                );
             }
         }
     }
@@ -944,13 +903,7 @@ mod tests {
                 .iter()
                 .map(|&(_, slot)| arena.key_of_slot(slot).unwrap())
                 .collect();
-            let found = search(
-                Some(graph),
-                arena,
-                &query,
-                &params(Some(10), None, false),
-                None,
-            );
+            let found = search(graph, arena, &query, &params(Some(10), None, false), None);
             assert_eq!(found.len(), 10);
             hits += found
                 .iter()
@@ -964,28 +917,16 @@ mod tests {
     fn exact_search_matches_handcrafted_ground_truth() {
         let (arena, graph) = handcrafted();
         let query = arena.pack_query(&axis_vector(8, 0)).unwrap();
-        let all = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(10), None, true),
-            None,
-        );
+        let all = search(&graph, &arena, &query, &params(Some(10), None, true), None);
         assert_eq!(keys(&all), ["a", "b", "t1", "t2", "c", "d"]);
         let expected = [0.0, 1.0 - FRAC_1_SQRT_2, 0.5, 0.5, 1.0, 2.0];
         for (found, expected) in all.iter().zip(expected) {
             assert_eq!(found.distance, expected);
         }
-        let inclusive = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(None, Some(0.5), true),
-            None,
-        );
+        let inclusive = search(&graph, &arena, &query, &params(None, Some(0.5), true), None);
         assert_eq!(keys(&inclusive), ["a", "b", "t1", "t2"]);
         let below_ties = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(0.499), true),
@@ -993,7 +934,7 @@ mod tests {
         );
         assert_eq!(keys(&below_ties), ["a", "b"]);
         let tie_cut = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(Some(3), Some(0.5), true),
@@ -1001,7 +942,7 @@ mod tests {
         );
         assert_eq!(keys(&tie_cut), ["a", "b", "t1"]);
         let closest = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(Some(1), Some(2.0), true),
@@ -1014,16 +955,10 @@ mod tests {
     fn tiny_index_approx_equals_exact() {
         let (arena, graph) = handcrafted();
         let query = arena.pack_query(&axis_vector(8, 0)).unwrap();
-        let all = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(10), None, false),
-            None,
-        );
+        let all = search(&graph, &arena, &query, &params(Some(10), None, false), None);
         assert_eq!(keys(&all), ["a", "b", "t1", "t2", "c", "d"]);
         let inclusive = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(0.5), false),
@@ -1031,7 +966,7 @@ mod tests {
         );
         assert_eq!(keys(&inclusive), ["a", "b", "t1", "t2"]);
         let tie_cut = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(Some(3), Some(0.5), false),
@@ -1039,7 +974,7 @@ mod tests {
         );
         assert_eq!(keys(&tie_cut), ["a", "b", "t1"]);
         let closest = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(Some(1), Some(2.0), false),
@@ -1056,22 +991,14 @@ mod tests {
         for exact in [false, true] {
             for (limit, max_distance) in [(Some(5), None), (None, Some(1.0)), (Some(1), Some(0.5))]
             {
-                let with_graph = search(
-                    Some(&graph),
+                let found = search(
+                    &graph,
                     &arena,
                     &query,
                     &params(limit, max_distance, exact),
                     None,
                 );
-                assert!(with_graph.is_empty());
-                let without_graph = search(
-                    None,
-                    &arena,
-                    &query,
-                    &params(limit, max_distance, exact),
-                    None,
-                );
-                assert!(without_graph.is_empty());
+                assert!(found.is_empty());
             }
         }
         assert_eq!(graph.entry_point(), None);
@@ -1085,17 +1012,11 @@ mod tests {
         let graph = Graph::rebuild(&arena);
         let query = arena.pack_query(&axis_vector(8, 0)).unwrap();
         for exact in [false, true] {
-            let by_limit = search(
-                Some(&graph),
-                &arena,
-                &query,
-                &params(Some(10), None, exact),
-                None,
-            );
+            let by_limit = search(&graph, &arena, &query, &params(Some(10), None, exact), None);
             assert_eq!(keys(&by_limit), ["only"]);
             assert_eq!(by_limit[0].distance, 0.0);
             let by_threshold = search(
-                Some(&graph),
+                &graph,
                 &arena,
                 &query,
                 &params(None, Some(0.0), exact),
@@ -1103,7 +1024,13 @@ mod tests {
             );
             assert_eq!(keys(&by_threshold), ["only"]);
         }
-        let without_graph = search(None, &arena, &query, &params(Some(3), None, false), None);
+        let without_graph = search(
+            &Graph::new(),
+            &arena,
+            &query,
+            &params(Some(3), None, false),
+            None,
+        );
         assert_eq!(keys(&without_graph), ["only"]);
     }
 
@@ -1116,16 +1043,10 @@ mod tests {
         }
         let query = arena.pack_query(&axis_vector(8, 0)).unwrap();
         for exact in [false, true] {
-            let by_limit = search(
-                Some(&graph),
-                &arena,
-                &query,
-                &params(Some(3), None, exact),
-                None,
-            );
+            let by_limit = search(&graph, &arena, &query, &params(Some(3), None, exact), None);
             assert!(by_limit.is_empty());
             let by_threshold = search(
-                Some(&graph),
+                &graph,
                 &arena,
                 &query,
                 &params(None, Some(2.5), exact),
@@ -1154,13 +1075,7 @@ mod tests {
             arena.remove(key).unwrap();
         }
         for exact in [false, true] {
-            let found = search(
-                Some(&graph),
-                &arena,
-                &query,
-                &params(Some(10), None, exact),
-                None,
-            );
+            let found = search(&graph, &arena, &query, &params(Some(10), None, exact), None);
             assert_eq!(found.len(), 10);
             for hit in &found {
                 assert!(!removed.contains(&hit.key));
@@ -1171,7 +1086,7 @@ mod tests {
         }
         let nearest_distance = reference[0].0;
         let within = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(nearest_distance), false),
@@ -1182,7 +1097,7 @@ mod tests {
         }
         let allowed: HashSet<u32> = reference[..12].iter().map(|&(_, slot)| slot).collect();
         let filtered = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(Some(12), None, false),
@@ -1202,7 +1117,7 @@ mod tests {
         let new_query = arena.pack_query(&new_vector).unwrap();
         for exact in [false, true] {
             let top = search(
-                Some(&graph),
+                &graph,
                 &arena,
                 &new_query,
                 &params(Some(1), None, exact),
@@ -1215,7 +1130,7 @@ mod tests {
         let moved_distance = arena.distance_to_query(&old_query, 7);
         assert!(moved_distance > 0.3);
         let near_old = search(
-            Some(&graph),
+            &graph,
             &arena,
             &old_query,
             &params(None, Some(0.3), false),
@@ -1225,7 +1140,7 @@ mod tests {
             assert_ne!(hit.key, "key-7");
         }
         let everything = search(
-            Some(&graph),
+            &graph,
             &arena,
             &new_query,
             &params(None, Some(2.5), false),
@@ -1245,16 +1160,10 @@ mod tests {
         graph.reinsert(entry_slot, &arena);
         assert!(graph.entry_point().is_some());
         let query = arena.pack_query(&new_vector).unwrap();
-        let top = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(1), None, false),
-            None,
-        );
+        let top = search(&graph, &arena, &query, &params(Some(1), None, false), None);
         assert_eq!(keys(&top), [entry_key.as_str()]);
         let everything = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(2.5), false),
@@ -1273,17 +1182,11 @@ mod tests {
         graph.reinsert(3, &arena);
         let query = arena.pack_query(&new_vector).unwrap();
         for exact in [false, true] {
-            let top = search(
-                Some(&graph),
-                &arena,
-                &query,
-                &params(Some(1), None, exact),
-                None,
-            );
+            let top = search(&graph, &arena, &query, &params(Some(1), None, exact), None);
             assert_eq!(keys(&top), ["fresh"]);
         }
         let everything = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(2.5), false),
@@ -1304,13 +1207,7 @@ mod tests {
         graph.reinsert(0, &arena);
         assert_eq!(graph.entry_point(), Some(0));
         let query = arena.pack_query(&axis_vector(8, 3)).unwrap();
-        let found = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(5), None, false),
-            None,
-        );
+        let found = search(&graph, &arena, &query, &params(Some(5), None, false), None);
         assert_eq!(keys(&found), ["solo"]);
         assert_eq!(found[0].distance, 0.0);
     }
@@ -1327,7 +1224,7 @@ mod tests {
         assert_eq!(allowed.len(), 10);
         let reference = reference_ranking(arena, &query, Some(&allowed));
         let found = search(
-            Some(graph),
+            graph,
             arena,
             &query,
             &params(Some(3), None, false),
@@ -1342,6 +1239,31 @@ mod tests {
     }
 
     #[test]
+    fn usize_max_limit_does_not_overflow_with_or_without_filter() {
+        let (arena, graph) = (&FIXTURE.0, &FIXTURE.1);
+        let query = arena
+            .pack_query(&seeded_unit_vector(0x00DD_0006, FIXTURE_DIMS))
+            .unwrap();
+        let allowed: HashSet<u32> = (0..3).collect();
+        let filtered = search(
+            graph,
+            arena,
+            &query,
+            &params(Some(usize::MAX), None, false),
+            Some(&allowed),
+        );
+        assert_eq!(filtered.len(), 3);
+        let unfiltered = search(
+            graph,
+            arena,
+            &query,
+            &params(Some(usize::MAX), None, false),
+            None,
+        );
+        assert_eq!(unfiltered.len(), FIXTURE_COUNT);
+    }
+
+    #[test]
     fn large_filter_traverses_the_graph_and_respects_the_filter() {
         let (arena, graph) = (&FIXTURE.0, &FIXTURE.1);
         let query = arena
@@ -1351,7 +1273,7 @@ mod tests {
         assert!(allowed.len() > small_filter_cap(Some(10)));
         let reference = reference_ranking(arena, &query, Some(&allowed));
         let found = search(
-            Some(graph),
+            graph,
             arena,
             &query,
             &params(Some(10), None, false),
@@ -1372,7 +1294,7 @@ mod tests {
             .count();
         assert!(hits >= 8, "filtered recall@10 was {hits}/10");
         let within = search(
-            Some(graph),
+            graph,
             arena,
             &query,
             &params(None, Some(0.9), false),
@@ -1404,7 +1326,7 @@ mod tests {
                             continue;
                         }
                         let found = search(
-                            Some(graph),
+                            graph,
                             arena,
                             &query,
                             &params(limit, max_distance, exact),
@@ -1456,13 +1378,7 @@ mod tests {
         let query = arena
             .pack_query(&seeded_unit_vector(0x00DD_0004, FIXTURE_DIMS))
             .unwrap();
-        let everything = search(
-            Some(graph),
-            arena,
-            &query,
-            &params(None, Some(2.5), false),
-            None,
-        );
+        let everything = search(graph, arena, &query, &params(None, Some(2.5), false), None);
         assert_eq!(everything.len(), FIXTURE_COUNT);
         assert_sorted(&everything);
     }
@@ -1476,7 +1392,7 @@ mod tests {
         let reference = reference_ranking(arena, &query, None);
         let threshold = reference[4].0;
         let found = search(
-            Some(graph),
+            graph,
             arena,
             &query,
             &params(None, Some(threshold), false),
@@ -1509,15 +1425,9 @@ mod tests {
         let query = arena
             .pack_query(&seeded_unit_vector(0x8111_0000, 16))
             .unwrap();
-        let from_original = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(10), None, false),
-            None,
-        );
+        let from_original = search(&graph, &arena, &query, &params(Some(10), None, false), None);
         let from_rebuilt = search(
-            Some(&rebuilt),
+            &rebuilt,
             &arena,
             &query,
             &params(Some(10), None, false),
@@ -1606,13 +1516,7 @@ mod tests {
             .unwrap();
         arena.upsert("c", &axis_vector(8, 1)).unwrap();
         let query = arena.pack_query(&axis_vector(8, 1)).unwrap();
-        let found = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(3), None, false),
-            None,
-        );
+        let found = search(&graph, &arena, &query, &params(Some(3), None, false), None);
         assert_eq!(keys(&found), ["c", "b", "a"]);
     }
 
@@ -1637,19 +1541,13 @@ mod tests {
             .pack_query(&seeded_unit_vector(0x00E1_0000, dims))
             .unwrap();
         let reference = reference_ranking(&arena, &query, None);
-        let top = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(10), None, false),
-            None,
-        );
+        let top = search(&graph, &arena, &query, &params(Some(10), None, false), None);
         for (hit, &(distance, slot)) in top.iter().zip(&reference) {
             assert_eq!(hit.key, arena.key_of_slot(slot).unwrap());
             assert_eq!(hit.distance, distance);
         }
         let everything = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(2.5), false),
@@ -1667,7 +1565,7 @@ mod tests {
             .pack_query(&seeded_unit_vector(0x00E2_0000, dims))
             .unwrap();
         let found = search(
-            Some(&graph),
+            &graph,
             &arena,
             &fresh_query,
             &params(Some(1), None, false),
@@ -1675,7 +1573,7 @@ mod tests {
         );
         assert_eq!(keys(&found), ["fresh"]);
         let all = search(
-            Some(&graph),
+            &graph,
             &arena,
             &fresh_query,
             &params(None, Some(2.5), false),
@@ -1708,13 +1606,7 @@ mod tests {
         arena.upsert("b", &axis_vector(8, 1)).unwrap();
         arena.upsert("c", &axis_vector(8, 2)).unwrap();
         let query = arena.pack_query(&axis_vector(8, 2)).unwrap();
-        let found = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(3), None, false),
-            None,
-        );
+        let found = search(&graph, &arena, &query, &params(Some(3), None, false), None);
         assert_eq!(found.len(), 3);
         assert_eq!(found[0].key, "c");
     }
@@ -1739,16 +1631,10 @@ mod tests {
                     .unwrap();
             assert_identical_graphs(&reloaded, &graph);
             let query = arena.pack_query(&vector).unwrap();
-            let top = search(
-                Some(&graph),
-                &arena,
-                &query,
-                &params(Some(1), None, false),
-                None,
-            );
+            let top = search(&graph, &arena, &query, &params(Some(1), None, false), None);
             assert_eq!(keys(&top), [key.as_str()]);
             let everything = search(
-                Some(&graph),
+                &graph,
                 &arena,
                 &query,
                 &params(None, Some(2.5), false),
@@ -1764,15 +1650,9 @@ mod tests {
         let query = arena
             .pack_query(&seeded_unit_vector(0xB200_0000, 16))
             .unwrap();
-        let from_churned = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(10), None, false),
-            None,
-        );
+        let from_churned = search(&graph, &arena, &query, &params(Some(10), None, false), None);
         let from_rebuilt = search(
-            Some(&rebuilt),
+            &rebuilt,
             &arena,
             &query,
             &params(Some(10), None, false),
@@ -1833,13 +1713,7 @@ mod tests {
                 let query_vector = seeded_unit_vector(splitmix64(&mut state), dims);
                 let query = arena.pack_query(&query_vector).unwrap();
                 let reference = reference_ranking(arena, &query, None);
-                let top = search(
-                    Some(graph),
-                    arena,
-                    &query,
-                    &params(Some(10), None, false),
-                    None,
-                );
+                let top = search(graph, arena, &query, &params(Some(10), None, false), None);
                 assert_sorted(&top);
                 assert_eq!(top.len(), reference.len().min(10));
                 for hit in &top {
@@ -1861,19 +1735,14 @@ mod tests {
                     "churn recall was {hits}/{}",
                     top.len()
                 );
-                let everything = search(
-                    Some(graph),
-                    arena,
-                    &query,
-                    &params(None, Some(2.5), false),
-                    None,
-                );
+                let everything =
+                    search(graph, arena, &query, &params(None, Some(2.5), false), None);
                 assert_sorted(&everything);
                 assert_eq!(everything.len(), live.len());
                 if reference.len() >= 5 {
                     let threshold = reference[4].0;
                     let within = search(
-                        Some(graph),
+                        graph,
                         arena,
                         &query,
                         &params(None, Some(threshold), false),
@@ -1894,7 +1763,7 @@ mod tests {
                     arena.live_slots().filter(|slot| slot % 2 == 0).collect();
                 if !allowed.is_empty() {
                     let filtered = search(
-                        Some(graph),
+                        graph,
                         arena,
                         &query,
                         &params(Some(5), None, false),
@@ -1916,15 +1785,9 @@ mod tests {
         let query = arena
             .pack_query(&seeded_unit_vector(0xC900_0000, dims))
             .unwrap();
-        let from_churned = search(
-            Some(graph),
-            arena,
-            &query,
-            &params(Some(10), None, false),
-            None,
-        );
+        let from_churned = search(graph, arena, &query, &params(Some(10), None, false), None);
         let from_rebuilt = search(
-            Some(&rebuilt),
+            &rebuilt,
             arena,
             &query,
             &params(Some(10), None, false),
@@ -1950,16 +1813,10 @@ mod tests {
             .iter()
             .map(|&(_, slot)| arena.key_of_slot(slot).unwrap())
             .collect();
-        let top = search(
-            Some(&graph),
-            &arena,
-            &query,
-            &params(Some(10), None, false),
-            None,
-        );
+        let top = search(&graph, &arena, &query, &params(Some(10), None, false), None);
         assert_eq!(keys(&top), expected);
         let everything = search(
-            Some(&graph),
+            &graph,
             &arena,
             &query,
             &params(None, Some(2.5), false),
@@ -1978,7 +1835,7 @@ mod tests {
             for exact in [false, true] {
                 for (limit, max_distance) in [(Some(3), None), (None, Some(1.0))] {
                     let found = search(
-                        Some(&graph),
+                        &graph,
                         &arena,
                         &query,
                         &params(limit, max_distance, exact),

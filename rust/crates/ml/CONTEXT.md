@@ -11,7 +11,7 @@ Glossary of terms for the ML crate's domain. Definitions describe meaning, not i
 - **Tombstone** — A logged record marking a key as removed. Tombstoned entries are dead but still occupy log and graph space until compaction.
 - **Compaction** — Rewriting the vector log to contain only live entries and rebuilding the graph, triggered when dead entries exceed a threshold.
 - **Writer** — The single instance per index file allowed to mutate it, enforced by an OS lock. All other opens are read-only and see a point-in-time view.
-- **Flush** — Explicitly persisting the current graph snapshot so the next open needs no replay.
+- **Flush** — Explicitly persisting the current graph snapshot so the next open replays no records into the graph; every open still scans the log to rebuild the arena.
 - **Exact search** — Brute-force scan over all live embeddings; results are ground truth.
 - **Approximate search** — Index-backed (HNSW) search; may miss neighbours in exchange for speed.
 - **Distance** — 1 − inner product of L2-normalized embeddings, in [0, 2]; lower is closer. The only metric vecdb speaks.

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -50,4 +50,48 @@ pub enum VecDbError {
     InvalidDimensions(usize),
     #[error("search requires a limit or a max distance")]
     UnboundedSearch,
+}
+
+impl VecDbError {
+    pub(crate) fn io(path: &Path, source: std::io::Error) -> Self {
+        Self::Io {
+            path: path.to_path_buf(),
+            source,
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::graph::Graph;
+
+    pub(crate) fn assert_identical_graphs(first: &Graph, second: &Graph) {
+        assert_eq!(first.entry_point(), second.entry_point());
+        assert_eq!(
+            first.slots().collect::<Vec<_>>(),
+            second.slots().collect::<Vec<_>>()
+        );
+        for slot in first.slots() {
+            assert_eq!(first.level_of(slot), second.level_of(slot));
+            let level = first.level_of(slot).unwrap();
+            for layer in 0..=level {
+                assert_eq!(
+                    first.neighbors_of(slot, layer),
+                    second.neighbors_of(slot, layer)
+                );
+            }
+        }
+    }
+
+    pub(crate) fn stale_downward_edge_exists(graph: &Graph) -> bool {
+        graph.slots().any(|slot| {
+            let level = graph.level_of(slot).unwrap();
+            (0..=level).any(|layer| {
+                graph
+                    .neighbors_of(slot, layer)
+                    .iter()
+                    .any(|&neighbor| graph.level_of(neighbor).unwrap() < layer)
+            })
+        })
+    }
 }

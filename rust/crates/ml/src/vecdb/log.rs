@@ -6,9 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::VecDbError;
 use super::arena::{MAX_KEY_BYTES, validate_key};
-use super::kernel::LANE_WIDTH;
+use super::kernel::{LANE_WIDTH, splitmix64};
 
-const HEADER_LEN: usize = 32;
+pub(crate) const HEADER_LEN: usize = 32;
 const MAGIC: [u8; 4] = *b"EVDB";
 const FORMAT_VERSION: u16 = 1;
 const SCALAR_TAG_F32: u8 = 0;
@@ -46,25 +46,13 @@ pub(crate) struct Log {
 impl Log {
     pub(crate) fn create(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         validate_dims(dims)?;
-        let mut file = File::options()
+        let file = File::options()
             .read(true)
             .write(true)
             .create_new(true)
             .open(path)
-            .map_err(|source| io_error(path, source))?;
-        let generation = fresh_generation();
-        file.write_all(&encode_header(dims as u32, &generation))
-            .map_err(|source| io_error(path, source))?;
-        file.sync_all().map_err(|source| io_error(path, source))?;
-        sync_parent_dir(path)?;
-        Ok(Self {
-            file,
-            path: path.to_path_buf(),
-            dims,
-            generation,
-            end_offset: HEADER_LEN as u64,
-            encode_buffer: Vec::new(),
-        })
+            .map_err(|source| VecDbError::io(path, source))?;
+        Self::initialize(file, path, dims)
     }
 
     pub(crate) fn open(
@@ -75,18 +63,20 @@ impl Log {
         validate_dims(expected_dims)?;
         let file_len = file
             .metadata()
-            .map_err(|source| io_error(path, source))?
+            .map_err(|source| VecDbError::io(path, source))?
             .len();
         if file_len < HEADER_LEN as u64 {
-            return Err(VecDbError::Corrupt(format!(
-                "log is {file_len} bytes, smaller than its {HEADER_LEN}-byte header"
-            )));
+            log::warn!(
+                "reinitializing {} whose {file_len}-byte header was never completed",
+                path.display()
+            );
+            return Self::initialize(file, path, expected_dims);
         }
         file.seek(SeekFrom::Start(0))
-            .map_err(|source| io_error(path, source))?;
+            .map_err(|source| VecDbError::io(path, source))?;
         let mut header = [0u8; HEADER_LEN];
         file.read_exact(&mut header)
-            .map_err(|source| io_error(path, source))?;
+            .map_err(|source| VecDbError::io(path, source))?;
         let generation = decode_header(&header, expected_dims)?;
         Ok(Self {
             file,
@@ -94,6 +84,25 @@ impl Log {
             dims: expected_dims,
             generation,
             end_offset: file_len,
+            encode_buffer: Vec::new(),
+        })
+    }
+
+    fn initialize(mut file: File, path: &Path, dims: usize) -> Result<Self, VecDbError> {
+        let generation = fresh_generation();
+        file.seek(SeekFrom::Start(0))
+            .map_err(|source| VecDbError::io(path, source))?;
+        file.write_all(&encode_header(dims as u32, &generation))
+            .map_err(|source| VecDbError::io(path, source))?;
+        file.sync_all()
+            .map_err(|source| VecDbError::io(path, source))?;
+        sync_parent_dir(path)?;
+        Ok(Self {
+            file,
+            path: path.to_path_buf(),
+            dims,
+            generation,
+            end_offset: HEADER_LEN as u64,
             encode_buffer: Vec::new(),
         })
     }
@@ -111,7 +120,7 @@ impl Log {
     pub(crate) fn scan(&mut self) -> Result<LogScanner<'_>, VecDbError> {
         self.file
             .seek(SeekFrom::Start(HEADER_LEN as u64))
-            .map_err(|source| io_error(&self.path, source))?;
+            .map_err(|source| VecDbError::io(&self.path, source))?;
         Ok(LogScanner {
             reader: BufReader::new(&mut self.file),
             path: &self.path,
@@ -123,17 +132,29 @@ impl Log {
         })
     }
 
-    pub(crate) fn append(&mut self, entries: &[LogEntry<'_>]) -> Result<(u64, u64), VecDbError> {
-        let start = self.end_offset;
+    pub(crate) fn append(&mut self, entries: &[LogEntry<'_>]) -> Result<(), VecDbError> {
         if entries.is_empty() {
-            return Ok((start, start));
+            return Ok(());
         }
         for entry in entries {
             validate_entry(entry, self.dims)?;
         }
+        match self.write_records(entries) {
+            Ok(written) => {
+                self.end_offset += written;
+                Ok(())
+            }
+            Err(error) => {
+                self.discard_unacked_tail();
+                Err(error)
+            }
+        }
+    }
+
+    fn write_records(&mut self, entries: &[LogEntry<'_>]) -> Result<u64, VecDbError> {
         self.file
-            .seek(SeekFrom::Start(start))
-            .map_err(|source| io_error(&self.path, source))?;
+            .seek(SeekFrom::Start(self.end_offset))
+            .map_err(|source| VecDbError::io(&self.path, source))?;
         self.encode_buffer.clear();
         let mut written = 0u64;
         for entry in entries {
@@ -145,9 +166,13 @@ impl Log {
         written += self.drain_encode_buffer()?;
         self.file
             .sync_all()
-            .map_err(|source| io_error(&self.path, source))?;
-        self.end_offset = start + written;
-        Ok((start, self.end_offset))
+            .map_err(|source| VecDbError::io(&self.path, source))?;
+        Ok(written)
+    }
+
+    fn discard_unacked_tail(&mut self) {
+        let _ = self.file.set_len(self.end_offset);
+        let _ = self.file.sync_all();
     }
 
     fn drain_encode_buffer(&mut self) -> Result<u64, VecDbError> {
@@ -156,7 +181,7 @@ impl Log {
         }
         self.file
             .write_all(&self.encode_buffer)
-            .map_err(|source| io_error(&self.path, source))?;
+            .map_err(|source| VecDbError::io(&self.path, source))?;
         let written = self.encode_buffer.len() as u64;
         self.encode_buffer.clear();
         Ok(written)
@@ -174,11 +199,11 @@ impl Log {
         );
         self.file
             .set_len(target)
-            .map_err(|source| io_error(&self.path, source))?;
+            .map_err(|source| VecDbError::io(&self.path, source))?;
         self.end_offset = target;
         self.file
             .sync_all()
-            .map_err(|source| io_error(&self.path, source))?;
+            .map_err(|source| VecDbError::io(&self.path, source))?;
         Ok(())
     }
 
@@ -188,10 +213,6 @@ impl Log {
 
     pub(crate) fn generation(&self) -> [u8; 16] {
         self.generation
-    }
-
-    pub(crate) fn dims(&self) -> usize {
-        self.dims
     }
 
     pub(crate) fn path(&self) -> &Path {
@@ -303,7 +324,7 @@ impl LogScanner<'_> {
             Err(error) if error.kind() == ErrorKind::UnexpectedEof => Ok(false),
             Err(source) => {
                 self.done = true;
-                Err(io_error(self.path, source))
+                Err(VecDbError::io(self.path, source))
             }
         }
     }
@@ -418,20 +439,28 @@ fn fresh_generation() -> [u8; 16] {
     generation
 }
 
-fn splitmix64(state: &mut u64) -> u64 {
-    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-    let mut mixed = *state;
-    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    mixed ^ (mixed >> 31)
+pub(crate) fn remove_stale_temp_sibling(path: &Path) -> Result<(), VecDbError> {
+    remove_if_present(&temp_sibling_path(path))
 }
 
-pub(crate) fn remove_stale_temp_sibling(path: &Path) -> Result<(), VecDbError> {
-    let temp_path = temp_sibling_path(path);
-    match std::fs::remove_file(&temp_path) {
+pub(crate) fn remove_if_present(path: &Path) -> Result<(), VecDbError> {
+    match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
-        Err(source) => Err(io_error(&temp_path, source)),
+        Err(source) => Err(VecDbError::io(path, source)),
+    }
+}
+
+pub(crate) fn rename_with_windows_fallback(from: &Path, to: &Path) -> Result<(), VecDbError> {
+    match std::fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        #[cfg(windows)]
+        Err(_) => {
+            let _ = std::fs::remove_file(to);
+            std::fs::rename(from, to).map_err(|source| VecDbError::io(from, source))
+        }
+        #[cfg(not(windows))]
+        Err(source) => Err(VecDbError::io(from, source)),
     }
 }
 
@@ -441,26 +470,19 @@ fn temp_sibling_path(path: &Path) -> PathBuf {
     PathBuf::from(temp)
 }
 
-fn io_error(path: &Path, source: std::io::Error) -> VecDbError {
-    VecDbError::Io {
-        path: path.to_path_buf(),
-        source,
-    }
-}
-
 #[cfg(unix)]
-fn sync_parent_dir(path: &Path) -> Result<(), VecDbError> {
+pub(crate) fn sync_parent_dir(path: &Path) -> Result<(), VecDbError> {
     let parent = match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
         _ => Path::new("."),
     };
     File::open(parent)
         .and_then(|dir| dir.sync_all())
-        .map_err(|source| io_error(parent, source))
+        .map_err(|source| VecDbError::io(parent, source))
 }
 
 #[cfg(not(unix))]
-fn sync_parent_dir(_path: &Path) -> Result<(), VecDbError> {
+pub(crate) fn sync_parent_dir(_path: &Path) -> Result<(), VecDbError> {
     Ok(())
 }
 
@@ -482,6 +504,24 @@ mod tests {
     fn reopen(path: &Path, dims: usize) -> Log {
         let file = File::options().read(true).write(true).open(path).unwrap();
         Log::open(file, path, dims).unwrap()
+    }
+
+    fn append_bounds(log: &mut Log, entries: &[LogEntry<'_>]) -> (u64, u64) {
+        let start = log.current_end_offset();
+        log.append(entries).unwrap();
+        (start, log.current_end_offset())
+    }
+
+    fn append_raw_bytes(path: &Path, bytes: &[u8]) {
+        let mut surgeon = File::options().append(true).open(path).unwrap();
+        surgeon.write_all(bytes).unwrap();
+        surgeon.sync_all().unwrap();
+    }
+
+    fn encoded_add(key: &str, vector: &[f32]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        encode_record_into(&mut bytes, &LogEntry::Add { key, vector });
+        bytes
     }
 
     fn scan_all(log: &mut Log) -> (Vec<(LogRecord, u64)>, u64) {
@@ -545,13 +585,11 @@ mod tests {
         let path = dir.path().join("log");
         let created = Log::create(&path, 512).unwrap();
         let generation = created.generation();
-        assert_eq!(created.dims(), 512);
         assert_eq!(created.current_end_offset(), HEADER_LEN as u64);
         assert_eq!(created.path(), path.as_path());
         drop(created.into_file());
         let reopened = reopen(&path, 512);
         assert_eq!(reopened.generation(), generation);
-        assert_eq!(reopened.dims(), 512);
         assert_eq!(reopened.current_end_offset(), HEADER_LEN as u64);
     }
 
@@ -626,13 +664,32 @@ mod tests {
     }
 
     #[test]
-    fn rejects_file_shorter_than_header() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        std::fs::write(&path, [1u8; 10]).unwrap();
-        let file = File::options().read(true).write(true).open(&path).unwrap();
-        let error = Log::open(file, &path, 8).unwrap_err();
-        assert!(matches!(&error, VecDbError::Corrupt(message) if message.contains("header")));
+    fn writer_open_reinitializes_files_shorter_than_the_header() {
+        for junk_len in [0usize, 10, 31] {
+            let dir = TempDir::new().unwrap();
+            let path = dir.path().join("log");
+            std::fs::write(&path, vec![1u8; junk_len]).unwrap();
+            let file = File::options().read(true).write(true).open(&path).unwrap();
+            let mut log = Log::open(file, &path, 8).unwrap();
+            assert_eq!(log.current_end_offset(), HEADER_LEN as u64);
+            assert_eq!(std::fs::metadata(&path).unwrap().len(), HEADER_LEN as u64);
+            let (records, _) = scan_all(&mut log);
+            assert!(records.is_empty());
+            let vector = seeded_vector(6, 8);
+            let (start, end) = append_bounds(
+                &mut log,
+                &[LogEntry::Add {
+                    key: "reborn",
+                    vector: &vector,
+                }],
+            );
+            assert_eq!(start, HEADER_LEN as u64);
+            let generation = log.generation();
+            drop(log);
+            let reopened = reopen(&path, 8);
+            assert_eq!(reopened.generation(), generation);
+            assert_eq!(reopened.current_end_offset(), end);
+        }
     }
 
     #[test]
@@ -732,8 +789,8 @@ mod tests {
                 },
                 LogEntry::Tombstone { key: "beta" },
             ];
-            let (first, _) = log.append(&entries[0..1]).unwrap();
-            let (second, end) = log.append(&entries[1..2]).unwrap();
+            let (first, _) = append_bounds(&mut log, &entries[0..1]);
+            let (second, end) = append_bounds(&mut log, &entries[1..2]);
             assert_eq!(first, HEADER_LEN as u64);
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(
@@ -764,7 +821,7 @@ mod tests {
                 vector: &vectors[2],
             },
         ];
-        let (start, end) = log.append(&entries).unwrap();
+        let (start, end) = append_bounds(&mut log, &entries);
         assert_eq!(start, HEADER_LEN as u64);
         assert_eq!(end, log.current_end_offset());
         let (records, recoverable_end) = scan_all(&mut log);
@@ -863,8 +920,10 @@ mod tests {
         let mut boundaries = Vec::new();
         for (index, vector) in vectors.iter().enumerate() {
             let key = format!("key-{index}");
-            let bounds = log.append(&[LogEntry::Add { key: &key, vector }]).unwrap();
-            boundaries.push(bounds);
+            boundaries.push(append_bounds(
+                &mut log,
+                &[LogEntry::Add { key: &key, vector }],
+            ));
         }
         drop(log);
         let full_bytes = std::fs::read(&build_path).unwrap();
@@ -887,18 +946,20 @@ mod tests {
         let path = dir.path().join("log");
         let mut log = Log::create(&path, 8).unwrap();
         let vector = seeded_vector(1, 8);
-        let (_, first_end) = log
-            .append(&[LogEntry::Add {
+        let (_, first_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
                 key: "kept",
                 vector: &vector,
-            }])
-            .unwrap();
-        let (_, torn_end) = log
-            .append(&[LogEntry::Add {
+            }],
+        );
+        let (_, torn_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
                 key: "torn",
                 vector: &vector,
-            }])
-            .unwrap();
+            }],
+        );
         drop(log);
         let cut = first_end + (torn_end - first_end) / 2;
         let file = File::options().read(true).write(true).open(&path).unwrap();
@@ -912,18 +973,119 @@ mod tests {
         log.truncate_to(recoverable_end).unwrap();
         assert_eq!(log.current_end_offset(), first_end);
         assert_eq!(std::fs::metadata(&path).unwrap().len(), first_end);
-        let (start, end) = log
-            .append(&[LogEntry::Add {
+        let (start, end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
                 key: "fresh",
                 vector: &vector,
-            }])
-            .unwrap();
+            }],
+        );
         assert_eq!(start, first_end);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 2);
         assert_eq!(records[1].1, start);
         assert_eq!(recoverable_end, end);
         assert_eq!(std::fs::metadata(&path).unwrap().len(), end);
+    }
+
+    #[test]
+    fn discard_unacked_tail_drops_phantom_frames_before_reopen() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        let mut log = Log::create(&path, 8).unwrap();
+        let vector = seeded_vector(1, 8);
+        let (_, acked_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "acked",
+                vector: &vector,
+            }],
+        );
+        let phantom = encoded_add("phantom", &vector);
+        append_raw_bytes(&path, &phantom);
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len(),
+            acked_end + phantom.len() as u64
+        );
+        log.discard_unacked_tail();
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), acked_end);
+        drop(log);
+        let mut reopened = reopen(&path, 8);
+        let (records, recoverable_end) = scan_all(&mut reopened);
+        assert_eq!(records.len(), 1);
+        assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "acked"));
+        assert_eq!(recoverable_end, acked_end);
+    }
+
+    #[test]
+    fn append_failure_rolls_back_without_disturbing_acked_records() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        let mut log = Log::create(&path, 8).unwrap();
+        let vector = seeded_vector(2, 8);
+        let (_, acked_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "kept",
+                vector: &vector,
+            }],
+        );
+        drop(log);
+        let unwritable = File::open(&path).unwrap();
+        let mut log = Log::open(unwritable, &path, 8).unwrap();
+        assert!(matches!(
+            log.append(&[LogEntry::Add {
+                key: "lost",
+                vector: &vector
+            }]),
+            Err(VecDbError::Io { .. })
+        ));
+        assert_eq!(log.current_end_offset(), acked_end);
+        drop(log);
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), acked_end);
+        let mut reopened = reopen(&path, 8);
+        let (records, _) = scan_all(&mut reopened);
+        assert_eq!(records.len(), 1);
+        assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "kept"));
+    }
+
+    #[test]
+    fn append_after_phantom_frames_overwrites_at_the_acked_offset() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        let mut log = Log::create(&path, 8).unwrap();
+        let vector = seeded_vector(3, 8);
+        let (_, acked_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "first",
+                vector: &vector,
+            }],
+        );
+        append_raw_bytes(&path, &encoded_add("ghost", &vector));
+        let replacement = seeded_vector(4, 8);
+        let (start, end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "third",
+                vector: &replacement,
+            }],
+        );
+        assert_eq!(start, acked_end);
+        let (records, recoverable_end) = scan_all(&mut log);
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[1].1, acked_end);
+        assert!(matches!(&records[1].0, LogRecord::Add { key, .. } if key == "third"));
+        assert_eq!(recoverable_end, end);
+        drop(log);
+        let mut reopened = reopen(&path, 8);
+        let (records, _) = scan_all(&mut reopened);
+        assert_eq!(records.len(), 2);
+        assert!(
+            records
+                .iter()
+                .all(|(record, _)| !matches!(record, LogRecord::Add { key, .. } if key == "ghost"))
+        );
     }
 
     #[test]
@@ -935,8 +1097,10 @@ mod tests {
         let mut boundaries = Vec::new();
         for (index, vector) in vectors.iter().enumerate() {
             let key = format!("key-{index}");
-            let bounds = log.append(&[LogEntry::Add { key: &key, vector }]).unwrap();
-            boundaries.push(bounds);
+            boundaries.push(append_bounds(
+                &mut log,
+                &[LogEntry::Add { key: &key, vector }],
+            ));
         }
         drop(log);
         let bytes = std::fs::read(&build_path).unwrap();
@@ -1003,21 +1167,20 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         let mut log = Log::create(&path, 8).unwrap();
-        assert_eq!(
-            log.append(&[]).unwrap(),
-            (HEADER_LEN as u64, HEADER_LEN as u64)
-        );
+        log.append(&[]).unwrap();
+        assert_eq!(log.current_end_offset(), HEADER_LEN as u64);
         let vector = seeded_vector(7, 8);
         let mut expected_offsets = Vec::new();
         let mut previous_end = HEADER_LEN as u64;
         for index in 0..5u32 {
             let key = format!("entry-{index}");
-            let (start, end) = log
-                .append(&[LogEntry::Add {
+            let (start, end) = append_bounds(
+                &mut log,
+                &[LogEntry::Add {
                     key: &key,
                     vector: &vector,
-                }])
-                .unwrap();
+                }],
+            );
             assert_eq!(start, previous_end);
             expected_offsets.push(start);
             previous_end = end;
@@ -1130,13 +1293,10 @@ mod tests {
             .collect();
         let mut bulk_log = Log::create(&bulk_path, dims).unwrap();
         let mut sequential_log = Log::create(&sequential_path, dims).unwrap();
-        let (_, bulk_end) = bulk_log.append(&entries).unwrap();
+        let (_, bulk_end) = append_bounds(&mut bulk_log, &entries);
         let mut sequential_end = 0;
         for entry in &entries {
-            sequential_end = sequential_log
-                .append(std::slice::from_ref(entry))
-                .unwrap()
-                .1;
+            sequential_end = append_bounds(&mut sequential_log, std::slice::from_ref(entry)).1;
         }
         assert_eq!(bulk_end, sequential_end);
         assert!(bulk_end - HEADER_LEN as u64 > ENCODE_FLUSH_BYTES as u64);
@@ -1171,13 +1331,10 @@ mod tests {
         ];
         let mut bulk_log = Log::create(&bulk_path, 8).unwrap();
         let mut sequential_log = Log::create(&sequential_path, 8).unwrap();
-        let (bulk_start, bulk_end) = bulk_log.append(&entries).unwrap();
+        let (bulk_start, bulk_end) = append_bounds(&mut bulk_log, &entries);
         let mut sequential_end = 0;
         for entry in &entries {
-            sequential_end = sequential_log
-                .append(std::slice::from_ref(entry))
-                .unwrap()
-                .1;
+            sequential_end = append_bounds(&mut sequential_log, std::slice::from_ref(entry)).1;
         }
         assert_eq!(bulk_start, HEADER_LEN as u64);
         assert_eq!(bulk_end, sequential_end);

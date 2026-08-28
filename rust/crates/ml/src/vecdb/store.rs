@@ -4,10 +4,13 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena, validate_key};
+use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
 use super::graph::{Graph, search as graph_search};
 use super::lock::lock_exclusive;
-use super::log::{Log, LogEntry, LogRecord, remove_stale_temp_sibling};
+use super::log::{
+    HEADER_LEN, Log, LogEntry, LogRecord, remove_if_present, remove_stale_temp_sibling,
+    rename_with_windows_fallback, sync_parent_dir,
+};
 use super::snapshot::{load_snapshot, remove_snapshot, snapshot_path, write_snapshot};
 use super::{Match, SearchParams, VecDbError};
 
@@ -17,6 +20,10 @@ const SNAPSHOT_QUIET_GAP: Duration = Duration::from_secs(10);
 const COMPACTION_MIN_DEAD_RECORDS: u64 = 64;
 const COMPACTION_DEAD_RATIO: u64 = 10;
 const COMPACTION_BATCH_SIZE: usize = 1000;
+const KEY_TABLE_COPIES: usize = 2;
+const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
+const GRAPH_NODE_OVERHEAD_BYTES: usize = 48;
+const NEIGHBOR_LIST_OVERHEAD_BYTES: usize = 24;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stats {
@@ -33,6 +40,7 @@ pub struct VecDb {
     arena: VectorArena,
     graph: Graph,
     total_records: u64,
+    compaction_retry_at_dead: u64,
     mode: Mode,
 }
 
@@ -56,12 +64,11 @@ impl VecDb {
                     .read(true)
                     .write(true)
                     .open(path)
-                    .map_err(|source| io_error(path, source))?
+                    .map_err(|source| VecDbError::io(path, source))?
             }
             Err(error) => return Err(error),
         };
-        lock_exclusive(&file, path)?;
-        let mut log = Log::open(file, path, dims)?;
+        let mut log = open_locked(file, path, dims)?;
         remove_stale_temp_sibling(path)?;
         let snapshot_present = std::fs::metadata(snapshot_path(path)).is_ok();
         let replayed = replay(&mut log, dims)?;
@@ -73,19 +80,31 @@ impl VecDb {
         } else {
             replayed.total_records > 0 || snapshot_present
         };
+        let pending_records = if replayed.used_snapshot {
+            replayed.tail_records
+        } else {
+            replayed.total_records
+        } as usize;
         let mut db = Self {
             path: path.to_path_buf(),
             arena: replayed.arena,
             graph: replayed.graph,
             total_records: replayed.total_records,
+            compaction_retry_at_dead: 0,
             mode: Mode::Writer(WriterState {
                 log,
                 mutations_since_snapshot: 0,
                 last_write: None,
             }),
         };
-        if snapshot_stale {
-            db.write_snapshot_now()?;
+        if snapshot_stale && let Err(error) = db.write_snapshot_now() {
+            log::warn!(
+                "continuing without an open-time snapshot for {}: {error}",
+                path.display()
+            );
+            if let Mode::Writer(state) = &mut db.mode {
+                state.mutations_since_snapshot = pending_records.max(1);
+            }
         }
         Ok(db)
     }
@@ -94,16 +113,17 @@ impl VecDb {
         let file = match File::open(path) {
             Ok(file) => file,
             Err(error) if error.kind() == ErrorKind::NotFound => {
-                return Ok(Self {
-                    path: path.to_path_buf(),
-                    arena: VectorArena::new(dims)?,
-                    graph: Graph::new(),
-                    total_records: 0,
-                    mode: Mode::ReadOnly { log_bytes: 0 },
-                });
+                return Self::empty_read_only(path, dims);
             }
-            Err(source) => return Err(io_error(path, source)),
+            Err(source) => return Err(VecDbError::io(path, source)),
         };
+        let file_len = file
+            .metadata()
+            .map_err(|source| VecDbError::io(path, source))?
+            .len();
+        if file_len < HEADER_LEN as u64 {
+            return Self::empty_read_only(path, dims);
+        }
         let mut log = Log::open(file, path, dims)?;
         let replayed = replay(&mut log, dims)?;
         drop(log);
@@ -112,16 +132,28 @@ impl VecDb {
             arena: replayed.arena,
             graph: replayed.graph,
             total_records: replayed.total_records,
+            compaction_retry_at_dead: 0,
             mode: Mode::ReadOnly {
                 log_bytes: replayed.recoverable_end,
             },
         })
     }
 
+    fn empty_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
+        Ok(Self {
+            path: path.to_path_buf(),
+            arena: VectorArena::new(dims)?,
+            graph: Graph::new(),
+            total_records: 0,
+            compaction_retry_at_dead: 0,
+            mode: Mode::ReadOnly { log_bytes: 0 },
+        })
+    }
+
     pub fn add(&mut self, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
         let now = Instant::now();
-        self.writer_state()?;
-        self.validate_entry(key, vector)?;
+        self.ensure_writer()?;
+        ensure_finite(key, vector)?;
         self.writer_state()?
             .log
             .append(&[LogEntry::Add { key, vector }])?;
@@ -132,12 +164,12 @@ impl VecDb {
 
     pub fn bulk_add(&mut self, entries: &[(String, Vec<f32>)]) -> Result<(), VecDbError> {
         let now = Instant::now();
-        self.writer_state()?;
+        self.ensure_writer()?;
         if entries.is_empty() {
             return Ok(());
         }
         for (key, vector) in entries {
-            self.validate_entry(key, vector)?;
+            ensure_finite(key, vector)?;
         }
         let records: Vec<LogEntry<'_>> = entries
             .iter()
@@ -153,7 +185,7 @@ impl VecDb {
 
     pub fn remove(&mut self, key: &str) -> Result<bool, VecDbError> {
         let now = Instant::now();
-        self.writer_state()?;
+        self.ensure_writer()?;
         if self.arena.slot_of_key(key).is_none() {
             return Ok(false);
         }
@@ -167,7 +199,7 @@ impl VecDb {
 
     pub fn bulk_remove(&mut self, keys: &[String]) -> Result<usize, VecDbError> {
         let now = Instant::now();
-        self.writer_state()?;
+        self.ensure_writer()?;
         let mut scheduled: Vec<&str> = Vec::new();
         let mut seen: HashSet<&str> = HashSet::new();
         for key in keys {
@@ -216,7 +248,7 @@ impl VecDb {
                 .collect()
         });
         Ok(graph_search(
-            Some(&self.graph),
+            &self.graph,
             &self.arena,
             &packed,
             params,
@@ -233,23 +265,23 @@ impl VecDb {
     }
 
     pub fn reset(&mut self) -> Result<(), VecDbError> {
-        self.writer_state()?;
-        let dims = self.arena.dims();
-        let Mode::Writer(old_state) =
-            std::mem::replace(&mut self.mode, Mode::ReadOnly { log_bytes: 0 })
-        else {
-            return Err(VecDbError::ReadOnly);
-        };
+        let old_state = self.take_writer_state()?;
         drop(old_state);
-        remove_if_present(&self.path)?;
-        remove_snapshot(&self.path)?;
-        remove_stale_temp_sibling(&self.path)?;
-        let file = Log::create(&self.path, dims)?.into_file();
-        lock_exclusive(&file, &self.path)?;
-        let log = Log::open(file, &self.path, dims)?;
+        let dims = self.arena.dims();
+        let recreated = remove_index_files(&self.path)
+            .and_then(|()| Log::create(&self.path, dims))
+            .and_then(|created| open_locked(created.into_file(), &self.path, dims));
+        let log = match recreated {
+            Ok(log) => log,
+            Err(error) => {
+                let _ = self.restore_writer_mode(dims, None);
+                return Err(error);
+            }
+        };
         self.arena = VectorArena::new(dims)?;
         self.graph = Graph::new();
         self.total_records = 0;
+        self.compaction_retry_at_dead = 0;
         self.mode = Mode::Writer(WriterState {
             log,
             mutations_since_snapshot: 0,
@@ -263,10 +295,7 @@ impl VecDb {
             return Err(VecDbError::ReadOnly);
         };
         drop(state);
-        remove_if_present(&self.path)?;
-        remove_snapshot(&self.path)?;
-        remove_stale_temp_sibling(&self.path)?;
-        Ok(())
+        remove_index_files(&self.path)
     }
 
     pub fn stats(&self) -> Stats {
@@ -303,20 +332,47 @@ impl VecDb {
         }
     }
 
-    fn validate_entry(&self, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
-        validate_key(key)?;
-        if vector.len() != self.arena.dims() {
-            return Err(VecDbError::DimensionMismatch {
-                expected: self.arena.dims(),
-                actual: vector.len(),
-            });
+    fn ensure_writer(&self) -> Result<(), VecDbError> {
+        match &self.mode {
+            Mode::Writer(_) => Ok(()),
+            Mode::ReadOnly { .. } => Err(VecDbError::ReadOnly),
         }
-        if let Some(index) = vector.iter().position(|value| !value.is_finite()) {
-            return Err(VecDbError::InvalidVector(format!(
-                "component {index} of the vector for key {key:?} is not finite"
-            )));
+    }
+
+    fn take_writer_state(&mut self) -> Result<WriterState, VecDbError> {
+        self.ensure_writer()?;
+        match std::mem::replace(&mut self.mode, Mode::ReadOnly { log_bytes: 0 }) {
+            Mode::Writer(state) => Ok(state),
+            Mode::ReadOnly { .. } => Err(VecDbError::ReadOnly),
         }
-        Ok(())
+    }
+
+    fn restore_writer_mode(
+        &mut self,
+        dims: usize,
+        last_write: Option<Instant>,
+    ) -> Result<(), VecDbError> {
+        match open_path_locked(&self.path, dims) {
+            Ok(log) => {
+                self.mode = Mode::Writer(WriterState {
+                    log,
+                    mutations_since_snapshot: 0,
+                    last_write,
+                });
+                Ok(())
+            }
+            Err(error) => {
+                let log_bytes = std::fs::metadata(&self.path)
+                    .map(|meta| meta.len())
+                    .unwrap_or(0);
+                log::warn!(
+                    "degrading {} to read-only after failing to restore its writer: {error}",
+                    self.path.display()
+                );
+                self.mode = Mode::ReadOnly { log_bytes };
+                Err(error)
+            }
+        }
     }
 
     fn record_mutations(&mut self, count: usize, now: Instant) -> Result<(), VecDbError> {
@@ -335,11 +391,21 @@ impl VecDb {
         let dead = total.saturating_sub(live);
         if dead >= COMPACTION_MIN_DEAD_RECORDS
             && dead.saturating_mul(COMPACTION_DEAD_RATIO) >= total
+            && dead >= self.compaction_retry_at_dead
         {
-            return self.compact();
+            match self.compact() {
+                Ok(()) => self.compaction_retry_at_dead = 0,
+                Err(error) => {
+                    log::warn!("compaction of {} failed: {error}", self.path.display());
+                    self.compaction_retry_at_dead = dead + COMPACTION_MIN_DEAD_RECORDS;
+                }
+            }
+            return Ok(());
         }
-        if mutations >= SNAPSHOT_HARD_CAP || (mutations >= SNAPSHOT_QUIET_THRESHOLD && quiet) {
-            return self.write_snapshot_now();
+        if (mutations >= SNAPSHOT_HARD_CAP || (mutations >= SNAPSHOT_QUIET_THRESHOLD && quiet))
+            && let Err(error) = self.write_snapshot_now()
+        {
+            log::warn!("snapshot of {} failed: {error}", self.path.display());
         }
         Ok(())
     }
@@ -360,11 +426,9 @@ impl VecDb {
     }
 
     fn compact(&mut self) -> Result<(), VecDbError> {
-        let Mode::Writer(state) = &mut self.mode else {
-            return Err(VecDbError::ReadOnly);
-        };
-        let dims = state.log.dims();
-        let (mut temp_log, temp_path) = Log::create_temp_sibling(state.log.path(), dims)?;
+        self.ensure_writer()?;
+        let dims = self.arena.dims();
+        let (mut temp_log, temp_path) = Log::create_temp_sibling(&self.path, dims)?;
         let mut compacted = VectorArena::new(dims)?;
         if let Err(error) = stage_live_entries(&self.arena, &mut compacted, &mut temp_log) {
             drop(temp_log);
@@ -375,32 +439,21 @@ impl VecDb {
         if let Err(source) = temp_file.sync_all() {
             drop(temp_file);
             let _ = std::fs::remove_file(&temp_path);
-            return Err(io_error(&temp_path, source));
+            return Err(VecDbError::io(&temp_path, source));
         }
         drop(temp_file);
-        let last_write = state.last_write;
-        let Mode::Writer(old_state) =
-            std::mem::replace(&mut self.mode, Mode::ReadOnly { log_bytes: 0 })
-        else {
-            return Err(VecDbError::ReadOnly);
-        };
-        drop(old_state);
-        std::fs::rename(&temp_path, &self.path).map_err(|source| io_error(&self.path, source))?;
-        let file = File::options()
-            .read(true)
-            .write(true)
-            .open(&self.path)
-            .map_err(|source| io_error(&self.path, source))?;
-        lock_exclusive(&file, &self.path)?;
-        let log = Log::open(file, &self.path, dims)?;
-        self.arena = compacted;
-        self.graph = Graph::rebuild(&self.arena);
-        self.total_records = self.arena.live_count() as u64;
-        self.mode = Mode::Writer(WriterState {
-            log,
-            mutations_since_snapshot: 0,
-            last_write,
-        });
+        let last_write = self.take_writer_state()?.last_write;
+        let promoted = promote_compacted_log(&temp_path, &self.path);
+        if temp_path.exists() {
+            let _ = std::fs::remove_file(&temp_path);
+        } else {
+            self.arena = compacted;
+            self.graph = Graph::rebuild(&self.arena);
+            self.total_records = self.arena.live_count() as u64;
+        }
+        let restored = self.restore_writer_mode(dims, last_write);
+        promoted?;
+        restored?;
         self.write_snapshot_now()
     }
 
@@ -413,7 +466,7 @@ impl VecDb {
             .arena
             .live_slots()
             .filter_map(|slot| self.arena.key_of_slot(slot))
-            .map(|key| 2 * (key.len() + 48))
+            .map(|key| KEY_TABLE_COPIES * (key.len() + KEY_ENTRY_OVERHEAD_BYTES))
             .sum();
         let free_list_bytes = self.arena.dead_count() * size_of::<u32>();
         let graph_bytes: usize = self
@@ -421,9 +474,13 @@ impl VecDb {
             .slots()
             .map(|slot| {
                 let level = self.graph.level_of(slot).unwrap_or(0);
-                48 + (0..=level)
-                    .map(|layer| 24 + size_of_val(self.graph.neighbors_of(slot, layer)))
-                    .sum::<usize>()
+                GRAPH_NODE_OVERHEAD_BYTES
+                    + (0..=level)
+                        .map(|layer| {
+                            NEIGHBOR_LIST_OVERHEAD_BYTES
+                                + size_of_val(self.graph.neighbors_of(slot, layer))
+                        })
+                        .sum::<usize>()
             })
             .sum();
         vector_bytes + key_bytes + free_list_bytes + graph_bytes
@@ -504,10 +561,44 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
 fn apply_outcome(graph: &mut Graph, arena: &VectorArena, outcome: UpsertOutcome) {
     match outcome {
         UpsertOutcome::NewSlot(slot) => graph.insert(slot, arena),
-        UpsertOutcome::RecycledSlot(_) | UpsertOutcome::ReplacedInPlace(_) => {
-            graph.reinsert(outcome.slot(), arena);
+        UpsertOutcome::RecycledSlot(slot) | UpsertOutcome::ReplacedInPlace(slot) => {
+            graph.reinsert(slot, arena);
         }
     }
+}
+
+fn ensure_finite(key: &str, vector: &[f32]) -> Result<(), VecDbError> {
+    if let Some(index) = vector.iter().position(|value| !value.is_finite()) {
+        return Err(VecDbError::InvalidVector(format!(
+            "component {index} of the vector for key {key:?} is not finite"
+        )));
+    }
+    Ok(())
+}
+
+fn open_locked(file: File, path: &Path, dims: usize) -> Result<Log, VecDbError> {
+    lock_exclusive(&file, path)?;
+    Log::open(file, path, dims)
+}
+
+fn open_path_locked(path: &Path, dims: usize) -> Result<Log, VecDbError> {
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .open(path)
+        .map_err(|source| VecDbError::io(path, source))?;
+    open_locked(file, path, dims)
+}
+
+fn promote_compacted_log(temp_path: &Path, path: &Path) -> Result<(), VecDbError> {
+    rename_with_windows_fallback(temp_path, path)?;
+    sync_parent_dir(path)
+}
+
+fn remove_index_files(path: &Path) -> Result<(), VecDbError> {
+    remove_if_present(path)?;
+    remove_snapshot(path)?;
+    remove_stale_temp_sibling(path)
 }
 
 fn stage_live_entries(
@@ -547,40 +638,18 @@ fn flush_stage_batch(
     Ok(())
 }
 
-fn remove_if_present(path: &Path) -> Result<(), VecDbError> {
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
-        Err(source) => Err(io_error(path, source)),
-    }
-}
-
-fn io_error(path: &Path, source: std::io::Error) -> VecDbError {
-    VecDbError::Io {
-        path: path.to_path_buf(),
-        source,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
 
     use tempfile::TempDir;
 
+    use super::super::kernel::splitmix64;
     use super::*;
 
     const DIMS: usize = 16;
     const ADD_RECORD_LEN: u64 = 3 + 5 + (DIMS as u64) * 4 + 4;
     const TOMBSTONE_RECORD_LEN: u64 = 3 + 5 + 4;
-
-    fn splitmix64(state: &mut u64) -> u64 {
-        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = *state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
 
     fn seeded_unit_vector(seed: u64, dims: usize) -> Vec<f32> {
         let mut state = seed;
@@ -1399,22 +1468,165 @@ mod tests {
     }
 
     #[test]
-    fn open_of_a_short_file_fails_clean_without_altering_it() {
+    fn writer_open_reinitializes_a_file_shorter_than_the_header() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let partial = [0x45u8, 0x56, 0x44, 0x42, 0x01, 0x00, 0x00];
         fs::write(&path, partial).unwrap();
-        assert!(matches!(
-            VecDb::open(&path, DIMS),
-            Err(VecDbError::Corrupt(_))
-        ));
-        assert_eq!(fs::read(&path).unwrap(), partial);
-        assert!(matches!(
-            VecDb::open_read_only(&path, DIMS),
-            Err(VecDbError::Corrupt(_))
-        ));
+        let mut db = open_writer(&path);
+        assert!(db.is_empty());
+        assert_eq!(db.stats().log_bytes, 32);
+        db.add("fresh", &seeded_unit_vector(11, DIMS)).unwrap();
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 1);
+        assert_own_nearest(&reopened, "fresh", &seeded_unit_vector(11, DIMS));
+    }
+
+    #[test]
+    fn read_only_open_of_a_short_file_is_empty_and_unaltered() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let partial = [0x45u8, 0x56, 0x44, 0x42, 0x01, 0x00, 0x00];
+        fs::write(&path, partial).unwrap();
+        let db = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert!(db.is_empty());
+        assert_eq!(db.stats().log_bytes, 0);
         assert_eq!(fs::read(&path).unwrap(), partial);
         assert!(!snapshot_exists(&path));
+    }
+
+    #[test]
+    fn promote_compacted_log_replaces_the_log_durably() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        drop(Log::create(&path, DIMS).unwrap().into_file());
+        let old_generation = generation_of(&path);
+        let temp = temp_sibling(&path);
+        drop(Log::create(&temp, DIMS).unwrap().into_file());
+        let new_generation = generation_of(&temp);
+        promote_compacted_log(&temp, &path).unwrap();
+        assert!(!temp.exists());
+        assert_eq!(generation_of(&path), new_generation);
+        assert_ne!(generation_of(&path), old_generation);
+        let log = open_path_locked(&path, DIMS).unwrap();
+        assert_eq!(log.generation(), new_generation);
+        drop(log);
+        assert!(matches!(
+            promote_compacted_log(&temp, &path),
+            Err(VecDbError::Io { .. })
+        ));
+        assert_eq!(generation_of(&path), new_generation);
+    }
+
+    #[test]
+    fn restore_writer_mode_relocks_and_reenables_writes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 3, 260)).unwrap();
+        drop(db.take_writer_state().unwrap());
+        assert!(matches!(db.mode, Mode::ReadOnly { .. }));
+        db.restore_writer_mode(DIMS, None).unwrap();
+        db.add("after", &seeded_unit_vector(4, DIMS)).unwrap();
+        assert!(matches!(
+            VecDb::open(&path, DIMS),
+            Err(VecDbError::Locked(_))
+        ));
+        assert_eq!(db.len(), 4);
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 4);
+        assert!(reopened.contains("after"));
+    }
+
+    #[test]
+    fn restore_writer_mode_degrades_to_accurate_read_only_when_reopen_fails() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 3, 270)).unwrap();
+        drop(db.take_writer_state().unwrap());
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[20] ^= 0x5A;
+        fs::write(&path, &bytes).unwrap();
+        assert!(matches!(
+            db.restore_writer_mode(DIMS, None),
+            Err(VecDbError::Corrupt(_))
+        ));
+        assert!(matches!(db.mode, Mode::ReadOnly { log_bytes } if log_bytes == bytes.len() as u64));
+        assert_eq!(db.stats().log_bytes, bytes.len() as u64);
+        let vector = seeded_unit_vector(5, DIMS);
+        assert!(matches!(db.add("x", &vector), Err(VecDbError::ReadOnly)));
+    }
+
+    #[test]
+    fn snapshot_failure_degrades_the_write_and_flush_still_errors() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.add("seed", &seeded_unit_vector(1, DIMS)).unwrap();
+        fs::create_dir(snapshot_path(&path)).unwrap();
+        writer(&mut db).mutations_since_snapshot = 4999;
+        db.record_mutations(1, Instant::now()).unwrap();
+        assert_eq!(writer(&mut db).mutations_since_snapshot, 5000);
+        assert!(matches!(db.flush(), Err(VecDbError::Io { .. })));
+        db.add("more", &seeded_unit_vector(2, DIMS)).unwrap();
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 2);
+        assert!(reopened.contains("seed"));
+        assert!(reopened.contains("more"));
+    }
+
+    #[test]
+    fn failed_compaction_keeps_the_write_ok_and_backs_off() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 100, 280)).unwrap();
+        let generation_before = generation_of(&path);
+        fs::create_dir(temp_sibling(&path)).unwrap();
+        let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
+        assert_eq!(db.stats().dead_count, 128);
+        assert_eq!(generation_of(&path), generation_before);
+        db.add("probe", &seeded_unit_vector(7, DIMS)).unwrap();
+        assert!(matches!(
+            VecDb::open(&path, DIMS),
+            Err(VecDbError::Locked(_))
+        ));
+        fs::remove_dir(temp_sibling(&path)).unwrap();
+        db.bulk_add(&bulk_entries(64, 36, 290)).unwrap();
+        assert_eq!(db.stats().dead_count, 164);
+        assert_eq!(generation_of(&path), generation_before);
+        db.bulk_add(&bulk_entries(64, 28, 295)).unwrap();
+        assert_eq!(db.stats().dead_count, 0);
+        assert_ne!(generation_of(&path), generation_before);
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 37);
+        assert!(reopened.contains("probe"));
+        assert!(reopened.contains("key-64"));
+        assert!(!reopened.contains("key-0"));
+    }
+
+    #[test]
+    fn open_succeeds_and_serves_data_when_the_snapshot_cannot_be_written() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 5, 300)).unwrap();
+        drop(db);
+        fs::create_dir(snapshot_path(&path)).unwrap();
+        let mut db = open_writer(&path);
+        assert_eq!(db.len(), 5);
+        assert_own_nearest(&db, "key-2", &seeded_unit_vector(302, DIMS));
+        assert!(matches!(db.flush(), Err(VecDbError::Io { .. })));
+        drop(db);
+        fs::remove_dir(snapshot_path(&path)).unwrap();
+        drop(open_writer(&path));
+        assert!(snapshot_exists(&path));
     }
 
     #[test]

@@ -2,6 +2,14 @@ use wide::f32x8;
 
 pub(crate) const LANE_WIDTH: usize = 8;
 
+pub(crate) fn splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut mixed = *state;
+    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    mixed ^ (mixed >> 31)
+}
+
 pub(crate) trait VectorKernel {
     type Lane;
 
@@ -54,14 +62,6 @@ pub(crate) fn unpack_lanes(lanes: &[f32x8]) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn splitmix64(state: &mut u64) -> u64 {
-        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = *state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
 
     fn seeded_values(seed: u64, count: usize) -> Vec<f32> {
         let mut state = seed;

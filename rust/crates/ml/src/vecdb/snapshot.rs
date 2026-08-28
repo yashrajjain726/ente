@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::VecDbError;
 use super::graph::{Graph, GraphNodeParts};
+use super::log::{remove_if_present, rename_with_windows_fallback, sync_parent_dir};
 
 const MAGIC: [u8; 4] = *b"EVDG";
 const FORMAT_VERSION: u16 = 1;
@@ -238,35 +239,15 @@ impl<'a> BodyReader<'a> {
 }
 
 fn write_and_swap(bytes: &[u8], temp: &Path, target: &Path) -> Result<(), VecDbError> {
-    let mut file = File::create(temp).map_err(|source| io_error(temp, source))?;
+    let mut file = File::create(temp).map_err(|source| VecDbError::io(temp, source))?;
     file.write_all(bytes)
-        .map_err(|source| io_error(temp, source))?;
-    file.sync_all().map_err(|source| io_error(temp, source))?;
+        .map_err(|source| VecDbError::io(temp, source))?;
+    file.sync_all()
+        .map_err(|source| VecDbError::io(temp, source))?;
     drop(file);
-    rename_over(temp, target)?;
-    sync_parent_dir_best_effort(target);
+    rename_with_windows_fallback(temp, target)?;
+    let _ = sync_parent_dir(target);
     Ok(())
-}
-
-fn rename_over(temp: &Path, target: &Path) -> Result<(), VecDbError> {
-    match std::fs::rename(temp, target) {
-        Ok(()) => Ok(()),
-        #[cfg(windows)]
-        Err(_) => {
-            let _ = std::fs::remove_file(target);
-            std::fs::rename(temp, target).map_err(|source| io_error(temp, source))
-        }
-        #[cfg(not(windows))]
-        Err(source) => Err(io_error(temp, source)),
-    }
-}
-
-fn remove_if_present(path: &Path) -> Result<(), VecDbError> {
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
-        Err(source) => Err(io_error(path, source)),
-    }
 }
 
 fn temp_snapshot_path(log_path: &Path) -> PathBuf {
@@ -279,25 +260,6 @@ fn append_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(extended)
 }
 
-fn io_error(path: &Path, source: std::io::Error) -> VecDbError {
-    VecDbError::Io {
-        path: path.to_path_buf(),
-        source,
-    }
-}
-
-#[cfg(unix)]
-fn sync_parent_dir_best_effort(path: &Path) {
-    let parent = match path.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    let _ = File::open(parent).and_then(|dir| dir.sync_all());
-}
-
-#[cfg(not(unix))]
-fn sync_parent_dir_best_effort(_path: &Path) {}
-
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
@@ -305,6 +267,8 @@ mod tests {
     use super::super::SearchParams;
     use super::super::arena::{UpsertOutcome, VectorArena};
     use super::super::graph::search;
+    use super::super::kernel::splitmix64;
+    use super::super::test_support::{assert_identical_graphs, stale_downward_edge_exists};
     use super::*;
 
     const GOLDEN: [u8; 86] = [
@@ -364,14 +328,6 @@ mod tests {
         assert!(load_golden(&log_path).is_none());
     }
 
-    fn splitmix64(state: &mut u64) -> u64 {
-        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = *state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-
     fn seeded_unit_vector(seed: u64, dims: usize) -> Vec<f32> {
         let mut state = seed;
         let mut values: Vec<f32> = (0..dims)
@@ -400,36 +356,6 @@ mod tests {
         arena
     }
 
-    fn stale_downward_edge_exists(graph: &Graph) -> bool {
-        graph.slots().any(|slot| {
-            let level = graph.level_of(slot).unwrap();
-            (0..=level).any(|layer| {
-                graph
-                    .neighbors_of(slot, layer)
-                    .iter()
-                    .any(|&neighbor| graph.level_of(neighbor).unwrap() < layer)
-            })
-        })
-    }
-
-    fn assert_identical_graphs(first: &Graph, second: &Graph) {
-        assert_eq!(first.entry_point(), second.entry_point());
-        assert_eq!(
-            first.slots().collect::<Vec<_>>(),
-            second.slots().collect::<Vec<_>>()
-        );
-        for slot in first.slots() {
-            assert_eq!(first.level_of(slot), second.level_of(slot));
-            let level = first.level_of(slot).unwrap();
-            for layer in 0..=level {
-                assert_eq!(
-                    first.neighbors_of(slot, layer),
-                    second.neighbors_of(slot, layer)
-                );
-            }
-        }
-    }
-
     fn churned_fixture(dims: usize) -> (VectorArena, Graph) {
         let mut arena = build_arena(600, dims, 0x00A1_0000);
         let mut graph = Graph::rebuild(&arena);
@@ -443,17 +369,22 @@ mod tests {
                 .filter(|&slot| arena.is_alive(slot))
                 .unwrap_or_else(|| arena.live_slots().next().unwrap());
             let key = arena.key_of_slot(victim).unwrap().to_string();
-            let outcome = arena
-                .upsert(&key, &seeded_unit_vector(0x00A2_0000 + round, dims))
-                .unwrap();
-            graph.reinsert(outcome.slot(), &arena);
+            assert_eq!(
+                arena
+                    .upsert(&key, &seeded_unit_vector(0x00A2_0000 + round, dims))
+                    .unwrap(),
+                UpsertOutcome::ReplacedInPlace(victim)
+            );
+            graph.reinsert(victim, &arena);
             stale_seen |= stale_downward_edge_exists(&graph);
         }
-        let outcome = arena
+        let UpsertOutcome::RecycledSlot(recycled) = arena
             .upsert("recycled", &seeded_unit_vector(0x00A3_0000, dims))
-            .unwrap();
-        assert!(matches!(outcome, UpsertOutcome::RecycledSlot(_)));
-        graph.reinsert(outcome.slot(), &arena);
+            .unwrap()
+        else {
+            panic!("expected a recycled slot");
+        };
+        graph.reinsert(recycled, &arena);
         assert!(stale_seen);
         (arena, graph)
     }
@@ -533,8 +464,8 @@ mod tests {
                 params(None, Some(0.9)),
                 params(Some(3), Some(1.2)),
             ] {
-                let original = search(Some(&graph), &arena, &query, &search_params, None);
-                let reconstructed = search(Some(&rebuilt), &arena, &query, &search_params, None);
+                let original = search(&graph, &arena, &query, &search_params, None);
+                let reconstructed = search(&rebuilt, &arena, &query, &search_params, None);
                 assert_eq!(original, reconstructed);
                 assert!(!original.is_empty());
             }
@@ -615,7 +546,7 @@ mod tests {
                 return;
             };
             for search_params in [params(Some(2), None), params(None, Some(2.5))] {
-                let found = search(Some(&graph), &arena, &query, &search_params, None);
+                let found = search(&graph, &arena, &query, &search_params, None);
                 assert!(found.len() <= 3);
             }
             searched += 1;

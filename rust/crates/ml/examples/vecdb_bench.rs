@@ -241,9 +241,74 @@ fn generate_data(scale: usize, dims: usize, clusters: u64) -> BenchData {
     }
 }
 
+struct IngestTimings {
+    single_count: usize,
+    single_total: Duration,
+    bulk_count: usize,
+    bulk_total: Duration,
+    snapshot_write: Duration,
+}
+
+struct SearchTimings {
+    approx_total: Duration,
+    exact_total: Duration,
+    recall: f64,
+    threshold: f32,
+    threshold_total: Duration,
+    threshold_avg_hits: f64,
+    filtered_total: Duration,
+}
+
+struct ReopenTimings {
+    open_with_snapshot: Duration,
+    open_full_rebuild: Duration,
+}
+
+struct CompactionTimings {
+    removed: usize,
+    remove_and_compact: Duration,
+    compaction_fired: bool,
+}
+
 fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbReport {
     let path = dir.join("bench.vecdb");
     let mut db = VecDb::open(&path, dims).expect("open vecdb");
+    let ingest = ingest_phase(&mut db, data, scale);
+    let searches = search_phase(&db, data, scale);
+    let stats = db.stats();
+    let snapshot_file = PathBuf::from(format!("{}.graph", path.display()));
+    let snapshot_bytes = std::fs::metadata(&snapshot_file)
+        .map(|meta| meta.len())
+        .unwrap_or(0);
+    drop(db);
+    let (reopens, mut db) = reopen_phase(&path, dims, &snapshot_file, scale);
+    let compaction = compaction_phase(&mut db, data, scale);
+    db.delete().expect("vecdb delete");
+    VecdbReport {
+        single_count: ingest.single_count,
+        single_total: ingest.single_total,
+        bulk_count: ingest.bulk_count,
+        bulk_total: ingest.bulk_total,
+        snapshot_write: ingest.snapshot_write,
+        approx_total: searches.approx_total,
+        exact_total: searches.exact_total,
+        recall: searches.recall,
+        threshold: searches.threshold,
+        threshold_total: searches.threshold_total,
+        threshold_avg_hits: searches.threshold_avg_hits,
+        filtered_total: searches.filtered_total,
+        open_with_snapshot: reopens.open_with_snapshot,
+        open_full_rebuild: reopens.open_full_rebuild,
+        removed: compaction.removed,
+        remove_and_compact: compaction.remove_and_compact,
+        compaction_fired: compaction.compaction_fired,
+        log_bytes: stats.log_bytes,
+        snapshot_bytes,
+        memory_bytes: stats.approximate_memory_bytes,
+    }
+}
+
+fn ingest_phase(db: &mut VecDb, data: &BenchData, scale: usize) -> IngestTimings {
     let single_count = SINGLE_ADD_COUNT.min(data.entries.len());
     eprintln!("[scale {scale}] vecdb single adds");
     let started = Instant::now();
@@ -261,33 +326,38 @@ fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbRe
     db.add("bench-probe", &data.probe).expect("vecdb probe add");
     let started = Instant::now();
     db.flush().expect("vecdb flush");
-    let snapshot_write = started.elapsed();
+    IngestTimings {
+        single_count,
+        single_total,
+        bulk_count: rest.len(),
+        bulk_total,
+        snapshot_write: started.elapsed(),
+    }
+}
 
+fn search_phase(db: &VecDb, data: &BenchData, scale: usize) -> SearchTimings {
     eprintln!("[scale {scale}] vecdb searches");
     let approx_params = limit_params(SEARCH_K, false);
     let exact_params = limit_params(SEARCH_K, true);
-    warm(&db, &data.queries, &approx_params);
-    let (approx_total, approx_results) = timed_searches(&db, &data.queries, &approx_params);
-    warm(&db, &data.queries, &exact_params);
-    let (exact_total, exact_results) = timed_searches(&db, &data.queries, &exact_params);
+    warm(db, &data.queries, &approx_params);
+    let (approx_total, approx_results) = timed_searches(db, &data.queries, &approx_params);
+    warm(db, &data.queries, &exact_params);
+    let (exact_total, exact_results) = timed_searches(db, &data.queries, &exact_params);
     let recall = recall_at_k(&exact_results, &approx_results, SEARCH_K);
-
-    let threshold = one_percent_threshold(&db, data);
+    let threshold = one_percent_threshold(db, data);
     let threshold_params = SearchParams {
         limit: None,
         max_distance: Some(threshold),
         exact: false,
         allowed_keys: None,
     };
-    warm(&db, &data.queries, &threshold_params);
-    let (threshold_total, threshold_results) =
-        timed_searches(&db, &data.queries, &threshold_params);
+    warm(db, &data.queries, &threshold_params);
+    let (threshold_total, threshold_results) = timed_searches(db, &data.queries, &threshold_params);
     let threshold_avg_hits = threshold_results
         .iter()
         .map(|found| found.len())
         .sum::<usize>() as f64
         / threshold_results.len().max(1) as f64;
-
     let filtered_params = SearchParams {
         limit: Some(SEARCH_K),
         max_distance: None,
@@ -299,27 +369,45 @@ fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbRe
                 .collect(),
         ),
     };
-    warm(&db, &data.queries, &filtered_params);
-    let (filtered_total, _) = timed_searches(&db, &data.queries, &filtered_params);
+    warm(db, &data.queries, &filtered_params);
+    let (filtered_total, _) = timed_searches(db, &data.queries, &filtered_params);
+    SearchTimings {
+        approx_total,
+        exact_total,
+        recall,
+        threshold,
+        threshold_total,
+        threshold_avg_hits,
+        filtered_total,
+    }
+}
 
-    let stats = db.stats();
-    let snapshot_file = PathBuf::from(format!("{}.graph", path.display()));
-    let snapshot_bytes = std::fs::metadata(&snapshot_file)
-        .map(|meta| meta.len())
-        .unwrap_or(0);
-
+fn reopen_phase(
+    path: &Path,
+    dims: usize,
+    snapshot_file: &Path,
+    scale: usize,
+) -> (ReopenTimings, VecDb) {
     eprintln!("[scale {scale}] vecdb cold open with snapshot");
-    drop(db);
     let started = Instant::now();
-    let reopened = VecDb::open(&path, dims).expect("vecdb reopen with snapshot");
+    let reopened = VecDb::open(path, dims).expect("vecdb reopen with snapshot");
     let open_with_snapshot = started.elapsed();
     drop(reopened);
-    std::fs::remove_file(&snapshot_file).expect("remove snapshot");
+    std::fs::remove_file(snapshot_file).expect("remove snapshot");
     eprintln!("[scale {scale}] vecdb cold open without snapshot (full rebuild)");
     let started = Instant::now();
-    let mut db = VecDb::open(&path, dims).expect("vecdb reopen without snapshot");
+    let db = VecDb::open(path, dims).expect("vecdb reopen without snapshot");
     let open_full_rebuild = started.elapsed();
+    (
+        ReopenTimings {
+            open_with_snapshot,
+            open_full_rebuild,
+        },
+        db,
+    )
+}
 
+fn compaction_phase(db: &mut VecDb, data: &BenchData, scale: usize) -> CompactionTimings {
     eprintln!("[scale {scale}] vecdb remove {REMOVAL_PERCENT}% + compact");
     let removed = data.entries.len() * REMOVAL_PERCENT / 100;
     let removals: Vec<String> = (0..removed).map(|index| format!("vec-{index}")).collect();
@@ -328,30 +416,10 @@ fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbRe
     db.bulk_remove(&removals).expect("vecdb bulk remove");
     let remove_and_compact = started.elapsed();
     let stats_after = db.stats();
-    let compaction_fired = stats_after.log_bytes < log_before && stats_after.dead_count == 0;
-    db.delete().expect("vecdb delete");
-
-    VecdbReport {
-        single_count,
-        single_total,
-        bulk_count: rest.len(),
-        bulk_total,
-        snapshot_write,
-        approx_total,
-        exact_total,
-        recall,
-        threshold,
-        threshold_total,
-        threshold_avg_hits,
-        filtered_total,
-        open_with_snapshot,
-        open_full_rebuild,
+    CompactionTimings {
         removed,
         remove_and_compact,
-        compaction_fired,
-        log_bytes: stats.log_bytes,
-        snapshot_bytes,
-        memory_bytes: stats.approximate_memory_bytes,
+        compaction_fired: stats_after.log_bytes < log_before && stats_after.dead_count == 0,
     }
 }
 
