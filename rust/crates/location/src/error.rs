@@ -13,6 +13,8 @@ pub enum Error {
         section: &'static str,
         reason: Cow<'static, str>,
     },
+    #[error("coordinate is outside the valid latitude/longitude range")]
+    InvalidCoordinate,
     #[error("map point {0} has an invalid coordinate")]
     InvalidMapPoint(usize),
     #[error("minimum marker distance must be finite and positive")]
