@@ -14,7 +14,7 @@ import "package:workmanager/workmanager.dart" as workmanager;
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   workmanager.Workmanager().executeTask((taskName, inputData) async {
-    final DateTime taskStartedAt = DateTime.now();
+    final Stopwatch taskStopwatch = Stopwatch()..start();
     final TimeLogger tlog = TimeLogger();
     // Deferred error construction: an eagerly created Future.error with no
     // listener surfaces as an unhandled exception even on success.
@@ -26,7 +26,7 @@ void callbackDispatcher() {
         try {
           BgTaskUtils.$.info('Task started $tlog');
           final Duration remainingBudget = Platform.isIOS
-              ? kBGTaskTimeout - DateTime.now().difference(taskStartedAt)
+              ? kBGTaskTimeout - taskStopwatch.elapsed
               : const Duration(hours: 1);
           await runBackgroundTask(taskName, tlog).timeout(
             remainingBudget.isNegative ? Duration.zero : remainingBudget,
