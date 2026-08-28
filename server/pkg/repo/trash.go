@@ -172,6 +172,7 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
 	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT collection_id FROM 
 		collection_files WHERE file_id = ANY($1) AND is_deleted = $2`, pq.Array(fileIDs), false)
 	if err != nil {
@@ -191,13 +192,11 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 		SET is_deleted = $1, updation_time = $2 WHERE file_id = ANY($3)`,
 		true, updationTime, pq.Array(fileIDs))
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
 		WHERE collection_id = ANY ($2)`, updationTime, pq.Array(cIDs))
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()
