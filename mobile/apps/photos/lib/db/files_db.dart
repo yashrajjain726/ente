@@ -126,8 +126,6 @@ class FilesDB with SqlDbBase {
     columnAddedTime,
   ];
 
-  static final String _fileRowProjection = _columnNames.join(", ");
-
   FilesDB._privateConstructor();
 
   static final FilesDB instance = FilesDB._privateConstructor();
@@ -2012,7 +2010,7 @@ class FilesDB with SqlDbBase {
         ? ' AND (${order.columns.join(', ')}) ${order.comparison} '
               '(${List.filled(order.columns.length, '?').join(', ')})'
         : '';
-    return 'SELECT $_fileRowProjection FROM $filesTable '
+    return 'SELECT * FROM $filesTable '
         'WHERE ($whereClause)$pageBoundaryClause '
         'ORDER BY ${order.orderByClause} LIMIT ?';
   }
