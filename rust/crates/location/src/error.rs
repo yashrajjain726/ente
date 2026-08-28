@@ -6,7 +6,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("failed to read location asset: {0}")]
+    #[error("failed to read location asset")]
     Io(#[from] std::io::Error),
     #[error("invalid {section}: {reason}")]
     InvalidData {
