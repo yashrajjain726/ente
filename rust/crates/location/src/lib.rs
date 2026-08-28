@@ -131,8 +131,15 @@ impl CountryIndex {
         let mut unclassified_coordinate_indices = Vec::new();
 
         for (coordinate_index, &coordinate) in coordinates.iter().enumerate() {
-            let classification = self.lookup(coordinate)?;
             let coordinate_index = coordinate_index as u32;
+            let classification = match self.lookup(coordinate) {
+                Ok(classification) => classification,
+                Err(Error::InvalidCoordinate) => {
+                    unclassified_coordinate_indices.push(coordinate_index);
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             if classification.disputes.is_empty() {
                 if classification.countries.is_empty() {
                     unclassified_coordinate_indices.push(coordinate_index);

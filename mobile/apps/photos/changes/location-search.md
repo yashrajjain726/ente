@@ -1,0 +1,1 @@
+- Added country-name search and improved city matching for locations and memories.
