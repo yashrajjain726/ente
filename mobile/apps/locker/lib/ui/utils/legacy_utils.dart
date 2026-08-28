@@ -103,7 +103,7 @@ Future<bool?> hasLegacyKit() async {
 }
 
 Future<List<LegacyKit>> _getLegacyKits() =>
-    legacy.getLegacyKits(authenticatedSession());
+    legacy.kits(session: authenticatedSession());
 
 Future<LegacyKitCreateResult> _createLegacyKit(
   List<String> partNames,
@@ -113,33 +113,33 @@ Future<LegacyKitCreateResult> _createLegacyKit(
   if (keyAttributes == null) {
     throw StateError("Missing account key attributes");
   }
-  final result = await legacy.createLegacyKit(
-    authenticatedSession(),
-    keyAttributes,
-    partNames,
-    noticePeriodInHours,
+  final result = await legacy.createKit(
+    session: authenticatedSession(),
+    currentUserKeyAttrs: keyAttributes,
+    partNames: partNames,
+    noticePeriodInHours: noticePeriodInHours,
   );
   Bus.instance.fire(LegacyKitCreatedEvent());
   return result;
 }
 
 Future<List<LegacyKitShare>> _downloadLegacyKitShares(String kitId) =>
-    legacy.downloadLegacyKitShares(authenticatedSession(), kitId);
+    legacy.downloadKitShares(session: authenticatedSession(), kitId: kitId);
 
 Future<void> _updateLegacyKitRecoveryNotice(
   String kitId,
   int noticePeriodInHours,
-) => legacy.updateLegacyKitRecoveryNotice(
-  authenticatedSession(),
-  kitId,
-  noticePeriodInHours,
+) => legacy.updateKitRecoveryNotice(
+  session: authenticatedSession(),
+  kitId: kitId,
+  noticePeriodInHours: noticePeriodInHours,
 );
 
 Future<void> _blockLegacyKitRecovery(String kitId) =>
-    legacy.blockLegacyKitRecovery(authenticatedSession(), kitId);
+    legacy.blockKitRecovery(session: authenticatedSession(), kitId: kitId);
 
 Future<void> _deleteLegacyKit(String kitId) =>
-    legacy.deleteLegacyKit(authenticatedSession(), kitId);
+    legacy.deleteKit(session: authenticatedSession(), kitId: kitId);
 
 Future<bool> _authenticateForLegacyFlow(BuildContext context, String reason) {
   return LocalAuthenticationService.instance.requestLocalAuthentication(

@@ -1,1 +1,0 @@
-class LegacyKitActiveRecoverySessionException implements Exception {}
