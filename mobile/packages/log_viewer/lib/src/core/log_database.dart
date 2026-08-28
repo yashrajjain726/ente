@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:log_viewer/src/core/log_models.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqlite_async/sqlite_async.dart';
+import 'package:sqflite/sqflite.dart';
 
 class LogDatabase {
   static const String _databaseName = 'log_viewer.db';
@@ -11,112 +11,74 @@ class LogDatabase {
   static const int _databaseVersion = 1;
 
   final int maxEntries;
-  Future<SqliteDatabase>? _databaseFuture;
+  Database? _database;
 
   LogDatabase({this.maxEntries = 10000});
 
-  Future<SqliteDatabase> get database {
-    _databaseFuture ??= _initDatabase();
-    return _databaseFuture!;
+  Future<Database> get database async {
+    _database ??= await _initDatabase();
+    return _database!;
   }
 
-  Future<SqliteDatabase> _initDatabase() async {
-    SqliteDatabase? database;
-    try {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final path = join(documentsDirectory.path, _databaseName);
-      database = SqliteDatabase(path: path);
-      await _migrate(database);
-      return database;
-    } catch (_) {
-      _databaseFuture = null;
-      await database?.close();
-      rethrow;
-    }
-  }
+  Future<Database> _initDatabase() async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final path = join(documentsDirectory.path, _databaseName);
 
-  Future<void> _migrate(SqliteDatabase database) async {
-    // Opens must not take the write lock when no migration is pending: a
-    // write lock orphaned by a killed engine must never block later opens.
-    final probe = await database.writeLock(
-      (tx) => tx.get('PRAGMA user_version'),
+    return await databaseFactory.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: _databaseVersion,
+        onCreate: _onCreate,
+        onOpen: _onOpen,
+        // Transactions orphaned by killed engines must not block later opens.
+        rollbackActiveTransactionOnOpen: true,
+      ),
     );
-    final probedVersion = probe['user_version'] as int;
-    if (probedVersion == _databaseVersion) {
-      return;
-    }
-    if (probedVersion > _databaseVersion) {
-      throw StateError(
-        'Log database version $probedVersion is newer than supported '
-        'version $_databaseVersion',
-      );
-    }
-    final didMigrate = await database.writeTransaction((tx) async {
-      final result = await tx.get('PRAGMA user_version');
-      final currentVersion = result['user_version'] as int;
-      if (currentVersion == _databaseVersion) {
-        return false;
-      }
-      if (currentVersion > _databaseVersion) {
-        throw StateError(
-          'Log database version $currentVersion is newer than supported '
-          'version $_databaseVersion',
-        );
-      }
+  }
 
-      if (currentVersion < 1) {
-        await tx.execute('''
-          CREATE TABLE $_tableName(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            message TEXT NOT NULL,
-            level TEXT NOT NULL,
-            timestamp INTEGER NOT NULL,
-            logger_name TEXT NOT NULL,
-            error TEXT,
-            stack_trace TEXT,
-            process_prefix TEXT NOT NULL DEFAULT ''
-          )
-        ''');
-        await tx.execute(
-          'CREATE INDEX idx_timestamp ON $_tableName(timestamp DESC)',
-        );
-      }
-      await tx.execute('PRAGMA user_version = $_databaseVersion');
-      return true;
-    });
-    if (didMigrate) {
-      await database.refreshSchema();
-    }
+  Future<void> _onCreate(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE $_tableName(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message TEXT NOT NULL,
+        level TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        logger_name TEXT NOT NULL,
+        error TEXT,
+        stack_trace TEXT,
+        process_prefix TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_timestamp ON $_tableName(timestamp DESC)',
+    );
+  }
+
+  Future<void> _onOpen(Database db) async {
+    await db.rawQuery('PRAGMA journal_mode = WAL');
   }
 
   Future<int> insertLog(LogEntry entry) async {
     final db = await database;
-    final result = await db.execute('''
-      INSERT INTO $_tableName (
-        id, message, level, timestamp, logger_name, error, stack_trace,
-        process_prefix
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      RETURNING id
-      ''', _entryParameters(entry));
+    final id = await db.insert(_tableName, entry.toMap());
 
     await _truncateIfNeeded(db);
 
-    return result.first['id'] as int;
+    return id;
   }
 
   Future<void> insertLogs(List<LogEntry> entries) async {
     if (entries.isEmpty) return;
 
     final db = await database;
-    await db.executeBatch(
-      '''
-      INSERT INTO $_tableName (
-        id, message, level, timestamp, logger_name, error, stack_trace,
-        process_prefix
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ''',
-      [for (final entry in entries) _entryParameters(entry)],
-    );
+    final batch = db.batch();
+
+    for (final entry in entries) {
+      batch.insert(_tableName, entry.toMap());
+    }
+
+    await batch.commit(noResult: true);
     await _truncateIfNeeded(db);
   }
 
@@ -128,7 +90,7 @@ class LogDatabase {
     final db = await database;
 
     final conditions = <String>[];
-    final args = <Object?>[];
+    final args = <dynamic>[];
 
     if (filter != null) {
       if (filter.selectedLoggers.isNotEmpty) {
@@ -175,18 +137,17 @@ class LogDatabase {
       }
     }
 
-    final whereClause = conditions.isEmpty
-        ? ''
-        : 'WHERE ${conditions.join(' AND ')}';
-    final sortOrder = filter?.sortNewestFirst == false ? 'ASC' : 'DESC';
-    final results = await db.getAll(
-      '''
-      SELECT * FROM $_tableName
-      $whereClause
-      ORDER BY timestamp $sortOrder
-      LIMIT ? OFFSET ?
-      ''',
-      [...args, limit, offset],
+    final whereClause = conditions.isEmpty ? null : conditions.join(' AND ');
+
+    final results = await db.query(
+      _tableName,
+      where: whereClause,
+      whereArgs: args.isEmpty ? null : args,
+      orderBy: filter?.sortNewestFirst == false
+          ? 'timestamp ASC'
+          : 'timestamp DESC',
+      limit: limit,
+      offset: offset,
     );
 
     return results.map((map) => LogEntry.fromMap(map)).toList();
@@ -194,7 +155,7 @@ class LogDatabase {
 
   Future<List<String>> getUniqueLoggers() async {
     final db = await database;
-    final results = await db.getAll(
+    final results = await db.rawQuery(
       'SELECT DISTINCT logger_name FROM $_tableName ORDER BY logger_name',
     );
 
@@ -203,9 +164,8 @@ class LogDatabase {
 
   Future<List<String>> getUniqueProcesses() async {
     final db = await database;
-    final results = await db.getAll(
-      'SELECT DISTINCT process_prefix FROM $_tableName WHERE process_prefix != ? ORDER BY process_prefix',
-      [''],
+    final results = await db.rawQuery(
+      'SELECT DISTINCT process_prefix FROM $_tableName WHERE process_prefix != "" ORDER BY process_prefix',
     );
 
     final prefixes = results
@@ -222,14 +182,14 @@ class LogDatabase {
     final db = await database;
 
     if (filter == null || !filter.hasActiveFilters) {
-      final result = await db.getAll(
+      final result = await db.rawQuery(
         'SELECT COUNT(*) as count FROM $_tableName',
       );
       return result.first['count'] as int;
     }
 
     final conditions = <String>[];
-    final args = <Object?>[];
+    final args = <dynamic>[];
 
     if (filter.selectedLoggers.isNotEmpty) {
       final placeholders = List.filled(
@@ -277,25 +237,27 @@ class LogDatabase {
     final whereClause = conditions.join(' AND ');
     final query =
         'SELECT COUNT(*) as count FROM $_tableName WHERE $whereClause';
-    final result = await db.getAll(query, args);
+    final result = await db.rawQuery(query, args);
 
     return result.first['count'] as int;
   }
 
   Future<void> clearLogs() async {
     final db = await database;
-    await db.execute('DELETE FROM $_tableName');
+    await db.delete(_tableName);
   }
 
   Future<void> clearLogsByLogger(String loggerName) async {
     final db = await database;
-    await db.execute('DELETE FROM $_tableName WHERE logger_name = ?', [
-      loggerName,
-    ]);
+    await db.delete(
+      _tableName,
+      where: 'logger_name = ?',
+      whereArgs: [loggerName],
+    );
   }
 
-  Future<void> _truncateIfNeeded(SqliteDatabase db) async {
-    final countResult = await db.getAll(
+  Future<void> _truncateIfNeeded(Database db) async {
+    final countResult = await db.rawQuery(
       'SELECT COUNT(*) as count FROM $_tableName',
     );
     final count = countResult.first['count'] as int;
@@ -321,7 +283,7 @@ class LogDatabase {
     final db = await database;
 
     final conditions = <String>[];
-    final args = <Object?>[];
+    final args = <dynamic>[];
 
     if (filter != null) {
       if (filter.selectedLoggers.isNotEmpty) {
@@ -373,7 +335,7 @@ class LogDatabase {
         : 'WHERE ${conditions.join(' AND ')}';
 
     final totalQuery = 'SELECT COUNT(*) as total FROM $_tableName $whereClause';
-    final totalResult = await db.getAll(totalQuery, args);
+    final totalResult = await db.rawQuery(totalQuery, args);
     final totalCount = totalResult.first['total'] as int;
 
     if (totalCount == 0) return [];
@@ -383,14 +345,14 @@ class LogDatabase {
       SELECT 
         logger_name,
         COUNT(*) as count,
-        (COUNT(*) * 100.0 / ?) as percentage
+        (COUNT(*) * 100.0 / $totalCount) as percentage
       FROM $_tableName 
       $whereClause
       GROUP BY logger_name 
       ORDER BY count DESC
     ''';
 
-    final results = await db.getAll(statsQuery, [totalCount, ...args]);
+    final results = await db.rawQuery(statsQuery, args);
 
     return results
         .map(
@@ -405,7 +367,7 @@ class LogDatabase {
 
   Future<TimeRange?> getTimeRange() async {
     final db = await database;
-    final result = await db.getAll('''
+    final result = await db.rawQuery('''
       SELECT 
         MIN(timestamp) as min_timestamp,
         MAX(timestamp) as max_timestamp
@@ -428,7 +390,7 @@ class LogDatabase {
 
   Future<List<DateTime>> getLogTimestamps() async {
     final db = await database;
-    final result = await db.getAll('''
+    final result = await db.rawQuery('''
       SELECT timestamp
       FROM $_tableName
       ORDER BY timestamp ASC
@@ -442,22 +404,10 @@ class LogDatabase {
   }
 
   Future<void> close() async {
-    final databaseFuture = _databaseFuture;
-    if (databaseFuture != null) {
-      final db = await databaseFuture;
+    final db = _database;
+    if (db != null) {
       await db.close();
-      _databaseFuture = null;
+      _database = null;
     }
   }
-
-  List<Object?> _entryParameters(LogEntry entry) => [
-    entry.id,
-    entry.message,
-    entry.level,
-    entry.timestamp.millisecondsSinceEpoch,
-    entry.loggerName,
-    entry.error,
-    entry.stackTrace,
-    entry.processPrefix,
-  ];
 }
