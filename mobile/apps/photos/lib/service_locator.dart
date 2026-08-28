@@ -206,7 +206,7 @@ TrashSyncService get trashSyncService {
 
 LocationService? _locationService;
 LocationService get locationService {
-  _locationService ??= LocationService(ServiceLocator.instance.prefs);
+  _locationService ??= LocationService();
   return _locationService!;
 }
 
