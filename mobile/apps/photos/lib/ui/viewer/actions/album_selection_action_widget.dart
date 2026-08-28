@@ -71,9 +71,24 @@ class _AlbumSelectionActionWidgetState
     final hasUnpinnedAlbum = widget.selectedAlbums.albums.any(
       (album) => !album.isPinned,
     );
+    final userID = Configuration.instance.getUserID()!;
+    final isHomeSection = widget.sectionType == UISectionType.homeCollections;
+    final ownsAllSelectedAlbums = widget.selectedAlbums.albums.every(
+      (album) => album.isOwner(userID),
+    );
+    final receivesAllSelectedAlbums = widget.selectedAlbums.albums.every(
+      (album) => !album.isOwner(userID),
+    );
+    final showOwnerActions =
+        widget.sectionType == UISectionType.outgoingCollections ||
+        isHomeSection && ownsAllSelectedAlbums;
+    final showReceivedActions =
+        widget.sectionType == UISectionType.incomingCollections ||
+        isHomeSection && receivesAllSelectedAlbums;
+    final showMixedEnteActions =
+        isHomeSection && !ownsAllSelectedAlbums && !receivesAllSelectedAlbums;
 
-    if (widget.sectionType == UISectionType.homeCollections ||
-        widget.sectionType == UISectionType.outgoingCollections) {
+    if (showOwnerActions) {
       items.add(
         SelectionActionButton(
           labelText: context.strings.share,
@@ -109,6 +124,16 @@ class _AlbumSelectionActionWidgetState
           isCritical: true,
         ),
       );
+      items.add(
+        SelectionActionButton(
+          labelText: context.strings.hide,
+          hugeIcon: HugeIcons.strokeRoundedViewOffSlash,
+          onTap: _onHideOrUnHideClick,
+        ),
+      );
+    }
+
+    if (showMixedEnteActions) {
       items.add(
         SelectionActionButton(
           labelText: context.strings.hide,
@@ -160,7 +185,7 @@ class _AlbumSelectionActionWidgetState
       );
     }
 
-    if (widget.sectionType == UISectionType.incomingCollections) {
+    if (showReceivedActions) {
       if (flagService.enableShareePin) {
         final hasShareePinnedAlbum = widget.selectedAlbums.albums.any(
           (album) => album.hasShareePinned(),
@@ -434,8 +459,7 @@ class _AlbumSelectionActionWidgetState
       return;
     }
 
-    final isUnarchiving =
-        widget.sectionType == UISectionType.incomingCollections
+    final isUnarchiving = _usesShareeMetadata(collections.first)
         ? collections.first.hasShareeArchived()
         : collections.first.isArchived();
     final dialog = createProgressDialog(
@@ -446,7 +470,7 @@ class _AlbumSelectionActionWidgetState
 
     try {
       for (final collection in collections) {
-        if (widget.sectionType == UISectionType.incomingCollections) {
+        if (_usesShareeMetadata(collection)) {
           final hasShareeArchived = collection.hasShareeArchived();
           final int prevVisiblity = hasShareeArchived
               ? archiveVisibility
@@ -505,6 +529,12 @@ class _AlbumSelectionActionWidgetState
       setState(() {});
     }
     widget.selectedAlbums.clearAll();
+  }
+
+  bool _usesShareeMetadata(Collection collection) {
+    return widget.sectionType == UISectionType.incomingCollections ||
+        widget.sectionType == UISectionType.homeCollections &&
+            !collection.isOwner(Configuration.instance.getUserID()!);
   }
 
   Future<void> _leaveAlbum() async {

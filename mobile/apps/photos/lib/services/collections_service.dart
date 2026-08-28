@@ -419,6 +419,11 @@ class CollectionsService {
     Iterable<Collection> collections,
   ) async {
     final sorted = collections.toList();
+    final userID = _config.getUserID();
+    bool isPinnedForCurrentUser(Collection collection) =>
+        userID != null && !collection.isOwner(userID)
+        ? collection.hasShareePinned()
+        : collection.isPinned;
     await sortCollectionsByAlbumPreferences(sorted);
     return [
       ...sorted.where(
@@ -426,11 +431,13 @@ class CollectionsService {
       ),
       ...sorted.where(
         (collection) =>
-            collection.type != CollectionType.favorites && collection.isPinned,
+            collection.type != CollectionType.favorites &&
+            isPinnedForCurrentUser(collection),
       ),
       ...sorted.where(
         (collection) =>
-            collection.type != CollectionType.favorites && !collection.isPinned,
+            collection.type != CollectionType.favorites &&
+            !isPinnedForCurrentUser(collection),
       ),
     ];
   }
@@ -671,7 +678,7 @@ class CollectionsService {
   Future<List<Collection>> getCollectionForOnEnteSection() async {
     final bool hasFavorites = FavoritesService.instance.hasFavorites();
     return orderCollectionsForAlbums(
-      getCollectionsForUI().where(
+      getCollectionsForUI(includedShared: true).where(
         (collection) =>
             collection.type != CollectionType.uncategorized &&
             !collection.isQuickLinkCollection() &&
