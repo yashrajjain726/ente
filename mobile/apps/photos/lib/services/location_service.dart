@@ -2,6 +2,7 @@ import "dart:convert";
 import "dart:math";
 
 import "package:computer/computer.dart";
+import "package:connectivity_plus/connectivity_plus.dart";
 import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
@@ -43,12 +44,25 @@ class LocationService {
 
   rust.LocationIndex? _index;
   Future<rust.LocationIndex?>? _loading;
+  bool _indexLoadFailed = false;
+  bool _retryIndexAfterLoad = false;
   final _countryNames = <String, CountryNames>{};
 
   // TODO: lau: consider actually using this in location section
   List<BaseLocation> baseLocations = [];
 
   LocationService() {
+    Connectivity().onConnectivityChanged.listen((connections) {
+      if (!connections.any((result) => result != ConnectivityResult.none)) {
+        return;
+      }
+      if (_loading != null) {
+        _retryIndexAfterLoad = true;
+      } else if (_indexLoadFailed) {
+        _indexLoadFailed = false;
+        _loadIndex();
+      }
+    });
     Future.delayed(const Duration(seconds: 3), () {
       _loadIndex();
     });
@@ -163,6 +177,7 @@ class LocationService {
 
   Future<rust.LocationIndex?> _loadIndex() {
     if (_index != null) return Future.value(_index);
+    if (_indexLoadFailed) return Future.value(null);
     return _loading ??= _openIndex();
   }
 
@@ -181,11 +196,20 @@ class LocationService {
         );
       }
       return _index;
-    } catch (e, s) {
-      _logger.severe("Failed to load location index", e, s);
+    } catch (e) {
+      _logger.warning("Failed to load location index: $e");
       return null;
     } finally {
+      final retryAfterLoad = _retryIndexAfterLoad;
+      _retryIndexAfterLoad = false;
       _loading = null;
+      if (_index == null) {
+        if (retryAfterLoad) {
+          _loadIndex().ignore();
+        } else {
+          _indexLoadFailed = true;
+        }
+      }
     }
   }
 
