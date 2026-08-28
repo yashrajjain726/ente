@@ -351,6 +351,7 @@ Future<void> _runMinimally(
         );
       } else {
         try {
+          PersonService.init(entityService, MLDataDB.instance, prefs);
           if (await isForegroundEngineActive()) {
             _logger.info("[BG TASK] skipping ML, foreground became active");
           } else {
@@ -360,7 +361,6 @@ Future<void> _runMinimally(
                 "[BG TASK] skipping ML run, foreground became active during ML init",
               );
             } else {
-              PersonService.init(entityService, MLDataDB.instance, prefs);
               final disposition = await MLService.instance.runAllML(
                 force: false,
                 control: mlRunControl,
