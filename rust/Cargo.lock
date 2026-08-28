@@ -2749,8 +2749,11 @@ dependencies = [
 name = "ente-photos"
 version = "0.0.0"
 dependencies = [
+ "ente-assets",
+ "ente-location",
  "quick-xml",
  "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

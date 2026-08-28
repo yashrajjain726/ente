@@ -1035,6 +1035,7 @@ class SearchService {
     final Map<LocalEntity<LocationTag>, List<EnteFile>> result = {};
     final normalizedQuery = query.toLowerCase();
     if (!context.mounted) return const [];
+    final locale = Localizations.localeOf(context).toLanguageTag();
     final noLocationName = context.strings.noLocation;
     if (!context.mounted) return const [];
     final noLocationTagName = context.strings.noLocationTag;
@@ -1163,6 +1164,37 @@ class SearchService {
     final allCitiesSearch = query == '__city';
     if (allCitiesSearch) {
       query = '';
+    }
+    if (!allCitiesSearch) {
+      Map<String, List<EnteFile>> countries;
+      try {
+        countries = await locationService.getFilesInCountry(
+          filesWithLocation,
+          query,
+          locale,
+        );
+      } catch (e, s) {
+        _logger.warning("Failed to search countries", e, s);
+        countries = {};
+      }
+      final sortedCountries = countries.keys.toList()
+        ..sort((a, b) => countries[b]!.length.compareTo(countries[a]!.length));
+      for (final country in sortedCountries) {
+        if (!locationTagNames.add(country)) continue;
+        searchResults.add(
+          GenericSearchResult(
+            ResultType.location,
+            country,
+            countries[country]!,
+            hierarchicalSearchFilter: TopLevelGenericFilter(
+              filterName: country,
+              occurrence: kMostRelevantFilter,
+              filterResultType: ResultType.location,
+              matchedUploadedIDs: filesToUploadedFileIDs(countries[country]!),
+            ),
+          ),
+        );
+      }
     }
     final results = await locationService.getFilesInCity(
       filesWithLocation,
