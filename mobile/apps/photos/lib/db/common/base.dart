@@ -38,12 +38,13 @@ mixin SqlDbBase {
   Future<SqliteDatabase> openMigratedDatabase(
     String dbName,
     List<String> migrationScripts, {
+    int maxReaders = 1,
     void Function(String path)? logPath,
   }) async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, dbName);
     logPath?.call(path);
-    final database = SqliteDatabase(path: path);
+    final database = SqliteDatabase(path: path, maxReaders: maxReaders);
     try {
       await migrate(database, migrationScripts);
       return database;

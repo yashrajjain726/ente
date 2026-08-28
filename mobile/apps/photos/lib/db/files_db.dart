@@ -130,6 +130,7 @@ class FilesDB with SqlDbBase {
     () => openMigratedDatabase(
       _databaseName,
       _migrationScripts,
+      maxReaders: 5,
       logPath: (path) => _logger.info("DB path " + path),
     ),
   );

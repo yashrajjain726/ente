@@ -220,7 +220,7 @@ class ContactsDatabase {
       '$_databasePrefix$userId$_databaseSuffix',
     );
 
-    final database = SqliteDatabase(path: path);
+    final database = SqliteDatabase(path: path, maxReaders: 1);
     try {
       await _migrate(database);
       return database;
