@@ -644,17 +644,16 @@ Future<void> _sync(String caller) async {
 Future runWithLogs(
   Function() function, {
   String prefix = "",
-  bool enableSentry = true,
+  Duration? sentryInitTimeout,
 }) async {
   await SuperLogging.main(
     LogConfig(
       body: function,
       logDirPath: (await getApplicationSupportDirectory()).path + "/logs",
       maxLogFiles: 5,
-      sentryDsn: enableSentry
-          ? (kDebugMode ? sentryDebugDSN : sentryDSN)
-          : null,
-      tunnel: enableSentry ? sentryTunnel : null,
+      sentryDsn: kDebugMode ? sentryDebugDSN : sentryDSN,
+      tunnel: sentryTunnel,
+      sentryInitTimeout: sentryInitTimeout,
       enableInDebugMode: true,
       prefix: prefix,
     ),

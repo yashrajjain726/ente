@@ -88,6 +88,8 @@ class LogConfig {
 
   String? tunnel;
 
+  Duration? sentryInitTimeout;
+
   Duration sentryRetryDelay;
 
   // Null disables file logging; empty uses the default directory.
@@ -106,6 +108,7 @@ class LogConfig {
   LogConfig({
     this.sentryDsn,
     this.tunnel,
+    this.sentryInitTimeout,
     this.sentryRetryDelay = const Duration(seconds: 30),
     this.logDirPath,
     this.maxLogFiles = 10,
@@ -206,30 +209,31 @@ class SuperLogging {
     if (appConfig.body == null) return;
 
     if (enable && sentryIsEnabled) {
-      await SentryFlutter.init(
-        (options) {
-          options.dsn = appConfig!.sentryDsn;
-          options.anrEnabled = true;
-          options.anrTimeoutInterval = const Duration(seconds: 5);
-          options.httpClient = http.Client();
-          if (appConfig.tunnel != null) {
-            options.transport = TunneledTransport(
-              Uri.parse(appConfig.tunnel!),
-              options,
-            );
-          }
-          options.beforeSend = (SentryEvent event, Hint hint) async {
-            final dynamic error = event.throwable;
-            if (error != null && _shouldSkipSentry(error)) {
-              return null;
-            }
-            return event;
-          };
-        },
-        appRunner: () => kDebugMode
-            ? _runWithUnhandledErrorLogging(appConfig!.body!)
-            : appConfig!.body!(),
-      );
+      final sentryInitTimeout = appConfig.sentryInitTimeout;
+      if (sentryInitTimeout == null) {
+        await SentryFlutter.init(
+          _configureSentryOptions,
+          appRunner: () => kDebugMode
+              ? _runWithUnhandledErrorLogging(appConfig!.body!)
+              : appConfig!.body!(),
+        );
+      } else {
+        try {
+          await SentryFlutter.init(
+            _configureSentryOptions,
+          ).timeout(sentryInitTimeout);
+        } catch (e) {
+          sentryIsEnabled = false;
+          $.warning(
+            "Sentry init did not complete, running body without it: $e",
+          );
+        }
+        if (kDebugMode) {
+          await _runWithUnhandledErrorLogging(appConfig.body!);
+        } else {
+          await appConfig.body!();
+        }
+      }
     } else {
       if (kDebugMode) {
         // Keep debug-only until we're sure this doesn't cause regressions.
@@ -238,6 +242,24 @@ class SuperLogging {
         await appConfig.body!();
       }
     }
+  }
+
+  static void _configureSentryOptions(SentryFlutterOptions options) {
+    options.dsn = config.sentryDsn;
+    options.anrEnabled = true;
+    options.anrTimeoutInterval = const Duration(seconds: 5);
+    options.httpClient = http.Client();
+    final tunnel = config.tunnel;
+    if (tunnel != null) {
+      options.transport = TunneledTransport(Uri.parse(tunnel), options);
+    }
+    options.beforeSend = (SentryEvent event, Hint hint) async {
+      final dynamic error = event.throwable;
+      if (error != null && _shouldSkipSentry(error)) {
+        return null;
+      }
+      return event;
+    };
   }
 
   static Future<void> _runWithUnhandledErrorLogging(

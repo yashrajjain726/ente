@@ -42,7 +42,7 @@ void callbackDispatcher() {
         }
       },
       prefix: "[bg]",
-      enableSentry: !Platform.isAndroid,
+      sentryInitTimeout: const Duration(seconds: 5),
     ).onError((_, _) {
       failure = "Didn't finished correctly!";
       return;
