@@ -9,21 +9,13 @@ const kEngineDeathTimeoutInMicroseconds = 5000000;
 Future<bool> isForegroundEngineActive() =>
     _isEngineActive([kLastFGTaskHeartBeatTime, kLastNativeFGTaskHeartBeatTime]);
 
-Future<bool> isDartForegroundEngineActive() =>
-    _isEngineActive([kLastFGTaskHeartBeatTime]);
-
-Future<bool> isNativeForegroundActive() =>
-    _isEngineActive([kLastNativeFGTaskHeartBeatTime]);
-
 Future<bool> isBackgroundEngineActive() =>
     _isEngineActive([kLastBGTaskHeartBeatTime]);
 
 Future<bool> _isEngineActive(List<String> heartBeatKeys) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload();
-  final currentTime = DateTime.now().microsecondsSinceEpoch;
-  final lastHeartBeatTime = heartBeatKeys
-      .map((key) => prefs.getInt(key) ?? 0)
-      .reduce((latest, heartbeat) => latest > heartbeat ? latest : heartbeat);
-  return lastHeartBeatTime > (currentTime - kEngineDeathTimeoutInMicroseconds);
+  final threshold =
+      DateTime.now().microsecondsSinceEpoch - kEngineDeathTimeoutInMicroseconds;
+  return heartBeatKeys.any((key) => (prefs.getInt(key) ?? 0) > threshold);
 }

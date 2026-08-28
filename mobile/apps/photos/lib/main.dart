@@ -727,16 +727,18 @@ Future<void> _handleBackgroundPush(Object message) async {
 }
 
 Future<void> _logFGHeartBeatInfo(SharedPreferences prefs) async {
-  final bool isDartEngineActive = await isDartForegroundEngineActive();
-  final bool isNativeForeground = await isNativeForegroundActive();
   await prefs.reload();
-  final lastFGTaskHeartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
-  final String lastRun = lastFGTaskHeartBeatTime == 0
+  final threshold =
+      DateTime.now().microsecondsSinceEpoch - kEngineDeathTimeoutInMicroseconds;
+  final lastDartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
+  final lastNativeBeatTime = prefs.getInt(kLastNativeFGTaskHeartBeatTime) ?? 0;
+  String describe(int beatTime) => beatTime == 0
       ? 'never'
-      : DateTime.fromMicrosecondsSinceEpoch(lastFGTaskHeartBeatTime).toString();
+      : DateTime.fromMicrosecondsSinceEpoch(beatTime).toString();
   _logger.info(
-    'isDartForegroundEngineActive: $isDartEngineActive, '
-    'isNativeForegroundActive: $isNativeForeground, '
-    'last Dart beat: $lastRun',
+    'dartFGBeatFresh: ${lastDartBeatTime > threshold}, '
+    'nativeFGBeatFresh: ${lastNativeBeatTime > threshold}, '
+    'last Dart beat: ${describe(lastDartBeatTime)}, '
+    'last native beat: ${describe(lastNativeBeatTime)}',
   );
 }
