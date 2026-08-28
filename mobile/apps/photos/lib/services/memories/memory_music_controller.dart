@@ -11,11 +11,13 @@ enum _MemoryMusicPauseReason { appBackground, viewerAction, videoItem }
 
 class MemoryMusicController extends ChangeNotifier {
   final Map<String, MemoryMusicTrack> _assignments;
+  final List<MemoryMusicTrack> _tracks;
   final MemoryMusicPlayer _player;
   final Future<void> Function(bool isMuted) _persistMuted;
   final Logger _logger = Logger("MemoryMusicController");
   final Set<_MemoryMusicPauseReason> _pauseReasons =
       <_MemoryMusicPauseReason>{};
+  final Set<String> _unavailableTrackIDs = <String>{};
 
   Future<void>? _audioSessionInitialization;
 
@@ -30,7 +32,9 @@ class MemoryMusicController extends ChangeNotifier {
     required bool initiallyMuted,
     required Future<void> Function(bool isMuted) persistMuted,
     required MemoryMusicPlayer player,
+    required List<MemoryMusicTrack> tracks,
   }) : _assignments = assignments,
+       _tracks = tracks,
        _isMuted = initiallyMuted,
        _persistMuted = persistMuted,
        _player = player;
@@ -56,30 +60,33 @@ class MemoryMusicController extends ChangeNotifier {
       return;
     }
 
-    final track = _assignments[memoryID]!;
+    final assignedTrack = _assignments[memoryID]!;
     final generation = ++_loadGeneration;
     _status = _MemoryMusicPlaybackStatus.loading;
     await _synchronizePlayback();
     if (!_isCurrentLoad(generation)) return;
 
-    try {
-      await _ensureAudioSessionInitialized();
-      if (!_isCurrentLoad(generation)) return;
-      await _player.load(track);
-      if (!_isCurrentLoad(generation)) return;
-      await _player.setLooping();
-      if (!_isCurrentLoad(generation)) return;
-      _status = _MemoryMusicPlaybackStatus.ready;
-      await _synchronizePlayback();
-    } catch (error, stackTrace) {
-      if (!_isCurrentLoad(generation)) return;
-      _status = _MemoryMusicPlaybackStatus.idle;
-      _logger.warning(
-        "Failed to load memory music track ${track.id}",
-        error,
-        stackTrace,
-      );
+    final candidates = <MemoryMusicTrack>[
+      assignedTrack,
+      for (final track in _tracks)
+        if (track.id != assignedTrack.id) track,
+    ];
+    for (final track in candidates) {
+      if (_unavailableTrackIDs.contains(track.id)) continue;
+      try {
+        await _loadTrack(track, generation);
+        return;
+      } catch (error, stackTrace) {
+        if (!_isCurrentLoad(generation)) return;
+        _unavailableTrackIDs.add(track.id);
+        _logger.warning(
+          "Failed to load memory music track ${track.id}",
+          error,
+          stackTrace,
+        );
+      }
     }
+    _status = _MemoryMusicPlaybackStatus.idle;
   }
 
   Future<void> toggleMuted() async {
@@ -142,6 +149,17 @@ class MemoryMusicController extends ChangeNotifier {
 
   Future<void> _ensureAudioSessionInitialized() =>
       _audioSessionInitialization ??= _initializeAudioSession();
+
+  Future<void> _loadTrack(MemoryMusicTrack track, int generation) async {
+    await _ensureAudioSessionInitialized();
+    if (!_isCurrentLoad(generation)) return;
+    await _player.load(track);
+    if (!_isCurrentLoad(generation)) return;
+    await _player.setLooping();
+    if (!_isCurrentLoad(generation)) return;
+    _status = _MemoryMusicPlaybackStatus.ready;
+    await _synchronizePlayback();
+  }
 
   Future<void> _initializeAudioSession() async {
     try {

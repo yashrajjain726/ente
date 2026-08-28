@@ -6,6 +6,16 @@ import "package:photos/services/memories/memory_music_controller.dart";
 import "package:photos/services/memories/memory_music_player.dart";
 
 void main() {
+  const track1 = MemoryMusicTrack(
+    id: "track-1",
+    url: "https://example.com/track-1.mp3",
+    cacheFileName: "track-1.mp3",
+  );
+  const track2 = MemoryMusicTrack(
+    id: "track-2",
+    url: "https://example.com/track-2.mp3",
+    cacheFileName: "track-2.mp3",
+  );
   late _FakeMemoryMusicPlayer player;
   late List<bool> persistedMuteValues;
   late MemoryMusicController controller;
@@ -13,20 +23,13 @@ void main() {
   MemoryMusicController createController({bool initiallyMuted = false}) {
     return MemoryMusicController(
       assignments: const <String, MemoryMusicTrack>{
-        "memory-1": MemoryMusicTrack(
-          id: "track-1",
-          url: "https://example.com/track-1.mp3",
-          cacheFileName: "track-1.mp3",
-        ),
-        "memory-2": MemoryMusicTrack(
-          id: "track-2",
-          url: "https://example.com/track-2.mp3",
-          cacheFileName: "track-2.mp3",
-        ),
+        "memory-1": track1,
+        "memory-2": track2,
       },
       initiallyMuted: initiallyMuted,
       persistMuted: (value) async => persistedMuteValues.add(value),
       player: player,
+      tracks: const <MemoryMusicTrack>[track1, track2],
     );
   }
 
@@ -147,24 +150,31 @@ void main() {
     expect(player.playing, isTrue);
   });
 
-  test("a failed track load can be retried", () async {
-    player.failNextLoad = true;
+  test("a failed track uses another track for the session", () async {
+    player.failedTrackIDs.add("track-1");
 
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
+    await controller.activateMemory("memory-2", currentItemIsVideo: false);
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
-    expect(player.loadAttempts, 2);
+    expect(player.attemptedTracks.map((track) => track.id), <String>[
+      "track-1",
+      "track-2",
+      "track-2",
+      "track-2",
+    ]);
     expect(player.playing, isTrue);
   });
 }
 
 class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
+  final List<MemoryMusicTrack> attemptedTracks = <MemoryMusicTrack>[];
   final List<MemoryMusicTrack> loadedTracks = <MemoryMusicTrack>[];
   bool looping = false;
   bool playing = false;
   bool playedImmediately = false;
   bool pausedImmediately = false;
-  bool failNextLoad = false;
+  final Set<String> failedTrackIDs = <String>{};
   int loadAttempts = 0;
   int playAttempts = 0;
   Future<void> Function()? beforeNextLoadCompletes;
@@ -175,8 +185,8 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   @override
   Future<void> load(MemoryMusicTrack track) async {
     loadAttempts++;
-    if (failNextLoad) {
-      failNextLoad = false;
+    attemptedTracks.add(track);
+    if (failedTrackIDs.contains(track.id)) {
       throw StateError("load failed");
     }
     loadedTracks.add(track);

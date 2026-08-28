@@ -38,6 +38,7 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
       initiallyMuted: localSettings.isMemoriesAudioMuted(),
       persistMuted: localSettings.setMemoriesAudioMuted,
       player: JustAudioMemoryMusicPlayer(),
+      tracks: memoryMusicTracks,
     );
   }
 

@@ -14,11 +14,6 @@ void main() {
       url: "https://example.com/track-2.mp3",
       cacheFileName: "track-2.mp3",
     ),
-    MemoryMusicTrack(
-      id: "track-3",
-      url: "https://example.com/track-3.mp3",
-      cacheFileName: "track-3.mp3",
-    ),
   ];
   const memoryIDs = <String>["memory-a", "memory-b", "memory-c", "memory-d"];
 
@@ -32,7 +27,7 @@ void main() {
       "track-2",
       "track-1",
       "track-2",
-      "track-3",
+      "track-1",
     ]);
   });
 

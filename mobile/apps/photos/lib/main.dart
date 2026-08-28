@@ -187,7 +187,7 @@ Future<void> _runInForeground(
       unawaited(SemanticSearchService.instance.init());
       unawaited(MemoryLaneService.instance.init());
       if (flagService.internalUser) {
-        unawaited(_downloadMemoryMusicTrack());
+        unawaited(_downloadMemoryMusicTracks());
       }
       unawaited(
         Future.delayed(
@@ -200,20 +200,23 @@ Future<void> _runInForeground(
   });
 }
 
-Future<void> _downloadMemoryMusicTrack() async {
-  final track = memoryMusicTracks.single;
-  try {
-    await RemoteAssetsService.instance.getAsset(
-      track.url,
-      cacheFileName: track.cacheFileName,
-    );
-  } catch (error, stackTrace) {
-    _logger.warning(
-      "Failed to download memory music track ${track.id}",
-      error,
-      stackTrace,
-    );
-  }
+Future<void> _downloadMemoryMusicTracks() async {
+  await Future.wait(
+    memoryMusicTracks.map((track) async {
+      try {
+        await RemoteAssetsService.instance.getAsset(
+          track.url,
+          cacheFileName: track.cacheFileName,
+        );
+      } catch (error, stackTrace) {
+        _logger.warning(
+          "Failed to download memory music track ${track.id}",
+          error,
+          stackTrace,
+        );
+      }
+    }),
+  );
 }
 
 Future<void> _warmPickerFilesDb() async {
