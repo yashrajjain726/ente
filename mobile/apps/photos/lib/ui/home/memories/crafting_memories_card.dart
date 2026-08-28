@@ -5,14 +5,14 @@ import "package:hugeicons/hugeicons.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/notification_service.dart";
 import "package:photos/ui/home/memories/horts.dart";
-import "package:photos/ui/home/memories/memory_cover_widget.dart";
+import "package:photos/ui/home/memories/memory_card.dart";
 
-class CraftMemories extends StatelessWidget {
+class CraftingMemoriesCardWidget extends StatelessWidget {
   final double width;
   final double height;
   final VoidCallback? onNotificationsPermissionGranted;
 
-  const CraftMemories({
+  const CraftingMemoriesCardWidget({
     super.key,
     required this.width,
     required this.height,
@@ -24,7 +24,7 @@ class CraftMemories extends StatelessWidget {
     final l10n = context.strings;
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: MemoryCoverWidget.gap / 2.0,
+        horizontal: MemoryCardWidget.gap / 2.0,
       ),
       child: SizedBox(
         width: width,
