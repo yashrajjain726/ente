@@ -198,8 +198,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
           .getMemories()
           .then(_sortMemories)
           .then((memories) {
-            if (memories.isEmpty) {
+            if (memories.isEmpty || !memoriesCacheService.showAnyMemories) {
               _cancelPendingWarm();
+              return <SmartMemory>[];
             } else {
               _scheduleWarmCovers(memories);
             }
