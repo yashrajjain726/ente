@@ -238,6 +238,15 @@ Future<void> runBackgroundTask(
     Platform.isIOS ? kBGTaskMLSelfStopIOS : kBGTaskMLSelfStopAndroid,
     () => mlRunControl.requestStop(MlStopReason.backgroundDeadline),
   );
+  final mlForegroundWatchTimer = Timer.periodic(
+    const Duration(milliseconds: 500),
+    (_) async {
+      if (mlRunControl.stopRequested) return;
+      if (await isForegroundEngineActive()) {
+        mlRunControl.requestStop(MlStopReason.foregroundActive);
+      }
+    },
+  );
 
   try {
     final isRunningInFG = await isForegroundEngineActive();
@@ -255,6 +264,7 @@ Future<void> runBackgroundTask(
     await _runMinimally(taskId, tlog, mlRunControl);
   } finally {
     mlSelfStopTimer.cancel();
+    mlForegroundWatchTimer.cancel();
   }
 }
 
@@ -351,8 +361,8 @@ Future<void> _runMinimally(
         );
       } else {
         try {
-          await MLService.instance.init();
           PersonService.init(entityService, MLDataDB.instance, prefs);
+          await MLService.instance.init();
           final disposition = await MLService.instance.runAllML(
             force: false,
             control: mlRunControl,
@@ -631,7 +641,11 @@ Future<void> _sync(String caller) async {
   }
 }
 
-Future runWithLogs(Function() function, {String prefix = ""}) async {
+Future runWithLogs(
+  Function() function, {
+  String prefix = "",
+  Duration? sentryInitTimeout,
+}) async {
   await SuperLogging.main(
     LogConfig(
       body: function,
@@ -639,6 +653,7 @@ Future runWithLogs(Function() function, {String prefix = ""}) async {
       maxLogFiles: 5,
       sentryDsn: kDebugMode ? sentryDebugDSN : sentryDSN,
       tunnel: sentryTunnel,
+      sentryInitTimeout: sentryInitTimeout,
       enableInDebugMode: true,
       prefix: prefix,
     ),
@@ -712,11 +727,18 @@ Future<void> _handleBackgroundPush(Object message) async {
 }
 
 Future<void> _logFGHeartBeatInfo(SharedPreferences prefs) async {
-  final bool isRunningInFG = await isForegroundEngineActive();
   await prefs.reload();
-  final lastFGTaskHeartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
-  final String lastRun = lastFGTaskHeartBeatTime == 0
+  final threshold =
+      DateTime.now().microsecondsSinceEpoch - kEngineDeathTimeoutInMicroseconds;
+  final lastDartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
+  final lastNativeBeatTime = prefs.getInt(kLastNativeFGTaskHeartBeatTime) ?? 0;
+  String describe(int beatTime) => beatTime == 0
       ? 'never'
-      : DateTime.fromMicrosecondsSinceEpoch(lastFGTaskHeartBeatTime).toString();
-  _logger.info('isAlreadyRunningFG: $isRunningInFG, last Beat: $lastRun');
+      : DateTime.fromMicrosecondsSinceEpoch(beatTime).toString();
+  _logger.info(
+    'dartFGBeatFresh: ${lastDartBeatTime > threshold}, '
+    'nativeFGBeatFresh: ${lastNativeBeatTime > threshold}, '
+    'last Dart beat: ${describe(lastDartBeatTime)}, '
+    'last native beat: ${describe(lastNativeBeatTime)}',
+  );
 }

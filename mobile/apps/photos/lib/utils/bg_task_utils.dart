@@ -14,32 +14,40 @@ import "package:workmanager/workmanager.dart" as workmanager;
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   workmanager.Workmanager().executeTask((taskName, inputData) async {
+    final Stopwatch taskStopwatch = Stopwatch()..start();
     final TimeLogger tlog = TimeLogger();
     // Deferred error construction: an eagerly created Future.error with no
     // listener surfaces as an unhandled exception even on success.
     String? failure = "Task didn't run";
     final prefs = await SharedPreferences.getInstance();
 
-    await runWithLogs(() async {
-      try {
-        BgTaskUtils.$.info('Task started $tlog');
-        await runBackgroundTask(taskName, tlog).timeout(
-          Platform.isIOS ? kBGTaskTimeout : const Duration(hours: 1),
-          onTimeout: () async {
-            BgTaskUtils.$.warning(
-              "TLE, committing seppuku for taskID: $taskName",
-            );
-            await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
-          },
-        );
-        BgTaskUtils.$.info('Task run successful $tlog');
-        failure = null;
-      } catch (e) {
-        BgTaskUtils.$.warning('Task error: $e');
-        await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
-        failure = e.toString();
-      }
-    }, prefix: "[bg]").onError((_, _) {
+    await runWithLogs(
+      () async {
+        try {
+          BgTaskUtils.$.info('Task started $tlog');
+          final Duration remainingBudget = Platform.isIOS
+              ? kBGTaskTimeout - taskStopwatch.elapsed
+              : const Duration(hours: 1);
+          await runBackgroundTask(taskName, tlog).timeout(
+            remainingBudget.isNegative ? Duration.zero : remainingBudget,
+            onTimeout: () async {
+              BgTaskUtils.$.warning(
+                "TLE, committing seppuku for taskID: $taskName",
+              );
+              await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+            },
+          );
+          BgTaskUtils.$.info('Task run successful $tlog');
+          failure = null;
+        } catch (e) {
+          BgTaskUtils.$.warning('Task error: $e');
+          await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+          failure = e.toString();
+        }
+      },
+      prefix: "[bg]",
+      sentryInitTimeout: const Duration(seconds: 5),
+    ).onError((_, _) {
       failure = "Didn't finished correctly!";
       return;
     });
