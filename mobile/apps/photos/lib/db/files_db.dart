@@ -126,7 +126,7 @@ class FilesDB with SqlDbBase {
     columnAddedTime,
   ];
 
-  static final String _materializedFileProjection = _columnNames.join(", ");
+  static final String _fileRowProjection = _columnNames.join(", ");
 
   FilesDB._privateConstructor();
 
@@ -2012,7 +2012,7 @@ class FilesDB with SqlDbBase {
         ? ' AND (${order.columns.join(', ')}) ${order.comparison} '
               '(${List.filled(order.columns.length, '?').join(', ')})'
         : '';
-    return 'SELECT $_materializedFileProjection FROM $filesTable '
+    return 'SELECT $_fileRowProjection FROM $filesTable '
         'WHERE ($whereClause)$pageBoundaryClause '
         'ORDER BY ${order.orderByClause} LIMIT ?';
   }
