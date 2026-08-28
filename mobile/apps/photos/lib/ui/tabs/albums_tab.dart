@@ -1190,8 +1190,7 @@ class _LocalGalleryTrashButtonState extends State<_LocalGalleryTrashButton> {
   @override
   void initState() {
     _isTrashSupported = (() async {
-      return flagService.internalUser &&
-          Platform.isAndroid &&
+      return Platform.isAndroid &&
           !await isAndroidSDKVersionLowerThan(android11SDKINT);
     })();
     super.initState();
