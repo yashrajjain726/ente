@@ -2,6 +2,7 @@ import "dart:convert";
 import "dart:math";
 
 import "package:computer/computer.dart";
+import "package:connectivity_plus/connectivity_plus.dart";
 import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
@@ -18,6 +19,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/src/rust/api/location_api.dart" as rust;
 
 const double earthRadius = 6371; // Earth's radius in kilometers
+const _locationIndexNetworkRetryDelay = Duration(minutes: 15);
 
 class CitySearchIndex {
   final Map<EnteFile, City> assignments;
@@ -43,12 +45,20 @@ class LocationService {
 
   rust.LocationIndex? _index;
   Future<rust.LocationIndex?>? _loading;
+  DateTime? _retryLocationIndexAfter;
   final _countryNames = <String, CountryNames>{};
 
   // TODO: lau: consider actually using this in location section
   List<BaseLocation> baseLocations = [];
 
   LocationService() {
+    Connectivity().onConnectivityChanged.listen((connections) {
+      if (_retryLocationIndexAfter != null &&
+          connections.any((result) => result != ConnectivityResult.none)) {
+        _retryLocationIndexAfter = null;
+        _loadIndex();
+      }
+    });
     Future.delayed(const Duration(seconds: 3), () {
       _loadIndex();
     });
@@ -163,6 +173,9 @@ class LocationService {
 
   Future<rust.LocationIndex?> _loadIndex() {
     if (_index != null) return Future.value(_index);
+    if (_retryLocationIndexAfter?.isAfter(DateTime.now()) ?? false) {
+      return Future.value(null);
+    }
     return _loading ??= _openIndex();
   }
 
@@ -174,6 +187,7 @@ class LocationService {
       _logger.info(
         "Loaded location index in ${DateTime.now().difference(startTime).inMilliseconds}ms, reloadingDiscovery: $reloadLocationDiscoverySection",
       );
+      _retryLocationIndexAfter = null;
       if (reloadLocationDiscoverySection) {
         reloadLocationDiscoverySection = false;
         Bus.instance.fire(
@@ -181,10 +195,15 @@ class LocationService {
         );
       }
       return _index;
-    } catch (e, s) {
-      _logger.severe("Failed to load location index", e, s);
+    } catch (e) {
+      _logger.warning("Failed to load location index: $e");
       return null;
     } finally {
+      if (_index == null) {
+        _retryLocationIndexAfter = DateTime.now().add(
+          _locationIndexNetworkRetryDelay,
+        );
+      }
       _loading = null;
     }
   }
