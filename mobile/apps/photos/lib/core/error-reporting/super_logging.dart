@@ -6,10 +6,9 @@ import 'dart:io';
 import "package:dio/dio.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:log_viewer/log_viewer.dart';
 import 'package:logging/logging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart';
@@ -163,20 +162,6 @@ class SuperLogging {
     Logger.root.level = rootLoggerLevel;
     EnteWatch.setLogLevel(_terminalLoggerLevel);
     Logger.root.onRecord.listen(onLogRecord);
-
-    // Bg engines killed mid-write can wedge log_viewer.db; keep DB logging
-    // foreground-only and never let startup block on it.
-    if (_getExecutionContext() == 'foreground' &&
-        (_preferences.getBool("enable_db_logging") ?? kDebugMode)) {
-      try {
-        await LogViewer.initialize(
-          prefix: appConfig.prefix,
-        ).timeout(const Duration(seconds: 2));
-        $.info("Log viewer initialized successfully");
-      } catch (e) {
-        $.warning("Failed to initialize log viewer: $e");
-      }
-    }
 
     if (isFDroidClient) {
       assert(
@@ -552,12 +537,5 @@ class SuperLogging {
     }
     final pkgName = (await PackageInfo.fromPlatform()).packageName;
     return pkgName.startsWith("io.ente.photos.fdroid");
-  }
-
-  static void showLogViewer(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const LogViewerPage()),
-    );
   }
 }
