@@ -46,20 +46,10 @@ class IgnoredFilesDB with SqlDbBase {
   Future<void> insertMultiple(List<IgnoredFile> ignoredFiles) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    final parameterSets = <List<Object?>>[];
-    for (final file in ignoredFiles) {
-      parameterSets.add([
-        file.localID,
-        file.title,
-        file.deviceFolder,
-        file.reason,
-      ]);
-      if (parameterSets.length == 400) {
-        await _insertBatch(db, parameterSets);
-        parameterSets.clear();
-      }
-    }
-    await _insertBatch(db, parameterSets);
+    await _insertBatch(db, [
+      for (final file in ignoredFiles)
+        [file.localID, file.title, file.deviceFolder, file.reason],
+    ]);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:
@@ -84,17 +74,10 @@ class IgnoredFilesDB with SqlDbBase {
   Future<void> removeIgnoredEntries(List<IgnoredFile> ignoredFiles) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    final parameterSets = <List<Object?>>[];
-    for (final file in ignoredFiles) {
-      parameterSets.add(
+    await _deleteBatch(db, [
+      for (final file in ignoredFiles)
         Platform.isAndroid ? [file.deviceFolder, file.title] : [file.localID],
-      );
-      if (parameterSets.length == 400) {
-        await _deleteBatch(db, parameterSets);
-        parameterSets.clear();
-      }
-    }
-    await _deleteBatch(db, parameterSets);
+    ]);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:

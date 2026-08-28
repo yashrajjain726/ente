@@ -89,15 +89,9 @@ class TrashDB with SqlDbBase {
   Future<void> insertMultiple(List<EnteTrashFile> trashFiles) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    final parameterSets = <List<Object?>>[];
-    for (final trash in trashFiles) {
-      parameterSets.add(_getParametersForTrash(trash));
-      if (parameterSets.length == 400) {
-        await _insertBatch(db, parameterSets);
-        parameterSets.clear();
-      }
-    }
-    await _insertBatch(db, parameterSets);
+    await _insertBatch(db, [
+      for (final trash in trashFiles) _getParametersForTrash(trash),
+    ]);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:

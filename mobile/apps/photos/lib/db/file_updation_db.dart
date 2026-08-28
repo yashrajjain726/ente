@@ -57,15 +57,9 @@ class FileUpdationDB with SqlDbBase {
   Future<void> insertMultiple(List<String> fileLocalIDs, String reason) async {
     final startTime = DateTime.now();
     final db = await instance.database;
-    final parameterSets = <List<Object?>>[];
-    for (final localID in fileLocalIDs) {
-      parameterSets.add([localID, reason]);
-      if (parameterSets.length == 400) {
-        await _insertBatch(db, parameterSets);
-        parameterSets.clear();
-      }
-    }
-    await _insertBatch(db, parameterSets);
+    await _insertBatch(db, [
+      for (final localID in fileLocalIDs) [localID, reason],
+    ]);
     final endTime = DateTime.now();
     final duration = Duration(
       microseconds:

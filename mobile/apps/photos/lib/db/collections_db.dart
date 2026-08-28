@@ -188,15 +188,10 @@ class CollectionsDB with SqlDbBase {
 
   Future<void> insert(List<Collection> collections) async {
     final db = await instance.database;
-    final parameterSets = <List<Object?>>[];
-    for (final collection in collections) {
-      parameterSets.add(_getParametersForCollection(collection));
-      if (parameterSets.length == 400) {
-        await _insertBatch(db, parameterSets);
-        parameterSets.clear();
-      }
-    }
-    await _insertBatch(db, parameterSets);
+    await _insertBatch(db, [
+      for (final collection in collections)
+        _getParametersForCollection(collection),
+    ]);
   }
 
   Future<List<Collection>> getAllCollections() async {
