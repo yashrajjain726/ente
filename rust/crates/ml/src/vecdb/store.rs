@@ -9,7 +9,7 @@ use super::graph::{Graph, search as graph_search};
 use super::lock::lock_exclusive;
 use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, remove_if_present, remove_stale_temp_sibling,
-    rename_with_windows_fallback, sync_parent_dir,
+    sync_parent_dir,
 };
 use super::snapshot::{load_snapshot, remove_snapshot, snapshot_path, write_snapshot};
 use super::{Match, SearchParams, VecDbError};
@@ -266,6 +266,7 @@ impl VecDb {
 
     pub fn reset(&mut self) -> Result<(), VecDbError> {
         let old_state = self.take_writer_state()?;
+        let old_generation = old_state.log.generation();
         drop(old_state);
         let dims = self.arena.dims();
         let recreated = remove_index_files(&self.path)
@@ -274,7 +275,7 @@ impl VecDb {
         let log = match recreated {
             Ok(log) => log,
             Err(error) => {
-                let _ = self.restore_writer_mode(dims, None);
+                self.recover_after_failed_reset(dims, old_generation);
                 return Err(error);
             }
         };
@@ -372,6 +373,20 @@ impl VecDb {
                 self.mode = Mode::ReadOnly { log_bytes };
                 Err(error)
             }
+        }
+    }
+
+    fn recover_after_failed_reset(&mut self, dims: usize, old_generation: [u8; 16]) {
+        let old_log_restored = self.restore_writer_mode(dims, None).is_ok()
+            && matches!(&self.mode, Mode::Writer(state) if state.log.generation() == old_generation);
+        if old_log_restored {
+            return;
+        }
+        if let Ok(empty) = VectorArena::new(dims) {
+            self.arena = empty;
+            self.graph = Graph::new();
+            self.total_records = 0;
+            self.compaction_retry_at_dead = 0;
         }
     }
 
@@ -591,7 +606,7 @@ fn open_path_locked(path: &Path, dims: usize) -> Result<Log, VecDbError> {
 }
 
 fn promote_compacted_log(temp_path: &Path, path: &Path) -> Result<(), VecDbError> {
-    rename_with_windows_fallback(temp_path, path)?;
+    std::fs::rename(temp_path, path).map_err(|source| VecDbError::io(temp_path, source))?;
     sync_parent_dir(path)
 }
 
@@ -1659,6 +1674,76 @@ mod tests {
         let reopened = open_writer(&path);
         assert_eq!(reopened.len(), 1);
         assert!(reopened.contains("again"));
+        assert!(!reopened.contains("key-0"));
+    }
+
+    #[test]
+    fn failed_reset_with_the_log_gone_becomes_an_accurate_empty_instance() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 5, 310)).unwrap();
+        fs::create_dir(snapshot_path(&path)).unwrap();
+        assert!(matches!(db.reset(), Err(VecDbError::Io { .. })));
+        assert!(!path.exists());
+        assert!(db.is_empty());
+        assert_eq!(db.len(), 0);
+        assert!(!db.contains("key-0"));
+        assert_eq!(db.stats().log_bytes, 0);
+        let vector = seeded_unit_vector(1, DIMS);
+        assert!(matches!(db.add("x", &vector), Err(VecDbError::ReadOnly)));
+        assert!(db.search(&vector, &limit_params(3)).unwrap().is_empty());
+        drop(db);
+        fs::remove_dir(snapshot_path(&path)).unwrap();
+        let reopened = open_writer(&path);
+        assert!(reopened.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_reset_that_cannot_remove_the_log_keeps_the_writer_and_data() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 5, 320)).unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
+        let outcome = db.reset();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+        let Err(VecDbError::Io { .. }) = outcome else {
+            return;
+        };
+        assert_eq!(db.len(), 5);
+        assert!(db.contains("key-0"));
+        db.add("after", &seeded_unit_vector(6, DIMS)).unwrap();
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 6);
+        assert!(reopened.contains("key-4"));
+        assert!(reopened.contains("after"));
+    }
+
+    #[test]
+    fn reset_recovery_over_a_recreated_log_clears_memory_to_match_disk() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 5, 330)).unwrap();
+        let old_generation = generation_of(&path);
+        drop(db.take_writer_state().unwrap());
+        remove_index_files(&path).unwrap();
+        drop(Log::create(&path, DIMS).unwrap().into_file());
+        db.recover_after_failed_reset(DIMS, old_generation);
+        assert!(db.is_empty());
+        assert!(!db.contains("key-0"));
+        assert_eq!(db.stats().log_bytes, 32);
+        db.add("fresh", &seeded_unit_vector(7, DIMS)).unwrap();
+        assert_eq!(db.len(), 1);
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 1);
+        assert!(reopened.contains("fresh"));
         assert!(!reopened.contains("key-0"));
     }
 
