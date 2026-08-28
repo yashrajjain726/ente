@@ -677,6 +677,12 @@ class CollectionsService {
 
   Future<List<Collection>> getCollectionForOnEnteSection() async {
     final bool hasFavorites = FavoritesService.instance.hasFavorites();
+    final int? userID = _config.getUserID();
+    bool isEmptyOwnedFavorites(Collection collection) =>
+        collection.type == CollectionType.favorites &&
+        userID != null &&
+        collection.isOwner(userID) &&
+        !hasFavorites;
     return orderCollectionsForAlbums(
       getCollectionsForUI(includedShared: true).where(
         (collection) =>
@@ -684,7 +690,7 @@ class CollectionsService {
             !collection.isQuickLinkCollection() &&
             !collection.isHidden() &&
             !collection.isArchived() &&
-            (collection.type != CollectionType.favorites || hasFavorites),
+            !isEmptyOwnedFavorites(collection),
       ),
     );
   }
