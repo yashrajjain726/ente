@@ -238,6 +238,14 @@ Future<void> runBackgroundTask(
     Platform.isIOS ? kBGTaskMLSelfStopIOS : kBGTaskMLSelfStopAndroid,
     () => mlRunControl.requestStop(MlStopReason.backgroundDeadline),
   );
+  final mlForegroundWatchTimer = Timer.periodic(const Duration(seconds: 1), (
+    _,
+  ) async {
+    if (mlRunControl.stopRequested) return;
+    if (await isForegroundEngineActive()) {
+      mlRunControl.requestStop(MlStopReason.foregroundActive);
+    }
+  });
 
   try {
     final isRunningInFG = await isForegroundEngineActive();
@@ -255,6 +263,7 @@ Future<void> runBackgroundTask(
     await _runMinimally(taskId, tlog, mlRunControl);
   } finally {
     mlSelfStopTimer.cancel();
+    mlForegroundWatchTimer.cancel();
   }
 }
 
@@ -352,22 +361,12 @@ Future<void> _runMinimally(
       } else {
         try {
           PersonService.init(entityService, MLDataDB.instance, prefs);
-          if (await isForegroundEngineActive()) {
-            _logger.info("[BG TASK] skipping ML, foreground became active");
-          } else {
-            await MLService.instance.init();
-            if (await isForegroundEngineActive()) {
-              _logger.info(
-                "[BG TASK] skipping ML run, foreground became active during ML init",
-              );
-            } else {
-              final disposition = await MLService.instance.runAllML(
-                force: false,
-                control: mlRunControl,
-              );
-              _logger.info("[BG TASK] ML run disposition: ${disposition.name}");
-            }
-          }
+          await MLService.instance.init();
+          final disposition = await MLService.instance.runAllML(
+            force: false,
+            control: mlRunControl,
+          );
+          _logger.info("[BG TASK] ML run disposition: ${disposition.name}");
         } finally {
           controller.releaseCompute(ml: true);
         }
