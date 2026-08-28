@@ -7,12 +7,12 @@ import "package:photos/services/notification_service.dart";
 import "package:photos/ui/home/memories/horts.dart";
 import "package:photos/ui/home/memories/memory_card.dart";
 
-class CraftMemoriesCardWidget extends StatelessWidget {
+class CraftingMemoriesCardWidget extends StatelessWidget {
   final double width;
   final double height;
   final VoidCallback? onNotificationsPermissionGranted;
 
-  const CraftMemoriesCardWidget({
+  const CraftingMemoriesCardWidget({
     super.key,
     required this.width,
     required this.height,

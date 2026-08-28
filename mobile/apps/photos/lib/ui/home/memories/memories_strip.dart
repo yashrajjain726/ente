@@ -34,12 +34,12 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   int _warmGeneration = 0;
   String? _lastWarmSignature;
   final _videoPrefetcher = MemoryVideoPrefetcher();
-  late Future<bool> _showCraftMemories;
+  late Future<bool> _showCraftingMemories;
 
   @override
   void initState() {
     super.initState();
-    _refreshShowCraftMemories();
+    _refreshShowCraftingMemories();
     _memoriesSettingSubscription = Bus.instance
         .on<MemoriesSettingChanged>()
         .listen((event) {
@@ -63,11 +63,11 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     });
   }
 
-  void _refreshShowCraftMemories() {
-    _showCraftMemories = _getShowCraftMemories();
+  void _refreshShowCraftingMemories() {
+    _showCraftingMemories = _getShowCraftingMemories();
   }
 
-  Future<bool> _getShowCraftMemories() async {
+  Future<bool> _getShowCraftingMemories() async {
     final hasPermissions = await NotificationService.instance
         .hasGrantedPermissions();
     if (hasPermissions) return false;
@@ -218,9 +218,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
 
   Widget _buildMemories(List<SmartMemory> memories) {
     return FutureBuilder<bool>(
-      future: _showCraftMemories,
+      future: _showCraftingMemories,
       builder: (context, snapshot) {
-        final showCraftMemories = snapshot.data ?? false;
+        final showCraftingMemories = snapshot.data ?? false;
         return SizedBox(
           height: _memoryheight + MemoryCardWidget.outerStrokeWidth * 2,
           child: ListView.builder(
@@ -231,21 +231,21 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
               parent: BouncingScrollPhysics(),
             ),
             scrollDirection: Axis.horizontal,
-            itemCount: (showCraftMemories ? 1 : 0) + memories.length,
+            itemCount: (showCraftingMemories ? 1 : 0) + memories.length,
             itemBuilder: (context, itemIndex) {
-              if (showCraftMemories && itemIndex == 0) {
-                return CraftMemoriesCardWidget(
+              if (showCraftingMemories && itemIndex == 0) {
+                return CraftingMemoriesCardWidget(
                   width: _memoryheight * 0.5,
                   height: _memoryheight,
                   onNotificationsPermissionGranted: () {
                     if (!mounted) return;
                     setState(() {
-                      _refreshShowCraftMemories();
+                      _refreshShowCraftingMemories();
                     });
                   },
                 );
               }
-              final memoryIndex = itemIndex - (showCraftMemories ? 1 : 0);
+              final memoryIndex = itemIndex - (showCraftingMemories ? 1 : 0);
               return MemoryCardWidget(
                 smartMemory: memories[memoryIndex],
                 allMemories: memories,
