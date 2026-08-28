@@ -19,7 +19,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/src/rust/api/location_api.dart" as rust;
 
 const double earthRadius = 6371; // Earth's radius in kilometers
-const _locationIndexNetworkRetryDelay = Duration(minutes: 15);
 
 class CitySearchIndex {
   final Map<EnteFile, City> assignments;
@@ -45,7 +44,8 @@ class LocationService {
 
   rust.LocationIndex? _index;
   Future<rust.LocationIndex?>? _loading;
-  DateTime? _retryLocationIndexAfter;
+  bool _indexLoadFailed = false;
+  bool _retryIndexAfterLoad = false;
   final _countryNames = <String, CountryNames>{};
 
   // TODO: lau: consider actually using this in location section
@@ -53,9 +53,13 @@ class LocationService {
 
   LocationService() {
     Connectivity().onConnectivityChanged.listen((connections) {
-      if (_retryLocationIndexAfter != null &&
-          connections.any((result) => result != ConnectivityResult.none)) {
-        _retryLocationIndexAfter = null;
+      if (!connections.any((result) => result != ConnectivityResult.none)) {
+        return;
+      }
+      if (_loading != null) {
+        _retryIndexAfterLoad = true;
+      } else if (_indexLoadFailed) {
+        _indexLoadFailed = false;
         _loadIndex();
       }
     });
@@ -173,9 +177,7 @@ class LocationService {
 
   Future<rust.LocationIndex?> _loadIndex() {
     if (_index != null) return Future.value(_index);
-    if (_retryLocationIndexAfter?.isAfter(DateTime.now()) ?? false) {
-      return Future.value(null);
-    }
+    if (_indexLoadFailed) return Future.value(null);
     return _loading ??= _openIndex();
   }
 
@@ -187,7 +189,6 @@ class LocationService {
       _logger.info(
         "Loaded location index in ${DateTime.now().difference(startTime).inMilliseconds}ms, reloadingDiscovery: $reloadLocationDiscoverySection",
       );
-      _retryLocationIndexAfter = null;
       if (reloadLocationDiscoverySection) {
         reloadLocationDiscoverySection = false;
         Bus.instance.fire(
@@ -199,12 +200,16 @@ class LocationService {
       _logger.warning("Failed to load location index: $e");
       return null;
     } finally {
-      if (_index == null) {
-        _retryLocationIndexAfter = DateTime.now().add(
-          _locationIndexNetworkRetryDelay,
-        );
-      }
+      final retryAfterLoad = _retryIndexAfterLoad;
+      _retryIndexAfterLoad = false;
       _loading = null;
+      if (_index == null) {
+        if (retryAfterLoad) {
+          _loadIndex().ignore();
+        } else {
+          _indexLoadFailed = true;
+        }
+      }
     }
   }
 
