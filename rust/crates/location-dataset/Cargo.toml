@@ -1,0 +1,11 @@
+[package]
+name = "ente-location-dataset"
+edition = "2024"
+publish = false
+
+[dependencies]
+ente-location.workspace = true
+reqwest = { workspace = true, features = ["blocking", "rustls-tls-webpki-roots"] }
+sha2.workspace = true
+thiserror.workspace = true
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
