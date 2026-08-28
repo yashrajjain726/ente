@@ -14,6 +14,7 @@ import "package:workmanager/workmanager.dart" as workmanager;
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   workmanager.Workmanager().executeTask((taskName, inputData) async {
+    final DateTime taskStartedAt = DateTime.now();
     final TimeLogger tlog = TimeLogger();
     // Deferred error construction: an eagerly created Future.error with no
     // listener surfaces as an unhandled exception even on success.
@@ -24,8 +25,11 @@ void callbackDispatcher() {
       () async {
         try {
           BgTaskUtils.$.info('Task started $tlog');
+          final Duration remainingBudget = Platform.isIOS
+              ? kBGTaskTimeout - DateTime.now().difference(taskStartedAt)
+              : const Duration(hours: 1);
           await runBackgroundTask(taskName, tlog).timeout(
-            Platform.isIOS ? kBGTaskTimeout : const Duration(hours: 1),
+            remainingBudget.isNegative ? Duration.zero : remainingBudget,
             onTimeout: () async {
               BgTaskUtils.$.warning(
                 "TLE, committing seppuku for taskID: $taskName",
