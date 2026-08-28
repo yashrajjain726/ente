@@ -117,23 +117,16 @@ func (repo *UserAuthRepository) InsertSRPAuth(ctx context.Context, userID int64,
 }
 
 func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Context, userID int64, updateKeyAttr ente.UpdateKeysRequest, setup *ente.SRPSetupEntity) error {
-	isSRPSetupDone, err := repo.IsSRPSetupDone(ctx, userID)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	if !isSRPSetupDone {
-		_, err = tx.ExecContext(ctx, `
-	INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, $2 , $3, $4)`,
-			userID, setup.SRPUserID, setup.Salt, setup.Verifier)
-	} else {
-		_, err = tx.ExecContext(ctx, `UPDATE srp_auth SET srp_user_id = $1, salt = $2, verifier = $3 WHERE user_id = $4`,
-			setup.SRPUserID, setup.Salt, setup.Verifier, userID)
-	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, $2, $3, $4)
+		ON CONFLICT (user_id) DO UPDATE SET
+			srp_user_id = EXCLUDED.srp_user_id, salt = EXCLUDED.salt, verifier = EXCLUDED.verifier`,
+		userID, setup.SRPUserID, setup.Salt, setup.Verifier)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
