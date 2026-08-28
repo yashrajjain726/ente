@@ -572,8 +572,6 @@ class _AlbumSelectionActionWidgetState
           context: context,
           error: actionResult.exception,
         );
-      } else if (actionResult.action == ButtonAction.first) {
-        Navigator.of(context).pop();
       }
     }
   }
