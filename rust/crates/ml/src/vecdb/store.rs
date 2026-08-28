@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
 use super::graph::{Graph, search as graph_search};
-use super::lock::lock_exclusive;
+use super::lock::{WriterLock, lock_path};
 use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, remove_if_present, remove_stale_temp_sibling,
     sync_parent_dir,
@@ -50,6 +50,7 @@ enum Mode {
 }
 
 struct WriterState {
+    lock: WriterLock,
     log: Log,
     mutations_since_snapshot: usize,
     last_write: Option<Instant>,
@@ -57,18 +58,14 @@ struct WriterState {
 
 impl VecDb {
     pub fn open(path: &Path, dims: usize) -> Result<Self, VecDbError> {
-        let file = match Log::create(path, dims) {
-            Ok(created) => created.into_file(),
+        let lock = WriterLock::acquire(path)?;
+        let mut log = match Log::create(path, dims) {
+            Ok(created) => created,
             Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
-                File::options()
-                    .read(true)
-                    .write(true)
-                    .open(path)
-                    .map_err(|source| VecDbError::io(path, source))?
+                reopen_log(path, dims)?
             }
             Err(error) => return Err(error),
         };
-        let mut log = open_locked(file, path, dims)?;
         remove_stale_temp_sibling(path)?;
         let snapshot_present = std::fs::metadata(snapshot_path(path)).is_ok();
         let replayed = replay(&mut log, dims)?;
@@ -92,6 +89,7 @@ impl VecDb {
             total_records: replayed.total_records,
             compaction_retry_at_dead: 0,
             mode: Mode::Writer(WriterState {
+                lock,
                 log,
                 mutations_since_snapshot: 0,
                 last_write: None,
@@ -265,17 +263,15 @@ impl VecDb {
     }
 
     pub fn reset(&mut self) -> Result<(), VecDbError> {
-        let old_state = self.take_writer_state()?;
-        let old_generation = old_state.log.generation();
-        drop(old_state);
+        let WriterState { lock, log, .. } = self.take_writer_state()?;
+        let old_generation = log.generation();
+        drop(log);
         let dims = self.arena.dims();
-        let recreated = remove_index_files(&self.path)
-            .and_then(|()| Log::create(&self.path, dims))
-            .and_then(|created| open_locked(created.into_file(), &self.path, dims));
+        let recreated = remove_data_files(&self.path).and_then(|()| Log::create(&self.path, dims));
         let log = match recreated {
             Ok(log) => log,
             Err(error) => {
-                self.recover_after_failed_reset(dims, old_generation);
+                self.recover_after_failed_reset(lock, dims, old_generation);
                 return Err(error);
             }
         };
@@ -284,6 +280,7 @@ impl VecDb {
         self.total_records = 0;
         self.compaction_retry_at_dead = 0;
         self.mode = Mode::Writer(WriterState {
+            lock,
             log,
             mutations_since_snapshot: 0,
             last_write: None,
@@ -295,8 +292,11 @@ impl VecDb {
         let Mode::Writer(state) = self.mode else {
             return Err(VecDbError::ReadOnly);
         };
-        drop(state);
-        remove_index_files(&self.path)
+        let WriterState { lock, log, .. } = state;
+        drop(log);
+        let removed = remove_index_files(&self.path);
+        drop(lock);
+        removed
     }
 
     pub fn stats(&self) -> Stats {
@@ -350,12 +350,14 @@ impl VecDb {
 
     fn restore_writer_mode(
         &mut self,
+        lock: WriterLock,
         dims: usize,
         last_write: Option<Instant>,
     ) -> Result<(), VecDbError> {
-        match open_path_locked(&self.path, dims) {
+        match reopen_log(&self.path, dims) {
             Ok(log) => {
                 self.mode = Mode::Writer(WriterState {
+                    lock,
                     log,
                     mutations_since_snapshot: 0,
                     last_write,
@@ -376,8 +378,13 @@ impl VecDb {
         }
     }
 
-    fn recover_after_failed_reset(&mut self, dims: usize, old_generation: [u8; 16]) {
-        let old_log_restored = self.restore_writer_mode(dims, None).is_ok()
+    fn recover_after_failed_reset(
+        &mut self,
+        lock: WriterLock,
+        dims: usize,
+        old_generation: [u8; 16],
+    ) {
+        let old_log_restored = self.restore_writer_mode(lock, dims, None).is_ok()
             && matches!(&self.mode, Mode::Writer(state) if state.log.generation() == old_generation);
         if old_log_restored {
             return;
@@ -457,7 +464,13 @@ impl VecDb {
             return Err(VecDbError::io(&temp_path, source));
         }
         drop(temp_file);
-        let last_write = self.take_writer_state()?.last_write;
+        let WriterState {
+            lock,
+            log,
+            last_write,
+            ..
+        } = self.take_writer_state()?;
+        drop(log);
         let promoted = promote_compacted_log(&temp_path, &self.path);
         if temp_path.exists() {
             let _ = std::fs::remove_file(&temp_path);
@@ -466,7 +479,7 @@ impl VecDb {
             self.graph = Graph::rebuild(&self.arena);
             self.total_records = self.arena.live_count() as u64;
         }
-        let restored = self.restore_writer_mode(dims, last_write);
+        let restored = self.restore_writer_mode(lock, dims, last_write);
         promoted?;
         restored?;
         self.write_snapshot_now()
@@ -591,18 +604,13 @@ fn ensure_finite(key: &str, vector: &[f32]) -> Result<(), VecDbError> {
     Ok(())
 }
 
-fn open_locked(file: File, path: &Path, dims: usize) -> Result<Log, VecDbError> {
-    lock_exclusive(&file, path)?;
-    Log::open(file, path, dims)
-}
-
-fn open_path_locked(path: &Path, dims: usize) -> Result<Log, VecDbError> {
+fn reopen_log(path: &Path, dims: usize) -> Result<Log, VecDbError> {
     let file = File::options()
         .read(true)
         .write(true)
         .open(path)
         .map_err(|source| VecDbError::io(path, source))?;
-    open_locked(file, path, dims)
+    Log::open(file, path, dims)
 }
 
 fn promote_compacted_log(temp_path: &Path, path: &Path) -> Result<(), VecDbError> {
@@ -611,6 +619,11 @@ fn promote_compacted_log(temp_path: &Path, path: &Path) -> Result<(), VecDbError
 }
 
 fn remove_index_files(path: &Path) -> Result<(), VecDbError> {
+    remove_data_files(path)?;
+    remove_if_present(&lock_path(path))
+}
+
+fn remove_data_files(path: &Path) -> Result<(), VecDbError> {
     remove_if_present(path)?;
     remove_snapshot(path)?;
     remove_stale_temp_sibling(path)
@@ -1082,6 +1095,46 @@ mod tests {
     }
 
     #[test]
+    fn writer_stays_locked_across_a_completed_compaction() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let mut db = open_writer(&path);
+        db.bulk_add(&bulk_entries(0, 120, 340)).unwrap();
+        let generation_before = generation_of(&path);
+        let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
+        assert_ne!(generation_of(&path), generation_before);
+        assert_eq!(db.stats().dead_count, 0);
+        let Err(error) = VecDb::open(&path, DIMS) else {
+            panic!("second writer must not open after compaction");
+        };
+        assert!(matches!(error, VecDbError::Locked(locked) if locked == path));
+        db.add("post", &seeded_unit_vector(7, DIMS)).unwrap();
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 57);
+        assert!(reopened.contains("post"));
+        assert!(!reopened.contains("key-0"));
+    }
+
+    #[test]
+    fn stale_lock_file_with_garbage_bytes_is_reused_at_open() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        fs::write(lock_path(&path), [0xAB; 24]).unwrap();
+        let mut db = open_writer(&path);
+        db.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
+        let Err(error) = VecDb::open(&path, DIMS) else {
+            panic!("second writer must not open");
+        };
+        assert!(matches!(error, VecDbError::Locked(locked) if locked == path));
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 1);
+        assert!(reopened.contains("fresh"));
+    }
+
+    #[test]
     fn read_only_opens_alongside_a_writer() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -1121,6 +1174,7 @@ mod tests {
         );
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
+        assert!(!lock_path(&path).exists());
     }
 
     #[test]
@@ -1509,6 +1563,7 @@ mod tests {
         assert_eq!(db.stats().log_bytes, 0);
         assert_eq!(fs::read(&path).unwrap(), partial);
         assert!(!snapshot_exists(&path));
+        assert!(!lock_path(&path).exists());
     }
 
     #[test]
@@ -1524,7 +1579,7 @@ mod tests {
         assert!(!temp.exists());
         assert_eq!(generation_of(&path), new_generation);
         assert_ne!(generation_of(&path), old_generation);
-        let log = open_path_locked(&path, DIMS).unwrap();
+        let log = reopen_log(&path, DIMS).unwrap();
         assert_eq!(log.generation(), new_generation);
         drop(log);
         assert!(matches!(
@@ -1535,14 +1590,19 @@ mod tests {
     }
 
     #[test]
-    fn restore_writer_mode_relocks_and_reenables_writes() {
+    fn restore_writer_mode_reinstalls_the_kept_lock_and_reenables_writes() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let mut db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 260)).unwrap();
-        drop(db.take_writer_state().unwrap());
+        let WriterState { lock, log, .. } = db.take_writer_state().unwrap();
+        drop(log);
         assert!(matches!(db.mode, Mode::ReadOnly { .. }));
-        db.restore_writer_mode(DIMS, None).unwrap();
+        assert!(matches!(
+            VecDb::open(&path, DIMS),
+            Err(VecDbError::Locked(_))
+        ));
+        db.restore_writer_mode(lock, DIMS, None).unwrap();
         db.add("after", &seeded_unit_vector(4, DIMS)).unwrap();
         assert!(matches!(
             VecDb::open(&path, DIMS),
@@ -1561,12 +1621,13 @@ mod tests {
         let path = dir.path().join("db");
         let mut db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 3, 270)).unwrap();
-        drop(db.take_writer_state().unwrap());
+        let WriterState { lock, log, .. } = db.take_writer_state().unwrap();
+        drop(log);
         let mut bytes = fs::read(&path).unwrap();
         bytes[20] ^= 0x5A;
         fs::write(&path, &bytes).unwrap();
         assert!(matches!(
-            db.restore_writer_mode(DIMS, None),
+            db.restore_writer_mode(lock, DIMS, None),
             Err(VecDbError::Corrupt(_))
         ));
         assert!(matches!(db.mode, Mode::ReadOnly { log_bytes } if log_bytes == bytes.len() as u64));
@@ -1731,10 +1792,11 @@ mod tests {
         let mut db = open_writer(&path);
         db.bulk_add(&bulk_entries(0, 5, 330)).unwrap();
         let old_generation = generation_of(&path);
-        drop(db.take_writer_state().unwrap());
-        remove_index_files(&path).unwrap();
+        let WriterState { lock, log, .. } = db.take_writer_state().unwrap();
+        drop(log);
+        remove_data_files(&path).unwrap();
         drop(Log::create(&path, DIMS).unwrap().into_file());
-        db.recover_after_failed_reset(DIMS, old_generation);
+        db.recover_after_failed_reset(lock, DIMS, old_generation);
         assert!(db.is_empty());
         assert!(!db.contains("key-0"));
         assert_eq!(db.stats().log_bytes, 32);
@@ -1757,10 +1819,12 @@ mod tests {
         fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
         assert!(path.exists());
         assert!(snapshot_exists(&path));
+        assert!(lock_path(&path).exists());
         db.delete().unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
         assert!(!temp_sibling(&path).exists());
+        assert!(!lock_path(&path).exists());
     }
 
     #[test]

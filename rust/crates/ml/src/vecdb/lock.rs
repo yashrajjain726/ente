@@ -1,132 +1,136 @@
-use std::fs::File;
-use std::path::Path;
+use std::fs::{File, TryLockError};
+use std::path::{Path, PathBuf};
 
 use super::VecDbError;
 
-pub(crate) fn lock_exclusive(file: &File, path: &Path) -> Result<(), VecDbError> {
-    if try_lock(file) {
-        return Ok(());
+const ACQUIRE_ATTEMPTS: usize = 8;
+
+#[derive(Debug)]
+pub(crate) struct WriterLock {
+    _file: File,
+}
+
+impl WriterLock {
+    pub(crate) fn acquire(log_path: &Path) -> Result<Self, VecDbError> {
+        let sidecar = lock_path(log_path);
+        for _ in 0..ACQUIRE_ATTEMPTS {
+            let file = open_sidecar(&sidecar)?;
+            match file.try_lock() {
+                Ok(()) => {
+                    if lock_is_on_the_linked_sidecar(&file, &sidecar)? {
+                        return Ok(Self { _file: file });
+                    }
+                }
+                Err(TryLockError::WouldBlock) => {
+                    return Err(VecDbError::Locked(log_path.to_path_buf()));
+                }
+                Err(TryLockError::Error(source)) => return Err(VecDbError::io(&sidecar, source)),
+            }
+        }
+        Err(VecDbError::Locked(log_path.to_path_buf()))
     }
-    let error = std::io::Error::last_os_error();
-    if error.raw_os_error() == Some(WOULD_BLOCK_CODE) {
-        return Err(VecDbError::Locked(path.to_path_buf()));
-    }
-    Err(VecDbError::Io {
-        path: path.to_path_buf(),
-        source: error,
-    })
+}
+
+pub(crate) fn lock_path(log_path: &Path) -> PathBuf {
+    let mut extended = log_path.as_os_str().to_os_string();
+    extended.push(".lock");
+    PathBuf::from(extended)
+}
+
+fn open_sidecar(sidecar: &Path) -> Result<File, VecDbError> {
+    File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(sidecar)
+        .map_err(|source| VecDbError::io(sidecar, source))
 }
 
 #[cfg(unix)]
-const WOULD_BLOCK_CODE: i32 = libc::EWOULDBLOCK;
+fn lock_is_on_the_linked_sidecar(file: &File, sidecar: &Path) -> Result<bool, VecDbError> {
+    use std::io::ErrorKind;
+    use std::os::unix::fs::MetadataExt;
 
-#[cfg(unix)]
-fn try_lock(file: &File) -> bool {
-    use std::os::fd::AsRawFd;
-
-    unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) == 0 }
+    let held = file
+        .metadata()
+        .map_err(|source| VecDbError::io(sidecar, source))?;
+    match std::fs::metadata(sidecar) {
+        Ok(linked) => Ok(linked.dev() == held.dev() && linked.ino() == held.ino()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(VecDbError::io(sidecar, source)),
+    }
 }
 
-#[cfg(windows)]
-const WOULD_BLOCK_CODE: i32 = windows_sys::Win32::Foundation::ERROR_LOCK_VIOLATION as i32;
-
-#[cfg(windows)]
-const LOCK_BYTE_OFFSET: u64 = u64::MAX - 1;
-
-#[cfg(windows)]
-fn try_lock(file: &File) -> bool {
-    use std::os::windows::io::AsRawHandle;
-
-    use windows_sys::Win32::Storage::FileSystem::{
-        LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY, LockFileEx,
-    };
-    use windows_sys::Win32::System::IO::OVERLAPPED;
-
-    let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
-    overlapped.Anonymous.Anonymous.Offset = LOCK_BYTE_OFFSET as u32;
-    overlapped.Anonymous.Anonymous.OffsetHigh = (LOCK_BYTE_OFFSET >> 32) as u32;
-    unsafe {
-        LockFileEx(
-            file.as_raw_handle(),
-            LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-            0,
-            1,
-            0,
-            &mut overlapped,
-        ) != 0
-    }
+#[cfg(not(unix))]
+fn lock_is_on_the_linked_sidecar(_file: &File, _sidecar: &Path) -> Result<bool, VecDbError> {
+    Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::path::Path;
-
     use tempfile::TempDir;
 
     use super::*;
 
-    fn open_rw(path: &Path) -> File {
-        File::options()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(path)
-            .unwrap()
+    #[test]
+    fn lock_path_appends_the_lock_extension() {
+        assert_eq!(
+            lock_path(Path::new("/a/vectors")),
+            Path::new("/a/vectors.lock")
+        );
+        assert_eq!(
+            lock_path(Path::new("/a/vectors.db")),
+            Path::new("/a/vectors.db.lock")
+        );
     }
 
     #[test]
-    fn locks_a_fresh_file() {
+    fn acquire_creates_and_locks_the_sidecar() {
         let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        let file = open_rw(&path);
-        assert!(lock_exclusive(&file, &path).is_ok());
+        let log_path = dir.path().join("log");
+        let _guard = WriterLock::acquire(&log_path).unwrap();
+        assert!(lock_path(&log_path).exists());
+        assert!(!log_path.exists());
     }
 
     #[test]
-    fn second_handle_on_the_same_path_conflicts() {
+    fn second_acquire_on_the_same_path_reports_the_log_path() {
         let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        let holder = open_rw(&path);
-        lock_exclusive(&holder, &path).unwrap();
-        let contender = open_rw(&path);
-        let error = lock_exclusive(&contender, &path).unwrap_err();
-        assert!(matches!(error, VecDbError::Locked(locked) if locked == path));
+        let log_path = dir.path().join("log");
+        let _holder = WriterLock::acquire(&log_path).unwrap();
+        let error = WriterLock::acquire(&log_path).unwrap_err();
+        assert!(matches!(error, VecDbError::Locked(locked) if locked == log_path));
     }
 
     #[test]
-    fn closing_the_holding_handle_releases_the_lock() {
+    fn dropping_the_guard_releases_the_lock() {
         let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        let holder = open_rw(&path);
-        lock_exclusive(&holder, &path).unwrap();
+        let log_path = dir.path().join("log");
+        let holder = WriterLock::acquire(&log_path).unwrap();
         drop(holder);
-        let successor = open_rw(&path);
-        assert!(lock_exclusive(&successor, &path).is_ok());
+        assert!(WriterLock::acquire(&log_path).is_ok());
     }
 
     #[test]
-    fn held_lock_does_not_block_reads_or_copies_through_other_handles() {
+    fn distinct_paths_lock_independently() {
         let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        std::fs::write(&path, b"payload").unwrap();
-        let holder = open_rw(&path);
-        lock_exclusive(&holder, &path).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), b"payload");
-        let copy_path = dir.path().join("copy");
-        std::fs::copy(&path, &copy_path).unwrap();
-        assert_eq!(std::fs::read(&copy_path).unwrap(), b"payload");
+        let _first = WriterLock::acquire(&dir.path().join("first")).unwrap();
+        assert!(WriterLock::acquire(&dir.path().join("second")).is_ok());
     }
 
+    #[cfg(unix)]
     #[test]
-    fn distinct_paths_do_not_conflict() {
+    fn unlinking_the_sidecar_orphans_the_held_lock_and_frees_the_path() {
         let dir = TempDir::new().unwrap();
-        let first_path = dir.path().join("first");
-        let second_path = dir.path().join("second");
-        let first = open_rw(&first_path);
-        let second = open_rw(&second_path);
-        lock_exclusive(&first, &first_path).unwrap();
-        assert!(lock_exclusive(&second, &second_path).is_ok());
+        let log_path = dir.path().join("log");
+        let sidecar = lock_path(&log_path);
+        let orphaned = WriterLock::acquire(&log_path).unwrap();
+        std::fs::remove_file(&sidecar).unwrap();
+        assert!(!lock_is_on_the_linked_sidecar(&orphaned._file, &sidecar).unwrap());
+        let successor = WriterLock::acquire(&log_path).unwrap();
+        assert!(lock_is_on_the_linked_sidecar(&successor._file, &sidecar).unwrap());
+        let error = WriterLock::acquire(&log_path).unwrap_err();
+        assert!(matches!(error, VecDbError::Locked(locked) if locked == log_path));
     }
 }

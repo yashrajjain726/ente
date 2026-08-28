@@ -28,16 +28,6 @@ thiserror.workspace = true
 usearch = { version = "=2.21.4", optional = true }
 wide = "0.7"
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = [
-    "Win32_Foundation",
-    "Win32_Storage_FileSystem",
-    "Win32_System_IO",
-] }
-
 # Cargokit sets ORT_LIB_PATH to Ente's verified iOS archive.
 [target.'cfg(target_os = "ios")'.dependencies]
 ort = { workspace = true, features = [
