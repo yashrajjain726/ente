@@ -960,20 +960,31 @@ class FilesDB with SqlDbBase {
 
   Future<List<EnteFile>> getUnUploadedLocalFilesPendingOfflineProcessing(
     int processingVersion, {
-    int? limit,
+    required int limit,
+    ({int creationTime, int generatedID})? cursor,
   }) async {
     final db = await instance.sqliteAsyncDB;
     final args = <Object?>[processingVersion];
     var query =
-        'SELECT * FROM $filesTable WHERE ($columnUploadedFileID IS '
+        'SELECT * FROM $filesTable WHERE $columnGeneratedID IN ('
+        'SELECT MAX($columnGeneratedID) FROM $filesTable WHERE '
+        '($columnUploadedFileID IS '
         'NULL OR $columnUploadedFileID IS -1) AND $columnLocalID IS NOT NULL '
         'AND $columnLocalID IS NOT -1 AND ($columnMetadataVersion IS NULL OR '
-        '$columnMetadataVersion < ?) GROUP BY $columnLocalID ORDER BY '
-        '$columnCreationTime DESC';
-    if (limit != null) {
-      query += ' LIMIT ?';
-      args.add(limit);
+        '$columnMetadataVersion < ?) GROUP BY $columnLocalID)';
+    if (cursor != null) {
+      query +=
+          ' AND ($columnCreationTime < ? OR ($columnCreationTime = ? AND '
+          '$columnGeneratedID < ?))';
+      args.addAll([
+        cursor.creationTime,
+        cursor.creationTime,
+        cursor.generatedID,
+      ]);
     }
+    query +=
+        ' ORDER BY $columnCreationTime DESC, $columnGeneratedID DESC LIMIT ?';
+    args.add(limit);
     final results = await db.getAll(query, args);
     return convertToFiles(results);
   }
