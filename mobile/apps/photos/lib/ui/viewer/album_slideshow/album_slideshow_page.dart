@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:math" show min;
 import "dart:ui";
 
 import "package:ente_components/components/bottom_sheet/bottom_sheet_component.dart";
@@ -39,6 +40,8 @@ class AlbumSlideshowPage extends StatefulWidget {
 
 class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
     with WidgetsBindingObserver {
+  static const int _thumbnailLookahead = 10;
+  static const int _fileLookahead = 3;
   static const Duration _mediaReadyTimeout = Duration(seconds: 10);
   static const Duration _autoCrossFadeDuration = Duration(milliseconds: 600);
   static const Duration _manualCrossFadeDuration = Duration(milliseconds: 200);
@@ -84,7 +87,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
       _files.shuffle();
     }
     _setAlbumSlideshowWakeLock(_isForeground && _isPlaying);
-    _preloadAdjacentFiles();
+    _preloadFilesAroundCurrent();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncSystemUi();
@@ -197,24 +200,26 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
       _currentSlideReady = false;
       _autoAdvanceTransition = autoAdvance;
     });
-    _preloadAdjacentFiles();
+    _preloadFilesAroundCurrent();
     _scheduleAdvance();
   }
 
-  void _preloadAdjacentFiles() {
+  void _preloadFilesAroundCurrent() {
     if (_files.length < 2) return;
 
-    final previousIndex = (_currentIndex - 1 + _files.length) % _files.length;
-    final nextIndex = (_currentIndex + 1) % _files.length;
-    _preloadFileAt(previousIndex);
-    if (nextIndex != previousIndex) {
-      _preloadFileAt(nextIndex);
+    final thumbnailCount = min(_thumbnailLookahead, _files.length - 1);
+    for (var offset = 1; offset <= thumbnailCount; offset++) {
+      final file = _files[(_currentIndex + offset) % _files.length];
+      preloadThumbnail(file);
+      if (offset <= _fileLookahead) {
+        preloadFile(file);
+      }
     }
-  }
 
-  void _preloadFileAt(int index) {
-    preloadThumbnail(_files[index]);
-    preloadFile(_files[index]);
+    if (thumbnailCount < _files.length - 1) {
+      final previousIndex = (_currentIndex - 1 + _files.length) % _files.length;
+      preloadThumbnail(_files[previousIndex]);
+    }
   }
 
   void _togglePlayback() {
@@ -265,7 +270,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
       _currentIndex = files.indexOf(currentFile);
       _useRandomOrder = value;
     });
-    _preloadAdjacentFiles();
+    _preloadFilesAroundCurrent();
     unawaited(localSettings.setAlbumSlideshowRandomOrder(value));
   }
 
