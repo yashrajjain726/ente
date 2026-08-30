@@ -4,22 +4,43 @@ use llama_cpp_2::model::AddBos;
 use super::{Context, Error};
 
 impl Context {
-    pub fn embed(&self, text: &str) -> Result<Vec<f32>, Error> {
+    pub fn embed(&self, query: &str) -> Result<Vec<f32>, Error> {
         let params = self.embedding_params().ok_or(Error::Unsupported(
             "Context is not configured for embeddings",
         ))?;
-        if text.trim().is_empty() {
+        if query.trim().is_empty() {
             return Err(Error::InvalidInput(
                 "embedding query must not be empty".to_string(),
             ));
         }
+        let prompt = params.query_prompt.replacen("{query}", query, 1);
+        self.embed_prompt(&prompt)
+    }
 
-        let prompt = params.query_prompt.replacen("{query}", text, 1);
+    pub fn embed_document(&self, title: &str, text: &str) -> Result<Vec<f32>, Error> {
+        if title.trim().is_empty() {
+            return Err(Error::InvalidInput(
+                "embedding document title must not be empty".to_string(),
+            ));
+        }
+        if text.trim().is_empty() {
+            return Err(Error::InvalidInput(
+                "embedding document text must not be empty".to_string(),
+            ));
+        }
+        let prompt = crate::config::format_knowledge_document_prompt(title, text);
+        self.embed_prompt(&prompt)
+    }
+
+    fn embed_prompt(&self, prompt: &str) -> Result<Vec<f32>, Error> {
+        let params = self.embedding_params().ok_or(Error::Unsupported(
+            "Context is not configured for embeddings",
+        ))?;
         let (batch_size, source_dim, dim) = (params.batch_size, params.source_dim, params.dim);
         self.with_context_and_cache_mut(|context, cached_tokens| {
             let tokens = context
                 .model
-                .str_to_token(&prompt, AddBos::Always)
+                .str_to_token(prompt, AddBos::Always)
                 .map_err(|err| Error::Llama {
                     op: "Embedding tokenization failed",
                     message: err.to_string(),

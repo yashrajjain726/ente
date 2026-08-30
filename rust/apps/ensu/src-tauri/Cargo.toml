@@ -13,6 +13,7 @@ ente-ensu.workspace = true
 ente-ensu-crypto.workspace = true
 keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 log.workspace = true
+notify = "6.1.1"
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2.11.2", features = [] }

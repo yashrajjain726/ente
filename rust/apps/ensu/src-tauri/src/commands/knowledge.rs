@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use ente_assets::{AssetStore, download};
 use ente_ensu::config::{AttributionConfig, KnowledgeDatasetConfig};
 use ente_ensu::{llm, retrieval};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::async_runtime;
 use tauri::{AppHandle, Emitter, Manager, State as TauriState, WebviewWindow};
 
@@ -87,62 +87,6 @@ pub struct KnowledgePackDto {
     attribution: AttributionDto,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SourceCitationDto {
-    pub dataset_id: String,
-    pub dataset_label: String,
-    pub credit: String,
-    pub title: String,
-    pub source_url: String,
-    pub license_label: String,
-    pub license_url: String,
-}
-
-impl From<retrieval::SourceCitation> for SourceCitationDto {
-    fn from(value: retrieval::SourceCitation) -> Self {
-        Self {
-            dataset_id: value.dataset_id,
-            dataset_label: value.dataset_label,
-            credit: value.credit,
-            title: value.title,
-            source_url: value.source_url,
-            license_label: value.license_label,
-            license_url: value.license_url,
-        }
-    }
-}
-
-impl From<SourceCitationDto> for retrieval::SourceCitation {
-    fn from(value: SourceCitationDto) -> Self {
-        Self {
-            dataset_id: value.dataset_id,
-            dataset_label: value.dataset_label,
-            credit: value.credit,
-            title: value.title,
-            source_url: value.source_url,
-            license_label: value.license_label,
-            license_url: value.license_url,
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KnowledgePromptContextDto {
-    text: String,
-    citations: Vec<SourceCitationDto>,
-}
-
-impl From<retrieval::KnowledgePromptContext> for KnowledgePromptContextDto {
-    fn from(value: retrieval::KnowledgePromptContext) -> Self {
-        Self {
-            text: value.text,
-            citations: value.citations.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct KnowledgeDownloadProgressDto {
@@ -168,6 +112,25 @@ pub(crate) fn retrieval_error(error: retrieval::RetrievalError) -> ApiError {
         retrieval::RetrievalError::Zstd(_) => "zstd",
     };
     ApiError::new(code, error.to_string())
+}
+
+fn select_verified_mixed_grounding(
+    pack_hits: &[retrieval::KnowledgePromptHit],
+    note_hits: &[ente_ensu::notes::NotesSearchHit],
+    mut verify: impl FnMut(&ente_ensu::notes::NoteSourceReference) -> Result<bool, ApiError>,
+) -> Result<Vec<retrieval::GroundedExcerpt>, ApiError> {
+    let selected =
+        retrieval::select_mixed_grounding(pack_hits, note_hits).map_err(retrieval_error)?;
+    let mut verified = Vec::with_capacity(selected.len());
+    for excerpt in selected {
+        if let retrieval::GroundedSource::LocalNote { reference } = &excerpt.source
+            && !verify(reference)?
+        {
+            continue;
+        }
+        verified.push(excerpt);
+    }
+    Ok(verified)
 }
 
 fn reconcile_and_open(
@@ -410,15 +373,21 @@ pub fn knowledge_cancel_pack_download(knowledge_state: TauriState<'_, State>, st
 
 #[tauri::command]
 pub async fn knowledge_retrieve(
+    app: AppHandle,
     model_state: TauriState<'_, ModelDownloadState>,
     llm_state: TauriState<'_, crate::commands::llm::State>,
-    knowledge_state: TauriState<'_, State>,
     query: String,
     enabled_stable_ids: Vec<String>,
     max_context_utf8_bytes: u32,
     retrieval_epoch: u64,
-) -> Result<Option<KnowledgePromptContextDto>, ApiError> {
-    if query.trim().is_empty() || enabled_stable_ids.is_empty() || max_context_utf8_bytes == 0 {
+) -> Result<Option<retrieval::GroundedPromptContext>, ApiError> {
+    let knowledge_state = app.state::<State>();
+    let notes_state = app.state::<crate::commands::notes::State>();
+    let note_collection_ids = notes_state.available_open_index_collection_ids();
+    if query.trim().is_empty()
+        || (enabled_stable_ids.is_empty() && note_collection_ids.is_empty())
+        || max_context_utf8_bytes == 0
+    {
         return Ok(None);
     }
 
@@ -442,6 +411,7 @@ pub async fn knowledge_retrieve(
     let embedding_path = ente_ensu::model::llm_model_path(&store, &embedding_asset)
         .ok_or_else(|| ApiError::new("embedding_missing", "Embedding model path is missing"))?;
     let indexes = Arc::clone(&knowledge_state.indexes);
+    let notes = notes_state.retrieval_handle();
     let cancellation_epoch = llm_state.retrieval_epoch();
     if cancellation_epoch.load(Ordering::Relaxed) != retrieval_epoch {
         return Err(ApiError::new("cancelled", "Knowledge retrieval cancelled"));
@@ -482,7 +452,7 @@ pub async fn knowledge_retrieve(
         check_cancelled()?;
 
         let indexes = indexes.lock().unwrap_or_else(PoisonError::into_inner);
-        let mut hits = Vec::<retrieval::KnowledgePromptHit>::new();
+        let mut pack_hits = Vec::<retrieval::KnowledgePromptHit>::new();
         for dataset in &datasets {
             check_cancelled()?;
             let Some(open) = indexes.get(&dataset.stable_id) else {
@@ -494,7 +464,7 @@ pub async fn knowledge_retrieve(
                 dataset.relevance_threshold,
             ) {
                 Ok(dataset_hits) => {
-                    hits.extend(dataset_hits.into_iter().map(|hit| {
+                    pack_hits.extend(dataset_hits.into_iter().map(|hit| {
                         retrieval::KnowledgePromptHit {
                             dataset_id: dataset.stable_id.clone(),
                             hit,
@@ -513,11 +483,40 @@ pub async fn knowledge_retrieve(
         drop(indexes);
         check_cancelled()?;
 
-        hits.sort_by(|left, right| right.hit.score.total_cmp(&left.hit.score));
-        hits.truncate(embedding.max_hits as usize);
-        let budget = max_context_utf8_bytes.min(embedding.max_context_utf8_bytes) as usize;
-        retrieval::build_knowledge_prompt_context(&hits, budget)
-            .map(|context| context.map(Into::into))
+        let mut note_hits = Vec::new();
+        for collection_id in &note_collection_ids {
+            check_cancelled()?;
+            match notes.search_collection(collection_id, &query_embedding) {
+                Ok(collection_hits) => note_hits.extend(collection_hits),
+                Err(error) => logging::log(
+                    "Knowledge",
+                    format!("Notes search skipped collection={collection_id} error={error}"),
+                ),
+            }
+        }
+        check_cancelled()?;
+
+        let context_budget = max_context_utf8_bytes.min(embedding.max_context_utf8_bytes);
+        let mut excerpts = select_verified_mixed_grounding(&pack_hits, &note_hits, |reference| {
+            check_cancelled()?;
+            let verified = notes.verify_source_reference(reference);
+            if !verified {
+                crate::commands::notes::mark_reference_stale(
+                    &app,
+                    &reference.collection_id,
+                    reference.document_id.clone(),
+                );
+            }
+            Ok(verified)
+        })?;
+        for excerpt in &mut excerpts {
+            if let retrieval::GroundedSource::LocalNote { reference } = &mut excerpt.source {
+                reference.collection_label = notes.collection_label(&reference.collection_id);
+            }
+        }
+        check_cancelled()?;
+
+        retrieval::build_grounded_prompt_context(&excerpts, context_budget as usize)
             .map_err(retrieval_error)
     })
     .await

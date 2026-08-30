@@ -31,9 +31,22 @@ export interface SourceCitation {
     licenseUrl: string;
 }
 
+export interface NoteSourceReference {
+    collectionId: string;
+    collectionLabel?: string;
+    documentId: string;
+    indexedRevision: string;
+    title: string;
+    section?: string | null;
+}
+
+export type GroundedSource =
+    | { type: "ensuPack"; citation: SourceCitation }
+    | { type: "localNote"; reference: NoteSourceReference };
+
 export interface KnowledgePromptContext {
     text: string;
-    citations: SourceCitation[];
+    sources: GroundedSource[];
 }
 
 interface KnowledgeDownloadProgress {

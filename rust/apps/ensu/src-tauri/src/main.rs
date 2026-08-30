@@ -25,6 +25,11 @@ fn main() {
             app.manage(commands::llm::ModelDownloadState::new(
                 app.path().app_data_dir()?,
             ));
+            app.manage(
+                commands::notes::State::new(app.path().app_data_dir()?)
+                    .map_err(|error| std::io::Error::other(error.message))?,
+            );
+            commands::notes::initialize_for_app(app.handle());
 
             if let Some(window) = app.get_webview_window("main")
                 && let Err(err) = window.show()
@@ -80,6 +85,12 @@ fn main() {
             commands::knowledge::knowledge_download_pack,
             commands::knowledge::knowledge_cancel_pack_download,
             commands::knowledge::knowledge_retrieve,
+            commands::notes::notes_list_collections,
+            commands::notes::notes_has_available_index,
+            commands::notes::notes_add_collection,
+            commands::notes::notes_remove_collection,
+            commands::notes::notes_index_collection,
+            commands::notes::notes_open_document,
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|err| {

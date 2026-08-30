@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::config::{
@@ -7,14 +8,18 @@ use crate::config::{
     is_path_safe_component,
 };
 
-use super::{RetrievalError, normalize_single_line};
+use super::{GroundedSource, RetrievalError, normalize_single_line};
 
 const BEGIN_SENTINEL: &str = "----- BEGIN ENSU KNOWLEDGE SOURCES v1 -----";
 const END_SENTINEL: &str = "----- END ENSU KNOWLEDGE SOURCES -----";
+const MIXED_BEGIN_SENTINEL: &str = "----- BEGIN ENSU GROUNDED SOURCES v2 -----";
+const MIXED_END_SENTINEL: &str = "----- END ENSU GROUNDED SOURCES -----";
+const MIXED_SOURCES_PREFIX: &str = "Sources: ";
 const LICENSE_HEADER: &str =
     "Adapted sources · CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SourceCitation {
     pub dataset_id: String,
     pub dataset_label: String,
@@ -29,6 +34,12 @@ pub struct SourceCitation {
 pub struct ParsedAssistantText {
     pub text: String,
     pub citations: Vec<SourceCitation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedGroundedAssistantText {
+    pub text: String,
+    pub sources: Vec<GroundedSource>,
 }
 
 pub fn finalize_assistant_text(
@@ -47,14 +58,71 @@ pub fn finalize_assistant_text(
 }
 
 pub fn parse_assistant_text(stored_text: &str) -> ParsedAssistantText {
-    parse_assistant_text_inner(stored_text).unwrap_or_else(|| ParsedAssistantText {
-        text: stored_text.to_owned(),
-        citations: Vec::new(),
-    })
+    let parsed = parse_grounded_assistant_text(stored_text);
+    ParsedAssistantText {
+        text: parsed.text,
+        citations: parsed
+            .sources
+            .into_iter()
+            .filter_map(|source| match source {
+                GroundedSource::EnsuPack { citation } => Some(citation),
+                GroundedSource::LocalNote { .. } => None,
+            })
+            .collect(),
+    }
 }
 
 pub fn clean_assistant_text(stored_text: &str) -> String {
-    parse_assistant_text(stored_text).text
+    parse_grounded_assistant_text(stored_text).text
+}
+
+pub fn finalize_grounded_assistant_text(
+    raw_assistant_text: &str,
+    sources: &[GroundedSource],
+) -> Result<String, RetrievalError> {
+    let pack_citations = sources
+        .iter()
+        .map(|source| match source {
+            GroundedSource::EnsuPack { citation } => Some(citation.clone()),
+            GroundedSource::LocalNote { .. } => None,
+        })
+        .collect::<Option<Vec<_>>>();
+    if let Some(citations) = pack_citations {
+        return finalize_assistant_text(raw_assistant_text, &citations);
+    }
+
+    let assistant_text = neutralize_model_sentinels(raw_assistant_text.trim());
+    if assistant_text.is_empty() || sources.is_empty() {
+        return Ok(assistant_text);
+    }
+    let sources = normalize_grounded_sources(sources)?;
+    if sources.is_empty() {
+        return Ok(assistant_text);
+    }
+    let sources = serde_json::to_string(&sources)?;
+    Ok(format!(
+        "{assistant_text}\n\n{MIXED_BEGIN_SENTINEL}\n{MIXED_SOURCES_PREFIX}{sources}\n{MIXED_END_SENTINEL}"
+    ))
+}
+
+pub fn parse_grounded_assistant_text(stored_text: &str) -> ParsedGroundedAssistantText {
+    if let Some(parsed) = parse_mixed_assistant_text_inner(stored_text) {
+        return parsed;
+    }
+    if let Some(parsed) = parse_assistant_text_inner(stored_text) {
+        return ParsedGroundedAssistantText {
+            text: parsed.text,
+            sources: parsed
+                .citations
+                .into_iter()
+                .map(|citation| GroundedSource::EnsuPack { citation })
+                .collect(),
+        };
+    }
+    ParsedGroundedAssistantText {
+        text: stored_text.to_owned(),
+        sources: Vec::new(),
+    }
 }
 
 pub fn knowledge_source_chip_label(citations: &[SourceCitation]) -> Option<String> {
@@ -77,37 +145,38 @@ fn normalize_and_deduplicate(
     let mut seen = HashSet::new();
     let mut normalized = Vec::with_capacity(citations.len());
     for citation in citations {
-        if !is_path_safe_component(&citation.dataset_id) {
-            return Err(RetrievalError::InvalidInput(
-                "citation dataset_id is not path-safe".to_string(),
-            ));
-        }
-        let dataset_label = normalize_required(&citation.dataset_label, "dataset label")?;
-        let credit = normalize_required(&citation.credit, "credit")?;
-        let title = normalize_required(&citation.title, "title")?;
-        let license_label = normalize_required(&citation.license_label, "license label")?;
-        if license_label != LICENSE_LABEL || citation.license_url != LICENSE_URL {
-            return Err(RetrievalError::InvalidInput(
-                "citation must use the v1 CC BY-SA 4.0 license".to_string(),
-            ));
-        }
-        validate_https_url(&citation.source_url, "source URL")?;
-
-        let key = (citation.dataset_id.as_str(), citation.source_url.as_str());
+        let citation = normalize_citation(citation)?;
+        let key = (citation.dataset_id.clone(), citation.source_url.clone());
         if !seen.insert(key) {
             continue;
         }
-        normalized.push(SourceCitation {
-            dataset_id: citation.dataset_id.clone(),
-            dataset_label,
-            credit,
-            title,
-            source_url: citation.source_url.clone(),
-            license_label,
-            license_url: citation.license_url.clone(),
-        });
+        normalized.push(citation);
     }
     Ok(normalized)
+}
+
+fn normalize_citation(citation: &SourceCitation) -> Result<SourceCitation, RetrievalError> {
+    if !is_path_safe_component(&citation.dataset_id) {
+        return Err(RetrievalError::InvalidInput(
+            "citation dataset_id is not path-safe".to_string(),
+        ));
+    }
+    let license_label = normalize_required(&citation.license_label, "license label")?;
+    if license_label != LICENSE_LABEL || citation.license_url != LICENSE_URL {
+        return Err(RetrievalError::InvalidInput(
+            "citation must use the v1 CC BY-SA 4.0 license".to_string(),
+        ));
+    }
+    validate_https_url(&citation.source_url, "source URL")?;
+    Ok(SourceCitation {
+        dataset_id: citation.dataset_id.clone(),
+        dataset_label: normalize_required(&citation.dataset_label, "dataset label")?,
+        credit: normalize_required(&citation.credit, "credit")?,
+        title: normalize_required(&citation.title, "title")?,
+        source_url: citation.source_url.clone(),
+        license_label,
+        license_url: citation.license_url.clone(),
+    })
 }
 
 fn format_footer(citations: &[SourceCitation]) -> String {
@@ -131,6 +200,88 @@ fn format_footer(citations: &[SourceCitation]) -> String {
     }
     output.push_str(END_SENTINEL);
     output
+}
+
+fn normalize_grounded_sources(
+    sources: &[GroundedSource],
+) -> Result<Vec<GroundedSource>, RetrievalError> {
+    let mut normalized = Vec::with_capacity(sources.len());
+    let mut seen = HashSet::new();
+    for source in sources {
+        match source {
+            GroundedSource::EnsuPack { citation } => {
+                let citation = normalize_citation(citation)?;
+                let key = format!(
+                    "pack\u{0}{}\u{0}{}",
+                    citation.dataset_id, citation.source_url
+                );
+                if seen.insert(key) {
+                    normalized.push(GroundedSource::EnsuPack { citation });
+                }
+            }
+            GroundedSource::LocalNote { reference } => {
+                let reference = crate::notes::NoteSourceReference {
+                    collection_id: reference.collection_id.clone(),
+                    collection_label: reference
+                        .collection_label
+                        .as_deref()
+                        .map(|label| normalize_required(label, "note collection label"))
+                        .transpose()?,
+                    document_id: reference.document_id.clone(),
+                    indexed_revision: reference.indexed_revision.clone(),
+                    title: normalize_required(&reference.title, "note title")?,
+                    section: reference
+                        .section
+                        .as_deref()
+                        .map(|section| normalize_required(section, "note section"))
+                        .transpose()?,
+                };
+                reference
+                    .validate()
+                    .map_err(|error| RetrievalError::InvalidInput(error.to_string()))?;
+                let key = format!(
+                    "note\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+                    reference.collection_id,
+                    reference.document_id,
+                    reference.indexed_revision,
+                    reference.title,
+                    reference.section.as_deref().unwrap_or_default()
+                );
+                if seen.insert(key) {
+                    normalized.push(GroundedSource::LocalNote { reference });
+                }
+            }
+        }
+    }
+    Ok(normalized)
+}
+
+fn parse_mixed_assistant_text_inner(stored_text: &str) -> Option<ParsedGroundedAssistantText> {
+    let candidate = stored_text.strip_suffix('\n').unwrap_or(stored_text);
+    let separator = format!("\n\n{MIXED_BEGIN_SENTINEL}\n");
+    let footer_start = candidate.rfind(&separator)?;
+    let assistant_text = &candidate[..footer_start];
+    if assistant_text.is_empty() {
+        return None;
+    }
+    let footer = &candidate[footer_start + 2..];
+    let mut lines = footer.split('\n');
+    if lines.next()? != MIXED_BEGIN_SENTINEL {
+        return None;
+    }
+    let sources_json = lines.next()?.strip_prefix(MIXED_SOURCES_PREFIX)?;
+    if lines.next()? != MIXED_END_SENTINEL || lines.next().is_some() {
+        return None;
+    }
+    let sources = serde_json::from_str::<Vec<GroundedSource>>(sources_json).ok()?;
+    if sources.is_empty() || sources.len() > 64 {
+        return None;
+    }
+    let sources = normalize_grounded_sources(&sources).ok()?;
+    (!sources.is_empty()).then(|| ParsedGroundedAssistantText {
+        text: assistant_text.to_owned(),
+        sources,
+    })
 }
 
 fn parse_assistant_text_inner(stored_text: &str) -> Option<ParsedAssistantText> {
@@ -221,7 +372,7 @@ fn valid_stored_field(value: &str) -> bool {
     !value.trim().is_empty() && !value.chars().any(char::is_control)
 }
 
-fn normalize_required(value: &str, field: &str) -> Result<String, RetrievalError> {
+pub(super) fn normalize_required(value: &str, field: &str) -> Result<String, RetrievalError> {
     let normalized = normalize_single_line(value);
     if normalized.is_empty() {
         Err(RetrievalError::InvalidInput(format!(
@@ -256,7 +407,10 @@ fn validate_https_url(value: &str, field: &str) -> Result<(), RetrievalError> {
 fn neutralize_model_sentinels(text: &str) -> String {
     text.lines()
         .map(|line| {
-            if matches!(line, BEGIN_SENTINEL | END_SENTINEL) {
+            if matches!(
+                line,
+                BEGIN_SENTINEL | END_SENTINEL | MIXED_BEGIN_SENTINEL | MIXED_END_SENTINEL
+            ) {
                 format!("[model] {line}")
             } else {
                 line.to_owned()
@@ -375,5 +529,39 @@ mod tests {
         );
         let finalized = finalize_assistant_text("Answer", &[source]).unwrap();
         assert_eq!(parse_assistant_text(&(finalized + "\n")).text, "Answer");
+    }
+
+    #[test]
+    fn mixed_footer_round_trips_and_old_pack_apis_remain_compatible() {
+        let pack = citation(
+            "simplewiki",
+            "Simple English Wikipedia",
+            "https://simple.wikipedia.org/wiki/Example",
+        );
+        let sources = vec![
+            GroundedSource::EnsuPack {
+                citation: pack.clone(),
+            },
+            GroundedSource::LocalNote {
+                reference: crate::notes::NoteSourceReference {
+                    collection_id: "123e4567-e89b-12d3-a456-426614174000".to_string(),
+                    collection_label: Some("InterestAreas".to_string()),
+                    document_id: "folder/note.md".to_string(),
+                    indexed_revision: "a".repeat(64),
+                    title: "Local title".to_string(),
+                    section: Some("Details".to_string()),
+                },
+            },
+        ];
+        let finalized = finalize_grounded_assistant_text("Grounded answer", &sources).unwrap();
+        assert!(finalized.contains(MIXED_BEGIN_SENTINEL));
+        let parsed = parse_grounded_assistant_text(&finalized);
+        assert_eq!(parsed.text, "Grounded answer");
+        assert_eq!(parsed.sources, sources);
+        assert_eq!(clean_assistant_text(&finalized), "Grounded answer");
+
+        let pack_view = parse_assistant_text(&finalized);
+        assert_eq!(pack_view.text, "Grounded answer");
+        assert_eq!(pack_view.citations, [pack]);
     }
 }

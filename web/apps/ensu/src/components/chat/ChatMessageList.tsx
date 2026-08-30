@@ -5,6 +5,7 @@ import {
     type BranchSwitcher,
 } from "@/services/chat/branching";
 import type { ChatAttachment, ChatMessage } from "@/services/chat/store";
+import { noteSourceErrorMessage, openNoteDocument } from "@/services/notes";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import {
     ArrowLeft01Icon,
@@ -72,6 +73,22 @@ const sourceLinkSx = {
     color: "accent.main",
     cursor: "pointer",
 } as const;
+
+const sourceChipSx = {
+    height: 25,
+    borderRadius: 1,
+    bgcolor: "fill.faintHover",
+    color: "text.base",
+    fontSize: "12px",
+    lineHeight: "15px",
+    fontWeight: 500,
+    cursor: "pointer",
+    "& .MuiChip-label": { px: 1.25 },
+    "&:hover": { bgcolor: "fill.muted" },
+} as const;
+
+const sourceChipLabel = (label: string, sourceCount: number) =>
+    sourceCount > 1 ? `${label} +${sourceCount - 1}` : label;
 
 export interface ParsedDocuments {
     text: string;
@@ -216,15 +233,75 @@ const AiSafetyFooter = memo(() => {
     );
 });
 
+type MessageSource = NonNullable<ChatMessage["sources"]>[number];
+type PackSource = Extract<MessageSource, { type: "ensuPack" }>;
+type LocalNoteSource = Extract<MessageSource, { type: "localNote" }>;
+
+const LocalNoteSourceCard = memo(
+    ({ source, number }: { source: LocalNoteSource; number: number }) => {
+        const [openError, setOpenError] = useState<string | null>(null);
+        const { reference } = source;
+        return (
+            <Stack
+                sx={{
+                    gap: 1.25,
+                    p: 2,
+                    borderRadius: 1.5,
+                    bgcolor: "fill.faint",
+                }}
+            >
+                <Typography variant="mini" sx={{ color: "text.muted" }}>
+                    SOURCE {number} ·{" "}
+                    {(reference.collectionLabel ?? "Your Notes").toUpperCase()}
+                </Typography>
+                <Typography variant="h6">{reference.title}</Typography>
+                {reference.section && (
+                    <Typography variant="small" sx={{ color: "text.muted" }}>
+                        {reference.section}
+                    </Typography>
+                )}
+                <Divider sx={{ my: 0.25 }} />
+                <Typography variant="small" sx={{ color: "text.muted" }}>
+                    {reference.documentId}
+                </Typography>
+                <Link
+                    component="button"
+                    type="button"
+                    underline="hover"
+                    onClick={() => {
+                        setOpenError(null);
+                        void openNoteDocument(
+                            reference.collectionId,
+                            reference.documentId,
+                        ).catch((error: unknown) =>
+                            setOpenError(noteSourceErrorMessage(error)),
+                        );
+                    }}
+                    sx={{ ...sourceLinkSx, alignSelf: "flex-start" }}
+                >
+                    Open note ↗
+                </Link>
+                {openError && (
+                    <Typography variant="small" sx={{ color: "critical.main" }}>
+                        {openError}
+                    </Typography>
+                )}
+            </Stack>
+        );
+    },
+);
+
 const KnowledgeSourcesDialog = memo(
     ({
         citations,
+        localNotes,
         onClose,
         dialogTitleSx,
         closeButtonSx,
         closeIconProps,
     }: {
-        citations: NonNullable<ChatMessage["citations"]>;
+        citations: PackSource["citation"][];
+        localNotes: LocalNoteSource[];
         onClose: () => void;
         dialogTitleSx: SystemStyleObject<Theme>;
         closeButtonSx: SystemStyleObject<Theme>;
@@ -261,65 +338,88 @@ const KnowledgeSourcesDialog = memo(
                 </IconButton>
             </DialogTitle>
             <DialogContent sx={{ px: 3, pt: 1, pb: 3 }}>
-                <Stack sx={{ gap: 1.5 }}>
-                    {citations.map((citation, index) => (
-                        <Stack
-                            key={`${citation.datasetId}:${citation.sourceUrl}:${index}`}
-                            sx={{
-                                gap: 1.25,
-                                p: 2,
-                                borderRadius: 1.5,
-                                bgcolor: "fill.faint",
-                            }}
-                        >
-                            <Typography
-                                variant="mini"
-                                sx={{ color: "text.muted" }}
-                            >
-                                SOURCE {index + 1} ·{" "}
-                                {citation.datasetLabel.toUpperCase()}
+                <Stack sx={{ gap: 2.5 }}>
+                    {citations.length > 0 && (
+                        <Stack sx={{ gap: 1.5 }}>
+                            <Typography component="h3" variant="h6">
+                                Ensu Packs
                             </Typography>
-                            <Typography variant="h6">
-                                {citation.title}
-                            </Typography>
-                            <Divider sx={{ my: 0.25 }} />
-                            <Typography
-                                variant="small"
-                                sx={{ color: "text.muted" }}
-                            >
-                                {citation.credit}
-                            </Typography>
-                            <Stack
-                                direction="row"
-                                sx={{ gap: 2, flexWrap: "wrap" }}
-                            >
-                                <Link
-                                    component="button"
-                                    type="button"
-                                    underline="hover"
-                                    onClick={() =>
-                                        void openExternalUrl(citation.sourceUrl)
-                                    }
-                                    sx={sourceLinkSx}
+                            {citations.map((citation, index) => (
+                                <Stack
+                                    key={`${citation.datasetId}:${citation.sourceUrl}:${index}`}
+                                    sx={{
+                                        gap: 1.25,
+                                        p: 2,
+                                        borderRadius: 1.5,
+                                        bgcolor: "fill.faint",
+                                    }}
                                 >
-                                    Open source ↗
-                                </Link>
-                                <Link
-                                    component="button"
-                                    type="button"
-                                    underline="hover"
-                                    onClick={() =>
-                                        void openExternalUrl(
-                                            citation.licenseUrl,
-                                        )
-                                    }
-                                    sx={sourceLinkSx}
-                                >
-                                    {citation.licenseLabel} ↗
-                                </Link>
-                            </Stack>
+                                    <Typography
+                                        variant="mini"
+                                        sx={{ color: "text.muted" }}
+                                    >
+                                        SOURCE {index + 1} ·{" "}
+                                        {citation.datasetLabel.toUpperCase()}
+                                    </Typography>
+                                    <Typography variant="h6">
+                                        {citation.title}
+                                    </Typography>
+                                    <Divider sx={{ my: 0.25 }} />
+                                    <Typography
+                                        variant="small"
+                                        sx={{ color: "text.muted" }}
+                                    >
+                                        {citation.credit}
+                                    </Typography>
+                                    <Stack
+                                        direction="row"
+                                        sx={{ gap: 2, flexWrap: "wrap" }}
+                                    >
+                                        <Link
+                                            component="button"
+                                            type="button"
+                                            underline="hover"
+                                            onClick={() =>
+                                                void openExternalUrl(
+                                                    citation.sourceUrl,
+                                                )
+                                            }
+                                            sx={sourceLinkSx}
+                                        >
+                                            Open source ↗
+                                        </Link>
+                                        <Link
+                                            component="button"
+                                            type="button"
+                                            underline="hover"
+                                            onClick={() =>
+                                                void openExternalUrl(
+                                                    citation.licenseUrl,
+                                                )
+                                            }
+                                            sx={sourceLinkSx}
+                                        >
+                                            {citation.licenseLabel} ↗
+                                        </Link>
+                                    </Stack>
+                                </Stack>
+                            ))}
                         </Stack>
-                    ))}
+                    )}
+                    {localNotes.length > 0 && (
+                        <Stack sx={{ gap: 1.5 }}>
+                            <Typography component="h3" variant="h6">
+                                Your Notes
+                            </Typography>
+                            {localNotes.map((source, index) => (
+                                <LocalNoteSourceCard
+                                    key={`${source.reference.collectionId}:${source.reference.documentId}:${index}`}
+                                    source={source}
+                                    number={citations.length + index + 1}
+                                />
+                            ))}
+                        </Stack>
+                    )}
                 </Stack>
             </DialogContent>
         </Dialog>
@@ -394,7 +494,29 @@ const MessageRow = memo(
         const isSelf = message.sender === "self";
         const isStreaming = message.messageUuid === STREAMING_SELECTION_KEY;
         const isSynthetic = !!message.isSynthetic;
-        const citations = message.citations ?? [];
+        const sources = message.sources ?? [];
+        const citations = sources
+            .filter(
+                (source): source is PackSource => source.type === "ensuPack",
+            )
+            .map(({ citation }) => citation);
+        const localNotes = sources.filter(
+            (source): source is LocalNoteSource => source.type === "localNote",
+        );
+        const packCount = new Set(citations.map(({ datasetId }) => datasetId))
+            .size;
+        const noteCount = new Set(
+            localNotes.map(({ reference }) => reference.collectionId),
+        ).size;
+        const packSourceLabel = citations.length
+            ? sourceChipLabel(citations[0]!.datasetLabel, packCount)
+            : undefined;
+        const noteSourceLabel = localNotes.length
+            ? sourceChipLabel(
+                  localNotes[0]!.reference.collectionLabel ?? "Your Notes",
+                  noteCount,
+              )
+            : undefined;
         const [showSources, setShowSources] = useState(false);
         const switcher = branchSwitchers[message.messageUuid];
         const showSwitcher = !isSynthetic && !!switcher && switcher.total > 1;
@@ -562,32 +684,37 @@ const MessageRow = memo(
                                             className="markdown-content"
                                         />
                                     </Box>
-                                    {message.sourceLabel && (
-                                        <Chip
-                                            size="small"
-                                            label={message.sourceLabel}
-                                            onClick={() => setShowSources(true)}
-                                            sx={{
-                                                height: 25,
-                                                borderRadius: 1,
-                                                bgcolor: "fill.faintHover",
-                                                color: "text.base",
-                                                fontSize: "12px",
-                                                lineHeight: "15px",
-                                                fontWeight: 500,
-                                                cursor: "pointer",
-                                                "& .MuiChip-label": {
-                                                    px: 1.25,
-                                                },
-                                                "&:hover": {
-                                                    bgcolor: "fill.muted",
-                                                },
-                                            }}
-                                        />
+                                    {(packSourceLabel || noteSourceLabel) && (
+                                        <Stack
+                                            direction="row"
+                                            sx={{ gap: 0.75, flexWrap: "wrap" }}
+                                        >
+                                            {packSourceLabel && (
+                                                <Chip
+                                                    size="small"
+                                                    label={packSourceLabel}
+                                                    onClick={() =>
+                                                        setShowSources(true)
+                                                    }
+                                                    sx={sourceChipSx}
+                                                />
+                                            )}
+                                            {noteSourceLabel && (
+                                                <Chip
+                                                    size="small"
+                                                    label={noteSourceLabel}
+                                                    onClick={() =>
+                                                        setShowSources(true)
+                                                    }
+                                                    sx={sourceChipSx}
+                                                />
+                                            )}
+                                        </Stack>
                                     )}
                                     {showSources && (
                                         <KnowledgeSourcesDialog
                                             citations={citations}
+                                            localNotes={localNotes}
                                             onClose={() =>
                                                 setShowSources(false)
                                             }

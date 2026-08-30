@@ -1,11 +1,14 @@
 import type { KnowledgePack } from "@/services/knowledge";
+import type { NotesCollection } from "@/services/notes";
 import { isTauriRuntime as detectTauriAppRuntime } from "@/services/tauri-runtime";
 import {
     ArrowLeft01Icon,
     ArrowRight01Icon,
     Bug01Icon,
     Cancel01Icon,
+    Delete01Icon,
     File01Icon,
+    Folder01Icon,
     InformationCircleIcon,
     PackageIcon,
     Settings01Icon,
@@ -69,6 +72,29 @@ const formatBytes = (bytes: number) => {
     }
     return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 };
+
+const notesStatusLabel = (status: NotesCollection["status"]) => {
+    switch (status) {
+        case "indexing":
+            return "Indexing";
+        case "updating":
+            return "Updating";
+        case "ready":
+            return "Ready";
+        case "pending":
+            return "Pending";
+        case "unavailable":
+            return "Folder unavailable";
+        case "error":
+            return "Needs attention";
+    }
+};
+
+const formatNotesUpdatedAt = (timestamp: number) =>
+    new Date(timestamp).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+    });
 
 const compactInlineLinkSx = {
     border: 0,
@@ -144,6 +170,13 @@ export interface ChatDialogsProps {
     handleDownloadKnowledgePack: (stableId: string) => void;
     handleCancelKnowledgePackDownload: (stableId: string) => void;
     handleSetKnowledgePackEnabled: (stableId: string, enabled: boolean) => void;
+    notesCollections: NotesCollection[];
+    notesCollectionsLoading: boolean;
+    notesCollectionsError: string | null;
+    retryNotesCollections: () => void;
+    handleAddNotesFolder: () => void;
+    handleRemoveNotesCollection: (collectionId: string, label: string) => void;
+    handleIndexNotesCollection: (collectionId: string, force?: boolean) => void;
     chatNotificationOpen: boolean;
     setChatNotificationOpen: React.Dispatch<React.SetStateAction<boolean>>;
     chatNotification?: NotificationAttributes;
@@ -209,6 +242,13 @@ export const ChatDialogs = memo(
         handleDownloadKnowledgePack,
         handleCancelKnowledgePackDownload,
         handleSetKnowledgePackEnabled,
+        notesCollections,
+        notesCollectionsLoading,
+        notesCollectionsError,
+        retryNotesCollections,
+        handleAddNotesFolder,
+        handleRemoveNotesCollection,
+        handleIndexNotesCollection,
         chatNotificationOpen,
         setChatNotificationOpen,
         chatNotification,
@@ -255,11 +295,13 @@ export const ChatDialogs = memo(
             React.useState(false);
         const [showKnowledgeSettings, setShowKnowledgeSettings] =
             React.useState(false);
+        const [showNotesSettings, setShowNotesSettings] = React.useState(false);
         const [attributionPack, setAttributionPack] =
             React.useState<KnowledgePack | null>(null);
 
         const returnToSettings = () => {
             setShowKnowledgeSettings(false);
+            setShowNotesSettings(false);
             openSettingsModal();
         };
 
@@ -488,6 +530,31 @@ export const ChatDialogs = memo(
                                     <ListItemButton
                                         onClick={() => {
                                             closeSettingsModal();
+                                            setShowNotesSettings(true);
+                                        }}
+                                        sx={settingsItemSx}
+                                    >
+                                        <HugeiconsIcon
+                                            icon={Folder01Icon}
+                                            {...compactIconProps}
+                                        />
+                                        <Typography
+                                            variant="small"
+                                            sx={{ flex: 1 }}
+                                        >
+                                            Your Notes
+                                        </Typography>
+                                        <HugeiconsIcon
+                                            icon={ArrowRight01Icon}
+                                            {...smallIconProps}
+                                        />
+                                    </ListItemButton>
+                                )}
+
+                                {isTauriRuntime && (
+                                    <ListItemButton
+                                        onClick={() => {
+                                            closeSettingsModal();
                                             setShowKnowledgeSettings(true);
                                         }}
                                         sx={settingsItemSx}
@@ -708,6 +775,210 @@ export const ChatDialogs = memo(
                                     Build {buildVersion}
                                 </Typography>
                             )}
+                        </Stack>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog
+                    open={showNotesSettings}
+                    onClose={returnToSettings}
+                    fullScreen={isSmall}
+                    maxWidth={false}
+                    fullWidth
+                    slotProps={{
+                        paper: { sx: [dialogPaperSx, { maxWidth: 720 }] },
+                    }}
+                >
+                    <DialogTitle
+                        sx={[
+                            dialogTitleSx,
+                            {
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                pl: 1,
+                            },
+                        ]}
+                    >
+                        <IconButton
+                            aria-label="Back to settings"
+                            onClick={returnToSettings}
+                            sx={drawerIconButtonSx}
+                        >
+                            <HugeiconsIcon
+                                icon={ArrowLeft01Icon}
+                                {...tinyIconProps}
+                            />
+                        </IconButton>
+                        <Box component="span" sx={{ flex: 1 }}>
+                            Your Notes
+                        </Box>
+                    </DialogTitle>
+                    <DialogContent>
+                        <Stack sx={{ gap: 2 }}>
+                            {notesCollectionsError && (
+                                <Stack
+                                    direction="row"
+                                    sx={{ alignItems: "center", gap: 1 }}
+                                >
+                                    <Typography
+                                        variant="small"
+                                        sx={{ flex: 1, color: "critical.main" }}
+                                    >
+                                        {notesCollectionsError}
+                                    </Typography>
+                                    <Button
+                                        size="small"
+                                        onClick={retryNotesCollections}
+                                    >
+                                        Retry
+                                    </Button>
+                                </Stack>
+                            )}
+                            {notesCollectionsLoading && <LinearProgress />}
+                            {notesCollections.map((collection) => {
+                                const indexing =
+                                    collection.status === "indexing" ||
+                                    collection.status === "updating";
+                                const progress = collection.indexingProgress;
+                                const canRetry =
+                                    collection.status === "pending" ||
+                                    collection.status === "error" ||
+                                    collection.status === "unavailable";
+                                const retryLabel =
+                                    collection.status === "error" ||
+                                    collection.status === "unavailable"
+                                        ? "Try again"
+                                        : "Continue indexing";
+                                return (
+                                    <Stack
+                                        key={collection.id}
+                                        sx={{
+                                            gap: 1.25,
+                                            p: 2,
+                                            borderRadius: 2,
+                                            bgcolor: "fill.faint",
+                                        }}
+                                    >
+                                        <Stack
+                                            direction="row"
+                                            sx={{
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <Stack
+                                                sx={{ flex: 1, minWidth: 0 }}
+                                            >
+                                                <Typography variant="h6" noWrap>
+                                                    {collection.label}
+                                                </Typography>
+                                                <Typography
+                                                    variant="mini"
+                                                    noWrap
+                                                    sx={{ color: "text.muted" }}
+                                                >
+                                                    {notesStatusLabel(
+                                                        collection.status,
+                                                    )}{" "}
+                                                    ·{" "}
+                                                    {
+                                                        collection.indexedDocumentCount
+                                                    }{" "}
+                                                    {collection.indexedDocumentCount ===
+                                                    1
+                                                        ? "note indexed"
+                                                        : "notes indexed"}
+                                                </Typography>
+                                                {collection.lastUpdatedAtMs !=
+                                                    null && (
+                                                    <Typography
+                                                        variant="mini"
+                                                        noWrap
+                                                        sx={{
+                                                            color: "text.muted",
+                                                        }}
+                                                    >
+                                                        Last updated{" "}
+                                                        {formatNotesUpdatedAt(
+                                                            collection.lastUpdatedAtMs,
+                                                        )}
+                                                    </Typography>
+                                                )}
+                                            </Stack>
+                                            <IconButton
+                                                aria-label={`Remove ${collection.label}`}
+                                                disabled={indexing}
+                                                onClick={() =>
+                                                    handleRemoveNotesCollection(
+                                                        collection.id,
+                                                        collection.label,
+                                                    )
+                                                }
+                                                sx={actionButtonSx}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Delete01Icon}
+                                                    {...compactIconProps}
+                                                />
+                                            </IconButton>
+                                        </Stack>
+                                        {indexing && (
+                                            <LinearProgress
+                                                variant={
+                                                    progress == null
+                                                        ? "indeterminate"
+                                                        : "determinate"
+                                                }
+                                                value={progress ?? undefined}
+                                            />
+                                        )}
+                                        {collection.lastError && (
+                                            <Typography
+                                                variant="small"
+                                                sx={{ color: "critical.main" }}
+                                            >
+                                                {collection.lastError}
+                                            </Typography>
+                                        )}
+                                        {canRetry && (
+                                            <Button
+                                                size="small"
+                                                onClick={() =>
+                                                    handleIndexNotesCollection(
+                                                        collection.id,
+                                                        true,
+                                                    )
+                                                }
+                                                sx={{ alignSelf: "flex-start" }}
+                                            >
+                                                {retryLabel}
+                                            </Button>
+                                        )}
+                                    </Stack>
+                                );
+                            })}
+                            <ListItemButton
+                                disabled={notesCollectionsLoading}
+                                onClick={handleAddNotesFolder}
+                                sx={settingsItemSx}
+                            >
+                                <HugeiconsIcon
+                                    icon={Folder01Icon}
+                                    {...compactIconProps}
+                                />
+                                <Typography variant="small" sx={{ flex: 1 }}>
+                                    Select notes folder
+                                </Typography>
+                            </ListItemButton>
+                            <Typography
+                                variant="small"
+                                sx={{ px: 2, color: "text.muted" }}
+                            >
+                                Ensu reads and indexes markdown files in the
+                                selected folder. Source files are never
+                                modified.
+                            </Typography>
                         </Stack>
                     </DialogContent>
                 </Dialog>
