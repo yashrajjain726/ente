@@ -36,12 +36,3 @@ export interface ResolvedContactDisplay {
 export interface ResolvedContactAvatar extends ResolvedContactDisplay {
     avatarURL: string | undefined;
 }
-
-export type {
-    LegacyContactRecord,
-    LegacyContactState,
-    LegacyInfo,
-    LegacyRecoverySession,
-    LegacyRecoveryStatus,
-    LegacyUser,
-} from "ente-legacy-wasm/authenticated";
