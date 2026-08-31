@@ -375,12 +375,15 @@ class _AlbumSelectionActionWidgetState
 
   Future<void> _onHideOrUnHideClick() async {
     final userID = Configuration.instance.getUserID()!;
+    final hasOwnedFavorites = widget.selectedAlbums.albums.any(
+      (collection) => _isOwnedFavorite(collection, userID),
+    );
     final collections = widget.selectedAlbums.albums
-        .where((c) => c.type != CollectionType.favorites)
+        .where((collection) => !_isOwnedFavorite(collection, userID))
         .toList();
 
     if (collections.isEmpty) {
-      if (hasFavorites) {
+      if (hasOwnedFavorites) {
         _showFavToast();
       }
       widget.selectedAlbums.clearAll();
@@ -440,19 +443,23 @@ class _AlbumSelectionActionWidgetState
       await dialog.hide();
     }
 
-    if (hasFavorites) {
+    if (hasOwnedFavorites) {
       _showFavToast();
     }
     widget.selectedAlbums.clearAll();
   }
 
   Future<void> _archiveClick() async {
+    final userID = Configuration.instance.getUserID()!;
+    final hasOwnedFavorites = widget.selectedAlbums.albums.any(
+      (collection) => _isOwnedFavorite(collection, userID),
+    );
     final collections = widget.selectedAlbums.albums
-        .where((c) => c.type != CollectionType.favorites)
+        .where((collection) => !_isOwnedFavorite(collection, userID))
         .toList();
 
     if (collections.isEmpty) {
-      if (hasFavorites) {
+      if (hasOwnedFavorites) {
         _showFavToast();
       }
       widget.selectedAlbums.clearAll();
@@ -522,13 +529,18 @@ class _AlbumSelectionActionWidgetState
       await dialog.hide();
     }
 
-    if (hasFavorites) {
+    if (hasOwnedFavorites) {
       _showFavToast();
     }
     if (mounted) {
       setState(() {});
     }
     widget.selectedAlbums.clearAll();
+  }
+
+  bool _isOwnedFavorite(Collection collection, int userID) {
+    return collection.type == CollectionType.favorites &&
+        collection.isOwner(userID);
   }
 
   bool _usesShareeMetadata(Collection collection) {
