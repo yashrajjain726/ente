@@ -1600,15 +1600,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.11.1"
-  media_extension:
-    dependency: transitive
-    description:
-      path: "."
-      ref: "7dfca297926ad113780e8151d58262bf5f8c8e9c"
-      resolved-ref: "7dfca297926ad113780e8151d58262bf5f8c8e9c"
-      url: "https://github.com/ente/media_extension.git"
-    source: git
-    version: "1.0.2"
   media_kit:
     dependency: transitive
     description:
