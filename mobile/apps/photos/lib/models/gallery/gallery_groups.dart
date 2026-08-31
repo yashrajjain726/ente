@@ -281,9 +281,36 @@ class GalleryGroups {
     assert(groupIDs.length == _groupScrollOffsets.length);
   }
 
+  Widget _buildGroupHeader(
+    BuildContext context,
+    String groupID,
+    List<EnteFile> filesInGroup,
+    int rowIndex,
+  ) {
+    if (!groupType.showGroupHeader()) {
+      return const SizedBox(height: spacing);
+    }
+    return GroupHeaderWidget(
+      title: _groupIdToGroupDataMap[groupID]!.groupType.getTitle(
+        context,
+        filesInGroup.first,
+      ),
+      gridSize: crossAxisCount,
+      filesInGroup: filesInGroup,
+      selectedFiles: selectedFiles,
+      showSelectAll: showSelectAll && !limitSelectionToOne,
+      showGalleryLayoutSettingCTA: rowIndex == 0 && showGallerySettingsCTA,
+    );
+  }
+
+  void _registerGroupScrollOffset(String groupID, double scrollOffset) {
+    _scrollOffsetToGroupIdMap[scrollOffset] = groupID;
+    _groupIdToScrollOffsetMap[groupID] = scrollOffset;
+    _groupScrollOffsets.add(scrollOffset);
+  }
+
   List<SectionLayout> _computeFixedGroupLayouts() {
     final stopwatch = Stopwatch()..start();
-    final showGroupHeader = groupType.showGroupHeader();
     int currentIndex = 0;
     double currentOffset = 0.0;
     final tileHeight =
@@ -316,22 +343,12 @@ class GalleryGroups {
           spacing: spacing,
           builder: (context, rowIndex) {
             if (rowIndex == firstIndex) {
-              if (showGroupHeader) {
-                return GroupHeaderWidget(
-                  title: _groupIdToGroupDataMap[groupID]!.groupType.getTitle(
-                    context,
-                    groupIDToFilesMap[groupID]!.first,
-                  ),
-                  gridSize: crossAxisCount,
-                  filesInGroup: groupIDToFilesMap[groupID]!,
-                  selectedFiles: selectedFiles,
-                  showSelectAll: showSelectAll && !limitSelectionToOne,
-                  showGalleryLayoutSettingCTA:
-                      rowIndex == 0 && showGallerySettingsCTA,
-                );
-              } else {
-                return const SizedBox(height: spacing);
-              }
+              return _buildGroupHeader(
+                context,
+                groupID,
+                filesInGroup,
+                rowIndex,
+              );
             } else {
               final gridRowChildren = <Widget>[];
               final firstIndexOfRowWrtFilesInGroup =
@@ -409,9 +426,7 @@ class GalleryGroups {
         ),
       );
 
-      _scrollOffsetToGroupIdMap[currentOffset] = groupID;
-      _groupIdToScrollOffsetMap[groupID] = currentOffset;
-      _groupScrollOffsets.add(currentOffset);
+      _registerGroupScrollOffset(groupID, currentOffset);
 
       currentIndex = lastIndex;
       currentOffset = maxOffset;
@@ -425,7 +440,6 @@ class GalleryGroups {
 
   List<SectionLayout> _computeMosaicGroupLayouts() {
     final stopwatch = Stopwatch()..start();
-    final showGroupHeader = groupType.showGroupHeader();
     final targetRowHeight =
         (widthAvailable - (crossAxisCount - 1) * spacing) / crossAxisCount;
     final groupLayouts = <SectionLayout>[];
@@ -462,21 +476,12 @@ class GalleryGroups {
           rows: rows,
           builder: (context, rowIndex) {
             if (rowIndex == firstIndex) {
-              if (showGroupHeader) {
-                return GroupHeaderWidget(
-                  title: _groupIdToGroupDataMap[groupID]!.groupType.getTitle(
-                    context,
-                    filesInGroup.first,
-                  ),
-                  gridSize: crossAxisCount,
-                  filesInGroup: filesInGroup,
-                  selectedFiles: selectedFiles,
-                  showSelectAll: showSelectAll && !limitSelectionToOne,
-                  showGalleryLayoutSettingCTA:
-                      rowIndex == 0 && showGallerySettingsCTA,
-                );
-              }
-              return const SizedBox(height: spacing);
+              return _buildGroupHeader(
+                context,
+                groupID,
+                filesInGroup,
+                rowIndex,
+              );
             }
 
             final row = rows[rowIndex - bodyFirstIndex];
@@ -514,9 +519,7 @@ class GalleryGroups {
         ),
       );
 
-      _scrollOffsetToGroupIdMap[currentOffset] = groupID;
-      _groupIdToScrollOffsetMap[groupID] = currentOffset;
-      _groupScrollOffsets.add(currentOffset);
+      _registerGroupScrollOffset(groupID, currentOffset);
 
       currentIndex = lastIndex;
       currentOffset = maxOffset;
