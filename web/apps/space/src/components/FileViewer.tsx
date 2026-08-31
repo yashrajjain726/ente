@@ -1452,7 +1452,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 px: "9px",
                             }}
                         >
-                            <Box component="span" sx={{ color: "#70EC80" }}>
+                            <Box component="span" sx={{ color: textBase }}>
                                 {activePhotoIndex + 1}
                             </Box>
                             <Box component="span" sx={{ color: textTertiary }}>

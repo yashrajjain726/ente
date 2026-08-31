@@ -14,6 +14,7 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpacePostUnreadBadge } from "components/PostUnreadBadge";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import type { FriendProfile } from "data/friends";
@@ -413,7 +414,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     alignItems: "center",
                     appearance: "none",
                     aspectRatio: "1",
-                    bgcolor: post && isRead ? "#000" : "#E5E7EA",
+                    bgcolor: "#E5E7EA",
                     border: 0,
                     borderRadius: "20%",
                     color: textBase,
@@ -459,9 +460,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                                 aria-hidden
                                 src={thumbHashDataURL}
                                 sx={{
-                                    filter: isRead
-                                        ? "blur(14px) brightness(0.2)"
-                                        : "blur(14px)",
+                                    filter: "blur(14px)",
                                     height: "100%",
                                     inset: 0,
                                     objectFit: "cover",
@@ -480,7 +479,6 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                                     animation: isRead
                                         ? "none"
                                         : "spaceNewPostImageFade 520ms cubic-bezier(0.16, 1, 0.3, 1) both",
-                                    filter: isRead ? "brightness(0.2)" : "none",
                                     height: "100%",
                                     inset: 0,
                                     objectFit: "cover",
@@ -515,6 +513,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         {initial}
                     </Box>
                 )}
+                {!isRead && <SpacePostUnreadBadge count={posts.length} />}
             </Box>
             <Box
                 component="button"
@@ -542,6 +541,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             >
                 <SpaceAvatarImage
                     aria-hidden
+                    border="2px solid rgba(255, 255, 255, 0.36)"
                     borderRadius="50%"
                     src={displayAvatarUrl}
                 />

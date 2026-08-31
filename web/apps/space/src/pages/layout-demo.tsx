@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpacePostUnreadBadge } from "components/PostUnreadBadge";
 import React from "react";
 import {
     homeCircleGridLayout,
@@ -45,11 +46,14 @@ const LayoutDemoPost: React.FC<{ placement?: HomeCirclePlacement }> = ({
                     bgcolor: "#1A211F",
                     borderRadius: "20%",
                     height: "100%",
+                    overflow: "hidden",
                     position: "relative",
                     width: "100%",
                     zIndex: 1,
                 }}
-            />
+            >
+                <SpacePostUnreadBadge count={2} />
+            </Box>
             <Box
                 aria-hidden
                 sx={{
