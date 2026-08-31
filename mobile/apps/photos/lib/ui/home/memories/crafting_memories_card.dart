@@ -52,7 +52,7 @@ class CraftingMemoriesCardWidget extends StatelessWidget {
         height: height,
         width: width,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(kMemoryCardBorderRadius),
           child: Stack(
             children: [
               Positioned.fill(
