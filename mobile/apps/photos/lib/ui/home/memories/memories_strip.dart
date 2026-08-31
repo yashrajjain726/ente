@@ -40,6 +40,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   // Delay cover warming past startup; generations invalidate stale work.
   Timer? _warmTimer;
   int _warmGeneration = 0;
+  int _fetchGeneration = 0;
   String? _lastWarmSignature;
   final _videoPrefetcher = MemoryVideoPrefetcher();
   final _scrollController = ScrollController();
@@ -206,6 +207,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   }
 
   void _fetchMemories(Event? event) {
+    final fetchGeneration = ++_fetchGeneration;
     setState(() {
       if (event is MemoriesSettingChanged &&
           memoriesCacheService.showAnyMemories) {
@@ -215,7 +217,10 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
           .getMemories()
           .then(_sortMemories)
           .then((memories) {
-            if (mounted && _scrollController.hasClients) {
+            if (!mounted || fetchGeneration != _fetchGeneration) {
+              return memories;
+            }
+            if (_scrollController.hasClients) {
               _scrollController.jumpTo(0);
             }
             if (memories.isEmpty || !memoriesCacheService.showAnyMemories) {
@@ -227,7 +232,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
             return memories;
           })
           .onError((_, _) {
-            _cancelPendingWarm();
+            if (mounted && fetchGeneration == _fetchGeneration) {
+              _cancelPendingWarm();
+            }
             return [];
           });
     });
