@@ -3837,6 +3837,15 @@
   "sendLink": "Send link",
   "sendLogsDescription": "This will send across logs to help us debug your issue. While we take precautions to ensure that sensitive information is not logged, we encourage you to view these logs before sharing them.",
   "sendQrCode": "Send QR code",
+  "sendToEmail": "Send to {email}",
+  "@sendToEmail": {
+    "placeholders": {
+      "email": {
+        "type": "String",
+        "example": "support@ente.com"
+      }
+    }
+  },
   "serverEndpoint": "Server endpoint",
   "@serverEndpoint": {
     "description": "Label for server endpoint setting"
