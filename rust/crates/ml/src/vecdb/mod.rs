@@ -31,7 +31,6 @@ pub struct Match {
 pub struct KeyMatches {
     pub key: String,
     pub matches: Vec<Match>,
-    pub truncated: bool,
 }
 
 #[derive(Debug, Error)]

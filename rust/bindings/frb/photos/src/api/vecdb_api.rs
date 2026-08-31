@@ -47,7 +47,6 @@ pub struct VecDbMatch {
 pub struct VecDbKeyMatches {
     pub key: String,
     pub matches: Vec<VecDbMatch>,
-    pub truncated: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -222,7 +221,6 @@ impl VecDb {
             .map(|entry| VecDbKeyMatches {
                 key: entry.key,
                 matches: to_api_matches(entry.matches),
-                truncated: entry.truncated,
             })
             .collect())
     }
@@ -517,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn bulk_search_keys_excludes_self_and_reports_truncation() {
+    fn bulk_search_keys_excludes_self_and_honors_the_filters() {
         let dir = TestDir::create();
         let db = VecDb::new(dir.db_path(), DIMS).unwrap();
         db.bulk_add_vectors(
@@ -538,7 +536,6 @@ mod tests {
         assert_eq!(results[0].key, "b");
         assert_eq!(results[0].matches.len(), 2);
         assert!(results[0].matches.iter().all(|found| found.key != "b"));
-        assert!(results[0].truncated);
         assert_eq!(results[1].key, "a");
         assert!(results[1].matches.iter().all(|found| found.key != "a"));
         let restricted = db
@@ -546,7 +543,6 @@ mod tests {
             .unwrap();
         for entry in &restricted {
             assert_eq!(entry.matches.len(), 1);
-            assert!(!entry.truncated);
         }
         assert_eq!(restricted[0].matches[0].key, "b");
         assert_eq!(restricted[1].matches[0].key, "a");
@@ -554,7 +550,6 @@ mod tests {
             .bulk_search_keys(vec![key("a")], 2, Some(0.5), false, false)
             .unwrap();
         assert!(cut[0].matches.is_empty());
-        assert!(cut[0].truncated);
     }
 
     #[test]

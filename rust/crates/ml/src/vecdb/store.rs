@@ -377,7 +377,6 @@ impl VecDb {
                 results.push(KeyMatches {
                     key: key.clone(),
                     matches: Vec::new(),
-                    truncated: false,
                 });
                 continue;
             }
@@ -389,7 +388,6 @@ impl VecDb {
                 allowed_slots.as_ref(),
                 Some(slot),
             );
-            let truncated = matches.len() >= count;
             if let Some(cap) = max_distance {
                 let keep = matches.partition_point(|entry| entry.distance <= cap);
                 matches.truncate(keep);
@@ -397,7 +395,6 @@ impl VecDb {
             results.push(KeyMatches {
                 key: key.clone(),
                 matches,
-                truncated,
             });
         }
         Ok(results)
@@ -2702,7 +2699,6 @@ mod tests {
             assert_eq!(found, vec!["key-5", "twin-a", "key-0", "key-31"]);
             for entry in &results {
                 assert_eq!(entry.matches.len(), 4);
-                assert!(entry.truncated);
                 assert!(entry.matches.iter().all(|found| found.key != entry.key));
             }
             assert_eq!(results[1].matches[0].key, "twin-b");
@@ -2735,7 +2731,6 @@ mod tests {
             assert_eq!(restricted.len(), 4);
             for entry in &restricted {
                 assert_eq!(entry.matches.len(), 3);
-                assert!(!entry.truncated);
                 assert!(
                     entry
                         .matches
@@ -2757,7 +2752,7 @@ mod tests {
     }
 
     #[test]
-    fn bulk_search_stored_distance_cut_and_truncated_flag() {
+    fn bulk_search_stored_applies_the_distance_cut() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
@@ -2776,29 +2771,24 @@ mod tests {
                 .unwrap();
             assert_eq!(cut[0].matches.len(), 1);
             assert_eq!(cut[0].matches[0].key, "close");
-            assert!(cut[0].truncated);
             let uncut = db
                 .bulk_search_stored(&center, 20, Some(0.5), exact, false)
                 .unwrap();
             assert_eq!(uncut[0].matches.len(), 1);
-            assert!(!uncut[0].truncated);
             let complete = db
                 .bulk_search_stored(&center, 9, None, exact, false)
                 .unwrap();
             assert_eq!(complete[0].matches.len(), 9);
-            assert!(complete[0].truncated);
             let whole_index = db
                 .bulk_search_stored(&center, 10, None, exact, false)
                 .unwrap();
             assert_eq!(whole_index[0].matches.len(), 9);
-            assert!(!whole_index[0].truncated);
             for bad_distance in [f32::NAN, f32::INFINITY, -0.5] {
                 let degenerate = db
                     .bulk_search_stored(&center, 5, Some(bad_distance), exact, false)
                     .unwrap();
                 assert_eq!(degenerate.len(), 1);
                 assert!(degenerate[0].matches.is_empty());
-                assert!(!degenerate[0].truncated);
             }
         }
     }
@@ -2818,7 +2808,6 @@ mod tests {
                 assert_eq!(results.len(), 1);
                 assert_eq!(results[0].key, "solo");
                 assert!(results[0].matches.is_empty());
-                assert!(!results[0].truncated);
             }
         }
     }
