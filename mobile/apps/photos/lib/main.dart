@@ -49,12 +49,14 @@ import "package:photos/services/machine_learning/face_ml/person/person_service.d
 import "package:photos/services/machine_learning/ml_run_control.dart";
 import 'package:photos/services/machine_learning/ml_service.dart';
 import 'package:photos/services/machine_learning/semantic_search/semantic_search_service.dart';
+import "package:photos/services/memories/memory_music_tracks.dart";
 import 'package:photos/services/memory_lane/memory_lane_service.dart';
 import 'package:photos/services/memory_share_service.dart';
 import "package:photos/services/notification_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/services/process_activity.dart";
 import 'package:photos/services/push_service.dart';
+import "package:photos/services/remote_assets_service.dart";
 import 'package:photos/services/search_service.dart';
 import 'package:photos/services/social_notification_coordinator.dart';
 import 'package:photos/services/sync/local_sync_service.dart';
@@ -184,6 +186,9 @@ Future<void> _runInForeground(
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(SemanticSearchService.instance.init());
       unawaited(MemoryLaneService.instance.init());
+      if (flagService.internalUser) {
+        unawaited(_downloadMemoryMusicTracks());
+      }
       unawaited(
         Future.delayed(
           const Duration(seconds: 5),
@@ -193,6 +198,25 @@ Future<void> _runInForeground(
     });
     unawaited(_scheduleFGSync('appStart in FG'));
   });
+}
+
+Future<void> _downloadMemoryMusicTracks() async {
+  await Future.wait(
+    memoryMusicTracks.map((track) async {
+      try {
+        await RemoteAssetsService.instance.getAsset(
+          track.url,
+          cacheFileName: track.cacheFileName,
+        );
+      } catch (error, stackTrace) {
+        _logger.warning(
+          "Failed to download memory music track ${track.id}",
+          error,
+          stackTrace,
+        );
+      }
+    }),
+  );
 }
 
 Future<void> _warmPickerFilesDb() async {
@@ -238,6 +262,15 @@ Future<void> runBackgroundTask(
     Platform.isIOS ? kBGTaskMLSelfStopIOS : kBGTaskMLSelfStopAndroid,
     () => mlRunControl.requestStop(MlStopReason.backgroundDeadline),
   );
+  final mlForegroundWatchTimer = Timer.periodic(
+    const Duration(milliseconds: 500),
+    (_) async {
+      if (mlRunControl.stopRequested) return;
+      if (await isForegroundEngineActive()) {
+        mlRunControl.requestStop(MlStopReason.foregroundActive);
+      }
+    },
+  );
 
   try {
     final isRunningInFG = await isForegroundEngineActive();
@@ -255,6 +288,7 @@ Future<void> runBackgroundTask(
     await _runMinimally(taskId, tlog, mlRunControl);
   } finally {
     mlSelfStopTimer.cancel();
+    mlForegroundWatchTimer.cancel();
   }
 }
 
@@ -351,8 +385,8 @@ Future<void> _runMinimally(
         );
       } else {
         try {
-          await MLService.instance.init();
           PersonService.init(entityService, MLDataDB.instance, prefs);
+          await MLService.instance.init();
           final disposition = await MLService.instance.runAllML(
             force: false,
             control: mlRunControl,
@@ -631,7 +665,11 @@ Future<void> _sync(String caller) async {
   }
 }
 
-Future runWithLogs(Function() function, {String prefix = ""}) async {
+Future runWithLogs(
+  Function() function, {
+  String prefix = "",
+  Duration? sentryInitTimeout,
+}) async {
   await SuperLogging.main(
     LogConfig(
       body: function,
@@ -639,6 +677,7 @@ Future runWithLogs(Function() function, {String prefix = ""}) async {
       maxLogFiles: 5,
       sentryDsn: kDebugMode ? sentryDebugDSN : sentryDSN,
       tunnel: sentryTunnel,
+      sentryInitTimeout: sentryInitTimeout,
       enableInDebugMode: true,
       prefix: prefix,
     ),
@@ -712,11 +751,18 @@ Future<void> _handleBackgroundPush(Object message) async {
 }
 
 Future<void> _logFGHeartBeatInfo(SharedPreferences prefs) async {
-  final bool isRunningInFG = await isForegroundEngineActive();
   await prefs.reload();
-  final lastFGTaskHeartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
-  final String lastRun = lastFGTaskHeartBeatTime == 0
+  final threshold =
+      DateTime.now().microsecondsSinceEpoch - kEngineDeathTimeoutInMicroseconds;
+  final lastDartBeatTime = prefs.getInt(kLastFGTaskHeartBeatTime) ?? 0;
+  final lastNativeBeatTime = prefs.getInt(kLastNativeFGTaskHeartBeatTime) ?? 0;
+  String describe(int beatTime) => beatTime == 0
       ? 'never'
-      : DateTime.fromMicrosecondsSinceEpoch(lastFGTaskHeartBeatTime).toString();
-  _logger.info('isAlreadyRunningFG: $isRunningInFG, last Beat: $lastRun');
+      : DateTime.fromMicrosecondsSinceEpoch(beatTime).toString();
+  _logger.info(
+    'dartFGBeatFresh: ${lastDartBeatTime > threshold}, '
+    'nativeFGBeatFresh: ${lastNativeBeatTime > threshold}, '
+    'last Dart beat: ${describe(lastDartBeatTime)}, '
+    'last native beat: ${describe(lastNativeBeatTime)}',
+  );
 }

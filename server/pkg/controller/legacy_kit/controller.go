@@ -288,6 +288,9 @@ func (c *Controller) ChangePassword(ctx *gin.Context, req ente.LegacyKitRecovery
 	if session.Status != ente.LegacyKitRecoveryStatusReady {
 		return nil, stacktrace.Propagate(ente.NewBadRequestWithMessage("legacy kit recovery is not ready"), "")
 	}
+	if err := req.UpdateSrpAndKeysRequest.Validate(); err != nil {
+		return nil, stacktrace.Propagate(err, "invalid request")
+	}
 	// Known and accepted for the current recovery flow: once a legacy-kit session
 	// is READY, we clear existing second-factor requirements before applying the
 	// recovered password update, so an old TOTP/passkey enrollment does not block

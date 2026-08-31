@@ -1,6 +1,5 @@
 import "dart:io";
 
-import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart' as hw;
 import 'package:photos/app_mode.dart';
 import 'package:photos/core/constants.dart';
@@ -89,7 +88,6 @@ class LocalSettings {
   static const kPeopleSortSimilaritySelected =
       "people_sort_similarity_selected";
   static const kShowLocalIDOverThumbnails = "show_local_id_over_thumbnails";
-  static const kEnableDatabaseLogging = "enable_db_logging";
   static const _kInternalUserDisabled = "ls.internal_user_disabled";
   static const _kBGDebugNotificationsEnabled =
       "ls.bg_debug_notifications_enabled";
@@ -524,13 +522,6 @@ class LocalSettings {
 
   Future<void> setShowLocalIDOverThumbnails(bool value) async {
     await _prefs.setBool(kShowLocalIDOverThumbnails, value);
-  }
-
-  bool get enableDatabaseLogging =>
-      _prefs.getBool(kEnableDatabaseLogging) ?? kDebugMode;
-
-  Future<void> setEnableDatabaseLogging(bool value) async {
-    await _prefs.setBool(kEnableDatabaseLogging, value);
   }
 
   bool get isInternalUserDisabled =>

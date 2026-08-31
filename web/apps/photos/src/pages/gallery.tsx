@@ -131,8 +131,9 @@ import {
     addManualFileAssignmentsToPerson,
     isMLEnabled,
 } from "ente-new/photos/services/ml";
-import { openContacts } from "ente-photos-wasm";
+import { contactsGetDiff, contactsGetProfilePicture } from "ente-photos-wasm";
 
+import { openAuthenticatedSession } from "@/services/authenticated-session";
 import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
@@ -484,7 +485,8 @@ const Page: React.FC = () => {
         let unsubscribeMainWindowFocus: (() => void) | undefined;
 
         void (async () => {
-            if (!haveMasterKeyInSession() || !(await savedAuthToken())) {
+            const authToken = await savedAuthToken();
+            if (!haveMasterKeyInSession() || !authToken) {
                 stashRedirect("/gallery");
                 void router.push("/");
                 return;
@@ -510,15 +512,21 @@ const Page: React.FC = () => {
             const user = ensureLocalUser();
             const masterKey = await masterKeyFromSession();
             if (masterKey) {
-                void ensureContactsReady(
-                    { userID: user.id, masterKeyB64: masterKey },
-                    openContacts,
-                ).catch((error: unknown) => {
-                    log.warn(
-                        "[gallery] Failed to warm contacts display cache",
-                        error,
-                    );
-                });
+                void openAuthenticatedSession(user.id, authToken, masterKey)
+                    .then((session) =>
+                        ensureContactsReady(
+                            user.id,
+                            session,
+                            contactsGetDiff,
+                            contactsGetProfilePicture,
+                        ),
+                    )
+                    .catch((error: unknown) => {
+                        log.warn(
+                            "[gallery] Failed to warm contacts display cache",
+                            error,
+                        );
+                    });
             }
             const userDetails = await savedUserDetailsOrTriggerPull();
             dispatch({

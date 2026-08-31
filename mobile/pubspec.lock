@@ -621,10 +621,10 @@ packages:
     dependency: transitive
     description:
       name: exif_reader
-      sha256: "8491a1733f31b5b0c49d05e3fd2690538f1906b52f156d9d1fe7fad9d76bcced"
+      sha256: bdb0f14e6550eea85059513354e7feda2267ba3a0e108356aa283a71038ac535
       url: "https://pub.dev"
     source: hosted
-    version: "4.1.0"
+    version: "4.2.0"
   expandable:
     dependency: transitive
     description:
@@ -2225,10 +2225,10 @@ packages:
     dependency: transitive
     description:
       name: random_access_source
-      sha256: "2cb3578e3027d6f7e44a66ec9bf72f5e0b73e9c0e62f4768977a0ed962d08be7"
+      sha256: "0d33a16014f72da17adfb44fdafe8976b45d51a22a192d2fe832d1c1da2bee34"
       url: "https://pub.dev"
     source: hosted
-    version: "4.2.1"
+    version: "4.3.1"
   receive_sharing_intent:
     dependency: transitive
     description:
@@ -2579,14 +2579,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.2"
-  sqflite_migration:
-    dependency: transitive
-    description:
-      name: sqflite_migration
-      sha256: "8134886ceaa738c0b7a014cf6115817d6abb0598a7435b18815c25c0d5cffdd0"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.0"
   sqflite_platform_interface:
     dependency: transitive
     description:

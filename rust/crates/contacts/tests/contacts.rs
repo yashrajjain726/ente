@@ -2,7 +2,7 @@
 
 mod support;
 
-use ente_contacts::models::ContactData;
+use ente_contacts::ContactData;
 use ente_core::http;
 use ente_legacy::{
     LegacyContactState, LegacyKitRecoveryClient, LegacyKitRecoveryStatus, LegacyRecoveryStatus,
@@ -131,31 +131,36 @@ async fn run_contacts_stage(endpoint: &str, pair: &legacy::LegacyPair) {
 }
 
 async fn run_legacy_reject_stage(pair: &legacy::LegacyPair) {
-    pair.trusted_ctx
-        .start_recovery(pair.owner.user_id, pair.trusted.user_id)
-        .await
-        .unwrap();
+    ente_legacy::start_recovery(
+        &pair.trusted_session,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+    )
+    .await
+    .unwrap();
 
     assert!(matches!(
-        pair.owner_ctx
-            .update_recovery_notice(pair.trusted.user_id, 1)
-            .await,
+        ente_legacy::update_recovery_notice(&pair.owner_session, pair.trusted.user_id, 1).await,
         Err(ente_legacy::Error::ActiveRecoverySession)
     ));
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
     let recovery =
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .expect("owner recovery session missing");
     assert_eq!(recovery.status, LegacyRecoveryStatus::Waiting);
 
-    pair.owner_ctx
-        .reject_recovery(&recovery.id, pair.owner.user_id, pair.trusted.user_id)
-        .await
-        .unwrap();
+    ente_legacy::reject_recovery(
+        &pair.owner_session,
+        &recovery.id,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+    )
+    .await
+    .unwrap();
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
-    let trusted_info = pair.trusted_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
+    let trusted_info = ente_legacy::info(&pair.trusted_session).await.unwrap();
     assert!(
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .is_none()
@@ -172,24 +177,31 @@ async fn run_legacy_reject_stage(pair: &legacy::LegacyPair) {
 }
 
 async fn run_legacy_stop_stage(pair: &legacy::LegacyPair) {
-    pair.trusted_ctx
-        .start_recovery(pair.owner.user_id, pair.trusted.user_id)
-        .await
-        .unwrap();
+    ente_legacy::start_recovery(
+        &pair.trusted_session,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+    )
+    .await
+    .unwrap();
 
-    let trusted_info = pair.trusted_ctx.info().await.unwrap();
+    let trusted_info = ente_legacy::info(&pair.trusted_session).await.unwrap();
     let recovery =
         legacy::trusted_recovery_session(&trusted_info, pair.owner.user_id, pair.trusted.user_id)
             .expect("trusted recovery session missing");
     assert_eq!(recovery.status, LegacyRecoveryStatus::Waiting);
 
-    pair.trusted_ctx
-        .stop_recovery(&recovery.id, pair.owner.user_id, pair.trusted.user_id)
-        .await
-        .unwrap();
+    ente_legacy::stop_recovery(
+        &pair.trusted_session,
+        &recovery.id,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+    )
+    .await
+    .unwrap();
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
-    let trusted_info = pair.trusted_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
+    let trusted_info = ente_legacy::info(&pair.trusted_session).await.unwrap();
     assert!(
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .is_none()
@@ -201,37 +213,41 @@ async fn run_legacy_stop_stage(pair: &legacy::LegacyPair) {
 }
 
 async fn run_legacy_reinvite_stage(pair: &legacy::LegacyPair) {
-    pair.owner_ctx
-        .update_contact(
-            pair.owner.user_id,
-            pair.trusted.user_id,
-            LegacyContactState::Revoked,
-        )
-        .await
-        .unwrap();
+    ente_legacy::update_contact(
+        &pair.owner_session,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+        LegacyContactState::Revoked,
+    )
+    .await
+    .unwrap();
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
-    let trusted_info = pair.trusted_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
+    let trusted_info = ente_legacy::info(&pair.trusted_session).await.unwrap();
     assert!(legacy::owner_contact(&owner_info, pair.owner.user_id, pair.trusted.user_id).is_none());
     assert!(
         legacy::trusted_contact(&trusted_info, pair.owner.user_id, pair.trusted.user_id).is_none()
     );
 
-    pair.owner_ctx
-        .add_contact(&pair.trusted.email, &pair.owner.key_attributes, Some(14))
-        .await
-        .unwrap();
-    pair.trusted_ctx
-        .update_contact(
-            pair.owner.user_id,
-            pair.trusted.user_id,
-            LegacyContactState::Accepted,
-        )
-        .await
-        .unwrap();
+    ente_legacy::add_contact(
+        &pair.owner_session,
+        &pair.trusted.email,
+        &pair.owner.key_attributes,
+        Some(14),
+    )
+    .await
+    .unwrap();
+    ente_legacy::update_contact(
+        &pair.trusted_session,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+        LegacyContactState::Accepted,
+    )
+    .await
+    .unwrap();
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
-    let trusted_info = pair.trusted_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
+    let trusted_info = ente_legacy::info(&pair.trusted_session).await.unwrap();
     let owner_contact =
         legacy::owner_contact(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .expect("reinvited contact missing from owner view");
@@ -249,23 +265,30 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
             .expect("two-factor status before recovery fetch failed")
     );
 
-    pair.trusted_ctx
-        .start_recovery(pair.owner.user_id, pair.trusted.user_id)
-        .await
-        .unwrap();
+    ente_legacy::start_recovery(
+        &pair.trusted_session,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+    )
+    .await
+    .unwrap();
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
     let recovery =
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .expect("owner recovery session missing");
     assert_eq!(recovery.status, LegacyRecoveryStatus::Waiting);
 
-    pair.owner_ctx
-        .approve_recovery(&recovery.id, pair.owner.user_id, pair.trusted.user_id)
-        .await
-        .unwrap();
+    ente_legacy::approve_recovery(
+        &pair.owner_session,
+        &recovery.id,
+        pair.owner.user_id,
+        pair.trusted.user_id,
+    )
+    .await
+    .unwrap();
 
-    let owner_info = pair.owner_ctx.info().await.unwrap();
+    let owner_info = ente_legacy::info(&pair.owner_session).await.unwrap();
     let recovery =
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .expect("approved recovery session missing");
@@ -273,10 +296,14 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
 
     let previous_password = pair.owner.password.clone();
     let new_password = support::unique_password("LegacyRecovered");
-    pair.trusted_ctx
-        .change_password(&recovery.id, &pair.trusted.key_attributes, &new_password)
-        .await
-        .unwrap();
+    ente_legacy::change_password(
+        &pair.trusted_session,
+        &recovery.id,
+        &pair.trusted.key_attributes,
+        &new_password,
+    )
+    .await
+    .unwrap();
 
     match auth::login_without_totp(endpoint, &pair.owner.email, &previous_password).await {
         Err(ente_accounts::Error::IncorrectPassword) => {}
@@ -300,9 +327,9 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
             .expect("two-factor status after recovery fetch failed")
     );
 
-    let recovered_owner_ctx = legacy::open_client(endpoint, &recovered_owner);
-    let owner_info = recovered_owner_ctx.info().await.unwrap();
-    let trusted_info = pair.trusted_ctx.info().await.unwrap();
+    let recovered_owner_session = legacy::open_session(endpoint, &recovered_owner);
+    let owner_info = ente_legacy::info(&recovered_owner_session).await.unwrap();
+    let trusted_info = ente_legacy::info(&pair.trusted_session).await.unwrap();
     assert!(
         legacy::owner_recovery_session(&owner_info, pair.owner.user_id, pair.trusted.user_id)
             .is_none()
@@ -318,7 +345,7 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
     assert_eq!(owner_contact.state, LegacyContactState::Accepted);
 
     pair.owner = recovered_owner;
-    pair.owner_ctx = recovered_owner_ctx;
+    pair.owner_session = recovered_owner_session;
 }
 
 async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitOwner) {
@@ -360,22 +387,19 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .expect("legacy kit invalid create request failed");
     assert_eq!(invalid_create.status(), reqwest::StatusCode::BAD_REQUEST);
 
-    let waiting_kit = owner
-        .owner_ctx
-        .create_kit(
-            &owner.owner.key_attributes,
-            ["North".into(), "East".into(), "West".into()],
-            24,
-        )
-        .await
-        .expect("waiting legacy kit create failed");
+    let waiting_kit = ente_legacy::create_kit(
+        &owner.owner_session,
+        &owner.owner.key_attributes,
+        ["North".into(), "East".into(), "West".into()],
+        24,
+    )
+    .await
+    .expect("waiting legacy kit create failed");
     assert_eq!(waiting_kit.kit.notice_period_in_hours, 24);
     assert_eq!(waiting_kit.kit.metadata.parts.len(), 3);
     assert_eq!(waiting_kit.shares.len(), 3);
 
-    let listed = owner
-        .owner_ctx
-        .kits()
+    let listed = ente_legacy::kits(&owner.owner_session)
         .await
         .expect("legacy kit list failed");
     let listed_waiting_kit = listed
@@ -385,11 +409,10 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
     assert_eq!(listed_waiting_kit.metadata.parts.len(), 3);
     assert_eq!(listed_waiting_kit.metadata.parts[0].name, "North");
 
-    let downloaded_shares = owner
-        .owner_ctx
-        .download_kit_shares(&waiting_kit.kit.id)
-        .await
-        .expect("legacy kit share download failed");
+    let downloaded_shares =
+        ente_legacy::download_kit_shares(&owner.owner_session, &waiting_kit.kit.id)
+            .await
+            .expect("legacy kit share download failed");
     assert_eq!(downloaded_shares.len(), 3);
     assert_eq!(downloaded_shares[0].kit_id, waiting_kit.kit.id);
     assert_eq!(
@@ -427,9 +450,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .expect("legacy kit invalid recovery open request failed");
     assert_eq!(invalid_open.status(), reqwest::StatusCode::BAD_REQUEST);
 
-    let listed_after_invalid_open = owner
-        .owner_ctx
-        .kits()
+    let listed_after_invalid_open = ente_legacy::kits(&owner.owner_session)
         .await
         .expect("legacy kit list after invalid challenge failed");
     let listed_waiting_after_invalid_open = listed_after_invalid_open
@@ -529,11 +550,10 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .await
         .expect("resumed legacy kit session fetch failed");
     assert_eq!(resumed_session.status, LegacyKitRecoveryStatus::Waiting);
-    let owner_recovery_session = owner
-        .owner_ctx
-        .kit_recovery_session(&waiting_kit.kit.id)
-        .await
-        .expect("owner legacy kit recovery session fetch failed");
+    let owner_recovery_session =
+        ente_legacy::kit_recovery_session(&owner.owner_session, &waiting_kit.kit.id)
+            .await
+            .expect("owner legacy kit recovery session fetch failed");
     let owner_active_session = owner_recovery_session
         .session
         .as_ref()
@@ -561,9 +581,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
             .all(|initiator| !initiator.user_agent.is_empty())
     );
 
-    owner
-        .owner_ctx
-        .block_kit_recovery(&waiting_kit.kit.id)
+    ente_legacy::block_kit_recovery(&owner.owner_session, &waiting_kit.kit.id)
         .await
         .expect("legacy kit block failed");
     let blocked_session = resumed_waiting_handle
@@ -579,22 +597,17 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         blocked_original_session.status,
         LegacyKitRecoveryStatus::Blocked
     );
-    let blocked_owner_recovery_session = owner
-        .owner_ctx
-        .kit_recovery_session(&waiting_kit.kit.id)
-        .await
-        .expect("owner legacy kit recovery session fetch after block failed");
+    let blocked_owner_recovery_session =
+        ente_legacy::kit_recovery_session(&owner.owner_session, &waiting_kit.kit.id)
+            .await
+            .expect("owner legacy kit recovery session fetch after block failed");
     assert!(blocked_owner_recovery_session.session.is_none());
     assert!(blocked_owner_recovery_session.initiators.is_empty());
 
-    owner
-        .owner_ctx
-        .delete_kit(&waiting_kit.kit.id)
+    ente_legacy::delete_kit(&owner.owner_session, &waiting_kit.kit.id)
         .await
         .expect("legacy kit delete failed");
-    let listed_after_delete = owner
-        .owner_ctx
-        .kits()
+    let listed_after_delete = ente_legacy::kits(&owner.owner_session)
         .await
         .expect("legacy kit list after delete failed");
     assert!(
@@ -614,15 +627,14 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         ente_legacy::Error::LegacyKitInactive
     ));
 
-    let immediate_kit = owner
-        .owner_ctx
-        .create_kit(
-            &owner.owner.key_attributes,
-            ["Alpha".into(), "Bravo".into(), "Charlie".into()],
-            0,
-        )
-        .await
-        .expect("immediate legacy kit create failed");
+    let immediate_kit = ente_legacy::create_kit(
+        &owner.owner_session,
+        &owner.owner.key_attributes,
+        ["Alpha".into(), "Bravo".into(), "Charlie".into()],
+        0,
+    )
+    .await
+    .expect("immediate legacy kit create failed");
     let ready_handle = recovery_client
         .open_from_shares(&immediate_kit.shares[0..2], Some("beneficiary@example.org"))
         .await

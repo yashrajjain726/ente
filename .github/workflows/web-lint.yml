@@ -50,6 +50,8 @@ jobs:
 
             - run: npm audit --audit-level critical
 
+            - run: _ENTE_IS_DESKTOP=1 npm run build:photos
+
             - run: npm run build:wasm
 
             - run: npm run lint

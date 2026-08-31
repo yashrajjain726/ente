@@ -1,3 +1,4 @@
+import { authenticatedLegacySession } from "@/services/authenticated-session";
 import {
     LegacyDrawerContent,
     type LegacySuggestedUser,
@@ -18,6 +19,10 @@ export const LockerLegacyDrawer: React.FC<
         title="Legacy"
         caption="Legacy allows trusted contacts to access your account in your absence."
     >
-        <LegacyDrawerContent open={open} suggestedUsers={suggestedUsers} />
+        <LegacyDrawerContent
+            open={open}
+            suggestedUsers={suggestedUsers}
+            getSession={authenticatedLegacySession}
+        />
     </LockerTitledNestedSidebarDrawer>
 );
