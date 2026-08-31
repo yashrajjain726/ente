@@ -48,7 +48,6 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 export const homeBackground = "#0C1014";
 
 const green = "#08C225";
-const mediaSkeletonElementBackground = "#E6E6E6";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
@@ -57,6 +56,7 @@ const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
 const headerChromeColor = "#202825";
+const mediaPlaceholderColor = headerChromeColor;
 const headerHeight = 64;
 const headerIconSize = 22;
 const headerSideWidth = 36;
@@ -414,7 +414,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     alignItems: "center",
                     appearance: "none",
                     aspectRatio: "1",
-                    bgcolor: "#E5E7EA",
+                    bgcolor: mediaPlaceholderColor,
                     border: 0,
                     borderRadius: "20%",
                     color: textBase,
@@ -434,7 +434,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     <Skeleton
                         variant="rectangular"
                         sx={{
-                            bgcolor: mediaSkeletonElementBackground,
+                            bgcolor: mediaPlaceholderColor,
                             height: "100%",
                             transform: "none",
                             width: "100%",
@@ -446,7 +446,7 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                             <Skeleton
                                 variant="rectangular"
                                 sx={{
-                                    bgcolor: mediaSkeletonElementBackground,
+                                    bgcolor: mediaPlaceholderColor,
                                     height: "100%",
                                     transform: "none",
                                     width: "100%",
@@ -539,12 +539,26 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     zIndex: 2,
                 }}
             >
-                <SpaceAvatarImage
-                    aria-hidden
-                    border="2px solid rgba(255, 255, 255, 0.36)"
-                    borderRadius="50%"
-                    src={displayAvatarUrl}
-                />
+                {isAvatarPending ? (
+                    <Skeleton
+                        variant="circular"
+                        sx={{
+                            bgcolor: mediaPlaceholderColor,
+                            border: "2px solid rgba(255, 255, 255, 0.36)",
+                            boxSizing: "border-box",
+                            height: "100%",
+                            transform: "none",
+                            width: "100%",
+                        }}
+                    />
+                ) : (
+                    <SpaceAvatarImage
+                        aria-hidden
+                        border="2px solid rgba(255, 255, 255, 0.36)"
+                        borderRadius="50%"
+                        src={displayAvatarUrl}
+                    />
+                )}
             </Box>
         </Box>
     );
@@ -1348,7 +1362,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 <Skeleton
                                     variant="circular"
                                     sx={{
-                                        bgcolor: mediaSkeletonElementBackground,
+                                        bgcolor: mediaPlaceholderColor,
                                         height: headerAvatarImageSize,
                                         transform: "none",
                                         width: headerAvatarImageSize,
