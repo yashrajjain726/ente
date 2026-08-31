@@ -36,7 +36,6 @@ import 'package:photos/db/files_db.dart';
 import "package:photos/db/ml/db.dart";
 import 'package:photos/ente_theme_data.dart';
 import "package:photos/locale.dart";
-import "package:photos/models/gallery/gallery_layout_config.dart";
 import 'package:photos/module/upload/service/file_uploader.dart';
 import 'package:photos/module/upload/service/local_file_update_service.dart';
 import "package:photos/service_locator.dart";
@@ -587,17 +586,12 @@ void _logRustEntry(Logger logger, String level, String target, String body) {
 }
 
 void logLocalSettings() {
-  final storedGalleryLayout = localSettings.getGalleryLayoutType();
-  final effectiveGalleryLayout = resolveGalleryLayoutType(storedGalleryLayout);
   final settings = {
     'Show memories': memoriesCacheService.showAnyMemories,
     'Smart memories enabled': localSettings.isSmartMemoriesEnabled,
     'ML enabled': flagService.hasGrantedMLConsent,
     'ML local indexing enabled': localSettings.isMLLocalIndexingEnabled,
     'Multipart upload enabled': localSettings.userEnabledMultiplePart,
-    'Gallery layout': effectiveGalleryLayout.name,
-    if (storedGalleryLayout != effectiveGalleryLayout)
-      'Stored gallery layout': storedGalleryLayout.name,
     'Gallery grid size': localSettings.getPhotoGridSize(),
     'Video streaming enabled':
         VideoPreviewService.instance.isVideoStreamingEnabled,
