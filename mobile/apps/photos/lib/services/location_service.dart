@@ -16,6 +16,7 @@ import "package:photos/models/local_entity_data.dart";
 import "package:photos/models/location/location.dart";
 import 'package:photos/models/location_tag/location_tag.dart';
 import "package:photos/service_locator.dart";
+import "package:photos/services/native_country_locales.dart";
 import "package:photos/src/rust/api/location_api.dart" as rust;
 
 const double earthRadius = 6371; // Earth's radius in kilometers
@@ -122,12 +123,9 @@ class LocationService {
     if (index == null) return {};
     final names = _countryNames[locale] ??= await CountryNamesClient.get(
       locale,
+      nativeLocales: nativeCountryLocales,
     );
-    final normalizedQuery = query.toLowerCase();
-    final matchingCodes = names.names.entries
-        .where((entry) => entry.value.toLowerCase().contains(normalizedQuery))
-        .map((entry) => entry.key)
-        .toSet();
+    final matchingCodes = names.matchingCodes(query);
     if (matchingCodes.isEmpty) return {};
     final files = allFiles.where((file) => file.hasLocation).toList();
     final groups = await index.groupCountries(
