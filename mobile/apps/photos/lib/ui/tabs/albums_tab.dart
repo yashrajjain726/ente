@@ -273,11 +273,15 @@ class _AlbumsTabState extends State<AlbumsTab>
     if (!RemoteSyncService.instance.isFirstRemoteSyncDone()) {
       return false;
     }
+    final userID = Configuration.instance.getUserID();
+    if (userID == null) {
+      return false;
+    }
     final collectionIDToLatestTimeCount = await CollectionsService.instance
         .getCollectionIDToNewestFileTime();
     final emptyAlbumCount = collections.where((collection) {
       final latestTimeCount = collectionIDToLatestTimeCount[collection.id];
-      return latestTimeCount == null;
+      return collection.isOwner(userID) && latestTimeCount == null;
     }).length;
     return emptyAlbumCount > 2;
   }
