@@ -9,11 +9,6 @@ export interface HomeCirclePlacement {
     y: number;
 }
 
-const homeCircleSizeScale = 0.94;
-
-export const homeCircleOrbitGap = (circleSize: number) =>
-    Math.max(3, Math.min(9, circleSize * 0.04));
-
 const circleSlotsForCount = (count: number) => {
     if (count == 1) {
         return { columns: 1, rows: 1, slots: [{ column: 0, row: 0 }] };
@@ -79,20 +74,18 @@ export const homeCirclePlacements = (
               ? 1 / 0.48
               : columns + (columns - 1) * circleGapRatio;
     const layoutHeight = 1 + rowOffsets[rowOffsets.length - 1]!;
-    const slotSize = Math.min(
+    const size = Math.min(
         canvasWidth / layoutWidth,
         canvasHeight / layoutHeight,
     );
-    const size = slotSize * homeCircleSizeScale;
-    const circleInset = (slotSize - size) / 2;
-    const horizontalStep = slotSize * (1 + circleGapRatio);
-    const renderedWidth = slotSize + horizontalStep * (columns - 1);
-    const renderedHeight = slotSize * layoutHeight;
+    const horizontalStep = size * (1 + circleGapRatio);
+    const renderedWidth = size + horizontalStep * (columns - 1);
+    const renderedHeight = size * layoutHeight;
     const originX = (canvasWidth - renderedWidth) / 2;
     const originY = (canvasHeight - renderedHeight) / 2;
     return slots.map(({ column, row }) => ({
         size,
-        x: originX + column * horizontalStep + circleInset,
-        y: originY + rowOffsets[row]! * slotSize + circleInset,
+        x: originX + column * horizontalStep,
+        y: originY + rowOffsets[row]! * size,
     }));
 };

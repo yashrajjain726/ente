@@ -9,12 +9,13 @@ import {
     prependCachedSpaceFeedPost,
 } from "services/feed-cache";
 import { consumeSentSpaceInviteFriend } from "services/invite";
-import { markSpacePostSeen } from "services/post-seen";
+import { loadUnseenSpacePostIDs, markSpacePostSeen } from "services/post-seen";
 import { loadExistingSpaceId } from "services/profile";
 import {
     createCurrentPhotoPost,
     loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
+    loadCurrentSpaceLatestPost,
     loadCurrentSpacePostAssetURL,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
@@ -22,7 +23,6 @@ import {
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
-import { loadUnseenSpacePosts } from "services/unseen-posts";
 import { useSpaceAppState } from "state/app-state";
 import { spaceWaveMessageText } from "utils/message-limits";
 import { prepareSpacePostImageFromEdit } from "utils/post-image";
@@ -42,7 +42,8 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
-    const [unseenPosts, setUnseenPosts] = useState<SpacePost[]>([]);
+    const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
+    const [unseenPostIDs, setUnseenPostIDs] = useState<Set<number>>(new Set());
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
@@ -70,7 +71,8 @@ const Page: React.FC = () => {
     useEffect(() => {
         let cancelled = false;
         setSpaceId(undefined);
-        setUnseenPosts([]);
+        setLatestPosts([]);
+        setUnseenPostIDs(new Set());
         setHasUnreadMessages(undefined);
         setIsLatestPostsLoading(true);
         setIsFriendsLoading(true);
@@ -102,24 +104,33 @@ const Page: React.FC = () => {
                         setIsFriendsLoading(false);
                         return Promise.all(
                             nextFriends.map(async (friend) => {
-                                if (!friend.spaceId) return [];
+                                if (!friend.spaceId) return null;
                                 try {
-                                    return await loadUnseenSpacePosts(
+                                    return await loadCurrentSpaceLatestPost(
                                         friend.spaceId,
                                         nextSpaceId,
                                     );
                                 } catch (error) {
                                     log.warn(
-                                        `Failed to load unseen posts for ${friend.id}`,
+                                        `Failed to load latest post for ${friend.id}`,
                                         error,
                                     );
-                                    return [];
+                                    return null;
                                 }
                             }),
-                        ).then((unseenPostGroups) => {
+                        ).then((latestPosts) => {
                             if (cancelled) return;
 
-                            setUnseenPosts(unseenPostGroups.flat());
+                            const nextLatestPosts = latestPosts.filter(
+                                (post): post is SpacePost => post !== null,
+                            );
+                            setLatestPosts(nextLatestPosts);
+                            setUnseenPostIDs(
+                                loadUnseenSpacePostIDs(
+                                    nextFriends,
+                                    nextLatestPosts,
+                                ),
+                            );
                         });
                     },
                 );
@@ -147,7 +158,7 @@ const Page: React.FC = () => {
             void patchCachedSpaceFeedPost(spaceId, postId, {
                 viewerLiked: liked,
             });
-            setUnseenPosts((currentItems) =>
+            setLatestPosts((currentItems) =>
                 currentItems.map((item) =>
                     item.postId == postId
                         ? { ...item, viewerLiked: liked }
@@ -197,7 +208,7 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={homeBackground} />
             <HomeScreen
-                unseenPosts={unseenPosts}
+                latestPosts={latestPosts}
                 friendRequestSentToastName={friendRequestSentToastName}
                 friends={friends}
                 hasUnreadMessages={hasUnreadMessages}
@@ -205,6 +216,7 @@ const Page: React.FC = () => {
                 isLatestPostsLoading={isLatestPostsLoading}
                 isFriendsLoading={isFriendsLoading}
                 profile={profile}
+                unseenPostIDs={unseenPostIDs}
                 viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&
@@ -256,13 +268,13 @@ const Page: React.FC = () => {
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onPostSeen={(friendSpaceID, postID) => {
                     markSpacePostSeen(friendSpaceID, postID);
-                    setUnseenPosts((currentPosts) =>
-                        currentPosts.filter(
-                            (post) =>
-                                post.spaceId != friendSpaceID ||
-                                post.postId != postID,
-                        ),
-                    );
+                    setUnseenPostIDs((currentPostIDs) => {
+                        if (!currentPostIDs.has(postID)) return currentPostIDs;
+
+                        const nextPostIDs = new Set(currentPostIDs);
+                        nextPostIDs.delete(postID);
+                        return nextPostIDs;
+                    });
                 }}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={

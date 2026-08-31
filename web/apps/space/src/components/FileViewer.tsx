@@ -58,6 +58,7 @@ const defaultPhotoHeight = 680;
 const viewerSwipeMinDeltaPx = 72;
 const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
+const viewerHeaderButtonVisualSize = 28;
 const draftPostExitDurationMs = 320;
 const keyboardInsetThresholdPx = 80;
 const keyboardDismissMaxDurationMs = 500;
@@ -181,7 +182,6 @@ interface SpaceFileViewerProps {
     photos?: SpaceViewerPhoto[];
     focusReplyOnOpen?: boolean;
     postActionMode?: SpaceViewerPostActionMode;
-    showSequenceProgress?: boolean;
 }
 
 interface ViewerSwipeGesture {
@@ -275,12 +275,23 @@ const viewerHeaderButtonSx = {
     display: "flex",
     height: spaceTouchTargetSize,
     justifyContent: "center",
-    ml: "-8px",
-    mr: "-16px",
+    mx: "-8px",
     p: 0,
     width: spaceTouchTargetSize,
     "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
-    "&:hover": { color: textBase },
+    "&:hover .space-viewer-header-button-visual": {
+        bgcolor: controlBackgroundHover,
+    },
+};
+
+const viewerHeaderButtonVisualSx = {
+    alignItems: "center",
+    bgcolor: controlBackground,
+    borderRadius: "50%",
+    display: "flex",
+    height: viewerHeaderButtonVisualSize,
+    justifyContent: "center",
+    width: viewerHeaderButtonVisualSize,
 };
 
 const resizeCaptionInput = (
@@ -366,7 +377,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     photoIndex = 0,
     photos,
     postActionMode = "like-only",
-    showSequenceProgress = false,
 }) => {
     const activePostActionMode = postActionMode;
     const isDraftPost = activePostActionMode == "draft-post";
@@ -394,8 +404,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         viewerPhotos.length - 1,
     );
     const activePhoto = viewerPhotos[activePhotoIndex] ?? photo;
-    const shouldShowSequenceProgress =
-        showSequenceProgress && !isDraftPost && viewerPhotos.length > 1;
     const canUpdatePostCaption =
         !isDraftPost &&
         Boolean(activePhoto.postId) &&
@@ -1429,41 +1437,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         justifySelf: "flex-end",
                     }}
                 >
-                    {shouldShowSequenceProgress && (
-                        <Box
-                            component="span"
-                            aria-label={`Post ${activePhotoIndex + 1} of ${viewerPhotos.length}`}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: controlBackground,
-                                borderRadius: "999px",
-                                boxSizing: "border-box",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontVariantNumeric: "tabular-nums",
-                                fontWeight: 700,
-                                gap: "6px",
-                                height: 28,
-                                justifyContent: "center",
-                                lineHeight: "16px",
-                                minWidth: 48,
-                                mr: "6px",
-                                px: "9px",
-                            }}
-                        >
-                            <Box component="span" sx={{ color: "#70EC80" }}>
-                                {activePhotoIndex + 1}
-                            </Box>
-                            <Box component="span" sx={{ color: textTertiary }}>
-                                /
-                            </Box>
-                            <Box component="span" sx={{ color: textBase }}>
-                                {viewerPhotos.length}
-                            </Box>
-                        </Box>
-                    )}
                     {canManagePost && !isCaptionEditing && (
                         <Box
                             component="button"
@@ -1515,11 +1488,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         onClick={closeViewer}
                         sx={viewerHeaderButtonSx}
                     >
-                        <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={18}
-                            strokeWidth={1.8}
-                        />
+                        <Box
+                            className="space-viewer-header-button-visual"
+                            component="span"
+                            sx={viewerHeaderButtonVisualSx}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={1.8}
+                            />
+                        </Box>
                     </Box>
                 </Box>
                 {canManagePost && (
@@ -2125,7 +2104,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 onFocus={() => setIsReplyFocused(true)}
                                 onKeyDown={handleReplyKeyDown}
                                 onPointerDown={handleReplyInputPointerDown}
-                                placeholder={`Reply to ${displayName}...`}
+                                placeholder="Reply..."
                                 readOnly={canAddFriendForPostAction}
                                 rows={1}
                                 value={replyText}
