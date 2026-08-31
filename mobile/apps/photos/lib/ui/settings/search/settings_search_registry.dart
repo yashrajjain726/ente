@@ -28,7 +28,7 @@ class SettingsSearchRegistry {
     final hasLoggedIn = Configuration.instance.isLoggedIn();
     final isLocalGallery = isLocalGalleryMode;
     final showThemeControls = Platform.isAndroid || kDebugMode;
-    final showMosaicLayout = isMosaicLayoutAvailable;
+    final showJustifiedLayout = isJustifiedLayoutAvailable;
     final items = <SettingsSearchItem>[];
 
     if (hasLoggedIn && !isLocalGallery) {
@@ -321,13 +321,12 @@ class SettingsSearchRegistry {
           "grid size",
           "group by",
           "layout",
-          if (showMosaicLayout) "masonry",
-          if (showMosaicLayout) "mosaic",
+          if (showJustifiedLayout) "justified",
         ],
       ),
     );
 
-    if (showMosaicLayout) {
+    if (showJustifiedLayout) {
       items.add(
         SettingsSearchItem(
           title: l10n.layout,
@@ -337,7 +336,7 @@ class SettingsSearchRegistry {
           routeBuilder: (_) =>
               const GallerySettingsScreen(fromGalleryLayoutSettingsCTA: false),
           isSubPage: true,
-          keywords: ["layout", "grid", "masonry", "mosaic", "justified"],
+          keywords: ["layout", "grid", "justified"],
         ),
       );
     }

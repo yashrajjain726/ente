@@ -3,14 +3,14 @@ import "dart:math" as math;
 
 import "package:photos/models/gallery/section_layout.dart";
 
-class MosaicRowLayout {
+class JustifiedRowLayout {
   final int firstIndex;
   final int lastIndex;
   final double minOffset;
   final double height;
   final List<double> itemWidths;
 
-  const MosaicRowLayout({
+  const JustifiedRowLayout({
     required this.firstIndex,
     required this.lastIndex,
     required this.minOffset,
@@ -21,10 +21,10 @@ class MosaicRowLayout {
   double get maxOffset => minOffset + height;
 }
 
-class MosaicSectionLayout extends SectionLayout {
-  final List<MosaicRowLayout> rows;
+class JustifiedSectionLayout extends SectionLayout {
+  final List<JustifiedRowLayout> rows;
 
-  const MosaicSectionLayout({
+  const JustifiedSectionLayout({
     required super.firstIndex,
     required super.lastIndex,
     required super.minOffset,
@@ -92,14 +92,14 @@ class MosaicSectionLayout extends SectionLayout {
   }
 }
 
-class MosaicLayoutCalculator {
+class JustifiedLayoutCalculator {
   static const double _minimumAspectRatio = 1 / 3;
   static const double _maximumAspectRatio = 4.0;
   static const double _maximumRowHeightFactor = 2.4;
   // Logical pixels map to density-independent tap extents on both platforms.
   static const double _minimumTappableExtent = 48.0;
 
-  const MosaicLayoutCalculator._();
+  const JustifiedLayoutCalculator._();
 
   static double aspectRatioForDimensions(int width, int height) {
     if (width <= 0 || height <= 0) return 1;
@@ -108,7 +108,7 @@ class MosaicLayoutCalculator {
         .toDouble();
   }
 
-  static List<MosaicRowLayout> computeRows({
+  static List<JustifiedRowLayout> computeRows({
     required Iterable<double> aspectRatios,
     required double availableWidth,
     required double targetRowHeight,
@@ -125,7 +125,7 @@ class MosaicLayoutCalculator {
       throw ArgumentError.value(spacing, "spacing");
     }
 
-    final rows = <MosaicRowLayout>[];
+    final rows = <JustifiedRowLayout>[];
     final pendingRatios = <double>[];
     final maximumRowHeight = targetRowHeight * _maximumRowHeightFactor;
     var pendingRatioSum = 0.0;
@@ -162,7 +162,7 @@ class MosaicLayoutCalculator {
       }
 
       rows.add(
-        MosaicRowLayout(
+        JustifiedRowLayout(
           firstIndex: pendingFirstIndex,
           lastIndex: pendingFirstIndex + pendingRatios.length - 1,
           minOffset: rowOffset,

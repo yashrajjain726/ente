@@ -1,11 +1,11 @@
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/models/gallery/mosaic_layout.dart";
+import "package:photos/models/gallery/justified_layout.dart";
 import "package:photos/ui/viewer/gallery/component/sectioned_sliver_list.dart";
 
 void main() {
   testWidgets(
-    "a deep mosaic jump builds only the nearby viewport and cache rows",
+    "a deep justified jump builds only the nearby viewport and cache rows",
     (tester) async {
       const rowCount = 100000;
       const rowHeight = 50.0;
@@ -15,9 +15,9 @@ void main() {
       const deepRowIndex = 80000;
       const deepChildIndex = deepRowIndex + 1;
       final builtIndices = <int>[];
-      final rows = List<MosaicRowLayout>.generate(
+      final rows = List<JustifiedRowLayout>.generate(
         rowCount,
-        (index) => MosaicRowLayout(
+        (index) => JustifiedRowLayout(
           firstIndex: index,
           lastIndex: index,
           minOffset: index * rowStride,
@@ -26,7 +26,7 @@ void main() {
         ),
         growable: false,
       );
-      final section = MosaicSectionLayout(
+      final section = JustifiedSectionLayout(
         firstIndex: 0,
         lastIndex: rowCount,
         minOffset: 0,

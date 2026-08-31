@@ -12,17 +12,17 @@ void main() {
     expect(settings.getGalleryLayoutType(), GalleryLayoutType.grid);
   });
 
-  test("gallery layout persists mosaic", () async {
+  test("gallery layout persists justified", () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     final settings = LocalSettings(preferences);
 
-    await settings.setGalleryLayoutType(GalleryLayoutType.mosaic);
+    await settings.setGalleryLayoutType(GalleryLayoutType.justified);
 
-    expect(settings.getGalleryLayoutType(), GalleryLayoutType.mosaic);
+    expect(settings.getGalleryLayoutType(), GalleryLayoutType.justified);
     expect(
       preferences.getString(LocalSettings.kGalleryLayoutType),
-      GalleryLayoutType.mosaic.name,
+      "justified",
     );
   });
 }

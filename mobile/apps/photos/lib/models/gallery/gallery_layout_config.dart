@@ -3,14 +3,14 @@ import "package:photos/settings/local_settings.dart";
 
 // FlagService treats debug builds as internal while still honoring the
 // developer setting that disables internal-user features.
-bool get isMosaicLayoutAvailable => flagService.internalUser;
+bool get isJustifiedLayoutAvailable => flagService.internalUser;
 
 GalleryLayoutType resolveGalleryLayoutType(
   GalleryLayoutType preferredLayoutType, {
-  bool? mosaicLayoutAvailable,
+  bool? justifiedLayoutAvailable,
 }) {
-  final isAvailable = mosaicLayoutAvailable ?? isMosaicLayoutAvailable;
-  if (preferredLayoutType == GalleryLayoutType.mosaic && !isAvailable) {
+  final isAvailable = justifiedLayoutAvailable ?? isJustifiedLayoutAvailable;
+  if (preferredLayoutType == GalleryLayoutType.justified && !isAvailable) {
     return GalleryLayoutType.grid;
   }
   return preferredLayoutType;

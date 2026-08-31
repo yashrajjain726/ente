@@ -126,7 +126,7 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
       serverLoadDeferDuration: galleryThumbnailServerLoadDeferDuration,
       shouldShowLivePhotoOverlay: true,
       // Recreate the loader when the effective tier changes, such as when
-      // switching between Grid and Mosaic layouts.
+      // switching between Grid and Justified layouts.
       key: ValueKey((heroTag, effectiveThumbnailSize)),
       thumbnailSize: effectiveThumbnailSize,
       useRequestedThumbnailSizeForLocalCache: widget.thumbnailSize != null,

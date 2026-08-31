@@ -9,8 +9,8 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/gallery/fixed_extent_section_layout.dart";
 import "package:photos/models/gallery/gallery_groups.dart";
-import "package:photos/models/gallery/mosaic_grid_row.dart";
-import "package:photos/models/gallery/mosaic_layout.dart";
+import "package:photos/models/gallery/justified_grid_row.dart";
+import "package:photos/models/gallery/justified_layout.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
@@ -45,11 +45,11 @@ void main() {
   });
 
   setUp(() async {
-    await localSettings.setGalleryLayoutType(GalleryLayoutType.mosaic);
+    await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
     await localSettings.setPhotoGridSize(4);
   });
 
-  test("day grouping creates independent, contiguous mosaic sections", () {
+  test("day grouping creates independent, contiguous justified sections", () {
     for (final sortOrderAsc in [false, true]) {
       final days = sortOrderAsc ? [17, 18, 19] : [19, 18, 17];
       final expectedGroups = <List<EnteFile>>[];
@@ -90,22 +90,25 @@ void main() {
         final groupID = groups.groupIDs[groupIndex];
         final section = groups.groupLayouts[groupIndex];
 
-        expect(section, isA<MosaicSectionLayout>());
-        final mosaicSection = section as MosaicSectionLayout;
+        expect(section, isA<JustifiedSectionLayout>());
+        final justifiedSection = section as JustifiedSectionLayout;
         expect(groups.groupIDToFilesMap[groupID], orderedEquals(expectedFiles));
-        expect(mosaicSection.firstIndex, expectedFirstChildIndex);
-        expect(mosaicSection.minOffset, closeTo(expectedSectionOffset, 1e-9));
-        expect(mosaicSection.headerExtent, 48);
-        _expectRowsCoverFiles(mosaicSection, expectedFiles.length);
+        expect(justifiedSection.firstIndex, expectedFirstChildIndex);
         expect(
-          groups.getFileAtScrollOffset(mosaicSection.minOffset),
+          justifiedSection.minOffset,
+          closeTo(expectedSectionOffset, 1e-9),
+        );
+        expect(justifiedSection.headerExtent, 48);
+        _expectRowsCoverFiles(justifiedSection, expectedFiles.length);
+        expect(
+          groups.getFileAtScrollOffset(justifiedSection.minOffset),
           same(expectedFiles.first),
           reason: "a shared section boundary belongs to the next section",
         );
         if (groupIndex > 0) {
           expect(
             groups.groupLayouts[groupIndex - 1].maxOffset,
-            mosaicSection.minOffset,
+            justifiedSection.minOffset,
           );
         }
 
@@ -115,64 +118,67 @@ void main() {
           expect(groups.getFileAtScrollOffset(fileOffset!), same(file));
           expect(
             groups.getOffsetOfGroupContainingFile(file),
-            closeTo(mosaicSection.minOffset, 1e-9),
+            closeTo(justifiedSection.minOffset, 1e-9),
           );
         }
 
-        expectedFirstChildIndex = mosaicSection.lastIndex + 1;
-        expectedSectionOffset = mosaicSection.maxOffset;
+        expectedFirstChildIndex = justifiedSection.lastIndex + 1;
+        expectedSectionOffset = justifiedSection.maxOffset;
       }
     }
   });
 
-  test("headerless mosaic remains one continuous group past grid chunks", () {
-    const fileCount = 100;
-    final files = List<EnteFile>.generate(
-      fileCount,
-      (index) => _file(
-        index: index,
-        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
-        width: 3,
-        height: 2,
-      ),
-      growable: false,
-    );
+  test(
+    "headerless justified remains one continuous group past grid chunks",
+    () {
+      const fileCount = 100;
+      final files = List<EnteFile>.generate(
+        fileCount,
+        (index) => _file(
+          index: index,
+          creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+          width: 3,
+          height: 2,
+        ),
+        growable: false,
+      );
 
-    final groups = _galleryGroups(
-      files: files,
-      groupType: GroupType.none,
-      groupHeaderExtent: GalleryGroups.spacing,
-    );
+      final groups = _galleryGroups(
+        files: files,
+        groupType: GroupType.none,
+        groupHeaderExtent: GalleryGroups.spacing,
+      );
 
-    expect(groups.groupIDs, hasLength(1));
-    expect(groups.groupLayouts, hasLength(1));
-    expect(groups.groupIDToFilesMap.values.single, orderedEquals(files));
-    expect(groups.allFilesWithDummies, hasLength(fileCount));
-    for (var index = 0; index < fileCount; index++) {
-      expect(groups.allFilesWithDummies[index], same(files[index]));
-      expect(groups.allFilesWithDummies[index], isNot(isA<DummyFile>()));
-    }
+      expect(groups.groupIDs, hasLength(1));
+      expect(groups.groupLayouts, hasLength(1));
+      expect(groups.groupIDToFilesMap.values.single, orderedEquals(files));
+      expect(groups.allFilesWithDummies, hasLength(fileCount));
+      for (var index = 0; index < fileCount; index++) {
+        expect(groups.allFilesWithDummies[index], same(files[index]));
+        expect(groups.allFilesWithDummies[index], isNot(isA<DummyFile>()));
+      }
 
-    final section = groups.groupLayouts.single as MosaicSectionLayout;
-    expect(section.headerExtent, GalleryGroups.spacing);
-    expect(section.bodyMinOffset, GalleryGroups.spacing);
-    _expectRowsCoverFiles(section, fileCount);
+      final section = groups.groupLayouts.single as JustifiedSectionLayout;
+      expect(section.headerExtent, GalleryGroups.spacing);
+      expect(section.bodyMinOffset, GalleryGroups.spacing);
+      _expectRowsCoverFiles(section, fileCount);
 
-    final rowAcrossLegacyBoundary = section.rows.singleWhere(
-      (row) => row.firstIndex <= 39 && row.lastIndex >= 40,
-    );
-    expect(rowAcrossLegacyBoundary.firstIndex, 39);
-    expect(rowAcrossLegacyBoundary.lastIndex, 41);
+      final rowAcrossLegacyBoundary = section.rows.singleWhere(
+        (row) => row.firstIndex <= 39 && row.lastIndex >= 40,
+      );
+      expect(rowAcrossLegacyBoundary.firstIndex, 39);
+      expect(rowAcrossLegacyBoundary.lastIndex, 41);
 
-    for (final index in [75, fileCount - 1]) {
-      final fileOffset = groups.getOffsetOfFile(files[index]);
-      expect(fileOffset, isNotNull);
-      expect(groups.getFileAtScrollOffset(fileOffset!), same(files[index]));
-    }
-    expect(groups.getFileAtScrollOffset(section.maxOffset), same(files.last));
-  });
+      for (final index in [75, fileCount - 1]) {
+        final fileOffset = groups.getOffsetOfFile(files[index]);
+        expect(fileOffset, isNotNull);
+        expect(groups.getFileAtScrollOffset(fileOffset!), same(files[index]));
+      }
+      expect(groups.getFileAtScrollOffset(section.maxOffset), same(files.last));
+    },
+  );
 
-  testWidgets("mosaic rows request large thumbnails for every tile", (
+  testWidgets("justified rows request large thumbnails for every tile", (
     tester,
   ) async {
     final files = List<EnteFile>.generate(
@@ -190,18 +196,18 @@ void main() {
       groupType: GroupType.none,
       groupHeaderExtent: GalleryGroups.spacing,
     );
-    final section = groups.groupLayouts.single as MosaicSectionLayout;
+    final section = groups.groupLayouts.single as JustifiedSectionLayout;
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: SizedBox(key: ValueKey("mosaic-builder-context")),
+        home: SizedBox(key: ValueKey("justified-builder-context")),
       ),
     );
     final context = tester.element(
-      find.byKey(const ValueKey("mosaic-builder-context")),
+      find.byKey(const ValueKey("justified-builder-context")),
     );
     final rowWidget =
-        section.builder(context, section.bodyFirstIndex) as MosaicGridRow;
+        section.builder(context, section.bodyFirstIndex) as JustifiedGridRow;
     final galleryTiles = rowWidget.children.map(
       (child) => (child as RepaintBoundary).child! as GalleryFileWidget,
     );
@@ -280,7 +286,7 @@ GalleryGroups _galleryGroups({
     groupHeaderExtent: groupHeaderExtent,
     showSelectAll: false,
     layoutTypeOverride: layoutTypeOverride,
-    mosaicLayoutAvailable: true,
+    justifiedLayoutAvailable: true,
   );
 }
 
@@ -297,7 +303,7 @@ EnteFile _file({
     ..pubMagicMetadata = PubMagicMetadata(w: width, h: height);
 }
 
-void _expectRowsCoverFiles(MosaicSectionLayout section, int fileCount) {
+void _expectRowsCoverFiles(JustifiedSectionLayout section, int fileCount) {
   expect(section.rows, isNotEmpty);
   var expectedFirstFileIndex = 0;
   var expectedRowOffset = 0.0;

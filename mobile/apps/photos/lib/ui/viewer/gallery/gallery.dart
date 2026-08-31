@@ -395,7 +395,7 @@ class GalleryState extends State<Gallery> {
       limitSelectionToOne: widget.limitSelectionToOne,
       showGallerySettingsCTA: widget.showGallerySettingsCTA,
       layoutTypeOverride: widget.layoutTypeOverride,
-      mosaicLayoutAvailable: isMosaicLayoutAvailable,
+      justifiedLayoutAvailable: isJustifiedLayoutAvailable,
     );
     galleryGroups = groups;
 

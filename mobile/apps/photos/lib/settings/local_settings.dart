@@ -14,7 +14,7 @@ enum AlbumSortDirection { ascending, descending }
 
 enum AlbumViewType { grid, list }
 
-enum GalleryLayoutType { grid, mosaic }
+enum GalleryLayoutType { grid, justified }
 
 enum PeopleSortKey { mostPhotos, name, lastUpdated }
 
@@ -267,7 +267,7 @@ class LocalSettings {
 
   GalleryLayoutType getGalleryLayoutType() {
     return switch (_prefs.getString(kGalleryLayoutType)) {
-      "mosaic" => GalleryLayoutType.mosaic,
+      "justified" => GalleryLayoutType.justified,
       _ => GalleryLayoutType.grid,
     };
   }

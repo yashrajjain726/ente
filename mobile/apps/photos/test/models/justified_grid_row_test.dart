@@ -1,10 +1,10 @@
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/models/gallery/mosaic_grid_row.dart";
+import "package:photos/models/gallery/justified_grid_row.dart";
 
 void main() {
   testWidgets(
-    "MosaicGridRow gives children their precomputed sizes and offsets",
+    "JustifiedGridRow gives children their precomputed sizes and offsets",
     (tester) async {
       const rowKey = ValueKey("row");
       const firstKey = ValueKey("first");
@@ -18,7 +18,7 @@ void main() {
               alignment: Alignment.topLeft,
               child: SizedBox(
                 width: 300,
-                child: MosaicGridRow(
+                child: JustifiedGridRow(
                   key: rowKey,
                   itemWidths: [60, 90, 146],
                   height: 80,

@@ -43,7 +43,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
     return SettingsPageScaffold(
       title: l10n.gallery,
       children: [
-        if (isMosaicLayoutAvailable) ...[
+        if (isJustifiedLayoutAvailable) ...[
           SettingsItem(
             title: l10n.layout,
             trailing: _trailingLabel(
@@ -104,12 +104,12 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   String _layoutTypeLabel(BuildContext context, GalleryLayoutType layoutType) {
     return switch (layoutType) {
       GalleryLayoutType.grid => context.strings.grid,
-      GalleryLayoutType.mosaic => context.strings.layoutMasonry,
+      GalleryLayoutType.justified => context.strings.layoutJustified,
     };
   }
 
   Future<void> _showLayoutTypeSheet(BuildContext context) async {
-    if (!isMosaicLayoutAvailable) return;
+    if (!isJustifiedLayoutAvailable) return;
     final l10n = context.strings;
     await showBottomSheetComponent<void>(
       context: context,
@@ -141,7 +141,8 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   }
 
   Future<void> _setLayoutType(GalleryLayoutType layoutType) async {
-    if (layoutType == GalleryLayoutType.mosaic && !isMosaicLayoutAvailable) {
+    if (layoutType == GalleryLayoutType.justified &&
+        !isJustifiedLayoutAvailable) {
       return;
     }
     if (localSettings.getGalleryLayoutType() == layoutType) return;

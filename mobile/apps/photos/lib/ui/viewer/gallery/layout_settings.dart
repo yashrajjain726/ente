@@ -22,7 +22,7 @@ class GalleryLayoutSettings extends StatefulWidget {
 class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
   late bool isDayLayout;
   late bool isMonthLayout;
-  late bool isMosaicLayout;
+  late bool isJustifiedLayout;
 
   @override
   void initState() {
@@ -42,7 +42,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
         layoutType == GalleryLayoutType.grid &&
         localSettings.getGalleryGroupType() == GroupType.month &&
         localSettings.getPhotoGridSize() == 5;
-    isMosaicLayout = layoutType == GalleryLayoutType.mosaic;
+    isJustifiedLayout = layoutType == GalleryLayoutType.justified;
   }
 
   void _reloadWithLatestSetting() {
@@ -77,22 +77,22 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             showOnlyLoadingState: true,
             onTap: () => _applyLayout(GroupType.month, 5),
           ),
-          if (isMosaicLayoutAvailable)
+          if (isJustifiedLayoutAvailable)
             MenuComponent(
-              title: context.strings.layoutMasonry,
+              title: context.strings.layoutJustified,
               leading: const Icon(Icons.view_quilt_outlined),
-              trailing: isMosaicLayout
+              trailing: isJustifiedLayout
                   ? Icon(Icons.check, color: colors.primary)
                   : null,
               showOnlyLoadingState: true,
-              onTap: _applyMosaicLayout,
+              onTap: _applyJustifiedLayout,
             ),
           MenuComponent(
             title: context.strings.custom,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (!isDayLayout && !isMonthLayout && !isMosaicLayout) ...[
+                if (!isDayLayout && !isMonthLayout && !isJustifiedLayout) ...[
                   Icon(Icons.check, color: colors.primary),
                   const SizedBox(width: 8),
                 ],
@@ -132,10 +132,10 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
     Navigator.pop(context);
   }
 
-  Future<void> _applyMosaicLayout() async {
-    if (!isMosaicLayoutAvailable) return;
-    if (localSettings.getGalleryLayoutType() != GalleryLayoutType.mosaic) {
-      await localSettings.setGalleryLayoutType(GalleryLayoutType.mosaic);
+  Future<void> _applyJustifiedLayout() async {
+    if (!isJustifiedLayoutAvailable) return;
+    if (localSettings.getGalleryLayoutType() != GalleryLayoutType.justified) {
+      await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
       Bus.instance.fire(GalleryLayoutChangedEvent());
     }
 

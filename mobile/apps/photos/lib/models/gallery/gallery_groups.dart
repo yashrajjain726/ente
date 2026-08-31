@@ -9,8 +9,8 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/gallery/fixed_extent_grid_row.dart";
 import "package:photos/models/gallery/fixed_extent_section_layout.dart";
 import "package:photos/models/gallery/gallery_layout_config.dart";
-import "package:photos/models/gallery/mosaic_grid_row.dart";
-import "package:photos/models/gallery/mosaic_layout.dart";
+import "package:photos/models/gallery/justified_grid_row.dart";
+import "package:photos/models/gallery/justified_layout.dart";
 import "package:photos/models/gallery/section_layout.dart";
 import "package:photos/models/selected_files.dart";
 import "package:photos/service_locator.dart";
@@ -31,7 +31,7 @@ class GalleryGroups {
   final _logger = Logger("GalleryGroups");
   final bool showGallerySettingsCTA;
   final GalleryLayoutType? layoutTypeOverride;
-  final bool mosaicLayoutAvailable;
+  final bool justifiedLayoutAvailable;
 
   final bool sortOrderAsc;
   final double widthAvailable;
@@ -48,7 +48,7 @@ class GalleryGroups {
     this.limitSelectionToOne = false,
     this.showGallerySettingsCTA = false,
     this.layoutTypeOverride,
-    required this.mosaicLayoutAvailable,
+    required this.justifiedLayoutAvailable,
   }) {
     init();
     if (!groupType.showGroupHeader()) {
@@ -130,7 +130,7 @@ class GalleryGroups {
     final rowIndex = childIndex - section.bodyFirstIndex;
     final fileIndex = switch (section) {
       FixedExtentSectionLayout() => rowIndex * crossAxisCount,
-      MosaicSectionLayout() => section.rows[rowIndex].firstIndex,
+      JustifiedSectionLayout() => section.rows[rowIndex].firstIndex,
       _ => 0,
     };
     return files[fileIndex.clamp(0, files.length - 1)];
@@ -152,9 +152,9 @@ class GalleryGroups {
             (fileIndex ~/ crossAxisCount) * section.mainAxisStride,
         rowExtent: section.tileHeight,
       ),
-      MosaicSectionLayout() => () {
+      JustifiedSectionLayout() => () {
         final row =
-            section.rows[_mosaicRowIndexForFile(section.rows, fileIndex)];
+            section.rows[_justifiedRowIndexForFile(section.rows, fileIndex)];
         return (
           headerExtent: section.headerExtent,
           rowOffset: section.bodyMinOffset + row.minOffset,
@@ -198,7 +198,7 @@ class GalleryGroups {
     return generatedIDLocation ?? uploadedFileIDLocation ?? localIDLocation;
   }
 
-  int _mosaicRowIndexForFile(List<MosaicRowLayout> rows, int fileIndex) {
+  int _justifiedRowIndexForFile(List<JustifiedRowLayout> rows, int fileIndex) {
     var low = 0;
     var high = rows.length - 1;
     while (low <= high) {
@@ -265,13 +265,13 @@ class GalleryGroups {
     crossAxisCount = localSettings.getPhotoGridSize();
     layoutType = resolveGalleryLayoutType(
       layoutTypeOverride ?? localSettings.getGalleryLayoutType(),
-      mosaicLayoutAvailable: mosaicLayoutAvailable,
+      justifiedLayoutAvailable: justifiedLayoutAvailable,
     );
     _buildGroups();
 
     _groupLayouts = switch (layoutType) {
       GalleryLayoutType.grid => _computeFixedGroupLayouts(),
-      GalleryLayoutType.mosaic => _computeMosaicGroupLayouts(),
+      GalleryLayoutType.justified => _computeJustifiedGroupLayouts(),
     };
 
     assert(groupIDs.length == _groupIdToFilesMap.length);
@@ -438,7 +438,7 @@ class GalleryGroups {
     return groupLayouts;
   }
 
-  List<SectionLayout> _computeMosaicGroupLayouts() {
+  List<SectionLayout> _computeJustifiedGroupLayouts() {
     final stopwatch = Stopwatch()..start();
     final targetRowHeight =
         (widthAvailable - (crossAxisCount - 1) * spacing) / crossAxisCount;
@@ -448,9 +448,9 @@ class GalleryGroups {
 
     for (final groupID in _groupIdToFilesMap.keys) {
       final filesInGroup = _groupIdToFilesMap[groupID]!;
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: filesInGroup.map(
-          (file) => MosaicLayoutCalculator.aspectRatioForDimensions(
+          (file) => JustifiedLayoutCalculator.aspectRatioForDimensions(
             file.width,
             file.height,
           ),
@@ -466,7 +466,7 @@ class GalleryGroups {
       final bodyFirstIndex = firstIndex + 1;
 
       groupLayouts.add(
-        MosaicSectionLayout(
+        JustifiedSectionLayout(
           firstIndex: firstIndex,
           lastIndex: lastIndex,
           minOffset: minOffset,
@@ -508,7 +508,7 @@ class GalleryGroups {
               );
             }
 
-            return MosaicGridRow(
+            return JustifiedGridRow(
               itemWidths: row.itemWidths,
               height: row.height,
               spacing: spacing,
@@ -526,7 +526,7 @@ class GalleryGroups {
     }
 
     _logger.info(
-      "Built mosaic group layouts in ${stopwatch.elapsedMilliseconds} ms",
+      "Built justified group layouts in ${stopwatch.elapsedMilliseconds} ms",
     );
     stopwatch.stop();
     return groupLayouts;
@@ -543,7 +543,7 @@ class GalleryGroups {
         _createNewGroup(_copyFilesInRange(start, end), yearsInGroups);
         start = end;
       }
-    } else if (layoutType == GalleryLayoutType.mosaic) {
+    } else if (layoutType == GalleryLayoutType.justified) {
       if (allFiles.isNotEmpty) {
         _createNewGroup(_copyFilesInRange(0, allFiles.length), yearsInGroups);
       }

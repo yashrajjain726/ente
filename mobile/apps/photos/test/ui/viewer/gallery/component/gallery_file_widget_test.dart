@@ -165,7 +165,7 @@ void main() {
   });
 
   testWidgets(
-    "a requested large mosaic thumbnail bypasses the cached small tier",
+    "a requested large justified thumbnail bypasses the cached small tier",
     (tester) async {
       final file = EnteFile()
         ..generatedID = 2
@@ -179,7 +179,7 @@ void main() {
       );
       addTearDown(() => ThumbnailInMemoryLruCache.clearCache(file));
 
-      Widget buildGalleryTile({required bool mosaic}) {
+      Widget buildGalleryTile({required bool justified}) {
         return MaterialApp(
           home: GalleryContextState(
             sortOrderAsc: false,
@@ -190,11 +190,11 @@ void main() {
                 file: file,
                 selectedFiles: null,
                 limitSelectionToOne: true,
-                tag: mosaic ? "mosaic_" : "grid_",
+                tag: justified ? "justified_" : "grid_",
                 // A dense-grid size that preserves the legacy large-render /
-                // small-local-cache behavior when no mosaic override exists.
+                // small-local-cache behavior when no justified override exists.
                 photoGridSize: photoGridSizeDefault - 1,
-                thumbnailSize: mosaic ? thumbnailLargeSize : null,
+                thumbnailSize: justified ? thumbnailLargeSize : null,
                 currentUserID: null,
               ),
             ),
@@ -202,12 +202,12 @@ void main() {
         );
       }
 
-      await tester.pumpWidget(buildGalleryTile(mosaic: true));
-      final mosaicThumbnail = tester.widget<ThumbnailWidget>(
+      await tester.pumpWidget(buildGalleryTile(justified: true));
+      final justifiedThumbnail = tester.widget<ThumbnailWidget>(
         find.byType(ThumbnailWidget),
       );
-      expect(mosaicThumbnail.thumbnailSize, thumbnailLargeSize);
-      expect(mosaicThumbnail.useRequestedThumbnailSizeForLocalCache, isTrue);
+      expect(justifiedThumbnail.thumbnailSize, thumbnailLargeSize);
+      expect(justifiedThumbnail.useRequestedThumbnailSizeForLocalCache, isTrue);
       expect(
         find.descendant(
           of: find.byType(ThumbnailWidget),
@@ -216,7 +216,7 @@ void main() {
         findsNothing,
       );
 
-      await tester.pumpWidget(buildGalleryTile(mosaic: false));
+      await tester.pumpWidget(buildGalleryTile(justified: false));
       await tester.pump();
       final gridThumbnail = tester.widget<ThumbnailWidget>(
         find.byType(ThumbnailWidget),

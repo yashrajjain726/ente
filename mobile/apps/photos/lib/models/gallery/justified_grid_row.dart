@@ -2,13 +2,13 @@ import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
 
-class MosaicGridRow extends MultiChildRenderObjectWidget {
+class JustifiedGridRow extends MultiChildRenderObjectWidget {
   final List<double> itemWidths;
   final double height;
   final double spacing;
   final TextDirection textDirection;
 
-  const MosaicGridRow({
+  const JustifiedGridRow({
     super.key,
     required this.itemWidths,
     required this.height,
@@ -19,7 +19,7 @@ class MosaicGridRow extends MultiChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    return RenderMosaicGridRow(
+    return RenderJustifiedGridRow(
       itemWidths: itemWidths,
       height: height,
       spacing: spacing,
@@ -30,7 +30,7 @@ class MosaicGridRow extends MultiChildRenderObjectWidget {
   @override
   void updateRenderObject(
     BuildContext context,
-    RenderMosaicGridRow renderObject,
+    RenderJustifiedGridRow renderObject,
   ) {
     renderObject
       ..itemWidths = itemWidths
@@ -49,13 +49,16 @@ class MosaicGridRow extends MultiChildRenderObjectWidget {
   }
 }
 
-class _MosaicGridRowParentData extends ContainerBoxParentData<RenderBox> {}
+class _JustifiedGridRowParentData extends ContainerBoxParentData<RenderBox> {}
 
-class RenderMosaicGridRow extends RenderBox
+class RenderJustifiedGridRow extends RenderBox
     with
-        ContainerRenderObjectMixin<RenderBox, _MosaicGridRowParentData>,
-        RenderBoxContainerDefaultsMixin<RenderBox, _MosaicGridRowParentData> {
-  RenderMosaicGridRow({
+        ContainerRenderObjectMixin<RenderBox, _JustifiedGridRowParentData>,
+        RenderBoxContainerDefaultsMixin<
+          RenderBox,
+          _JustifiedGridRowParentData
+        > {
+  RenderJustifiedGridRow({
     List<RenderBox>? children,
     required List<double> itemWidths,
     required double height,
@@ -106,8 +109,8 @@ class RenderMosaicGridRow extends RenderBox
 
   @override
   void setupParentData(RenderBox child) {
-    if (child.parentData is! _MosaicGridRowParentData) {
-      child.parentData = _MosaicGridRowParentData();
+    if (child.parentData is! _JustifiedGridRowParentData) {
+      child.parentData = _JustifiedGridRowParentData();
     }
   }
 
@@ -131,7 +134,7 @@ class RenderMosaicGridRow extends RenderBox
   void performLayout() {
     assert(
       childCount == itemWidths.length,
-      "Each mosaic child must have one precomputed width",
+      "Each justified child must have one precomputed width",
     );
     final rowWidth = constraints.hasBoundedWidth
         ? constraints.maxWidth
@@ -148,7 +151,7 @@ class RenderMosaicGridRow extends RenderBox
         BoxConstraints.tight(Size(childWidth, size.height)),
         parentUsesSize: false,
       );
-      final childParentData = child.parentData! as _MosaicGridRowParentData;
+      final childParentData = child.parentData! as _JustifiedGridRowParentData;
       if (flipMainAxis) offsetX -= childWidth;
       childParentData.offset = Offset(offsetX, 0);
       offsetX += flipMainAxis ? -(spacing) : childWidth + spacing;

@@ -1,27 +1,27 @@
 import "package:flutter/widgets.dart";
 import "package:flutter_test/flutter_test.dart";
-import "package:photos/models/gallery/mosaic_layout.dart";
+import "package:photos/models/gallery/justified_layout.dart";
 
 void main() {
-  group("MosaicLayoutCalculator", () {
+  group("JustifiedLayoutCalculator", () {
     test("uses a square fallback for missing or invalid dimensions", () {
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(0, 0), 1);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(0, 100), 1);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(100, 0), 1);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(-100, 50), 1);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(100, -50), 1);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(0, 0), 1);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(0, 100), 1);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(100, 0), 1);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(-100, 50), 1);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(100, -50), 1);
     });
 
     test("preserves normal ratios and clamps extreme dimensions", () {
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(4, 3), 4 / 3);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(1, 100), 1 / 3);
-      expect(MosaicLayoutCalculator.aspectRatioForDimensions(100, 1), 4);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(4, 3), 4 / 3);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(1, 100), 1 / 3);
+      expect(JustifiedLayoutCalculator.aspectRatioForDimensions(100, 1), 4);
     });
 
     test("justified rows conserve the full available width", () {
       const availableWidth = 400.0;
       const spacing = 2.0;
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [1, 1, 1, 1],
         availableWidth: availableWidth,
         targetRowHeight: 100,
@@ -41,7 +41,7 @@ void main() {
       const availableWidth = 400.0;
       const targetRowHeight = 100.0;
       const spacing = 2.0;
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [1, 1],
         availableWidth: availableWidth,
         targetRowHeight: targetRowHeight,
@@ -60,7 +60,7 @@ void main() {
     test("a sparse portrait final row remains ragged and tappable", () {
       const availableWidth = 400.0;
       const targetRowHeight = 100.0;
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [0.25],
         availableWidth: availableWidth,
         targetRowHeight: targetRowHeight,
@@ -78,7 +78,7 @@ void main() {
     test("keeps a tappable portrait with the following panorama", () {
       const availableWidth = 393.0;
       const spacing = 2.0;
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [0.85, 4.0],
         availableWidth: availableWidth,
         targetRowHeight: 130,
@@ -102,7 +102,7 @@ void main() {
         [0.25, 4.0],
         [4.0, 0.25],
       ]) {
-        final rows = MosaicLayoutCalculator.computeRows(
+        final rows = JustifiedLayoutCalculator.computeRows(
           aspectRatios: ratios,
           availableWidth: 430,
           targetRowHeight: 106,
@@ -120,7 +120,7 @@ void main() {
     });
 
     test("does not make a justified row shorter than the tap target", () {
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [4.0, 4.0],
         availableWidth: 360,
         targetRowHeight: 80,
@@ -135,7 +135,7 @@ void main() {
     });
 
     test("accepts a justified row exactly at the tap target", () {
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [1.0, 4.0],
         availableWidth: 242,
         targetRowHeight: 100,
@@ -148,7 +148,7 @@ void main() {
     });
 
     test("raises a sparse row to the minimum tappable height", () {
-      final rows = MosaicLayoutCalculator.computeRows(
+      final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [4.0],
         availableWidth: 400,
         targetRowHeight: 30,
@@ -161,23 +161,23 @@ void main() {
     });
   });
 
-  group("MosaicSectionLayout", () {
+  group("JustifiedSectionLayout", () {
     const rows = [
-      MosaicRowLayout(
+      JustifiedRowLayout(
         firstIndex: 0,
         lastIndex: 1,
         minOffset: 0,
         height: 10,
         itemWidths: [40, 40],
       ),
-      MosaicRowLayout(
+      JustifiedRowLayout(
         firstIndex: 2,
         lastIndex: 2,
         minOffset: 12,
         height: 20,
         itemWidths: [80],
       ),
-      MosaicRowLayout(
+      JustifiedRowLayout(
         firstIndex: 3,
         lastIndex: 4,
         minOffset: 34,
@@ -185,7 +185,7 @@ void main() {
         itemWidths: [30, 50],
       ),
     ];
-    final section = MosaicSectionLayout(
+    final section = JustifiedSectionLayout(
       firstIndex: 10,
       lastIndex: 13,
       minOffset: 100,

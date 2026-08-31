@@ -152,7 +152,7 @@ void main() {
     await localSettings.setGalleryLayoutType(GalleryLayoutType.grid);
     await localSettings.setPhotoGridSize(2);
     final galleryKey = GlobalKey<GalleryState>();
-    final files = List<EnteFile>.generate(1000, _mosaicTestFile);
+    final files = List<EnteFile>.generate(1000, _justifiedTestFile);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -198,7 +198,7 @@ void main() {
     );
 
     await Future.wait([
-      localSettings.setGalleryLayoutType(GalleryLayoutType.mosaic),
+      localSettings.setGalleryLayoutType(GalleryLayoutType.justified),
       localSettings.setPhotoGridSize(6),
     ]);
     Bus.instance.fire(GalleryLayoutChangedEvent());
@@ -206,9 +206,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    final mosaicGroups = galleryKey.currentState!.galleryGroups!;
-    expect(mosaicGroups.layoutType, GalleryLayoutType.mosaic);
-    final newGeometry = mosaicGroups.getGeometryOfFile(anchorFile)!;
+    final justifiedGroups = galleryKey.currentState!.galleryGroups!;
+    expect(justifiedGroups.layoutType, GalleryLayoutType.justified);
+    final newGeometry = justifiedGroups.getGeometryOfFile(anchorFile)!;
     expect(newGeometry.rowExtent, lessThan(oldGeometry.rowExtent));
     final expectedAnchorOffset =
         newGeometry.rowOffset + newGeometry.rowExtent * rowProgress;
@@ -243,7 +243,7 @@ DummyFile _dummyFile(String groupID) {
     ..creationTime = DateTime(2026, 8, 19).microsecondsSinceEpoch;
 }
 
-DummyFile _mosaicTestFile(int index) {
+DummyFile _justifiedTestFile(int index) {
   final dimensions = switch (index % 4) {
     0 => (w: 1600, h: 900),
     1 => (w: 900, h: 1600),
