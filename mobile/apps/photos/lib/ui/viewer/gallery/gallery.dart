@@ -208,11 +208,10 @@ class GalleryState extends State<Gallery> {
     );
     _layoutChangeSubscription = Bus.instance
         .on<GalleryLayoutChangedEvent>()
-        .listen((event) async {
+        .listen((_) async {
           if (!mounted) return;
           final generation = ++_layoutChangeGeneration;
           final scrollAnchor = _captureLayoutScrollAnchor();
-          _logger.info("Rebuilding gallery for ${event.reason}");
           _setGroupType();
           final measuredHeaderExtent = await _measureGroupHeaderExtent();
           if (!mounted || generation != _layoutChangeGeneration) return;
