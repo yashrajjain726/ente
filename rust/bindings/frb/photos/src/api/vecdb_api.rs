@@ -32,6 +32,7 @@ impl From<vecdb::VecDbError> for RustVecDbError {
             vecdb::VecDbError::DimensionMismatch { .. } => Self::DimensionMismatch { message },
             vecdb::VecDbError::InvalidDimensions(_) => Self::InvalidDimensions { message },
             vecdb::VecDbError::UnboundedSearch => Self::UnboundedSearch { message },
+            vecdb::VecDbError::LengthMismatch { .. } => Self::LengthMismatch { message },
         }
     }
 }
@@ -46,16 +47,17 @@ pub struct VecDbMatch {
 pub struct VecDbKeyMatches {
     pub key: String,
     pub matches: Vec<VecDbMatch>,
+    pub truncated: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct VecDbStats {
-    pub live_count: usize,
-    pub dead_count: usize,
-    pub dims: usize,
+    pub live_count: u32,
+    pub dead_count: u32,
+    pub dims: u32,
     pub log_bytes: u64,
-    pub records_since_snapshot: usize,
-    pub approximate_memory_bytes: usize,
+    pub records_since_snapshot: u32,
+    pub approximate_memory_bytes: u64,
 }
 
 fn to_api_match(entry: vecdb::Match) -> VecDbMatch {
@@ -65,49 +67,56 @@ fn to_api_match(entry: vecdb::Match) -> VecDbMatch {
     }
 }
 
+fn to_api_matches(matches: Vec<vecdb::Match>) -> Vec<VecDbMatch> {
+    matches.into_iter().map(to_api_match).collect()
+}
+
+fn distance_cut(matches: &mut Vec<VecDbMatch>, max_distance: f32) {
+    let keep = matches.partition_point(|entry| entry.distance <= max_distance);
+    matches.truncate(keep);
+}
+
+fn valid_distance(distance: f32) -> bool {
+    distance.is_finite() && distance >= 0.0
+}
+
+pub fn delete_vec_db_files(file_path: String) -> Result<(), RustVecDbError> {
+    Ok(vecdb::VecDb::purge(Path::new(&file_path))?)
+}
+
 #[frb(opaque)]
 pub struct VecDb {
     inner: vecdb::VecDb,
 }
 
 impl VecDb {
-    #[frb(sync)]
-    pub fn new(file_path: String, dimensions: usize) -> Result<Self, RustVecDbError> {
+    pub fn new(file_path: String, dimensions: u32) -> Result<Self, RustVecDbError> {
         Ok(Self {
-            inner: vecdb::VecDb::open(Path::new(&file_path), dimensions)?,
+            inner: vecdb::VecDb::open(Path::new(&file_path), dimensions as usize)?,
         })
     }
 
-    pub fn open_read_only(file_path: String, dimensions: usize) -> Result<Self, RustVecDbError> {
+    pub fn open_read_only(file_path: String, dimensions: u32) -> Result<Self, RustVecDbError> {
         Ok(Self {
-            inner: vecdb::VecDb::open_read_only(Path::new(&file_path), dimensions)?,
+            inner: vecdb::VecDb::open_read_only(Path::new(&file_path), dimensions as usize)?,
         })
     }
 
     pub fn search(
         &self,
         query: Vec<f32>,
-        limit: Option<usize>,
+        limit: Option<u32>,
         max_distance: Option<f32>,
         exact: bool,
         allowed_keys: Option<Vec<String>>,
     ) -> Result<Vec<VecDbMatch>, RustVecDbError> {
         let params = vecdb::SearchParams {
-            limit,
+            limit: limit.map(|value| value as usize),
             max_distance,
             exact,
             allowed_keys,
         };
-        self.run_search(&query, &params)
-    }
-
-    fn run_search(
-        &self,
-        query: &[f32],
-        params: &vecdb::SearchParams,
-    ) -> Result<Vec<VecDbMatch>, RustVecDbError> {
-        let matches = self.inner.search(query, params)?;
-        Ok(matches.into_iter().map(to_api_match).collect())
+        Ok(to_api_matches(self.inner.search(&query, &params)?))
     }
 
     pub fn add_vector(&self, key: String, vector: Vec<f32>) -> Result<(), RustVecDbError> {
@@ -119,53 +128,7 @@ impl VecDb {
         keys: Vec<String>,
         vectors: Vec<Vec<f32>>,
     ) -> Result<(), RustVecDbError> {
-        if keys.len() != vectors.len() {
-            return Err(RustVecDbError::LengthMismatch {
-                message: format!(
-                    "keys length {} does not match vectors length {}",
-                    keys.len(),
-                    vectors.len()
-                ),
-            });
-        }
-        let entries: Vec<(String, Vec<f32>)> = keys.into_iter().zip(vectors).collect();
-        Ok(self.inner.bulk_add(&entries)?)
-    }
-
-    pub fn search_vectors(
-        &self,
-        query: Vec<f32>,
-        count: usize,
-        exact: bool,
-    ) -> Result<Vec<VecDbMatch>, RustVecDbError> {
-        self.search(query, Some(count), None, exact, None)
-    }
-
-    pub fn bulk_search_vectors(
-        &self,
-        queries: Vec<Vec<f32>>,
-        count: usize,
-        exact: bool,
-    ) -> Result<Vec<Vec<VecDbMatch>>, RustVecDbError> {
-        let params = vecdb::SearchParams {
-            limit: Some(count),
-            max_distance: None,
-            exact,
-            allowed_keys: None,
-        };
-        queries
-            .iter()
-            .map(|query| self.run_search(query, &params))
-            .collect()
-    }
-
-    pub fn search_vectors_within_distance(
-        &self,
-        query: Vec<f32>,
-        max_distance: f32,
-        exact: bool,
-    ) -> Result<Vec<VecDbMatch>, RustVecDbError> {
-        self.search(query, None, Some(max_distance), exact, None)
+        Ok(self.inner.bulk_add(&keys, &vectors)?)
     }
 
     pub fn approx_search_vectors_within_similarity(
@@ -176,82 +139,100 @@ impl VecDb {
         self.search(query, None, Some(1.0 - minimum_similarity), false, None)
     }
 
-    pub fn approx_filtered_search_vectors_within_distance(
+    pub fn bulk_search_within_similarity(
         &self,
-        query: Vec<f32>,
-        allowed_keys: Vec<String>,
-        count: usize,
-        max_distance: f32,
-    ) -> Result<Vec<VecDbMatch>, RustVecDbError> {
-        self.search(
-            query,
-            Some(count),
-            Some(max_distance),
-            false,
-            Some(allowed_keys),
-        )
+        queries: Vec<Vec<f32>>,
+        minimum_similarities: Vec<f32>,
+        limit: Option<u32>,
+        exact: bool,
+    ) -> Result<Vec<Vec<VecDbMatch>>, RustVecDbError> {
+        if queries.len() != minimum_similarities.len() {
+            return Err(RustVecDbError::LengthMismatch {
+                message: format!(
+                    "queries length {} does not match similarities length {}",
+                    queries.len(),
+                    minimum_similarities.len()
+                ),
+            });
+        }
+        let cuts: Vec<f32> = minimum_similarities
+            .iter()
+            .map(|similarity| 1.0 - similarity)
+            .collect();
+        let widest = cuts
+            .iter()
+            .copied()
+            .filter(|cut| valid_distance(*cut))
+            .fold(f32::NEG_INFINITY, f32::max);
+        let params = vecdb::SearchParams {
+            limit: limit.map(|value| value as usize),
+            max_distance: Some(widest),
+            exact,
+            allowed_keys: None,
+        };
+        let results = self.inner.bulk_search(&queries, &params)?;
+        Ok(results
+            .into_iter()
+            .zip(cuts)
+            .map(|(matches, cut)| {
+                if !valid_distance(cut) {
+                    return Vec::new();
+                }
+                let mut matches = to_api_matches(matches);
+                distance_cut(&mut matches, cut);
+                matches
+            })
+            .collect())
     }
 
     pub fn bulk_approx_filtered_search_vectors_within_distance(
         &self,
         queries: Vec<Vec<f32>>,
         allowed_keys: Vec<String>,
-        count: usize,
+        count: u32,
         max_distance: f32,
     ) -> Result<Vec<Vec<VecDbMatch>>, RustVecDbError> {
         let params = vecdb::SearchParams {
-            limit: Some(count),
+            limit: Some(count as usize),
             max_distance: Some(max_distance),
             exact: false,
             allowed_keys: Some(allowed_keys),
         };
-        queries
-            .iter()
-            .map(|query| self.run_search(query, &params))
-            .collect()
+        let results = self.inner.bulk_search(&queries, &params)?;
+        Ok(results.into_iter().map(to_api_matches).collect())
     }
 
     pub fn bulk_search_keys(
         &self,
         potential_keys: Vec<String>,
-        count: usize,
+        count: u32,
+        max_distance: Option<f32>,
         exact: bool,
+        restrict_to_input: bool,
     ) -> Result<Vec<VecDbKeyMatches>, RustVecDbError> {
-        let params = vecdb::SearchParams {
-            limit: Some(count),
-            max_distance: None,
+        let results = self.inner.bulk_search_stored(
+            &potential_keys,
+            count as usize,
+            max_distance,
             exact,
-            allowed_keys: None,
-        };
-        let mut results = Vec::new();
-        for key in potential_keys {
-            let Some(vector) = self.inner.get(&key) else {
-                continue;
-            };
-            let matches = self.run_search(&vector, &params)?;
-            results.push(VecDbKeyMatches { key, matches });
-        }
-        Ok(results)
-    }
-
-    pub fn contains_vector(&self, key: String) -> bool {
-        self.inner.contains(&key)
-    }
-
-    pub fn get_vector(&self, key: String) -> Option<Vec<f32>> {
-        self.inner.get(&key)
+            restrict_to_input,
+        )?;
+        Ok(results
+            .into_iter()
+            .map(|entry| VecDbKeyMatches {
+                key: entry.key,
+                matches: to_api_matches(entry.matches),
+                truncated: entry.truncated,
+            })
+            .collect())
     }
 
     pub fn bulk_get_vectors(&self, keys: Vec<String>) -> Vec<Option<Vec<f32>>> {
         keys.iter().map(|key| self.inner.get(key)).collect()
     }
 
-    pub fn remove_vector(&self, key: String) -> Result<usize, RustVecDbError> {
-        Ok(usize::from(self.inner.remove(&key)?))
-    }
-
-    pub fn bulk_remove_vectors(&self, keys: Vec<String>) -> Result<usize, RustVecDbError> {
-        Ok(self.inner.bulk_remove(&keys)?)
+    pub fn bulk_remove_vectors(&self, keys: Vec<String>) -> Result<u32, RustVecDbError> {
+        Ok(self.inner.bulk_remove(&keys)? as u32)
     }
 
     pub fn flush(&self) -> Result<(), RustVecDbError> {
@@ -266,33 +247,16 @@ impl VecDb {
         Ok(self.inner.delete()?)
     }
 
-    pub fn get_index_stats(&self) -> VecDbStats {
-        match self.inner.stats() {
-            Ok(stats) => VecDbStats {
-                live_count: stats.live_count,
-                dead_count: stats.dead_count,
-                dims: stats.dims,
-                log_bytes: stats.log_bytes,
-                records_since_snapshot: stats.records_since_snapshot,
-                approximate_memory_bytes: stats.approximate_memory_bytes,
-            },
-            Err(_) => VecDbStats {
-                live_count: 0,
-                dead_count: 0,
-                dims: 0,
-                log_bytes: 0,
-                records_since_snapshot: 0,
-                approximate_memory_bytes: 0,
-            },
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+    pub fn get_index_stats(&self) -> Result<VecDbStats, RustVecDbError> {
+        let stats = self.inner.stats()?;
+        Ok(VecDbStats {
+            live_count: stats.live_count as u32,
+            dead_count: stats.dead_count as u32,
+            dims: stats.dims as u32,
+            log_bytes: stats.log_bytes,
+            records_since_snapshot: stats.records_since_snapshot as u32,
+            approximate_memory_bytes: stats.approximate_memory_bytes as u64,
+        })
     }
 }
 
@@ -303,7 +267,7 @@ mod tests {
 
     use super::*;
 
-    const DIMS: usize = 8;
+    const DIMS: u32 = 8;
 
     static TEST_DIR_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -333,7 +297,7 @@ mod tests {
     }
 
     fn basis(axis: usize) -> Vec<f32> {
-        let mut vector = vec![0.0; DIMS];
+        let mut vector = vec![0.0; DIMS as usize];
         vector[axis] = 1.0;
         vector
     }
@@ -349,63 +313,49 @@ mod tests {
         db.add_vector(key("a"), basis(0)).unwrap();
         db.bulk_add_vectors(vec![key("b"), key("c")], vec![basis(1), basis(2)])
             .unwrap();
-        assert!(db.contains_vector(key("a")));
-        assert!(!db.contains_vector(key("missing")));
-        assert_eq!(db.get_vector(key("b")).unwrap(), basis(1));
-        assert!(db.get_vector(key("missing")).is_none());
         assert_eq!(
             db.bulk_get_vectors(vec![key("c"), key("missing")]),
             vec![Some(basis(2)), None]
         );
-        let matches = db.search_vectors(basis(0), 2, true).unwrap();
+        let matches = db.search(basis(0), Some(2), None, true, None).unwrap();
         assert_eq!(matches[0].key, "a");
         assert!(matches[0].distance.abs() < 1.0e-6);
-        let bulk = db
-            .bulk_search_vectors(vec![basis(1), basis(2)], 1, false)
-            .unwrap();
-        assert_eq!(bulk.len(), 2);
-        assert_eq!(bulk[0][0].key, "b");
-        assert_eq!(bulk[1][0].key, "c");
+        let within = db.search(basis(0), None, Some(0.5), true, None).unwrap();
+        assert_eq!(within.len(), 1);
+        assert_eq!(within[0].key, "a");
         let filtered = db
-            .approx_filtered_search_vectors_within_distance(
+            .search(
                 basis(0),
-                vec![key("b"), key("c")],
-                3,
-                2.0,
+                Some(3),
+                Some(2.0),
+                false,
+                Some(vec![key("b"), key("c")]),
             )
             .unwrap();
         assert!(filtered.iter().all(|found| found.key != "a"));
         assert_eq!(filtered.len(), 2);
-        let within = db
-            .search_vectors_within_distance(basis(0), 0.5, true)
-            .unwrap();
-        assert_eq!(within.len(), 1);
-        assert_eq!(within[0].key, "a");
-        let stats = db.get_index_stats();
+        let stats = db.get_index_stats().unwrap();
         assert_eq!(stats.live_count, 3);
         assert_eq!(stats.dead_count, 0);
         assert_eq!(stats.dims, DIMS);
         assert!(stats.log_bytes > 32);
         assert!(stats.approximate_memory_bytes > 0);
-        assert_eq!(db.len(), 3);
-        assert!(!db.is_empty());
         db.flush().unwrap();
-        assert_eq!(db.get_index_stats().records_since_snapshot, 0);
+        assert_eq!(db.get_index_stats().unwrap().records_since_snapshot, 0);
         let read_only = VecDb::open_read_only(dir.db_path(), DIMS).unwrap();
-        assert_eq!(read_only.len(), 3);
+        assert_eq!(read_only.get_index_stats().unwrap().live_count, 3);
         assert!(matches!(
             read_only.add_vector(key("x"), basis(3)),
             Err(RustVecDbError::ReadOnly { .. })
         ));
-        assert_eq!(db.remove_vector(key("a")).unwrap(), 1);
-        assert_eq!(db.remove_vector(key("a")).unwrap(), 0);
         assert_eq!(
-            db.bulk_remove_vectors(vec![key("b"), key("nope")]).unwrap(),
-            1
+            db.bulk_remove_vectors(vec![key("a"), key("b"), key("nope")])
+                .unwrap(),
+            2
         );
-        assert_eq!(db.len(), 1);
+        assert_eq!(db.get_index_stats().unwrap().live_count, 1);
         db.reset_index().unwrap();
-        assert!(db.is_empty());
+        assert_eq!(db.get_index_stats().unwrap().live_count, 0);
         db.add_vector(key("again"), basis(3)).unwrap();
         db.delete_index().unwrap();
         assert!(!PathBuf::from(dir.db_path()).exists());
@@ -419,7 +369,7 @@ mod tests {
             .bulk_add_vectors(vec![key("a")], vec![basis(0), basis(1)])
             .unwrap_err();
         assert!(matches!(error, RustVecDbError::LengthMismatch { .. }));
-        assert!(db.is_empty());
+        assert_eq!(db.get_index_stats().unwrap().live_count, 0);
     }
 
     #[test]
@@ -444,6 +394,72 @@ mod tests {
                     .is_empty()
             );
         }
+    }
+
+    #[test]
+    fn bulk_search_within_similarity_honors_per_query_thresholds() {
+        let dir = TestDir::create();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        db.bulk_add_vectors(
+            vec![key("a"), key("b"), key("c")],
+            vec![basis(0), basis(1), basis(2)],
+        )
+        .unwrap();
+        let queries = vec![basis(0), basis(0), basis(1)];
+        let results = db
+            .bulk_search_within_similarity(queries.clone(), vec![0.5, -1.0, 0.5], None, true)
+            .unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].len(), 1);
+        assert_eq!(results[0][0].key, "a");
+        assert_eq!(results[1].len(), 3);
+        assert_eq!(results[2].len(), 1);
+        assert_eq!(results[2][0].key, "b");
+        let limited = db
+            .bulk_search_within_similarity(queries.clone(), vec![-1.0, -1.0, -1.0], Some(2), false)
+            .unwrap();
+        assert!(limited.iter().all(|matches| matches.len() == 2));
+        let mixed = vec![0.5, -1.0, 0.9];
+        for exact in [true, false] {
+            let bulk = db
+                .bulk_search_within_similarity(queries.clone(), mixed.clone(), Some(2), exact)
+                .unwrap();
+            for ((query, similarity), matches) in queries.iter().zip(&mixed).zip(&bulk) {
+                let direct = db
+                    .search(query.clone(), Some(2), Some(1.0 - similarity), exact, None)
+                    .unwrap();
+                assert_eq!(matches.len(), direct.len());
+                for (found, expected) in matches.iter().zip(&direct) {
+                    assert_eq!(found.key, expected.key);
+                    assert_eq!(found.distance, expected.distance);
+                }
+            }
+        }
+        assert!(matches!(
+            db.bulk_search_within_similarity(queries.clone(), vec![0.5], None, false),
+            Err(RustVecDbError::LengthMismatch { .. })
+        ));
+        let degenerate = db
+            .bulk_search_within_similarity(
+                queries.clone(),
+                vec![f32::NAN, 1.5, -1.0],
+                Some(3),
+                true,
+            )
+            .unwrap();
+        assert!(degenerate[0].is_empty());
+        assert!(degenerate[1].is_empty());
+        assert_eq!(degenerate[2].len(), 3);
+        let all_degenerate = db
+            .bulk_search_within_similarity(
+                queries,
+                vec![f32::NAN, f32::INFINITY, 3.0],
+                Some(3),
+                false,
+            )
+            .unwrap();
+        assert_eq!(all_degenerate.len(), 3);
+        assert!(all_degenerate.iter().all(Vec::is_empty));
     }
 
     #[test]
@@ -501,20 +517,66 @@ mod tests {
     }
 
     #[test]
-    fn bulk_search_keys_includes_self_match_and_skips_absent() {
+    fn bulk_search_keys_excludes_self_and_reports_truncation() {
         let dir = TestDir::create();
         let db = VecDb::new(dir.db_path(), DIMS).unwrap();
-        db.bulk_add_vectors(vec![key("a"), key("b")], vec![basis(0), basis(1)])
-            .unwrap();
+        db.bulk_add_vectors(
+            vec![key("a"), key("b"), key("c")],
+            vec![basis(0), basis(1), basis(2)],
+        )
+        .unwrap();
         let results = db
-            .bulk_search_keys(vec![key("missing"), key("b"), key("a")], 2, true)
+            .bulk_search_keys(
+                vec![key("missing"), key("b"), key("a")],
+                2,
+                None,
+                true,
+                false,
+            )
             .unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].key, "b");
-        assert_eq!(results[0].matches[0].key, "b");
-        assert!(results[0].matches[0].distance.abs() < 1.0e-6);
         assert_eq!(results[0].matches.len(), 2);
+        assert!(results[0].matches.iter().all(|found| found.key != "b"));
+        assert!(results[0].truncated);
         assert_eq!(results[1].key, "a");
-        assert_eq!(results[1].matches[0].key, "a");
+        assert!(results[1].matches.iter().all(|found| found.key != "a"));
+        let restricted = db
+            .bulk_search_keys(vec![key("a"), key("b")], 5, None, true, true)
+            .unwrap();
+        for entry in &restricted {
+            assert_eq!(entry.matches.len(), 1);
+            assert!(!entry.truncated);
+        }
+        assert_eq!(restricted[0].matches[0].key, "b");
+        assert_eq!(restricted[1].matches[0].key, "a");
+        let cut = db
+            .bulk_search_keys(vec![key("a")], 2, Some(0.5), false, false)
+            .unwrap();
+        assert!(cut[0].matches.is_empty());
+        assert!(cut[0].truncated);
+    }
+
+    #[test]
+    fn delete_vec_db_files_purges_with_and_without_live_instances() {
+        let dir = TestDir::create();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        db.add_vector(key("a"), basis(0)).unwrap();
+        db.flush().unwrap();
+        delete_vec_db_files(dir.db_path()).unwrap();
+        assert!(!PathBuf::from(dir.db_path()).exists());
+        assert!(!PathBuf::from(format!("{}.graph", dir.db_path())).exists());
+        assert!(!PathBuf::from(format!("{}.lock", dir.db_path())).exists());
+        assert!(matches!(
+            db.get_index_stats(),
+            Err(RustVecDbError::Closed { .. })
+        ));
+        let reopened = VecDb::new(dir.db_path(), DIMS).unwrap();
+        assert_eq!(reopened.get_index_stats().unwrap().live_count, 0);
+        reopened.add_vector(key("b"), basis(1)).unwrap();
+        drop(reopened);
+        delete_vec_db_files(dir.db_path()).unwrap();
+        assert!(!PathBuf::from(dir.db_path()).exists());
+        delete_vec_db_files(dir.db_path()).unwrap();
     }
 }

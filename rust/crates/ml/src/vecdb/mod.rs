@@ -27,6 +27,13 @@ pub struct Match {
     pub distance: f32,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeyMatches {
+    pub key: String,
+    pub matches: Vec<Match>,
+    pub truncated: bool,
+}
+
 #[derive(Debug, Error)]
 pub enum VecDbError {
     #[error("{}: {source}", path.display())]
@@ -53,6 +60,8 @@ pub enum VecDbError {
     InvalidDimensions(usize),
     #[error("search requires a limit or a max distance")]
     UnboundedSearch,
+    #[error("length mismatch: {keys} keys, {vectors} vectors")]
+    LengthMismatch { keys: usize, vectors: usize },
 }
 
 impl VecDbError {

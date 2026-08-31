@@ -465,6 +465,17 @@ pub(crate) fn search(
     params: &SearchParams,
     allowed_slots: Option<&HashSet<u32>>,
 ) -> Vec<Match> {
+    search_excluding(graph, arena, query, params, allowed_slots, None)
+}
+
+pub(crate) fn search_excluding(
+    graph: &Graph,
+    arena: &VectorArena,
+    query: &[f32x8],
+    params: &SearchParams,
+    allowed_slots: Option<&HashSet<u32>>,
+    banned_slot: Option<u32>,
+) -> Vec<Match> {
     debug_assert!(params.limit.is_some() || params.max_distance.is_some());
     if let Some(max_distance) = params.max_distance {
         debug_assert!(max_distance.is_finite() && max_distance >= 0.0);
@@ -477,15 +488,15 @@ pub(crate) fn search(
         return Vec::new();
     }
     if params.exact {
-        return brute_force(arena, query, params, allowed_slots);
+        return brute_force(arena, query, params, allowed_slots, banned_slot);
     }
     if let Some(allowed) = allowed_slots
         && allowed.len() <= small_filter_cap(params.limit)
     {
-        return brute_force(arena, query, params, allowed_slots);
+        return brute_force(arena, query, params, allowed_slots, banned_slot);
     }
     if graph.entry_point.is_none() {
-        return brute_force(arena, query, params, allowed_slots);
+        return brute_force(arena, query, params, allowed_slots, banned_slot);
     }
     let context = QueryContext {
         graph,
@@ -493,11 +504,18 @@ pub(crate) fn search(
         query,
     };
     match params.limit {
-        Some(limit) => approx_limited(&context, limit, params.max_distance, allowed_slots),
+        Some(limit) => approx_limited(
+            &context,
+            limit,
+            params.max_distance,
+            allowed_slots,
+            banned_slot,
+        ),
         None => approx_threshold(
             &context,
             params.max_distance.unwrap_or(f32::MAX),
             allowed_slots,
+            banned_slot,
         ),
     }
 }
@@ -524,8 +542,13 @@ fn result_bound(arena: &VectorArena, allowed: Option<&HashSet<u32>>) -> usize {
 fn admission<'a>(
     arena: &'a VectorArena,
     allowed: Option<&'a HashSet<u32>>,
+    banned: Option<u32>,
 ) -> impl Fn(u32) -> bool + 'a {
-    move |slot| arena.is_alive(slot) && allowed.is_none_or(|set| set.contains(&slot))
+    move |slot| {
+        banned != Some(slot)
+            && arena.is_alive(slot)
+            && allowed.is_none_or(|set| set.contains(&slot))
+    }
 }
 
 fn approx_limited(
@@ -533,13 +556,14 @@ fn approx_limited(
     limit: usize,
     max_distance: Option<f32>,
     allowed: Option<&HashSet<u32>>,
+    banned: Option<u32>,
 ) -> Vec<Match> {
     let bound = result_bound(context.arena, allowed);
     let ef = limit
         .saturating_mul(EF_SEARCH_LIMIT_FACTOR)
         .max(EF_SEARCH_FLOOR)
         .min(bound);
-    let admit = admission(context.arena, allowed);
+    let admit = admission(context.arena, allowed, banned);
     let scored = context.top_scored(ef, &admit);
     to_matches(context.arena, scored, Some(limit), max_distance)
 }
@@ -548,9 +572,10 @@ fn approx_threshold(
     context: &QueryContext<'_>,
     max_distance: f32,
     allowed: Option<&HashSet<u32>>,
+    banned: Option<u32>,
 ) -> Vec<Match> {
     let bound = result_bound(context.arena, allowed);
-    let admit = admission(context.arena, allowed);
+    let admit = admission(context.arena, allowed, banned);
     let mut previous = 0usize;
     for step in THRESHOLD_STEP_COUNTS
         .into_iter()
@@ -579,11 +604,12 @@ fn brute_force(
     query: &[f32x8],
     params: &SearchParams,
     allowed: Option<&HashSet<u32>>,
+    banned: Option<u32>,
 ) -> Vec<Match> {
     let mut top: BinaryHeap<Scored> = BinaryHeap::new();
     let mut all: Vec<Scored> = Vec::new();
     let mut consider = |slot: u32| {
-        if !arena.is_alive(slot) {
+        if banned == Some(slot) || !arena.is_alive(slot) {
             return;
         }
         let distance = arena.distance_to_query(query, slot);
@@ -1032,6 +1058,103 @@ mod tests {
             None,
         );
         assert_eq!(keys(&without_graph), ["only"]);
+    }
+
+    #[test]
+    fn banned_entry_point_is_excluded_yet_still_routes_traversal() {
+        let (arena, graph) = (&FIXTURE.0, &FIXTURE.1);
+        let entry = graph.entry_point().unwrap();
+        let entry_key = arena.key_of_slot(entry).unwrap();
+        let query = arena.vector_lanes(entry).to_vec();
+        let reference = reference_ranking(arena, &query, None);
+        assert_eq!(reference[0].1, entry);
+        for exact in [true, false] {
+            let found = search_excluding(
+                graph,
+                arena,
+                &query,
+                &params(Some(10), None, exact),
+                None,
+                Some(entry),
+            );
+            assert_eq!(found.len(), 10);
+            assert_sorted(&found);
+            assert!(found.iter().all(|hit| hit.key != entry_key));
+            if exact {
+                let expected: Vec<&str> = reference[1..11]
+                    .iter()
+                    .map(|&(_, slot)| arena.key_of_slot(slot).unwrap())
+                    .collect();
+                assert_eq!(keys(&found), expected);
+            }
+        }
+        let everything = search_excluding(
+            graph,
+            arena,
+            &query,
+            &params(None, Some(2.5), false),
+            None,
+            Some(entry),
+        );
+        assert_eq!(everything.len(), FIXTURE_COUNT - 1);
+        assert!(everything.iter().all(|hit| hit.key != entry_key));
+        let large_filter: HashSet<u32> = (0..1200).chain([entry]).collect();
+        assert!(large_filter.len() > small_filter_cap(Some(10)));
+        let filtered = search_excluding(
+            graph,
+            arena,
+            &query,
+            &params(Some(10), None, false),
+            Some(&large_filter),
+            Some(entry),
+        );
+        assert_eq!(filtered.len(), 10);
+        assert!(filtered.iter().all(|hit| hit.key != entry_key));
+        let small_filter: HashSet<u32> = reference[..12].iter().map(|&(_, slot)| slot).collect();
+        let brute = search_excluding(
+            graph,
+            arena,
+            &query,
+            &params(Some(12), None, false),
+            Some(&small_filter),
+            Some(entry),
+        );
+        let expected: Vec<&str> = reference[1..12]
+            .iter()
+            .map(|&(_, slot)| arena.key_of_slot(slot).unwrap())
+            .collect();
+        assert_eq!(keys(&brute), expected);
+    }
+
+    #[test]
+    fn banned_only_node_yields_empty_in_every_mode() {
+        let mut arena = VectorArena::new(8).unwrap();
+        arena.upsert("only", &axis_vector(8, 0)).unwrap();
+        let graph = Graph::rebuild(&arena);
+        let query = arena.vector_lanes(0).to_vec();
+        let allowed: HashSet<u32> = [0].into_iter().collect();
+        for exact in [true, false] {
+            for filter in [None, Some(&allowed)] {
+                let by_limit = search_excluding(
+                    &graph,
+                    &arena,
+                    &query,
+                    &params(Some(5), None, exact),
+                    filter,
+                    Some(0),
+                );
+                assert!(by_limit.is_empty());
+                let by_threshold = search_excluding(
+                    &graph,
+                    &arena,
+                    &query,
+                    &params(None, Some(2.5), exact),
+                    filter,
+                    Some(0),
+                );
+                assert!(by_threshold.is_empty());
+            }
+        }
     }
 
     #[test]

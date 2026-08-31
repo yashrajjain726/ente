@@ -9,14 +9,14 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
-use super::graph::{Graph, search as graph_search};
+use super::graph::{Graph, search as graph_search, search_excluding};
 use super::lock::{WriterLock, lock_path};
 use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, remove_if_present, remove_stale_temp_sibling,
     sync_parent_dir,
 };
 use super::snapshot::{load_snapshot, remove_snapshot, snapshot_path, write_snapshot};
-use super::{Match, SearchParams, VecDbError};
+use super::{KeyMatches, Match, SearchParams, VecDbError};
 
 const SNAPSHOT_HARD_CAP: usize = 5000;
 const SNAPSHOT_QUIET_THRESHOLD: usize = 1000;
@@ -238,25 +238,32 @@ impl VecDb {
         apply_policy(&self.shared, &mut half, 1, now)
     }
 
-    pub fn bulk_add(&self, entries: &[(String, Vec<f32>)]) -> Result<(), VecDbError> {
+    pub fn bulk_add(&self, keys: &[String], vectors: &[Vec<f32>]) -> Result<(), VecDbError> {
+        if keys.len() != vectors.len() {
+            return Err(VecDbError::LengthMismatch {
+                keys: keys.len(),
+                vectors: vectors.len(),
+            });
+        }
         let now = Instant::now();
         let mut half = self.writable_half()?;
         let state = active_state(&mut half)?;
-        if entries.is_empty() {
+        if keys.is_empty() {
             return Ok(());
         }
-        for (key, vector) in entries {
+        for (key, vector) in keys.iter().zip(vectors) {
             ensure_finite(key, vector)?;
         }
-        let records: Vec<LogEntry<'_>> = entries
+        let records: Vec<LogEntry<'_>> = keys
             .iter()
+            .zip(vectors)
             .map(|(key, vector)| LogEntry::Add { key, vector })
             .collect();
         state.log.append(&records)?;
-        for (key, vector) in entries {
+        for (key, vector) in keys.iter().zip(vectors) {
             apply_add(&self.shared, key, vector)?;
         }
-        apply_policy(&self.shared, &mut half, entries.len(), now)
+        apply_policy(&self.shared, &mut half, keys.len(), now)
     }
 
     pub fn remove(&self, key: &str) -> Result<bool, VecDbError> {
@@ -315,28 +322,85 @@ impl VecDb {
 
     pub fn search(&self, query: &[f32], params: &SearchParams) -> Result<Vec<Match>, VecDbError> {
         self.shared.ensure_open()?;
-        if params.limit.is_none() && params.max_distance.is_none() {
-            return Err(VecDbError::UnboundedSearch);
-        }
-        if let Some(max_distance) = params.max_distance
-            && (!max_distance.is_finite() || max_distance < 0.0)
-        {
+        if degenerate_distance_cut(params)? {
             return Ok(Vec::new());
         }
         let st = self.shared.state_read();
-        let packed = st.arena.pack_query(query)?;
-        let allowed_slots: Option<HashSet<u32>> = params.allowed_keys.as_ref().map(|keys| {
-            keys.iter()
-                .filter_map(|key| st.arena.slot_of_key(key))
-                .collect()
-        });
-        Ok(graph_search(
-            &st.graph,
-            &st.arena,
-            &packed,
-            params,
-            allowed_slots.as_ref(),
-        ))
+        let allowed_slots = resolve_allowed_slots(&st, params.allowed_keys.as_deref());
+        search_in_state(&st, query, params, allowed_slots.as_ref())
+    }
+
+    pub fn bulk_search(
+        &self,
+        queries: &[Vec<f32>],
+        params: &SearchParams,
+    ) -> Result<Vec<Vec<Match>>, VecDbError> {
+        self.shared.ensure_open()?;
+        if degenerate_distance_cut(params)? {
+            return Ok(queries.iter().map(|_| Vec::new()).collect());
+        }
+        let st = self.shared.state_read();
+        let allowed_slots = resolve_allowed_slots(&st, params.allowed_keys.as_deref());
+        queries
+            .iter()
+            .map(|query| search_in_state(&st, query, params, allowed_slots.as_ref()))
+            .collect()
+    }
+
+    pub fn bulk_search_stored(
+        &self,
+        keys: &[String],
+        count: usize,
+        max_distance: Option<f32>,
+        exact: bool,
+        restrict_to_input: bool,
+    ) -> Result<Vec<KeyMatches>, VecDbError> {
+        self.shared.ensure_open()?;
+        let st = self.shared.state_read();
+        let resolved: Vec<(&String, u32)> = keys
+            .iter()
+            .filter_map(|key| st.arena.slot_of_key(key).map(|slot| (key, slot)))
+            .collect();
+        let degenerate =
+            max_distance.is_some_and(|distance| !distance.is_finite() || distance < 0.0);
+        let allowed_slots: Option<HashSet<u32>> =
+            restrict_to_input.then(|| resolved.iter().map(|(_, slot)| *slot).collect());
+        let params = SearchParams {
+            limit: Some(count),
+            max_distance: None,
+            exact,
+            allowed_keys: None,
+        };
+        let mut results = Vec::with_capacity(resolved.len());
+        for (key, slot) in resolved {
+            if degenerate {
+                results.push(KeyMatches {
+                    key: key.clone(),
+                    matches: Vec::new(),
+                    truncated: false,
+                });
+                continue;
+            }
+            let mut matches = search_excluding(
+                &st.graph,
+                &st.arena,
+                st.arena.vector_lanes(slot),
+                &params,
+                allowed_slots.as_ref(),
+                Some(slot),
+            );
+            let truncated = matches.len() >= count;
+            if let Some(cap) = max_distance {
+                let keep = matches.partition_point(|entry| entry.distance <= cap);
+                matches.truncate(keep);
+            }
+            results.push(KeyMatches {
+                key: key.clone(),
+                matches,
+                truncated,
+            });
+        }
+        Ok(results)
     }
 
     pub fn flush(&self) -> Result<(), VecDbError> {
@@ -385,30 +449,19 @@ impl VecDb {
         if self.read_only {
             return Err(VecDbError::ReadOnly);
         }
-        let mut half = self.shared.writer_half();
-        self.shared.ensure_open()?;
-        let WriterState { lock, log, .. } = take_writer_state(&mut half)?;
-        let mut st = self.shared.state_write();
-        self.shared.closed.store(true, Ordering::Release);
-        drop(log);
-        let removed = remove_index_files(&self.shared.path);
-        if let Ok(empty) = VectorArena::new(self.shared.dims) {
-            st.arena = empty;
-            st.graph = Graph::new();
-            st.total_records = 0;
-        }
-        if let Some(key) = &self.shared.registry_key
-            && let Some(slot) = existing_path_slot(key)
+        close_live_instance(&self.shared)
+    }
+
+    pub fn purge(path: &Path) -> Result<(), VecDbError> {
+        if let Ok(key) = registry_key_for(path)
+            && let Some(slot) = existing_path_slot(&key)
         {
-            let mut guard = lock_slot(&slot);
-            if std::ptr::eq(guard.live.as_ptr(), Arc::as_ptr(&self.shared)) {
-                guard.live = Weak::new();
+            let live = lock_slot(&slot).live.upgrade();
+            if let Some(shared) = live {
+                return close_live_instance(&shared);
             }
         }
-        drop(st);
-        drop(lock);
-        drop(half);
-        removed
+        remove_index_files(path)
     }
 
     pub fn stats(&self) -> Result<Stats, VecDbError> {
@@ -470,6 +523,69 @@ fn take_writer_state(half: &mut WriterHalf) -> Result<WriterState, VecDbError> {
             Err(VecDbError::ReadOnly)
         }
     }
+}
+
+fn degenerate_distance_cut(params: &SearchParams) -> Result<bool, VecDbError> {
+    if params.limit.is_none() && params.max_distance.is_none() {
+        return Err(VecDbError::UnboundedSearch);
+    }
+    Ok(params
+        .max_distance
+        .is_some_and(|max_distance| !max_distance.is_finite() || max_distance < 0.0))
+}
+
+fn resolve_allowed_slots(
+    state: &SearchState,
+    allowed_keys: Option<&[String]>,
+) -> Option<HashSet<u32>> {
+    allowed_keys.map(|keys| {
+        keys.iter()
+            .filter_map(|key| state.arena.slot_of_key(key))
+            .collect()
+    })
+}
+
+fn search_in_state(
+    state: &SearchState,
+    query: &[f32],
+    params: &SearchParams,
+    allowed_slots: Option<&HashSet<u32>>,
+) -> Result<Vec<Match>, VecDbError> {
+    let packed = state.arena.pack_query(query)?;
+    Ok(graph_search(
+        &state.graph,
+        &state.arena,
+        &packed,
+        params,
+        allowed_slots,
+    ))
+}
+
+fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
+    let mut half = shared.writer_half();
+    shared.ensure_open()?;
+    let WriterState { lock, log, .. } = take_writer_state(&mut half)?;
+    let mut st = shared.state_write();
+    shared.closed.store(true, Ordering::Release);
+    drop(log);
+    let removed = remove_index_files(&shared.path);
+    if let Ok(empty) = VectorArena::new(shared.dims) {
+        st.arena = empty;
+        st.graph = Graph::new();
+        st.total_records = 0;
+    }
+    if let Some(key) = &shared.registry_key
+        && let Some(slot) = existing_path_slot(key)
+    {
+        let mut guard = lock_slot(&slot);
+        if std::ptr::eq(guard.live.as_ptr(), Arc::as_ptr(shared)) {
+            guard.live = Weak::new();
+        }
+    }
+    drop(st);
+    drop(lock);
+    drop(half);
+    removed
 }
 
 fn apply_add(shared: &Shared, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
@@ -999,6 +1115,11 @@ mod tests {
             .collect()
     }
 
+    fn bulk_add(db: &VecDb, entries: &[(String, Vec<f32>)]) -> Result<(), VecDbError> {
+        let (keys, vectors): (Vec<String>, Vec<Vec<f32>>) = entries.iter().cloned().unzip();
+        db.bulk_add(&keys, &vectors)
+    }
+
     fn limit_params(limit: usize) -> SearchParams {
         SearchParams {
             limit: Some(limit),
@@ -1109,7 +1230,7 @@ mod tests {
         let path = dir.path().join("db");
         let probe = seeded_unit_vector(777, DIMS);
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 150, 100)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 150, 100)).unwrap();
         db.add("probe", &probe).unwrap();
         assert_eq!(db.len(), 151);
         assert!(!db.is_empty());
@@ -1169,7 +1290,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 10)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 10)).unwrap();
         let query = seeded_unit_vector(1, DIMS);
         assert!(matches!(
             db.search(&query, &SearchParams::default()),
@@ -1224,7 +1345,7 @@ mod tests {
             )
             .unwrap();
         }
-        db.bulk_add(&bulk_entries(0, 6, 40)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 6, 40)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
         assert_eq!(reopened.len(), 10);
@@ -1244,7 +1365,7 @@ mod tests {
         let path = dir.path().join("db");
         let copy = dir.path().join("copy");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 6, 60)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 6, 60)).unwrap();
         fs::copy(&path, &copy).unwrap();
         let copied = open_writer(&copy);
         assert_eq!(copied.len(), 6);
@@ -1264,7 +1385,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 4, 20)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 4, 20)).unwrap();
         drop(db);
         let clean_len = fs::metadata(&path).unwrap().len();
         let mut bytes = fs::read(&path).unwrap();
@@ -1282,7 +1403,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 4, 30)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 4, 30)).unwrap();
         db.flush().unwrap();
         drop(db);
         let clean_len = fs::metadata(&path).unwrap().len();
@@ -1301,7 +1422,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 8, 50)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 8, 50)).unwrap();
         db.flush().unwrap();
         drop(db);
         fs::remove_file(snapshot_path(&path)).unwrap();
@@ -1316,7 +1437,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 3, 70)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 3, 70)).unwrap();
         db.flush().unwrap();
         drop(db);
         let stale_snapshot = fs::read(snapshot_path(&path)).unwrap();
@@ -1338,7 +1459,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 80)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 80)).unwrap();
         db.flush().unwrap();
         drop(db);
         let bytes = fs::read(&path).unwrap();
@@ -1355,7 +1476,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 90)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 90)).unwrap();
         db.flush().unwrap();
         drop(db);
         let mut bytes = fs::read(snapshot_path(&path)).unwrap();
@@ -1371,7 +1492,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 110)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 110)).unwrap();
         db.flush().unwrap();
         drop(db);
         fs::write(temp_sibling(&path), [0xAB; 100]).unwrap();
@@ -1391,7 +1512,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 3, 120)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 3, 120)).unwrap();
         let joined = VecDb::open(&path, DIMS).unwrap();
         assert!(Arc::ptr_eq(&db.shared, &joined.shared));
         assert_eq!(joined.len(), 3);
@@ -1524,7 +1645,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 120, 340)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 120, 340)).unwrap();
         let generation_before = generation_of(&path);
         let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
@@ -1564,7 +1685,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 3, 130)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 3, 130)).unwrap();
         let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
         assert!(Arc::ptr_eq(&db.shared, &read_only.shared));
         assert_eq!(read_only.len(), 3);
@@ -1638,10 +1759,13 @@ mod tests {
             Err(VecDbError::ReadOnly)
         ));
         assert!(matches!(
-            read_only.bulk_add(&bulk_entries(0, 2, 5)),
+            bulk_add(&read_only, &bulk_entries(0, 2, 5)),
             Err(VecDbError::ReadOnly)
         ));
-        assert!(matches!(read_only.bulk_add(&[]), Err(VecDbError::ReadOnly)));
+        assert!(matches!(
+            bulk_add(&read_only, &[]),
+            Err(VecDbError::ReadOnly)
+        ));
         assert!(matches!(
             read_only.remove("kept"),
             Err(VecDbError::ReadOnly)
@@ -1662,7 +1786,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 100, 140)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 100, 140)).unwrap();
         drop(db);
         let snapshot_view = VecDb::open_read_only(&path, DIMS).unwrap();
         assert_eq!(snapshot_view.len(), 100);
@@ -1779,7 +1903,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 150)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 150)).unwrap();
         let log_bytes = db.stats().unwrap().log_bytes;
         assert!(!db.remove("missing").unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
@@ -1798,7 +1922,7 @@ mod tests {
             log_bytes + 2 * TOMBSTONE_RECORD_LEN
         );
         assert_eq!(db.bulk_remove(&[]).unwrap(), 0);
-        db.bulk_add(&[]).unwrap();
+        bulk_add(&db, &[]).unwrap();
         assert_eq!(
             db.stats().unwrap().log_bytes,
             log_bytes + 2 * TOMBSTONE_RECORD_LEN
@@ -1849,7 +1973,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 2, 160)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 2, 160)).unwrap();
         assert!(!snapshot_exists(&path));
         assert_eq!(db.stats().unwrap().records_since_snapshot, 2);
         db.flush().unwrap();
@@ -1865,7 +1989,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 3, 170)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 3, 170)).unwrap();
         drop(db);
         assert!(!snapshot_exists(&path));
         drop(open_writer(&path));
@@ -1883,7 +2007,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 120, 1000)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 120, 1000)).unwrap();
         let generation_before = generation_of(&path);
         for index in 0..40u64 {
             db.add(
@@ -1942,7 +2066,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 1100, 3000)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 1100, 3000)).unwrap();
         let generation_before = generation_of(&path);
         let removals: Vec<String> = (0..58).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 58);
@@ -1969,7 +2093,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 120, 210)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 120, 210)).unwrap();
         db.flush().unwrap();
         let stale_snapshot = fs::read(snapshot_path(&path)).unwrap();
         let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
@@ -2051,7 +2175,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 3, 260)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 3, 260)).unwrap();
         let WriterState { lock, log, .. } = take_writer(&db);
         drop(log);
         assert!(is_degraded(&db));
@@ -2085,7 +2209,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 3, 270)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 3, 270)).unwrap();
         let WriterState { lock, log, .. } = take_writer(&db);
         drop(log);
         let mut bytes = fs::read(&path).unwrap();
@@ -2130,7 +2254,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 100, 280)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 100, 280)).unwrap();
         let generation_before = generation_of(&path);
         fs::create_dir(temp_sibling(&path)).unwrap();
         let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
@@ -2143,10 +2267,10 @@ mod tests {
             Err(VecDbError::Locked(_))
         ));
         fs::remove_dir(temp_sibling(&path)).unwrap();
-        db.bulk_add(&bulk_entries(64, 36, 290)).unwrap();
+        bulk_add(&db, &bulk_entries(64, 36, 290)).unwrap();
         assert_eq!(db.stats().unwrap().dead_count, 164);
         assert_eq!(generation_of(&path), generation_before);
-        db.bulk_add(&bulk_entries(64, 28, 295)).unwrap();
+        bulk_add(&db, &bulk_entries(64, 28, 295)).unwrap();
         assert_eq!(db.stats().unwrap().dead_count, 0);
         assert_ne!(generation_of(&path), generation_before);
         drop(db);
@@ -2162,7 +2286,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 300)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 300)).unwrap();
         drop(db);
         fs::create_dir(snapshot_path(&path)).unwrap();
         let db = open_writer(&path);
@@ -2180,7 +2304,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 20, 180)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 20, 180)).unwrap();
         db.flush().unwrap();
         let generation_before = generation_of(&path);
         db.reset().unwrap();
@@ -2214,7 +2338,7 @@ mod tests {
         let path = dir.path().join("db");
         let first = open_writer(&path);
         let second = VecDb::open(&path, DIMS).unwrap();
-        first.bulk_add(&bulk_entries(0, 10, 220)).unwrap();
+        bulk_add(&first, &bulk_entries(0, 10, 220)).unwrap();
         assert_eq!(second.len(), 10);
         second.reset().unwrap();
         assert!(first.is_empty());
@@ -2231,7 +2355,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 310)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 310)).unwrap();
         fs::create_dir(snapshot_path(&path)).unwrap();
         assert!(matches!(db.reset(), Err(VecDbError::Io { .. })));
         assert!(!path.exists());
@@ -2256,7 +2380,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 320)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 320)).unwrap();
         fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
         let outcome = db.reset();
         fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
@@ -2278,7 +2402,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 330)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 330)).unwrap();
         let old_generation = generation_of(&path);
         let WriterState { lock, log, .. } = take_writer(&db);
         drop(log);
@@ -2305,7 +2429,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 5, 190)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 5, 190)).unwrap();
         db.flush().unwrap();
         fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
         assert!(path.exists());
@@ -2323,7 +2447,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let first = open_writer(&path);
-        first.bulk_add(&bulk_entries(0, 5, 400)).unwrap();
+        bulk_add(&first, &bulk_entries(0, 5, 400)).unwrap();
         first.flush().unwrap();
         let survivor = VecDb::open(&path, DIMS).unwrap();
         let observer = VecDb::open_read_only(&path, DIMS).unwrap();
@@ -2338,7 +2462,7 @@ mod tests {
         ));
         assert!(matches!(survivor.add("x", &query), Err(VecDbError::Closed)));
         assert!(matches!(
-            survivor.bulk_add(&bulk_entries(0, 2, 401)),
+            bulk_add(&survivor, &bulk_entries(0, 2, 401)),
             Err(VecDbError::Closed)
         ));
         assert!(matches!(survivor.remove("key-0"), Err(VecDbError::Closed)));
@@ -2367,7 +2491,7 @@ mod tests {
         let path = dir.path().join("db");
         let writer = open_writer(&path);
         let pre = bulk_entries(10_000, 50, 900);
-        writer.bulk_add(&pre).unwrap();
+        bulk_add(&writer, &pre).unwrap();
         let bulk = bulk_entries(0, BULK, 700);
         let expected: Arc<HashMap<String, Vec<f32>>> =
             Arc::new(pre.iter().chain(bulk.iter()).cloned().collect());
@@ -2415,7 +2539,7 @@ mod tests {
             })
         };
         barrier.wait();
-        writer.bulk_add(&bulk).unwrap();
+        bulk_add(&writer, &bulk).unwrap();
         stop.store(true, Ordering::Relaxed);
         for reader in readers {
             let (handle, iterations) = reader.join().unwrap();
@@ -2435,7 +2559,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
-        db.bulk_add(&bulk_entries(0, 300, 500)).unwrap();
+        bulk_add(&db, &bulk_entries(0, 300, 500)).unwrap();
         let removals: Vec<String> = (0..30).map(|index| format!("key-{index}")).collect();
         assert_eq!(db.bulk_remove(&removals).unwrap(), 30);
         assert_eq!(db.stats().unwrap().dead_count, 60);
@@ -2489,7 +2613,7 @@ mod tests {
         let mut infected = bulk_entries(10, 3, 200);
         infected[1].1[0] = f32::INFINITY;
         assert!(matches!(
-            db.bulk_add(&infected),
+            bulk_add(&db, &infected),
             Err(VecDbError::InvalidVector(_))
         ));
         assert_eq!(db.len(), 1);
@@ -2501,5 +2625,305 @@ mod tests {
         assert_eq!(reopened.len(), 1);
         assert!(reopened.contains("key-0"));
         assert!(!reopened.contains("bad"));
+    }
+
+    #[test]
+    fn bulk_search_matches_per_query_search() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 200, 640)).unwrap();
+        let allowed = vec![
+            "key-3".to_string(),
+            "key-77".to_string(),
+            "key-77".to_string(),
+            "key-150".to_string(),
+            "absent".to_string(),
+        ];
+        let queries: Vec<Vec<f32>> = (0..6)
+            .map(|index| seeded_unit_vector(9000 + index, DIMS))
+            .collect();
+        for shape in search_shapes(allowed) {
+            let bulk = db.bulk_search(&queries, &shape).unwrap();
+            assert_eq!(bulk.len(), queries.len());
+            for (query, matches) in queries.iter().zip(&bulk) {
+                assert_eq!(matches, &db.search(query, &shape).unwrap());
+            }
+        }
+        assert!(matches!(
+            db.bulk_search(&queries, &SearchParams::default()),
+            Err(VecDbError::UnboundedSearch)
+        ));
+        for bad_distance in [f32::NAN, f32::INFINITY, -0.5] {
+            let degenerate = SearchParams {
+                limit: Some(3),
+                max_distance: Some(bad_distance),
+                ..SearchParams::default()
+            };
+            let empties = db.bulk_search(&queries, &degenerate).unwrap();
+            assert_eq!(empties.len(), queries.len());
+            assert!(empties.iter().all(Vec::is_empty));
+        }
+        let empty_allowed = SearchParams {
+            limit: Some(5),
+            allowed_keys: Some(Vec::new()),
+            ..SearchParams::default()
+        };
+        let none_allowed = db.bulk_search(&queries, &empty_allowed).unwrap();
+        assert_eq!(none_allowed.len(), queries.len());
+        assert!(none_allowed.iter().all(Vec::is_empty));
+        for query in &queries {
+            assert!(db.search(query, &empty_allowed).unwrap().is_empty());
+        }
+        assert!(db.bulk_search(&[], &limit_params(3)).unwrap().is_empty());
+    }
+
+    #[test]
+    fn bulk_search_stored_preserves_order_skips_absent_and_excludes_self() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 40, 820)).unwrap();
+        let twin = seeded_unit_vector(31_000, DIMS);
+        db.add("twin-a", &twin).unwrap();
+        db.add("twin-b", &twin).unwrap();
+        let input = vec![
+            "key-5".to_string(),
+            "missing".to_string(),
+            "twin-a".to_string(),
+            "key-0".to_string(),
+            "key-31".to_string(),
+        ];
+        for exact in [false, true] {
+            let results = db
+                .bulk_search_stored(&input, 4, None, exact, false)
+                .unwrap();
+            let found: Vec<&str> = results.iter().map(|entry| entry.key.as_str()).collect();
+            assert_eq!(found, vec!["key-5", "twin-a", "key-0", "key-31"]);
+            for entry in &results {
+                assert_eq!(entry.matches.len(), 4);
+                assert!(entry.truncated);
+                assert!(entry.matches.iter().all(|found| found.key != entry.key));
+            }
+            assert_eq!(results[1].matches[0].key, "twin-b");
+            assert!(results[1].matches[0].distance.abs() < 1.0e-6);
+        }
+        assert!(
+            db.bulk_search_stored(&[], 3, None, false, false)
+                .unwrap()
+                .is_empty()
+        );
+        let absent = vec!["nope".to_string(), "nada".to_string()];
+        assert!(
+            db.bulk_search_stored(&absent, 3, None, true, true)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn bulk_search_stored_restricts_to_input_only_when_asked() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 30, 860)).unwrap();
+        let input: Vec<String> = (1..=4).map(|index| format!("key-{index}")).collect();
+        for exact in [false, true] {
+            let restricted = db
+                .bulk_search_stored(&input, 10, None, exact, true)
+                .unwrap();
+            assert_eq!(restricted.len(), 4);
+            for entry in &restricted {
+                assert_eq!(entry.matches.len(), 3);
+                assert!(!entry.truncated);
+                assert!(
+                    entry
+                        .matches
+                        .iter()
+                        .all(|found| input.contains(&found.key) && found.key != entry.key)
+                );
+            }
+            let open = db
+                .bulk_search_stored(&input, 10, None, exact, false)
+                .unwrap();
+            assert!(open.iter().all(|entry| entry.matches.len() == 10));
+            assert!(open.iter().any(|entry| {
+                entry
+                    .matches
+                    .iter()
+                    .any(|found| !input.contains(&found.key))
+            }));
+        }
+    }
+
+    #[test]
+    fn bulk_search_stored_distance_cut_and_truncated_flag() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("center", &basis_vector(0)).unwrap();
+        let mut close = basis_vector(0);
+        close[0] = 0.99;
+        close[1] = (1.0f32 - 0.99 * 0.99).sqrt();
+        db.add("close", &close).unwrap();
+        for axis in 2..10 {
+            db.add(&format!("far-{axis}"), &basis_vector(axis)).unwrap();
+        }
+        let center = vec!["center".to_string()];
+        for exact in [false, true] {
+            let cut = db
+                .bulk_search_stored(&center, 5, Some(0.5), exact, false)
+                .unwrap();
+            assert_eq!(cut[0].matches.len(), 1);
+            assert_eq!(cut[0].matches[0].key, "close");
+            assert!(cut[0].truncated);
+            let uncut = db
+                .bulk_search_stored(&center, 20, Some(0.5), exact, false)
+                .unwrap();
+            assert_eq!(uncut[0].matches.len(), 1);
+            assert!(!uncut[0].truncated);
+            let complete = db
+                .bulk_search_stored(&center, 9, None, exact, false)
+                .unwrap();
+            assert_eq!(complete[0].matches.len(), 9);
+            assert!(complete[0].truncated);
+            let whole_index = db
+                .bulk_search_stored(&center, 10, None, exact, false)
+                .unwrap();
+            assert_eq!(whole_index[0].matches.len(), 9);
+            assert!(!whole_index[0].truncated);
+            for bad_distance in [f32::NAN, f32::INFINITY, -0.5] {
+                let degenerate = db
+                    .bulk_search_stored(&center, 5, Some(bad_distance), exact, false)
+                    .unwrap();
+                assert_eq!(degenerate.len(), 1);
+                assert!(degenerate[0].matches.is_empty());
+                assert!(!degenerate[0].truncated);
+            }
+        }
+    }
+
+    #[test]
+    fn bulk_search_stored_on_a_single_entry_index_finds_nothing() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("solo", &seeded_unit_vector(5, DIMS)).unwrap();
+        let input = vec!["solo".to_string()];
+        for exact in [false, true] {
+            for restrict in [false, true] {
+                let results = db
+                    .bulk_search_stored(&input, 3, None, exact, restrict)
+                    .unwrap();
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].key, "solo");
+                assert!(results[0].matches.is_empty());
+                assert!(!results[0].truncated);
+            }
+        }
+    }
+
+    #[test]
+    fn bulk_add_length_mismatch_is_rejected_before_anything_else() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("seed", &seeded_unit_vector(1, DIMS)).unwrap();
+        let log_bytes = db.stats().unwrap().log_bytes;
+        let keys = vec!["x".to_string(), "y".to_string()];
+        let vectors = vec![seeded_unit_vector(2, DIMS)];
+        assert!(matches!(
+            db.bulk_add(&keys, &vectors),
+            Err(VecDbError::LengthMismatch {
+                keys: 2,
+                vectors: 1
+            })
+        ));
+        assert_eq!(db.len(), 1);
+        assert!(!db.contains("x"));
+        assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
+        let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert!(matches!(
+            read_only.bulk_add(&keys, &vectors),
+            Err(VecDbError::LengthMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn purge_with_a_live_instance_behaves_like_delete() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let first = open_writer(&path);
+        bulk_add(&first, &bulk_entries(0, 5, 950)).unwrap();
+        first.flush().unwrap();
+        fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
+        let survivor = VecDb::open(&path, DIMS).unwrap();
+        let observer = VecDb::open_read_only(&path, DIMS).unwrap();
+        VecDb::purge(&path).unwrap();
+        assert!(!path.exists());
+        assert!(!snapshot_exists(&path));
+        assert!(!temp_sibling(&path).exists());
+        assert!(!lock_path(&path).exists());
+        let query = seeded_unit_vector(1, DIMS);
+        assert!(matches!(
+            survivor.search(&query, &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(
+            survivor.bulk_search(std::slice::from_ref(&query), &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(
+            survivor.bulk_search_stored(&["key-0".to_string()], 3, None, false, false),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(survivor.add("x", &query), Err(VecDbError::Closed)));
+        assert!(matches!(
+            bulk_add(&survivor, &bulk_entries(0, 2, 951)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(survivor.remove("key-0"), Err(VecDbError::Closed)));
+        assert!(matches!(
+            survivor.bulk_remove(&["key-0".to_string()]),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(survivor.stats(), Err(VecDbError::Closed)));
+        assert!(matches!(survivor.flush(), Err(VecDbError::Closed)));
+        assert!(matches!(survivor.reset(), Err(VecDbError::Closed)));
+        assert!(matches!(
+            observer.search(&query, &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(first.stats(), Err(VecDbError::Closed)));
+        assert!(matches!(survivor.delete(), Err(VecDbError::Closed)));
+        let fresh = open_writer(&path);
+        assert!(fresh.is_empty());
+        fresh.add("anew", &query).unwrap();
+        assert_eq!(fresh.len(), 1);
+    }
+
+    #[test]
+    fn purge_without_a_live_instance_removes_files_and_tolerates_missing_ones() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 5, 960)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
+        assert!(path.exists());
+        assert!(snapshot_exists(&path));
+        assert!(lock_path(&path).exists());
+        VecDb::purge(&path).unwrap();
+        assert!(!path.exists());
+        assert!(!snapshot_exists(&path));
+        assert!(!temp_sibling(&path).exists());
+        assert!(!lock_path(&path).exists());
+        VecDb::purge(&path).unwrap();
+        VecDb::purge(&dir.path().join("never-created")).unwrap();
+        let fresh = open_writer(&path);
+        assert!(fresh.is_empty());
+        fresh.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
+        assert_eq!(fresh.len(), 1);
     }
 }

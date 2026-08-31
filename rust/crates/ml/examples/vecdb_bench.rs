@@ -318,9 +318,13 @@ fn ingest_phase(db: &mut VecDb, data: &BenchData, scale: usize) -> IngestTimings
     let single_total = started.elapsed();
     let rest = &data.entries[single_count..];
     eprintln!("[scale {scale}] vecdb bulk adds");
+    let batches: Vec<(Vec<String>, Vec<Vec<f32>>)> = rest
+        .chunks(BULK_BATCH_SIZE)
+        .map(|batch| batch.iter().cloned().unzip())
+        .collect();
     let started = Instant::now();
-    for batch in rest.chunks(BULK_BATCH_SIZE) {
-        db.bulk_add(batch).expect("vecdb bulk add");
+    for (keys, vectors) in &batches {
+        db.bulk_add(keys, vectors).expect("vecdb bulk add");
     }
     let bulk_total = started.elapsed();
     db.add("bench-probe", &data.probe).expect("vecdb probe add");
