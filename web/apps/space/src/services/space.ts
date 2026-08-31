@@ -31,7 +31,7 @@ import { normalizeSpaceMessageText } from "utils/message-limits";
 
 export { clearSpaceMediaURLCache } from "services/media-cache";
 
-const currentFeedPageSize = 10;
+const currentHomePostsPageSize = 100;
 
 interface SpaceAvatar {
     keyVersion: number;
@@ -88,6 +88,10 @@ interface SpacePostResponse {
 interface SpacePostPageResponse {
     items?: SpacePostResponse[];
     nextCursor?: string;
+}
+
+interface SpaceHomePostPageResponse extends SpacePostPageResponse {
+    syncCursor: string;
 }
 
 type SpaceMessageConversationActivityType =
@@ -207,9 +211,10 @@ export interface SpacePost extends SpacePostBase {
     imageUrl?: string;
 }
 
-export interface SpacePostPage {
+export interface SpaceHomePostPage {
     items: SpacePost[];
     nextCursor?: string;
+    syncCursor: string;
 }
 
 export interface SpaceProfilePost extends SpacePostBase {
@@ -673,18 +678,22 @@ const profilePostFromPost = (post: SpacePostResponse): SpaceProfilePost => {
     };
 };
 
-const postPageFromAccountPage = async (
+const homePostPageFromAccountPage = async (
     ctx: SpaceAccountCtxHandle,
-    page: SpacePostPageResponse,
+    page: SpaceHomePostPageResponse,
     loadMedia = true,
     viewerSpaceId?: string,
-): Promise<SpacePostPage> => {
+): Promise<SpaceHomePostPage> => {
     const items = await Promise.all(
         (page.items ?? []).map((post) =>
             postFromAccountPost(ctx, post, loadMedia, viewerSpaceId),
         ),
     );
-    return { items, nextCursor: page.nextCursor || undefined };
+    return {
+        items,
+        nextCursor: page.nextCursor || undefined,
+        syncCursor: page.syncCursor,
+    };
 };
 
 const profilePostPageFromPage = (
@@ -1162,19 +1171,21 @@ export const removeCurrentSpaceFriend = async (
     }
 };
 
-export const loadCurrentFeedPage = async (
+export const loadCurrentHomePostsPage = async (
     spaceId: string,
+    after?: string,
     cursor?: string,
-): Promise<SpacePostPage> => {
+): Promise<SpaceHomePostPage> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const page = (await ctx.listFeed(
+        const page = (await ctx.listHomePosts(
             spaceId,
+            after ?? null,
             cursor ?? null,
-            currentFeedPageSize,
-        )) as SpacePostPageResponse;
+            currentHomePostsPageSize,
+        )) as SpaceHomePostPageResponse;
         await persistCurrentOwnedSpaces(ctx);
-        return await postPageFromAccountPage(ctx, page, false, spaceId);
+        return await homePostPageFromAccountPage(ctx, page, false, spaceId);
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1209,25 +1220,6 @@ export const loadCurrentSpaceProfilePostsPage = async (
                 60,
             )) as SpacePostPageResponse,
         );
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
-export const loadCurrentSpaceLatestPost = async (
-    spaceId: string,
-    viewerSpaceId: string,
-): Promise<SpacePost | null> => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        const page = (await ctx.listPosts(
-            spaceId,
-            viewerSpaceId,
-            null,
-            1,
-        )) as SpacePostPageResponse;
-        const post = page.items?.[0];
-        return post ? profilePostFromPost(post) : null;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1360,9 +1352,6 @@ export const createCurrentPhotoPost = async ({
         releaseCurrentSpaceContext(ctx);
     }
 };
-
-export const isSpacePostLimitReachedError = (error: unknown) =>
-    isNamedError(error, "post_limit_reached");
 
 const normalizedImageDimension = (dimension: number | undefined) =>
     typeof dimension == "number" && Number.isFinite(dimension) && dimension > 0

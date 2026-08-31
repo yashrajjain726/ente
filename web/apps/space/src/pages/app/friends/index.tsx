@@ -4,10 +4,7 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
-import {
-    invalidateCachedSpaceFeed,
-    removeCachedSpaceFeedPostsBySpace,
-} from "services/feed-cache";
+import { removeCachedSpaceHomePostsBySpace } from "services/home-posts";
 import { spaceInviteURL } from "services/invite";
 import {
     clearSpaceFriendsCache,
@@ -103,7 +100,6 @@ const Page: React.FC = () => {
                     try {
                         if (status == "friend") {
                             clearSpaceFriendsCache();
-                            void invalidateCachedSpaceFeed(actorSpaceId);
                             const [requests, friends] = await Promise.all([
                                 loadCurrentFriendRequests(actorSpaceId),
                                 loadCurrentSpaceFriends(actorSpaceId),
@@ -166,7 +162,6 @@ const Page: React.FC = () => {
                         setShowFriendRequestCanceledToast(true);
                         return;
                     }
-                    void invalidateCachedSpaceFeed(actorSpaceId);
                     const friends = await loadCurrentSpaceFriends(actorSpaceId);
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
@@ -224,7 +219,7 @@ const Page: React.FC = () => {
                         actorSpaceId,
                         friend.spaceId,
                     );
-                    await removeCachedSpaceFeedPostsBySpace(
+                    await removeCachedSpaceHomePostsBySpace(
                         actorSpaceId,
                         friend.spaceId,
                     );

@@ -1,9 +1,15 @@
 import { ArrowLeft02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import React from "react";
-import { homeCirclePlacements } from "utils/home-circle-layout";
+import {
+    homeCircleGridLayout,
+    homeCirclePlacements,
+    usesHomeCircleGrid,
+    type HomeCirclePlacement,
+} from "utils/home-circle-layout";
 
 const background = "#0C1014";
 const headerChromeColor = "#202825";
@@ -16,6 +22,54 @@ interface CanvasSize {
     height: number;
     width: number;
 }
+
+const LayoutDemoPost: React.FC<{ placement?: HomeCirclePlacement }> = ({
+    placement,
+}) => {
+    const avatarSize = placement ? Math.min(32, placement.size * 0.2) : "20%";
+    return (
+        <Box
+            sx={{
+                aspectRatio: "1",
+                position: placement ? "absolute" : "relative",
+                width: placement?.size ?? "100%",
+                ...(placement && {
+                    height: placement.size,
+                    left: placement.x,
+                    top: placement.y,
+                }),
+            }}
+        >
+            <Box
+                sx={{
+                    bgcolor: "#1A211F",
+                    borderRadius: "20%",
+                    height: "100%",
+                    position: "relative",
+                    width: "100%",
+                    zIndex: 1,
+                }}
+            />
+            <Box
+                aria-hidden
+                sx={{
+                    borderRadius: "50%",
+                    bottom: "10%",
+                    height: avatarSize,
+                    left: "10%",
+                    maxHeight: 32,
+                    maxWidth: 32,
+                    overflow: "hidden",
+                    position: "absolute",
+                    width: avatarSize,
+                    zIndex: 2,
+                }}
+            >
+                <SpaceAvatarImage aria-hidden borderRadius="50%" />
+            </Box>
+        </Box>
+    );
+};
 
 const LayoutDemoPage: React.FC = () => {
     const [friendCount, setFriendCount] = React.useState(1);
@@ -53,14 +107,17 @@ const LayoutDemoPage: React.FC = () => {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
+    const usesGrid = usesHomeCircleGrid(friendCount);
     const placements = homeCirclePlacements(
         friendCount,
         canvasSize.width,
         canvasSize.height,
     );
-    const circleSize = placements[0]?.size ?? 0;
-    const ringWidth = Math.max(1, Math.min(3, circleSize * 0.018));
-    const circlePadding = Math.max(1.5, Math.min(4, circleSize * 0.025));
+    const gridLayout = homeCircleGridLayout(
+        friendCount,
+        canvasSize.width,
+        canvasSize.height,
+    );
 
     return (
         <Box
@@ -181,57 +238,44 @@ const LayoutDemoPage: React.FC = () => {
                 </Box>
                 <Box
                     sx={{
-                        bottom: layoutVerticalInset,
-                        left: "16px",
-                        position: "absolute",
-                        right: "16px",
-                        top: layoutVerticalInset,
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        height: `calc(100svh - ${headerHeight}px)`,
+                        pb: layoutVerticalInset,
+                        pt: `calc(${layoutVerticalInset} - ${headerHeight}px)`,
+                        px: "16px",
                     }}
                 >
                     <Box
                         ref={canvasRef}
                         sx={{
-                            height: "100%",
+                            display: usesGrid ? "grid" : "block",
+                            flex: "1 1 auto",
+                            gap: gridLayout ? `${gridLayout.gap}px` : undefined,
+                            gridTemplateColumns: gridLayout
+                                ? `repeat(3, ${gridLayout.size}px)`
+                                : undefined,
+                            gridTemplateRows: gridLayout
+                                ? `repeat(${gridLayout.rows}, ${gridLayout.size}px)`
+                                : undefined,
+                            minHeight: 0,
+                            placeContent: usesGrid ? "center" : undefined,
                             position: "relative",
                             width: "100%",
                         }}
                     >
-                        {circleSize > 0 &&
-                            placements.map(({ size, x, y }, index) => (
-                                <Box
-                                    key={index}
-                                    sx={{
-                                        height: size,
-                                        left: x,
-                                        position: "absolute",
-                                        top: y,
-                                        width: size,
-                                    }}
-                                >
-                                    <Box
-                                        sx={{
-                                            aspectRatio: "1",
-                                            border: `${ringWidth}px solid #2A3430`,
-                                            borderRadius: "50%",
-                                            boxSizing: "border-box",
-                                            height: "100%",
-                                            p: `${circlePadding}px`,
-                                            position: "relative",
-                                            width: "100%",
-                                            zIndex: 1,
-                                        }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                bgcolor: "#1A211F",
-                                                borderRadius: "50%",
-                                                height: "100%",
-                                                width: "100%",
-                                            }}
-                                        />
-                                    </Box>
-                                </Box>
-                            ))}
+                        {usesGrid && gridLayout
+                            ? Array.from(
+                                  { length: friendCount },
+                                  (_, index) => <LayoutDemoPost key={index} />,
+                              )
+                            : placements.map((placement, index) => (
+                                  <LayoutDemoPost
+                                      key={index}
+                                      placement={placement}
+                                  />
+                              ))}
                     </Box>
                 </Box>
                 <SpacePostFloatingActionButton />

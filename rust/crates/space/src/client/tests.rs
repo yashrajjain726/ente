@@ -1754,7 +1754,7 @@ async fn refresh_friend_shares_accepts_empty_server_response() {
 }
 
 #[tokio::test]
-async fn list_feed_uses_space_feed_endpoint() {
+async fn list_home_posts_uses_home_posts_endpoint() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
     let shares = server
@@ -1764,10 +1764,11 @@ async fn list_feed_uses_space_feed_endpoint() {
         .with_body("[]")
         .create_async()
         .await;
-    let feed = server
-        .mock("GET", "/spaces/space_owner_main/feed")
+    let home_posts = server
+        .mock("GET", "/spaces/space_owner_main/home-posts")
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("after".into(), "1000:1".into()),
             Matcher::UrlEncoded("cursor".into(), "cursor-1".into()),
             Matcher::UrlEncoded("limit".into(), "5".into()),
         ]))
@@ -1776,8 +1777,8 @@ async fn list_feed_uses_space_feed_endpoint() {
             json!({
                 "items": [{
                     "postId": 42,
-                    "spaceId": "space_owner_main",
-                    "spaceSlug": "owner-main",
+                    "spaceId": "space_friend_gallery",
+                    "spaceSlug": "friend-gallery",
                     "author": {
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery"
@@ -1789,7 +1790,8 @@ async fn list_feed_uses_space_feed_endpoint() {
                     "createdAt": "2026-04-16T00:00:00Z",
                     "viewerLiked": true
                 }],
-                "nextCursor": "cursor-2"
+                "nextCursor": "cursor-2",
+                "syncCursor": "2000:42"
             })
             .to_string(),
         )
@@ -1797,15 +1799,21 @@ async fn list_feed_uses_space_feed_endpoint() {
         .await;
 
     let page = ctx
-        .list_feed("space_owner_main", Some("cursor-1".to_owned()), Some(5))
+        .list_home_posts(
+            "space_owner_main",
+            Some("1000:1".to_owned()),
+            Some("cursor-1".to_owned()),
+            Some(5),
+        )
         .await
-        .expect("feed page should load");
+        .expect("home posts should load");
 
     assert_eq!(page.items.len(), 1);
     assert_eq!(page.items[0].post_id, 42);
     assert_eq!(page.next_cursor, "cursor-2");
+    assert_eq!(page.sync_cursor, "2000:42");
     shares.assert_async().await;
-    feed.assert_async().await;
+    home_posts.assert_async().await;
 }
 
 #[tokio::test]

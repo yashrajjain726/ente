@@ -17,7 +17,7 @@ import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     SpaceFileViewer,
-    SpaceViewerFeedBackdrop,
+    SpaceViewerPostBackdrop,
     type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
@@ -462,6 +462,7 @@ interface ProfileScreenProps {
     onDeletePost?: (postId: number) => Promise<void> | void;
     onDraftPostPublished?: () => void;
     onOpenFriends?: () => void;
+    onOpenPost?: (post: ProfilePostItem) => void;
     onOpenProfileCover?: () => void;
     onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
@@ -499,6 +500,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onDeletePost,
     onDraftPostPublished,
     onOpenFriends,
+    onOpenPost,
     onOpenProfileCover,
     onOpenProfilePhoto,
     onOpenSettings,
@@ -831,6 +833,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         (postIndex: number) => {
             const item = viewerPostItems[postIndex];
             if (!item) return;
+            onOpenPost?.(item);
 
             const updateSelectedPost = (imageUrl: string) => {
                 setSelectedPost((currentPost) => {
@@ -860,6 +863,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         [
             loadPostImage,
             loadedPostImageURLFor,
+            onOpenPost,
             selectedPostForItem,
             viewerPostItems,
         ],
@@ -1023,7 +1027,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }}
         >
             {selectedPost && (
-                <SpaceViewerFeedBackdrop exiting={isDraftPostExitAnimating} />
+                <SpaceViewerPostBackdrop exiting={isDraftPostExitAnimating} />
             )}
             <Box
                 sx={{
@@ -1809,6 +1813,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                             undefined
                                                         )
                                                             return;
+                                                        onOpenPost?.(item);
                                                         setSelectedPost(
                                                             selectedPostForItem(
                                                                 item,

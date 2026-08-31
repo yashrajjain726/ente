@@ -6,7 +6,6 @@ import type {
     SetupProfileDetails,
 } from "screens/SetupProfileScreen";
 import type { PendingSpacePasskeyVerification } from "services/passkey-verification";
-import type { SpacePost } from "services/space";
 import type { CreateProfileSource } from "utils/routes";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
@@ -19,47 +18,9 @@ export interface RefreshSpaceProfileOptions {
     throwOnError?: boolean;
 }
 
-export interface PendingSpaceFeedPost {
-    avatarUrl?: string | null;
-    caption?: string;
-    friendID: string;
-    height?: number;
-    id: string;
-    imageUrl: string;
-    name: string;
-    spaceId: string;
-    status: "pending";
-    timestampMs: number;
-    width?: number;
-}
-
-export type FailedSpaceFeedPost = Omit<PendingSpaceFeedPost, "status"> & {
-    reason?: "post-limit";
-    status: "failed";
-};
-
-export interface PostedSpaceFeedPost {
-    id: string;
-    post: SpacePost;
-    status: "posted";
-}
-
-export interface ReadySpaceFeedPost {
-    id: string;
-    post: SpacePost;
-    status: "ready";
-}
-
-export type LocalSpaceFeedPost =
-    | FailedSpaceFeedPost
-    | PendingSpaceFeedPost
-    | PostedSpaceFeedPost
-    | ReadySpaceFeedPost;
-
 export interface SpaceAppState {
     friends: FriendProfile[];
     isLiveSignupVerification: boolean;
-    localFeedPosts: LocalSpaceFeedPost[];
     onboardingEntrySource: OnboardingEntrySource;
     pendingLoginCredentials: SpaceLoginCredentials | null;
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
@@ -77,9 +38,6 @@ export interface SpaceAppState {
     resetAfterLogout: () => void;
     setFriends: React.Dispatch<React.SetStateAction<FriendProfile[]>>;
     setIsLiveSignupVerification: React.Dispatch<React.SetStateAction<boolean>>;
-    setLocalFeedPosts: React.Dispatch<
-        React.SetStateAction<LocalSpaceFeedPost[]>
-    >;
     setOnboardingEntrySource: React.Dispatch<
         React.SetStateAction<OnboardingEntrySource>
     >;

@@ -4,17 +4,17 @@ import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import {
-    patchCachedSpaceFeedPost,
-    prependCachedSpaceFeedPost,
-} from "services/feed-cache";
+    loadSpaceHomePosts,
+    patchCachedSpaceHomePost,
+    refreshSpaceHomePosts,
+} from "services/home-posts";
 import { consumeSentSpaceInviteFriend } from "services/invite";
 import { loadExistingSpaceId } from "services/profile";
 import {
     createCurrentPhotoPost,
+    loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
-    loadCurrentSpaceLatestPost,
     loadCurrentSpacePostAssetURL,
-    loadCurrentSpacePostAvatarURL,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
     setCurrentPostLiked,
@@ -39,6 +39,7 @@ const Page: React.FC = () => {
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
+    const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
@@ -64,15 +65,18 @@ const Page: React.FC = () => {
     }, [router.isReady]);
 
     useEffect(() => {
-        let cancelled = false;
+        const request = { cancelled: false };
+        const isCancelled = () => request.cancelled;
         setSpaceId(undefined);
         setLatestPosts([]);
+        setUnreadPosts([]);
         setHasUnreadMessages(undefined);
         setIsLatestPostsLoading(true);
         setIsFriendsLoading(true);
-        void loadExistingSpaceId()
-            .then((nextSpaceId) => {
-                if (cancelled) return;
+        void (async () => {
+            try {
+                const nextSpaceId = await loadExistingSpaceId();
+                if (isCancelled()) return;
 
                 setSpaceId(nextSpaceId);
                 if (!nextSpaceId) {
@@ -82,7 +86,7 @@ const Page: React.FC = () => {
 
                 void loadCurrentUnreadStatus(nextSpaceId)
                     .then((unreadStatus) => {
-                        if (!cancelled) {
+                        if (!isCancelled()) {
                             setHasUnreadMessages(unreadStatus.messagesUnread);
                         }
                     })
@@ -90,52 +94,39 @@ const Page: React.FC = () => {
                         log.error("Failed to load space unread status", error),
                     );
 
-                return loadCurrentSpaceFriends(nextSpaceId).then(
-                    (nextFriends) => {
-                        if (cancelled) return;
+                const [nextFriends, savedHomePosts] = await Promise.all([
+                    loadCurrentSpaceFriends(nextSpaceId),
+                    loadSpaceHomePosts(nextSpaceId),
+                ]);
+                if (isCancelled()) return;
 
-                        setFriends(nextFriends);
-                        setIsFriendsLoading(false);
-                        return Promise.all(
-                            nextFriends.map(async (friend) => {
-                                if (!friend.spaceId) return null;
-                                try {
-                                    return await loadCurrentSpaceLatestPost(
-                                        friend.spaceId,
-                                        nextSpaceId,
-                                    );
-                                } catch (error) {
-                                    log.warn(
-                                        `Failed to load latest post for ${friend.id}`,
-                                        error,
-                                    );
-                                    return null;
-                                }
-                            }),
-                        ).then((latestPosts) => {
-                            if (cancelled) return;
-
-                            setLatestPosts(
-                                latestPosts.filter(
-                                    (post): post is SpacePost => post !== null,
-                                ),
-                            );
-                        });
-                    },
-                );
-            })
-            .catch((error: unknown) =>
-                log.error("Failed to load space friends", error),
-            )
-            .finally(() => {
-                if (cancelled) return;
-
-                setIsLatestPostsLoading(false);
+                setFriends(nextFriends);
                 setIsFriendsLoading(false);
-            });
+                if (savedHomePosts) {
+                    setLatestPosts(savedHomePosts.latestPosts);
+                    setUnreadPosts(savedHomePosts.unreadPosts);
+                    setIsLatestPostsLoading(false);
+                }
+
+                const refreshedHomePosts = await refreshSpaceHomePosts(
+                    nextSpaceId,
+                    nextFriends,
+                );
+                if (isCancelled() || !refreshedHomePosts) return;
+                setLatestPosts(refreshedHomePosts.latestPosts);
+                setUnreadPosts(refreshedHomePosts.unreadPosts);
+            } catch (error) {
+                log.error("Failed to load Space home posts", error);
+            } finally {
+                if (!isCancelled()) {
+                    setIsLatestPostsLoading(false);
+                    setIsFriendsLoading(false);
+                }
+            }
+        })();
 
         return () => {
-            cancelled = true;
+            request.cancelled = true;
         };
     }, [setFriends]);
 
@@ -144,10 +135,17 @@ const Page: React.FC = () => {
             if (!spaceId) throw new Error("Missing space.");
 
             await setCurrentPostLiked(spaceId, postId, liked);
-            void patchCachedSpaceFeedPost(spaceId, postId, {
+            void patchCachedSpaceHomePost(spaceId, postId, {
                 viewerLiked: liked,
             });
             setLatestPosts((currentItems) =>
+                currentItems.map((item) =>
+                    item.postId == postId
+                        ? { ...item, viewerLiked: liked }
+                        : item,
+                ),
+            );
+            setUnreadPosts((currentItems) =>
                 currentItems.map((item) =>
                     item.postId == postId
                         ? { ...item, viewerLiked: liked }
@@ -175,6 +173,7 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={homeBackground} />
             <HomeScreen
                 latestPosts={latestPosts}
+                unreadPosts={unreadPosts}
                 friendRequestSentToastName={friendRequestSentToastName}
                 friends={friends}
                 hasUnreadMessages={hasUnreadMessages}
@@ -203,7 +202,7 @@ const Page: React.FC = () => {
                                       image.cropArea,
                                       image.rotationDegrees,
                                   );
-                              const post = await createCurrentPhotoPost({
+                              await createCurrentPhotoPost({
                                   caption,
                                   file: preparedImage.file,
                                   height: preparedImage.height,
@@ -211,7 +210,6 @@ const Page: React.FC = () => {
                                   thumbHash: preparedImage.thumbHash,
                                   width: preparedImage.width,
                               });
-                              void prependCachedSpaceFeedPost(spaceId, post);
                           }
                         : undefined
                 }
@@ -229,7 +227,7 @@ const Page: React.FC = () => {
                         );
                     }
                 }}
-                onLoadPostAvatar={loadCurrentSpacePostAvatarURL}
+                onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={

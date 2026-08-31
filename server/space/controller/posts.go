@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ente/museum/ente"
@@ -152,8 +153,12 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 	}, nil
 }
 
-func (c *PostsController) ListFeed(ctx context.Context, viewerSpace *repo.SpaceRecord, req models.ListFeedRequest) (*models.FeedPage, error) {
-	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx, viewerSpace.SpaceID, req.Cursor, req.Limit)
+func (c *PostsController) ListHomePosts(ctx context.Context, viewerSpace *repo.SpaceRecord, req models.ListHomePostsRequest) (*models.HomePostPage, error) {
+	syncCreatedAt, err := c.PostsRepo.CurrentDatabaseTimeMicroseconds(ctx)
+	if err != nil {
+		return nil, err
+	}
+	posts, nextCursor, err := c.PostsRepo.ListHomePosts(ctx, viewerSpace.SpaceID, req.After, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -161,9 +166,15 @@ func (c *PostsController) ListFeed(ctx context.Context, viewerSpace *repo.SpaceR
 	if err != nil {
 		return nil, err
 	}
-	return &models.FeedPage{
+	syncPostID := int64(0)
+	if len(posts) > 0 && posts[0].CreatedAt >= syncCreatedAt {
+		syncCreatedAt = posts[0].CreatedAt
+		syncPostID = posts[0].PostID
+	}
+	return &models.HomePostPage{
 		Items:      items,
 		NextCursor: nextCursor,
+		SyncCursor: strconv.FormatInt(syncCreatedAt, 10) + ":" + strconv.FormatInt(syncPostID, 10),
 	}, nil
 }
 

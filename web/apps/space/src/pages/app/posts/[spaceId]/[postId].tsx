@@ -3,7 +3,10 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
-import { patchCachedSpaceFeedPost } from "services/feed-cache";
+import {
+    markSpaceHomePostRead,
+    patchCachedSpaceHomePost,
+} from "services/home-posts";
 import {
     loadCurrentSpacePost,
     replyToCurrentPost,
@@ -89,12 +92,13 @@ const Page: React.FC = () => {
             return;
         }
 
+        const viewerSpaceId = profile.spaceId;
         let cancelled = false;
         setPost(null);
         setPostLoadError(undefined);
         setIsPostLoading(true);
 
-        void loadCurrentSpacePost(spaceId, postId, profile.spaceId)
+        void loadCurrentSpacePost(spaceId, postId, viewerSpaceId)
             .then((nextPost) => {
                 if (cancelled) return;
                 if (!nextPost) {
@@ -102,6 +106,15 @@ const Page: React.FC = () => {
                     return;
                 }
                 setPost(nextPost);
+                if (nextPost.spaceId != viewerSpaceId) {
+                    void markSpaceHomePostRead(viewerSpaceId, nextPost).catch(
+                        (error: unknown) =>
+                            log.warn(
+                                "Failed to mark Space post as read",
+                                error,
+                            ),
+                    );
+                }
             })
             .catch((error: unknown) => {
                 log.error("Failed to load space post", error);
@@ -185,7 +198,7 @@ const Page: React.FC = () => {
                 }
                 onSetPostLiked={async (nextPostId, liked) => {
                     await setCurrentPostLiked(actorSpaceId, nextPostId, liked);
-                    void patchCachedSpaceFeedPost(actorSpaceId, nextPostId, {
+                    void patchCachedSpaceHomePost(actorSpaceId, nextPostId, {
                         viewerLiked: liked,
                     });
                 }}

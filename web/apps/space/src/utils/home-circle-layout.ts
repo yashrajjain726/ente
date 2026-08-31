@@ -3,10 +3,23 @@ interface CircleSlot {
     row: number;
 }
 
+const gridFriendCountStart = 9;
+const gridColumnCount = 3;
+const circleGapRatio = 0.1;
+
+export const usesHomeCircleGrid = (count: number) =>
+    count >= gridFriendCountStart;
+
 export interface HomeCirclePlacement {
     size: number;
     x: number;
     y: number;
+}
+
+export interface HomeCircleGridLayout {
+    gap: number;
+    rows: number;
+    size: number;
 }
 
 const circleSlotsForCount = (count: number) => {
@@ -25,12 +38,12 @@ const circleSlotsForCount = (count: number) => {
     }
     if (count == 3) {
         return {
-            columns: 2,
-            rows: 2,
+            columns: 1,
+            rows: 3,
             slots: [
-                { column: 0.5, row: 0 },
+                { column: 0, row: 0 },
                 { column: 0, row: 1 },
-                { column: 1, row: 1 },
+                { column: 0, row: 2 },
             ],
         };
     }
@@ -49,33 +62,56 @@ const circleSlotsForCount = (count: number) => {
     return { columns, rows, slots };
 };
 
+const layoutDimensions = (columns: number, rows: number) => ({
+    height: rows + (rows - 1) * circleGapRatio,
+    width: columns + (columns - 1) * circleGapRatio,
+});
+
+export const homeCircleGridLayout = (
+    count: number,
+    canvasWidth: number,
+    canvasHeight: number,
+): HomeCircleGridLayout | undefined => {
+    if (!usesHomeCircleGrid(count) || canvasWidth <= 0 || canvasHeight <= 0) {
+        return undefined;
+    }
+
+    const rows = Math.ceil(count / gridColumnCount);
+    const layout = layoutDimensions(gridColumnCount, rows);
+    const size = Math.min(
+        canvasWidth / layout.width,
+        canvasHeight / layout.height,
+    );
+    return { gap: size * circleGapRatio, rows, size };
+};
+
 export const homeCirclePlacements = (
     count: number,
     canvasWidth: number,
     canvasHeight: number,
 ): HomeCirclePlacement[] => {
-    if (count < 1 || canvasWidth <= 0 || canvasHeight <= 0) return [];
+    if (
+        count < 1 ||
+        usesHomeCircleGrid(count) ||
+        canvasWidth <= 0 ||
+        canvasHeight <= 0
+    ) {
+        return [];
+    }
 
     const { columns, rows, slots } = circleSlotsForCount(count);
-    const circleGapRatio = 0.1;
-    const slotsByRow = Array.from({ length: rows }, (_, row) =>
-        slots.filter((slot) => slot.row == row),
-    );
     const rowOffsets = [0];
     for (let row = 1; row < rows; row++) {
-        const rowsAreStaggered =
-            slotsByRow[row - 1]!.length != slotsByRow[row]!.length;
-        rowOffsets.push(rowOffsets[row - 1]! + (rowsAreStaggered ? 1 : 1.1));
+        rowOffsets.push(rowOffsets[row - 1]! + 1.1);
     }
-    const layoutWidth = columns + (columns - 1) * circleGapRatio;
-    const layoutHeight = 1 + rowOffsets[rowOffsets.length - 1]!;
+    const layout = layoutDimensions(columns, rows);
     const size = Math.min(
-        canvasWidth / layoutWidth,
-        canvasHeight / layoutHeight,
+        canvasWidth / layout.width,
+        canvasHeight / layout.height,
     );
     const horizontalStep = size * (1 + circleGapRatio);
     const renderedWidth = size + horizontalStep * (columns - 1);
-    const renderedHeight = size * layoutHeight;
+    const renderedHeight = size * layout.height;
     const originX = (canvasWidth - renderedWidth) / 2;
     const originY = (canvasHeight - renderedHeight) / 2;
     return slots.map(({ column, row }) => ({

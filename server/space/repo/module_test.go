@@ -2044,7 +2044,7 @@ func TestListPostsBySpaceCursorUsesCreatedAtSortOrder(t *testing.T) {
 	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
 }
 
-func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
+func TestListHomePostsReturnsFriendLatestAndPostsAfterCursor(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -2076,30 +2076,52 @@ func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
 	setPostCreatedAt(t, module, 2000, second)
 	setPostCreatedAt(t, module, 1000, third)
 
-	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceSpace.SpaceID, "", 1)
+	page, nextCursor, err := module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "", "", 10)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, ownPost, page[0].PostID)
-	require.Equal(t, aliceSpace.SpaceID, page[0].SpaceID)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, bobSpace.SpaceID, page[0].SpaceID)
 	require.False(t, page[0].ViewerLiked)
-	require.Equal(t, "5000:"+strconv.FormatInt(ownPost, 10), nextCursor)
+	require.Empty(t, nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceSpace.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, second, page[1].PostID)
+	require.Empty(t, nextCursor)
+
+	after := "1000:" + strconv.FormatInt(third, 10)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, after, "", 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceSpace.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, after, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, second, page[0].PostID)
-	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
+	require.Empty(t, nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceSpace.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "3000:"+strconv.FormatInt(first, 10), "", 10)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, third, page[0].PostID)
+	require.Equal(t, first, page[0].PostID)
+	require.Empty(t, nextCursor)
+
+	require.NoError(t, module.Posts.UpdateCaption(ctx, second, bobSpace.SpaceID, testSpaceBytes("updated-caption")))
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, testSpaceBytes("updated-caption"), page[1].CaptionCipher)
+	require.Empty(t, nextCursor)
+
+	require.NoError(t, module.Posts.DeletePost(ctx, second, bobSpace.SpaceID))
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, first, page[0].PostID)
 	require.Empty(t, nextCursor)
 }
 
