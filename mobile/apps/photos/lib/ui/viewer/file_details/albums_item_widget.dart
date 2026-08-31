@@ -108,6 +108,7 @@ class AlbumsItemWidget extends StatelessWidget {
       }
       chips.add(
         IconButtonComponent(
+          size: FilterChipComponent.minHeight,
           icon: HugeIcon(
             icon: HugeIcons.strokeRoundedPlusSign,
             size: IconSizes.small,
