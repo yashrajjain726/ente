@@ -543,11 +543,13 @@ func (c *UserController) RemoveAllTokens(userID int64) error {
 }
 
 func (c *UserController) RemoveAllOtherTokens(userID int64, token string) error {
-	return c.finishTokenRevocation(c.UserAuthRepo.RemoveAllOtherTokens(userID, token))
+	tokenHash := auth.HashToken(token)
+	return c.finishTokenRevocation(c.UserAuthRepo.RemoveAllOtherTokensByHash(userID, tokenHash[:]))
 }
 
 func (c *UserController) TerminateSession(userID int64, token string) error {
-	return c.finishTokenRevocation(c.UserAuthRepo.RemoveToken(userID, token))
+	tokenHash := auth.HashToken(token)
+	return c.finishTokenRevocation(c.UserAuthRepo.RemoveTokenByHash(userID, tokenHash[:]))
 }
 
 func (c *UserController) finishTokenRevocation(tokens []repo.RevokedToken, err error) error {
