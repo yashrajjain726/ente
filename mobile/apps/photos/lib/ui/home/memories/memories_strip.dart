@@ -44,11 +44,17 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   final _videoPrefetcher = MemoryVideoPrefetcher();
   bool _shouldShowCraftingMemories = false;
   late Future<void> _shouldShowCraftingMemoriesLoaded;
+  late final List<SmartMemory> _initialMemories;
   late Future<List<SmartMemory>> _memories;
 
   @override
   void initState() {
     super.initState();
+    _initialMemories = _sortMemories(
+      (memoriesCacheService.currentMemoriesSync ?? [])
+          .where((memory) => memory.shouldShowNow())
+          .toList(),
+    );
     _shouldShowCraftingMemoriesLoaded = CraftingMemoriesCardWidget.shouldShow()
         .then((value) {
           _shouldShowCraftingMemories = value;
@@ -101,10 +107,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     }
     return FutureBuilder(
       future: _memories,
+      initialData: _initialMemories,
       builder: (context, snapshot) {
-        final memories =
-            snapshot.data ??
-            _sortMemories(memoriesCacheService.currentMemoriesSync ?? []);
+        final memories = snapshot.data ?? [];
         if (memories.isEmpty) {
           return const SizedBox.shrink();
         }
