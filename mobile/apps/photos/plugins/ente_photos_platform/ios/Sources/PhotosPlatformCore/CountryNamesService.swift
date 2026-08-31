@@ -19,7 +19,7 @@ public struct CountryNamesService {
             names: Dictionary(
                 uniqueKeysWithValues: Locale.isoRegionCodes.compactMap { code in
                     locale.localizedString(forRegionCode: code).map { (code, $0) }
-                })
+                }
             ),
             nativeNames: Dictionary(
                 uniqueKeysWithValues: nativeLocales.map { code, localeIdentifiers in
