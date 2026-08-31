@@ -42,6 +42,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   int _warmGeneration = 0;
   String? _lastWarmSignature;
   final _videoPrefetcher = MemoryVideoPrefetcher();
+  final _scrollController = ScrollController();
   bool _shouldShowCraftingMemories = false;
   late Future<void> _shouldShowCraftingMemoriesLoaded;
   late final List<SmartMemory> _initialMemories;
@@ -80,6 +81,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _memorySeenSubscription.cancel();
     _warmTimer?.cancel();
     _videoPrefetcher.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -114,7 +116,6 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
           return const SizedBox.shrink();
         }
         return Column(
-          key: ValueKey(identityHashCode(_memories)),
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 12),
@@ -126,6 +127,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
                 return SizedBox(
                   height: cardHeight + 2,
                   child: ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.symmetric(
                       horizontal: kMemoryCardStripGap / 2.0,
                     ),
@@ -205,6 +207,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
           .getMemories()
           .then(_sortMemories)
           .then((memories) {
+            if (mounted && _scrollController.hasClients) {
+              _scrollController.jumpTo(0);
+            }
             if (memories.isEmpty || !memoriesCacheService.showAnyMemories) {
               _cancelPendingWarm();
               return <SmartMemory>[];
