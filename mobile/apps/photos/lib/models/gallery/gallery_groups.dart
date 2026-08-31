@@ -428,10 +428,6 @@ class GalleryGroups {
     final showGroupHeader = groupType.showGroupHeader();
     final targetRowHeight =
         (widthAvailable - (crossAxisCount - 1) * spacing) / crossAxisCount;
-    final largeThumbnailMinExtent =
-        (widthAvailable - (photoGridSizeDefault - 2) * spacing) /
-        (photoGridSizeDefault - 1) *
-        0.9;
     final groupLayouts = <SectionLayout>[];
     var currentIndex = 0;
     var currentOffset = 0.0;
@@ -439,14 +435,12 @@ class GalleryGroups {
     for (final groupID in _groupIdToFilesMap.keys) {
       final filesInGroup = _groupIdToFilesMap[groupID]!;
       final rows = MosaicLayoutCalculator.computeRows(
-        aspectRatios: filesInGroup
-            .map(
-              (file) => MosaicLayoutCalculator.aspectRatioForDimensions(
-                file.width,
-                file.height,
-              ),
-            )
-            .toList(growable: false),
+        aspectRatios: filesInGroup.map(
+          (file) => MosaicLayoutCalculator.aspectRatioForDimensions(
+            file.width,
+            file.height,
+          ),
+        ),
         availableWidth: widthAvailable,
         targetRowHeight: targetRowHeight,
         spacing: spacing,
@@ -493,7 +487,6 @@ class GalleryGroups {
               fileIndex++
             ) {
               final file = filesInGroup[fileIndex];
-              final itemWidth = row.itemWidths[fileIndex - row.firstIndex];
               rowChildren.add(
                 RepaintBoundary(
                   key: ValueKey(tagPrefix + file.tag),
@@ -503,9 +496,7 @@ class GalleryGroups {
                     limitSelectionToOne: limitSelectionToOne,
                     tag: tagPrefix,
                     photoGridSize: crossAxisCount,
-                    thumbnailSize: itemWidth >= largeThumbnailMinExtent
-                        ? thumbnailLargeSize
-                        : thumbnailSmallSize,
+                    thumbnailSize: thumbnailLargeSize,
                     currentUserID: currentUserID,
                   ),
                 ),

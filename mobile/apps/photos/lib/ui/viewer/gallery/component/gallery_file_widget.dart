@@ -125,7 +125,8 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
       diskLoadDeferDuration: galleryThumbnailDiskLoadDeferDuration,
       serverLoadDeferDuration: galleryThumbnailServerLoadDeferDuration,
       shouldShowLivePhotoOverlay: true,
-      // Recreate the loader when a mosaic tile crosses thumbnail tiers.
+      // Recreate the loader when the effective tier changes, such as when
+      // switching between Grid and Mosaic layouts.
       key: ValueKey((heroTag, effectiveThumbnailSize)),
       thumbnailSize: effectiveThumbnailSize,
       useRequestedThumbnailSizeForLocalCache: widget.thumbnailSize != null,

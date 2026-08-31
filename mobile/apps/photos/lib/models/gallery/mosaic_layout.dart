@@ -1,3 +1,4 @@
+import "dart:collection";
 import "dart:math" as math;
 
 import "package:photos/models/gallery/section_layout.dart";
@@ -108,7 +109,7 @@ class MosaicLayoutCalculator {
   }
 
   static List<MosaicRowLayout> computeRows({
-    required List<double> aspectRatios,
+    required Iterable<double> aspectRatios,
     required double availableWidth,
     required double targetRowHeight,
     required double spacing,
@@ -124,13 +125,6 @@ class MosaicLayoutCalculator {
       throw ArgumentError.value(spacing, "spacing");
     }
 
-    final normalizedRatios = aspectRatios
-        .map(
-          (ratio) => ratio.isFinite && ratio > 0
-              ? ratio.clamp(_minimumAspectRatio, _maximumAspectRatio).toDouble()
-              : 1.0,
-        )
-        .toList(growable: false);
     final rows = <MosaicRowLayout>[];
     final pendingRatios = <double>[];
     final maximumRowHeight = targetRowHeight * _maximumRowHeightFactor;
@@ -173,7 +167,7 @@ class MosaicLayoutCalculator {
           lastIndex: pendingFirstIndex + pendingRatios.length - 1,
           minOffset: rowOffset,
           height: height,
-          itemWidths: List.unmodifiable(widths),
+          itemWidths: UnmodifiableListView(widths),
         ),
       );
       rowOffset += height + spacing;
@@ -183,7 +177,10 @@ class MosaicLayoutCalculator {
       pendingMinimumRatio = double.infinity;
     }
 
-    for (final ratio in normalizedRatios) {
+    for (final rawRatio in aspectRatios) {
+      final ratio = rawRatio.isFinite && rawRatio > 0
+          ? rawRatio.clamp(_minimumAspectRatio, _maximumAspectRatio).toDouble()
+          : 1.0;
       if (pendingRatios.isNotEmpty) {
         final candidateCount = pendingRatios.length + 1;
         final candidateRatioSum = pendingRatioSum + ratio;
@@ -215,6 +212,6 @@ class MosaicLayoutCalculator {
     }
 
     addPendingRow(fillWidth: false);
-    return List.unmodifiable(rows);
+    return UnmodifiableListView(rows);
   }
 }

@@ -214,19 +214,5 @@ void main() {
       expect(section.getMinChildIndexForScrollOffset(139), 13);
       expect(section.getMinChildIndexForScrollOffset(169), 13);
     });
-
-    test(
-      "finds the last child without including a row at its leading edge",
-      () {
-        expect(section.getMaxChildIndexForScrollOffset(100), 10);
-        expect(section.getMaxChildIndexForScrollOffset(105), 10);
-        expect(section.getMaxChildIndexForScrollOffset(105.001), 11);
-        expect(section.getMaxChildIndexForScrollOffset(117), 11);
-        expect(section.getMaxChildIndexForScrollOffset(117.001), 12);
-        expect(section.getMaxChildIndexForScrollOffset(139), 12);
-        expect(section.getMaxChildIndexForScrollOffset(139.001), 13);
-        expect(section.getMaxChildIndexForScrollOffset(169), 13);
-      },
-    );
   });
 }

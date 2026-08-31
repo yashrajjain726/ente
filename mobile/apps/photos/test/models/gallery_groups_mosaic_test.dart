@@ -1,16 +1,20 @@
 import "package:dio/dio.dart";
+import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/core/constants.dart";
 import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/gallery/fixed_extent_section_layout.dart";
 import "package:photos/models/gallery/gallery_groups.dart";
+import "package:photos/models/gallery/mosaic_grid_row.dart";
 import "package:photos/models/gallery/mosaic_layout.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
+import "package:photos/ui/viewer/gallery/component/gallery_file_widget.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
@@ -166,6 +170,47 @@ void main() {
       expect(groups.getFileAtScrollOffset(fileOffset!), same(files[index]));
     }
     expect(groups.getFileAtScrollOffset(section.maxOffset), same(files.last));
+  });
+
+  testWidgets("mosaic rows request large thumbnails for every tile", (
+    tester,
+  ) async {
+    final files = List<EnteFile>.generate(
+      2,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: index.isEven ? 1 : 4,
+        height: 1,
+      ),
+      growable: false,
+    );
+    final groups = _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+    );
+    final section = groups.groupLayouts.single as MosaicSectionLayout;
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SizedBox(key: ValueKey("mosaic-builder-context")),
+      ),
+    );
+    final context = tester.element(
+      find.byKey(const ValueKey("mosaic-builder-context")),
+    );
+    final rowWidget =
+        section.builder(context, section.bodyFirstIndex) as MosaicGridRow;
+    final galleryTiles = rowWidget.children.map(
+      (child) => (child as RepaintBoundary).child! as GalleryFileWidget,
+    );
+
+    expect(galleryTiles, hasLength(files.length));
+    expect(
+      galleryTiles.map((tile) => tile.thumbnailSize),
+      everyElement(thumbnailLargeSize),
+    );
   });
 
   test("file geometry survives replacement with the same stable identity", () {
