@@ -227,12 +227,23 @@ class EnteFile {
     } else {
       // Gallery layout only needs these two fields. Decode them without
       // materializing and retaining PubMagicMetadata for every gallery file.
-      final metadata = jsonDecode(pubMmdEncodedJson ?? '{}');
-      if (metadata is Map<String, dynamic>) {
-        _width =
-            PubMagicMetadata.safeParseInt(metadata[widthKey], widthKey) ?? 0;
-        _height =
-            PubMagicMetadata.safeParseInt(metadata[heightKey], heightKey) ?? 0;
+      _width = 0;
+      _height = 0;
+      try {
+        final metadata = jsonDecode(pubMmdEncodedJson ?? '{}');
+        if (metadata is Map<String, dynamic>) {
+          _width =
+              PubMagicMetadata.safeParseInt(metadata[widthKey], widthKey) ?? 0;
+          _height =
+              PubMagicMetadata.safeParseInt(metadata[heightKey], heightKey) ??
+              0;
+        }
+      } on FormatException catch (error, stackTrace) {
+        _logger.severe(
+          "Failed to decode public metadata dimensions for file $tag",
+          error,
+          stackTrace,
+        );
       }
     }
     _dimensionsDecoded = true;

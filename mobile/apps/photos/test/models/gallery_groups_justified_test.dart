@@ -1,6 +1,7 @@
 import "package:dio/dio.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
+import "package:logging/logging.dart";
 import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/constants.dart";
@@ -217,6 +218,40 @@ void main() {
       galleryTiles.map((tile) => tile.thumbnailSize),
       everyElement(thumbnailLargeSize),
     );
+  });
+
+  test("malformed dimensions fall back to a square and log once", () async {
+    final logs = <LogRecord>[];
+    final subscription = Logger("File").onRecord.listen(logs.add);
+    try {
+      final file = EnteFile()
+        ..generatedID = 1
+        ..creationTime = DateTime(2026, 8, 19).microsecondsSinceEpoch
+        ..fileType = FileType.image
+        ..pubMmdEncodedJson = '{"w": 100';
+
+      final groups = _galleryGroups(
+        files: [file],
+        groupType: GroupType.none,
+        groupHeaderExtent: GalleryGroups.spacing,
+      );
+      final section = groups.groupLayouts.single as JustifiedSectionLayout;
+      final row = section.rows.single;
+
+      expect(row.itemWidths.single, row.height);
+      expect(
+        logs.where(
+          (record) =>
+              record.level == Level.SEVERE &&
+              record.message.contains(
+                "Failed to decode public metadata dimensions",
+              ),
+        ),
+        hasLength(1),
+      );
+    } finally {
+      await subscription.cancel();
+    }
   });
 
   test("file geometry survives replacement with the same stable identity", () {
