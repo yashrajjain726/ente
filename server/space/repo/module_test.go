@@ -483,7 +483,7 @@ func TestExchangeBrowserSessionKeepsTokenWhenSessionCreationFails(t *testing.T) 
 	err = module.Sessions.ExchangeBrowserSession(ctx, authTokenHash[:], tokenHash, userID, "new-wrap-key", timeutil.NDaysFromNow(1))
 	require.Error(t, err)
 	var isDeleted bool
-	require.NoError(t, module.Sessions.DB.QueryRow(`SELECT is_deleted FROM tokens WHERE token = $1`, authToken).Scan(&isDeleted))
+	require.NoError(t, module.Sessions.DB.QueryRow(`SELECT is_deleted FROM tokens WHERE token_hash = $1`, authTokenHash[:]).Scan(&isDeleted))
 	require.False(t, isDeleted)
 }
 
