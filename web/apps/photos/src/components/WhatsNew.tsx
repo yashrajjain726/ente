@@ -73,12 +73,12 @@ const ChangelogContent: React.FC = () => {
         <Stack sx={{ gap: 2, mb: 1 }}>
             <Typography variant="h6">
                 {ut(
-                    "Smarter album management, improved authentication, faster ML indexing, and more",
+                    "Improved All Albums view, add album descriptions, faster ML indexing, and more",
                 )}
             </Typography>
             <Typography sx={{ color: "text.muted" }}>
                 {ut(
-                    "Add album description, add hidden photos to hidden albums, find photos without location data, share referral codes, and faster hardware-accelerated ML indexing.",
+                    "New filters in All Albums to navigate quick links, shared, received, or empty albums, and delete empty albums in bulk. Improved signup and login interfaces, add hidden photos to hidden albums, find photos without location data, and more.",
                 )}
             </Typography>
         </Stack>
