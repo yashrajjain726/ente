@@ -1,6 +1,6 @@
 import { copyTextToClipboard } from "@/browser";
 import { getPasteThemeTokens, usePasteColorMode } from "@/theme";
-import { useConsumePaste } from "@/usePaste";
+import { useConsumePaste } from "@/use-paste";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import type { SubmitEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import { pasteTextFieldSx } from "./textFieldSx";
+import { pasteTextFieldSx } from "./text-field-sx";
 
 export const PasteViewPanel = () => {
     const {

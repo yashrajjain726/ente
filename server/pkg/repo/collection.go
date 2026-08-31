@@ -510,12 +510,10 @@ func (repo *CollectionRepository) Share(
 				END`,
 		collectionID, fromUserID, toUserID, encryptedKey, updationTime, role, updationTime)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(context, `UPDATE collections SET updation_time = $1 WHERE collection_id = $2`, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()
@@ -591,26 +589,23 @@ func (repo *CollectionRepository) UpdateShareeMetadata(
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
 	sqlResult, err := tx.ExecContext(context, `UPDATE collection_shares SET magic_metadata = $1, updation_time = $2  WHERE collection_id = $3 AND from_user_id = $4 AND to_user_id = $5 AND is_deleted = $6`,
 		metadata, updationTime, collectionID, ownerUserID, shareeUserID, false)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	affected, err := sqlResult.RowsAffected()
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	if affected != 1 {
-		tx.Rollback()
 		err = fmt.Errorf("invalid number of rows affected %d", affected)
 		return stacktrace.Propagate(err, "")
 	}
 
 	_, err = tx.ExecContext(context, `UPDATE collections SET updation_time = $1 WHERE collection_id = $2`, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()
@@ -823,17 +818,16 @@ func (repo *CollectionRepository) RemoveFilesV3(context context.Context, collect
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
 	_, err = tx.ExecContext(context, `UPDATE collection_files 
 		SET is_deleted = $1, updation_time = $2 WHERE collection_id = $3 AND file_id = ANY($4)`,
 		true, updationTime, collectionID, pq.Array(fileIDs))
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(context, `UPDATE collections SET updation_time = $1
 		WHERE collection_id = $2`, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()
@@ -849,17 +843,16 @@ func (repo *CollectionRepository) SuggestAction(ctx context.Context, collectionI
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
 	_, err = tx.ExecContext(ctx, `UPDATE collection_files
             SET action_user = $1, action = $2, updation_time = $3
             WHERE collection_id = $4 AND file_id = ANY($5)`,
 		actorUserID, action, updationTime, collectionID, pq.Array(fileIDs))
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1 WHERE collection_id = $2`, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	return tx.Commit()
@@ -1115,23 +1108,21 @@ func (repo *CollectionRepository) ScheduleDelete(collectionID int64) error {
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	defer tx.Rollback()
 	_, err = tx.ExecContext(ctx, `UPDATE collection_shares 
 		SET is_deleted = $1, updation_time = $2 
 		WHERE collection_id = $3`, true, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collections 
 		SET is_deleted = $1, updation_time = $2 
 		WHERE collection_id = $3`, true, updationTime, collectionID)
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = repo.QueueRepo.AddItems(ctx, tx, TrashCollectionQueueV3, []string{strconv.FormatInt(collectionID, 10)})
 	if err != nil {
-		tx.Rollback()
 		return stacktrace.Propagate(err, "")
 	}
 	err = tx.Commit()

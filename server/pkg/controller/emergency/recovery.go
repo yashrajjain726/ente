@@ -55,6 +55,9 @@ func (c *Controller) ChangePassword(ctx *gin.Context, userID int64, request ente
 	if err != nil {
 		return nil, err
 	}
+	if err := request.UpdateSrp.Validate(); err != nil {
+		return nil, stacktrace.Propagate(err, "invalid request")
+	}
 	if disableErr := c.UserCtrl.DisableTwoFactor(contact.UserID); disableErr != nil {
 		return nil, stacktrace.Propagate(disableErr, "failed to disable 2fa")
 	}

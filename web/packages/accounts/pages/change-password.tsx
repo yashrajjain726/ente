@@ -4,11 +4,11 @@ import {
     AccountsPageFooter,
     AccountsPageTitle,
 } from "ente-accounts/components/layouts/centered-paper";
-import { deriveKeyInsufficientMemoryErrorMessage } from "ente-accounts/services/crypto";
 import { appHomeRoute, stashRedirect } from "ente-accounts/services/redirect";
 import { changePassword, type LocalUser } from "ente-accounts/services/user";
 import { LinkButton } from "ente-base/components/LinkButton";
 import { LoadingIndicator } from "ente-base/components/loaders";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import { t } from "i18next";
 import { useRouter } from "next/router";
@@ -75,8 +75,7 @@ const PageContents: React.FC<PageContentsProps> = ({
                 .catch((e: unknown) => {
                     log.error("Could not change password", e);
                     setPasswordsFieldError(
-                        e instanceof Error &&
-                            e.message == deriveKeyInsufficientMemoryErrorMessage
+                        isNamedError(e, "insufficient_memory")
                             ? t("password_generation_failed")
                             : t("generic_error"),
                     );

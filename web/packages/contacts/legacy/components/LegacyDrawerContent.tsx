@@ -2,16 +2,20 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Box, CircularProgress, Stack, Typography } from "@mui/material";
 import { useBaseContext } from "ente-base/context";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
+import {
+    getInfo,
+    rejectRecovery,
+    startRecovery,
+    stopRecovery,
+    updateContact,
+    updateRecoveryNotice,
+    type Session,
+} from "ente-legacy-wasm/authenticated";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     legacyChangePassword,
-    legacyGetInfo,
-    legacyRejectRecovery,
-    legacyStartRecovery,
-    legacyStopRecovery,
-    legacyUpdateContact,
-    legacyUpdateRecoveryNotice,
     type LegacyContactRecord,
     type LegacyInfo,
     type LegacyRecoverySession,
@@ -139,6 +143,7 @@ const warningBannerSx = {
 
 interface LegacyDrawerContentProps {
     open: boolean;
+    getSession: () => Promise<Session>;
     suggestedUsers?: LegacySuggestedUser[];
 }
 
@@ -152,6 +157,7 @@ interface ConfirmActionDialogInput {
 
 export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
     open,
+    getSession,
     suggestedUsers = [],
 }) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
@@ -166,7 +172,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
         async (reportErrors: boolean) => {
             setIsLoading(true);
             try {
-                setInfo(await legacyGetInfo());
+                setInfo(await getInfo(await getSession()));
                 return true;
             } catch (error) {
                 if (reportErrors) {
@@ -182,7 +188,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                 setIsLoading(false);
             }
         },
-        [onGenericError],
+        [getSession, onGenericError],
     );
 
     const refresh = useCallback(async () => {
@@ -323,17 +329,15 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
         }
         setIsSubmitting(true);
         try {
-            await legacyUpdateRecoveryNotice(
+            await updateRecoveryNotice(
+                await getSession(),
                 selectedOwnerContact.emergencyContact.id,
                 selectedOwnerDays,
             );
             setActiveSheet(undefined);
             await refreshAfterMutation();
         } catch (error) {
-            if (
-                error instanceof Error &&
-                error.name == "active_recovery_session"
-            ) {
+            if (isNamedError(error, "active_recovery_session")) {
                 showMiniDialog({
                     title: "Recovery in progress",
                     message:
@@ -346,6 +350,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
             setIsSubmitting(false);
         }
     }, [
+        getSession,
         onGenericError,
         refreshAfterMutation,
         selectedOwnerContact,
@@ -375,7 +380,8 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                             continueText: "Start recovery",
                             continueColor: "accent",
                             action: async () => {
-                                await legacyStartRecovery(
+                                await startRecovery(
+                                    await getSession(),
                                     selectedTrustedContact.user.id,
                                     selectedTrustedContact.emergencyContact.id,
                                 );
@@ -401,7 +407,8 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                             message: `Are you sure you want to cancel recovery of ${selectedTrustedContact.user.email}'s account?`,
                             continueText: "Cancel recovery",
                             action: async () => {
-                                await legacyStopRecovery(
+                                await stopRecovery(
+                                    await getSession(),
                                     selectedTrustedRecovery.id,
                                     selectedTrustedRecovery.user.id,
                                     selectedTrustedRecovery.emergencyContact.id,
@@ -415,7 +422,8 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                             message: `If you remove yourself as a trusted contact, you'll lose access to ${selectedTrustedContact.user.email}'s account after their inactivity period.`,
                             continueText: "Remove contact",
                             action: async () => {
-                                await legacyUpdateContact(
+                                await updateContact(
+                                    await getSession(),
                                     selectedTrustedContact.user.id,
                                     selectedTrustedContact.emergencyContact.id,
                                     "CONTACT_LEFT",
@@ -439,6 +447,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                         setIsSubmitting(true);
                         try {
                             await legacyChangePassword(
+                                await getSession(),
                                 resetPasswordPage.session.id,
                                 password,
                             );
@@ -730,6 +739,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                 onClose={() => setActiveSheet(undefined)}
             >
                 <LegacyAddContactContent
+                    getSession={getSession}
                     variant="sheet"
                     suggestedUsers={addScreenSuggestedUsers}
                     existingEmails={existingEmails}
@@ -791,7 +801,8 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                                                 ? "Revoke invite"
                                                 : "Remove contact",
                                         action: async () => {
-                                            await legacyUpdateContact(
+                                            await updateContact(
+                                                await getSession(),
                                                 selectedOwnerContact.user.id,
                                                 selectedOwnerContact
                                                     .emergencyContact.id,
@@ -829,8 +840,9 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                             loading={isSubmitting}
                             onClick={() =>
                                 void runAction(
-                                    () =>
-                                        legacyUpdateContact(
+                                    async () =>
+                                        updateContact(
+                                            await getSession(),
                                             selectedTrustedInvite.user.id,
                                             selectedTrustedInvite
                                                 .emergencyContact.id,
@@ -846,8 +858,9 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                             buttonType="tertiaryCritical"
                             onClick={() =>
                                 void runAction(
-                                    () =>
-                                        legacyUpdateContact(
+                                    async () =>
+                                        updateContact(
+                                            await getSession(),
                                             selectedTrustedInvite.user.id,
                                             selectedTrustedInvite
                                                 .emergencyContact.id,
@@ -886,7 +899,8 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
                                 ),
                                 continueText: "Reject recovery",
                                 action: async () => {
-                                    await legacyRejectRecovery(
+                                    await rejectRecovery(
+                                        await getSession(),
                                         selectedRecoveryAttempt.id,
                                         selectedRecoveryAttempt.user.id,
                                         selectedRecoveryAttempt.emergencyContact

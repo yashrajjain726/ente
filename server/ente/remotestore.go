@@ -192,6 +192,11 @@ func ResolveCustomDomainValue(value string) (string, error) {
 	return value, nil
 }
 
+func CanonicalDomain(domain string) (string, error) {
+	asciiDomain, err := idna.Lookup.ToASCII(domain)
+	return strings.ToLower(asciiDomain), err
+}
+
 func isValidDomainWithoutScheme(input string) error {
 	trimmed := strings.TrimSpace(input)
 	if trimmed != input {
@@ -204,7 +209,7 @@ func isValidDomainWithoutScheme(input string) error {
 		return NewBadRequestWithMessage("domain should not contain scheme (e.g., http:// or https://)")
 	}
 
-	asciiDomain, err := idna.ToASCII(trimmed)
+	asciiDomain, err := CanonicalDomain(trimmed)
 	if err != nil {
 		return NewBadRequestWithMessage(fmt.Sprintf("invalid idn domain format: %s", trimmed))
 	}

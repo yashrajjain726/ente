@@ -9,7 +9,7 @@ import {
     getQrRenderMetrics,
     isQRCodeStylingModule,
     type QRCodeStylingInstance,
-} from "./qrCode";
+} from "./qr-code";
 
 interface PasteQrCodeProps {
     value: string;

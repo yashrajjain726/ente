@@ -1,12 +1,9 @@
-use std::sync::Arc;
-
 use ente_core::{
+    Session,
     crypto::SecretVec,
-    http::{Api, ApiConfig, Auth, Http},
+    http::{ApiConfig, Auth},
 };
-use ente_legacy::{
-    LegacyClient, LegacyContactRecord, LegacyContactState, LegacyInfo, LegacyRecoverySession,
-};
+use ente_legacy::{LegacyContactRecord, LegacyContactState, LegacyInfo, LegacyRecoverySession};
 
 use crate::CLIENT_PACKAGE;
 use crate::support::auth::{self, TestAccount};
@@ -19,13 +16,12 @@ pub struct LegacyPairState {
 pub struct LegacyPair {
     pub owner: TestAccount,
     pub trusted: TestAccount,
-    pub owner_ctx: LegacyClient,
-    pub trusted_ctx: LegacyClient,
+    pub owner_session: Session,
+    pub trusted_session: Session,
 }
 
-pub fn open_client(endpoint: &str, account: &TestAccount) -> LegacyClient {
-    let api = Api::new(
-        Http::new().unwrap(),
+pub fn open_session(endpoint: &str, account: &TestAccount) -> Session {
+    Session::new(
         ApiConfig {
             origin: endpoint.to_string(),
             client_package: Some(CLIENT_PACKAGE.to_string()),
@@ -33,11 +29,9 @@ pub fn open_client(endpoint: &str, account: &TestAccount) -> LegacyClient {
             user_agent: Some("ente-legacy-e2e".to_string()),
             auth: Some(Auth::User(account.auth_token.clone())),
         },
-    );
-    LegacyClient::new(
-        Arc::new(api),
-        Arc::new(SecretVec::new(account.master_key.clone())),
+        SecretVec::new(account.master_key.clone()),
     )
+    .unwrap()
 }
 
 pub async fn create_accepted_pair_state(
@@ -47,21 +41,25 @@ pub async fn create_accepted_pair_state(
     let owner = auth::create_account_strict(endpoint, "legacy-owner", "LegacyOwner").await;
     let trusted = auth::create_fixture_account(endpoint, "legacy-trusted").await;
 
-    let owner_ctx = open_client(endpoint, &owner);
-    let trusted_ctx = open_client(endpoint, &trusted);
+    let owner_session = open_session(endpoint, &owner);
+    let trusted_session = open_session(endpoint, &trusted);
 
-    owner_ctx
-        .add_contact(
-            &trusted.email,
-            &owner.key_attributes,
-            Some(recovery_notice_in_days),
-        )
-        .await
-        .unwrap();
-    trusted_ctx
-        .update_contact(owner.user_id, trusted.user_id, LegacyContactState::Accepted)
-        .await
-        .unwrap();
+    ente_legacy::add_contact(
+        &owner_session,
+        &trusted.email,
+        &owner.key_attributes,
+        Some(recovery_notice_in_days),
+    )
+    .await
+    .unwrap();
+    ente_legacy::update_contact(
+        &trusted_session,
+        owner.user_id,
+        trusted.user_id,
+        LegacyContactState::Accepted,
+    )
+    .await
+    .unwrap();
 
     LegacyPairState { owner, trusted }
 }
@@ -69,14 +67,14 @@ pub async fn create_accepted_pair_state(
 pub fn open_pair(endpoint: &str, state: &LegacyPairState) -> LegacyPair {
     let owner = state.owner.clone();
     let trusted = state.trusted.clone();
-    let owner_ctx = open_client(endpoint, &owner);
-    let trusted_ctx = open_client(endpoint, &trusted);
+    let owner_session = open_session(endpoint, &owner);
+    let trusted_session = open_session(endpoint, &trusted);
 
     LegacyPair {
         owner,
         trusted,
-        owner_ctx,
-        trusted_ctx,
+        owner_session,
+        trusted_session,
     }
 }
 

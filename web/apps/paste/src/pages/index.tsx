@@ -1,7 +1,7 @@
 import { PasteCreatePanel } from "@/components/PasteCreatePanel";
 import { PasteFrame } from "@/components/PasteFrame";
 import { PasteViewPanel } from "@/components/PasteViewPanel";
-import { usePasteRoute } from "@/usePaste";
+import { usePasteRoute } from "@/use-paste";
 import { Stack } from "@mui/material";
 import Head from "next/head";
 

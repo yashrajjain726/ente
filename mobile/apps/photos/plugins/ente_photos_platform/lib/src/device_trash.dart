@@ -25,7 +25,9 @@ class DeviceTrashFile {
 
 class DeviceTrashClient {
   static final instance = DeviceTrashClient();
-  static const _methodChannel = MethodChannel('io.ente.photos.platform');
+  static const _methodChannel = MethodChannel(
+    'io.ente.photos.platform/device_trash',
+  );
 
   Future<List<DeviceTrashFile>> getFiles() async {
     if (!Platform.isAndroid) {

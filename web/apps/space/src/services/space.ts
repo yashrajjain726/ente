@@ -1,12 +1,13 @@
 import type { FriendProfile } from "data/friends";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
 import type {
     SpaceAccountCtxHandle,
     SpaceLinkCtxHandle,
 } from "ente-space-wasm";
-import type { PendingSpaceInvite } from "services/spaceInvite";
+import type { PendingSpaceInvite } from "services/invite";
 import {
     cachedSpaceMediaBlobURL,
     cachedSpaceMediaBlobURLIfPresent,
@@ -14,20 +15,20 @@ import {
     rememberCachedSpaceMediaBlobURL,
     spacePostMediaCacheKey,
     spaceProfileMediaCacheKey,
-} from "services/spaceMediaCache";
+} from "services/media-cache";
 import {
     ensureCurrentSpaceContext,
     loadExistingSpaceProfile,
     persistCurrentOwnedSpaces,
     releaseCurrentSpaceContext,
-} from "services/spaceProfile";
+} from "services/profile";
 import {
     parseSpaceProfilePayload,
     spaceProfileTextField,
-} from "services/spaceProfilePayload";
-import { normalizeSpaceMessageText } from "utils/spaceMessageLimits";
+} from "services/profile-payload";
+import { normalizeSpaceMessageText } from "utils/message-limits";
 
-export { clearSpaceMediaURLCache } from "services/spaceMediaCache";
+export { clearSpaceMediaURLCache } from "services/media-cache";
 
 const currentFeedPageSize = 10;
 
@@ -368,16 +369,8 @@ interface SpaceConversationsContext {
     listConversations: (spaceId: string) => Promise<SpaceConversationsResponse>;
 }
 
-export const isSpaceContentError = (error: unknown) => {
-    if (!error || typeof error != "object" || !("code" in error)) return false;
-    const code = error.code;
-    return (
-        code == "crypto" ||
-        code == "base64_decode" ||
-        code == "invalid_input" ||
-        code == "missing_friend_sealed_space_key"
-    );
-};
+export const isSpaceContentError = (error: unknown) =>
+    isNamedError(error, "content_unavailable");
 
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
@@ -1352,12 +1345,8 @@ export const createCurrentPhotoPost = async ({
     }
 };
 
-export const isSpacePostLimitReachedError = (error: unknown) => {
-    if (!error || typeof error != "object" || !("status" in error)) {
-        return false;
-    }
-    return (error as { status?: unknown }).status == 409;
-};
+export const isSpacePostLimitReachedError = (error: unknown) =>
+    isNamedError(error, "post_limit_reached");
 
 const normalizedImageDimension = (dimension: number | undefined) =>
     typeof dimension == "number" && Number.isFinite(dimension) && dimension > 0

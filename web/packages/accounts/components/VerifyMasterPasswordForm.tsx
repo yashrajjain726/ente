@@ -1,12 +1,10 @@
 import { Input, TextField } from "@mui/material";
 import { decryptBox, deriveKey } from "ente-accounts/services/crypto";
-import {
-    srpVerificationUnauthorizedErrorMessage,
-    type SRPAttributes,
-} from "ente-accounts/services/srp";
+import type { SRPAttributes } from "ente-accounts/services/srp";
 import type { KeyAttributes } from "ente-accounts/services/user";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
+import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
 import { useFormik } from "formik";
 import { t } from "i18next";
@@ -122,10 +120,7 @@ export const VerifyMasterPasswordForm: React.FC<
                     keyAttributes = result;
                 }
             } catch (e) {
-                if (
-                    e instanceof Error &&
-                    e.message == srpVerificationUnauthorizedErrorMessage
-                ) {
+                if (isNamedError(e, "srp_verification_unauthorized")) {
                     log.error("Incorrect password or no account", e);
                     setFieldError(t("incorrect_password_or_no_account"));
                     return;

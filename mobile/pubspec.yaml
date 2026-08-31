@@ -30,10 +30,10 @@ workspace:
   - packages/ente_screen_brightness
   - packages/events
   - packages/feature_flag
+  - packages/frb
   - packages/legacy
   - packages/local_auth_linux
   - packages/lock_screen
-  - packages/log_viewer
   - packages/logging
   - packages/mail
   - packages/native_video_editor

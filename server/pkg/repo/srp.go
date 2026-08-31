@@ -116,41 +116,23 @@ func (repo *UserAuthRepository) InsertSRPAuth(ctx context.Context, userID int64,
 	return stacktrace.Propagate(err, "")
 }
 
-func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Context, userID int64, req ente.UpdateSRPAndKeysRequest, setup *ente.SRPSetupEntity) error {
-	isSRPSetupDone, err := repo.IsSRPSetupDone(ctx, userID)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
+func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Context, userID int64, updateKeyAttr ente.UpdateKeysRequest, setup *ente.SRPSetupEntity) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if !isSRPSetupDone {
-		_, err = tx.ExecContext(ctx, `
-	INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, $2 , $3, $4)`,
-			userID, setup.SRPUserID, setup.Salt, setup.Verifier)
-	} else {
-		_, err = tx.ExecContext(ctx, `UPDATE srp_auth SET srp_user_id = $1, salt = $2, verifier = $3 WHERE user_id = $4`,
-			setup.SRPUserID, setup.Salt, setup.Verifier, userID)
-	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, $2, $3, $4)
+		ON CONFLICT (user_id) DO UPDATE SET
+			srp_user_id = EXCLUDED.srp_user_id, salt = EXCLUDED.salt, verifier = EXCLUDED.verifier`,
+		userID, setup.SRPUserID, setup.Salt, setup.Verifier)
 	if err != nil {
-		rollBackErr := tx.Rollback()
-		if rollBackErr != nil {
-			return rollBackErr
-		}
 		return stacktrace.Propagate(err, "")
-	}
-	updateKeyAttr := *req.UpdateAttributes
-	if validErr := updateKeyAttr.Validate(); validErr != nil {
-		return stacktrace.Propagate(validErr, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE key_attributes SET kek_salt = $1, encrypted_key = $2, key_decryption_nonce = $3, mem_limit = $4, ops_limit = $5 WHERE user_id = $6`,
 		updateKeyAttr.KEKSalt, updateKeyAttr.EncryptedKey, updateKeyAttr.KeyDecryptionNonce, updateKeyAttr.MemLimit, updateKeyAttr.OpsLimit, userID)
 	if err != nil {
-		rollBackErr := tx.Rollback()
-		if rollBackErr != nil {
-			return rollBackErr
-		}
 		return stacktrace.Propagate(err, "")
 	}
 	return tx.Commit()

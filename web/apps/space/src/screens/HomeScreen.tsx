@@ -6,28 +6,28 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
-import { SpaceActionToast } from "components/SpaceActionToast";
-import { SpaceAvatarImage } from "components/SpaceAvatarImage";
+import { SpaceActionToast } from "components/ActionToast";
+import { SpaceAvatarImage } from "components/AvatarImage";
 import {
     SpaceFileViewer,
     SpaceViewerFeedBackdrop,
     type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
-} from "components/SpaceFileViewer";
-import { SpaceInlinePostButton } from "components/SpaceInlinePostButton";
-import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
+} from "components/FileViewer";
+import { SpaceInlinePostButton } from "components/InlinePostButton";
 import {
     spacePostLikeButtonPop,
     spacePostLikeHeartPop,
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
-} from "components/SpacePostLikeAnimation";
-import { SpacePWAInstallPrompt } from "components/SpacePWAInstallPrompt";
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
-import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
+} from "components/post-like-animation";
+import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
+import { SpaceLoadingSpinner } from "components/RouteFallback";
+import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import log from "ente-base/log";
-import { useBrowserBackClose } from "hooks/useBrowserBackClose";
+import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
@@ -36,16 +36,16 @@ import {
     type SpacePostAssetURLLoader,
     type SpacePostAvatarURLLoader,
 } from "services/space";
-import type { LocalSpaceFeedPost } from "state/spaceAppState";
-import { spaceTouchTargetSize } from "styles/touchTargets";
-import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
-import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
+import type { LocalSpaceFeedPost } from "state/app-state";
+import { spaceTouchTargetSize } from "styles/touch-targets";
+import { firstNameFrom, formatSpaceDate } from "utils/display";
+import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
 import {
     canPreviewSpaceImageFile,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
     spacePostPreviewImageForFile,
-} from "utils/spacePostImage";
+} from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 export const homeBackground = "#F5F5F7";

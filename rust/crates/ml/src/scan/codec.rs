@@ -13,7 +13,7 @@ pub(crate) fn decode_bgr(bytes: &[u8]) -> Result<ImageU8, ScanError> {
         .map_err(|_| ScanError::Codec("image height does not fit in i32".to_string()))?;
 
     let mut bgr = decoded.rgb;
-    for px in bgr.chunks_exact_mut(3) {
+    for px in bgr.as_chunks_mut::<3>().0 {
         px.swap(0, 2);
     }
     ImageU8::new(width, height, 3, bgr).map_err(ScanError::Codec)
@@ -27,7 +27,7 @@ pub(crate) fn encode_jpeg(image: &ImageU8, quality: u8) -> Result<Vec<u8>, ScanE
         )));
     }
     let mut rgb = image.data.clone();
-    for px in rgb.chunks_exact_mut(3) {
+    for px in rgb.as_chunks_mut::<3>().0 {
         px.swap(0, 2);
     }
     encode_rgb(

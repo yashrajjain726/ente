@@ -9,9 +9,11 @@ crate-type = ["cdylib"]
 ente-core.workspace = true
 ente-space.workspace = true
 ente-wasm-log.workspace = true
+js-sys.workspace = true
 log.workspace = true
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
+thiserror.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 

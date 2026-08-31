@@ -1,6 +1,6 @@
 import { RecoverTwoFactorForm } from "@/components/auth/RecoveryForm";
 import { AuthShell } from "@/components/AuthShell";
-import { featureFlags } from "@/featureFlags";
+import { featureFlags } from "@/feature-flags";
 import AccountsTwoFactorRecoverPage, {
     type TwoFactorRecoverPresentationProps,
 } from "ente-accounts/pages/two-factor/recover";
