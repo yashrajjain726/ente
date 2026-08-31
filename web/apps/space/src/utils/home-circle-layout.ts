@@ -67,12 +67,7 @@ export const homeCirclePlacements = (
             slotsByRow[row - 1]!.length != slotsByRow[row]!.length;
         rowOffsets.push(rowOffsets[row - 1]! + (rowsAreStaggered ? 1 : 1.1));
     }
-    const layoutWidth =
-        count == 1
-            ? 1 / 0.5
-            : count == 2
-              ? 1 / 0.48
-              : columns + (columns - 1) * circleGapRatio;
+    const layoutWidth = columns + (columns - 1) * circleGapRatio;
     const layoutHeight = 1 + rowOffsets[rowOffsets.length - 1]!;
     const size = Math.min(
         canvasWidth / layoutWidth,

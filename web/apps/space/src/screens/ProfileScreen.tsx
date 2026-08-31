@@ -591,7 +591,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const friendActionsMenuID = React.useId();
     const isFriendActionsOpen = Boolean(friendActionsAnchor);
     const isUnfriendActionRunning = unfriendActionPhase != null;
-    const canManageFriend = isFriendProfile && Boolean(onUnfriend);
+    const canManageFriend =
+        isFriendProfile && Boolean(onMessageFriend || onUnfriend);
     const displayName = profile.fullName.trim() || profile.username.trim();
     const coverUrl = profile.coverUrl ?? null;
     const isCoverURLPending = Boolean(profile.coverObjectID && !coverUrl);
@@ -638,6 +639,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
 
     const closeFriendActions = () => setFriendActionsAnchor(null);
+
+    const messageFriend = () => {
+        closeFriendActions();
+        onMessageFriend?.();
+    };
 
     const requestUnfriend = () => {
         closeFriendActions();
@@ -1275,7 +1281,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     whiteSpace: "nowrap",
                                 }}
                             >
-                                {firstName}
+                                {profile.username}
                             </Box>
                             {isOwnerProfile ? (
                                 <Box
@@ -1307,40 +1313,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         icon={Menu01Icon}
                                         size={20}
                                         strokeWidth={2.4}
-                                    />
-                                </Box>
-                            ) : isFriendProfile && onMessageFriend ? (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label={`Open chat with ${displayName}`}
-                                    onClick={onMessageFriend}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: "inherit",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "flex-end",
-                                        justifySelf: "end",
-                                        p: 0,
-                                        width: spaceTouchTargetSize,
-                                        "& svg path:first-of-type": {
-                                            display: "none",
-                                        },
-                                        "&:focus-visible": {
-                                            borderRadius: "50%",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={BubbleChatIcon}
-                                        size={21}
-                                        strokeWidth={2.5}
                                     />
                                 </Box>
                             ) : (
@@ -1466,10 +1438,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             width: 112,
                                         }}
                                     />
-                                ) : isPublicProfile ? (
-                                    displayName
                                 ) : (
-                                    profile.username
+                                    displayName
                                 )}
                             </Box>
                             {isOwnerProfile ? (
@@ -1592,6 +1562,54 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                     }}
                                 >
+                                    {onMessageFriend && (
+                                        <MenuItem
+                                            dense
+                                            disableRipple
+                                            onClick={messageFriend}
+                                            sx={{
+                                                alignItems: "center",
+                                                borderRadius: "10px",
+                                                color: textBase,
+                                                display: "flex",
+                                                gap: "8px",
+                                                minHeight: 36,
+                                                px: "9px",
+                                                py: "4px",
+                                                whiteSpace: "nowrap",
+                                                "&.Mui-focusVisible": {
+                                                    bgcolor:
+                                                        "rgba(0, 0, 0, 0.04)",
+                                                },
+                                                "&:active": {
+                                                    bgcolor:
+                                                        "rgba(0, 0, 0, 0.04)",
+                                                },
+                                                "&:hover": {
+                                                    bgcolor:
+                                                        "rgba(0, 0, 0, 0.04)",
+                                                },
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={BubbleChatIcon}
+                                                size={18}
+                                                strokeWidth={1.8}
+                                                style={{ flexShrink: 0 }}
+                                            />
+                                            <Box
+                                                sx={{
+                                                    fontFamily:
+                                                        '"Inter Variable", Inter, sans-serif',
+                                                    fontSize: 13,
+                                                    fontWeight: 650,
+                                                    lineHeight: "18px",
+                                                }}
+                                            >
+                                                Message
+                                            </Box>
+                                        </MenuItem>
+                                    )}
                                     {onUnfriend && (
                                         <MenuItem
                                             dense

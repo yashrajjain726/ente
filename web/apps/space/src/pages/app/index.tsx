@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
-import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
@@ -9,22 +8,19 @@ import {
     prependCachedSpaceFeedPost,
 } from "services/feed-cache";
 import { consumeSentSpaceInviteFriend } from "services/invite";
-import { loadUnseenSpacePostIDs, markSpacePostSeen } from "services/post-seen";
 import { loadExistingSpaceId } from "services/profile";
 import {
     createCurrentPhotoPost,
-    loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
     loadCurrentSpaceLatestPost,
     loadCurrentSpacePostAssetURL,
+    loadCurrentSpacePostAvatarURL,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
-    sendCurrentMessage,
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
-import { spaceWaveMessageText } from "utils/message-limits";
 import { prepareSpacePostImageFromEdit } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -43,7 +39,6 @@ const Page: React.FC = () => {
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
-    const [unseenPostIDs, setUnseenPostIDs] = useState<Set<number>>(new Set());
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
@@ -72,7 +67,6 @@ const Page: React.FC = () => {
         let cancelled = false;
         setSpaceId(undefined);
         setLatestPosts([]);
-        setUnseenPostIDs(new Set());
         setHasUnreadMessages(undefined);
         setIsLatestPostsLoading(true);
         setIsFriendsLoading(true);
@@ -121,14 +115,9 @@ const Page: React.FC = () => {
                         ).then((latestPosts) => {
                             if (cancelled) return;
 
-                            const nextLatestPosts = latestPosts.filter(
-                                (post): post is SpacePost => post !== null,
-                            );
-                            setLatestPosts(nextLatestPosts);
-                            setUnseenPostIDs(
-                                loadUnseenSpacePostIDs(
-                                    nextFriends,
-                                    nextLatestPosts,
+                            setLatestPosts(
+                                latestPosts.filter(
+                                    (post): post is SpacePost => post !== null,
                                 ),
                             );
                         });
@@ -169,29 +158,6 @@ const Page: React.FC = () => {
         [spaceId],
     );
 
-    const waveAtFriend = async (friend: FriendProfile) => {
-        if (!profile?.spaceId) throw new Error("Missing space.");
-
-        await sendCurrentMessage(
-            profile.spaceId,
-            friend.spaceId ?? friend.id,
-            spaceWaveMessageText,
-            {
-                avatarKeyVersion: profile.avatarKeyVersion,
-                avatarObjectID: profile.avatarObjectID,
-                avatarUpdatedAt: profile.avatarUpdatedAt,
-                avatarUrl: profile.avatarUrl,
-                friendsCount: 0,
-                fullName: profile.fullName,
-                id: profile.spaceId,
-                spaceId: profile.spaceId,
-                spaceSlug: profile.spaceSlug,
-                username: profile.username,
-            },
-            friend,
-        );
-    };
-
     if (
         profileLoadStatus == "error" ||
         (profileLoadStatus == "ready" && !profile)
@@ -216,7 +182,6 @@ const Page: React.FC = () => {
                 isLatestPostsLoading={isLatestPostsLoading}
                 isFriendsLoading={isFriendsLoading}
                 profile={profile}
-                unseenPostIDs={unseenPostIDs}
                 viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&
@@ -226,7 +191,6 @@ const Page: React.FC = () => {
                 }
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
                 onInitialPostPhotoConsumed={() => setPendingPostPhotoFile(null)}
-                onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onCreatePost={
                     profile
                         ? async (image, caption) => {
@@ -265,17 +229,8 @@ const Page: React.FC = () => {
                         );
                     }
                 }}
+                onLoadPostAvatar={loadCurrentSpacePostAvatarURL}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
-                onPostSeen={(friendSpaceID, postID) => {
-                    markSpacePostSeen(friendSpaceID, postID);
-                    setUnseenPostIDs((currentPostIDs) => {
-                        if (!currentPostIDs.has(postID)) return currentPostIDs;
-
-                        const nextPostIDs = new Set(currentPostIDs);
-                        nextPostIDs.delete(postID);
-                        return nextPostIDs;
-                    });
-                }}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={
                     profile
@@ -301,7 +256,6 @@ const Page: React.FC = () => {
                         : undefined
                 }
                 onSetPostLiked={setLatestPostLiked}
-                onWaveFriend={profile?.spaceId ? waveAtFriend : undefined}
             />
         </>
     );
