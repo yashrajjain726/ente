@@ -49,11 +49,38 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          child: ButtonComponent(
-            label: l10n.continueInMailApp,
-            isDisabled: _isSending,
-            shouldSurfaceExecutionStates: false,
-            onTap: _onSend,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      l10n.sendToEmail(email: supportEmail),
+                      textAlign: TextAlign.center,
+                      style: TextStyles.mini.copyWith(color: colors.textLight),
+                    ),
+                  ),
+                  IconButtonComponent(
+                    icon: const HugeIcon(icon: HugeIcons.strokeRoundedCopy01),
+                    variant: IconButtonComponentVariant.unfilled,
+                    shouldSurfaceExecutionStates: false,
+                    tooltip: l10n.copyEmailAddress,
+                    size: 32,
+                    iconSize: IconSizes.small,
+                    onTap: () => _copyToClipboard(supportEmail),
+                  ),
+                ],
+              ),
+              const SizedBox(height: Spacing.md),
+              ButtonComponent(
+                label: l10n.continueInMailApp,
+                isDisabled: _isSending,
+                shouldSurfaceExecutionStates: false,
+                onTap: _onSend,
+              ),
+            ],
           ),
         ),
       ),
