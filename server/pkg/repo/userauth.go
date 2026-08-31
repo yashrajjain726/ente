@@ -251,7 +251,7 @@ func (repo *UserAuthRepository) markTokensDeleted(query string, args ...interfac
 }
 
 func (repo *UserAuthRepository) GetActiveSessions(userID int64, app ente.App) ([]ente.Session, error) {
-	rows, err := repo.DB.Query(`SELECT token, creation_time, ip, user_agent, last_used_at FROM tokens WHERE user_id = $1 AND app = $2 AND is_deleted = false`, userID, app)
+	rows, err := repo.DB.Query(`SELECT token_hash, creation_time, ip, user_agent, last_used_at FROM tokens WHERE user_id = $1 AND app = $2 AND is_deleted = false`, userID, app)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -261,7 +261,7 @@ func (repo *UserAuthRepository) GetActiveSessions(userID int64, app ente.App) ([
 		var ip sql.NullString
 		var userAgent sql.NullString
 		var session ente.Session
-		err := rows.Scan(&session.Token, &session.CreationTime, &ip, &userAgent, &session.LastUsedTime)
+		err := rows.Scan(&session.TokenHash, &session.CreationTime, &ip, &userAgent, &session.LastUsedTime)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}

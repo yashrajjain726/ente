@@ -231,6 +231,8 @@ type ProfileData struct {
 
 type Session struct {
 	Token        string `json:"token"`
+	TokenHash    []byte `json:"-"`
+	IsCurrent    bool   `json:"isCurrent"`
 	CreationTime int64  `json:"creationTime"`
 	IP           string `json:"ip"`
 	UA           string `json:"ua"`

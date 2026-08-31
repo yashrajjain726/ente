@@ -500,8 +500,8 @@ func (h *UserHandler) GetActiveSessions(c *gin.Context) {
 
 func (h *UserHandler) TerminateSession(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
-	token := c.Query("token")
-	err := h.UserController.TerminateSession(userID, token)
+	identifier := c.Query("token")
+	err := h.UserController.TerminateSessionByIdentifier(userID, auth.GetToken(c), identifier)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
