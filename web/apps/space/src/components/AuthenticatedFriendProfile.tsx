@@ -4,7 +4,6 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
-import { friendsBackground } from "screens/FriendsScreen";
 import {
     FriendProfileImageViewerScreen,
     friendProfileImageViewerBackground,
@@ -25,6 +24,7 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
@@ -146,7 +146,7 @@ export const AuthenticatedFriendProfile: React.FC<
     if (profileLoadStatus != "ready" || !profile?.spaceId) {
         return (
             <SpaceRouteFallback
-                background={friendsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -155,13 +155,13 @@ export const AuthenticatedFriendProfile: React.FC<
         !hadCachedFriendProfileOnMount.current &&
         (isProfileLoading || isPostsLoading)
     ) {
-        return <SpaceRouteFallback background={friendsBackground} />;
+        return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
     }
     const actorSpaceId = profile.spaceId;
 
     return (
         <>
-            <SpacePageMeta themeColor={friendsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileScreen
                 friendsCount={displayedProfile.friendsCount}
                 headerVariant="friend"

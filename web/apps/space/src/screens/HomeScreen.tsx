@@ -28,6 +28,13 @@ import {
     type SpacePost,
     type SpacePostAssetURLLoader,
 } from "services/space";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
 import {
@@ -45,11 +52,9 @@ import {
 } from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
-export const homeBackground = "#0C1014";
-
 const green = "#08C225";
-const textBase = "#000";
-const textSecondary = "#6B6B6B";
+const textBase = spaceText;
+const textSecondary = spaceTextMuted;
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 36;
@@ -587,7 +592,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: "#FFFFFF",
+                bgcolor: spaceSurface,
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 boxSizing: "border-box",
@@ -645,7 +650,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     p: 0,
                     width: spaceTouchTargetSize,
                     "&:focus-visible": {
-                        outline: "2px solid rgba(0 0 0 / 0.72)",
+                        outline: "2px solid rgba(255 255 255 / 0.72)",
                         outlineOffset: 2,
                     },
                 }}
@@ -1232,8 +1237,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <Box
             component="main"
             sx={{
-                background:
-                    "radial-gradient(ellipse 120% 95% at 50% 58%, rgba(38, 78, 52, 0.16), transparent 72%), #0C1014",
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -1281,7 +1285,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             WebkitMaskImage:
                                 "linear-gradient(to bottom, #000 0%, transparent 100%)",
                             backdropFilter: "blur(4px)",
-                            background: `linear-gradient(to bottom, ${homeBackground}, rgba(0, 0, 0, 0.35) 75%, transparent)`,
+                            background: `linear-gradient(to bottom, ${spaceAppBackgroundColor}, rgba(0, 0, 0, 0.35) 75%, transparent)`,
                             content: '""',
                             height: "calc(100% + 28px)",
                             left: 0,

@@ -2,7 +2,7 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
-import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
+import { ProfileScreen } from "screens/ProfileScreen";
 import { spaceInviteURL } from "services/invite";
 import {
     createCurrentPhotoPost,
@@ -15,6 +15,7 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { prepareSpacePostImageFromEdit } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
@@ -94,7 +95,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -103,7 +104,7 @@ const Page: React.FC = () => {
     if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -111,7 +112,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={profileBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileScreen
                 friendsCount={friendsCount}
                 isPostsLoading={isPostsLoading}

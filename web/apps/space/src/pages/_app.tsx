@@ -16,10 +16,18 @@ import React from "react";
 import "react-easy-crop/react-easy-crop.css";
 import { registerSpaceServiceWorker } from "services/web-push";
 import { SpaceAppStateProvider } from "state/AppStateProvider";
+import { spaceAppBackground, spaceAppBackgroundColor } from "styles/colors";
 import "styles/globals.css";
 
 const spaceTheme = createTheme(shareTheme, {
     components: {
+        MuiCssBaseline: {
+            styleOverrides: {
+                html: { backgroundColor: spaceAppBackgroundColor },
+                body: { background: spaceAppBackground },
+                "#__next": { minHeight: "100svh" },
+            },
+        },
         MuiDialog: {
             styleOverrides: {
                 root: {

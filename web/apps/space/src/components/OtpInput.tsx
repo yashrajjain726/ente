@@ -1,5 +1,6 @@
 import { Box } from "@mui/material";
 import React from "react";
+import { spaceSurface } from "styles/colors";
 import { sanitizeSpaceOTP, spaceOTPCodeLength } from "utils/otp";
 
 const green = "#08C225";
@@ -241,7 +242,7 @@ export const SpaceOtpInput = React.forwardRef<
                             key={index}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: active ? activeFill : "white",
+                                bgcolor: active ? activeFill : spaceSurface,
                                 border:
                                     typed || active
                                         ? `2px solid ${green}`

@@ -28,28 +28,34 @@ import type {
     SpaceMessageConversation,
     SpaceMessageQuote,
 } from "services/space";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
 import { clampSpaceMessageText } from "utils/message-limits";
 import { spacePostImageInputAccept } from "utils/post-image";
 
-export const messagesBackground = "#FFFFFF";
-
 const green = "#08C225";
-const textBase = "#000000";
-const textSecondary = "#777777";
-const lightSurface = "#F2F2F2";
-const lightSurfaceHover = "#E8E8E8";
+const textBase = spaceText;
+const textSecondary = spaceTextMuted;
+const lightSurface = spaceSurface;
+const lightSurfaceHover = spaceSurfaceHover;
 const composerSurface = lightSurface;
 const outgoingBubble = "#0DAF35";
 const incomingBubble = lightSurface;
 const outgoingMessageText = "#FFFFFF";
-const incomingMessageText = "#111111";
+const incomingMessageText = spaceText;
 const outgoingQuoteBubble = "#9EDFAE";
-const incomingQuoteBubble = "#FAFAFA";
-const incomingQuoteText = "#BDBDBD";
+const incomingQuoteBubble = spaceSurfaceHover;
+const incomingQuoteText = spaceTextMuted;
 const outgoingQuoteText = "#FFFFFF";
-const quoteRule = "#EEEEEE";
+const quoteRule = "rgba(255, 255, 255, 0.16)";
 const dangerColor = "#F63A3A";
 const composerHeight = 48;
 const composerMaxHeight = 112;
@@ -562,7 +568,7 @@ const ConversationListItem: React.FC<{
                                 alignItems: "center",
                                 bgcolor: dangerColor,
                                 borderRadius: "8px",
-                                boxShadow: `0 0 0 2px ${messagesBackground}`,
+                                boxShadow: `0 0 0 2px ${spaceAppBackgroundColor}`,
                                 color: "#FFFFFF",
                                 display: "inline-flex",
                                 flexShrink: 0,
@@ -967,7 +973,7 @@ const MessageLikeHeartIcon: React.FC = () => (
         <path
             d="M6.63749 12.3742C4.66259 10.885 0.75 7.4804 0.75 4.41664C0.75 2.39161 2.22368 0.75 4.25 0.75C5.3 0.75 6.35 1.10294 7.75 2.51469C9.15 1.10294 10.2 0.75 11.25 0.75C13.2763 0.75 14.75 2.39161 14.75 4.41664C14.75 7.4804 10.8374 10.885 8.86251 12.3742C8.19793 12.8753 7.30207 12.8753 6.63749 12.3742Z"
             fill={green}
-            stroke={messagesBackground}
+            stroke={spaceAppBackgroundColor}
             strokeWidth="4"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -2110,7 +2116,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             <Box
                 component="main"
                 sx={{
-                    bgcolor: messagesBackground,
+                    background: spaceAppBackground,
                     color: textBase,
                     display: "grid",
                     height: isThreadOpen ? "100dvh" : undefined,
@@ -2122,7 +2128,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             >
                 <Box
                     sx={{
-                        bgcolor: "inherit",
+                        bgcolor: "transparent",
                         boxSizing: "border-box",
                         display: isThreadOpen ? "grid" : undefined,
                         gridTemplateRows: isThreadOpen
@@ -2526,7 +2532,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 sx={{
                                                     WebkitTapHighlightColor:
                                                         "transparent",
-                                                    bgcolor: messagesBackground,
+                                                    bgcolor: "transparent",
                                                     borderRadius: "16px",
                                                     boxShadow:
                                                         "0 14px 40px rgba(0, 0, 0, 0.14)",
@@ -2562,7 +2568,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             {!isThreadReadOnly && (
                                 <Box
                                     sx={{
-                                        bgcolor: messagesBackground,
+                                        bgcolor: "transparent",
                                         boxSizing: "border-box",
                                         display: "grid",
                                         gap: "8px",
@@ -2870,7 +2876,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             onSharingChange={setIsInviteSharing}
                                             sx={{
                                                 alignItems: "center",
-                                                bgcolor: "#F2F2F2",
+                                                bgcolor: spaceSurface,
                                                 border: 0,
                                                 borderRadius: "18px",
                                                 color: textBase,
@@ -2899,7 +2905,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 "&:hover":
                                                     profileLink &&
                                                     !isInviteSharing
-                                                        ? { bgcolor: "#E8E8E8" }
+                                                        ? {
+                                                              bgcolor:
+                                                                  spaceSurfaceHover,
+                                                          }
                                                         : undefined,
                                             }}
                                         />

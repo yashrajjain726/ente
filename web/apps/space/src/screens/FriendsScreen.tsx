@@ -33,15 +33,21 @@ import {
     spaceUsernameValidationError,
 } from "services/profile";
 import type { SpaceFriendRequest } from "services/space";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
-export const friendsBackground = "#FFFFFF";
-
 const green = "#08C225";
-const avatarSkeletonBackground = "#E6E6E6";
-const textBase = "#000";
-const textStrong = "#303030";
-const textSoft = "#777777";
+const avatarSkeletonBackground = spaceSurface;
+const textBase = spaceText;
+const textStrong = spaceText;
+const textSoft = spaceTextMuted;
 const dangerColor = "#F63A3A";
 const friendAvatarLoadRootMargin = "800px 0px";
 
@@ -328,6 +334,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 slotProps={{
                     paper: {
                         sx: {
+                            bgcolor: spaceSurface,
                             borderRadius: "14px",
                             boxShadow: "0 14px 40px rgba(0, 0, 0, 0.16)",
                             mt: "6px",
@@ -353,10 +360,12 @@ const FriendRow: React.FC<FriendRowProps> = ({
                             py: "4px",
                             whiteSpace: "nowrap",
                             "&.Mui-focusVisible": {
-                                bgcolor: "rgba(0, 0, 0, 0.04)",
+                                bgcolor: "rgba(255, 255, 255, 0.06)",
                             },
-                            "&:active": { bgcolor: "rgba(0, 0, 0, 0.04)" },
-                            "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" },
+                            "&:active": {
+                                bgcolor: "rgba(255, 255, 255, 0.06)",
+                            },
+                            "&:hover": { bgcolor: "rgba(255, 255, 255, 0.06)" },
                         }}
                     >
                         <HugeiconsIcon
@@ -545,7 +554,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                                 },
                                 "&:hover": isBusy
                                     ? undefined
-                                    : { bgcolor: "#F1F1F1" },
+                                    : { bgcolor: spaceSurfaceHover },
                             }}
                         >
                             {action == "delete" ? (
@@ -571,7 +580,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                         onClick={() => runAction("delete", onDelete)}
                         sx={{
                             alignItems: "center",
-                            bgcolor: "#F2F2F2",
+                            bgcolor: spaceSurface,
                             border: 0,
                             borderRadius: "12px",
                             color: textBase,
@@ -591,7 +600,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                             },
                             "&:hover": isBusy
                                 ? undefined
-                                : { bgcolor: "#E8E8E8" },
+                                : { bgcolor: spaceSurfaceHover },
                         }}
                     >
                         {action == "delete" ? (
@@ -728,7 +737,7 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: "#FAFAFA",
+                        bgcolor: spaceAppBackgroundColor,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",
@@ -791,7 +800,7 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
                 </Box>
                 <Box
                     sx={{
-                        color: "#666666",
+                        color: textSoft,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 13,
                         lineHeight: "18px",
@@ -808,7 +817,7 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
                     <Box
                         sx={{
                             alignItems: "center",
-                            bgcolor: "#F2F2F2",
+                            bgcolor: spaceSurface,
                             border: `1px solid ${errorMessage ? dangerColor : "transparent"}`,
                             borderRadius: "14px",
                             display: "flex",
@@ -870,7 +879,10 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
                                 minWidth: 0,
                                 outline: 0,
                                 p: 0,
-                                "&::placeholder": { color: "#888", opacity: 1 },
+                                "&::placeholder": {
+                                    color: textSoft,
+                                    opacity: 1,
+                                },
                             }}
                         />
                     </Box>
@@ -1049,7 +1061,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: friendsBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 boxSizing: "border-box",
@@ -1060,7 +1072,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: friendsBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     minHeight: "100svh",
                     mx: "auto",
@@ -1245,7 +1257,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             onSharingChange={setIsInviteSharing}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#E8E8E8",
+                                bgcolor: spaceSurface,
                                 border: 0,
                                 borderRadius: "18px",
                                 color: textBase,
@@ -1273,7 +1285,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 },
                                 "&:hover":
                                     profileLink && !isInviteSharing
-                                        ? { bgcolor: "#DEDEDE" }
+                                        ? { bgcolor: spaceSurfaceHover }
                                         : undefined,
                             }}
                         />

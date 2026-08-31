@@ -7,15 +7,21 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
 import { useSpaceAppState } from "state/app-state";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { spacePostImageInputAccept } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
-const background = "#F5F5F7";
+const background = spaceAppBackgroundColor;
 const green = "#08C225";
-const textBase = "#000000";
-const textSecondary = "#6B6B6B";
+const textBase = spaceText;
+const textSecondary = spaceTextMuted;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
@@ -65,7 +71,7 @@ const Page: React.FC = () => {
             <Box
                 component="main"
                 sx={{
-                    bgcolor: background,
+                    background: spaceAppBackground,
                     color: textBase,
                     display: "grid",
                     minHeight: "100svh",

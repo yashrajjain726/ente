@@ -3,11 +3,18 @@ import { SpaceBackIcon } from "components/BackIcon";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import React from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
-const textBase = "#000";
-const textLight = "#969696";
+const textBase = spaceText;
+const textLight = spaceTextMuted;
 const warning = "#F63A3A";
 
 export const spaceAppAvatarCropSize =
@@ -18,7 +25,6 @@ export const spaceSetupAvatarCropFooterHeight = "130px";
 
 interface SpaceAvatarCropPageProps {
     aspect?: number;
-    background: string;
     crop: Point;
     cropShape?: "rect" | "round";
     errorMessage?: string;
@@ -60,7 +66,7 @@ const SpaceAvatarCropPageButton: React.FC<{
         onClick={onClick}
         sx={{
             alignItems: "center",
-            bgcolor: disabled && !loading ? "#F5F5F5" : green,
+            bgcolor: disabled && !loading ? spaceSurface : green,
             border: 0,
             borderRadius: "20px",
             color: disabled && !loading ? textLight : "white",
@@ -101,10 +107,10 @@ const SpaceAvatarCropPageSecondaryAction: React.FC<{
         sx={{
             alignItems: "center",
             alignSelf: "center",
-            bgcolor: variant == "button" ? "#F2F2F2" : "transparent",
+            bgcolor: variant == "button" ? spaceSurface : "transparent",
             border: 0,
             borderRadius: variant == "button" ? "20px" : 0,
-            color: "#666",
+            color: textLight,
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -130,7 +136,7 @@ const SpaceAvatarCropPageSecondaryAction: React.FC<{
             },
             "&:hover":
                 !disabled && variant == "button"
-                    ? { bgcolor: "#ECECEC" }
+                    ? { bgcolor: spaceSurfaceHover }
                     : undefined,
         }}
     >
@@ -139,7 +145,6 @@ const SpaceAvatarCropPageSecondaryAction: React.FC<{
 );
 
 export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
-    background,
     crop,
     errorMessage,
     headerVariant = "setup",
@@ -172,7 +177,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 "--profile-crop-width": isCoverCrop
                     ? "100%"
                     : "min(calc(100vw - 48px), 342px)",
-                bgcolor: background,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 height: "100dvh",
@@ -185,7 +190,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: background,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "grid",
                     gridTemplateRows: isAppHeader
@@ -362,7 +367,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
 
                 <Box
                     sx={{
-                        bgcolor: background,
+                        bgcolor: "transparent",
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",

@@ -3,7 +3,7 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
-import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
+import { MessagesScreen } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { spaceInviteURL } from "services/invite";
 import {
@@ -25,6 +25,7 @@ import {
     type SpaceMessageConversation,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -641,7 +642,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={messagesBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -650,7 +651,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
-                background={messagesBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -658,7 +659,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     return (
         <>
-            <SpacePageMeta themeColor={messagesBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <MessagesScreen
                 conversations={conversations}
                 friendsCount={conversationFriends.length}

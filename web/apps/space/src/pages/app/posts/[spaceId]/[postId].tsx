@@ -14,6 +14,7 @@ import {
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -162,7 +163,7 @@ const Page: React.FC = () => {
     ) {
         return (
             <SpaceRouteFallback
-                background="#FFFFFF"
+                background={spaceAppBackgroundColor}
                 message={postLoadError || profileLoadError}
             />
         );
@@ -171,7 +172,7 @@ const Page: React.FC = () => {
     if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
-                background="#FFFFFF"
+                background={spaceAppBackgroundColor}
                 message={postLoadError || profileLoadError}
             />
         );

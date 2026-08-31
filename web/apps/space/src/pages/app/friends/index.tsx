@@ -3,7 +3,7 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect } from "react";
-import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
+import { FriendsScreen } from "screens/FriendsScreen";
 import { removeCachedSpaceHomePostsBySpace } from "services/home-posts";
 import { spaceInviteURL } from "services/invite";
 import {
@@ -19,6 +19,7 @@ import {
     type SpaceFriendRequest,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -76,7 +77,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={friendsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -84,7 +85,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={friendsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <FriendsScreen
                 friendRequests={friendRequests}
                 friends={friends}

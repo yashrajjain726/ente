@@ -1,13 +1,17 @@
 import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import React, { useState } from "react";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
-export const setupProfileBackground = "#FAFAFA";
-
 const green = "#08C225";
-const textBase = "#000";
-const textLight = "#969696";
+const textBase = spaceText;
+const textLight = spaceTextMuted;
 const warning = "#F63A3A";
 const setupProfileFormID = "space-setup-profile-form";
 
@@ -153,7 +157,7 @@ const TextInput: React.FC<TextInputProps> = ({
         <Box
             sx={{
                 alignItems: "center",
-                bgcolor: "white",
+                bgcolor: spaceSurface,
                 borderRadius: "16px",
                 display: "flex",
                 height: 52,
@@ -227,7 +231,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: setupProfileBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -237,7 +241,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: setupProfileBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -356,7 +360,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
 
                 <Box
                     sx={{
-                        bgcolor: setupProfileBackground,
+                        bgcolor: "transparent",
                         bottom: 0,
                         boxSizing: "border-box",
                         left: "50%",
@@ -375,7 +379,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         disabled={!canContinue}
                         sx={{
                             alignItems: "center",
-                            bgcolor: canContinue ? green : "#F5F5F5",
+                            bgcolor: canContinue ? green : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
                             color: canContinue ? "white" : textLight,

@@ -8,7 +8,7 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
 import { OnboardingScreen, onboardingGreen } from "screens/OnboardingScreen";
-import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
+import { ProfileScreen } from "screens/ProfileScreen";
 import {
     clearPendingSpaceInvite,
     clearPendingSpaceInviteFriend,
@@ -34,6 +34,7 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState, type OnboardingEntrySource } from "state/app-state";
+import { spaceAppBackground, spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -125,7 +126,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
     <Box
         component="main"
         sx={{
-            bgcolor: "white",
+            background: spaceAppBackground,
             boxSizing: "border-box",
             display: "grid",
             minHeight: "100svh",
@@ -522,7 +523,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     if (hasProfileLoadError) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -535,7 +536,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     ) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 preview={invitePreview ? "invite" : "home"}
             />
         );
@@ -546,7 +547,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             return (
                 <>
                     <SpacePageMeta
-                        themeColor={profileBackground}
+                        themeColor={spaceAppBackgroundColor}
                         preview="invite"
                     />
                     <PublicProfileUnavailable />
@@ -558,7 +559,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             profileLoadStatus == "loading" ||
             (profile && authenticatedProfileRouteStatus != "complete")
         ) {
-            return <SpaceRouteFallback background={profileBackground} />;
+            return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
         }
 
         if (authenticatedProfileRoute == "friend" && publicIdentity) {
@@ -571,11 +572,11 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         }
 
         if (authenticatedProfileRoute == "self") {
-            return <SpaceRouteFallback background={profileBackground} />;
+            return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
         }
 
         if (!publicIdentity) {
-            return <SpaceRouteFallback background={profileBackground} />;
+            return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
         }
 
         const inviteFriend = {
@@ -629,7 +630,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         return (
             <>
                 <SpacePageMeta
-                    themeColor={profileBackground}
+                    themeColor={spaceAppBackgroundColor}
                     preview="invite"
                 />
                 {publicLink ? (

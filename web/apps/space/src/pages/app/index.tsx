@@ -2,7 +2,7 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
-import { HomeScreen, homeBackground } from "screens/HomeScreen";
+import { HomeScreen } from "screens/HomeScreen";
 import {
     loadSpaceHomePosts,
     patchCachedSpaceHomePost,
@@ -21,6 +21,7 @@ import {
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { prepareSpacePostImageFromEdit } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -162,7 +163,7 @@ const Page: React.FC = () => {
     ) {
         return (
             <SpaceRouteFallback
-                background={homeBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -170,7 +171,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={homeBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <HomeScreen
                 latestPosts={latestPosts}
                 unreadPosts={unreadPosts}

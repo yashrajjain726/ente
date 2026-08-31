@@ -2,14 +2,13 @@ import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import React from "react";
+import { spaceAppBackground, spaceText } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
-
-export const passkeyVerificationBackground = "#FAFAFA";
 
 const green = "#08C225";
 const primaryLight = "#DDEEDF";
 const primaryDark = "#069D1E";
-const textBase = "#000";
+const textBase = spaceText;
 const warning = "#F63A3A";
 
 export type PasskeyVerificationStatus = "waiting" | "checking" | "pending";
@@ -52,7 +51,7 @@ export const PasskeyVerificationScreen: React.FC<
         <Box
             component="main"
             sx={{
-                bgcolor: passkeyVerificationBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -62,7 +61,7 @@ export const PasskeyVerificationScreen: React.FC<
         >
             <Box
                 sx={{
-                    bgcolor: passkeyVerificationBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -205,7 +204,7 @@ export const PasskeyVerificationScreen: React.FC<
 
                 <Box
                     sx={{
-                        bgcolor: passkeyVerificationBackground,
+                        bgcolor: "transparent",
                         bottom: 0,
                         boxSizing: "border-box",
                         display: "flex",

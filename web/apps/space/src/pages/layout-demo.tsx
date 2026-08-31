@@ -5,6 +5,7 @@ import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import { SpacePostUnreadBadge } from "components/PostUnreadBadge";
 import React from "react";
+import { spaceAppBackground } from "styles/colors";
 import {
     homeCircleGridLayout,
     homeCirclePlacements,
@@ -12,7 +13,6 @@ import {
     type HomeCirclePlacement,
 } from "utils/home-circle-layout";
 
-const background = "#0C1014";
 const headerChromeColor = "#202825";
 const headerHeight = 64;
 const layoutVerticalInset =
@@ -127,7 +127,7 @@ const LayoutDemoPage: React.FC = () => {
         <Box
             component="main"
             sx={{
-                bgcolor: background,
+                background: spaceAppBackground,
                 color: "#FFF",
                 height: "100svh",
                 overflow: "hidden",

@@ -3,10 +3,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import React from "react";
+import { spaceSurface, spaceText } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
-const textBase = "#000";
+const textBase = spaceText;
 const toastHorizontalPadding = "16px";
 const toastEnter = keyframes`
     from {
@@ -64,7 +65,7 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: "#FFFFFF",
+                bgcolor: spaceSurface,
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 boxSizing: "border-box",
@@ -137,7 +138,7 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
                         p: 0,
                         width: 36,
                         "&:focus-visible": {
-                            outline: "2px solid rgba(0 0 0 / 0.72)",
+                            outline: "2px solid rgba(255 255 255 / 0.72)",
                             outlineOffset: 2,
                         },
                     }}

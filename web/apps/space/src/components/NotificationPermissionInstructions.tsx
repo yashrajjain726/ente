@@ -2,10 +2,16 @@ import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import { isSpaceIOS } from "hooks/use-pwa-install-prompt";
 import React from "react";
+import {
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 
 const green = "#08C225";
-const textBase = "#000";
-const textSoft = "#777777";
+const textBase = spaceText;
+const textSoft = spaceTextMuted;
 
 interface SpaceNotificationPermissionInstructionsProps {
     mode?: "brave-push" | "permission";
@@ -53,7 +59,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: "#FFFFFF",
+                        bgcolor: spaceSurface,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "0 -18px 44px rgba(0, 0, 0, 0.18)",
@@ -122,7 +128,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
                             key={step}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#FAFAFA",
+                                bgcolor: spaceSurfaceHover,
                                 borderRadius: "18px",
                                 color: textSoft,
                                 display: "flex",

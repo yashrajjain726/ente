@@ -32,6 +32,13 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpaceInviteIntent } from "services/invite";
 import { openSpaceShareLinkDialog } from "services/share-link";
 import { isSpaceContentError, type SpacePostAsset } from "services/space";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
 import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
@@ -44,25 +51,23 @@ import {
 } from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
-export const profileBackground = "#FFFFFF";
-
 const green = "#08C225";
 const dangerColor = "#F63A3A";
-const textBase = "#000";
-const textStrong = "#303030";
-const textSoft = "#777777";
+const textBase = spaceText;
+const textStrong = spaceText;
+const textSoft = spaceTextMuted;
 const coverForeground = "#FFFFFF";
 const profileCoverBackground = "#1F1F1F";
 const profileCoverTopShadow =
     "linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.18) 36%, rgba(0, 0, 0, 0.08) 72%, rgba(0, 0, 0, 0) 100%)";
-const profileCoverSkeletonBackground = "#E6E6E6";
+const profileCoverSkeletonBackground = spaceSurface;
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
 const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "8px";
-const photoMasonryPlaceholderBackground = "#F2F2F2";
+const photoMasonryPlaceholderBackground = spaceSurface;
 const photoMasonryRadius = "14px";
 const profileCoverRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
@@ -1017,7 +1022,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: profileBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -1031,7 +1036,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             )}
             <Box
                 sx={{
-                    bgcolor: profileBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -1516,7 +1521,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     slotProps={{
                                         paper: {
                                             sx: {
-                                                bgcolor: "#FFFFFF",
+                                                bgcolor: spaceSurface,
                                                 borderRadius: "14px",
                                                 boxShadow:
                                                     "0 14px 40px rgba(0, 0, 0, 0.16)",
@@ -1549,16 +1554,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 py: "4px",
                                                 whiteSpace: "nowrap",
                                                 "&.Mui-focusVisible": {
-                                                    bgcolor:
-                                                        "rgba(0, 0, 0, 0.04)",
+                                                    bgcolor: spaceSurfaceHover,
                                                 },
                                                 "&:active": {
-                                                    bgcolor:
-                                                        "rgba(0, 0, 0, 0.04)",
+                                                    bgcolor: spaceSurfaceHover,
                                                 },
                                                 "&:hover": {
-                                                    bgcolor:
-                                                        "rgba(0, 0, 0, 0.04)",
+                                                    bgcolor: spaceSurfaceHover,
                                                 },
                                             }}
                                         >
