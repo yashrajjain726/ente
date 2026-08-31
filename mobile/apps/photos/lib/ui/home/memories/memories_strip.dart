@@ -45,17 +45,13 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   final _scrollController = ScrollController();
   bool _shouldShowCraftingMemories = false;
   late Future<void> _shouldShowCraftingMemoriesLoaded;
-  late final List<SmartMemory> _initialMemories;
+  late List<SmartMemory> _initialMemories;
   late Future<List<SmartMemory>> _memories;
 
   @override
   void initState() {
     super.initState();
-    _initialMemories = _sortMemories(
-      (memoriesCacheService.currentMemoriesSync ?? [])
-          .where((memory) => memory.shouldShowNow())
-          .toList(),
-    );
+    _initialMemories = _getInitialMemories();
     _shouldShowCraftingMemoriesLoaded = CraftingMemoriesCardWidget.shouldShow()
         .then((value) {
           _shouldShowCraftingMemories = value;
@@ -166,6 +162,14 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     return indexedMemories.map((entry) => entry.$2).toList();
   }
 
+  List<SmartMemory> _getInitialMemories() {
+    return _sortMemories(
+      (memoriesCacheService.currentMemoriesSync ?? [])
+          .where((memory) => memory.shouldShowNow())
+          .toList(),
+    );
+  }
+
   List<MemoryCardWrapper> _buildCards(
     List<SmartMemory> memories,
     double cardHeight,
@@ -201,8 +205,12 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     ];
   }
 
-  void _fetchMemories(Event? _) {
+  void _fetchMemories(Event? event) {
     setState(() {
+      if (event is MemoriesSettingChanged &&
+          memoriesCacheService.showAnyMemories) {
+        _initialMemories = _getInitialMemories();
+      }
       _memories = memoriesCacheService
           .getMemories()
           .then(_sortMemories)
