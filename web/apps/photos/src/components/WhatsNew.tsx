@@ -73,12 +73,12 @@ const ChangelogContent: React.FC = () => {
         <Stack sx={{ gap: 2, mb: 1 }}>
             <Typography variant="h6">
                 {ut(
-                    "Better upload and family plan management experience, smarter Takeout imports, and more",
+                    "Smarter album management, improved authentication, faster ML indexing, and more",
                 )}
             </Typography>
             <Typography sx={{ color: "text.muted" }}>
                 {ut(
-                    "Redesigned upload experience. Google Takeout options for favorites and partner-shared photos. Manage your family plan in-app. Search people by name when tagging, and more.",
+                    "Add album description, add hidden photos to hidden albums, find photos without location data, share referral codes, and faster hardware-accelerated ML indexing.",
                 )}
             </Typography>
         </Stack>
