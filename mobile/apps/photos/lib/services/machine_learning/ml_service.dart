@@ -464,6 +464,11 @@ class MLService {
         _logRunStopped(control, "before post-run cache scheduling");
         return MlRunDisposition.stopped;
       }
+      await PersonService.instance.sync();
+      if (control.stopRequested) {
+        _logRunStopped(control, "after post-run person sync");
+        return MlRunDisposition.stopped;
+      }
       if (_mlControllerStatus == true) {
         await magicCacheService.updateCache(forced: force);
         if (control.stopRequested) {
