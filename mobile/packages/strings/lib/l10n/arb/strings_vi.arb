@@ -150,6 +150,10 @@
       "storageAmount": {}
     }
   },
+  "addPage": "Thêm trang",
+  "@addPage": {
+    "description": "Button to capture another page in the document scanner"
+  },
   "addParticipants": "Thêm người tham gia",
   "addPeopleWidgetPrompt": "Thêm một widget người vào màn hình chính để tùy chỉnh nó ở đây.",
   "addPerson": "Thêm người",
@@ -180,6 +184,7 @@
   },
   "addYourPhotosNow": "Thêm ảnh của bạn ngay bây giờ",
   "adjust": "Điều chỉnh",
+  "adjustCrop": "Điều chỉnh khung hình",
   "admin": "Quản trị",
   "admins": "Quản trị viên",
   "adminsAndCollaboratorsCanAddPhotosDescription": "Quản trị viên và cộng tác viên có thể thêm ảnh. Quản trị viên có thể quản lý ảnh và người tham gia.",
@@ -456,6 +461,33 @@
   "backupFile": "Sao lưu tệp",
   "backupFolderLabel": "Thư mục sao lưu:",
   "backupLocationChoiceDescription": "Bạn muốn lưu bản sao lưu của mình ở đâu?",
+  "backupMode": "Chế độ sao lưu",
+  "backupModeBackingUpItems": "{count, plural, other{Đang sao lưu {formattedCount} mục}}",
+  "@backupModeBackingUpItems": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "12546"
+      },
+      "formattedCount": {
+        "type": "String",
+        "example": "12,546"
+      }
+    }
+  },
+  "backupModeCheckingForMoreItems": "Đang kiểm tra các mục khác",
+  "backupModeFinishYourBackup": "Hoàn tất quá trình sao lưu của bạn",
+  "backupModeKeepAppOpen": "Giữ ứng dụng mở",
+  "backupModeNoBackupInProgress": "Không có quá trình sao lưu nào đang diễn ra",
+  "backupModeNoBackupInProgressDescription": "Bắt đầu sao lưu, sau đó quay lại chế độ sao lưu.",
+  "backupModePlugInPhone": "Hãy cắm sạc điện thoại. Việc sao lưu tốn pin.",
+  "backupModePreservingYourMemories": "Lưu giữ kỷ niệm của bạn",
+  "backupModeScreenDimmingDescription": "Màn hình sẽ mờ đi để tiết kiệm pin. Chạm vào màn hình bất cứ lúc nào để quay lại.",
+  "backupModeScreenWillDim": "Màn hình sẽ mờ đi để tiết kiệm pin",
+  "backupModeSettingsDescription": "Hãy giữ ứng dụng mở để hoàn tất quá trình sao lưu",
+  "backupModeStart": "Bắt đầu chế độ sao lưu",
+  "backupModeStayInEnte": "Hãy giữ ứng dụng Ente chạy. Việc chuyển sang ứng dụng khác sẽ tạm dừng quá trình sao lưu.",
+  "backupModeTapToWakeScreen": "Nhấn để đánh thức màn hình",
   "backupOnlyNewPhotos": "Sao lưu chỉ những ảnh mới",
   "backupOnlyNewPhotosAllFoldersSelected": "Tất cả các thư mục hiện đã được chọn để sao lưu.\n\nBạn có thể tiếp tục ngay bây giờ, hoặc cập nhật các thư mục đã chọn.",
   "backupOnlyNewPhotosNoFoldersSelectedContinue": "Hiện chưa có thư mục nào được chọn để sao lưu.\n\nBạn có thể tiếp tục hoặc cập nhật các thư mục đã chọn.",
@@ -494,6 +526,7 @@
   "camera": "Máy ảnh",
   "campingMoments": "Kỷ niệm cắm trại",
   "cancel": "Hủy",
+  "back": "Quay lại",
   "@cancel": {
     "description": "Cancel button label"
   },
@@ -1058,11 +1091,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Vô hiệu hóa khóa màn hình thiết bị khi Ente đang ở chế độ nền và có một bản sao lưu đang diễn ra. Điều này thường không cần thiết, nhưng có thể giúp tải lên các tệp lớn và tệp nhập của các thư viện lớn xong nhanh hơn.",
   "deviceNotFound": "Không tìm thấy thiết bị",
   "didYouKnow": "Bạn có biết?",
   "digits": "Chữ số",
-  "disableAutoLock": "Vô hiệu hóa khóa tự động",
   "disableBackup": "Tắt tính năng sao lưu",
   "disableDownloadWarningBody": "Người xem vẫn có thể chụp màn hình hoặc sao chép ảnh của bạn bằng các công cụ bên ngoài",
   "disableDownloadWarningTitle": "Xin lưu ý",
@@ -1565,6 +1596,16 @@
     }
   },
   "fileSavedToGallery": "Tệp đã được lưu vào thư viện",
+  "filesCanBeRestoredFromTrash": "{count, plural, other{Mục chưa sao lưu. Có thể khôi phục từ Thùng rác.}}",
+  "@filesCanBeRestoredFromTrash": {
+    "description": "Delete confirmation message for device-only items that will be moved to trash.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "filesDeleted": "Tệp đã bị xóa",
   "filesInAlbumSafelyOnEnte": "{count, plural, other {Toàn bộ {formattedNumber} mục trong album đã được sao lưu trên Ente, xóa các bản sao trên thiết bị để giải phóng dung lượng.}}",
   "@filesInAlbumSafelyOnEnte": {
@@ -1946,6 +1987,123 @@
       }
     }
   },
+  "librarySharingAllCurrentAlbumsShared": "Tất cả album hiện tại của bạn đã được chia sẻ",
+  "librarySharingBannerDescription": "Chia sẻ tất cả album của bạn",
+  "librarySharingDisable": "Vô hiệu hóa",
+  "librarySharingDisableDescription": "Những album bạn đã chia sẻ sẽ vẫn được chia sẻ với {recipient}, bao gồm cả những ảnh mới mà bạn thêm vào đó. Các album mới sẽ không được tự động chia sẻ.\n\nĐể ngừng chia sẻ một album, hãy nhấn vào album đó và chọn '{stopSharingLabel}'.",
+  "@librarySharingDisableDescription": {
+    "placeholders": {
+      "recipient": {
+        "type": "String",
+        "example": "Alex"
+      },
+      "stopSharingLabel": {
+        "type": "String",
+        "example": "Stop sharing"
+      }
+    }
+  },
+  "librarySharingDisableTitle": "Vô hiệu hóa chia sẻ thư viện?",
+  "librarySharingEnableDescription": "Những album hiện có của bạn và mọi album bạn tạo trong tương lai sẽ tự động được chia sẻ với {recipient}.",
+  "@librarySharingEnableDescription": {
+    "placeholders": {
+      "recipient": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "librarySharingEnableTitle": "Bật chia sẻ album?",
+  "librarySharingFailedAlbumCount": "{count, plural, other{Không thể cập nhật {count} album.}}",
+  "@librarySharingFailedAlbumCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingFailedDescription": "Không thể cập những album đã chọn.",
+  "librarySharingFailedTitle": "Chia sẻ thất bại",
+  "librarySharingHiddenAlbumsDescription": "Album ẩn sẽ không được chia sẻ. Bạn có thể ngừng chia sẻ bất kỳ album nào vào bất kỳ lúc nào.",
+  "librarySharingMemberSubtitle": "{count, plural, =0{Chưa chia sẻ album nào • {storageUsage}} other{{count} album đã chia sẻ • {storageUsage}}}",
+  "@librarySharingMemberSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      },
+      "storageUsage": {
+        "type": "String",
+        "example": "2 GB"
+      }
+    }
+  },
+  "librarySharingMixed": "Hỗn hợp",
+  "librarySharingNoAlbumsToShare": "Chưa có album nào để chia sẻ",
+  "librarySharingPreviouslyUnsharedDescription": "{count, plural, other{Việc chia sẻ đã bị dừng đối với các album này trước đó nên chúng không được chia sẻ lại.}}",
+  "@librarySharingPreviouslyUnsharedDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingPreviouslyUnsharedTitle": "{count, plural, other{{count} album đã không được chia sẻ}}",
+  "@librarySharingPreviouslyUnsharedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingRetryFailedAlbums": "Thử lại các album không thành công",
+  "librarySharingRole": "Vai trò",
+  "librarySharingRoles": "Vai trò",
+  "librarySharingShareAlbumCount": "{count, plural, other{Chia sẻ {count} album}}",
+  "@librarySharingShareAlbumCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingShareAlbums": "Chia sẻ album",
+  "librarySharingSharedAlbumCount": "{count, plural, =0{Chưa chia sẻ album nào} other{{count} album đã chia sẻ}}",
+  "@librarySharingSharedAlbumCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingShareWith": "Chia sẻ với",
+  "librarySharingSharingWith": "Đang chia sẻ với",
+  "librarySharingStopSharing": "Ngừng chia sẻ",
+  "librarySharingStopSharingDescription": "{count, plural, other{Họ sẽ mất những album này và mọi ảnh họ đã thêm sẽ được giữ lại. Bạn có thể chia sẻ lại sau.}}",
+  "@librarySharingStopSharingDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingStopSharingTitle": "{count, plural, other{Ngừng chia sẻ {count} album?}}",
+  "@librarySharingStopSharingTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingTitle": "Chia sẻ thư viện",
+  "librarySharingUpdateRoles": "Cập nhật vai trò",
   "limit": "Giới hạn",
   "linkCopiedToClipboard": "Liên kết đã được sao chép vào bộ nhớ tạm",
   "linkDeletedSuccessfully": "Xóa liên kết thành công",
@@ -2505,6 +2663,8 @@
   },
   "pets": "Thú cưng",
   "photoGridSize": "Kích thước lưới ảnh",
+  "photoLibraryAddPermissionRequired": "Ente cần quyền lưu ảnh và video vào Apple Photos. Bạn có thể cấp quyền truy cập trong phần Cài đặt.",
+  "photoLibraryAddPermissionRestricted": "Quyền truy cập Thư viện ảnh bị hạn chế trên thiết bị này.",
   "photos": "Ảnh",
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Ảnh bạn đã thêm sẽ bị xóa khỏi album",
   "photosCount": "{count, plural, =0{Chưa có ảnh} other{{count} ảnh}}",
@@ -2565,6 +2725,7 @@
       }
     }
   },
+  "playbackSpeed": "Tốc độ phát",
   "playfulKids": "Trẻ em vui chơi",
   "playOriginal": "Phát tệp gốc",
   "playstoreSubscription": "Gói PlayStore",
@@ -2788,9 +2949,14 @@
   "referrals": "Giới thiệu bạn bè",
   "referralsAreCurrentlyPaused": "Giới thiệu hiện đang tạm dừng",
   "referralStats": "Thống kê lượt giới thiệu",
-  "referralStep1": "1. Tùy chỉnh và chia sẻ mã của bạn.",
-  "referralStep2": "2. Họ đăng ký Ente bằng mã của bạn.",
-  "referralStep3": "3. {storageInGB}GB miễn phí cho họ + {storageInGB}GB cho bạn khi bạn nâng cấp.",
+  "referralStep1": "1. Chia sẻ mã của bạn với bạn bè",
+  "referralStep2": "2. Họ nhận thêm {storageInGB} GB khi đăng ký",
+  "@referralStep2": {
+    "placeholders": {
+      "storageInGB": {}
+    }
+  },
+  "referralStep3": "3. Bạn nhận thêm {storageInGB} GB khi họ nâng gói",
   "@referralStep3": {
     "placeholders": {
       "storageInGB": {}
@@ -2942,6 +3108,14 @@
     "description": "Display text for an action which triggers a restore of item from trash",
     "type": "text"
   },
+  "restoredItems": "{count, plural, other{Đã khôi phục {count} mục}}",
+  "@restoredItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "restoreToAlbum": "Khôi phục vào album",
   "restoringFiles": "Đang khôi phục tệp...",
   "resumableUploads": "Cho phép tiếp tục tải lên",
@@ -3052,8 +3226,7 @@
   "saveCollage": "Lưu ảnh ghép",
   "saveContact": "Lưu liên hệ",
   "saveCopy": "Lưu bản sao",
-  "saveDocumentDescription": "Tai len cac tai lieu quan trong.",
-  "saveDocumentTitle": "Tai lieu",
+  "saveFileDescription": "Tải lên những tài liệu quan trọng.",
   "saveKey": "Lưu mã",
   "@saveKey": {
     "description": "Save key button label"
@@ -3069,6 +3242,9 @@
   "scanCode": "Quét mã",
   "scannerTorchOff": "Tắt đèn flash",
   "scannerTorchOn": "Bật đèn flash",
+  "scannerCapture": "Chụp",
+  "scannerPreparing": "Chuẩn bị quét...",
+  "scanProcessing": "Tiến hành quét...",
   "scanThisBarcodeWithnyourAuthenticatorApp": "Quét mã vạch này bằng\nứng dụng xác thực của bạn",
   "scheduleShare": "Len lich chia se",
   "search": "Tìm kiếm",
@@ -3322,7 +3498,7 @@
   "share": "Chia sẻ",
   "shareALink": "Chia sẻ một liên kết",
   "shareAnAlbum": "Chia sẻ một album",
-  "shareCodeEarnStorage": "Chia sẻ mã, nhận dung lượng.",
+  "shareCodeEarnStorage": "Nhân đôi dung lượng Ente của bạn",
   "shareCodes": "Chia sẻ mã",
   "shareCodesDuration": "Chọn thời hạn bạn muốn chia sẻ mã.",
   "shareCollection": "Chia sẻ bộ sưu tập",
@@ -3372,11 +3548,10 @@
   },
   "shareTextRecommendUsingEnteForFamily": "Tải Ente để tôi có thể thêm bạn vào gói gia đình\n\nhttps://ente.com",
   "shareTextRecommendUsingEnteForPhotos": "Tải Ente để chúng ta có thể dễ dàng chia sẻ ảnh và video chất lượng gốc\n\nhttps://ente.com",
-  "shareTextReferralCode": "Ente Photos là nơi lưu trữ ảnh riêng tư và an toàn của bạn\n* Tải xuống Ente Photos từ https://ente.com/app\n* Tạo tài khoản\n* Áp mã giới thiệu {referralCode} trong Cài đặt->Giới thiệu bạn bè\n* Nhận thêm {referralStorageInGB} GB miễn phí!",
-  "@shareTextReferralCode": {
+  "shareTextReferralInvite": "Nhận miễn phí 20 GB với Ente Photos! Tải ứng dụng tại https://ente.com/invite và sử dụng mã {referralCode}.",
+  "@shareTextReferralInvite": {
     "placeholders": {
-      "referralCode": {},
-      "referralStorageInGB": {}
+      "referralCode": {}
     }
   },
   "shareThisLink": "Lien ket nay cho phep bat ky ai nhan duoc truy cap muc cua ban. Ban co the xoa quyen truy cap bat ky luc nao bang cach xoa lien ket.",
@@ -3800,7 +3975,7 @@
   },
   "unarchiveAlbum": "Bỏ lưu trữ album",
   "unarchiving": "Đang bỏ lưu trữ...",
-  "unavailableReferralCode": "Rất tiếc, mã này không khả dụng.",
+  "unavailableReferralCode": "Mã này đã được dùng",
   "uncategorized": "Chưa phân loại",
   "uncategorizedItemsWillShowUpHere": "Những mục chưa phân loại sẽ hiển thị ở đây",
   "undo": "Hoàn tác",
@@ -4119,6 +4294,7 @@
   "yourPlanWasSuccessfullyDowngraded": "Gói của bạn đã được hạ cấp thành công",
   "yourPlanWasSuccessfullyUpgraded": "Gói của bạn đã được nâng cấp thành công",
   "yourPurchaseWasSuccessful": "Bạn đã giao dịch thành công",
+  "yourReferralCode": "Nhập mã giới thiệu",
   "yourSubscriptionHasExpired": "Gói của bạn đã hết hạn",
   "yourSubscriptionWasUpdatedSuccessfully": "Gói của bạn đã được cập nhật thành công",
   "yourTrashIsEmpty": "Thung rac cua ban trong",

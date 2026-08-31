@@ -460,11 +460,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "عطّل قفل شاشة الجهاز عندما يكون Ente قيد التشغيل في المقدمة ويقوم بالنسخ الاحتياطي.\nهذا الإجراء غير مطلوب عادةً، لكنه قد يسرّع إكمال التحميلات الكبيرة أو الاستيرادات الأولية للمكتبات الضخمة.",
   "deviceNotFound": "لم يتم العثور على الجهاز",
   "didYouKnow": "هل تعلم؟",
   "digits": "الأرقام",
-  "disableAutoLock": "تعطيل القفل التلقائي",
   "disableDownloadWarningBody": "لا يزال بإمكان المشاهدين التقاط لقطات شاشة أو حفظ نسخة من صورك باستخدام أدوات خارجية",
   "disableDownloadWarningTitle": "يرجى الملاحظة",
   "disableLinkMessage": "سيؤدي هذا إلى إزالة الرابط العام للوصول إلى \"{albumName}\".",
@@ -1557,8 +1555,6 @@
   "saveChangesBeforeLeavingQuestion": "حفظ التغييرات قبل المغادرة؟",
   "saveCollage": "حفظ الكولاج",
   "saveCopy": "حفظ نسخة",
-  "saveDocumentDescription": "ارفع المستندات المهمة.",
-  "saveDocumentTitle": "مستند",
   "saveKey": "حفظ المفتاح",
   "@saveKey": {
     "description": "Save key button label"
@@ -1988,7 +1984,6 @@
   },
   "unarchiveAlbum": "إلغاء أرشفة الألبوم",
   "unarchiving": "جارٍ إلغاء الأرشفة...",
-  "unavailableReferralCode": "عذرًا، هذا الرمز غير متوفر.",
   "uncategorized": "غير مصنف",
   "undo": "تراجع",
   "unhide": "إظهار",
