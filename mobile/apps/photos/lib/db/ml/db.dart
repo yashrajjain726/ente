@@ -1252,6 +1252,23 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   @override
+  Future<void> deleteUnclusteredFaceIndexForFiles(List<int> fileIDs) async {
+    if (fileIDs.isEmpty) return;
+    final db = await asyncDB;
+    for (final chunk in fileIDs.chunks(_maxSqlBindParamsPerQuery)) {
+      final placeholders = List.filled(chunk.length, '?').join(', ');
+      await db.execute('''
+        DELETE FROM $facesTable
+        WHERE $fileIDColumn IN ($placeholders)
+        AND NOT EXISTS (
+          SELECT 1 FROM $faceClustersTable
+          WHERE $faceClustersTable.$faceIDColumn = $facesTable.$faceIDColumn
+        )
+        ''', chunk);
+    }
+  }
+
+  @override
   Future<int> getClusteredOrFacelessFileCount() async {
     final db = await asyncDB;
     final List<Map<String, dynamic>> clustered = await db.getAll(

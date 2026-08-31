@@ -731,6 +731,24 @@ class MLService {
         'and ${missingFileIDs.length} missing fileIDs',
       );
 
+      if (missingFileIDs.isNotEmpty) {
+        await mlDataDB.deleteUnclusteredFaceIndexForFiles(
+          missingFileIDs.toList(),
+        );
+        _logger.info(
+          'Pruned unclustered face data for ${missingFileIDs.length} missing files',
+        );
+      }
+
+      if (allFaceInfoForClustering.every((face) => face.clusterId != null)) {
+        _logger.info('All faces clustered');
+        _logger.info(
+          'clusterAllImages() finished, in '
+          '${DateTime.now().difference(clusterAllImagesTime).inSeconds} seconds',
+        );
+        return;
+      }
+
       final Map<String, (Uint8List, int)> oldClusterSummaries = await mlDataDB
           .getAllClusterSummary();
 
