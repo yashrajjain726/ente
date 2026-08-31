@@ -514,8 +514,10 @@
   "birthday": "Birthday",
   "birthdayJoy": "Birthday joy",
   "birthdays": "Birthdays",
+  "black": "Black",
   "blockLegacyKitRecoveryMessage": "Block the current recovery attempt\nNote that they can start a new recovery attempt",
   "blog": "Blog",
+  "blurred": "Blurred",
   "bothIssuerAndAccountCanNotBeEmpty": "Both issuer and account can not be empty",
   "bringYourFamilyAlong": "Bring your family along",
   "browseHelpPages": "Browse help pages",
@@ -2004,6 +2006,7 @@
   "informationTypes": "Information types",
   "informationTypesDesc": "Documents, notes, cards, passwords, and other item types",
   "initialBackupCreated": "Initial backup created!",
+  "inOrder": "In order",
   "insecureDevice": "Insecure device",
   "@insecureDevice": {
     "description": "Insecure device warning title"
@@ -2948,6 +2951,7 @@
   "photoGridSize": "Photo grid size",
   "photoLibraryAddPermissionRequired": "Ente needs permission to save photos and videos to Apple Photos. You can allow access in Settings.",
   "photoLibraryAddPermissionRestricted": "Photo Library access is restricted on this device.",
+  "photoOrder": "Photo order",
   "photos": "Photos",
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Photos added by you will be removed from the album",
   "photosAndVideosCount": "{count, plural, one{{formattedCount} photo & video} other{{formattedCount} photos & videos}}",
@@ -3714,6 +3718,15 @@
     }
   },
   "searchSettings": "Search settings",
+  "secondsCount": "{count, plural, one{{count} second} other{{count} seconds}}",
+  "@secondsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "5"
+      }
+    }
+  },
   "secret": "Secret",
   "secretCanNotBeEmpty": "Secret can not be empty",
   "security": "Security",
@@ -4000,6 +4013,7 @@
   "showPerson": "Show person",
   "showQRAuthMessage": "Authenticate to show QR code",
   "showTextOnWidget": "Show text on widget",
+  "shuffle": "Shuffle",
   "sigInBackupReminder": "Ente will automatically backup codes after sign-in.\n\nWe still recommend exporting codes as an extra backup.",
   "signInToBackup": "Sign in to backup your codes",
   "signOutFromOtherDevices": "Sign out from other devices",
@@ -4044,6 +4058,8 @@
   },
   "skip": "Skip",
   "skippedFiles": "Skipped files",
+  "slideshow": "Slideshow",
+  "slideshowSettings": "Slideshow settings",
   "smartMemories": "Smart memories",
   "smartSuggestions": "Smart suggestions",
   "snowAdventures": "Winter adventures",
@@ -4304,6 +4320,7 @@
       "name": {}
     }
   },
+  "timePerPhoto": "Time per photo",
   "title": "Title",
   "todaysLogs": "Today's logs",
   "toEnableAppLockPleaseSetupDevicePasscodeOrScreen": "To enable app lock, please setup device passcode or screen lock in your system settings.",

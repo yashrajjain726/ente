@@ -6,8 +6,10 @@ import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/configuration.dart";
+import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/models/collection/collection.dart";
+import "package:photos/models/file/file.dart";
 import "package:photos/models/metadata/common_keys.dart";
 import "package:photos/models/selected_albums.dart";
 import "package:photos/service_locator.dart";
@@ -20,6 +22,7 @@ import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/sharing/add_participant_page.dart";
+import "package:photos/ui/viewer/album_slideshow/album_slideshow.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/magic_util.dart";
 
@@ -98,6 +101,17 @@ class _AlbumSelectionActionWidgetState
           onTap: _shareCollection,
         ),
       );
+    }
+
+    items.add(
+      SelectionActionButton(
+        labelText: context.strings.slideshow,
+        hugeIcon: HugeIcons.strokeRoundedPresentation03,
+        onTap: _startAlbumSlideshow,
+      ),
+    );
+
+    if (showOwnerActions) {
       items.add(
         SelectionActionButton(
           labelText: context.strings.pin,
@@ -272,6 +286,39 @@ class _AlbumSelectionActionWidgetState
       AddParticipantPage(widget.selectedAlbums.albums.toList(), actions),
     );
     widget.selectedAlbums.clearAll();
+  }
+
+  Future<void> _startAlbumSlideshow() async {
+    final albums = widget.selectedAlbums.albums.toList(growable: false);
+    final dialog = createProgressDialog(context, context.strings.pleaseWait);
+    await dialog.show();
+
+    final files = <EnteFile>[];
+    try {
+      for (final album in albums) {
+        final fileResult = await FilesDB.instance.getFilesInCollection(
+          album.id,
+          galleryLoadStartTime,
+          galleryLoadEndTime,
+          asc: album.pubMagicMetadata.asc ?? false,
+        );
+        files.addAll(fileResult.files);
+      }
+    } finally {
+      await dialog.hide();
+    }
+    if (!mounted) return;
+
+    final opened = await showAlbumSlideshow(
+      context,
+      files: files,
+      title: albums.length == 1
+          ? albums.single.displayName
+          : context.strings.slideshow,
+    );
+    if (opened && mounted) {
+      widget.selectedAlbums.clearAll();
+    }
   }
 
   Future<void> _trashCollection() async {
