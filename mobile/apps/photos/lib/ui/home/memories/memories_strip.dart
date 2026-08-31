@@ -102,7 +102,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     return FutureBuilder(
       future: _memories,
       builder: (context, snapshot) {
-        final memories = snapshot.data ?? [];
+        final memories =
+            snapshot.data ??
+            _sortMemories(memoriesCacheService.currentMemoriesSync ?? []);
         if (memories.isEmpty) {
           return const SizedBox.shrink();
         }
