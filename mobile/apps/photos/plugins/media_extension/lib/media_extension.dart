@@ -15,7 +15,7 @@ class MediaExtension {
       MediaExtensionPlatform.instance.edit(uri, mimeType);
 
   Future<bool> openWith(String uri, String mimeType) =>
-      MediaExtensionPlatform.instance.edit(uri, mimeType);
+      MediaExtensionPlatform.instance.openWith(uri, mimeType);
 
   Future<MediaExtentionAction> getIntentAction() =>
       MediaExtensionPlatform.instance.getIntentAction();
