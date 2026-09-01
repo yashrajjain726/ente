@@ -1,5 +1,4 @@
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/feature-flags";
 import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
 import type { NewPasswordPresentationProps } from "ente-accounts/components/NewPasswordForm";
 import AccountsChangePasswordPage from "ente-accounts/pages/change-password";
@@ -16,10 +15,6 @@ function ResetPasswordPresentation(
 }
 
 function ChangePasswordPage(): React.JSX.Element {
-    if (!featureFlags.enableNewLockerAuthFlow) {
-        return <AccountsChangePasswordPage />;
-    }
-
     return (
         <AccountsChangePasswordPage
             resetPresentation={ResetPasswordPresentation}
