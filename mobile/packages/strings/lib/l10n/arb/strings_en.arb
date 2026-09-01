@@ -2605,6 +2605,10 @@
   "moveToAlbum": "Move to album",
   "moveToHiddenAlbum": "Move to hidden album",
   "movingFilesToAlbum": "Moving files to album...",
+  "muteAudio": "Mute audio",
+  "@muteAudio": {
+    "description": "Tooltip for muting audio in the memories viewer"
+  },
   "name": "Name",
   "nDays": "{count} days",
   "@nDays": {
@@ -4452,6 +4456,10 @@
   "unnamedPeopleSpotlight": "A familiar face",
   "unnamedPeopleThrowbackTogether": "Throwback together",
   "unnamedPeopleYouAndThem": "You two",
+  "unmuteAudio": "Unmute audio",
+  "@unmuteAudio": {
+    "description": "Tooltip for unmuting audio in the memories viewer"
+  },
   "unpin": "Unpin",
   "unpinnedCodeMessage": "{code} has been unpinned",
   "@unpinnedCodeMessage": {

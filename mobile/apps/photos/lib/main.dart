@@ -185,9 +185,7 @@ Future<void> _runInForeground(
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(SemanticSearchService.instance.init());
       unawaited(MemoryLaneService.instance.init());
-      if (flagService.internalUser) {
-        unawaited(MemoryMusicService.instance.prepare());
-      }
+      unawaited(MemoryMusicService.instance.prepare());
       unawaited(
         Future.delayed(
           const Duration(seconds: 5),

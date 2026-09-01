@@ -1089,8 +1089,8 @@ class _MemoryMusicMuteButton extends StatelessWidget {
       dimension: 48,
       child: IconButton(
         tooltip: isMuted
-            ? pendingTranslation("Unmute audio")
-            : pendingTranslation("Mute audio"),
+            ? context.strings.unmuteAudio
+            : context.strings.muteAudio,
         padding: const EdgeInsets.all(7),
         style: IconButton.styleFrom(
           shape: const CircleBorder(),
