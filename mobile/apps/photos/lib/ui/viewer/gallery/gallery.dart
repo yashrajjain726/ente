@@ -416,15 +416,17 @@ class GalleryState extends State<Gallery> {
     final sectionScrollOffset =
         _scrollController.offset - appBarCollapseExtent - _headerHeight;
     if (sectionScrollOffset < 0) return null;
-    final file = groups.getFileAtScrollOffset(sectionScrollOffset);
+    final anchorSectionOffset =
+        sectionScrollOffset + _pinnedGroupHeaderExtent(groups);
+    final file = groups.getFileAtScrollOffset(anchorSectionOffset);
     if (file == null) return null;
     final geometry = groups.getGeometryOfFile(file);
     if (geometry == null) return null;
 
-    final inHeader = sectionScrollOffset < geometry.rowOffset;
+    final inHeader = anchorSectionOffset < geometry.rowOffset;
     final offset = inHeader
-        ? geometry.rowOffset - sectionScrollOffset
-        : sectionScrollOffset - geometry.rowOffset;
+        ? geometry.rowOffset - anchorSectionOffset
+        : anchorSectionOffset - geometry.rowOffset;
     final extent = inHeader ? geometry.headerExtent : geometry.rowExtent;
     final progress = extent > 0 && extent.isFinite
         ? (offset / extent).clamp(0.0, 1.0).toDouble()
@@ -440,7 +442,9 @@ class GalleryState extends State<Gallery> {
           _scrollController.positions.length != 1) {
         return;
       }
-      final geometry = galleryGroups?.getGeometryOfFile(anchor.file);
+      final groups = galleryGroups;
+      if (groups == null) return;
+      final geometry = groups.getGeometryOfFile(anchor.file);
       if (geometry == null) return;
       final appBarCollapseExtent =
           widget.appBar?.resolveGeometry(context).collapseExtent ?? 0;
@@ -450,9 +454,11 @@ class GalleryState extends State<Gallery> {
       final rowPenetration = (geometry.rowExtent * anchor.progress)
           .clamp(0.0, maxRowPenetration)
           .toDouble();
-      final sectionOffset = anchor.inHeader
+      final anchorSectionOffset = anchor.inHeader
           ? geometry.rowOffset - geometry.headerExtent * anchor.progress
           : geometry.rowOffset + rowPenetration;
+      final sectionOffset =
+          anchorSectionOffset - _pinnedGroupHeaderExtent(groups);
       final targetOffset =
           _scrollOffsetForSectionOffset(
             sectionOffset,
@@ -463,6 +469,13 @@ class GalleryState extends State<Gallery> {
           );
       _scrollController.jumpTo(targetOffset);
     });
+  }
+
+  double _pinnedGroupHeaderExtent(GalleryGroups groups) {
+    return groups.groupType.showGroupHeader() &&
+            !widget.disablePinnedGroupHeader
+        ? groups.groupHeaderExtent
+        : 0;
   }
 
   Future<double> _measureGroupHeaderExtent() async {

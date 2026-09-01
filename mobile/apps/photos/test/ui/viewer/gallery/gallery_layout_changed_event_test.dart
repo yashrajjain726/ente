@@ -14,6 +14,8 @@ import "package:photos/models/file_load_result.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
+import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dart";
+import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
@@ -232,6 +234,95 @@ void main() {
     await localSettings.setGalleryLayoutType(GalleryLayoutType.grid);
     await localSettings.setPhotoGridSize(4);
   });
+
+  testWidgets(
+    "a grouped layout change preserves progress below the pinned header",
+    (tester) async {
+      await localSettings.setGalleryLayoutType(GalleryLayoutType.grid);
+      await localSettings.setPhotoGridSize(6);
+      final galleryKey = GlobalKey<GalleryState>();
+      final files = List<EnteFile>.generate(180, _justifiedTestFile);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: lightThemeData,
+          localizationsDelegates: StringsLocalizations.localizationsDelegates,
+          supportedLocales: StringsLocalizations.supportedLocales,
+          home: Scaffold(
+            body: _galleryHost(
+              Gallery(
+                key: galleryKey,
+                asyncLoader: (start, end, {limit, asc}) async =>
+                    FileLoadResult(files, false),
+                tagPrefix: "pinned_anchor_",
+                groupType: GroupType.month,
+                limitSelectionToOne: true,
+                showSelectAll: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 750));
+      await tester.pump();
+
+      final oldGroups = galleryKey.currentState!.galleryGroups!;
+      final anchorFile = files[120];
+      final oldGeometry = oldGroups.getGeometryOfFile(anchorFile)!;
+      const rowProgress = 0.35;
+      final oldAnchorOffset =
+          oldGeometry.rowOffset +
+          oldGeometry.rowExtent * rowProgress -
+          oldGroups.groupHeaderExtent;
+      final scrollableFinder = find.descendant(
+        of: find.byType(CustomScrollView),
+        matching: find.byType(Scrollable),
+      );
+      expect(scrollableFinder, findsOneWidget);
+      final scrollPosition = tester
+          .state<ScrollableState>(scrollableFinder)
+          .position;
+      scrollPosition.jumpTo(oldAnchorOffset);
+      await tester.pump();
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is GroupHeaderWidget && widget.isPinnedHeader,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        oldGroups.getFileAtScrollOffset(
+          scrollPosition.pixels + oldGroups.groupHeaderExtent,
+        ),
+        same(anchorFile),
+      );
+
+      await localSettings.setPhotoGridSize(2);
+      Bus.instance.fire(GalleryLayoutChangedEvent());
+      await tester.pumpAndSettle();
+
+      final newGroups = galleryKey.currentState!.galleryGroups!;
+      final newGeometry = newGroups.getGeometryOfFile(anchorFile)!;
+      final expectedAnchorOffset =
+          newGeometry.rowOffset +
+          newGeometry.rowExtent * rowProgress -
+          newGroups.groupHeaderExtent;
+      expect(newGroups.groupHeaderExtent, isNot(oldGroups.groupHeaderExtent));
+      expect(scrollPosition.pixels, closeTo(expectedAnchorOffset, 0.001));
+      expect(
+        newGroups.getFileAtScrollOffset(
+          scrollPosition.pixels + newGroups.groupHeaderExtent,
+        ),
+        same(anchorFile),
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 100));
+      await localSettings.setPhotoGridSize(4);
+    },
+  );
 }
 
 Widget _galleryHost(Gallery gallery) {
