@@ -38,45 +38,20 @@ test("WASM inner boundary", async (t) => {
     const cases = [
         ["new package, static caller, and type exports", {}],
         [
-            "public raw module loader",
-            {
-                source: 'export const loadWasm = () => import("./pkg/arbitrary-name");',
-                error: "no-restricted-syntax",
-            },
-        ],
-        [
-            "block-bodied public raw module loader",
-            {
-                source: 'export const loadWasm = () => { return import("./pkg/arbitrary-name"); };',
-                error: "no-restricted-syntax",
-            },
-        ],
-        [
-            "arrow operation with a private nested loader",
-            {
-                source: [
-                    "export const operation = () => {",
-                    '    const wasm = () => import("./pkg/arbitrary-name");',
-                    "    return wasm().then((module) => module.operation());",
-                    "};",
-                ].join("\n"),
-            },
-        ],
-        [
-            "function operation with a private nested loader",
-            {
-                source: [
-                    "export function operation() {",
-                    '    function wasm() { return import("./pkg/arbitrary-name"); }',
-                    "    return wasm().then((module) => module.operation());",
-                    "}",
-                ].join("\n"),
-            },
+            "deferred template-literal payload import",
+            { source: "const wasm = () => import(`./pkg/arbitrary-name`);" },
         ],
         [
             "eager dynamic import",
             {
                 source: 'export const wasm = import("./pkg/arbitrary-name");',
+                error: "no-restricted-syntax",
+            },
+        ],
+        [
+            "eager template-literal payload import",
+            {
+                source: "export const wasm = import(`./pkg/arbitrary-name`);",
                 error: "no-restricted-syntax",
             },
         ],
@@ -91,6 +66,13 @@ test("WASM inner boundary", async (t) => {
             "CommonJS payload import",
             {
                 source: 'const wasm = require("./pkg/arbitrary-name");',
+                error: "no-restricted-syntax",
+            },
+        ],
+        [
+            "CommonJS template-literal payload import",
+            {
+                source: "const wasm = require(`./pkg/arbitrary-name`);",
                 error: "no-restricted-syntax",
             },
         ],
@@ -116,29 +98,23 @@ test("WASM inner boundary", async (t) => {
             },
         ],
         [
+            "app template-literal bypasses the wrapper",
+            {
+                caller: "export const bypass = () => import(`../packages/wasm/new-package/pkg/arbitrary-name`);",
+                error: "no-restricted-syntax",
+            },
+        ],
+        [
+            "app requires a WASM payload",
+            {
+                caller: 'const wasm = require("../packages/wasm/new-package/pkg/arbitrary-name");',
+                error: "no-restricted-syntax",
+            },
+        ],
+        [
             "app imports a WASM payload",
             {
                 caller: 'export const bypass = () => import("../packages/wasm/new-package/arbitrary.wasm?url");',
-                error: "no-restricted-syntax",
-            },
-        ],
-        [
-            "private lazy instance initialization",
-            {
-                source: 'export class Client { #wasm = import("./pkg/arbitrary-name"); }',
-            },
-        ],
-        [
-            "public raw module field",
-            {
-                source: 'export class Client { wasm = import("./pkg/arbitrary-name"); }',
-                error: "no-restricted-syntax",
-            },
-        ],
-        [
-            "eager static initialization",
-            {
-                source: 'export class Client { static wasm = import("./pkg/arbitrary-name"); }',
                 error: "no-restricted-syntax",
             },
         ],

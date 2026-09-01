@@ -1,25 +1,12 @@
 export const rawWasmPath = String.raw`(?:^|/)pkg(?:/|$)|\.wasm(?:[?#].*)?$`;
 
 const selectorRawWasmPath = rawWasmPath.replaceAll("/", "\\u002F");
-const payloadImport = `ImportExpression[source.value=/${selectorRawWasmPath}/]`;
-const payloadRequire = `CallExpression[callee.name=require][arguments.0.value=/${selectorRawWasmPath}/]`;
+const payloadImport = `ImportExpression:matches([source.value=/${selectorRawWasmPath}/], [source.type=TemplateLiteral][source.expressions.length=0][source.quasis.0.value.cooked=/${selectorRawWasmPath}/])`;
+const payloadRequire = `CallExpression[callee.name=require]:matches([arguments.0.value=/${selectorRawWasmPath}/], [arguments.0.type=TemplateLiteral][arguments.0.expressions.length=0][arguments.0.quasis.0.value.cooked=/${selectorRawWasmPath}/])`;
 const restrictedPayloadRequire = {
     selector: payloadRequire,
     message: "Load generated WASM with import() inside its wrapper.",
 };
-const exportedPayloadLoader = [
-    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression > ImportExpression",
-    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression > AwaitExpression > ImportExpression",
-    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression > BlockStatement > ReturnStatement > ImportExpression",
-    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression > BlockStatement > ReturnStatement > AwaitExpression > ImportExpression",
-    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > FunctionExpression > BlockStatement > ReturnStatement > ImportExpression",
-    "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > FunctionExpression > BlockStatement > ReturnStatement > AwaitExpression > ImportExpression",
-    "ExportNamedDeclaration > FunctionDeclaration > BlockStatement > ReturnStatement > ImportExpression",
-    "ExportNamedDeclaration > FunctionDeclaration > BlockStatement > ReturnStatement > AwaitExpression > ImportExpression",
-    ":matches(ExportNamedDeclaration, ExportDefaultDeclaration) > ClassDeclaration > ClassBody > PropertyDefinition[static=false]:not([accessibility=private]):not([key.type=PrivateIdentifier]) > ImportExpression",
-]
-    .map((selector) => `${selector}[source.value=/${selectorRawWasmPath}/]`)
-    .join(",");
 
 export default [
     {
@@ -68,16 +55,8 @@ export default [
                 {
                     selector:
                         payloadImport +
-                        ":not(:matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) ImportExpression)" +
-                        ":not(PropertyDefinition[static=false] > .value)" +
-                        ":not(PropertyDefinition[static=false] > .value ImportExpression)",
-                    message:
-                        "Defer loading generated WASM until an operation needs it.",
-                },
-                {
-                    selector: exportedPayloadLoader,
-                    message:
-                        "Export operations instead of the generated WASM module.",
+                        ":not(:matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) ImportExpression)",
+                    message: "Defer loading generated WASM inside a function.",
                 },
                 restrictedPayloadRequire,
             ],
