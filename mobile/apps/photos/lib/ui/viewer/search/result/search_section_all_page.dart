@@ -1,7 +1,6 @@
 import "dart:async";
 import "dart:math" as math;
 
-import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
@@ -18,8 +17,11 @@ import "package:photos/models/search/search_types.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/ui/components/thumbnail_list_item.dart";
 import "package:photos/ui/viewer/gallery/collection_page.dart";
+import "package:photos/ui/viewer/gallery/gallery_app_bar_actions.dart";
 import "package:photos/ui/viewer/search/result/magic_result_screen.dart";
 import "package:photos/ui/viewer/search/result/searchable_item.dart";
+
+enum _LocationSortKey { count, name }
 
 class SearchSectionAllPage extends StatefulWidget {
   final SectionType sectionType;
@@ -45,6 +47,8 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
   final _searchFocusNode = FocusNode();
   String _searchQuery = "";
   late bool _isSearchBarVisible;
+  var _locationSortKey = _LocationSortKey.count;
+  var _locationSortAscending = false;
 
   bool get _isSearching => _searchQuery.trim().isNotEmpty;
 
@@ -146,20 +150,28 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
             return _buildScaffoldBody(slivers, cacheExtent);
           }
 
-          List<SearchResult> sectionResults = snapshot.data!;
+          final sectionResults = [...snapshot.data!];
 
-          if (widget.sectionType.sortByName) {
+          if (widget.sectionType == SectionType.location) {
+            sectionResults.sort((a, b) {
+              final comparison = switch (_locationSortKey) {
+                _LocationSortKey.count => a.resultFiles().length.compareTo(
+                  b.resultFiles().length,
+                ),
+                _LocationSortKey.name => compareAsciiLowerCaseNatural(
+                  a.name(),
+                  b.name(),
+                ),
+              };
+              if (comparison != 0) {
+                return _locationSortAscending ? comparison : -comparison;
+              }
+              return compareAsciiLowerCaseNatural(a.name(), b.name());
+            });
+          } else if (widget.sectionType.sortByName) {
             sectionResults.sort(
               (a, b) => compareAsciiLowerCaseNatural(a.name(), b.name()),
             );
-          }
-
-          if (widget.sectionType == SectionType.location) {
-            final result = sectionResults.splitMatch(
-              (e) => e.type() == ResultType.location,
-            );
-            sectionResults = result.matched;
-            sectionResults.addAll(result.unmatched);
           }
 
           final filteredResults = _filterResults(sectionResults);
@@ -339,6 +351,13 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
             dimension: _titleActionSize,
             child: _buildSearchAction(),
           ),
+          if (widget.sectionType == SectionType.location) ...[
+            const SizedBox(width: Spacing.sm),
+            SizedBox.square(
+              dimension: _titleActionSize,
+              child: _buildLocationSortAction(),
+            ),
+          ],
         ],
       ),
     );
@@ -351,6 +370,54 @@ class _SearchSectionAllPageState extends State<SearchSectionAllPage> {
       icon: const HugeIcon(icon: HugeIcons.strokeRoundedSearch01),
       onTap: _activateSearch,
     );
+  }
+
+  Widget _buildLocationSortAction() {
+    return galleryAppBarPopupMenuAction<_LocationSortKey>(
+      icon: const HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal),
+      tooltip: context.strings.sort,
+      optionsBuilder: _locationSortOptions,
+      onSelected: _setLocationSortMode,
+    );
+  }
+
+  List<EntePopupMenuOption<_LocationSortKey>> _locationSortOptions() {
+    final colors = context.componentColors;
+    final strings = context.strings;
+    final activeDirection = HugeIcon(
+      icon: _locationSortAscending
+          ? HugeIcons.strokeRoundedArrowUp02
+          : HugeIcons.strokeRoundedArrowDown02,
+      size: 12,
+      strokeWidth: 3,
+      color: colors.textLight,
+    );
+
+    return [
+      EntePopupMenuOption(
+        value: _LocationSortKey.count,
+        label: strings.count,
+        isActive: _locationSortKey == _LocationSortKey.count,
+        activeTrailingWidget: activeDirection,
+      ),
+      EntePopupMenuOption(
+        value: _LocationSortKey.name,
+        label: strings.name,
+        isActive: _locationSortKey == _LocationSortKey.name,
+        activeTrailingWidget: activeDirection,
+        showDivider: false,
+      ),
+    ];
+  }
+
+  void _setLocationSortMode(_LocationSortKey key) {
+    final ascending = key == _locationSortKey
+        ? !_locationSortAscending
+        : key == _LocationSortKey.name;
+    setState(() {
+      _locationSortKey = key;
+      _locationSortAscending = ascending;
+    });
   }
 
   Widget _buildSearchField(BuildContext context) {
