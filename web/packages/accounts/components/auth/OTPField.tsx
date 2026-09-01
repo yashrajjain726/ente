@@ -210,12 +210,12 @@ const OTPFieldRoot = styled("div")({
     display: "flex",
     flexDirection: "column",
     gap: "16px",
-    "&:focus-within > span": { color: "var(--locker-auth-text)" },
+    "&:focus-within > span": { color: "var(--auth-ui-text)" },
 });
 
 const OTPLabel = styled("span")({
     ...authMiniTypography,
-    color: "var(--locker-auth-text-muted)",
+    color: "var(--auth-ui-text-muted)",
     transition: "color 100ms ease-in",
     "@media (prefers-reduced-motion: reduce)": { transition: "none" },
 });
@@ -248,17 +248,17 @@ const OTPInput = styled(
     fontWeight: 600,
     lineHeight: 1,
     textAlign: "center",
-    color: "var(--locker-auth-text)",
-    backgroundColor: "var(--locker-auth-field)",
+    color: "var(--auth-ui-text)",
+    backgroundColor: "var(--auth-ui-field)",
     boxShadow: `inset 0 0 0 1px ${
-        $error ? "var(--locker-auth-warning)" : "var(--locker-auth-stroke)"
+        $error ? "var(--auth-ui-warning)" : "var(--auth-ui-stroke)"
     }`,
     outline: 0,
     cursor: "text",
     transition: "box-shadow 0.2s ease",
     "&:focus": {
         boxShadow: `inset 0 0 0 1px ${
-            $error ? "var(--locker-auth-warning)" : "var(--locker-auth-primary)"
+            $error ? "var(--auth-ui-warning)" : "var(--auth-ui-primary)"
         }`,
     },
     "&:disabled": { cursor: "not-allowed" },

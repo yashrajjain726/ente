@@ -1,6 +1,6 @@
-import { LoginForm } from "@/components/auth/LoginForm";
 import { LockerAuthShell } from "@/components/LockerAuthShell";
 import { featureFlags } from "@/feature-flags";
+import { LoginForm } from "ente-accounts/components/auth/LoginForm";
 import {
     LoginContents,
     type LoginPresentationProps,

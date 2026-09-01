@@ -44,7 +44,7 @@ export function RecoveryKeyForm({
                 ) : (
                     <CircularProgress
                         size={24}
-                        sx={{ color: "var(--locker-auth-primary)" }}
+                        sx={{ color: "var(--auth-ui-primary)" }}
                     />
                 )}
             </RecoveryKeyBox>
@@ -72,8 +72,8 @@ const RecoveryKeyBox = styled("div")({
     justifyContent: "center",
     position: "relative",
     boxSizing: "border-box",
-    backgroundColor: "var(--locker-auth-field)",
-    boxShadow: "inset 0 0 0 1px var(--locker-auth-stroke)",
+    backgroundColor: "var(--auth-ui-field)",
+    boxShadow: "inset 0 0 0 1px var(--auth-ui-stroke)",
 });
 
 const RecoveryKeyText = styled("p")({
@@ -83,7 +83,7 @@ const RecoveryKeyText = styled("p")({
     fontWeight: 500,
     lineHeight: "24px",
     wordBreak: "break-word",
-    color: "var(--locker-auth-text)",
+    color: "var(--auth-ui-text)",
 });
 
 const CopyButton = styled("button")({
@@ -99,7 +99,7 @@ const CopyButton = styled("button")({
     top: "12px",
     right: "12px",
     backgroundColor: "transparent",
-    color: "var(--locker-auth-text-muted)",
+    color: "var(--auth-ui-text-muted)",
     cursor: "pointer",
     "&:focus-visible": authFocusRing,
 });

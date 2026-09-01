@@ -85,19 +85,19 @@ const CheckboxMark = styled("span")({
     justifyContent: "center",
     boxSizing: "border-box",
     color: "#fff",
-    backgroundColor: "var(--auth-app-primary)",
-    "input:disabled + &": { backgroundColor: "var(--auth-app-text-disabled)" },
+    backgroundColor: "var(--auth-ui-primary)",
+    "input:disabled + &": { backgroundColor: "var(--auth-ui-text-disabled)" },
     "input:not(:checked) + &": {
         backgroundColor: "transparent",
-        boxShadow: "inset 0 0 0 1px var(--auth-app-text-faint)",
+        boxShadow: "inset 0 0 0 1px var(--auth-ui-text-faint)",
     },
     "input:not(:checked):disabled + &": {
-        boxShadow: "inset 0 0 0 1px var(--auth-app-text-disabled)",
+        boxShadow: "inset 0 0 0 1px var(--auth-ui-text-disabled)",
     },
     "input:focus-visible + &": authFocusRing,
 });
 
 const CheckboxLabelText = styled("span")({
     ...authBodyTypography,
-    color: "var(--auth-app-text)",
+    color: "var(--auth-ui-text)",
 });

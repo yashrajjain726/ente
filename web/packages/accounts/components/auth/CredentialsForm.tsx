@@ -93,7 +93,7 @@ export function PasswordForm({
 const HiddenEmail = styled("input")({ display: "none" });
 
 const Email = styled("strong")({
-    color: "var(--auth-app-text)",
+    color: "var(--auth-ui-text)",
     wordBreak: "break-word",
 });
 
@@ -109,5 +109,5 @@ const Host = styled("div")({
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: "16px",
-    color: "var(--auth-app-text-faint)",
+    color: "var(--auth-ui-text-faint)",
 });

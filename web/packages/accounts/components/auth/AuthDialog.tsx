@@ -1,15 +1,8 @@
-import {
-    Dialog,
-    GlobalStyles,
-    Slide,
-    styled,
-    type ModalProps,
-} from "@mui/material";
+import { Dialog, Slide, styled, type ModalProps } from "@mui/material";
 import type { TransitionProps } from "@mui/material/transitions";
 import React, { forwardRef } from "react";
 import {
     authBodyTypography,
-    authColorVariables,
     authDisplayFontFamily,
     authMobileMediaQuery,
 } from "./styles";
@@ -43,7 +36,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
         maxWidth={false}
         aria-labelledby={ariaLabelledby}
     >
-        <GlobalStyles styles={authColorVariables} />
         <SheetHandle />
         {children}
     </DialogRoot>
@@ -61,14 +53,14 @@ export const AuthDialogTitle = styled("h2")({
     fontSize: "22px",
     fontWeight: 600,
     lineHeight: "30px",
-    color: "var(--auth-app-text)",
+    color: "var(--auth-ui-text)",
     [authMobileMediaQuery]: { fontSize: "20px", lineHeight: "28px" },
 });
 
 export const AuthDialogText = styled("p")({
     ...authBodyTypography,
     margin: 0,
-    color: "var(--auth-app-text-muted)",
+    color: "var(--auth-ui-text-muted)",
     textWrap: "pretty",
 });
 
@@ -106,6 +98,6 @@ const SheetHandle = styled("div")({
         flexShrink: 0,
         margin: "0 auto 20px",
         borderRadius: "999px",
-        backgroundColor: "var(--auth-app-fill-active)",
+        backgroundColor: "var(--auth-ui-fill-active)",
     },
 });

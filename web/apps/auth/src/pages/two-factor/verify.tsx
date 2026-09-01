@@ -1,6 +1,6 @@
-import { TwoFactorForm } from "@/components/auth/TwoFactorForm";
 import { AuthShell } from "@/components/AuthShell";
 import { featureFlags } from "@/feature-flags";
+import { TwoFactorForm } from "ente-accounts/components/auth/TwoFactorForm";
 import AccountsTwoFactorVerifyPage, {
     type TwoFactorVerifyPresentationProps,
 } from "ente-accounts/pages/two-factor/verify";

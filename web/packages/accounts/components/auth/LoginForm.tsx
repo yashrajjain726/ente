@@ -95,7 +95,7 @@ const AccountPrompt = styled("div")({
     fontSize: "14px",
     fontWeight: 500,
     lineHeight: "20px",
-    color: "var(--locker-auth-text-muted)",
+    color: "var(--auth-ui-text-muted)",
 });
 
 const Host = styled("div")({
@@ -103,5 +103,5 @@ const Host = styled("div")({
     fontSize: "12px",
     fontWeight: 500,
     lineHeight: "16px",
-    color: "var(--locker-auth-text-faint)",
+    color: "var(--auth-ui-text-faint)",
 });
