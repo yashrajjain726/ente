@@ -44,7 +44,7 @@ const AppTitlebarBackdrop = styled("div")(({ theme }) => ({
     top: 0,
     left: 0,
     width: "100%",
-    minHeight: "env(titlebar-area-height, 30px)",
+    minHeight: "env(titlebar-area-height, 0px)",
     zIndex: 1,
     backgroundColor: theme.vars.palette.backdrop.muted,
     backdropFilter: "blur(12px)",

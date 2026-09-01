@@ -1,6 +1,6 @@
 import type { FSWatcher } from "chokidar";
 import type { BrowserWindow, IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { ipcMain, safeStorage } from "electron/main";
+import { ipcMain, nativeTheme, safeStorage } from "electron/main";
 import type {
     CollectionMapping,
     FFmpegCommand,
@@ -69,6 +69,7 @@ import {
     watchUpdateSyncedFiles,
 } from "./services/watch";
 import { triggerCreateUtilityProcess } from "./services/workers";
+import { userPreferences } from "./stores/user-preferences";
 
 const parsePersistedAppLockConfig = (
     config: unknown,
@@ -275,6 +276,32 @@ export const attachIPCHandlers = () => {
 };
 
 export const attachMainWindowIPCHandlers = (mainWindow: BrowserWindow) => {
+    on(
+        "setTitleBarOverlay",
+        (_, themeMode: unknown, isFileViewerOpen: unknown) => {
+            if (
+                (themeMode != "light" &&
+                    themeMode != "dark" &&
+                    themeMode != "system") ||
+                typeof isFileViewerOpen != "boolean"
+            )
+                return;
+
+            userPreferences.set("themeMode", themeMode);
+
+            if (process.platform != "win32") return;
+
+            const isDarkTheme =
+                themeMode == "dark" ||
+                (themeMode == "system" && nativeTheme.shouldUseDarkColors);
+            const isDark = isDarkTheme || isFileViewerOpen;
+            mainWindow.setTitleBarOverlay({
+                color: isDark ? "black" : "white",
+                symbolColor: isDark ? "#cdcdcd" : "black",
+            });
+        },
+    );
+
     on("triggerCreateUtilityProcess", (_, type: UtilityProcessType) =>
         triggerCreateUtilityProcess(type, mainWindow),
     );
