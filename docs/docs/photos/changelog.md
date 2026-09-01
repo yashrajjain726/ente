@@ -7,6 +7,22 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.7.28 (desktop) - Sep 2026
+
+- Improved the account deletion flow with clearer steps and a summary of the data that will be deleted.
+- Added search when assigning names to people.
+- Added support for adding photos to hidden albums.
+- Add album description to gallery.
+- Added a unified album details dialog for editing album names, descriptions, and cover photos.
+- Improved the authentication UI for Ente Photos.
+- Fixed CollectionMapDialog resetting after returning to the desktop app.
+- Added search for photos without location information.
+- Added functionality for sharing and applying referral codes.
+- Revamped the All Albums UI with filters for quick links, received albums, and shared albums, also added an option to delete all empty albums.
+- Use the shared rust ML code for indexing
+- Enable CoreML on MacOS and WebGPU on Linux and Windows
+- Fixed incorrect capture times for videos whose metadata stores creation time in UTC.
+
 ## v1.3.61 (mobile) - Aug 2026
 
 - Fixed remote photos not loading on older self-hosted Ente servers.
