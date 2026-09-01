@@ -167,10 +167,9 @@ const createMainWindow = () => {
         path.join(isDev ? "build" : process.resourcesPath, "window-icon.png"),
     );
     const bounds = windowBounds();
-    const themeMode = userPreferences.get("themeMode");
-    const shouldUseDarkColors =
-        themeMode == "dark" ||
-        (themeMode != "light" && nativeTheme.shouldUseDarkColors);
+    const themeMode = userPreferences.get("themeMode") ?? "system";
+    nativeTheme.themeSource = themeMode;
+    const shouldUseDarkColors = nativeTheme.shouldUseDarkColors;
 
     const window = new BrowserWindow({
         webPreferences: {
@@ -180,8 +179,6 @@ const createMainWindow = () => {
         icon,
         ...(bounds ?? {}),
         ...minimumWindowSize(),
-        // Linux uses its native frame. The overlay remains enabled elsewhere
-        // so the renderer receives its CSS dimensions.
         ...(process.platform == "linux"
             ? {}
             : {
@@ -196,7 +193,6 @@ const createMainWindow = () => {
                             }
                           : true,
               }),
-        // Match the initial paint to the selected theme to avoid a flash.
         backgroundColor: shouldUseDarkColors ? "black" : "white",
         show: false,
     });

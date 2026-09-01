@@ -280,21 +280,19 @@ export const attachMainWindowIPCHandlers = (mainWindow: BrowserWindow) => {
         "setTitleBarOverlay",
         (_, themeMode: unknown, isFileViewerOpen: unknown) => {
             if (
-                (themeMode != "light" &&
-                    themeMode != "dark" &&
-                    themeMode != "system") ||
-                typeof isFileViewerOpen != "boolean"
+                themeMode !== "light" &&
+                themeMode !== "dark" &&
+                themeMode !== "system"
             )
                 return;
+            if (typeof isFileViewerOpen != "boolean") return;
 
             userPreferences.set("themeMode", themeMode);
+            nativeTheme.themeSource = themeMode;
 
             if (process.platform != "win32") return;
 
-            const isDarkTheme =
-                themeMode == "dark" ||
-                (themeMode == "system" && nativeTheme.shouldUseDarkColors);
-            const isDark = isDarkTheme || isFileViewerOpen;
+            const isDark = nativeTheme.shouldUseDarkColors || isFileViewerOpen;
             mainWindow.setTitleBarOverlay({
                 color: isDark ? "black" : "white",
                 symbolColor: isDark ? "#cdcdcd" : "black",
