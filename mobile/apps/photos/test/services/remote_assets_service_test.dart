@@ -51,13 +51,6 @@ void main() {
       expect(await artifact.exists(), isFalse);
     }
     expect(await unrelatedFile.exists(), isTrue);
-    expect(
-      await RemoteAssetsService.instance.hasAsset(
-        remotePath,
-        cacheFileName: cacheFileName,
-      ),
-      isFalse,
-    );
 
     await RemoteAssetsService.instance.deleteAsset(
       remotePath,

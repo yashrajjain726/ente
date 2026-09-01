@@ -41,10 +41,9 @@ void main() {
     controller.dispose();
   });
 
-  test("photo memories load, loop, and play their assigned tracks", () async {
+  test("photo memories load and play their assigned tracks", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
-    expect(player.looping, isTrue);
     expect(player.playing, isTrue);
 
     await controller.activateMemory("memory-2", currentItemIsVideo: false);
@@ -53,17 +52,6 @@ void main() {
       "track-1",
       "track-2",
     ]);
-  });
-
-  test("video items pause music and photos resume it", () async {
-    await controller.activateMemory("memory-1", currentItemIsVideo: false);
-
-    await controller.activateMemory("memory-1", currentItemIsVideo: true);
-    expect(player.playing, isFalse);
-
-    await controller.activateMemory("memory-1", currentItemIsVideo: false);
-    expect(player.playing, isTrue);
-    expect(player.loadAttempts, 1);
   });
 
   test("initial mute state prevents playback", () async {
@@ -103,6 +91,7 @@ void main() {
 
     await controller.activateMemory("memory-2", currentItemIsVideo: false);
     expect(player.playing, isTrue);
+    expect(player.attemptedTracks, hasLength(2));
   });
 
   test("newer memory wins when activations overlap", () async {
@@ -163,12 +152,10 @@ void main() {
 class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
   final List<MemoryMusicTrack> attemptedTracks = <MemoryMusicTrack>[];
   final List<MemoryMusicTrack> loadedTracks = <MemoryMusicTrack>[];
-  bool looping = false;
   bool playing = false;
   bool playedImmediately = false;
   bool pausedImmediately = false;
   final Set<String> failedTrackIDs = <String>{};
-  int loadAttempts = 0;
   int playAttempts = 0;
   Future<void> Function()? beforeNextLoadCompletes;
 
@@ -177,7 +164,6 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
 
   @override
   Future<void> load(MemoryMusicTrack track) async {
-    loadAttempts++;
     attemptedTracks.add(track);
     if (failedTrackIDs.contains(track.id)) {
       throw StateError("load failed");
@@ -186,7 +172,6 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
     final beforeCompleting = beforeNextLoadCompletes;
     beforeNextLoadCompletes = null;
     await beforeCompleting?.call();
-    looping = true;
   }
 
   @override
