@@ -4,8 +4,8 @@ import (
 	"database/sql"
 
 	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/utils/auth"
 	"github.com/ente/museum/pkg/utils/network"
-
 	"github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
 	"github.com/lib/pq"
@@ -158,8 +158,9 @@ func (repo *UserAuthRepository) ReserveOTTVerificationAttempt(emailHash string, 
 }
 
 func (repo *UserAuthRepository) AddToken(userID int64, app ente.App, token string, ip string, userAgent string) error {
-	_, err := repo.DB.Exec(`INSERT INTO tokens(user_id, app, token, creation_time, ip, user_agent) VALUES($1, $2, $3, $4, $5, $6)`,
-		userID, app, token, time.Microseconds(), ip, userAgent)
+	tokenHash := auth.HashToken(token)
+	_, err := repo.DB.Exec(`INSERT INTO tokens(user_id, app, token_hash, creation_time, ip, user_agent) VALUES($1, $2, $3, $4, $5, $6)`,
+		userID, app, tokenHash[:], time.Microseconds(), ip, userAgent)
 	return stacktrace.Propagate(err, "")
 }
 
