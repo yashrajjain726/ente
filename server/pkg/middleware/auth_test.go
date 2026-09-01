@@ -136,8 +136,24 @@ func TestRejectAuthAppKeepsAuthRoutesAndBlocksStorageRoutes(t *testing.T) {
 	}
 }
 
-func TestSessionBoundJWTRejectsRevokedOriginSession(t *testing.T) {
+func TestSessionBoundJWTAuthentication(t *testing.T) {
 	router, tokens, userController := setupAuthRouteTest(t)
+
+	unboundJWT, err := userController.GetJWTToken(91001, jwt.FAMILIES)
+	if err != nil {
+		t.Fatalf("failed to create unbound JWT: %v", err)
+	}
+	if recorder := performAuthRouteRequest(router, "/family/test", unboundJWT, "io.ente.photos"); recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("unbound JWT status = %d, want %d; body=%s", recorder.Code, http.StatusUnauthorized, recorder.Body.String())
+	}
+
+	mismatchedJWT, err := userController.GetSessionJWTToken(91002, jwt.FAMILIES, tokens.auth, ente.Auth)
+	if err != nil {
+		t.Fatalf("failed to create mismatched session JWT: %v", err)
+	}
+	if recorder := performAuthRouteRequest(router, "/family/test", mismatchedJWT, "io.ente.photos"); recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("mismatched session JWT status = %d, want %d; body=%s", recorder.Code, http.StatusUnauthorized, recorder.Body.String())
+	}
 
 	boundJWT, err := userController.GetSessionJWTToken(91001, jwt.FAMILIES, tokens.auth, ente.Auth)
 	if err != nil {
@@ -182,18 +198,18 @@ func setupAuthRouteTest(t *testing.T) (*gin.Engine, authRouteTestTokens, *userco
 		Cache:        authCache,
 		JwtSecret:    []byte("auth-route-test-jwt-secret"),
 	}
-	var err error
-	tokens.family, err = userController.GetJWTToken(userID, jwt.FAMILIES)
-	if err != nil {
-		t.Fatalf("failed to create family JWT: %v", err)
-	}
-	tokens.payment, err = userController.GetJWTToken(userID, jwt.PAYMENT)
-	if err != nil {
-		t.Fatalf("failed to create payment JWT: %v", err)
-	}
 	addTokenForTest(t, userAuthRepo, userID, ente.Auth, tokens.auth)
 	addTokenForTest(t, userAuthRepo, userID, ente.Photos, tokens.photos)
 	addTokenForTest(t, userAuthRepo, userID, ente.Locker, tokens.locker)
+	var err error
+	tokens.family, err = userController.GetSessionJWTToken(userID, jwt.FAMILIES, tokens.auth, ente.Auth)
+	if err != nil {
+		t.Fatalf("failed to create family JWT: %v", err)
+	}
+	tokens.payment, err = userController.GetSessionJWTToken(userID, jwt.PAYMENT, tokens.auth, ente.Auth)
+	if err != nil {
+		t.Fatalf("failed to create payment JWT: %v", err)
+	}
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
