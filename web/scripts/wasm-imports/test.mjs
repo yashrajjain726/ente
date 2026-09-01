@@ -88,6 +88,13 @@ test("WASM inner boundary", async (t) => {
             },
         ],
         [
+            "CommonJS payload import",
+            {
+                source: 'const wasm = require("./pkg/arbitrary-name");',
+                error: "no-restricted-syntax",
+            },
+        ],
+        [
             "raw binding re-export",
             {
                 source: 'export * from "./pkg/arbitrary-name";',

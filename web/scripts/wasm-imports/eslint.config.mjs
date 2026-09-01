@@ -2,6 +2,11 @@ export const rawWasmPath = String.raw`(?:^|/)pkg(?:/|$)|\.wasm(?:[?#].*)?$`;
 
 const selectorRawWasmPath = rawWasmPath.replaceAll("/", "\\u002F");
 const payloadImport = `ImportExpression[source.value=/${selectorRawWasmPath}/]`;
+const payloadRequire = `CallExpression[callee.name=require][arguments.0.value=/${selectorRawWasmPath}/]`;
+const restrictedPayloadRequire = {
+    selector: payloadRequire,
+    message: "Load generated WASM with import() inside its wrapper.",
+};
 const exportedPayloadLoader = [
     "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression > ImportExpression",
     "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression > AwaitExpression > ImportExpression",
@@ -51,6 +56,7 @@ export default [
                     message:
                         "Load generated WASM through a wrapper in web/packages/wasm.",
                 },
+                restrictedPayloadRequire,
             ],
         },
     },
@@ -73,6 +79,7 @@ export default [
                     message:
                         "Export operations instead of the generated WASM module.",
                 },
+                restrictedPayloadRequire,
             ],
         },
     },
