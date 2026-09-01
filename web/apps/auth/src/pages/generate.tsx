@@ -1,5 +1,4 @@
 import { AuthShell } from "@/components/AuthShell";
-import { featureFlags } from "@/feature-flags";
 import { RecoveryKeyForm } from "ente-accounts/components/auth/RecoveryKeyForm";
 import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
 import type { NewPasswordPresentationProps } from "ente-accounts/components/NewPasswordForm";
@@ -28,10 +27,6 @@ function SetPasswordPresentation(
 }
 
 function GeneratePage(): React.JSX.Element {
-    if (!featureFlags.enableNewAuthFlow) {
-        return <AccountsGeneratePage />;
-    }
-
     return (
         <AccountsGeneratePage
             passwordPresentation={SetPasswordPresentation}

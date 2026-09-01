@@ -1,5 +1,4 @@
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/feature-flags";
 import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "ente-accounts/components/auth/VerifyEmailForm";
 import AccountsVerifyPage, {
@@ -18,10 +17,6 @@ function VerifyEmailPresentation(
 }
 
 function VerifyPage(): React.JSX.Element {
-    if (!featureFlags.enableNewLockerAuthFlow) {
-        return <AccountsVerifyPage />;
-    }
-
     return (
         <AccountsVerifyPage
             presentation={VerifyEmailPresentation}

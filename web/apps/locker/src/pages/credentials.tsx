@@ -1,5 +1,4 @@
 import { LockerAuthShell } from "@/components/LockerAuthShell";
-import { featureFlags } from "@/feature-flags";
 import {
     CredentialsForm,
     PasswordForm,
@@ -21,10 +20,6 @@ function CredentialsPresentation(
 }
 
 function CredentialsPage(): React.JSX.Element {
-    if (!featureFlags.enableNewLockerAuthFlow) {
-        return <AccountsCredentialsPage />;
-    }
-
     return (
         <AccountsCredentialsPage
             presentation={CredentialsPresentation}
