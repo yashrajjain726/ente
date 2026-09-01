@@ -1,9 +1,9 @@
 import { DevSettingsDialog } from "@/components/auth/DevSettingsDialog";
-import { LoginForm } from "@/components/auth/LoginForm";
-import { SignUpForm } from "@/components/auth/SignUpForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/feature-flags";
 import { Box, Stack, Typography, styled } from "@mui/material";
+import { LoginForm } from "ente-accounts/components/auth/LoginForm";
+import { SignUpForm } from "ente-accounts/components/auth/SignUpForm";
 import { LoginContents } from "ente-accounts/components/LoginContents";
 import { SignUpContents } from "ente-accounts/components/SignUpContents";
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";

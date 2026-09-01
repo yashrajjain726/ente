@@ -1,11 +1,11 @@
+import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
+import { PhotosAuthShell } from "@/components/PhotosAuthShell";
+import { featureFlags } from "@/feature-flags";
 import {
     CredentialsForm,
     PasswordForm,
-} from "@/components/auth/CredentialsForm";
-import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
-import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
-import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { featureFlags } from "@/feature-flags";
+} from "ente-accounts/components/auth/CredentialsForm";
+import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
 import AccountsCredentialsPage, {
     type CredentialsPresentationProps,
