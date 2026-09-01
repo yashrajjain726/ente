@@ -38,6 +38,10 @@ Learn more about [adding descriptions to photos](/photos/faq/metadata-and-editin
 
 Search for albums by name or search within specific albums to narrow down results.
 
+### Photos without location data
+
+On web and desktop, select **No location** from the search suggestions to find photos and videos that do not have GPS coordinates in their metadata. This can help identify items that need a [location added manually](/photos/faq/metadata-and-editing#add-location).
+
 ### Settings search
 
 Find settings by searching for their names or related terms.

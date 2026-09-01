@@ -43,6 +43,15 @@ Hiding differs from [Archiving](./archive) in that hidden content won't appear a
 - Select **Hidden**
 - Authenticate with your Ente password
 
+### Add photos to a hidden album (web/desktop)
+
+1. Open **Hidden** and authenticate with your Ente password
+2. Open a hidden album and select the photos
+3. Click **Add to album**
+4. Select another hidden album, or create a new one
+
+Albums created from this flow remain hidden. Adding a photo to another hidden album does not make it visible outside the **Hidden** section.
+
 ### Unhide album
 
 - Open the hidden album
