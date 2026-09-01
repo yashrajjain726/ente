@@ -1,5 +1,4 @@
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { featureFlags } from "@/feature-flags";
 import { TwoFactorForm } from "ente-accounts/components/auth/TwoFactorForm";
 import AccountsTwoFactorVerifyPage, {
     type TwoFactorVerifyPresentationProps,
@@ -17,10 +16,6 @@ function TwoFactorPresentation(
 }
 
 function TwoFactorVerifyPage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosAuthFlow) {
-        return <AccountsTwoFactorVerifyPage />;
-    }
-
     return <AccountsTwoFactorVerifyPage presentation={TwoFactorPresentation} />;
 }
 
