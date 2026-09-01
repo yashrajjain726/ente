@@ -1,4 +1,5 @@
 import "package:dio/dio.dart";
+import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
@@ -17,6 +18,7 @@ import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
+import "package:photos/ui/viewer/gallery/gallery_app_bar_config.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
 import "package:shared_preferences/shared_preferences.dart";
@@ -236,12 +238,27 @@ void main() {
   });
 
   testWidgets(
-    "a grouped layout change preserves progress below the pinned header",
+    "a non-home layout change preserves progress below its pinned header",
     (tester) async {
       await localSettings.setGalleryLayoutType(GalleryLayoutType.grid);
       await localSettings.setPhotoGridSize(6);
       final galleryKey = GlobalKey<GalleryState>();
       final files = List<EnteFile>.generate(180, _justifiedTestFile);
+      const galleryHeaderHeight = 32.0;
+      const appBarExpandedHeight = 92.0;
+      const appBarCollapsedHeight = kToolbarHeight;
+      final appBar = GalleryAppBarConfig(
+        sliverBuilder: (_) => const SliverAppBarComponent(
+          title: "Album",
+          expandedHeight: appBarExpandedHeight,
+          collapsedHeight: appBarCollapsedHeight,
+        ),
+        geometryBuilder: (context) => SliverAppBarComponent.resolveGeometry(
+          context,
+          expandedHeight: appBarExpandedHeight,
+          collapsedHeight: appBarCollapsedHeight,
+        ),
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -252,12 +269,17 @@ void main() {
             body: _galleryHost(
               Gallery(
                 key: galleryKey,
+                appBar: appBar,
                 asyncLoader: (start, end, {limit, asc}) async =>
                     FileLoadResult(files, false),
                 tagPrefix: "pinned_anchor_",
                 groupType: GroupType.month,
                 limitSelectionToOne: true,
                 showSelectAll: false,
+                header: const SizedBox(
+                  key: Key("gallery_header"),
+                  height: galleryHeaderHeight,
+                ),
               ),
             ),
           ),
@@ -268,10 +290,19 @@ void main() {
       await tester.pump();
 
       final oldGroups = galleryKey.currentState!.galleryGroups!;
+      final appBarGeometry = appBar.resolveGeometry(galleryKey.currentContext!);
+      expect(appBarGeometry.minExtent, greaterThan(0));
+      expect(appBarGeometry.collapseExtent, greaterThan(0));
+      expect(
+        tester.getSize(find.byKey(const Key("gallery_header"))).height,
+        galleryHeaderHeight,
+      );
       final anchorFile = files[120];
       final oldGeometry = oldGroups.getGeometryOfFile(anchorFile)!;
       const rowProgress = 0.35;
       final oldAnchorOffset =
+          appBarGeometry.collapseExtent +
+          galleryHeaderHeight +
           oldGeometry.rowOffset +
           oldGeometry.rowExtent * rowProgress -
           oldGroups.groupHeaderExtent;
@@ -286,15 +317,20 @@ void main() {
       scrollPosition.jumpTo(oldAnchorOffset);
       await tester.pump();
 
+      final pinnedHeaderFinder = find.byWidgetPredicate(
+        (widget) => widget is GroupHeaderWidget && widget.isPinnedHeader,
+      );
+      expect(pinnedHeaderFinder, findsOneWidget);
       expect(
-        find.byWidgetPredicate(
-          (widget) => widget is GroupHeaderWidget && widget.isPinnedHeader,
-        ),
-        findsOneWidget,
+        tester.getTopLeft(pinnedHeaderFinder).dy,
+        closeTo(appBarGeometry.minExtent, 0.001),
       );
       expect(
         oldGroups.getFileAtScrollOffset(
-          scrollPosition.pixels + oldGroups.groupHeaderExtent,
+          scrollPosition.pixels -
+              appBarGeometry.collapseExtent -
+              galleryHeaderHeight +
+              oldGroups.groupHeaderExtent,
         ),
         same(anchorFile),
       );
@@ -306,6 +342,8 @@ void main() {
       final newGroups = galleryKey.currentState!.galleryGroups!;
       final newGeometry = newGroups.getGeometryOfFile(anchorFile)!;
       final expectedAnchorOffset =
+          appBarGeometry.collapseExtent +
+          galleryHeaderHeight +
           newGeometry.rowOffset +
           newGeometry.rowExtent * rowProgress -
           newGroups.groupHeaderExtent;
@@ -313,7 +351,10 @@ void main() {
       expect(scrollPosition.pixels, closeTo(expectedAnchorOffset, 0.001));
       expect(
         newGroups.getFileAtScrollOffset(
-          scrollPosition.pixels + newGroups.groupHeaderExtent,
+          scrollPosition.pixels -
+              appBarGeometry.collapseExtent -
+              galleryHeaderHeight +
+              newGroups.groupHeaderExtent,
         ),
         same(anchorFile),
       );
