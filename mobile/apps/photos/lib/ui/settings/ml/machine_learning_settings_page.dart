@@ -18,6 +18,7 @@ import "package:photos/services/remote_assets_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/settings/ml/ml_user_dev_screen.dart";
+import "package:photos/utils/email_util.dart";
 import "package:photos/utils/ml_util.dart";
 import "package:photos/utils/network_util.dart";
 
@@ -40,6 +41,7 @@ class _MachineLearningSettingsPageState
   @override
   void initState() {
     super.initState();
+    mlDecryptionRecordStore.logFileIDs();
     wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.machineLearningSettingsScreen,
@@ -483,6 +485,7 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
+    final decryptionIssueCount = mlDecryptionRecordStore.count;
     return Column(
       children: [
         Padding(
@@ -564,7 +567,65 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
             return const EnteLoadingWidget();
           },
         ),
+        if (decryptionIssueCount > 0) ...[
+          const SizedBox(height: 8),
+          _MLProcessingIssuesBlurb(itemCount: decryptionIssueCount),
+        ],
       ],
+    );
+  }
+}
+
+class _MLProcessingIssuesBlurb extends StatelessWidget {
+  final int itemCount;
+
+  const _MLProcessingIssuesBlurb({required this.itemCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.fillLight,
+        borderRadius: BorderRadius.circular(Radii.button),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              context.strings.mlCouldNotProcessItems(count: itemCount),
+              style: TextStyles.bodyBold.copyWith(color: colors.warning),
+            ),
+            const SizedBox(height: Spacing.xs),
+            Text(
+              context.strings.mlItemsCouldNotBeProcessed(count: itemCount),
+              style: TextStyles.mini.copyWith(color: colors.textLight),
+            ),
+            const SizedBox(height: Spacing.sm),
+            ButtonComponent(
+              label: context.strings.contactUs,
+              variant: ButtonComponentVariant.link,
+              size: ButtonComponentSize.small,
+              shouldSurfaceExecutionStates: false,
+              onTap: () async {
+                mlDecryptionRecordStore.logFileIDs();
+                await sendLogs(
+                  context,
+                  context.strings.contactUs,
+                  "support@ente.com",
+                  postShare: () {},
+                  subject: "Machine learning processing issue",
+                  body: context.strings.mlItemsCouldNotBeProcessed(
+                    count: itemCount,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
