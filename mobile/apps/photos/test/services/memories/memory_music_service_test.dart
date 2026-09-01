@@ -18,17 +18,20 @@ void main() {
     preferences = await SharedPreferences.getInstance();
   });
 
-  test("sorts a valid manifest and caches each URL once", () async {
+  test("sorts a valid manifest and checks each cached URL once", () async {
     final manifest = _manifest([
       _track("z-track", _sharedURL, title: "Zed"),
       _track("a-track", _sharedURL, artist: "Artist"),
       _track("middle-track", _newURL),
     ]);
-    final cachedURLs = <String>[];
+    final checkedURLs = <String>[];
     final service = _service(
       preferences,
       fetchManifest: () async => manifest,
-      cacheAsset: (url) async => cachedURLs.add(url),
+      hasAsset: (url) async {
+        checkedURLs.add(url);
+        return true;
+      },
     );
 
     final tracks = await service.prepare();
@@ -40,8 +43,8 @@ void main() {
     ]);
     expect(tracks.first.artist, "Artist");
     expect(tracks.last.title, "Zed");
-    expect(cachedURLs, unorderedEquals([_sharedURL, _newURL]));
-    expect(cachedURLs.where((url) => url == _sharedURL), hasLength(1));
+    expect(checkedURLs, unorderedEquals([_sharedURL, _newURL]));
+    expect(checkedURLs.where((url) => url == _sharedURL), hasLength(1));
     expect(
       jsonDecode(preferences.getString(_manifestPreferenceKey)!),
       manifest,
@@ -127,20 +130,23 @@ void main() {
         ]),
       ),
     );
-    final cachedURLs = <String>[];
+    final availableURLs = <String>[];
     final deletedURLs = <String>[];
     final emptyManifest = _manifest([]);
     final service = _service(
       preferences,
       fetchManifest: () async => emptyManifest,
-      cacheAsset: (url) async => cachedURLs.add(url),
+      hasAsset: (url) async {
+        availableURLs.add(url);
+        return true;
+      },
       deleteAsset: (url) async => deletedURLs.add(url),
     );
 
     final tracks = await service.prepare();
 
     expect(tracks, isEmpty);
-    expect(cachedURLs, isEmpty);
+    expect(availableURLs, isEmpty);
     expect(deletedURLs, unorderedEquals([_cachedURL, _sharedURL]));
     expect(deletedURLs.where((url) => url == _cachedURL), hasLength(1));
     expect(
@@ -159,7 +165,7 @@ void main() {
         ]),
       ),
     );
-    final cachedURLs = <String>[];
+    final availableURLs = <String>[];
     final deletedURLs = <String>[];
     final service = _service(
       preferences,
@@ -167,51 +173,107 @@ void main() {
         _track("new-shared-id", _sharedURL),
         _track("new", _newURL),
       ]),
-      cacheAsset: (url) async => cachedURLs.add(url),
+      hasAsset: (url) async {
+        availableURLs.add(url);
+        return true;
+      },
       deleteAsset: (url) async => deletedURLs.add(url),
     );
 
     final tracks = await service.prepare();
 
     expect(tracks.map((track) => track.id), ["new", "new-shared-id"]);
-    expect(cachedURLs, unorderedEquals([_newURL, _sharedURL]));
+    expect(availableURLs, unorderedEquals([_newURL, _sharedURL]));
     expect(deletedURLs, [_cachedURL]);
   });
 
-  test(
-    "filters an audio failure and retries it without refetching the manifest",
-    () async {
-      const firstURL = "https://music.ente.com/first.mp3";
-      const secondURL = "https://music.ente.com/second.mp3";
-      var fetchCalls = 0;
-      final cacheAttempts = <String, int>{};
-      final service = _service(
-        preferences,
-        fetchManifest: () async {
-          fetchCalls++;
-          return _manifest([
-            _track("first", firstURL),
-            _track("second", secondURL),
-          ]);
-        },
-        cacheAsset: (url) async {
-          final attempt = (cacheAttempts[url] ?? 0) + 1;
-          cacheAttempts[url] = attempt;
-          if (url == firstURL && attempt == 1) {
-            throw StateError("download failed");
-          }
-        },
-      );
+  test("returns cached tracks without waiting for a download", () async {
+    final downloadStarted = Completer<void>();
+    final finishDownload = Completer<void>();
+    addTearDown(() {
+      if (!finishDownload.isCompleted) finishDownload.complete();
+    });
+    final service = _service(
+      preferences,
+      fetchManifest: () async =>
+          _manifest([_track("cached", _cachedURL), _track("new", _newURL)]),
+      hasAsset: (url) async => url == _cachedURL,
+      cacheAsset: (url) async {
+        expect(url, _newURL);
+        downloadStarted.complete();
+        await finishDownload.future;
+      },
+    );
 
-      final firstTracks = await service.prepare();
-      final retriedTracks = await service.prepare();
+    final preparation = service.prepare();
+    await downloadStarted.future.timeout(const Duration(seconds: 1));
 
-      expect(firstTracks.map((track) => track.id), ["second"]);
-      expect(retriedTracks.map((track) => track.id), ["first", "second"]);
-      expect(fetchCalls, 1);
-      expect(cacheAttempts, <String, int>{firstURL: 2, secondURL: 2});
-    },
-  );
+    expect(
+      (await preparation.timeout(
+        const Duration(seconds: 1),
+      )).map((track) => track.id),
+      ["cached"],
+    );
+
+    finishDownload.complete();
+    await Future<void>.delayed(Duration.zero);
+  });
+
+  test("returns after the first download succeeds", () async {
+    const slowURL = "https://music.ente.com/slow.mp3";
+    final slowDownloadStarted = Completer<void>();
+    final finishSlowDownload = Completer<void>();
+    addTearDown(() {
+      if (!finishSlowDownload.isCompleted) finishSlowDownload.complete();
+    });
+    final service = _service(
+      preferences,
+      fetchManifest: () async =>
+          _manifest([_track("ready", _newURL), _track("slow", slowURL)]),
+      hasAsset: (_) async => false,
+      cacheAsset: (url) async {
+        if (url == slowURL) {
+          slowDownloadStarted.complete();
+          await finishSlowDownload.future;
+        }
+      },
+    );
+
+    final preparation = service.prepare();
+    await slowDownloadStarted.future.timeout(const Duration(seconds: 1));
+
+    expect(
+      (await preparation.timeout(
+        const Duration(seconds: 1),
+      )).map((track) => track.id),
+      ["ready"],
+    );
+
+    finishSlowDownload.complete();
+    await Future<void>.delayed(Duration.zero);
+  });
+
+  test("retries failed downloads without refetching the manifest", () async {
+    var fetchCalls = 0;
+    var cacheAttempts = 0;
+    final service = _service(
+      preferences,
+      fetchManifest: () async {
+        fetchCalls++;
+        return _manifest([_track("track", _newURL)]);
+      },
+      hasAsset: (_) async => false,
+      cacheAsset: (_) async {
+        cacheAttempts++;
+        if (cacheAttempts == 1) throw StateError("download failed");
+      },
+    );
+
+    expect(await service.prepare(), isEmpty);
+    expect((await service.prepare()).map((track) => track.id), ["track"]);
+    expect(fetchCalls, 1);
+    expect(cacheAttempts, 2);
+  });
 
   test("concurrent preparation shares one manifest fetch", () async {
     final fetchStarted = Completer<void>();
@@ -227,6 +289,7 @@ void main() {
         return _manifest([_track("track", _newURL)]);
       },
       cacheAsset: (_) async => cacheCalls++,
+      hasAsset: (_) async => false,
     );
 
     final firstPreparation = service.prepare();
@@ -248,12 +311,14 @@ void main() {
 MemoryMusicService _service(
   SharedPreferences preferences, {
   required Future<Object?> Function() fetchManifest,
+  Future<bool> Function(String url)? hasAsset,
   Future<void> Function(String url)? cacheAsset,
   Future<void> Function(String url)? deleteAsset,
 }) {
   return MemoryMusicService(
     preferences: preferences,
     fetchManifest: fetchManifest,
+    hasAsset: hasAsset ?? (_) async => true,
     cacheAsset: cacheAsset ?? (_) async {},
     deleteAsset: deleteAsset ?? (_) async {},
   );

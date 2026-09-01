@@ -124,9 +124,12 @@ class RemoteAssetsService {
     });
   }
 
-  Future<bool> hasAsset(String remotePath) async {
+  Future<bool> hasAsset(String remotePath, {String? cacheFileName}) async {
     return _lockFor(remotePath).synchronized(() async {
-      final path = await _getLocalPath(remotePath);
+      final path = await _getLocalPath(
+        remotePath,
+        cacheFileName: cacheFileName,
+      );
       return File(path).exists();
     });
   }

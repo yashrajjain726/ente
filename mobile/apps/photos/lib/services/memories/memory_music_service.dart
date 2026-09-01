@@ -20,9 +20,12 @@ class MemoryMusicService {
 
   final SharedPreferences _preferences;
   final Future<Object?> Function() _fetchManifest;
+  final Future<bool> Function(String url) _hasAsset;
   final Future<void> Function(String url) _cacheAsset;
   final Future<void> Function(String url) _deleteAsset;
 
+  final Set<String> _availableURLs = {};
+  final Map<String, Future<bool>> _assetDownloads = {};
   List<MemoryMusicTrack>? _tracks;
   Future<List<MemoryMusicTrack>>? _preparation;
   bool _manifestRefreshed = false;
@@ -30,10 +33,12 @@ class MemoryMusicService {
   MemoryMusicService({
     required SharedPreferences preferences,
     required Future<Object?> Function() fetchManifest,
+    required Future<bool> Function(String url) hasAsset,
     required Future<void> Function(String url) cacheAsset,
     required Future<void> Function(String url) deleteAsset,
   }) : _preferences = preferences,
        _fetchManifest = fetchManifest,
+       _hasAsset = hasAsset,
        _cacheAsset = cacheAsset,
        _deleteAsset = deleteAsset;
 
@@ -45,6 +50,10 @@ class MemoryMusicService {
       );
       return response.data;
     },
+    hasAsset: (url) => RemoteAssetsService.instance.hasAsset(
+      url,
+      cacheFileName: memoryMusicCacheFileName(url),
+    ),
     cacheAsset: (url) async {
       await RemoteAssetsService.instance.getAsset(
         url,
@@ -153,24 +162,90 @@ class MemoryMusicService {
   Future<List<MemoryMusicTrack>> _availableTracks(
     List<MemoryMusicTrack> tracks,
   ) async {
-    final availableURLs = <String>{};
+    final currentURLs = tracks.map((track) => track.url).toSet();
+    _availableURLs.retainAll(currentURLs);
     await Future.wait(
-      tracks.map((track) => track.url).toSet().map((url) async {
-        try {
-          await _cacheAsset(url);
-          availableURLs.add(url);
-        } catch (error, stackTrace) {
-          _logger.warning(
-            "Failed to cache memory music asset $url",
-            error,
-            stackTrace,
-          );
-        }
-      }),
+      currentURLs
+          .where(
+            (url) =>
+                !_availableURLs.contains(url) &&
+                !_assetDownloads.containsKey(url),
+          )
+          .map(_findCachedAsset),
     );
+
+    final downloads = <Future<bool>>[
+      for (final url in currentURLs)
+        if (!_availableURLs.contains(url)) _downloadAsset(url),
+    ];
+    if (_availableURLs.isEmpty && downloads.isNotEmpty) {
+      await _waitForAvailableAsset(downloads);
+    }
+
     return tracks
-        .where((track) => availableURLs.contains(track.url))
+        .where((track) => _availableURLs.contains(track.url))
         .toList(growable: false);
+  }
+
+  Future<void> _findCachedAsset(String url) async {
+    try {
+      if (await _hasAsset(url)) _availableURLs.add(url);
+    } catch (error, stackTrace) {
+      _logger.warning(
+        "Failed to check memory music asset $url",
+        error,
+        stackTrace,
+      );
+    }
+  }
+
+  Future<bool> _downloadAsset(String url) {
+    final download = _assetDownloads[url];
+    if (download != null) return download;
+
+    late final Future<bool> nextDownload;
+    nextDownload = _cacheAssetURL(url).whenComplete(() {
+      if (identical(_assetDownloads[url], nextDownload)) {
+        _assetDownloads.remove(url);
+      }
+    });
+    _assetDownloads[url] = nextDownload;
+    return nextDownload;
+  }
+
+  Future<bool> _cacheAssetURL(String url) async {
+    try {
+      await _cacheAsset(url);
+    } catch (error, stackTrace) {
+      _logger.warning(
+        "Failed to cache memory music asset $url",
+        error,
+        stackTrace,
+      );
+      return false;
+    }
+
+    if (!_tracks!.any((track) => track.url == url)) {
+      return false;
+    }
+    _availableURLs.add(url);
+    return true;
+  }
+
+  Future<void> _waitForAvailableAsset(List<Future<bool>> downloads) {
+    final available = Completer<void>();
+    var remaining = downloads.length;
+    for (final download in downloads) {
+      unawaited(
+        download.then((didDownload) {
+          remaining--;
+          if (!available.isCompleted && (didDownload || remaining == 0)) {
+            available.complete();
+          }
+        }),
+      );
+    }
+    return available.future;
   }
 
   List<MemoryMusicTrack> _parseManifest(Object? manifest) {

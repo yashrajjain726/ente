@@ -26,6 +26,7 @@ void main() {
 
   test("deleteAsset removes every custom-named cache artifact", () async {
     const cacheFileName = "memory-music-track.mp3";
+    const remotePath = "https://music.ente.com/track.mp3";
     final localPath = p.join(tempDirectory.path, "assets", cacheFileName);
     final artifacts = await _createAssetArtifacts(localPath);
     final unrelatedFile = File(
@@ -33,8 +34,16 @@ void main() {
     );
     await unrelatedFile.writeAsString("unrelated");
 
+    expect(
+      await RemoteAssetsService.instance.hasAsset(
+        remotePath,
+        cacheFileName: cacheFileName,
+      ),
+      isTrue,
+    );
+
     await RemoteAssetsService.instance.deleteAsset(
-      "https://music.ente.com/track.mp3",
+      remotePath,
       cacheFileName: cacheFileName,
     );
 
@@ -42,9 +51,16 @@ void main() {
       expect(await artifact.exists(), isFalse);
     }
     expect(await unrelatedFile.exists(), isTrue);
+    expect(
+      await RemoteAssetsService.instance.hasAsset(
+        remotePath,
+        cacheFileName: cacheFileName,
+      ),
+      isFalse,
+    );
 
     await RemoteAssetsService.instance.deleteAsset(
-      "https://music.ente.com/track.mp3",
+      remotePath,
       cacheFileName: cacheFileName,
     );
   });

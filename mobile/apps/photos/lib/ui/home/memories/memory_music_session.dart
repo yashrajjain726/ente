@@ -1,6 +1,7 @@
 import "dart:async";
 
 import "package:flutter/material.dart";
+import "package:logging/logging.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/memories/just_audio_memory_music_player.dart";
 import "package:photos/services/memories/memory_music_controller.dart";
@@ -23,12 +24,16 @@ class MemoryMusicSession extends StatefulWidget {
 
 class _MemoryMusicSessionState extends State<MemoryMusicSession>
     with WidgetsBindingObserver {
+  static final _logger = Logger("MemoryMusicSession");
+
   MemoryMusicController? _controller;
   bool _isAppActive = true;
+  late bool _isMuted;
 
   @override
   void initState() {
     super.initState();
+    _isMuted = localSettings.isMemoriesAudioMuted();
     WidgetsBinding.instance.addObserver(this);
     final lifecycleState = WidgetsBinding.instance.lifecycleState;
     _isAppActive =
@@ -45,13 +50,33 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
     );
     final controller = MemoryMusicController(
       assignments: assignments,
-      initiallyMuted: localSettings.isMemoriesAudioMuted(),
+      initiallyMuted: _isMuted,
       persistMuted: localSettings.setMemoriesAudioMuted,
       player: JustAudioMemoryMusicPlayer(),
       tracks: tracks,
     );
     if (!_isAppActive) unawaited(controller.setAppActive(false));
     setState(() => _controller = controller);
+  }
+
+  Future<void> _toggleMuted() async {
+    final controller = _controller;
+    if (controller != null) {
+      await controller.toggleMuted();
+      return;
+    }
+
+    final isMuted = !_isMuted;
+    setState(() => _isMuted = isMuted);
+    try {
+      await localSettings.setMemoriesAudioMuted(isMuted);
+    } catch (error, stackTrace) {
+      _logger.warning(
+        "Failed to persist memories audio mute state",
+        error,
+        stackTrace,
+      );
+    }
   }
 
   @override
@@ -72,24 +97,42 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
 
   @override
   Widget build(BuildContext context) {
-    return MemoryMusicScope(controller: _controller, child: widget.child);
+    return MemoryMusicScope(
+      controller: _controller,
+      isMuted: _isMuted,
+      toggleMuted: _toggleMuted,
+      child: widget.child,
+    );
   }
 }
 
 class MemoryMusicScope extends InheritedNotifier<MemoryMusicController> {
+  final bool _isMuted;
+  final Future<void> Function() _toggleMuted;
+
   const MemoryMusicScope({
     required MemoryMusicController? controller,
+    required bool isMuted,
+    required Future<void> Function() toggleMuted,
     required super.child,
     super.key,
-  }) : super(notifier: controller);
+  }) : _isMuted = isMuted,
+       _toggleMuted = toggleMuted,
+       super(notifier: controller);
 
-  static MemoryMusicController? maybeOf(
-    BuildContext context, {
-    bool listen = true,
-  }) {
-    final scope = listen
+  MemoryMusicController? get controller => notifier;
+
+  bool get isMuted => notifier?.isMuted ?? _isMuted;
+
+  Future<void> toggleMuted() => _toggleMuted();
+
+  static MemoryMusicScope? maybeOf(BuildContext context, {bool listen = true}) {
+    return listen
         ? context.dependOnInheritedWidgetOfExactType<MemoryMusicScope>()
         : context.getInheritedWidgetOfExactType<MemoryMusicScope>();
-    return scope?.notifier;
   }
+
+  @override
+  bool updateShouldNotify(MemoryMusicScope oldWidget) =>
+      _isMuted != oldWidget._isMuted || super.updateShouldNotify(oldWidget);
 }
