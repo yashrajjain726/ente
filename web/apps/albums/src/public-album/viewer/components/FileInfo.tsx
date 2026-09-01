@@ -185,7 +185,10 @@ const annotateExif = (
     if (exif.Make && exif.Model) {
         annotatedExif.takenOnDevice = `${exif.Make.description} ${exif.Model.description}`;
     }
-    if (exif.FNumber) annotatedExif.fNumber = exif.FNumber.description;
+    const fNumber = exif.FNumber;
+    if (fNumber && fNumber.value[1] != 0) {
+        annotatedExif.fNumber = fNumber.description;
+    }
     if (exif.ExposureTime) {
         annotatedExif.exposureTime = exif.ExposureTime.description;
     }
