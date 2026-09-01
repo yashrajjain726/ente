@@ -5,7 +5,10 @@ import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
+import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
+import "package:photos/db/files_db.dart";
+import "package:photos/db/ml/db.dart";
 import "package:photos/events/notification_event.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/ml_indexing_isolate.dart";
@@ -32,6 +35,7 @@ class MachineLearningSettingsPage extends StatefulWidget {
 
 class _MachineLearningSettingsPageState
     extends State<MachineLearningSettingsPage> {
+  static final _logger = Logger("MachineLearningSettingsPage");
   Timer? _timer;
   int _titleTapCount = 0;
   Timer? _advancedOptionsTimer;
@@ -41,7 +45,7 @@ class _MachineLearningSettingsPageState
   @override
   void initState() {
     super.initState();
-    mlDecryptionRecordStore.logFileIDs();
+    unawaited(_pruneMlDecryptionRecords());
     wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.machineLearningSettingsScreen,
@@ -59,6 +63,40 @@ class _MachineLearningSettingsPageState
     _advancedOptionsTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
       _titleTapCount = 0;
     });
+  }
+
+  Future<void> _pruneMlDecryptionRecords() async {
+    final recordedFileIDs = mlDecryptionRecordStore.fileIDs;
+    if (recordedFileIDs.isEmpty) {
+      mlDecryptionRecordStore.logFileIDs();
+      return;
+    }
+    try {
+      final existingFiles = await FilesDB.instance.getFileIDToFileFromIDs(
+        recordedFileIDs,
+      );
+      final errorResultFileIDs = await MLDataDB.instance
+          .getFileIDsWithErrorResults(recordedFileIDs);
+      final staleFileIDs = recordedFileIDs
+          .where(
+            (fileID) =>
+                !existingFiles.containsKey(fileID) ||
+                !errorResultFileIDs.contains(fileID),
+          )
+          .toSet();
+      await mlDecryptionRecordStore.removeAll(staleFileIDs);
+      if (staleFileIDs.isNotEmpty && mounted) {
+        setState(() {});
+      }
+    } catch (error, stackTrace) {
+      _logger.warning(
+        "Failed to prune ML decryption records",
+        error,
+        stackTrace,
+      );
+    } finally {
+      mlDecryptionRecordStore.logFileIDs();
+    }
   }
 
   @override
@@ -461,6 +499,7 @@ class MLStatusWidget extends StatefulWidget {
 class MLStatusWidgetState extends State<MLStatusWidget> {
   Timer? _timer;
   bool _isDeviceHealthy = computeController.isDeviceHealthy;
+
   @override
   void initState() {
     super.initState();

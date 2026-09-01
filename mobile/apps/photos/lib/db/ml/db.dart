@@ -1242,6 +1242,32 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   @override
+  Future<Set<int>> getFileIDsWithErrorResults(List<int> fileIDs) async {
+    if (fileIDs.isEmpty) return {};
+    final db = await asyncDB;
+    final result = <int>{};
+    const chunkSize = _maxSqlBindParamsPerQuery ~/ 3;
+    for (final chunk in fileIDs.chunks(chunkSize)) {
+      final placeholders = List.filled(chunk.length, '?').join(', ');
+      final rows = await db.getAll(
+        '''
+        SELECT $fileIDColumn FROM $facesTable
+        WHERE $fileIDColumn IN ($placeholders) AND $faceScore < 0
+        UNION
+        SELECT $fileIDColumn FROM $clipTable
+        WHERE $fileIDColumn IN ($placeholders) AND LENGTH($embeddingColumn) = 0
+        UNION
+        SELECT $fileIDColumn FROM $petFacesTable
+        WHERE $fileIDColumn IN ($placeholders) AND $faceScore < 0
+        ''',
+        [...chunk, ...chunk, ...chunk],
+      );
+      result.addAll(rows.map((row) => row[fileIDColumn] as int));
+    }
+    return result;
+  }
+
+  @override
   Future<void> deleteFaceIndexForFiles(List<int> fileIDs) async {
     final db = await asyncDB;
     final String sql =
