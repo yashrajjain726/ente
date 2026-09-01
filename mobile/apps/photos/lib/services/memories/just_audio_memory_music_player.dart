@@ -5,6 +5,7 @@ import "package:just_audio/just_audio.dart";
 import "package:logging/logging.dart";
 import "package:photos/models/memories/memory_music_track.dart";
 import "package:photos/services/memories/memory_music_player.dart";
+import "package:photos/services/memories/memory_music_service.dart";
 import "package:photos/services/remote_assets_service.dart";
 
 class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
@@ -28,9 +29,10 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
 
   @override
   Future<void> load(MemoryMusicTrack track) async {
+    final cacheFileName = memoryMusicCacheFileName(track.url);
     final file = await RemoteAssetsService.instance.getAsset(
       track.url,
-      preserveFileExtension: true,
+      cacheFileName: cacheFileName,
     );
     try {
       await _player.setFilePath(file.path, preload: true);
@@ -38,7 +40,7 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
       try {
         await RemoteAssetsService.instance.deleteAsset(
           track.url,
-          preserveFileExtension: true,
+          cacheFileName: cacheFileName,
         );
       } catch (error, stackTrace) {
         _logger.warning(

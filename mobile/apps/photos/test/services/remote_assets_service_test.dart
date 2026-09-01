@@ -24,13 +24,10 @@ void main() {
     await tempDirectory.delete(recursive: true);
   });
 
-  test("deleteAsset removes every extension-preserving artifact", () async {
+  test("deleteAsset removes every custom-named cache artifact", () async {
+    const cacheFileName = "memory-music-track.mp3";
     const remotePath = "https://music.ente.com/track.mp3";
-    final localPath = p.join(
-      tempDirectory.path,
-      "assets",
-      "music_ente_com_track_mp3.mp3",
-    );
+    final localPath = p.join(tempDirectory.path, "assets", cacheFileName);
     final artifacts = await _createAssetArtifacts(localPath);
     final unrelatedFile = File(
       p.join(tempDirectory.path, "assets", "unrelated.mp3"),
@@ -40,14 +37,14 @@ void main() {
     expect(
       await RemoteAssetsService.instance.hasAsset(
         remotePath,
-        preserveFileExtension: true,
+        cacheFileName: cacheFileName,
       ),
       isTrue,
     );
 
     await RemoteAssetsService.instance.deleteAsset(
       remotePath,
-      preserveFileExtension: true,
+      cacheFileName: cacheFileName,
     );
 
     for (final artifact in artifacts) {
@@ -57,14 +54,14 @@ void main() {
     expect(
       await RemoteAssetsService.instance.hasAsset(
         remotePath,
-        preserveFileExtension: true,
+        cacheFileName: cacheFileName,
       ),
       isFalse,
     );
 
     await RemoteAssetsService.instance.deleteAsset(
       remotePath,
-      preserveFileExtension: true,
+      cacheFileName: cacheFileName,
     );
   });
 
