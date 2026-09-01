@@ -2605,6 +2605,7 @@
   "moveToAlbum": "Move to album",
   "moveToHiddenAlbum": "Move to hidden album",
   "movingFilesToAlbum": "Moving files to album...",
+  "muteAudio": "Mute audio",
   "name": "Name",
   "nDays": "{count} days",
   "@nDays": {
@@ -4452,6 +4453,7 @@
   "unnamedPeopleSpotlight": "A familiar face",
   "unnamedPeopleThrowbackTogether": "Throwback together",
   "unnamedPeopleYouAndThem": "You two",
+  "unmuteAudio": "Unmute audio",
   "unpin": "Unpin",
   "unpinnedCodeMessage": "{code} has been unpinned",
   "@unpinnedCodeMessage": {
