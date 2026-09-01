@@ -740,7 +740,7 @@ Future<String> getImagePathForML(EnteFile enteFile) async {
           modificationTime: enteFile.modificationTime,
         );
       }
-      file = await loadFileForMlWithDecryptionRetry(
+      file = await downloadAndLoadFileForMlWithDecryptionRetry(
         () => getFile(enteFile, isOrigin: true, throwOnDecryptionFailure: true),
       );
     } on RepeatedFileDecryptionError {
@@ -1040,7 +1040,7 @@ bool isExpectedMlSkipError(Object error) {
 
 String formatExpectedMlSkipReasonForLogs(Object error) {
   if (error is RepeatedFileDecryptionError) {
-    return "origin decryption failed twice for identical ciphertext";
+    return "origin decryption failed after three retries with identical ciphertext";
   }
   final normalized = _normalizedErrorMessage(error);
   if (normalized.contains("invalidimageformatexception")) {
