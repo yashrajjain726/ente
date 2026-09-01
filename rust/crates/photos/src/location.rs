@@ -2,10 +2,13 @@ use std::path::Path;
 
 use ente_assets::download::CancellationToken;
 use ente_assets::{Asset, AssetFile, AssetStore};
-use ente_location::{CityIndex, CityMatch, Coordinate, CountryIndex, CountryView};
+use ente_location::{
+    CityIndex, CityMatch, Coordinate, CountryIndex, CountryView, UrbanCenterIndex,
+};
 
-const ASSET_URL: &str = "https://assets.ente.com";
+const ASSET_URL: &str = "https://assets.ente.com/location/v2";
 const CITY_FILE: &str = "cities.bin";
+const URBAN_CENTER_FILE: &str = "urban-centres.bin";
 const COUNTRY_FILE: &str = "countries.bin";
 const DISPUTE_FILE: &str = "disputes.bin";
 
@@ -21,6 +24,7 @@ pub enum Error {
 
 pub struct LocationIndex {
     cities: CityIndex,
+    urban_centers: UrbanCenterIndex,
     countries: CountryIndex,
 }
 
@@ -34,6 +38,7 @@ impl LocationIndex {
             .await?;
         Ok(Self {
             cities: CityIndex::from_path(directory.join(CITY_FILE))?,
+            urban_centers: UrbanCenterIndex::from_path(directory.join(URBAN_CENTER_FILE))?,
             countries: CountryIndex::from_paths(
                 directory.join(COUNTRY_FILE),
                 directory.join(DISPUTE_FILE),
@@ -46,7 +51,8 @@ impl LocationIndex {
     }
 
     pub fn group_cities(&self, coordinates: &[Coordinate], query: &str) -> Vec<CityMatch> {
-        self.cities.match_coordinates(coordinates, query)
+        self.urban_centers
+            .match_coordinates_with_cities(&self.cities, coordinates, query)
     }
 
     pub fn group_countries(
@@ -64,11 +70,15 @@ impl LocationIndex {
 
 fn asset() -> Result<Asset, ente_assets::download::Error> {
     Asset::files(
-        vec!["location".into(), "v1".into()],
+        vec!["location".into(), "v2".into()],
         vec![
             file(
                 CITY_FILE,
-                "929a488aeac782d1cfc9e90b3eeb9536423977aab9f21cb1f86b9324ac53efbc",
+                "898dca892a71fd601ae8e75e5c55fd6d4591e4c98de335d9b33e7f076aa668f5",
+            ),
+            file(
+                URBAN_CENTER_FILE,
+                "e981b0383e6502ede56b52d5be96cda66f53d7352492e677d8978467c106dab0",
             ),
             file(
                 COUNTRY_FILE,

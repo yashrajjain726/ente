@@ -1,4 +1,5 @@
 use crate::binary::{array, range, u16_at, u32_at};
+use crate::geometry::{Point, Reader};
 use crate::{CountryCode, Error};
 
 const MAGIC: &[u8; 4] = b"CTRY";
@@ -135,7 +136,7 @@ impl CountryGeometry {
     }
 
     fn lookup_cell(&self, bytes: &[u8], point: Point) -> crate::Result<Vec<CountryCode>> {
-        let mut reader = Reader::new(bytes);
+        let mut reader = Reader::new(bytes, SECTION);
         let mut matches = Vec::new();
         for _ in 0..reader.byte()? {
             push_unique(&mut matches, self.country_code(reader.byte()?));
@@ -157,7 +158,7 @@ impl CountryGeometry {
                 push_unique(&mut matches, country);
             }
         }
-        debug_assert_eq!(reader.position, bytes.len());
+        debug_assert!(reader.is_done());
         Ok(matches)
     }
 }
@@ -169,66 +170,6 @@ pub(crate) struct PreparedCell {
     x: usize,
     y: usize,
     index: usize,
-}
-
-#[derive(Clone, Copy)]
-struct Point {
-    x: u16,
-    y: u16,
-}
-
-struct Reader<'a> {
-    bytes: &'a [u8],
-    position: usize,
-}
-
-impl<'a> Reader<'a> {
-    const fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, position: 0 }
-    }
-
-    fn byte(&mut self) -> crate::Result<u8> {
-        let value = *self.bytes.get(self.position).ok_or(invalid("truncated"))?;
-        self.position += 1;
-        Ok(value)
-    }
-
-    fn take(&mut self, count: usize) -> crate::Result<&'a [u8]> {
-        let end = self
-            .position
-            .checked_add(count)
-            .ok_or(invalid("truncated"))?;
-        let bytes = self
-            .bytes
-            .get(self.position..end)
-            .ok_or(invalid("truncated"))?;
-        self.position = end;
-        Ok(bytes)
-    }
-
-    fn ring_contains(&mut self, point: Point) -> crate::Result<bool> {
-        let count = usize::from(u16::from_le_bytes(
-            self.take(2)?.try_into().expect("two-byte slice"),
-        ));
-        if count == 0 {
-            return Ok(false);
-        }
-        let ring = self.take(count.checked_mul(4).ok_or(invalid("ring size overflow"))?)?;
-        let mut winding = 0_i32;
-        let mut previous = point_at(ring, count - 1);
-        for index in 0..count {
-            let current = point_at(ring, index);
-            if previous.y <= point.y {
-                if current.y > point.y && is_left(previous, current, point) > 0 {
-                    winding += 1;
-                }
-            } else if current.y <= point.y && is_left(previous, current, point) < 0 {
-                winding -= 1;
-            }
-            previous = current;
-        }
-        Ok(winding != 0)
-    }
 }
 
 fn validate(bytes: &[u8]) -> crate::Result<Layout> {
@@ -366,7 +307,7 @@ fn validate_layout(bytes: &[u8], layout: Layout, declared_length: usize) -> crat
 }
 
 fn validate_cell(bytes: &[u8], country_count: usize) -> crate::Result<()> {
-    let mut reader = Reader::new(bytes);
+    let mut reader = Reader::new(bytes, SECTION);
     for _ in 0..reader.byte()? {
         validate_country(reader.byte()?, country_count)?;
     }
@@ -375,7 +316,7 @@ fn validate_cell(bytes: &[u8], country_count: usize) -> crate::Result<()> {
         skip_rings(&mut reader)?;
         skip_rings(&mut reader)?;
     }
-    if reader.position != bytes.len() {
+    if !reader.is_done() {
         return Err(invalid("cell has trailing bytes"));
     }
     Ok(())
@@ -383,9 +324,7 @@ fn validate_cell(bytes: &[u8], country_count: usize) -> crate::Result<()> {
 
 fn skip_rings(reader: &mut Reader<'_>) -> crate::Result<()> {
     for _ in 0..reader.byte()? {
-        let count = usize::from(u16::from_le_bytes(
-            reader.take(2)?.try_into().expect("two-byte slice"),
-        ));
+        let count = usize::from(reader.u16()?);
         reader.take(count.checked_mul(4).ok_or(invalid("ring size overflow"))?)?;
     }
     Ok(())
@@ -397,19 +336,6 @@ fn validate_country(index: u8, country_count: usize) -> crate::Result<()> {
     } else {
         Err(invalid("cell references unknown country"))
     }
-}
-
-fn point_at(ring: &[u8], index: usize) -> Point {
-    let offset = index * 4;
-    Point {
-        x: u16::from_le_bytes([ring[offset], ring[offset + 1]]),
-        y: u16::from_le_bytes([ring[offset + 2], ring[offset + 3]]),
-    }
-}
-
-fn is_left(start: Point, end: Point, point: Point) -> i64 {
-    (i64::from(end.x) - i64::from(start.x)) * (i64::from(point.y) - i64::from(start.y))
-        - (i64::from(point.x) - i64::from(start.x)) * (i64::from(end.y) - i64::from(start.y))
 }
 
 fn normalize(value: f64, minimum: f64, width: f64) -> f64 {
