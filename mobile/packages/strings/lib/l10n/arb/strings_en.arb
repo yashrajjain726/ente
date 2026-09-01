@@ -2543,7 +2543,7 @@
   "mlConsentConfirmation": "I understand, and wish to enable machine learning",
   "mlConsentDescription": "If you enable machine learning, Ente will extract information like face geometry from files, including those shared with you.\n\nThis will happen on your device, and any generated biometric information will be end-to-end encrypted.",
   "mlConsentPrivacy": "Please click here for more details about this feature in our privacy policy",
-  "mlCouldNotProcessItems": "{count, plural, one{Could not process {count} item.} other{Could not process {count} items.}}",
+  "mlCouldNotProcessItems": "{count, plural, one{Could not process {count} item} other{Could not process {count} items}}",
   "@mlCouldNotProcessItems": {
     "description": "Title shown when machine learning could not process one or more items",
     "placeholders": {
@@ -2561,6 +2561,10 @@
         "type": "int"
       }
     }
+  },
+  "mlProcessingIssueReachOut": "Please reach out to us so we can help.",
+  "@mlProcessingIssueReachOut": {
+    "description": "Support prompt shown when machine learning could not process one or more items"
   },
   "mlProgressBannerDescription": "Your photos are getting processed on device to detect faces, objects and more.",
   "mlProgressBannerStatus": "{indexed} out of {total} photos processed",

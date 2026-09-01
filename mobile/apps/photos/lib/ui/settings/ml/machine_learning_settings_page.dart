@@ -591,37 +591,61 @@ class _MLProcessingIssuesBlurb extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(Spacing.lg),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              context.strings.mlCouldNotProcessItems(count: itemCount),
-              style: TextStyles.bodyBold.copyWith(color: colors.warning),
-            ),
-            const SizedBox(height: Spacing.xs),
-            Text(
-              context.strings.mlItemsCouldNotBeProcessed(count: itemCount),
-              style: TextStyles.mini.copyWith(color: colors.textLight),
-            ),
-            const SizedBox(height: Spacing.sm),
-            ButtonComponent(
-              label: context.strings.contactUs,
-              variant: ButtonComponentVariant.link,
-              size: ButtonComponentSize.small,
-              shouldSurfaceExecutionStates: false,
-              onTap: () async {
-                mlDecryptionRecordStore.logFileIDs();
-                await sendLogs(
-                  context,
-                  context.strings.contactUs,
-                  "support@ente.com",
-                  postShare: () {},
-                  subject: "Machine learning processing issue",
-                  body: context.strings.mlItemsCouldNotBeProcessed(
-                    count: itemCount,
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.cautionLight,
+                shape: BoxShape.circle,
+              ),
+              child: SizedBox.square(
+                dimension: 32,
+                child: Center(
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedAlert02,
+                    size: IconSizes.small,
+                    color: colors.caution,
                   ),
-                );
-              },
+                ),
+              ),
+            ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.strings.mlCouldNotProcessItems(count: itemCount),
+                    style: TextStyles.bodyBold.copyWith(color: colors.textBase),
+                  ),
+                  const SizedBox(height: Spacing.xs),
+                  Text(
+                    context.strings.mlProcessingIssueReachOut,
+                    style: TextStyles.mini.copyWith(color: colors.textLight),
+                  ),
+                  const SizedBox(height: Spacing.xs),
+                  Transform.translate(
+                    offset: const Offset(-Spacing.sm, 0),
+                    child: SettingsLink(
+                      label: context.strings.contactUs,
+                      onTap: () {
+                        mlDecryptionRecordStore.logFileIDs();
+                        sendLogs(
+                          context,
+                          context.strings.contactUs,
+                          "support@ente.com",
+                          postShare: () {},
+                          subject: "Machine learning processing issue",
+                          body: context.strings.mlItemsCouldNotBeProcessed(
+                            count: itemCount,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
