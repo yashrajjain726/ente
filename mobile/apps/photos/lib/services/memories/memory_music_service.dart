@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:convert";
 
 import "package:crypto/crypto.dart";
+import "package:dio/dio.dart";
 import "package:logging/logging.dart";
 import "package:photos/models/memories/memory_music_track.dart";
 import "package:photos/service_locator.dart";
@@ -21,6 +22,7 @@ class MemoryMusicService {
     fetchManifest: () async {
       final response = await ServiceLocator.instance.nonEnteDio.get<Object?>(
         _manifestURL,
+        options: Options(receiveTimeout: const Duration(seconds: 15)),
       );
       return response.data;
     },
