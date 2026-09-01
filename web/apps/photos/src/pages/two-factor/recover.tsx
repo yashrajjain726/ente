@@ -1,6 +1,6 @@
-import { RecoverTwoFactorForm } from "@/components/auth/RecoveryForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { featureFlags } from "@/feature-flags";
+import { RecoverTwoFactorForm } from "ente-accounts/components/auth/RecoveryForm";
 import AccountsTwoFactorRecoverPage, {
     type TwoFactorRecoverPresentationProps,
 } from "ente-accounts/pages/two-factor/recover";
