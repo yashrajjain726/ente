@@ -51,7 +51,6 @@ class _VideoWidgetState extends State<VideoWidget> {
   late final VideoSeekController _seekController;
   bool _isSeekInteractionActive = false;
   late final StreamSubscription<bool> _isPlayingStreamSubscription;
-  bool _isLongPressSpeedActive = false;
   OverlayEntry? _longPressSpeedIndicatorEntry;
   late final StreamSubscription<bool> _completedStreamSubscription;
 
@@ -112,15 +111,13 @@ class _VideoWidgetState extends State<VideoWidget> {
   }
 
   void _startLongPressSpeed() {
-    if (_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = true;
+    if (_longPressSpeedIndicatorEntry != null) return;
     _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
     widget.controller.player.setRate(kVideoLongPressPlaybackSpeed).ignore();
   }
 
   void _restorePlaybackSpeed() {
-    if (!_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = false;
+    if (_longPressSpeedIndicatorEntry == null) return;
     _longPressSpeedIndicatorEntry?.remove();
     _longPressSpeedIndicatorEntry = null;
     widget.controller.player.setRate(widget.playbackSpeed.value).ignore();

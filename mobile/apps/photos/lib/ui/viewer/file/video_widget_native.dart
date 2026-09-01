@@ -101,7 +101,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   StreamSubscription<DownloadTask>? downloadTaskSubscription;
   final _transformationController = TransformationController();
   bool _isZooming = false;
-  bool _isLongPressSpeedActive = false;
   OverlayEntry? _longPressSpeedIndicatorEntry;
 
   @override
@@ -331,15 +330,13 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   void _startLongPressSpeed() {
     final controller = _controller;
-    if (_isLongPressSpeedActive || controller == null) return;
-    _isLongPressSpeedActive = true;
+    if (_longPressSpeedIndicatorEntry != null || controller == null) return;
     _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
     controller.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
   }
 
   void _restorePlaybackSpeed() {
-    if (!_isLongPressSpeedActive) return;
-    _isLongPressSpeedActive = false;
+    if (_longPressSpeedIndicatorEntry == null) return;
     _longPressSpeedIndicatorEntry?.remove();
     _longPressSpeedIndicatorEntry = null;
     _controller?.setPlaybackSpeed(widget.playbackSpeed.value).ignore();
