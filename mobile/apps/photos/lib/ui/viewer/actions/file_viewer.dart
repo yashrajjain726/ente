@@ -35,6 +35,12 @@ class FileViewer extends StatefulWidget {
 class FileViewerState extends State<FileViewer> {
   static const int _reviewGalleryWindowSize = 80;
   static const int _reviewGallerySearchPageSize = 200;
+  static const List<Duration> _grantedImageReadRetryDelays = [
+    Duration(milliseconds: 250),
+    Duration(milliseconds: 500),
+    Duration(milliseconds: 1000),
+    Duration(milliseconds: 2000),
+  ];
 
   final action = AppLifecycleService.instance.mediaExtensionAction;
   ChewieController? controller;
@@ -388,17 +394,43 @@ class FileViewerState extends State<FileViewer> {
   }
 
   Future<Uint8List?> _readGrantedImageBytes(String uri) async {
-    try {
-      final bytes = await MediaExtension().readUriBytes(uri);
-      if (bytes == null || bytes.isEmpty) {
+    final mediaExtension = MediaExtension();
+    final maxAttempts = _grantedImageReadRetryDelays.length + 1;
+
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final bytes = await mediaExtension.readUriBytes(uri);
+        if (bytes != null && bytes.isNotEmpty) {
+          return bytes;
+        }
         _logger.severe("failed to read image bytes for $uri");
         return null;
+      } on PlatformException catch (error, stackTrace) {
+        if (error.code != "readUriBytes-pending" ||
+            attempt == maxAttempts - 1) {
+          _logger.severe(
+            "failed to read image bytes for $uri",
+            error,
+            stackTrace,
+          );
+          return null;
+        }
+        final retryDelay = _grantedImageReadRetryDelays[attempt];
+        _logger.warning(
+          "image is still pending for $uri, retrying in "
+          "${retryDelay.inMilliseconds} ms",
+        );
+        await Future<void>.delayed(retryDelay);
+      } catch (error, stackTrace) {
+        _logger.severe(
+          "failed to read image bytes for $uri",
+          error,
+          stackTrace,
+        );
+        return null;
       }
-      return bytes;
-    } catch (e, s) {
-      _logger.severe("failed to read image bytes for $uri", e, s);
-      return null;
     }
+    return null;
   }
 
   Widget _buildGrantedImageFallback(String data) {
