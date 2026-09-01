@@ -10,6 +10,7 @@ const QUERY_COUNT: usize = 100;
 const SINGLE_ADD_COUNT: usize = 2000;
 const BULK_BATCH_SIZE: usize = 1000;
 const SEARCH_K: usize = 10;
+const STORED_SEARCH_COUNT: usize = 100;
 const WARMUP_QUERIES: usize = 10;
 const REMOVAL_PERCENT: usize = 15;
 const DEFAULT_SCALES: &str = "10000,100000";
@@ -41,6 +42,9 @@ struct VecdbReport {
     threshold_total: Duration,
     threshold_avg_hits: f64,
     filtered_total: Duration,
+    stored_keys: usize,
+    stored_total: Duration,
+    stored_avg_hits: f64,
     open_with_snapshot: Duration,
     open_full_rebuild: Duration,
     removed: usize,
@@ -257,6 +261,9 @@ struct SearchTimings {
     threshold_total: Duration,
     threshold_avg_hits: f64,
     filtered_total: Duration,
+    stored_keys: usize,
+    stored_total: Duration,
+    stored_avg_hits: f64,
 }
 
 struct ReopenTimings {
@@ -297,6 +304,9 @@ fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbRe
         threshold_total: searches.threshold_total,
         threshold_avg_hits: searches.threshold_avg_hits,
         filtered_total: searches.filtered_total,
+        stored_keys: searches.stored_keys,
+        stored_total: searches.stored_total,
+        stored_avg_hits: searches.stored_avg_hits,
         open_with_snapshot: reopens.open_with_snapshot,
         open_full_rebuild: reopens.open_full_rebuild,
         removed: compaction.removed,
@@ -375,6 +385,33 @@ fn search_phase(db: &VecDb, data: &BenchData, scale: usize) -> SearchTimings {
     };
     warm(db, &data.queries, &filtered_params);
     let (filtered_total, _) = timed_searches(db, &data.queries, &filtered_params);
+    eprintln!("[scale {scale}] vecdb stored-key search");
+    let stored_keys: Vec<String> = data.entries.iter().map(|(key, _)| key.clone()).collect();
+    let warm_span = WARMUP_QUERIES.min(stored_keys.len());
+    db.bulk_search_stored(
+        &stored_keys[..warm_span],
+        STORED_SEARCH_COUNT,
+        Some(threshold),
+        false,
+        true,
+    )
+    .expect("vecdb stored warmup");
+    let started = Instant::now();
+    let stored_results = db
+        .bulk_search_stored(
+            &stored_keys,
+            STORED_SEARCH_COUNT,
+            Some(threshold),
+            false,
+            true,
+        )
+        .expect("vecdb stored search");
+    let stored_total = started.elapsed();
+    let stored_avg_hits = stored_results
+        .iter()
+        .map(|entry| entry.matches.len())
+        .sum::<usize>() as f64
+        / stored_results.len().max(1) as f64;
     SearchTimings {
         approx_total,
         exact_total,
@@ -383,6 +420,9 @@ fn search_phase(db: &VecDb, data: &BenchData, scale: usize) -> SearchTimings {
         threshold_total,
         threshold_avg_hits,
         filtered_total,
+        stored_keys: stored_results.len(),
+        stored_total,
+        stored_avg_hits,
     }
 }
 
@@ -543,6 +583,19 @@ fn print_vecdb_report(report: &VecdbReport) {
         format!("{QUERY_COUNT} queries"),
         report.filtered_total,
         per_op_text(report.filtered_total, QUERY_COUNT, "query"),
+    );
+    row(
+        &format!(
+            "stored-key search k={STORED_SEARCH_COUNT} d<={:.4} restricted",
+            report.threshold
+        ),
+        format!("{} keys", report.stored_keys),
+        report.stored_total,
+        per_op_text(report.stored_total, report.stored_keys, "key"),
+    );
+    println!(
+        "    {:<44} {:.1}",
+        "avg hits per stored key", report.stored_avg_hits
     );
     row(
         "open cold (valid snapshot)",
