@@ -155,8 +155,12 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private fun Uri.canBeRenderedFromUri(): Boolean {
         return scheme == ContentResolver.SCHEME_FILE ||
-            authority == MediaStoreAuthority ||
-            authority == MediaDocumentsAuthority
+            hasProviderAuthority(MediaStoreAuthority) ||
+            hasProviderAuthority(MediaDocumentsAuthority)
+    }
+
+    private fun Uri.hasProviderAuthority(providerAuthority: String): Boolean {
+        return host == providerAuthority
     }
 
     private fun ContentResolver.encodeAsBase64(contentUri: Uri): String {
@@ -375,7 +379,7 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                 result.error("readUriBytes-too-large", e.message, null)
             }
         } catch (e: IllegalStateException) {
-            val errorCode = if (e.isPendingOrTrashedMediaItemError()) {
+            val errorCode = if (uri.isRetryablePendingMediaStoreError(e)) {
                 "readUriBytes-pending"
             } else {
                 "readUriBytes-failed"
@@ -392,8 +396,18 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         }
     }
 
-    private fun IllegalStateException.isPendingOrTrashedMediaItemError(): Boolean {
-        return message?.contains("pending/trashed item", ignoreCase = true) == true
+    private fun Uri.isRetryablePendingMediaStoreError(error: IllegalStateException): Boolean {
+        if (!hasProviderAuthority(MediaStoreAuthority)) {
+            return false
+        }
+
+        // MediaProvider uses the same text for its pending ContentResolver check and
+        // its pending/trashed FUSE check. Only the former propagates this exception;
+        // FUSE converts trashed access to a generic I/O failure.
+        return error.message?.contains(
+            MediaStorePendingOrTrashedItemError,
+            ignoreCase = true,
+        ) == true
     }
 
     private fun InputStream.readBytesWithLimit(maxBytes: Long): ByteArray {
@@ -564,6 +578,8 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private companion object {
         private const val MediaStoreAuthority = "media"
         private const val MediaDocumentsAuthority = "com.android.providers.media.documents"
+        private const val MediaStorePendingOrTrashedItemError =
+            "Only owner is able to interact with pending/trashed item"
         private const val MaxReadUriBytes = 100L * 1024L * 1024L
     }
 
