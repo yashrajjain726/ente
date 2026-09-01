@@ -427,7 +427,7 @@ const HeaderSection: React.FC<SectionProps> = ({ onCloseSidebar }) => (
         <IconButton
             aria-label={t("close")}
             onClick={onCloseSidebar}
-            color="secondary"
+            color="primary"
         >
             <CloseIcon fontSize="small" />
         </IconButton>

@@ -142,6 +142,7 @@ class _LocationTagsWidgetState extends State<LocationTagsWidget> {
           .toList();
       result.add(
         IconButtonComponent(
+          size: FilterChipComponent.minHeight,
           icon: const HugeIcon(
             icon: HugeIcons.strokeRoundedPlusSign,
             size: IconSizes.small,

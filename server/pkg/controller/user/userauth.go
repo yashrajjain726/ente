@@ -1,6 +1,8 @@
 package user
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"errors"
@@ -400,11 +402,17 @@ func (c *UserController) Logout(ctx *gin.Context) error {
 }
 
 func (c *UserController) GetActiveSessions(context *gin.Context, userID int64) ([]ente.Session, error) {
-	tokens, err := c.UserAuthRepo.GetActiveSessions(userID, auth.GetApp(context))
+	sessions, err := c.UserAuthRepo.GetActiveSessions(userID, auth.GetApp(context))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	return tokens, nil
+	currentHash := auth.HashToken(auth.GetToken(context))
+	for i := range sessions {
+		session := &sessions[i]
+		session.Token = encodeSessionTokenHash(session.TokenHash)
+		session.IsCurrent = bytes.Equal(session.TokenHash, currentHash[:])
+	}
+	return sessions, nil
 }
 
 const (
@@ -543,11 +551,44 @@ func (c *UserController) RemoveAllTokens(userID int64) error {
 }
 
 func (c *UserController) RemoveAllOtherTokens(userID int64, token string) error {
-	return c.finishTokenRevocation(c.UserAuthRepo.RemoveAllOtherTokens(userID, token))
+	tokenHash := auth.HashToken(token)
+	return c.finishTokenRevocation(c.UserAuthRepo.RemoveAllOtherTokensByHash(userID, tokenHash[:]))
 }
 
 func (c *UserController) TerminateSession(userID int64, token string) error {
-	return c.finishTokenRevocation(c.UserAuthRepo.RemoveToken(userID, token))
+	tokenHash := auth.HashToken(token)
+	return c.finishTokenRevocation(c.UserAuthRepo.RemoveTokenByHash(userID, tokenHash[:]))
+}
+
+func (c *UserController) TerminateSessionByIdentifier(userID int64, currentToken, identifier string) error {
+	tokenHash, err := sessionIdentifierHash(identifier)
+	if err != nil {
+		return err
+	}
+	currentHash := auth.HashToken(currentToken)
+	if bytes.Equal(tokenHash, currentHash[:]) {
+		return ente.NewBadRequestWithMessage("use logout to terminate the current session")
+	}
+	return c.finishTokenRevocation(c.UserAuthRepo.RemoveTokenByHash(userID, tokenHash))
+}
+
+const sessionTokenHashPrefix = "th:"
+
+func encodeSessionTokenHash(tokenHash []byte) string {
+	return sessionTokenHashPrefix + base64.RawURLEncoding.EncodeToString(tokenHash)
+}
+
+func sessionIdentifierHash(identifier string) ([]byte, error) {
+	encoded, ok := strings.CutPrefix(identifier, sessionTokenHashPrefix)
+	if !ok {
+		tokenHash := auth.HashToken(identifier)
+		return tokenHash[:], nil
+	}
+	tokenHash, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil || len(tokenHash) != sha256.Size {
+		return nil, ente.NewBadRequestWithMessage("invalid session identifier")
+	}
+	return tokenHash, nil
 }
 
 func (c *UserController) finishTokenRevocation(tokens []repo.RevokedToken, err error) error {

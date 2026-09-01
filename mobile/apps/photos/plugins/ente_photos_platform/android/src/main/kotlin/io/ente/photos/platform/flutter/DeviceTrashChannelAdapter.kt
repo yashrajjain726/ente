@@ -9,9 +9,12 @@ import io.flutter.plugin.common.MethodChannel
 
 internal class DeviceTrashChannelAdapter : MethodChannel.MethodCallHandler {
     private lateinit var service: DeviceTrashService
+    private lateinit var methodChannel: MethodChannel
 
     fun attach(binding: FlutterPlugin.FlutterPluginBinding) {
         service = DeviceTrashService(binding.applicationContext)
+        methodChannel = MethodChannel(binding.binaryMessenger, METHOD_CHANNEL)
+        methodChannel.setMethodCallHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) =
@@ -32,6 +35,7 @@ internal class DeviceTrashChannelAdapter : MethodChannel.MethodCallHandler {
         }
 
     fun detach() {
+        methodChannel.setMethodCallHandler(null)
         service.close()
     }
 
@@ -41,4 +45,8 @@ internal class DeviceTrashChannelAdapter : MethodChannel.MethodCallHandler {
             "deleteBy" to deleteBy,
             "deviceFolder" to deviceFolder,
         )
+
+    private companion object {
+        const val METHOD_CHANNEL = "io.ente.photos.platform/device_trash"
+    }
 }

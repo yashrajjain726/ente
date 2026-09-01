@@ -1,0 +1,1 @@
+- Fixed Home and End key navigation in the search bar.

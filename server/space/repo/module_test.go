@@ -433,6 +433,7 @@ func TestExchangeBrowserSessionConsumesTokenOnce(t *testing.T) {
 	module := newSpaceTestModule(t)
 	userID := insertSpaceUser(t, module, "browser-session-exchange@example.com", "browser-session-exchange-public")
 	authToken := "browser-session-exchange-token"
+	authTokenHash := sha256.Sum256([]byte(authToken))
 	_, err := module.Sessions.DB.Exec(`
 		INSERT INTO tokens (user_id, token, creation_time, app)
 		VALUES ($1, $2, $3, 'photos')
@@ -444,7 +445,7 @@ func TestExchangeBrowserSessionConsumesTokenOnce(t *testing.T) {
 	for _, tokenHash := range [][]byte{[]byte("first-space-token-hash"), []byte("second-space-token-hash")} {
 		go func(tokenHash []byte) {
 			<-start
-			errs <- module.Sessions.ExchangeBrowserSession(ctx, authToken, tokenHash, userID, "session-wrap-key", timeutil.NDaysFromNow(1))
+			errs <- module.Sessions.ExchangeBrowserSession(ctx, authTokenHash[:], tokenHash, userID, "session-wrap-key", timeutil.NDaysFromNow(1))
 		}(tokenHash)
 	}
 	close(start)
@@ -470,6 +471,7 @@ func TestExchangeBrowserSessionKeepsTokenWhenSessionCreationFails(t *testing.T) 
 	module := newSpaceTestModule(t)
 	userID := insertSpaceUser(t, module, "browser-session-rollback@example.com", "browser-session-rollback-public")
 	authToken := "browser-session-rollback-token"
+	authTokenHash := sha256.Sum256([]byte(authToken))
 	tokenHash := []byte("duplicate-space-token-hash")
 	_, err := module.Sessions.DB.Exec(`
 		INSERT INTO tokens (user_id, token, creation_time, app)
@@ -478,7 +480,7 @@ func TestExchangeBrowserSessionKeepsTokenWhenSessionCreationFails(t *testing.T) 
 	require.NoError(t, err)
 	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, tokenHash, userID, "existing-wrap-key", timeutil.NDaysFromNow(1)))
 
-	err = module.Sessions.ExchangeBrowserSession(ctx, authToken, tokenHash, userID, "new-wrap-key", timeutil.NDaysFromNow(1))
+	err = module.Sessions.ExchangeBrowserSession(ctx, authTokenHash[:], tokenHash, userID, "new-wrap-key", timeutil.NDaysFromNow(1))
 	require.Error(t, err)
 	var isDeleted bool
 	require.NoError(t, module.Sessions.DB.QueryRow(`SELECT is_deleted FROM tokens WHERE token = $1`, authToken).Scan(&isDeleted))

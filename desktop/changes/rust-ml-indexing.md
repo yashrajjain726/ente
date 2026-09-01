@@ -1,2 +1,0 @@
-- Use the shared rust ML code for indexing
-- Enable CoreML on MacOS and WebGPU on Linux and Windows

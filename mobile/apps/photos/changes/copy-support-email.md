@@ -1,0 +1,1 @@
+- Made the support email easy to find and copy when reporting an issue.

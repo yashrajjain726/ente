@@ -15,12 +15,20 @@ final class CountryNamesChannelAdapter {
                 result(FlutterMethodNotImplemented)
                 return
             }
-            guard let locale = call.arguments as? String else {
+            guard let arguments = call.arguments as? [String: Any] else {
+                result(FlutterError(code: "invalid_arguments", message: "Expected country name arguments", details: nil))
+                return
+            }
+            guard let locale = arguments["locale"] as? String else {
                 result(FlutterError(code: "invalid_locale", message: "Expected a locale identifier", details: nil))
                 return
             }
-            let names = service.names(localeIdentifier: locale)
-            result(["region": names.region, "names": names.names])
+            guard let nativeLocales = arguments["nativeLocales"] as? [String: [String]] else {
+                result(FlutterError(code: "invalid_native_locales", message: "Expected native country locales", details: nil))
+                return
+            }
+            let names = service.names(localeIdentifier: locale, nativeLocales: nativeLocales)
+            result(["region": names.region, "names": names.names, "nativeNames": names.nativeNames])
         }
     }
 

@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:math" show min;
 import "dart:ui";
 
 import "package:ente_components/components/bottom_sheet/bottom_sheet_component.dart";
@@ -24,18 +25,14 @@ import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 const _albumSlideshowDurationOptions = [5, 10, 15, 30];
 
 class AlbumSlideshowPage extends StatefulWidget {
-  AlbumSlideshowPage({
-    required this.files,
-    required this.albumName,
-    super.key,
-  }) {
+  AlbumSlideshowPage({required this.files, required this.title, super.key}) {
     if (files.isEmpty) {
       throw ArgumentError("files must not be empty");
     }
   }
 
   final List<EnteFile> files;
-  final String albumName;
+  final String title;
 
   @override
   State<AlbumSlideshowPage> createState() => _AlbumSlideshowPageState();
@@ -43,6 +40,8 @@ class AlbumSlideshowPage extends StatefulWidget {
 
 class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
     with WidgetsBindingObserver {
+  static const int _thumbnailLookahead = 10;
+  static const int _fileLookahead = 3;
   static const Duration _mediaReadyTimeout = Duration(seconds: 10);
   static const Duration _autoCrossFadeDuration = Duration(milliseconds: 600);
   static const Duration _manualCrossFadeDuration = Duration(milliseconds: 200);
@@ -88,7 +87,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
       _files.shuffle();
     }
     _setAlbumSlideshowWakeLock(_isForeground && _isPlaying);
-    _preloadAdjacentFiles();
+    _preloadFilesAroundCurrent();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncSystemUi();
@@ -201,24 +200,26 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
       _currentSlideReady = false;
       _autoAdvanceTransition = autoAdvance;
     });
-    _preloadAdjacentFiles();
+    _preloadFilesAroundCurrent();
     _scheduleAdvance();
   }
 
-  void _preloadAdjacentFiles() {
+  void _preloadFilesAroundCurrent() {
     if (_files.length < 2) return;
 
-    final previousIndex = (_currentIndex - 1 + _files.length) % _files.length;
-    final nextIndex = (_currentIndex + 1) % _files.length;
-    _preloadFileAt(previousIndex);
-    if (nextIndex != previousIndex) {
-      _preloadFileAt(nextIndex);
+    final thumbnailCount = min(_thumbnailLookahead, _files.length - 1);
+    for (var offset = 1; offset <= thumbnailCount; offset++) {
+      final file = _files[(_currentIndex + offset) % _files.length];
+      preloadThumbnail(file);
+      if (offset <= _fileLookahead) {
+        preloadFile(file);
+      }
     }
-  }
 
-  void _preloadFileAt(int index) {
-    preloadThumbnail(_files[index]);
-    preloadFile(_files[index]);
+    if (thumbnailCount < _files.length - 1) {
+      final previousIndex = (_currentIndex - 1 + _files.length) % _files.length;
+      preloadThumbnail(_files[previousIndex]);
+    }
   }
 
   void _togglePlayback() {
@@ -269,7 +270,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
       _currentIndex = files.indexOf(currentFile);
       _useRandomOrder = value;
     });
-    _preloadAdjacentFiles();
+    _preloadFilesAroundCurrent();
     unawaited(localSettings.setAlbumSlideshowRandomOrder(value));
   }
 
@@ -500,7 +501,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
                             const SizedBox(width: Spacing.sm),
                             Expanded(
                               child: Text(
-                                widget.albumName,
+                                widget.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyles.display3.copyWith(
@@ -513,9 +514,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
                               child: Align(
                                 alignment: Alignment.centerRight,
                                 child: IconButtonComponent(
-                                  tooltip: pendingTranslation(
-                                    "Slideshow settings",
-                                  ),
+                                  tooltip: context.strings.slideshowSettings,
                                   variant: IconButtonComponentVariant.unfilled,
                                   shouldSurfaceExecutionStates: false,
                                   size: 48,
@@ -615,7 +614,7 @@ class _AlbumSlideshowSettingsSheetState
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     return BottomSheetComponent(
-      title: pendingTranslation("Slideshow settings"),
+      title: context.strings.slideshowSettings,
       closeTooltip: context.strings.close,
       isScrollable: true,
       content: Column(
@@ -623,7 +622,7 @@ class _AlbumSlideshowSettingsSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            pendingTranslation("Slide duration"),
+            context.strings.timePerPhoto,
             style: TextStyles.bodyBold.copyWith(color: colors.textBase),
           ),
           const SizedBox(height: Spacing.sm),
@@ -633,7 +632,7 @@ class _AlbumSlideshowSettingsSheetState
             children: [
               for (final seconds in _albumSlideshowDurationOptions)
                 _buildChip(
-                  label: pendingTranslation("$seconds sec"),
+                  label: context.strings.secondsCount(count: seconds),
                   selected: seconds == _durationSeconds,
                   onTap: () {
                     if (seconds == _durationSeconds) return;
@@ -645,7 +644,7 @@ class _AlbumSlideshowSettingsSheetState
           ),
           const SizedBox(height: Spacing.xl),
           Text(
-            pendingTranslation("Order"),
+            context.strings.photoOrder,
             style: TextStyles.bodyBold.copyWith(color: colors.textBase),
           ),
           const SizedBox(height: Spacing.sm),
@@ -654,12 +653,12 @@ class _AlbumSlideshowSettingsSheetState
             runSpacing: Spacing.md,
             children: [
               _buildChip(
-                label: pendingTranslation("In order"),
+                label: context.strings.inOrder,
                 selected: !_randomOrder,
                 onTap: () => _setRandomOrder(false),
               ),
               _buildChip(
-                label: pendingTranslation("Random"),
+                label: context.strings.shuffle,
                 selected: _randomOrder,
                 onTap: () => _setRandomOrder(true),
               ),
@@ -667,7 +666,7 @@ class _AlbumSlideshowSettingsSheetState
           ),
           const SizedBox(height: Spacing.xl),
           Text(
-            pendingTranslation("Background"),
+            context.strings.background,
             style: TextStyles.bodyBold.copyWith(color: colors.textBase),
           ),
           const SizedBox(height: Spacing.sm),
@@ -676,12 +675,12 @@ class _AlbumSlideshowSettingsSheetState
             runSpacing: Spacing.md,
             children: [
               _buildChip(
-                label: pendingTranslation("Blurred"),
+                label: context.strings.blurred,
                 selected: _blurred,
                 onTap: () => _setBlurred(true),
               ),
               _buildChip(
-                label: pendingTranslation("Black"),
+                label: context.strings.black,
                 selected: !_blurred,
                 onTap: () => _setBlurred(false),
               ),
@@ -698,7 +697,7 @@ class _AlbumSlideshowSettingsSheetState
     required VoidCallback onTap,
   }) {
     return AnimatedSize(
-      duration: Motion.standard,
+      duration: Motion.slow,
       curve: Curves.easeInOutCubic,
       alignment: Alignment.centerLeft,
       child: FilterChipComponent(
@@ -707,7 +706,7 @@ class _AlbumSlideshowSettingsSheetState
             ? FilterChipComponentState.selected
             : FilterChipComponentState.unselected,
         trailing: selected
-            ? const HugeIcon(icon: HugeIcons.strokeRoundedTick02, size: 12)
+            ? const HugeIcon(icon: HugeIcons.strokeRoundedTick02, size: 18)
             : null,
         onChanged: (_) => onTap(),
       ),

@@ -446,12 +446,6 @@ class MLService {
         _logRunStopped(control, "after initial clustering");
         return MlRunDisposition.stopped;
       }
-      if (_mlControllerStatus == true) {
-        // Cache refreshes only read ML stores, so they may safely outlive
-        // this run and the process lock.
-        magicCacheService.updateCache(forced: force).ignore();
-        memoriesCacheService.updateCache(forced: force).ignore();
-      }
       if (control.stopRequested) {
         _logRunStopped(control, "before indexing");
         return MlRunDisposition.stopped;
@@ -470,11 +464,22 @@ class MLService {
         _logRunStopped(control, "before post-run cache scheduling");
         return MlRunDisposition.stopped;
       }
+      await PersonService.instance.sync();
+      if (control.stopRequested) {
+        _logRunStopped(control, "after post-run person sync");
+        return MlRunDisposition.stopped;
+      }
       if (_mlControllerStatus == true) {
-        // Persist refreshed caches after ML so foreground can pick them up
-        // on the next resume, even when the work ran headlessly in background.
-        magicCacheService.updateCache().ignore();
-        memoriesCacheService.updateCache(forced: force).ignore();
+        await magicCacheService.updateCache(forced: force);
+        if (control.stopRequested) {
+          _logRunStopped(control, "after magic cache refresh");
+          return MlRunDisposition.stopped;
+        }
+        await memoriesCacheService.updateCache(forced: force);
+        if (control.stopRequested) {
+          _logRunStopped(control, "after memories cache refresh");
+          return MlRunDisposition.stopped;
+        }
       }
       return MlRunDisposition.completed;
     } finally {
@@ -730,6 +735,24 @@ class MLService {
         'Getting and sorting embeddings took ${DateTime.now().difference(startEmbeddingFetch).inMilliseconds} ms for ${allFaceInfoForClustering.length} embeddings'
         'and ${missingFileIDs.length} missing fileIDs',
       );
+
+      if (missingFileIDs.isNotEmpty) {
+        await mlDataDB.deleteUnclusteredFaceIndexForFiles(
+          missingFileIDs.toList(),
+        );
+        _logger.info(
+          'Pruned unclustered face data for ${missingFileIDs.length} missing files',
+        );
+      }
+
+      if (allFaceInfoForClustering.every((face) => face.clusterId != null)) {
+        _logger.info('All faces clustered');
+        _logger.info(
+          'clusterAllImages() finished, in '
+          '${DateTime.now().difference(clusterAllImagesTime).inSeconds} seconds',
+        );
+        return;
+      }
 
       final Map<String, (Uint8List, int)> oldClusterSummaries = await mlDataDB
           .getAllClusterSummary();

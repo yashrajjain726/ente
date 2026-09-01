@@ -383,9 +383,21 @@ const iconForOption = (option: SearchOption | undefined) => {
     }
 };
 
+const handleInputKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (
+    event,
+) => {
+    if (event.key === "Home" || event.key === "End") {
+        event.stopPropagation();
+    }
+};
+
 // Keep the search text visible after react-select loses focus.
 const Input: React.FC<InputProps<SearchOption, false>> = (props) => (
-    <SelectComponents.Input {...props} isHidden={false} />
+    <SelectComponents.Input
+        {...props}
+        isHidden={false}
+        onKeyDown={handleInputKeyDown}
+    />
 );
 
 // noOptionsMessage must return null or react-select leaves an empty menu div.

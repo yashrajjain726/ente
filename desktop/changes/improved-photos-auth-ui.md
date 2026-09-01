@@ -1,1 +1,0 @@
-- Improved the authentication UI for Ente Photos.

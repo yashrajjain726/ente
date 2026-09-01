@@ -1,1 +1,0 @@
-- Added functionality for sharing and applying referral codes.
