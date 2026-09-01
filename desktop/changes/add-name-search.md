@@ -1,1 +1,0 @@
-- Added search when assigning names to people.

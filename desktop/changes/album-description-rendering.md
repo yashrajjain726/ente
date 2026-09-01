@@ -1,1 +1,0 @@
-- Add album description to gallery.
