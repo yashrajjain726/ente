@@ -26,6 +26,12 @@ import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import kotlin.collections.HashMap
 
+private const val MediaStorePendingItemErrorPrefix =
+    "Only owner is able to interact with pending"
+
+internal fun isMediaStorePendingItemError(message: String?): Boolean {
+    return message?.contains(MediaStorePendingItemErrorPrefix, ignoreCase = true) == true
+}
 
 /// The Class which implements Activity Aware FlutterPlugin
 class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
@@ -41,7 +47,7 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private var activityBinding: ActivityPluginBinding? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val ioExecutor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val logTag = "EnteMediaExtensionPlugin"
+    private val logTag = "EnteMediaExtension"
 
     ///ENUM of all the possible IntentAction for a gallery app.
     enum class IntentAction {
@@ -401,13 +407,9 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             return false
         }
 
-        // MediaProvider uses the same text for its pending ContentResolver check and
-        // its pending/trashed FUSE check. Only the former propagates this exception;
-        // FUSE converts trashed access to a generic I/O failure.
-        return error.message?.contains(
-            MediaStorePendingOrTrashedItemError,
-            ignoreCase = true,
-        ) == true
+        // Only the ContentResolver pending check propagates this exception;
+        // the FUSE pending/trashed check converts it to a generic I/O failure.
+        return isMediaStorePendingItemError(error.message)
     }
 
     private fun InputStream.readBytesWithLimit(maxBytes: Long): ByteArray {
@@ -578,8 +580,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private companion object {
         private const val MediaStoreAuthority = "media"
         private const val MediaDocumentsAuthority = "com.android.providers.media.documents"
-        private const val MediaStorePendingOrTrashedItemError =
-            "Only owner is able to interact with pending/trashed item"
         private const val MaxReadUriBytes = 100L * 1024L * 1024L
     }
 
