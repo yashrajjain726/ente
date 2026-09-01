@@ -357,6 +357,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   // invalidates the prior delayed forward.
   Object? _kenBurnsStartToken;
   bool _isViewerPaused = false;
+  bool _isMusicViewerActionPaused = false;
   bool _isPlaybackPaused = false;
   bool get _isAnimationPaused =>
       !widget.isActive || _isViewerPaused || _isPlaybackPaused;
@@ -422,13 +423,10 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final memoryData = FullScreenMemoryData.of(context);
-    final previousMemoryData = _memoryData;
     _memoryData = memoryData;
     final nextNotifier = memoryData?.indexNotifier;
     if (identical(nextNotifier, _itemIndexNotifier)) {
-      if (!identical(previousMemoryData, memoryData)) {
-        _activateCurrentItemMusic();
-      }
+      _activateCurrentItemMusic();
       return;
     }
     _itemIndexNotifier?.removeListener(_activateCurrentItemMusic);
@@ -467,6 +465,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
     final file = inheritedData.memories[index].file;
     final controller = MemoryMusicScope.maybeOf(context, listen: false);
     if (controller == null) return;
+    unawaited(controller.setViewerActionPaused(_isMusicViewerActionPaused));
     unawaited(
       controller.activateMemory(
         widget.memoryID,
@@ -676,6 +675,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _pauseViewer() {
     if (!mounted) return;
+    _isMusicViewerActionPaused = true;
     final controller = MemoryMusicScope.maybeOf(context, listen: false);
     if (controller != null) {
       unawaited(controller.setViewerActionPaused(true));
@@ -686,6 +686,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
   void _resumeViewer() {
     if (!mounted) return;
+    _isMusicViewerActionPaused = false;
     Bus.instance.fire(ResumeVideoEvent());
     _toggleAnimation(pause: false);
     final controller = MemoryMusicScope.maybeOf(context, listen: false);

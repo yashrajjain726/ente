@@ -9,12 +9,10 @@ void main() {
   const track1 = MemoryMusicTrack(
     id: "track-1",
     url: "https://example.com/track-1.mp3",
-    cacheFileName: "track-1.mp3",
   );
   const track2 = MemoryMusicTrack(
     id: "track-2",
     url: "https://example.com/track-2.mp3",
-    cacheFileName: "track-2.mp3",
   );
   late _FakeMemoryMusicPlayer player;
   late List<bool> persistedMuteValues;
@@ -136,13 +134,12 @@ void main() {
   });
 
   test("music resumes only after every pause reason clears", () async {
-    await controller.activateMemory("memory-1", currentItemIsVideo: false);
-
     await controller.setAppActive(false);
-    expect(player.playing, isFalse);
     expect(player.pausedImmediately, isTrue);
-
     await controller.setViewerActionPaused(true);
+    await controller.activateMemory("memory-1", currentItemIsVideo: false);
+    expect(player.playing, isFalse);
+
     await controller.setAppActive(true);
     expect(player.playing, isFalse);
 
