@@ -1,5 +1,4 @@
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { featureFlags } from "@/feature-flags";
 import { RecoverTwoFactorForm } from "ente-accounts/components/auth/RecoveryForm";
 import AccountsTwoFactorRecoverPage, {
     type TwoFactorRecoverPresentationProps,
@@ -17,10 +16,6 @@ function RecoverTwoFactorPresentation(
 }
 
 function PasskeyRecoverPage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosAuthFlow) {
-        return <AccountsTwoFactorRecoverPage twoFactorType="passkey" />;
-    }
-
     return (
         <AccountsTwoFactorRecoverPage
             twoFactorType="passkey"

@@ -1,6 +1,5 @@
 import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { featureFlags } from "@/feature-flags";
 import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "ente-accounts/components/auth/VerifyEmailForm";
 import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components/LoginComponents";
@@ -30,10 +29,6 @@ function PasskeyPresentation(
 }
 
 function VerifyPage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosAuthFlow) {
-        return <AccountsVerifyPage />;
-    }
-
     return (
         <AccountsVerifyPage
             presentation={VerifyEmailPresentation}

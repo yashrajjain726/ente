@@ -1,6 +1,5 @@
 import { PasskeyVerificationForm } from "@/components/auth/PasskeyVerificationForm";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { featureFlags } from "@/feature-flags";
 import {
     CredentialsForm,
     PasswordForm,
@@ -33,10 +32,6 @@ function PasskeyPresentation(
 }
 
 function CredentialsPage(): React.JSX.Element {
-    if (!featureFlags.enableNewPhotosAuthFlow) {
-        return <AccountsCredentialsPage />;
-    }
-
     return (
         <AccountsCredentialsPage
             presentation={CredentialsPresentation}
