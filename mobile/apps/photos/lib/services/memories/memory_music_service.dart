@@ -1,7 +1,6 @@
 import "dart:async";
 import "dart:convert";
 
-import "package:crypto/crypto.dart";
 import "package:logging/logging.dart";
 import "package:photos/models/memories/memory_music_track.dart";
 import "package:photos/service_locator.dart";
@@ -10,9 +9,6 @@ import "package:shared_preferences/shared_preferences.dart";
 
 const _manifestURL = "https://music.ente.com/tracks.json";
 const _manifestPreferenceKey = "memory_music_manifest";
-
-String memoryMusicCacheFileName(String url) =>
-    "memory-music-${sha256.convert(utf8.encode(url))}.mp3";
 
 class MemoryMusicService {
   static final _logger = Logger("MemoryMusicService");
@@ -24,19 +20,17 @@ class MemoryMusicService {
       );
       return response.data;
     },
-    hasAsset: (url) => RemoteAssetsService.instance.hasAsset(
-      url,
-      cacheFileName: memoryMusicCacheFileName(url),
-    ),
+    hasAsset: (url) =>
+        RemoteAssetsService.instance.hasAsset(url, preserveFileExtension: true),
     cacheAsset: (url) async {
       await RemoteAssetsService.instance.getAsset(
         url,
-        cacheFileName: memoryMusicCacheFileName(url),
+        preserveFileExtension: true,
       );
     },
     deleteAsset: (url) => RemoteAssetsService.instance.deleteAsset(
       url,
-      cacheFileName: memoryMusicCacheFileName(url),
+      preserveFileExtension: true,
     ),
   );
 

@@ -31,12 +31,12 @@ class RemoteAssetsService {
     String remotePath, {
     bool refetch = false,
     String? expectedSha256,
-    String? cacheFileName,
+    bool preserveFileExtension = false,
   }) async {
     return _lockFor(remotePath).synchronized(() async {
       final path = await _getLocalPath(
         remotePath,
-        cacheFileName: cacheFileName,
+        preserveFileExtension: preserveFileExtension,
       );
       final file = File(path);
       if (await file.exists() && !refetch) {
@@ -53,11 +53,14 @@ class RemoteAssetsService {
     });
   }
 
-  Future<void> deleteAsset(String remotePath, {String? cacheFileName}) {
+  Future<void> deleteAsset(
+    String remotePath, {
+    bool preserveFileExtension = false,
+  }) {
     return _lockFor(remotePath).synchronized(() async {
       final localPath = await _getLocalPath(
         remotePath,
-        cacheFileName: cacheFileName,
+        preserveFileExtension: preserveFileExtension,
       );
       await _deleteAssetArtifacts(localPath);
     });
@@ -124,11 +127,14 @@ class RemoteAssetsService {
     });
   }
 
-  Future<bool> hasAsset(String remotePath, {String? cacheFileName}) {
+  Future<bool> hasAsset(
+    String remotePath, {
+    bool preserveFileExtension = false,
+  }) {
     return _lockFor(remotePath).synchronized(() async {
       final path = await _getLocalPath(
         remotePath,
-        cacheFileName: cacheFileName,
+        preserveFileExtension: preserveFileExtension,
       );
       return File(path).exists();
     });
@@ -136,20 +142,26 @@ class RemoteAssetsService {
 
   Future<String> _getLocalPath(
     String remotePath, {
-    String? cacheFileName,
+    bool preserveFileExtension = false,
   }) async {
     return (await getApplicationSupportDirectory()).path +
         "/assets/" +
-        (cacheFileName ?? _urlToFileName(remotePath));
+        _urlToFileName(
+          remotePath,
+          preserveFileExtension: preserveFileExtension,
+        );
   }
 
-  String _urlToFileName(String url) {
+  String _urlToFileName(String url, {bool preserveFileExtension = false}) {
+    final extension = preserveFileExtension
+        ? RegExp(r"\.[a-zA-Z0-9]+$").stringMatch(Uri.parse(url).path) ?? ""
+        : "";
     String fileName = url
         .replaceAll(RegExp(r'https?://'), '')
         .replaceAll(RegExp(r'[^\w\.]'), '_');
     fileName = fileName.replaceAll('.', '_');
 
-    return fileName;
+    return fileName + extension;
   }
 
   Future<void> _downloadFile(
