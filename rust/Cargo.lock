@@ -2662,6 +2662,7 @@ dependencies = [
  "ente-location",
  "geo",
  "reqwest 0.12.28",
+ "rusqlite",
  "sha2 0.11.0",
  "shapefile",
  "thiserror 2.0.18",

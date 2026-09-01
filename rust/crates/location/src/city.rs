@@ -10,13 +10,14 @@ use crate::binary::{f32_at, range, u16_at, u24_at, u32_at};
 use crate::{Coordinate, CountryCode, Error};
 
 const MAGIC: &[u8; 4] = b"CITY";
-const VERSION: u16 = 1;
-const HEADER_LEN: usize = 72;
+const VERSION: u16 = 2;
+const HEADER_LEN: usize = 76;
 const NODE_LEN: usize = 3;
 const POINT_LEN: usize = 15;
 const NAME_OFFSET_LEN: usize = 3;
 const MAX_U24: usize = 0x00ff_ffff;
 const MAX_CATCHMENT_KM: f64 = 30.0;
+const MAX_OVERRIDE_DISTANCE_KM: f64 = 3.0;
 const SECTION: &str = "city index";
 
 #[derive(Clone, Debug, PartialEq)]
@@ -40,6 +41,7 @@ pub struct CityMatch {
 #[derive(Clone, Copy, Debug)]
 struct Layout {
     point_count: usize,
+    override_count: usize,
     name_count: usize,
     country_count: usize,
     nodes: usize,
@@ -69,6 +71,12 @@ struct SearchBounds {
     maximum_longitude: f64,
 }
 
+#[derive(Clone, Copy)]
+struct Tree {
+    nodes: usize,
+    node_count: usize,
+}
+
 impl SearchBounds {
     const fn new(
         minimum_latitude: f64,
@@ -85,13 +93,13 @@ impl SearchBounds {
     }
 }
 
-struct SearchPattern {
+pub(crate) struct SearchPattern {
     characters: Vec<char>,
     fallback: Vec<usize>,
 }
 
 impl SearchPattern {
-    fn new(query: &str) -> Option<Self> {
+    pub(crate) fn new(query: &str) -> Option<Self> {
         let characters: Vec<char> = search_characters(query).collect();
         if characters.is_empty() {
             return None;
@@ -113,7 +121,7 @@ impl SearchPattern {
         })
     }
 
-    fn matches(&self, value: &str) -> bool {
+    pub(crate) fn matches(&self, value: &str) -> bool {
         let mut matched = 0;
         for character in search_characters(value) {
             while matched > 0 && character != self.characters[matched] {
@@ -135,6 +143,10 @@ fn search_characters(value: &str) -> impl Iterator<Item = char> + '_ {
         .nfd()
         .filter(|&character| !is_combining_mark(character))
         .flat_map(char::to_lowercase)
+}
+
+pub fn normalize_search_text(value: &str) -> String {
+    search_characters(value).collect()
 }
 
 pub struct CityIndex {
@@ -186,6 +198,29 @@ impl CityIndex {
     }
 
     pub fn match_coordinates(&self, coordinates: &[Coordinate], query: &str) -> Vec<CityMatch> {
+        self.match_coordinates_in(coordinates, query, self.tree(), MAX_CATCHMENT_KM)
+    }
+
+    pub fn match_override_coordinates(
+        &self,
+        coordinates: &[Coordinate],
+        query: &str,
+    ) -> Vec<CityMatch> {
+        self.match_coordinates_in(
+            coordinates,
+            query,
+            self.override_tree(),
+            MAX_OVERRIDE_DISTANCE_KM,
+        )
+    }
+
+    fn match_coordinates_in(
+        &self,
+        coordinates: &[Coordinate],
+        query: &str,
+        tree: Tree,
+        maximum_distance_km: f64,
+    ) -> Vec<CityMatch> {
         if coordinates.is_empty() {
             return Vec::new();
         }
@@ -202,7 +237,13 @@ impl CityIndex {
             if !coordinate.is_valid() {
                 continue;
             }
-            self.range_around(coordinate, MAX_CATCHMENT_KM, &mut candidates, &mut stack);
+            self.range_around(
+                tree,
+                coordinate,
+                maximum_distance_km,
+                &mut candidates,
+                &mut stack,
+            );
             eligible.clear();
             for &point_index in &candidates {
                 let point = self.point(point_index);
@@ -219,7 +260,7 @@ impl CityIndex {
                     f64::from(point.longitude),
                 );
                 let rank = self.rank(point_index);
-                if distance_km <= catchment_km(rank) {
+                if distance_km <= maximum_distance_km.min(catchment_km(rank)) {
                     eligible.push(Candidate {
                         point: point_index,
                         distance_km,
@@ -271,6 +312,7 @@ impl CityIndex {
 
     fn range_around(
         &self,
+        tree: Tree,
         coordinate: Coordinate,
         maximum_distance_km: f64,
         result: &mut Vec<usize>,
@@ -284,6 +326,7 @@ impl CityIndex {
         let maximum_latitude = (coordinate.latitude + latitude_delta).min(90.0);
         if longitude_delta >= 180.0 {
             self.range_into(
+                tree,
                 SearchBounds::new(minimum_latitude, maximum_latitude, -180.0, 180.0),
                 result,
                 stack,
@@ -295,6 +338,7 @@ impl CityIndex {
         let maximum_longitude = coordinate.longitude + longitude_delta;
         if minimum_longitude < -180.0 {
             self.range_into(
+                tree,
                 SearchBounds::new(
                     minimum_latitude,
                     maximum_latitude,
@@ -305,6 +349,7 @@ impl CityIndex {
                 stack,
             );
             self.range_into(
+                tree,
                 SearchBounds::new(
                     minimum_latitude,
                     maximum_latitude,
@@ -316,11 +361,13 @@ impl CityIndex {
             );
         } else if maximum_longitude > 180.0 {
             self.range_into(
+                tree,
                 SearchBounds::new(minimum_latitude, maximum_latitude, minimum_longitude, 180.0),
                 result,
                 stack,
             );
             self.range_into(
+                tree,
                 SearchBounds::new(
                     minimum_latitude,
                     maximum_latitude,
@@ -332,6 +379,7 @@ impl CityIndex {
             );
         } else {
             self.range_into(
+                tree,
                 SearchBounds::new(
                     minimum_latitude,
                     maximum_latitude,
@@ -346,17 +394,18 @@ impl CityIndex {
 
     fn range_into(
         &self,
+        tree: Tree,
         bounds: SearchBounds,
         result: &mut Vec<usize>,
         stack: &mut Vec<(usize, usize, u8)>,
     ) {
-        if self.layout.point_count == 0 {
+        if tree.node_count == 0 {
             return;
         }
         stack.clear();
-        stack.push((0, self.layout.point_count, 0));
+        stack.push((0, tree.node_count, 0));
         while let Some((node_index, subtree_size, axis)) = stack.pop() {
-            let point_index = self.node(node_index);
+            let point_index = self.node(tree, node_index);
             let point = self.point(point_index);
             let latitude = f64::from(point.latitude);
             let longitude = f64::from(point.longitude);
@@ -401,8 +450,22 @@ impl CityIndex {
         }
     }
 
-    fn node(&self, index: usize) -> usize {
-        u24_at(&self.bytes, self.layout.nodes + index * NODE_LEN).expect("validated node") as usize
+    fn tree(&self) -> Tree {
+        Tree {
+            nodes: self.layout.nodes,
+            node_count: self.layout.point_count,
+        }
+    }
+
+    fn override_tree(&self) -> Tree {
+        Tree {
+            nodes: self.layout.nodes + self.layout.point_count * NODE_LEN,
+            node_count: self.layout.override_count,
+        }
+    }
+
+    fn node(&self, tree: Tree, index: usize) -> usize {
+        u24_at(&self.bytes, tree.nodes + index * NODE_LEN).expect("validated node") as usize
     }
 
     fn point(&self, index: usize) -> Point {
@@ -495,6 +558,7 @@ fn validate(bytes: &[u8]) -> crate::Result<Layout> {
 
     let layout = Layout {
         point_count: read_usize(bytes, 8)?,
+        override_count: read_usize(bytes, 72)?,
         name_count: read_usize(bytes, 12)?,
         country_count: usize::from(read_u16(bytes, 16)?),
         nodes: read_usize(bytes, 24)?,
@@ -515,13 +579,29 @@ fn validate(bytes: &[u8]) -> crate::Result<Layout> {
     validate_sections(bytes, layout, declared_length)?;
     validate_strings(bytes, layout)?;
     validate_points(bytes, layout)?;
-    validate_tree(bytes, layout)?;
+    validate_tree(
+        bytes,
+        layout,
+        Tree {
+            nodes: layout.nodes,
+            node_count: layout.point_count,
+        },
+    )?;
+    validate_tree(
+        bytes,
+        layout,
+        Tree {
+            nodes: layout.nodes + layout.point_count * NODE_LEN,
+            node_count: layout.override_count,
+        },
+    )?;
     Ok(layout)
 }
 
 fn validate_sections(bytes: &[u8], layout: Layout, declared_length: usize) -> crate::Result<()> {
     if layout.point_count > MAX_U24
         || layout.name_count > MAX_U24
+        || layout.override_count > layout.point_count
         || layout.country_count > 256
         || (layout.point_count > 0 && (layout.name_count == 0 || layout.country_count == 0))
         || layout.rank_ends[3] > layout.point_count
@@ -531,6 +611,8 @@ fn validate_sections(bytes: &[u8], layout: Layout, declared_length: usize) -> cr
     }
     let nodes = range(layout.nodes, layout.point_count, NODE_LEN)
         .ok_or(invalid("node section overflow"))?;
+    let override_nodes = range(nodes.end, layout.override_count, NODE_LEN)
+        .ok_or(invalid("override-node section overflow"))?;
     let points = range(layout.points, layout.point_count, POINT_LEN)
         .ok_or(invalid("point section overflow"))?;
     let name_offsets = offset_table_range(layout.name_offsets, layout.name_count, NAME_OFFSET_LEN)?;
@@ -554,7 +636,7 @@ fn validate_sections(bytes: &[u8], layout: Layout, declared_length: usize) -> cr
         .ok_or(invalid("country section overflow"))?;
 
     if layout.nodes != HEADER_LEN
-        || layout.points != nodes.end
+        || layout.points != override_nodes.end
         || layout.name_offsets != points.end
         || layout.names != name_offsets.end
         || layout.country_offsets != names_end
@@ -587,9 +669,7 @@ fn validate_strings(bytes: &[u8], layout: Layout) -> crate::Result<()> {
     )?;
     for index in 0..layout.name_count {
         let value = table_entry_u24(bytes, layout.name_offsets, layout.names, index);
-        if let Some((name, alias)) = value.split_once('\0')
-            && (name.is_empty() || alias.is_empty() || alias.contains('\0'))
-        {
+        if value.split('\0').any(str::is_empty) {
             return Err(invalid("invalid city name"));
         }
     }
@@ -630,23 +710,23 @@ fn validate_points(bytes: &[u8], layout: Layout) -> crate::Result<()> {
     Ok(())
 }
 
-fn validate_tree(bytes: &[u8], layout: Layout) -> crate::Result<()> {
-    if layout.point_count == 0 {
+fn validate_tree(bytes: &[u8], layout: Layout, tree: Tree) -> crate::Result<()> {
+    if tree.node_count == 0 {
         return Ok(());
     }
 
     let mut visited_points = vec![false; layout.point_count];
-    let mut stack = vec![(0usize, layout.point_count, 0u8, -90.0, 90.0, -180.0, 180.0)];
+    let mut stack = vec![(0usize, tree.node_count, 0u8, -90.0, 90.0, -180.0, 180.0)];
     while let Some((node_index, size, axis, min_lat, max_lat, min_lng, max_lng)) = stack.pop() {
         if size == 0
             || node_index
                 .checked_add(size)
-                .is_none_or(|end| end > layout.point_count)
+                .is_none_or(|end| end > tree.node_count)
         {
             return Err(invalid("invalid tree layout"));
         }
-        let point = u24_at(bytes, layout.nodes + node_index * NODE_LEN)
-            .ok_or(invalid("truncated"))? as usize;
+        let point =
+            u24_at(bytes, tree.nodes + node_index * NODE_LEN).ok_or(invalid("truncated"))? as usize;
         if point >= layout.point_count || visited_points[point] {
             return Err(invalid("invalid tree node"));
         }
@@ -709,7 +789,7 @@ fn validate_tree(bytes: &[u8], layout: Layout) -> crate::Result<()> {
             }
         }
     }
-    if visited_points.iter().any(|&visited| !visited) {
+    if tree.node_count == layout.point_count && visited_points.iter().any(|&visited| !visited) {
         return Err(invalid("tree does not cover every point"));
     }
     Ok(())
@@ -815,7 +895,7 @@ fn catchment_km(rank: u8) -> f64 {
     [8.0, 10.0, 14.0, 20.0, 30.0][usize::from(rank)]
 }
 
-fn distance_km(lat1: f64, lng1: f64, lat2: f64, lng2: f64) -> f64 {
+pub(crate) fn distance_km(lat1: f64, lng1: f64, lat2: f64, lng2: f64) -> f64 {
     let lat1 = lat1.to_radians();
     let lat2 = lat2.to_radians();
     let delta_latitude = lat2 - lat1;

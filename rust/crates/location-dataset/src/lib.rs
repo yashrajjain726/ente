@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use ente_location::{CityIndex, CountryIndex};
+use ente_location::{CityIndex, CountryIndex, UrbanCenterIndex};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -11,10 +11,12 @@ mod country;
 mod dispute;
 mod download;
 mod sources;
+mod urban;
 
 pub use sources::{RemoteSources, SourcePaths};
 
 pub const CITY_FILE: &str = "cities.bin";
+pub const URBAN_CENTER_FILE: &str = "urban-centres.bin";
 pub const COUNTRY_FILE: &str = "countries.bin";
 pub const DISPUTE_FILE: &str = "disputes.bin";
 
@@ -30,6 +32,8 @@ pub enum Error {
     Zip(#[from] zip::result::ZipError),
     #[error("shapefile is invalid: {0}")]
     Shapefile(#[from] shapefile::Error),
+    #[error("GeoPackage is invalid: {0}")]
+    Sqlite(#[from] rusqlite::Error),
     #[error("invalid location data: {0}")]
     InvalidData(String),
     #[error(transparent)]
@@ -43,9 +47,10 @@ pub struct BuildOptions {
 
 pub struct BuildOutput {
     pub city_count: usize,
+    pub urban_center_count: usize,
     pub territory_count: usize,
     pub byte_length: usize,
-    pub files: [BuildFile; 3],
+    pub files: [BuildFile; 4],
 }
 
 pub struct BuildFile {
@@ -55,22 +60,36 @@ pub struct BuildFile {
 }
 
 pub fn build(options: &BuildOptions) -> Result<BuildOutput> {
-    let cities = city::build(&options.sources.cities, &options.sources.country_info)?;
+    let cities = city::build(
+        &options.sources.cities,
+        &options.sources.country_info,
+        &options.sources.alternate_names,
+        &options.sources.populated_places,
+    )?;
+    let city_index = CityIndex::from_bytes(cities.as_slice())?;
+    let urban_centers = urban::build(
+        &options.sources.urban_centres,
+        &options.sources.country_info,
+        &city_index,
+    )?;
     let countries = country::build_countries(&options.sources.countries)?;
     let disputes = dispute::build(
         &options.sources.countries,
         &options.sources.disputes,
         &options.sources.admin1,
     )?;
-    let city_count = CityIndex::from_bytes(cities.as_slice())?.len();
+    let city_count = city_index.len();
+    let urban_center_count = UrbanCenterIndex::from_bytes(urban_centers.as_slice())?.len();
     CountryIndex::from_bytes(countries.as_slice(), disputes.as_slice())?;
     let files = [
         build_file(CITY_FILE, &cities),
+        build_file(URBAN_CENTER_FILE, &urban_centers),
         build_file(COUNTRY_FILE, &countries),
         build_file(DISPUTE_FILE, &disputes),
     ];
     let output = BuildOutput {
         city_count,
+        urban_center_count,
         territory_count: catalog::DISPUTED_AREAS.len() + catalog::UKRAINIAN_REGIONS.len(),
         byte_length: files.iter().map(|file| file.byte_length).sum(),
         files,
@@ -78,6 +97,7 @@ pub fn build(options: &BuildOptions) -> Result<BuildOutput> {
     std::fs::create_dir_all(&options.output)?;
     for (name, bytes) in [
         (CITY_FILE, cities.as_slice()),
+        (URBAN_CENTER_FILE, urban_centers.as_slice()),
         (COUNTRY_FILE, countries.as_slice()),
         (DISPUTE_FILE, disputes.as_slice()),
     ] {
