@@ -116,7 +116,7 @@ export function VerifyEmailForm({
 }
 
 const Email = styled("strong")({
-    color: "var(--locker-auth-text)",
+    color: "var(--auth-ui-text)",
     wordBreak: "break-word",
 });
 

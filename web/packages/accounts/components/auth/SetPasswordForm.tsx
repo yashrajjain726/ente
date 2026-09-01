@@ -105,7 +105,7 @@ export function SetPasswordForm({
 const HiddenEmail = styled("input")({ display: "none" });
 
 const PasswordField = styled("div")({
-    "--locker-auth-message-gap": "8px",
+    "--auth-ui-message-gap": "8px",
     display: "flex",
     flexDirection: "column",
     gap: "8px",

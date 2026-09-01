@@ -162,7 +162,7 @@ export function SignUpForm({
 }
 
 const PasswordField = styled("div")({
-    "--auth-app-message-gap": "8px",
+    "--auth-ui-message-gap": "8px",
     display: "flex",
     flexDirection: "column",
     gap: "8px",
@@ -179,16 +179,16 @@ const TermsText = styled("span")({
     fontSize: "14px",
     fontWeight: 500,
     lineHeight: "20px",
-    color: "var(--auth-app-text-muted)",
+    color: "var(--auth-ui-password-message)",
 });
 
 const TermsLink = styled("a")({
-    color: "var(--auth-app-text)",
+    color: "var(--auth-ui-terms-link)",
     textDecoration: "none",
     "&:hover": { textDecoration: "underline" },
     "&:focus-visible": {
         borderRadius: "4px",
-        outline: "2px solid var(--auth-app-accent)",
+        outline: "2px solid var(--auth-ui-focus)",
         outlineOffset: "2px",
     },
 });
@@ -202,7 +202,7 @@ const AccountPrompt = styled("div")({
     fontWeight: 500,
     lineHeight: "20px",
     textAlign: "center",
-    color: "var(--auth-app-text-muted)",
+    color: "var(--auth-ui-text-muted)",
 });
 
 const Host = styled("div")({
@@ -211,5 +211,5 @@ const Host = styled("div")({
     fontWeight: 500,
     lineHeight: "16px",
     textAlign: "center",
-    color: "var(--auth-app-text-faint)",
+    color: "var(--auth-ui-text-faint)",
 });

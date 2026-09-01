@@ -8,7 +8,7 @@ export function FormFields({
 }
 
 const FormFieldsRoot = styled("div")({
-    "--locker-auth-message-gap": "16px",
+    "--auth-ui-message-gap": "16px",
     width: "100%",
     display: "flex",
     flexDirection: "column",

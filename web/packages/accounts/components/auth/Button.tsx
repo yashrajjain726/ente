@@ -76,46 +76,46 @@ const ButtonRoot = styled(
     position: "relative",
     boxSizing: "border-box",
     fontFamily: "inherit",
-    color: $variant === "primary" ? "#fff" : "var(--locker-auth-text)",
+    color: $variant === "primary" ? "#fff" : "var(--auth-ui-text)",
     backgroundColor:
         $variant === "primary"
-            ? "var(--locker-auth-primary)"
-            : "var(--locker-auth-button-secondary)",
+            ? "var(--auth-ui-primary)"
+            : "var(--auth-ui-button-secondary)",
     boxShadow:
         $variant === "primary"
-            ? "inset 0 0 0 1px var(--locker-auth-button-primary-stroke)"
-            : "inset 0 0 0 1px var(--locker-auth-button-secondary-stroke)",
+            ? "inset 0 0 0 1px var(--auth-ui-button-primary-stroke)"
+            : "inset 0 0 0 1px var(--auth-ui-button-secondary-stroke)",
     cursor: $loading ? "default" : "pointer",
     transition:
         "background-color 160ms ease, box-shadow 160ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
     "&:hover:not(:disabled)": {
         backgroundColor:
             $variant === "primary"
-                ? "var(--locker-auth-primary-hover)"
-                : "var(--locker-auth-button-secondary-hover)",
+                ? "var(--auth-ui-primary-hover)"
+                : "var(--auth-ui-button-secondary-hover)",
         boxShadow:
             $variant === "primary"
-                ? "inset 0 0 0 1px var(--locker-auth-button-primary-stroke-hover)"
-                : "inset 0 0 0 1px var(--locker-auth-button-secondary-stroke-hover)",
+                ? "inset 0 0 0 1px var(--auth-ui-button-primary-stroke-hover)"
+                : "inset 0 0 0 1px var(--auth-ui-button-secondary-stroke-hover)",
         transform: "translateY(-2px)",
     },
     "&:active:not(:disabled)": {
         backgroundColor:
             $variant === "primary"
-                ? "var(--locker-auth-primary-active)"
-                : "var(--locker-auth-button-secondary-active)",
+                ? "var(--auth-ui-primary-active)"
+                : "var(--auth-ui-button-secondary-active)",
         boxShadow:
             $variant === "primary"
-                ? "inset 0 0 0 1px var(--locker-auth-button-primary-stroke-active)"
-                : "inset 0 0 0 1px var(--locker-auth-button-secondary-stroke-active)",
+                ? "inset 0 0 0 1px var(--auth-ui-button-primary-stroke-active)"
+                : "inset 0 0 0 1px var(--auth-ui-button-secondary-stroke-active)",
         transform: "translateY(0) scale(0.985)",
     },
     "&:focus-visible": authFocusRing,
     "&:disabled": $loading
         ? { cursor: "default" }
         : {
-              color: "var(--locker-auth-text-disabled)",
-              backgroundColor: "var(--locker-auth-fill-hover)",
+              color: "var(--auth-ui-text-disabled)",
+              backgroundColor: "var(--auth-ui-fill-hover)",
               boxShadow: "none",
               cursor: "not-allowed",
           },

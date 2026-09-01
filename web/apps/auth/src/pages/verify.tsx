@@ -1,7 +1,7 @@
-import { SecondFactorChoiceDialog } from "@/components/auth/SecondFactorChoiceDialog";
-import { VerifyEmailForm } from "@/components/auth/VerifyEmailForm";
 import { AuthShell } from "@/components/AuthShell";
 import { featureFlags } from "@/feature-flags";
+import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
+import { VerifyEmailForm } from "ente-accounts/components/auth/VerifyEmailForm";
 import AccountsVerifyPage, {
     type VerifyEmailPresentationProps,
 } from "ente-accounts/pages/verify";

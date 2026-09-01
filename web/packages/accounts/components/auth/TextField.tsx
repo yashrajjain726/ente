@@ -176,22 +176,22 @@ export function TextField({
 }
 
 const FieldRoot = styled("div")({
-    "--auth-app-message-gap": "9px",
+    "--auth-ui-message-gap": "9px",
     width: "100%",
     display: "flex",
     flexDirection: "column",
     gap: "9px",
-    "&:focus-within > label": { color: "var(--auth-app-text)" },
+    "&:focus-within > label": { color: "var(--auth-ui-text)" },
 });
 
 const FieldLabel = styled("label")({
     ...authMiniTypography,
-    color: "var(--auth-app-text-muted)",
+    color: "var(--auth-ui-text-muted)",
     transition: "color 100ms ease-in",
     "@media (prefers-reduced-motion: reduce)": { transition: "none" },
 });
 
-const RequiredMark = styled("span")({ color: "var(--auth-app-warning)" });
+const RequiredMark = styled("span")({ color: "var(--auth-ui-warning)" });
 
 interface FieldBoxProps {
     $error: boolean;
@@ -213,18 +213,18 @@ const FieldBox = styled(
     gap: "8px",
     boxSizing: "border-box",
     backgroundColor: $disabled
-        ? "var(--auth-app-fill-hover)"
-        : "var(--auth-app-field)",
+        ? "var(--auth-ui-fill-hover)"
+        : "var(--auth-ui-field)",
     boxShadow: $disabled
         ? "none"
         : `inset 0 0 0 1px ${
-              $error ? "var(--auth-app-warning)" : "var(--auth-app-stroke)"
+              $error ? "var(--auth-ui-warning)" : "var(--auth-ui-stroke)"
           }`,
     "&:focus-within": $disabled
         ? undefined
         : {
               boxShadow: `inset 0 0 0 1px ${
-                  $error ? "var(--auth-app-warning)" : "var(--auth-app-primary)"
+                  $error ? "var(--auth-ui-warning)" : "var(--auth-ui-primary)"
               }`,
           },
 }));
@@ -239,11 +239,11 @@ const controlStyles = {
     outline: 0,
     background: "transparent",
     fontFamily: "inherit",
-    color: "var(--auth-app-text)",
-    "&::placeholder": { color: "var(--auth-app-text-faint)", opacity: 1 },
+    color: "var(--auth-ui-text)",
+    "&::placeholder": { color: "var(--auth-ui-text-faint)", opacity: 1 },
     "&:disabled": {
-        color: "var(--auth-app-text-disabled)",
-        WebkitTextFillColor: "var(--auth-app-text-disabled)",
+        color: "var(--auth-ui-text-disabled)",
+        WebkitTextFillColor: "var(--auth-ui-text-disabled)",
         cursor: "not-allowed",
     },
 };
@@ -267,11 +267,11 @@ const PasswordToggle = styled("button")({
     alignItems: "center",
     justifyContent: "center",
     background: "transparent",
-    color: "var(--auth-app-text-faint)",
+    color: "var(--auth-ui-text-faint)",
     cursor: "pointer",
     "&:focus-visible": authFocusRing,
     "&:disabled": {
-        color: "var(--auth-app-text-disabled)",
+        color: "var(--auth-ui-text-disabled)",
         cursor: "not-allowed",
     },
 });

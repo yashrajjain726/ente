@@ -82,19 +82,19 @@ const MessageRoot = styled(
         gridTemplateRows: $visible ? "1fr" : "0fr",
         marginTop:
             $animated && !$visible
-                ? "calc(-1 * var(--locker-auth-message-gap, 8px))"
+                ? "calc(-1 * var(--auth-ui-message-gap, 8px))"
                 : 0,
         opacity: $visible ? 1 : 0,
         transform: $visible ? "translateY(0)" : "translateY(-4px)",
         visibility: $visible ? "visible" : "hidden",
         color:
             $kind === "error"
-                ? "var(--locker-auth-warning)"
+                ? "var(--auth-ui-warning)"
                 : $kind === "warning"
-                  ? "var(--locker-auth-caution)"
+                  ? "var(--auth-ui-caution)"
                   : $kind === "success"
-                    ? "var(--locker-auth-success)"
-                    : "var(--locker-auth-text-muted)",
+                    ? "var(--auth-ui-success)"
+                    : "var(--auth-ui-text-muted)",
         ...($animated && {
             overflow: "hidden",
             transition: [

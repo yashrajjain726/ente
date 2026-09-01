@@ -32,7 +32,7 @@ const ScreenTitle = styled("h1")({
     fontWeight: 600,
     lineHeight: "38px",
     textWrap: "pretty",
-    color: "var(--auth-app-text)",
+    color: "var(--auth-ui-text)",
     [authMobileMediaQuery]: { fontSize: "26px", lineHeight: "34px" },
     "@media (min-width: 1600px)": { fontSize: "32px", lineHeight: "40px" },
 });
@@ -43,6 +43,6 @@ const ScreenSubtitle = styled("p")({
     fontWeight: 500,
     lineHeight: "24px",
     textWrap: "pretty",
-    color: "var(--auth-app-text-muted)",
+    color: "var(--auth-ui-text-muted)",
     [authMobileMediaQuery]: { fontSize: "13px", lineHeight: "20px" },
 });

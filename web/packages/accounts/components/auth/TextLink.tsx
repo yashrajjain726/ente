@@ -40,7 +40,7 @@ const TextLinkRoot = styled(
     background: "transparent",
     fontFamily: "inherit",
     fontWeight: $regular ? 500 : 600,
-    color: "var(--auth-app-text)",
+    color: "var(--auth-ui-link)",
     textDecoration: "none",
     cursor: "pointer",
     "&:hover:not(:disabled)": {
@@ -49,7 +49,7 @@ const TextLinkRoot = styled(
     },
     "&:focus-visible": { ...authFocusRing, borderRadius: "4px" },
     "&:disabled": {
-        color: "var(--auth-app-text-disabled)",
+        color: "var(--auth-ui-text-disabled)",
         cursor: "not-allowed",
     },
 }));
