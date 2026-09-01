@@ -374,12 +374,26 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             mainHandler.post {
                 result.error("readUriBytes-too-large", e.message, null)
             }
+        } catch (e: IllegalStateException) {
+            val errorCode = if (e.isPendingOrTrashedMediaItemError()) {
+                "readUriBytes-pending"
+            } else {
+                "readUriBytes-failed"
+            }
+            Log.w(logTag, "failed to read uri bytes for uri=$uri", e)
+            mainHandler.post {
+                result.error(errorCode, e.message, null)
+            }
         } catch (e: Exception) {
             Log.w(logTag, "failed to read uri bytes for uri=$uri", e)
             mainHandler.post {
                 result.error("readUriBytes-failed", e.message, null)
             }
         }
+    }
+
+    private fun IllegalStateException.isPendingOrTrashedMediaItemError(): Boolean {
+        return message?.contains("pending/trashed item", ignoreCase = true) == true
     }
 
     private fun InputStream.readBytesWithLimit(maxBytes: Long): ByteArray {
