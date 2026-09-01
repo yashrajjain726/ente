@@ -51,10 +51,8 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
       }
       rethrow;
     }
+    await _player.setLoopMode(LoopMode.one);
   }
-
-  @override
-  Future<void> setLooping() => _player.setLoopMode(LoopMode.one);
 
   @override
   Future<void> play() {
@@ -96,8 +94,7 @@ class JustAudioMemoryMusicPlayer implements MemoryMusicPlayer {
   @override
   Future<void> dispose() async {
     await pauseImmediately();
-    final generation = ++_fadeGeneration;
-    await _enqueueFade(generation, _player.dispose);
+    await _enqueueFade(++_fadeGeneration, _player.dispose);
   }
 
   Future<void> _fadeTo(

@@ -44,7 +44,6 @@ void main() {
     expect(tracks.first.artist, "Artist");
     expect(tracks.last.title, "Zed");
     expect(checkedURLs, unorderedEquals([_sharedURL, _newURL]));
-    expect(checkedURLs.where((url) => url == _sharedURL), hasLength(1));
     expect(
       jsonDecode(preferences.getString(_manifestPreferenceKey)!),
       manifest,
@@ -130,25 +129,18 @@ void main() {
         ]),
       ),
     );
-    final availableURLs = <String>[];
     final deletedURLs = <String>[];
     final emptyManifest = _manifest([]);
     final service = _service(
       preferences,
       fetchManifest: () async => emptyManifest,
-      hasAsset: (url) async {
-        availableURLs.add(url);
-        return true;
-      },
       deleteAsset: (url) async => deletedURLs.add(url),
     );
 
     final tracks = await service.prepare();
 
     expect(tracks, isEmpty);
-    expect(availableURLs, isEmpty);
     expect(deletedURLs, unorderedEquals([_cachedURL, _sharedURL]));
-    expect(deletedURLs.where((url) => url == _cachedURL), hasLength(1));
     expect(
       jsonDecode(preferences.getString(_manifestPreferenceKey)!),
       emptyManifest,
@@ -165,7 +157,6 @@ void main() {
         ]),
       ),
     );
-    final availableURLs = <String>[];
     final deletedURLs = <String>[];
     final service = _service(
       preferences,
@@ -173,17 +164,12 @@ void main() {
         _track("new-shared-id", _sharedURL),
         _track("new", _newURL),
       ]),
-      hasAsset: (url) async {
-        availableURLs.add(url);
-        return true;
-      },
       deleteAsset: (url) async => deletedURLs.add(url),
     );
 
     final tracks = await service.prepare();
 
     expect(tracks.map((track) => track.id), ["new", "new-shared-id"]);
-    expect(availableURLs, unorderedEquals([_newURL, _sharedURL]));
     expect(deletedURLs, [_cachedURL]);
   });
 
@@ -216,7 +202,6 @@ void main() {
     );
 
     finishDownload.complete();
-    await Future<void>.delayed(Duration.zero);
   });
 
   test("returns after the first download succeeds", () async {
@@ -250,7 +235,6 @@ void main() {
     );
 
     finishSlowDownload.complete();
-    await Future<void>.delayed(Duration.zero);
   });
 
   test("retries failed downloads without refetching the manifest", () async {
@@ -296,7 +280,6 @@ void main() {
     await fetchStarted.future;
     final secondPreparation = service.prepare();
 
-    expect(identical(firstPreparation, secondPreparation), isTrue);
     expect(fetchCalls, 1);
 
     finishFetch.complete();

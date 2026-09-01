@@ -16,7 +16,29 @@ String memoryMusicCacheFileName(String url) =>
 
 class MemoryMusicService {
   static final _logger = Logger("MemoryMusicService");
-  static MemoryMusicService? _instance;
+  static final instance = MemoryMusicService(
+    preferences: ServiceLocator.instance.prefs,
+    fetchManifest: () async {
+      final response = await ServiceLocator.instance.nonEnteDio.get<Object?>(
+        _manifestURL,
+      );
+      return response.data;
+    },
+    hasAsset: (url) => RemoteAssetsService.instance.hasAsset(
+      url,
+      cacheFileName: memoryMusicCacheFileName(url),
+    ),
+    cacheAsset: (url) async {
+      await RemoteAssetsService.instance.getAsset(
+        url,
+        cacheFileName: memoryMusicCacheFileName(url),
+      );
+    },
+    deleteAsset: (url) => RemoteAssetsService.instance.deleteAsset(
+      url,
+      cacheFileName: memoryMusicCacheFileName(url),
+    ),
+  );
 
   final SharedPreferences _preferences;
   final Future<Object?> Function() _fetchManifest;
@@ -42,41 +64,8 @@ class MemoryMusicService {
        _cacheAsset = cacheAsset,
        _deleteAsset = deleteAsset;
 
-  static MemoryMusicService get instance => _instance ??= MemoryMusicService(
-    preferences: ServiceLocator.instance.prefs,
-    fetchManifest: () async {
-      final response = await ServiceLocator.instance.nonEnteDio.get<Object?>(
-        _manifestURL,
-      );
-      return response.data;
-    },
-    hasAsset: (url) => RemoteAssetsService.instance.hasAsset(
-      url,
-      cacheFileName: memoryMusicCacheFileName(url),
-    ),
-    cacheAsset: (url) async {
-      await RemoteAssetsService.instance.getAsset(
-        url,
-        cacheFileName: memoryMusicCacheFileName(url),
-      );
-    },
-    deleteAsset: (url) => RemoteAssetsService.instance.deleteAsset(
-      url,
-      cacheFileName: memoryMusicCacheFileName(url),
-    ),
-  );
-
-  Future<List<MemoryMusicTrack>> prepare() {
-    final preparation = _preparation;
-    if (preparation != null) return preparation;
-
-    late final Future<List<MemoryMusicTrack>> nextPreparation;
-    nextPreparation = _prepare().whenComplete(() {
-      if (identical(_preparation, nextPreparation)) _preparation = null;
-    });
-    _preparation = nextPreparation;
-    return nextPreparation;
-  }
+  Future<List<MemoryMusicTrack>> prepare() =>
+      _preparation ??= _prepare().whenComplete(() => _preparation = null);
 
   Future<List<MemoryMusicTrack>> _prepare() async {
     _tracks ??= _readCachedManifest();
@@ -179,7 +168,9 @@ class MemoryMusicService {
         if (!_availableURLs.contains(url)) _downloadAsset(url),
     ];
     if (_availableURLs.isEmpty && downloads.isNotEmpty) {
-      await _waitForAvailableAsset(downloads);
+      await Stream.fromFutures(
+        downloads,
+      ).firstWhere((didDownload) => didDownload, orElse: () => false);
     }
 
     return tracks
@@ -199,19 +190,10 @@ class MemoryMusicService {
     }
   }
 
-  Future<bool> _downloadAsset(String url) {
-    final download = _assetDownloads[url];
-    if (download != null) return download;
-
-    late final Future<bool> nextDownload;
-    nextDownload = _cacheAssetURL(url).whenComplete(() {
-      if (identical(_assetDownloads[url], nextDownload)) {
+  Future<bool> _downloadAsset(String url) =>
+      _assetDownloads[url] ??= _cacheAssetURL(url).whenComplete(() {
         _assetDownloads.remove(url);
-      }
-    });
-    _assetDownloads[url] = nextDownload;
-    return nextDownload;
-  }
+      });
 
   Future<bool> _cacheAssetURL(String url) async {
     try {
@@ -230,22 +212,6 @@ class MemoryMusicService {
     }
     _availableURLs.add(url);
     return true;
-  }
-
-  Future<void> _waitForAvailableAsset(List<Future<bool>> downloads) {
-    final available = Completer<void>();
-    var remaining = downloads.length;
-    for (final download in downloads) {
-      unawaited(
-        download.then((didDownload) {
-          remaining--;
-          if (!available.isCompleted && (didDownload || remaining == 0)) {
-            available.complete();
-          }
-        }),
-      );
-    }
-    return available.future;
   }
 
   List<MemoryMusicTrack> _parseManifest(Object? manifest) {

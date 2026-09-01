@@ -27,7 +27,6 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
   static final _logger = Logger("MemoryMusicSession");
 
   MemoryMusicController? _controller;
-  bool _isAppActive = true;
   late bool _isMuted;
 
   @override
@@ -35,9 +34,6 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
     super.initState();
     _isMuted = localSettings.isMemoriesAudioMuted();
     WidgetsBinding.instance.addObserver(this);
-    final lifecycleState = WidgetsBinding.instance.lifecycleState;
-    _isAppActive =
-        lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
     unawaited(_initialize());
   }
 
@@ -55,7 +51,10 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
       player: JustAudioMemoryMusicPlayer(),
       tracks: tracks,
     );
-    if (!_isAppActive) unawaited(controller.setAppActive(false));
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    if (lifecycleState != null && lifecycleState != AppLifecycleState.resumed) {
+      unawaited(controller.setAppActive(false));
+    }
     setState(() => _controller = controller);
   }
 
@@ -81,10 +80,9 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _isAppActive = state == AppLifecycleState.resumed;
     final controller = _controller;
     if (controller != null) {
-      unawaited(controller.setAppActive(_isAppActive));
+      unawaited(controller.setAppActive(state == AppLifecycleState.resumed));
     }
   }
 
@@ -108,23 +106,20 @@ class _MemoryMusicSessionState extends State<MemoryMusicSession>
 
 class MemoryMusicScope extends InheritedNotifier<MemoryMusicController> {
   final bool _isMuted;
-  final Future<void> Function() _toggleMuted;
+  final Future<void> Function() toggleMuted;
 
   const MemoryMusicScope({
     required MemoryMusicController? controller,
     required bool isMuted,
-    required Future<void> Function() toggleMuted,
+    required this.toggleMuted,
     required super.child,
     super.key,
   }) : _isMuted = isMuted,
-       _toggleMuted = toggleMuted,
        super(notifier: controller);
 
   MemoryMusicController? get controller => notifier;
 
   bool get isMuted => notifier?.isMuted ?? _isMuted;
-
-  Future<void> toggleMuted() => _toggleMuted();
 
   static MemoryMusicScope? maybeOf(BuildContext context, {bool listen = true}) {
     return listen

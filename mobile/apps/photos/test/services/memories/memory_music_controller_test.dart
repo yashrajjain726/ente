@@ -41,12 +41,18 @@ void main() {
     controller.dispose();
   });
 
-  test("activating a photo memory loads, loops, and plays its track", () async {
+  test("photo memories load, loop, and play their assigned tracks", () async {
     await controller.activateMemory("memory-1", currentItemIsVideo: false);
 
-    expect(player.loadedTracks.map((track) => track.id), <String>["track-1"]);
     expect(player.looping, isTrue);
     expect(player.playing, isTrue);
+
+    await controller.activateMemory("memory-2", currentItemIsVideo: false);
+
+    expect(player.loadedTracks.map((track) => track.id), <String>[
+      "track-1",
+      "track-2",
+    ]);
   });
 
   test("video items pause music and photos resume it", () async {
@@ -97,16 +103,6 @@ void main() {
 
     await controller.activateMemory("memory-2", currentItemIsVideo: false);
     expect(player.playing, isTrue);
-  });
-
-  test("changing memories loads the assigned track", () async {
-    await controller.activateMemory("memory-1", currentItemIsVideo: false);
-    await controller.activateMemory("memory-2", currentItemIsVideo: false);
-
-    expect(player.loadedTracks.map((track) => track.id), <String>[
-      "track-1",
-      "track-2",
-    ]);
   });
 
   test("newer memory wins when activations overlap", () async {
@@ -190,10 +186,6 @@ class _FakeMemoryMusicPlayer implements MemoryMusicPlayer {
     final beforeCompleting = beforeNextLoadCompletes;
     beforeNextLoadCompletes = null;
     await beforeCompleting?.call();
-  }
-
-  @override
-  Future<void> setLooping() async {
     looping = true;
   }
 
