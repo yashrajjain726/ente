@@ -2,7 +2,7 @@ use crate::{
     error::{MlError, MlResult},
     models::Model,
     onnx,
-    postprocess::{NmsDetection, greedy_non_max_suppression},
+    postprocess::{NmsDetection, YoloOutputRow, greedy_non_max_suppression},
     preprocess::{YOLO_INPUT_SIZE, YoloInput},
     runtime::MlRuntimeView,
     types::{PetBodyDetection, PetFaceDetection},
@@ -116,47 +116,21 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
     // Row: x, y, width, height, score, left eye, right eye, nose, classes.
     for i in 0..detection_rows {
         let start = i * row_len;
-        let score = output_data.value(start + 4);
+        let row = YoloOutputRow::new(output_data, start);
+        let score = row.confidence();
         if score < PET_FACE_MIN_SCORE {
             continue;
         }
 
-        let x = output_data.value(start);
-        let y = output_data.value(start + 1);
-        let width = output_data.value(start + 2);
-        let height = output_data.value(start + 3);
-        let x_min_abs = x - width / 2.0;
-        let y_min_abs = y - height / 2.0;
-        let x_max_abs = x + width / 2.0;
-        let y_max_abs = y + height / 2.0;
+        let mut box_xyxy = row.box_xyxy();
 
-        let mut box_xyxy = [
-            x_min_abs / YOLO_INPUT_SIZE as f32,
-            y_min_abs / YOLO_INPUT_SIZE as f32,
-            x_max_abs / YOLO_INPUT_SIZE as f32,
-            y_max_abs / YOLO_INPUT_SIZE as f32,
-        ];
-
-        let mut keypoints = [
-            [
-                output_data.value(start + 5) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 6) / YOLO_INPUT_SIZE as f32,
-            ],
-            [
-                output_data.value(start + 7) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 8) / YOLO_INPUT_SIZE as f32,
-            ],
-            [
-                output_data.value(start + 9) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 10) / YOLO_INPUT_SIZE as f32,
-            ],
-        ];
+        let mut keypoints = [row.keypoint(5), row.keypoint(7), row.keypoint(9)];
 
         input.correct_box_and_keypoints(&mut box_xyxy, &mut keypoints);
 
         // Two-class rows are [cat, dog]; one-class rows are dog-only.
         let class_id: u8 = if row_len >= 13 {
-            if output_data.value(start + 12) > output_data.value(start + 11) {
+            if row.value(12) > row.value(11) {
                 PET_SPECIES_DOG
             } else {
                 PET_SPECIES_CAT
@@ -218,25 +192,12 @@ fn postprocess_pet_body_tensor<T: onnx::FloatTensorData>(
 
     for i in 0..detection_rows {
         let start = i * row_len;
-        let Some((class_id, class_score)) = winning_pet_body_class(output_data, start) else {
+        let row = YoloOutputRow::new(output_data, start);
+        let Some((class_id, class_score)) = winning_pet_body_class(row) else {
             continue;
         };
 
-        let x = output_data.value(start);
-        let y = output_data.value(start + 1);
-        let width = output_data.value(start + 2);
-        let height = output_data.value(start + 3);
-        let x_min_abs = x - width / 2.0;
-        let y_min_abs = y - height / 2.0;
-        let x_max_abs = x + width / 2.0;
-        let y_max_abs = y + height / 2.0;
-
-        let mut box_xyxy = [
-            x_min_abs / YOLO_INPUT_SIZE as f32,
-            y_min_abs / YOLO_INPUT_SIZE as f32,
-            x_max_abs / YOLO_INPUT_SIZE as f32,
-            y_max_abs / YOLO_INPUT_SIZE as f32,
-        ];
+        let mut box_xyxy = row.box_xyxy();
 
         input.correct_box(&mut box_xyxy);
 
@@ -250,14 +211,11 @@ fn postprocess_pet_body_tensor<T: onnx::FloatTensorData>(
     Ok(greedy_non_max_suppression(detections, BODY_IOU_THRESHOLD))
 }
 
-fn winning_pet_body_class<T: onnx::FloatTensorData>(
-    output_data: T,
-    row_start: usize,
-) -> Option<(u8, f32)> {
-    let obj_conf = output_data.value(row_start + 4);
+fn winning_pet_body_class<T: onnx::FloatTensorData>(row: YoloOutputRow<T>) -> Option<(u8, f32)> {
+    let obj_conf = row.confidence();
 
-    let cat_logit = output_data.value(row_start + 5 + COCO_CAT as usize);
-    let dog_logit = output_data.value(row_start + 5 + COCO_DOG as usize);
+    let cat_logit = row.value(5 + COCO_CAT as usize);
+    let dog_logit = row.value(5 + COCO_DOG as usize);
     let best_pet_logit = if dog_logit.total_cmp(&cat_logit).is_ge() {
         dog_logit
     } else {
@@ -270,9 +228,9 @@ fn winning_pet_body_class<T: onnx::FloatTensorData>(
     // A sufficiently strong pet score still needs to win against every other
     // COCO class. Keep the original total ordering and tie behaviour here.
     let mut best_cls = 0u8;
-    let mut best_logit = output_data.value(row_start + 5);
+    let mut best_logit = row.value(5);
     for class in 1u8..80 {
-        let logit = output_data.value(row_start + 5 + class as usize);
+        let logit = row.value(5 + class as usize);
         if logit.total_cmp(&best_logit).is_ge() {
             best_cls = class;
             best_logit = logit;
@@ -287,7 +245,7 @@ fn winning_pet_body_class<T: onnx::FloatTensorData>(
 
 #[cfg(test)]
 mod tests {
-    use crate::postprocess::{MAX_DETECTIONS_PER_IMAGE, greedy_non_max_suppression};
+    use crate::postprocess::{MAX_DETECTIONS_PER_IMAGE, YoloOutputRow, greedy_non_max_suppression};
 
     use super::{
         BODY_IOU_THRESHOLD, BODY_MIN_SCORE, COCO_CAT, COCO_DOG, PET_FACE_IOU_THRESHOLD,
@@ -401,7 +359,10 @@ mod tests {
         rows.push(body_row(1.0, &[(COCO_DOG, 0.8), (79, 0.8)]));
 
         for row in rows {
-            assert_eq!(winning_pet_body_class(row.as_slice(), 0), full_scan(&row));
+            assert_eq!(
+                winning_pet_body_class(YoloOutputRow::new(row.as_slice(), 0)),
+                full_scan(&row)
+            );
 
             let f16_row = row
                 .iter()
@@ -413,7 +374,7 @@ mod tests {
                 .map(|value| value.to_f32())
                 .collect::<Vec<_>>();
             assert_eq!(
-                winning_pet_body_class(f16_row.as_slice(), 0),
+                winning_pet_body_class(YoloOutputRow::new(f16_row.as_slice(), 0)),
                 full_scan(&converted_row),
             );
         }

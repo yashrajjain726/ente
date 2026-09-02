@@ -1,4 +1,51 @@
+use crate::{onnx, preprocess::YOLO_INPUT_SIZE};
+
 pub(crate) const MAX_DETECTIONS_PER_IMAGE: usize = 100;
+
+#[derive(Clone, Copy)]
+pub(crate) struct YoloOutputRow<T> {
+    output: T,
+    start: usize,
+}
+
+impl<T: onnx::FloatTensorData> YoloOutputRow<T> {
+    pub(crate) fn new(output: T, start: usize) -> Self {
+        Self { output, start }
+    }
+
+    pub(crate) fn value(self, offset: usize) -> f32 {
+        self.output.value(self.start + offset)
+    }
+
+    pub(crate) fn confidence(self) -> f32 {
+        self.value(4)
+    }
+
+    pub(crate) fn box_xyxy(self) -> [f32; 4] {
+        let x = self.value(0);
+        let y = self.value(1);
+        let width = self.value(2);
+        let height = self.value(3);
+        let x_min_abs = x - width / 2.0;
+        let y_min_abs = y - height / 2.0;
+        let x_max_abs = x + width / 2.0;
+        let y_max_abs = y + height / 2.0;
+
+        [
+            x_min_abs / YOLO_INPUT_SIZE as f32,
+            y_min_abs / YOLO_INPUT_SIZE as f32,
+            x_max_abs / YOLO_INPUT_SIZE as f32,
+            y_max_abs / YOLO_INPUT_SIZE as f32,
+        ]
+    }
+
+    pub(crate) fn keypoint(self, offset: usize) -> [f32; 2] {
+        [
+            self.value(offset) / YOLO_INPUT_SIZE as f32,
+            self.value(offset + 1) / YOLO_INPUT_SIZE as f32,
+        ]
+    }
+}
 
 pub(crate) trait NmsDetection {
     fn score(&self) -> f32;
@@ -71,7 +118,17 @@ pub(crate) fn l2_normalize(embedding: &mut [f32], zero_threshold: f32) {
 
 #[cfg(test)]
 mod tests {
-    use super::l2_normalize;
+    use super::{YoloOutputRow, l2_normalize};
+
+    #[test]
+    fn yolo_output_row_decodes_shared_fields_from_its_start_offset() {
+        let output = [99.0, 99.0, 320.0, 320.0, 128.0, 256.0, 0.75, 160.0, 480.0];
+        let row = YoloOutputRow::new(output.as_slice(), 2);
+
+        assert_eq!(row.confidence(), 0.75);
+        assert_eq!(row.box_xyxy(), [0.4, 0.3, 0.6, 0.7]);
+        assert_eq!(row.keypoint(5), [0.25, 0.75]);
+    }
 
     #[test]
     fn l2_normalization_preserves_the_existing_arithmetic() {
