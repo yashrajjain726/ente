@@ -525,6 +525,12 @@ const ConversationListItem: React.FC<{
                     width: "calc(100% + 16px)",
                     "&:active": { bgcolor: spaceDialogBackground },
                     "&:hover": { bgcolor: spaceDialogBackground },
+                    "&:has(> [data-space-row-action]:active)": {
+                        bgcolor: "transparent",
+                    },
+                    "&:has(> [data-space-row-action]:hover)": {
+                        bgcolor: "transparent",
+                    },
                 }}
             >
                 <Box
@@ -755,6 +761,7 @@ const ConversationListItem: React.FC<{
                         className="green-bg"
                         component="button"
                         type="button"
+                        data-space-row-action
                         onClick={onPostSomething}
                         sx={{
                             bgcolor: green,
@@ -2527,7 +2534,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     {replyingTo && (
                                         <Box
                                             sx={{
-                                                bgcolor: lightSurface,
+                                                bgcolor: spaceDialogBackground,
                                                 borderLeft: `3px solid ${green}`,
                                                 borderRadius: "12px",
                                                 boxSizing: "border-box",

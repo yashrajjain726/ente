@@ -661,11 +661,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
     const masonryColumns = buildPostMasonryColumns(masonryTiles);
     const usesAdaptiveMasonryRows = isOwnerProfile || isFriendProfile;
-    const usesSparseProfileLayout =
-        masonryTiles.length > 0 && masonryTiles.length <= 3;
+    const usesSinglePostLayout = masonryTiles.length == 1;
     const usesFullWidthPostRows =
-        usesAdaptiveMasonryRows || usesSparseProfileLayout;
-    const adaptiveMasonryRows = usesSparseProfileLayout
+        usesAdaptiveMasonryRows || usesSinglePostLayout;
+    const adaptiveMasonryRows = usesSinglePostLayout
         ? masonryTiles.map((tile) => [tile])
         : buildAdaptivePostMasonryRows(masonryTiles);
     const closeFriendActions = () => setFriendActionsAnchor(null);
@@ -1833,7 +1832,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         flex: hasProfilePosts ? "0 0 auto" : "1 1 0",
                         flexDirection: "column",
                         minHeight: hasProfilePosts ? undefined : 0,
-                        mt: "32px",
+                        mt: usesSinglePostLayout ? "20px" : "32px",
                         pb: usesFullWidthPostRows ? 0 : "16px",
                         px: 0,
                         width: "100%",
@@ -1850,14 +1849,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     : undefined,
                                 display: "grid",
                                 gap: usesFullWidthPostRows
-                                    ? usesSparseProfileLayout
-                                        ? photoMasonryGap
-                                        : adaptivePhotoMasonryGap
+                                    ? adaptivePhotoMasonryGap
                                     : photoMasonryGap,
                                 gridTemplateColumns: usesFullWidthPostRows
                                     ? "minmax(0, 1fr)"
                                     : `repeat(${masonryColumns.length}, minmax(0, 1fr))`,
-                                mt: "6px",
+                                mt: usesSinglePostLayout ? "4px" : "6px",
                                 mx: usesFullWidthPostRows ? 0 : "16px",
                                 overflow: usesFullWidthPostRows
                                     ? "hidden"
@@ -1891,10 +1888,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                           {tiles.map((tile) =>
                                               renderPostTile(
                                                   tile,
-                                                  usesSparseProfileLayout
+                                                  usesSinglePostLayout
                                                       ? photoMasonryRadius
                                                       : 0,
-                                                  usesSparseProfileLayout
+                                                  usesSinglePostLayout
                                                       ? Math.min(
                                                             tile.aspectRatio,
                                                             1,
