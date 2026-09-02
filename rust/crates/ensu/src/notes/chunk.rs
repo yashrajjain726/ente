@@ -1,5 +1,10 @@
 use super::document::PreparedNotesChunk;
-use super::{NOTES_CHUNK_CHARACTERS, NOTES_CHUNK_OVERLAP_CHARACTERS, NotesError, is_valid_label};
+use super::{
+    NOTES_CHUNK_OVERLAP_UTF8_BYTES, NOTES_CHUNK_UTF8_BYTES, NOTES_HEADING_MAX_UTF8_BYTES,
+    NotesError, is_valid_label,
+};
+
+const CHUNK_COMPACTION_THRESHOLD: usize = 1_024;
 
 #[derive(Debug)]
 struct DocumentGroup {
@@ -19,19 +24,20 @@ pub(super) fn prepare_chunks(
     let mut fence = None;
 
     for line in source.lines() {
-        if let Some((marker, count)) = fence_marker(line) {
-            match fence {
-                Some((open_marker, open_count)) if marker == open_marker && count >= open_count => {
+        match fence {
+            Some((marker, count)) => {
+                if is_closing_fence(line, marker, count) {
                     fence = None;
                 }
-                None => fence = Some((marker, count)),
-                _ => {}
+            }
+            None => {
+                fence = opening_fence(line);
             }
         }
         if fence.is_none()
             && let Some((level, heading)) = atx_heading(line)
         {
-            if !is_valid_label(&heading) {
+            if heading.len() > NOTES_HEADING_MAX_UTF8_BYTES || !is_valid_label(&heading) {
                 return Err(NotesError::InvalidInput(
                     "heading length or characters are invalid".to_string(),
                 ));
@@ -77,6 +83,9 @@ pub(super) fn prepare_chunks(
             });
         }
     }
+    if chunks.len() > CHUNK_COMPACTION_THRESHOLD {
+        chunks = compact_chunks(chunks);
+    }
     if chunks.is_empty() {
         return Err(NotesError::InvalidInput(
             "source document produced no chunks".to_string(),
@@ -94,8 +103,45 @@ fn flush_group(groups: &mut Vec<DocumentGroup>, section: Option<String>, lines: 
             section,
             text: lines[start..=end].join("\n"),
         });
+    } else if let Some(section) = section {
+        groups.push(DocumentGroup {
+            section: None,
+            text: section,
+        });
     }
     lines.clear();
+}
+
+fn append_chunk(chunks: &mut Vec<PreparedNotesChunk>, section: Option<String>, text: String) {
+    if let Some(previous) = chunks.last_mut() {
+        let separator = match section.as_deref() {
+            Some(section) => format!("\n\n## {section}\n"),
+            None => "\n\n".to_string(),
+        };
+        if previous
+            .text
+            .len()
+            .checked_add(separator.len())
+            .and_then(|size| size.checked_add(text.len()))
+            .is_some_and(|size| size <= NOTES_CHUNK_UTF8_BYTES)
+        {
+            previous.text.push_str(&separator);
+            previous.text.push_str(&text);
+            if previous.section != section {
+                previous.section = None;
+            }
+            return;
+        }
+    }
+    chunks.push(PreparedNotesChunk { section, text });
+}
+
+fn compact_chunks(chunks: Vec<PreparedNotesChunk>) -> Vec<PreparedNotesChunk> {
+    let mut compacted = Vec::new();
+    for chunk in chunks {
+        append_chunk(&mut compacted, chunk.section, chunk.text);
+    }
+    compacted
 }
 
 fn atx_heading(line: &str) -> Option<(usize, String)> {
@@ -130,8 +176,13 @@ fn atx_heading(line: &str) -> Option<(usize, String)> {
     }
 }
 
-fn fence_marker(line: &str) -> Option<(char, usize)> {
-    let line = line.trim_start();
+fn fence_candidate(line: &str) -> Option<&str> {
+    let leading_spaces = line.bytes().take_while(|byte| *byte == b' ').count();
+    (leading_spaces <= 3).then(|| &line[leading_spaces..])
+}
+
+fn opening_fence(line: &str) -> Option<(char, usize)> {
+    let line = fence_candidate(line)?;
     let marker = line.chars().next()?;
     if !matches!(marker, '`' | '~') {
         return None;
@@ -140,12 +191,25 @@ fn fence_marker(line: &str) -> Option<(char, usize)> {
         .chars()
         .take_while(|character| *character == marker)
         .count();
-    (count >= 3).then_some((marker, count))
+    if count < 3 || (marker == '`' && line[count..].contains('`')) {
+        return None;
+    }
+    Some((marker, count))
+}
+
+fn is_closing_fence(line: &str, marker: char, open_count: usize) -> bool {
+    let Some(line) = fence_candidate(line) else {
+        return false;
+    };
+    let count = line
+        .chars()
+        .take_while(|character| *character == marker)
+        .count();
+    count >= open_count && line[count..].trim().is_empty()
 }
 
 fn split_group(text: &str) -> Vec<String> {
-    let character_count = text.chars().count();
-    if character_count <= NOTES_CHUNK_CHARACTERS {
+    if text.len() <= NOTES_CHUNK_UTF8_BYTES {
         return vec![text.to_string()];
     }
 
@@ -155,17 +219,51 @@ fn split_group(text: &str) -> Vec<String> {
         .chain(std::iter::once(text.len()))
         .collect::<Vec<_>>();
     let mut chunks = Vec::new();
-    let mut start = 0;
-    while start < character_count {
-        let end = (start + NOTES_CHUNK_CHARACTERS).min(character_count);
+    let mut start = 0_usize;
+    while start + 1 < boundaries.len() {
+        let maximum_end_byte = boundaries[start].saturating_add(NOTES_CHUNK_UTF8_BYTES);
+        let end = boundaries
+            .partition_point(|boundary| *boundary <= maximum_end_byte)
+            .saturating_sub(1)
+            .max(start + 1);
         let chunk = text[boundaries[start]..boundaries[end]].trim();
         if !chunk.is_empty() {
             chunks.push(chunk.to_string());
         }
-        if end == character_count {
+        if end + 1 == boundaries.len() {
             break;
         }
-        start = end - NOTES_CHUNK_OVERLAP_CHARACTERS;
+        let minimum_start_byte = boundaries[end].saturating_sub(NOTES_CHUNK_OVERLAP_UTF8_BYTES);
+        let overlapped_start =
+            boundaries.partition_point(|boundary| *boundary < minimum_start_byte);
+        start = if overlapped_start > start {
+            overlapped_start.min(end)
+        } else {
+            end
+        };
     }
     chunks
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cross_section_compaction_uses_document_level_metadata() {
+        let compacted = compact_chunks(vec![
+            PreparedNotesChunk {
+                section: Some("First".to_string()),
+                text: "first passage".to_string(),
+            },
+            PreparedNotesChunk {
+                section: Some("Second".to_string()),
+                text: "second passage".to_string(),
+            },
+        ]);
+
+        assert_eq!(compacted.len(), 1);
+        assert_eq!(compacted[0].section, None);
+        assert!(compacted[0].text.contains("## Second\nsecond passage"));
+    }
 }

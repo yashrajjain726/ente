@@ -1,20 +1,24 @@
 mod chunk;
 mod document;
 mod index;
+mod indexing;
 mod manifest;
 mod reconcile;
 mod shard;
 mod source;
 mod writer;
 
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
-const NOTES_INDEX_CONTRACT_VERSION: u32 = 1;
+const NOTES_INDEX_CONTRACT_VERSION: u32 = 2;
 pub const NOTES_MAX_SOURCE_BYTES: usize = 2 * 1024 * 1024;
-const NOTES_CHUNK_CHARACTERS: usize = 1_400;
-const NOTES_CHUNK_OVERLAP_CHARACTERS: usize = 200;
+pub const NOTES_MAX_COLLECTION_SOURCE_BYTES: u64 = 128 * 1024 * 1024;
+pub const NOTES_MAX_COLLECTION_DOCUMENTS: usize = 20_000;
+const NOTES_MAX_COLLECTION_CHUNKS: u64 = 131_072;
+const NOTES_CHUNK_UTF8_BYTES: usize = 1_400;
+const NOTES_CHUNK_OVERLAP_UTF8_BYTES: usize = 200;
+const NOTES_HEADING_MAX_UTF8_BYTES: usize = 512;
 
 #[derive(Debug, Error)]
 pub enum NotesError {
@@ -26,6 +30,8 @@ pub enum NotesError {
     IncompatibleIndex,
     #[error("Notes collection is not ready")]
     NotReady,
+    #[error("Notes collection is too large: {0}")]
+    CollectionTooLarge(String),
     #[error("Notes index I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("Notes index JSON failed: {0}")]
@@ -35,7 +41,11 @@ pub enum NotesError {
 pub use document::{
     NotesSourceDocument, PreparedNotesChunk, PreparedNotesDocument, prepare_notes_document,
 };
-pub use index::{NotesCollectionIndex, NotesSearchHit};
+pub use index::{NotesCollectionIndex, NotesCollectionIndexSummary, NotesSearchHit};
+pub use indexing::{
+    NotesDocumentLoad, NotesIndexInput, NotesIndexOutcome, NotesIndexingError, NotesRevisionStatus,
+    index_notes_collection,
+};
 pub use reconcile::NotesReconciliationPlan;
 pub use source::NoteSourceReference;
 pub use writer::NotesIndexWriter;
@@ -45,13 +55,7 @@ pub fn notes_content_revision(bytes: &[u8]) -> String {
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut encoded = String::with_capacity(64);
-    for byte in Sha256::digest(bytes) {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
+    ente_ensu_crypto::sha256_hex(bytes)
 }
 
 pub fn validate_document_id(document_id: &str) -> Result<(), NotesError> {
@@ -63,6 +67,12 @@ pub fn validate_document_id(document_id: &str) -> Result<(), NotesError> {
     if document_id.chars().any(char::is_control) {
         return Err(NotesError::InvalidInput(
             "document ID contains a control character".to_string(),
+        ));
+    }
+    #[cfg(windows)]
+    if document_id.contains('\\') {
+        return Err(NotesError::InvalidInput(
+            "document ID contains an invalid path separator".to_string(),
         ));
     }
     if looks_like_absolute_local_path(document_id) {
@@ -119,6 +129,12 @@ fn validate_revision(revision: &str) -> Result<(), NotesError> {
 
 fn is_valid_label(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= 4_096 && !value.chars().any(char::is_control)
+}
+
+fn contains_unsupported_control(value: &str) -> bool {
+    value
+        .chars()
+        .any(|character| character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
 }
 
 fn invalid_index_input(error: NotesError) -> NotesError {

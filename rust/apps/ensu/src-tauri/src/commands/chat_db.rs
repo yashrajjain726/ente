@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 
 use ente_core::b64;
 use ente_ensu::db::{self, ChatDb, SqliteBackend};
-use ente_ensu::retrieval::GroundedSource;
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
 use tauri::{AppHandle, Manager, State};
@@ -13,6 +12,7 @@ use uuid::Uuid;
 
 use crate::commands::chat_db_migration;
 use crate::commands::common::{ApiError, app_data_dir};
+use crate::commands::knowledge::GroundedSourceDto;
 use crate::logging;
 
 #[derive(Default)]
@@ -158,7 +158,7 @@ pub struct ChatMessageDto {
     text: String,
     created_at: i64,
     attachments: Vec<ChatAttachmentDto>,
-    sources: Vec<GroundedSource>,
+    sources: Vec<GroundedSourceDto>,
 }
 
 impl From<db::Message> for ChatMessageDto {
@@ -187,7 +187,7 @@ impl From<db::Message> for ChatMessageDto {
                 .into_iter()
                 .map(ChatAttachmentDto::from)
                 .collect(),
-            sources: parsed.sources,
+            sources: parsed.sources.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -200,7 +200,7 @@ pub struct ChatMessageInsertInput {
     text: String,
     parent_message_uuid: Option<String>,
     attachments: Option<Vec<ChatAttachmentInput>>,
-    sources: Option<Vec<GroundedSource>>,
+    sources: Option<Vec<GroundedSourceDto>>,
 }
 
 #[derive(Deserialize)]
@@ -332,7 +332,15 @@ pub async fn chat_db_insert_message(
     let sender = normalize_sender(&input.sender)?;
     let attachments = convert_attachments(input.attachments)?;
     let text = if sender == "other" {
-        let sources = input.sources.unwrap_or_default();
+        let sources = input
+            .sources
+            .unwrap_or_default()
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
+        if sources.len() > ente_ensu::retrieval::MAX_GROUNDED_SOURCES {
+            return Err(ApiError::new("invalid_input", "Too many grounded sources"));
+        }
         let result = ente_ensu::retrieval::finalize_grounded_assistant_text(&input.text, &sources)
             .map_err(crate::commands::knowledge::retrieval_error);
         match result {

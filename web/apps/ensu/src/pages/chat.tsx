@@ -6,6 +6,7 @@ import { ChatDialogs } from "@/components/chat/ChatDialogs";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { useFileInput } from "@/components/utils/use-file-input";
+import { useNotesCollections } from "@/hooks/use-notes-collections";
 import { handleManualAppUpdateCheck } from "@/services/app-update";
 import {
     buildSelectedPath,
@@ -61,17 +62,7 @@ import type {
     ModelInfo,
     ModelSettings,
 } from "@/services/llm/types";
-import {
-    addNotesCollection,
-    hasAvailableNotesIndex,
-    indexNotesCollection,
-    listenForNotesStateChanged,
-    listNotesCollections,
-    notesErrorMessage,
-    removeNotesCollection,
-    selectNotesFolder,
-    type NotesCollection,
-} from "@/services/notes";
+import { hasAvailableNotesIndex } from "@/services/notes";
 import { isTauriRuntime as detectTauriAppRuntime } from "@/services/tauri-runtime";
 import { Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -273,10 +264,6 @@ const SESSION_TITLE_PROMPT =
 
 const REPEAT_PENALTY = 1.18;
 const STREAMING_OUTRO_DURATION_MS = 520;
-const NOTES_INDEX_SLICE_YIELD_MS = 25;
-const NOTES_REMOVE_WAIT_ERROR =
-    "Wait for indexing to finish, then remove this folder.";
-
 interface DocumentAttachment {
     id: string;
     name: string;
@@ -572,20 +559,6 @@ const Page: React.FC = () => {
     const [knowledgeErrors, setKnowledgeErrors] = useState<
         Record<string, string | undefined>
     >({});
-    const [notesCollections, setNotesCollections] = useState<NotesCollection[]>(
-        [],
-    );
-    const [notesCollectionsLoading, setNotesCollectionsLoading] =
-        useState(false);
-    const [notesOperationError, setNotesOperationError] = useState<
-        string | null
-    >(null);
-    const [notesListError, setNotesListError] = useState<string | null>(null);
-    const [notesSubscriptionError, setNotesSubscriptionError] = useState<
-        string | null
-    >(null);
-    const [notesSyncAttempt, setNotesSyncAttempt] = useState(0);
-
     const [modelSettingsLoaded, setModelSettingsLoaded] = useState(false);
     const [resolvedDefaultModel, setResolvedDefaultModel] =
         useState<ModelInfo>(DEFAULT_MODEL);
@@ -654,16 +627,6 @@ const Page: React.FC = () => {
     const currentJobIdRef = useRef<number | null>(null);
     const activeKnowledgeSourcesRef = useRef<GroundedSource[]>([]);
     const activeKnowledgeDownloadsRef = useRef(new Set<string>());
-    const activeNotesJobsRef = useRef(new Set<string>());
-    const queuedNotesJobsRef = useRef(new Map<string, boolean>());
-    const removingNotesCollectionsRef = useRef(new Set<string>());
-    const notesRemovalWaitCollectionRef = useRef<string | null>(null);
-    const runNotesIndexRef = useRef<
-        ((collectionId: string, force?: boolean) => void) | null
-    >(null);
-    const resumedNotesCollectionsRef = useRef(new Set<string>());
-    const notesCollectionsMutationRef = useRef(0);
-    const notesCollectionsRefreshRequestRef = useRef(0);
     const knowledgeCatalogPromiseRef = useRef<Promise<KnowledgePack[]> | null>(
         null,
     );
@@ -782,43 +745,6 @@ const Page: React.FC = () => {
             setKnowledgeCatalogLoading(false);
         }
     }, [isTauriRuntime, loadKnowledgeCatalogOnce]);
-
-    const refreshNotesCollections = useCallback(async () => {
-        if (!isTauriRuntime) return;
-        const request = ++notesCollectionsRefreshRequestRef.current;
-        setNotesCollectionsLoading(true);
-        try {
-            while (request === notesCollectionsRefreshRequestRef.current) {
-                const mutation = notesCollectionsMutationRef.current;
-                try {
-                    const collections = await listNotesCollections();
-                    if (request !== notesCollectionsRefreshRequestRef.current) {
-                        return;
-                    }
-                    if (mutation !== notesCollectionsMutationRef.current) {
-                        continue;
-                    }
-                    setNotesCollections(collections);
-                    setNotesListError(null);
-                    return;
-                } catch (error) {
-                    if (request !== notesCollectionsRefreshRequestRef.current) {
-                        return;
-                    }
-                    if (mutation !== notesCollectionsMutationRef.current) {
-                        continue;
-                    }
-                    setNotesListError(notesErrorMessage(error));
-                    log.error("Failed to refresh Your Notes", error);
-                    return;
-                }
-            }
-        } finally {
-            if (request === notesCollectionsRefreshRequestRef.current) {
-                setNotesCollectionsLoading(false);
-            }
-        }
-    }, [isTauriRuntime]);
 
     const sessionFromQuery = useMemo(() => {
         if (!router.isReady) return undefined;
@@ -1873,6 +1799,50 @@ const Page: React.FC = () => {
         }
         return providerRef.current;
     }, []);
+
+    const isNotesGenerationStarting = useCallback(
+        () => generationStartingRef.current,
+        [],
+    );
+    const cancelNotesIndexing = useCallback(() => {
+        const provider = providerRef.current;
+        if (provider?.getBackendKind() === "tauri") {
+            void provider
+                .cancelGeneration(-1)
+                .catch((error: unknown) =>
+                    log.warn("Failed to cancel Notes indexing", error),
+                );
+        }
+    }, []);
+    const confirmNotesRemoval = useCallback(
+        (label: string, remove: () => Promise<void>) => {
+            showMiniDialog({
+                title: "Remove notes folder?",
+                message: `Remove “${label}” from Your Notes? Source files will not be changed.`,
+                continue: { text: "Remove", color: "critical", action: remove },
+                cancel: "Cancel",
+                buttonDirection: "row",
+            });
+        },
+        [showMiniDialog],
+    );
+    const {
+        collections: notesCollections,
+        loading: notesCollectionsLoading,
+        error: notesCollectionsError,
+        retry: retryNotesCollections,
+        addFolder: handleAddNotesFolder,
+        removeCollection: handleRemoveNotesCollection,
+        runIndex: runNotesIndex,
+    } = useNotesCollections({
+        isTauriRuntime,
+        isGenerating,
+        isGenerationStarting: isNotesGenerationStarting,
+        modelReady: modelGateStatus === "ready",
+        ensureProvider,
+        cancelIndexing: cancelNotesIndexing,
+        confirmRemoval: confirmNotesRemoval,
+    });
 
     const getModelSettings = useCallback((): ModelSettings => {
         return {
@@ -2984,7 +2954,7 @@ const Page: React.FC = () => {
             let startupCompleted = false;
             try {
                 provider = await ensureProvider();
-                if (activeNotesJobsRef.current.size > 0) {
+                if (provider.getBackendKind() === "tauri") {
                     await provider.cancelGeneration(-1);
                     if (!isActiveGeneration()) return;
                 }
@@ -3688,295 +3658,6 @@ const Page: React.FC = () => {
         },
         [],
     );
-
-    const replaceNotesCollection = useCallback(
-        (collection: NotesCollection) => {
-            notesCollectionsMutationRef.current += 1;
-            setNotesCollections((current) => {
-                const exists = current.some(
-                    (item) => item.id === collection.id,
-                );
-                return exists
-                    ? current.map((item) =>
-                          item.id === collection.id ? collection : item,
-                      )
-                    : [...current, collection];
-            });
-        },
-        [],
-    );
-
-    const updateNotesCollection = useCallback((collection: NotesCollection) => {
-        notesCollectionsMutationRef.current += 1;
-        setNotesCollections((current) =>
-            current.map((item) =>
-                item.id === collection.id ? collection : item,
-            ),
-        );
-    }, []);
-
-    const runNotesIndex = useCallback(
-        (collectionId: string, force = false) => {
-            if (removingNotesCollectionsRef.current.has(collectionId)) return;
-            if (
-                isGenerating ||
-                generationStartingRef.current ||
-                activeNotesJobsRef.current.has(collectionId)
-            ) {
-                queuedNotesJobsRef.current.set(
-                    collectionId,
-                    force ||
-                        (queuedNotesJobsRef.current.get(collectionId) ?? false),
-                );
-                return;
-            }
-            resumedNotesCollectionsRef.current.add(collectionId);
-            activeNotesJobsRef.current.add(collectionId);
-            setNotesOperationError(null);
-
-            void ensureProvider()
-                .then((provider) =>
-                    provider.withKnowledgeRetrieval(
-                        async (retrievalEpoch) => {
-                            let hasMore = true;
-                            let bypassQuietPeriod = force;
-                            while (
-                                hasMore &&
-                                activeNotesJobsRef.current.has(collectionId)
-                            ) {
-                                const result = await indexNotesCollection(
-                                    collectionId,
-                                    bypassQuietPeriod,
-                                    retrievalEpoch,
-                                );
-                                if (
-                                    !activeNotesJobsRef.current.has(
-                                        collectionId,
-                                    ) ||
-                                    removingNotesCollectionsRef.current.has(
-                                        collectionId,
-                                    )
-                                ) {
-                                    return;
-                                }
-                                bypassQuietPeriod = false;
-                                replaceNotesCollection(result.collection);
-                                hasMore = result.hasMore;
-                                if (hasMore) {
-                                    await new Promise<void>((resolve) =>
-                                        window.setTimeout(
-                                            resolve,
-                                            NOTES_INDEX_SLICE_YIELD_MS,
-                                        ),
-                                    );
-                                }
-                            }
-                        },
-                        () =>
-                            activeNotesJobsRef.current.has(collectionId) &&
-                            !removingNotesCollectionsRef.current.has(
-                                collectionId,
-                            ),
-                    ),
-                )
-                .catch((error: unknown) => {
-                    if (removingNotesCollectionsRef.current.has(collectionId)) {
-                        return;
-                    }
-                    const { name } = tauriCommandError(error);
-                    if (name === "cancelled") {
-                        queuedNotesJobsRef.current.set(collectionId, force);
-                    } else if (name !== "not_due") {
-                        setNotesOperationError(notesErrorMessage(error));
-                        log.error("Failed to index Your Notes", error);
-                    }
-                    void refreshNotesCollections();
-                })
-                .finally(() => {
-                    activeNotesJobsRef.current.delete(collectionId);
-                    const queuedForce =
-                        queuedNotesJobsRef.current.get(collectionId);
-                    if (queuedForce !== undefined) {
-                        queuedNotesJobsRef.current.delete(collectionId);
-                        runNotesIndexRef.current?.(collectionId, queuedForce);
-                    } else if (
-                        notesRemovalWaitCollectionRef.current === collectionId
-                    ) {
-                        notesRemovalWaitCollectionRef.current = null;
-                        setNotesOperationError((current) =>
-                            current === NOTES_REMOVE_WAIT_ERROR
-                                ? null
-                                : current,
-                        );
-                    }
-                });
-        },
-        [
-            ensureProvider,
-            isGenerating,
-            refreshNotesCollections,
-            replaceNotesCollection,
-        ],
-    );
-    runNotesIndexRef.current = runNotesIndex;
-
-    useEffect(() => {
-        if (isGenerating || generationStartingRef.current) return;
-        for (const [collectionId, force] of queuedNotesJobsRef.current) {
-            if (activeNotesJobsRef.current.has(collectionId)) continue;
-            queuedNotesJobsRef.current.delete(collectionId);
-            runNotesIndex(collectionId, force);
-        }
-    }, [isGenerating, runNotesIndex]);
-
-    useEffect(() => {
-        if (!isTauriRuntime) return;
-        let disposed = false;
-        let unlisten: (() => void) | undefined;
-        const initialRefresh = refreshNotesCollections();
-        const refreshAfterSubscription = async () => {
-            await initialRefresh;
-            if (!disposed) await refreshNotesCollections();
-        };
-        void listenForNotesStateChanged((collection) => {
-            if (disposed) return;
-            updateNotesCollection(collection);
-        })
-            .then(async (listener) => {
-                if (disposed) {
-                    listener();
-                    return;
-                }
-                unlisten = listener;
-                setNotesSubscriptionError(null);
-                await refreshAfterSubscription();
-            })
-            .catch((error: unknown) => {
-                if (disposed) return;
-                setNotesSubscriptionError(notesErrorMessage(error));
-                log.error("Failed to listen for Your Notes updates", error);
-            });
-        return () => {
-            disposed = true;
-            notesCollectionsRefreshRequestRef.current += 1;
-            unlisten?.();
-        };
-    }, [
-        isTauriRuntime,
-        notesSyncAttempt,
-        refreshNotesCollections,
-        updateNotesCollection,
-    ]);
-
-    const retryNotesCollections = useCallback(() => {
-        setNotesOperationError(null);
-        setNotesSyncAttempt((attempt) => attempt + 1);
-    }, []);
-
-    useEffect(() => {
-        if (!isTauriRuntime || modelGateStatus !== "ready") return;
-        const timeouts: number[] = [];
-        for (const collection of notesCollections) {
-            const dueAt = collection.updateDueAtMs;
-            if (
-                dueAt != null &&
-                (collection.status === "ready" ||
-                    collection.status === "pending")
-            ) {
-                timeouts.push(
-                    window.setTimeout(
-                        () => runNotesIndex(collection.id),
-                        Math.max(0, dueAt - Date.now()),
-                    ),
-                );
-            }
-        }
-        return () => {
-            for (const timeout of timeouts) window.clearTimeout(timeout);
-        };
-    }, [isTauriRuntime, modelGateStatus, notesCollections, runNotesIndex]);
-
-    const handleAddNotesFolder = useCallback(async () => {
-        setNotesOperationError(null);
-        try {
-            const sourceRoot = await selectNotesFolder();
-            if (!sourceRoot) return;
-            const collection = await addNotesCollection(sourceRoot);
-            replaceNotesCollection(collection);
-            runNotesIndex(collection.id);
-        } catch (error) {
-            setNotesOperationError(notesErrorMessage(error));
-            log.error("Failed to add Notes folder", error);
-        }
-    }, [replaceNotesCollection, runNotesIndex]);
-
-    const handleRemoveNotesCollection = useCallback(
-        (collectionId: string, label: string) => {
-            showMiniDialog({
-                title: "Remove notes folder?",
-                message: `Remove “${label}” from Your Notes? Source files will not be changed.`,
-                continue: {
-                    text: "Remove",
-                    color: "critical",
-                    action: async () => {
-                        if (activeNotesJobsRef.current.has(collectionId)) {
-                            notesRemovalWaitCollectionRef.current =
-                                collectionId;
-                            setNotesOperationError(NOTES_REMOVE_WAIT_ERROR);
-                            return;
-                        }
-                        const queuedForce =
-                            queuedNotesJobsRef.current.get(collectionId);
-                        queuedNotesJobsRef.current.delete(collectionId);
-                        removingNotesCollectionsRef.current.add(collectionId);
-                        setNotesOperationError(null);
-                        try {
-                            await removeNotesCollection(collectionId);
-                            notesCollectionsMutationRef.current += 1;
-                            setNotesCollections((current) =>
-                                current.filter(
-                                    (item) => item.id !== collectionId,
-                                ),
-                            );
-                        } catch (error) {
-                            removingNotesCollectionsRef.current.delete(
-                                collectionId,
-                            );
-                            setNotesOperationError(notesErrorMessage(error));
-                            log.error(
-                                "Failed to remove Notes collection",
-                                error,
-                            );
-                            void refreshNotesCollections();
-                            if (queuedForce !== undefined) {
-                                runNotesIndexRef.current?.(
-                                    collectionId,
-                                    queuedForce,
-                                );
-                            }
-                        }
-                    },
-                },
-                cancel: "Cancel",
-                buttonDirection: "row",
-            });
-        },
-        [refreshNotesCollections, showMiniDialog],
-    );
-
-    useEffect(() => {
-        if (!isTauriRuntime || modelGateStatus !== "ready") return;
-        for (const collection of notesCollections) {
-            if (
-                collection.status === "pending" &&
-                collection.updateDueAtMs == null &&
-                !resumedNotesCollectionsRef.current.has(collection.id)
-            ) {
-                resumedNotesCollectionsRef.current.add(collection.id);
-                runNotesIndex(collection.id);
-            }
-        }
-    }, [isTauriRuntime, modelGateStatus, notesCollections, runNotesIndex]);
 
     const handleBuildVersionTap = useCallback(() => {
         if (advancedUnlocked || typeof window === "undefined") return;
@@ -5056,11 +4737,7 @@ const Page: React.FC = () => {
                 handleSetKnowledgePackEnabled={handleSetKnowledgePackEnabled}
                 notesCollections={notesCollections}
                 notesCollectionsLoading={notesCollectionsLoading}
-                notesCollectionsError={
-                    notesSubscriptionError ??
-                    notesListError ??
-                    notesOperationError
-                }
+                notesCollectionsError={notesCollectionsError}
                 retryNotesCollections={retryNotesCollections}
                 handleAddNotesFolder={handleAddNotesFolder}
                 handleRemoveNotesCollection={handleRemoveNotesCollection}

@@ -24,7 +24,7 @@ const SOURCE_DIM: u32 = 768;
 const RETRIEVAL_DIM: u32 = 512;
 const EMBEDDING_CONTEXT_SIZE: u32 = 2_048;
 const MAX_HITS: u32 = 2;
-const MAX_CONTEXT_UTF8_BYTES: u32 = 6_000;
+const MAX_CONTEXT_UTF8_BYTES: u32 = 8_192;
 const MODIFICATION_NOTICE: &str = "Adapted by Ente";
 
 #[derive(Debug, Clone, PartialEq)]

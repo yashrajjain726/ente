@@ -2,12 +2,12 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::manifest::{collection_directory, load_published_manifest, shard_directory};
-use super::shard::load_and_validate_shard;
+use super::shard::{NotesShardIntegrity, load_and_validate_shard};
 use super::{NotesError, validate_collection_id};
 
-const RELEVANCE_THRESHOLD: f32 = 0.45;
-const MAX_HITS_PER_COLLECTION: usize = 3;
-const MAX_HITS_PER_DOCUMENT: usize = 2;
+const RELEVANCE_THRESHOLD: f32 = 0.50;
+const MAX_HITS_PER_COLLECTION: usize = 5;
+const MAX_HITS_PER_DOCUMENT: usize = 3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotesSearchHit {
@@ -39,7 +39,26 @@ pub struct NotesCollectionIndex {
     vectors: Vec<u8>,
 }
 
+pub struct NotesCollectionIndexSummary {
+    pub document_count: usize,
+    pub last_updated_at_ms: Option<i64>,
+}
+
 impl NotesCollectionIndex {
+    pub fn inspect(
+        index_root: impl AsRef<Path>,
+        collection_id: String,
+    ) -> Result<NotesCollectionIndexSummary, NotesError> {
+        validate_collection_id(&collection_id)?;
+        let collection_directory = collection_directory(index_root.as_ref(), &collection_id);
+        let (manifest, last_updated_at_ms) =
+            load_published_manifest(&collection_directory, &collection_id, true)?;
+        Ok(NotesCollectionIndexSummary {
+            document_count: manifest.documents.len(),
+            last_updated_at_ms,
+        })
+    }
+
     pub fn open(index_root: impl AsRef<Path>, collection_id: String) -> Result<Self, NotesError> {
         validate_collection_id(&collection_id)?;
         let collection_directory = collection_directory(index_root.as_ref(), &collection_id);
@@ -80,6 +99,10 @@ impl NotesCollectionIndex {
                 document_id,
                 &document.revision,
                 document.chunk_count as usize,
+                NotesShardIntegrity {
+                    shard_sha256: &document.shard_sha256,
+                    vectors_sha256: &document.vectors_sha256,
+                },
                 None,
             )?;
             let title = loaded.shard.title;
@@ -123,6 +146,25 @@ impl NotesCollectionIndex {
 
     pub fn last_updated_at_ms(&self) -> Option<i64> {
         self.last_updated_at_ms
+    }
+
+    pub fn estimated_heap_bytes(&self) -> usize {
+        self.collection_id
+            .capacity()
+            .saturating_add(
+                self.chunks
+                    .capacity()
+                    .saturating_mul(std::mem::size_of::<IndexedChunk>()),
+            )
+            .saturating_add(self.vectors.capacity())
+            .saturating_add(self.chunks.iter().fold(0_usize, |total, chunk| {
+                total
+                    .saturating_add(chunk.document_id.capacity())
+                    .saturating_add(chunk.revision.capacity())
+                    .saturating_add(chunk.title.capacity())
+                    .saturating_add(chunk.section.as_ref().map_or(0, String::capacity))
+                    .saturating_add(chunk.text.capacity())
+            }))
     }
 
     pub fn search(&self, query: &[f32]) -> Result<Vec<NotesSearchHit>, NotesError> {

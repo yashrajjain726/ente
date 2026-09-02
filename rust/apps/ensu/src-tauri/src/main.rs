@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, RunEvent};
+use tauri::{Manager, RunEvent, async_runtime};
 
 mod commands;
 mod logging;
@@ -29,14 +29,16 @@ fn main() {
                 commands::notes::State::new(app.path().app_data_dir()?)
                     .map_err(|error| std::io::Error::other(error.message))?,
             );
-            commands::notes::initialize_for_app(app.handle());
-
             if let Some(window) = app.get_webview_window("main")
                 && let Err(err) = window.show()
             {
                 logging::log("App", format!("failed to show main window error={err}"));
                 return Err(Box::new(err));
             }
+            let notes_app = app.handle().clone();
+            async_runtime::spawn(async move {
+                commands::notes::initialize_for_app(notes_app).await;
+            });
             logging::log("App", "setup complete");
             Ok(())
         })

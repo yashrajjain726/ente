@@ -1,5 +1,8 @@
 use super::chunk::prepare_chunks;
-use super::{NOTES_MAX_SOURCE_BYTES, NotesError, notes_content_revision, validate_document_id};
+use super::{
+    NOTES_MAX_SOURCE_BYTES, NotesError, contains_unsupported_control, notes_content_revision,
+    validate_document_id,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotesSourceDocument {
@@ -51,6 +54,11 @@ pub fn prepare_notes_document(
             "source document must not be empty".to_string(),
         ));
     }
+    if contains_unsupported_control(text) {
+        return Err(NotesError::InvalidInput(
+            "source document contains an unsupported control character".to_string(),
+        ));
+    }
 
     let revision = notes_content_revision(bytes);
     let (title, chunks) = prepare_chunks(document_id, text)?;
@@ -65,7 +73,9 @@ pub fn prepare_notes_document(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::notes::{NOTES_CHUNK_CHARACTERS, NOTES_CHUNK_OVERLAP_CHARACTERS};
+    use crate::notes::{
+        NOTES_CHUNK_OVERLAP_UTF8_BYTES, NOTES_CHUNK_UTF8_BYTES, NOTES_HEADING_MAX_UTF8_BYTES,
+    };
 
     #[test]
     fn prepares_and_chunks_markdown() {
@@ -85,22 +95,81 @@ mod tests {
         let text = "é".repeat(1_600);
         let prepared = prepare_notes_document("unicode.md", text.as_bytes()).unwrap();
         assert_eq!(prepared.title, "unicode.md");
-        assert_eq!(prepared.chunks.len(), 2);
-        assert_eq!(
-            prepared.chunks[0].text.chars().count(),
-            NOTES_CHUNK_CHARACTERS
+        assert_eq!(prepared.chunks.len(), 3);
+        assert!(
+            prepared
+                .chunks
+                .iter()
+                .all(|chunk| chunk.text.len() <= NOTES_CHUNK_UTF8_BYTES)
         );
-        assert_eq!(prepared.chunks[1].text.chars().count(), 400);
-        let overlap = prepared.chunks[0]
-            .text
-            .chars()
-            .skip(NOTES_CHUNK_CHARACTERS - NOTES_CHUNK_OVERLAP_CHARACTERS)
-            .collect::<String>();
-        let next = prepared.chunks[1]
-            .text
-            .chars()
-            .take(NOTES_CHUNK_OVERLAP_CHARACTERS)
-            .collect::<String>();
-        assert_eq!(overlap, next);
+        for pair in prepared.chunks.windows(2) {
+            let overlap_characters = NOTES_CHUNK_OVERLAP_UTF8_BYTES / "é".len();
+            let overlap = pair[0]
+                .text
+                .chars()
+                .rev()
+                .take(overlap_characters)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<String>();
+            let next = pair[1]
+                .text
+                .chars()
+                .take(overlap_characters)
+                .collect::<String>();
+            assert!(overlap.len() <= NOTES_CHUNK_OVERLAP_UTF8_BYTES);
+            assert_eq!(overlap, next);
+        }
+    }
+
+    #[test]
+    fn preserves_heading_only_outlines() {
+        let prepared =
+            prepare_notes_document("outline.md", b"# Project\n## Alice\n## Bob\n## Carol\n")
+                .unwrap();
+        assert_eq!(prepared.title, "Project");
+        assert_eq!(prepared.chunks.len(), 3);
+        assert_eq!(
+            prepared
+                .chunks
+                .iter()
+                .map(|chunk| chunk.text.as_str())
+                .collect::<Vec<_>>(),
+            ["Alice", "Bob", "Carol"]
+        );
+    }
+
+    #[test]
+    fn rejects_controls_that_expand_unboundedly_in_json() {
+        let error = prepare_notes_document("controls.md", b"safe\x1funsafe").unwrap_err();
+        assert!(matches!(error, NotesError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn rejects_headings_above_the_serialization_bound() {
+        let source = format!("# {}\n\nbody", "a".repeat(NOTES_HEADING_MAX_UTF8_BYTES + 1));
+        assert!(matches!(
+            prepare_notes_document("heading.md", source.as_bytes()),
+            Err(NotesError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
+    fn ignores_heading_syntax_until_a_valid_fence_closer() {
+        let source = "```rust\n```not-a-closer\n# Code heading\n```\n# Real title\nbody";
+        let prepared = prepare_notes_document("fenced.md", source.as_bytes()).unwrap();
+        assert_eq!(prepared.title, "Real title");
+        assert!(prepared.chunks.iter().all(|chunk| {
+            chunk.section.as_deref() != Some("Code heading")
+                && !chunk.text.starts_with("Code heading")
+        }));
+    }
+
+    #[test]
+    fn does_not_treat_indented_code_as_a_fence() {
+        let source = "    ```\n# Real title\nbody";
+        let prepared = prepare_notes_document("indented.md", source.as_bytes()).unwrap();
+        assert_eq!(prepared.title, "Real title");
     }
 }

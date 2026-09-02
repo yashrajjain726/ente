@@ -73,23 +73,6 @@ const formatBytes = (bytes: number) => {
     return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 };
 
-const notesStatusLabel = (status: NotesCollection["status"]) => {
-    switch (status) {
-        case "indexing":
-            return "Indexing";
-        case "updating":
-            return "Updating";
-        case "ready":
-            return "Ready";
-        case "pending":
-            return "Pending";
-        case "unavailable":
-            return "Folder unavailable";
-        case "error":
-            return "Needs attention";
-    }
-};
-
 const formatNotesUpdatedAt = (timestamp: number) =>
     new Date(timestamp).toLocaleString(undefined, {
         dateStyle: "medium",
@@ -878,10 +861,6 @@ export const ChatDialogs = memo(
                                                     noWrap
                                                     sx={{ color: "text.muted" }}
                                                 >
-                                                    {notesStatusLabel(
-                                                        collection.status,
-                                                    )}{" "}
-                                                    ·{" "}
                                                     {
                                                         collection.indexedDocumentCount
                                                     }{" "}
@@ -889,22 +868,16 @@ export const ChatDialogs = memo(
                                                     1
                                                         ? "note indexed"
                                                         : "notes indexed"}
+                                                    {collection.lastUpdatedAtMs !=
+                                                        null && (
+                                                        <>
+                                                            {" · Updated at "}
+                                                            {formatNotesUpdatedAt(
+                                                                collection.lastUpdatedAtMs,
+                                                            )}
+                                                        </>
+                                                    )}
                                                 </Typography>
-                                                {collection.lastUpdatedAtMs !=
-                                                    null && (
-                                                    <Typography
-                                                        variant="mini"
-                                                        noWrap
-                                                        sx={{
-                                                            color: "text.muted",
-                                                        }}
-                                                    >
-                                                        Last updated{" "}
-                                                        {formatNotesUpdatedAt(
-                                                            collection.lastUpdatedAtMs,
-                                                        )}
-                                                    </Typography>
-                                                )}
                                             </Stack>
                                             <IconButton
                                                 aria-label={`Remove ${collection.label}`}
@@ -924,14 +897,25 @@ export const ChatDialogs = memo(
                                             </IconButton>
                                         </Stack>
                                         {indexing && (
-                                            <LinearProgress
-                                                variant={
-                                                    progress == null
-                                                        ? "indeterminate"
-                                                        : "determinate"
-                                                }
-                                                value={progress ?? undefined}
-                                            />
+                                            <Stack
+                                                direction="row"
+                                                sx={{
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                }}
+                                            >
+                                                <LinearProgress
+                                                    variant="determinate"
+                                                    value={progress ?? 0}
+                                                    sx={{ flex: 1 }}
+                                                />
+                                                <Typography
+                                                    variant="mini"
+                                                    sx={{ color: "text.muted" }}
+                                                >
+                                                    {progress ?? 0}%
+                                                </Typography>
+                                            </Stack>
                                         )}
                                         {collection.lastError && (
                                             <Typography
@@ -968,7 +952,7 @@ export const ChatDialogs = memo(
                                     {...compactIconProps}
                                 />
                                 <Typography variant="small" sx={{ flex: 1 }}>
-                                    Select notes folder
+                                    Add notes folder
                                 </Typography>
                             </ListItemButton>
                             <Typography

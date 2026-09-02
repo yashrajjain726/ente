@@ -17,6 +17,7 @@ const MIXED_END_SENTINEL: &str = "----- END ENSU GROUNDED SOURCES -----";
 const MIXED_SOURCES_PREFIX: &str = "Sources: ";
 const LICENSE_HEADER: &str =
     "Adapted sources · CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/";
+pub const MAX_GROUNDED_SOURCES: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -46,6 +47,11 @@ pub fn finalize_assistant_text(
     raw_assistant_text: &str,
     citations: &[SourceCitation],
 ) -> Result<String, RetrievalError> {
+    if citations.len() > MAX_GROUNDED_SOURCES {
+        return Err(RetrievalError::InvalidInput(
+            "too many grounded sources".to_string(),
+        ));
+    }
     let assistant_text = neutralize_model_sentinels(raw_assistant_text.trim());
     if assistant_text.is_empty() || citations.is_empty() {
         return Ok(assistant_text);
@@ -80,6 +86,11 @@ pub fn finalize_grounded_assistant_text(
     raw_assistant_text: &str,
     sources: &[GroundedSource],
 ) -> Result<String, RetrievalError> {
+    if sources.len() > MAX_GROUNDED_SOURCES {
+        return Err(RetrievalError::InvalidInput(
+            "too many grounded sources".to_string(),
+        ));
+    }
     let pack_citations = sources
         .iter()
         .map(|source| match source {
@@ -274,7 +285,7 @@ fn parse_mixed_assistant_text_inner(stored_text: &str) -> Option<ParsedGroundedA
         return None;
     }
     let sources = serde_json::from_str::<Vec<GroundedSource>>(sources_json).ok()?;
-    if sources.is_empty() || sources.len() > 64 {
+    if sources.is_empty() || sources.len() > MAX_GROUNDED_SOURCES {
         return None;
     }
     let sources = normalize_grounded_sources(&sources).ok()?;
@@ -350,6 +361,9 @@ fn parse_footer(footer: &str) -> Option<Vec<SourceCitation>> {
             license_label: license_label.to_owned(),
             license_url: license_url.to_owned(),
         });
+        if citations.len() > MAX_GROUNDED_SOURCES {
+            return None;
+        }
 
         match lines.get(cursor).copied()? {
             END_SENTINEL if cursor + 1 == lines.len() => break,
@@ -563,5 +577,28 @@ mod tests {
         let pack_view = parse_assistant_text(&finalized);
         assert_eq!(pack_view.text, "Grounded answer");
         assert_eq!(pack_view.citations, [pack]);
+    }
+
+    #[test]
+    fn rejects_source_lists_larger_than_the_parser_limit() {
+        let pack = citation(
+            "simplewiki",
+            "Simple English Wikipedia",
+            "https://simple.wikipedia.org/wiki/Example",
+        );
+        let sources = (0..=MAX_GROUNDED_SOURCES)
+            .map(|index| GroundedSource::LocalNote {
+                reference: crate::notes::NoteSourceReference {
+                    collection_id: "123e4567-e89b-12d3-a456-426614174000".to_string(),
+                    collection_label: Some("InterestAreas".to_string()),
+                    document_id: format!("note-{index}.md"),
+                    indexed_revision: "a".repeat(64),
+                    title: format!("Note {index}"),
+                    section: None,
+                },
+            })
+            .collect::<Vec<_>>();
+        assert!(finalize_grounded_assistant_text("Answer", &sources).is_err());
+        assert!(finalize_assistant_text("Answer", &vec![pack; MAX_GROUNDED_SOURCES + 1]).is_err());
     }
 }

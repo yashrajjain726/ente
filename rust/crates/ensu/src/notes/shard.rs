@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use super::manifest::notes_index_contract;
 use super::{
-    NOTES_CHUNK_CHARACTERS, NotesError, PreparedNotesDocument, invalid_index_input, is_valid_label,
-    validate_collection_id, validate_document_id, validate_revision,
+    NOTES_CHUNK_UTF8_BYTES, NotesError, PreparedNotesDocument, contains_unsupported_control,
+    invalid_index_input, is_valid_label, sha256_hex, validate_collection_id, validate_document_id,
+    validate_revision,
 };
 
 pub(super) const NOTES_SHARD_FILE: &str = "shard.json";
@@ -33,6 +34,12 @@ pub(super) struct ValidatedNotesShard {
     pub vectors: Vec<u8>,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct NotesShardIntegrity<'a> {
+    pub shard_sha256: &'a str,
+    pub vectors_sha256: &'a str,
+}
+
 impl NotesShard {
     pub(super) fn from_prepared(collection_id: &str, prepared: &PreparedNotesDocument) -> Self {
         Self {
@@ -52,14 +59,27 @@ impl NotesShard {
     }
 }
 
+pub(super) fn serialize_shard(shard: &NotesShard) -> Result<Vec<u8>, NotesError> {
+    let bytes = serde_json::to_vec(shard)?;
+    if bytes.is_empty() || bytes.len() as u64 > MAX_SHARD_JSON_BYTES {
+        return Err(NotesError::InvalidInput(
+            "serialized shard metadata exceeds the supported size".to_string(),
+        ));
+    }
+    Ok(bytes)
+}
+
 pub(super) fn load_and_validate_shard(
     directory: &Path,
     collection_id: &str,
     expected_document_id: &str,
     expected_revision: &str,
     expected_chunk_count: usize,
+    expected_integrity: NotesShardIntegrity<'_>,
     expected_prepared: Option<&PreparedNotesDocument>,
 ) -> Result<ValidatedNotesShard, NotesError> {
+    validate_revision(expected_integrity.shard_sha256).map_err(invalid_index_input)?;
+    validate_revision(expected_integrity.vectors_sha256).map_err(invalid_index_input)?;
     let directory_metadata = fs::symlink_metadata(directory)?;
     if !directory_metadata.file_type().is_dir() {
         return Err(NotesError::InvalidIndex(
@@ -74,7 +94,15 @@ pub(super) fn load_and_validate_shard(
             "shard metadata size is outside the supported range".to_string(),
         ));
     }
-    let shard: NotesShard = serde_json::from_slice(&fs::read(shard_path)?)?;
+    let shard_bytes = fs::read(shard_path)?;
+    if shard_bytes.len() as u64 != shard_metadata.len()
+        || sha256_hex(&shard_bytes) != expected_integrity.shard_sha256
+    {
+        return Err(NotesError::InvalidIndex(
+            "shard metadata digest does not match its manifest".to_string(),
+        ));
+    }
+    let shard: NotesShard = serde_json::from_slice(&shard_bytes)?;
     validate_shard(
         &shard,
         collection_id,
@@ -93,15 +121,20 @@ pub(super) fn load_and_validate_shard(
         .len()
         .checked_mul(vector_dimension)
         .ok_or_else(|| NotesError::InvalidIndex("shard vector byte length overflow".to_string()))?;
-    if vector_metadata.len() != expected_vector_bytes as u64 {
+    let vectors = fs::read(vectors_path)?;
+    if vector_metadata.len() != expected_vector_bytes as u64
+        || vectors.len() != expected_vector_bytes
+    {
         return Err(NotesError::InvalidIndex(
             "shard vector byte length does not match its metadata".to_string(),
         ));
     }
-    Ok(ValidatedNotesShard {
-        shard,
-        vectors: fs::read(vectors_path)?,
-    })
+    if sha256_hex(&vectors) != expected_integrity.vectors_sha256 {
+        return Err(NotesError::InvalidIndex(
+            "shard vector digest does not match its manifest".to_string(),
+        ));
+    }
+    Ok(ValidatedNotesShard { shard, vectors })
 }
 
 fn validate_shard(
@@ -134,7 +167,10 @@ fn validate_shard(
         ));
     }
     for chunk in &shard.chunks {
-        if chunk.text.trim().is_empty() || chunk.text.chars().count() > NOTES_CHUNK_CHARACTERS {
+        if chunk.text.trim().is_empty()
+            || chunk.text.len() > NOTES_CHUNK_UTF8_BYTES
+            || contains_unsupported_control(&chunk.text)
+        {
             return Err(NotesError::InvalidIndex(
                 "shard chunk text length is outside the supported range".to_string(),
             ));

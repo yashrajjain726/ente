@@ -11,7 +11,7 @@ use super::{
 };
 
 const MAX_PACK_HITS: usize = 2;
-const MAX_NOTES_HITS: usize = 6;
+pub const MAX_NOTES_GROUNDING_HITS: usize = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -33,9 +33,10 @@ pub struct GroundedPromptContext {
     pub sources: Vec<GroundedSource>,
 }
 
-pub fn select_mixed_grounding(
+pub fn select_mixed_grounding_candidates(
     pack_hits: &[KnowledgePromptHit],
     notes_hits: &[NotesSearchHit],
+    notes_limit: usize,
 ) -> Result<Vec<GroundedExcerpt>, RetrievalError> {
     let datasets = knowledge_datasets();
     let mut packs = pack_hits.iter().collect::<Vec<_>>();
@@ -101,7 +102,7 @@ pub fn select_mixed_grounding(
             .then_with(|| left.section.cmp(&right.section))
             .then_with(|| left.text.cmp(&right.text))
     });
-    for hit in notes.into_iter().take(MAX_NOTES_HITS) {
+    for hit in notes.into_iter().take(notes_limit) {
         let reference = NoteSourceReference {
             collection_id: hit.collection_id.clone(),
             collection_label: None,
@@ -161,12 +162,12 @@ pub fn build_grounded_prompt_context(
                 RetrievalError::InvalidInput("grounded context byte budget overflow".to_string())
             })?;
         let Some(available) = max_utf8_bytes.checked_sub(reserved) else {
-            break;
+            continue;
         };
         let sanitized = sanitize_excerpt(&excerpt.text);
         let passage = truncate_utf8(&sanitized, available).trim();
         if passage.is_empty() {
-            break;
+            continue;
         }
         text.push_str(&prefix);
         text.push_str(passage);
@@ -292,7 +293,8 @@ mod tests {
             note("two.md", 0.91),
             note("three.md", 0.89),
         ];
-        let selected = select_mixed_grounding(&packs, &notes).unwrap();
+        let selected =
+            select_mixed_grounding_candidates(&packs, &notes, MAX_NOTES_GROUNDING_HITS).unwrap();
 
         assert_eq!(selected.len(), 5);
         assert_eq!(
@@ -316,5 +318,28 @@ mod tests {
         );
         assert!(context.text.contains("(Your Notes · one.md)"));
         assert_eq!(context.sources.len(), selected.len());
+    }
+
+    #[test]
+    fn skips_an_unfit_source_label_and_uses_the_next_excerpt() {
+        let long_document_id = format!("{}.md", "a".repeat(4_093));
+        let selected = select_mixed_grounding_candidates(
+            &[],
+            &[
+                NotesSearchHit {
+                    title: long_document_id.clone(),
+                    ..note(&long_document_id, 0.95)
+                },
+                note("short.md", 0.90),
+            ],
+            MAX_NOTES_GROUNDING_HITS,
+        )
+        .unwrap();
+        let context = build_grounded_prompt_context(&selected, 512)
+            .unwrap()
+            .unwrap();
+        assert_eq!(context.sources.len(), 1);
+        assert!(context.text.contains("short.md passage"));
+        assert!(!context.text.contains(&long_document_id));
     }
 }

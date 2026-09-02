@@ -40,13 +40,13 @@ const BEGIN_CONTEXT_SENTINEL: &str = "----- BEGIN KNOWLEDGE CONTEXT -----";
 const END_CONTEXT_SENTINEL: &str = "----- END KNOWLEDGE CONTEXT -----";
 
 pub use citation::{
-    ParsedAssistantText, ParsedGroundedAssistantText, SourceCitation, clean_assistant_text,
-    finalize_assistant_text, finalize_grounded_assistant_text, knowledge_source_chip_label,
-    parse_assistant_text, parse_grounded_assistant_text,
+    MAX_GROUNDED_SOURCES, ParsedAssistantText, ParsedGroundedAssistantText, SourceCitation,
+    clean_assistant_text, finalize_assistant_text, finalize_grounded_assistant_text,
+    knowledge_source_chip_label, parse_assistant_text, parse_grounded_assistant_text,
 };
 pub use grounded::{
-    GroundedExcerpt, GroundedPromptContext, GroundedSource, build_grounded_prompt_context,
-    select_mixed_grounding,
+    GroundedExcerpt, GroundedPromptContext, GroundedSource, MAX_NOTES_GROUNDING_HITS,
+    build_grounded_prompt_context, select_mixed_grounding_candidates,
 };
 pub use index::{RetrievalHit, RetrievalIndex};
 pub use pack::{

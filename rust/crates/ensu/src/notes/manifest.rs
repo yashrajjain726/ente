@@ -8,14 +8,15 @@ use serde::{Deserialize, Serialize};
 use crate::config::knowledge_index_contract;
 
 use super::{
-    NOTES_INDEX_CONTRACT_VERSION, NOTES_MAX_SOURCE_BYTES, NotesError, invalid_index_input,
-    sha256_hex, validate_collection_id, validate_document_id, validate_revision,
+    NOTES_INDEX_CONTRACT_VERSION, NOTES_MAX_COLLECTION_CHUNKS, NOTES_MAX_COLLECTION_SOURCE_BYTES,
+    NOTES_MAX_SOURCE_BYTES, NotesError, invalid_index_input, sha256_hex, validate_collection_id,
+    validate_document_id, validate_revision,
 };
 
 pub(super) const NOTES_MANIFEST_FILE: &str = "manifest.json";
 pub(super) const NOTES_MANIFEST_BACKUP_FILE: &str = "manifest.json.backup";
 pub(super) const NOTES_DOCUMENTS_DIRECTORY: &str = "documents";
-const NOTES_MANIFEST_SCHEMA_VERSION: u32 = 1;
+const NOTES_MANIFEST_SCHEMA_VERSION: u32 = 2;
 const MAX_MANIFEST_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,6 +63,10 @@ pub(super) struct NotesManifestDocument {
     pub(super) source_size: u64,
     pub(super) source_modified_at_ms: Option<i64>,
     pub(super) chunk_count: u32,
+    #[serde(default)]
+    pub(super) shard_sha256: String,
+    #[serde(default)]
+    pub(super) vectors_sha256: String,
 }
 
 pub(super) fn empty_manifest(collection_id: &str) -> NotesManifest {
@@ -114,9 +119,13 @@ pub(super) fn validate_manifest(
         return Err(NotesError::NotReady);
     }
 
+    let mut total_source_bytes = 0_u64;
+    let mut total_chunks = 0_u64;
     for (document_id, document) in &manifest.documents {
         validate_document_id(document_id).map_err(invalid_index_input)?;
         validate_revision(&document.revision).map_err(invalid_index_input)?;
+        validate_revision(&document.shard_sha256).map_err(invalid_index_input)?;
+        validate_revision(&document.vectors_sha256).map_err(invalid_index_input)?;
         if document.source_size > NOTES_MAX_SOURCE_BYTES as u64 {
             return Err(NotesError::InvalidIndex(
                 "manifest source size exceeds the supported limit".to_string(),
@@ -129,8 +138,40 @@ pub(super) fn validate_manifest(
                 "manifest document chunk count is invalid".to_string(),
             ));
         }
+        total_source_bytes = total_source_bytes
+            .checked_add(document.source_size)
+            .ok_or_else(|| {
+                NotesError::InvalidIndex("collection source byte count overflow".to_string())
+            })?;
+        total_chunks = total_chunks
+            .checked_add(u64::from(document.chunk_count))
+            .ok_or_else(|| {
+                NotesError::InvalidIndex("collection chunk count overflow".to_string())
+            })?;
+    }
+    if total_source_bytes > NOTES_MAX_COLLECTION_SOURCE_BYTES
+        || total_chunks > NOTES_MAX_COLLECTION_CHUNKS
+    {
+        return Err(NotesError::InvalidIndex(
+            "collection exceeds the supported aggregate index size".to_string(),
+        ));
     }
     Ok(())
+}
+
+pub(super) fn serialize_manifest_for_publish(
+    manifest: &NotesManifest,
+    collection_id: &str,
+) -> Result<Vec<u8>, NotesError> {
+    validate_manifest(manifest, collection_id, false)?;
+    let mut bytes = serde_json::to_vec_pretty(manifest)?;
+    bytes.push(b'\n');
+    if bytes.len() as u64 > MAX_MANIFEST_BYTES {
+        return Err(NotesError::CollectionTooLarge(
+            "The folder contains too many notes to index".to_string(),
+        ));
+    }
+    Ok(bytes)
 }
 
 pub(super) fn load_manifest_file(

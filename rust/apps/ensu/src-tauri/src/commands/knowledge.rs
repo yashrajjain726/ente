@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use ente_assets::{AssetStore, download};
 use ente_ensu::config::{AttributionConfig, KnowledgeDatasetConfig};
 use ente_ensu::{llm, retrieval};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
 use tauri::{AppHandle, Emitter, Manager, State as TauriState, WebviewWindow};
 
@@ -87,6 +87,133 @@ pub struct KnowledgePackDto {
     attribution: AttributionDto,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceCitationDto {
+    dataset_id: String,
+    dataset_label: String,
+    credit: String,
+    title: String,
+    source_url: String,
+    license_label: String,
+    license_url: String,
+}
+
+impl From<retrieval::SourceCitation> for SourceCitationDto {
+    fn from(value: retrieval::SourceCitation) -> Self {
+        Self {
+            dataset_id: value.dataset_id,
+            dataset_label: value.dataset_label,
+            credit: value.credit,
+            title: value.title,
+            source_url: value.source_url,
+            license_label: value.license_label,
+            license_url: value.license_url,
+        }
+    }
+}
+
+impl From<SourceCitationDto> for retrieval::SourceCitation {
+    fn from(value: SourceCitationDto) -> Self {
+        Self {
+            dataset_id: value.dataset_id,
+            dataset_label: value.dataset_label,
+            credit: value.credit,
+            title: value.title,
+            source_url: value.source_url,
+            license_label: value.license_label,
+            license_url: value.license_url,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteSourceReferenceDto {
+    collection_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    collection_label: Option<String>,
+    document_id: String,
+    indexed_revision: String,
+    title: String,
+    section: Option<String>,
+}
+
+impl From<ente_ensu::notes::NoteSourceReference> for NoteSourceReferenceDto {
+    fn from(value: ente_ensu::notes::NoteSourceReference) -> Self {
+        Self {
+            collection_id: value.collection_id,
+            collection_label: value.collection_label,
+            document_id: value.document_id,
+            indexed_revision: value.indexed_revision,
+            title: value.title,
+            section: value.section,
+        }
+    }
+}
+
+impl From<NoteSourceReferenceDto> for ente_ensu::notes::NoteSourceReference {
+    fn from(value: NoteSourceReferenceDto) -> Self {
+        Self {
+            collection_id: value.collection_id,
+            collection_label: value.collection_label,
+            document_id: value.document_id,
+            indexed_revision: value.indexed_revision,
+            title: value.title,
+            section: value.section,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum GroundedSourceDto {
+    EnsuPack { citation: SourceCitationDto },
+    LocalNote { reference: NoteSourceReferenceDto },
+}
+
+impl From<retrieval::GroundedSource> for GroundedSourceDto {
+    fn from(value: retrieval::GroundedSource) -> Self {
+        match value {
+            retrieval::GroundedSource::EnsuPack { citation } => Self::EnsuPack {
+                citation: citation.into(),
+            },
+            retrieval::GroundedSource::LocalNote { reference } => Self::LocalNote {
+                reference: reference.into(),
+            },
+        }
+    }
+}
+
+impl From<GroundedSourceDto> for retrieval::GroundedSource {
+    fn from(value: GroundedSourceDto) -> Self {
+        match value {
+            GroundedSourceDto::EnsuPack { citation } => Self::EnsuPack {
+                citation: citation.into(),
+            },
+            GroundedSourceDto::LocalNote { reference } => Self::LocalNote {
+                reference: reference.into(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroundedPromptContextDto {
+    text: String,
+    sources: Vec<GroundedSourceDto>,
+}
+
+impl From<retrieval::GroundedPromptContext> for GroundedPromptContextDto {
+    fn from(value: retrieval::GroundedPromptContext) -> Self {
+        Self {
+            text: value.text,
+            sources: value.sources.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct KnowledgeDownloadProgressDto {
@@ -119,14 +246,19 @@ fn select_verified_mixed_grounding(
     note_hits: &[ente_ensu::notes::NotesSearchHit],
     mut verify: impl FnMut(&ente_ensu::notes::NoteSourceReference) -> Result<bool, ApiError>,
 ) -> Result<Vec<retrieval::GroundedExcerpt>, ApiError> {
-    let selected =
-        retrieval::select_mixed_grounding(pack_hits, note_hits).map_err(retrieval_error)?;
+    let selected = retrieval::select_mixed_grounding_candidates(pack_hits, note_hits, usize::MAX)
+        .map_err(retrieval_error)?;
     let mut verified = Vec::with_capacity(selected.len());
+    let mut verified_note_count = 0_usize;
     for excerpt in selected {
-        if let retrieval::GroundedSource::LocalNote { reference } = &excerpt.source
-            && !verify(reference)?
-        {
-            continue;
+        if let retrieval::GroundedSource::LocalNote { reference } = &excerpt.source {
+            if verified_note_count == retrieval::MAX_NOTES_GROUNDING_HITS {
+                continue;
+            }
+            if !verify(reference)? {
+                continue;
+            }
+            verified_note_count += 1;
         }
         verified.push(excerpt);
     }
@@ -380,10 +512,10 @@ pub async fn knowledge_retrieve(
     enabled_stable_ids: Vec<String>,
     max_context_utf8_bytes: u32,
     retrieval_epoch: u64,
-) -> Result<Option<retrieval::GroundedPromptContext>, ApiError> {
+) -> Result<Option<GroundedPromptContextDto>, ApiError> {
     let knowledge_state = app.state::<State>();
     let notes_state = app.state::<crate::commands::notes::State>();
-    let note_collection_ids = notes_state.available_open_index_collection_ids();
+    let note_collection_ids = notes_state.available_index_collection_ids();
     if query.trim().is_empty()
         || (enabled_stable_ids.is_empty() && note_collection_ids.is_empty())
         || max_context_utf8_bytes == 0
@@ -517,6 +649,7 @@ pub async fn knowledge_retrieve(
         check_cancelled()?;
 
         retrieval::build_grounded_prompt_context(&excerpts, context_budget as usize)
+            .map(|context| context.map(Into::into))
             .map_err(retrieval_error)
     })
     .await
@@ -540,4 +673,41 @@ pub(crate) fn clear_for_exit(app: &AppHandle) {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ente_ensu::notes::NotesSearchHit;
+
+    const COLLECTION_ID: &str = "123e4567-e89b-12d3-a456-426614174000";
+
+    fn note(index: usize) -> NotesSearchHit {
+        NotesSearchHit {
+            collection_id: COLLECTION_ID.to_string(),
+            document_id: format!("note-{index}.md"),
+            revision: "a".repeat(64),
+            score: 1.0 - index as f32 / 100.0,
+            title: format!("Note {index}"),
+            section: None,
+            text: format!("passage {index}"),
+        }
+    }
+
+    #[test]
+    fn stale_top_notes_are_backfilled_with_verified_hits() {
+        let notes = (0..6).map(note).collect::<Vec<_>>();
+
+        let selected = select_verified_mixed_grounding(&[], &notes, |reference| {
+            Ok(reference.document_id == "note-5.md")
+        })
+        .unwrap();
+
+        assert_eq!(selected.len(), 1);
+        assert!(matches!(
+            &selected[0].source,
+            retrieval::GroundedSource::LocalNote { reference }
+                if reference.document_id == "note-5.md"
+        ));
+    }
 }

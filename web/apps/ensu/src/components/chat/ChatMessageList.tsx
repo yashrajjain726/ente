@@ -273,6 +273,7 @@ const LocalNoteSourceCard = memo(
                         void openNoteDocument(
                             reference.collectionId,
                             reference.documentId,
+                            reference.indexedRevision,
                         ).catch((error: unknown) =>
                             setOpenError(noteSourceErrorMessage(error)),
                         );

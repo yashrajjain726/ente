@@ -30,7 +30,11 @@ const invokeNotes = async <T>(
 
 export const selectNotesFolder = async () => {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await open({
+        directory: true,
+        multiple: false,
+        recursive: false,
+    });
     return typeof selected === "string" ? selected : null;
 };
 
@@ -51,7 +55,7 @@ export const indexNotesCollection = (
     force: boolean,
     retrievalEpoch: number,
 ) =>
-    invokeNotes<{ collection: NotesCollection; hasMore: boolean }>(
+    invokeNotes<{ collection: NotesCollection; needsRerun: boolean }>(
         "notes_index_collection",
         { collectionId, force, retrievalEpoch },
     );
@@ -65,8 +69,16 @@ export const listenForNotesStateChanged = async (
     );
 };
 
-export const openNoteDocument = (collectionId: string, documentId: string) =>
-    invokeNotes<null>("notes_open_document", { collectionId, documentId });
+export const openNoteDocument = (
+    collectionId: string,
+    documentId: string,
+    indexedRevision: string,
+) =>
+    invokeNotes<null>("notes_open_document", {
+        collectionId,
+        documentId,
+        indexedRevision,
+    });
 
 const commandError = (error: unknown) =>
     (error && typeof error === "object" ? error : {}) as {
@@ -87,6 +99,8 @@ export const notesErrorMessage = (error: unknown) => {
             return "That folder is unavailable. Check its location and permissions.";
         case "embedding_missing":
             return "The knowledge embedding model must be downloaded first.";
+        case "collection_too_large":
+            return "This folder contains too many notes to index.";
         default:
             return typeof message === "string"
                 ? message
@@ -96,7 +110,12 @@ export const notesErrorMessage = (error: unknown) => {
 
 export const noteSourceErrorMessage = (error: unknown) => {
     const { name } = commandError(error);
-    return name === "open_failed"
-        ? "The note could not be opened."
-        : "Source no longer available.";
+    switch (name) {
+        case "open_failed":
+            return "The note could not be opened.";
+        case "source_changed":
+            return "This note changed after the answer was generated.";
+        default:
+            return "Source no longer available.";
+    }
 };
