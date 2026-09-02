@@ -939,7 +939,16 @@ export const ChatDialogs = memo(
                                                 {collection.lastError}
                                             </Typography>
                                         )}
-                                        {canRetry && (
+                                        {collection.watcherError && (
+                                            <Typography
+                                                variant="small"
+                                                sx={{ color: "text.muted" }}
+                                            >
+                                                {collection.watcherError}
+                                            </Typography>
+                                        )}
+                                        {(canRetry ||
+                                            collection.watcherError) && (
                                             <Button
                                                 size="small"
                                                 onClick={() =>
@@ -950,7 +959,9 @@ export const ChatDialogs = memo(
                                                 }
                                                 sx={{ alignSelf: "flex-start" }}
                                             >
-                                                Try again
+                                                {canRetry
+                                                    ? "Try again"
+                                                    : "Refresh"}
                                             </Button>
                                         )}
                                     </Stack>

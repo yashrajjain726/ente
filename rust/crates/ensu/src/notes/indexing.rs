@@ -215,8 +215,8 @@ pub fn index_notes_collection<E>(
             );
             continue;
         };
-        match writer.validate_document(&prepared, &source_metadata) {
-            Ok(()) => {}
+        let validated = match writer.validate_document(&prepared, &source_metadata) {
+            Ok(validated) => validated,
             Err(NotesError::InvalidInput(_)) => {
                 writer.commit_deletions(std::slice::from_ref(document_id))?;
                 processed_requested += 1;
@@ -230,7 +230,7 @@ pub fn index_notes_collection<E>(
                 continue;
             }
             Err(error) => return Err(error.into()),
-        }
+        };
         let Some(embeddings) = embed_document(&prepared).map_err(NotesIndexingError::Adapter)?
         else {
             writer.commit_deletions(std::slice::from_ref(document_id))?;
@@ -267,7 +267,7 @@ pub fn index_notes_collection<E>(
                 processed_requested,
             );
         }
-        writer.commit_document(&prepared, &embeddings, &verified_source)?;
+        writer.commit_validated_document(validated, &embeddings)?;
         processed_requested += 1;
         progress_document_count += 1;
         report_indexing_progress(

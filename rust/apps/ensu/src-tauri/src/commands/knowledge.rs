@@ -619,10 +619,15 @@ pub async fn knowledge_retrieve(
                 check_cancelled()?;
                 match notes.search_collection(collection_id, &query_embedding) {
                     Ok(collection_hits) => note_hits.extend(collection_hits),
-                    Err(error) => logging::log(
-                        "Knowledge",
-                        format!("Notes search skipped collection={collection_id} error={error}"),
-                    ),
+                    Err(error) => {
+                        crate::commands::notes::mark_index_unreadable(&app, collection_id);
+                        logging::log(
+                            "Knowledge",
+                            format!(
+                                "Notes search skipped and queued for rebuild collection={collection_id} error={error}"
+                            ),
+                        );
+                    }
                 }
             }
         }

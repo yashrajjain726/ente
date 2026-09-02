@@ -16,6 +16,7 @@ export interface NotesCollection {
     lastUpdatedAtMs: number | null;
     updateDueAtMs: number | null;
     lastError: string | null;
+    watcherError: string | null;
 }
 
 const invokeNotes = async <T>(

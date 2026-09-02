@@ -29,11 +29,6 @@ pub(super) struct NotesShardChunk {
     pub text: String,
 }
 
-pub(super) struct ValidatedNotesShard {
-    pub shard: NotesShard,
-    pub vectors: Vec<u8>,
-}
-
 #[derive(Clone, Copy)]
 pub(super) struct NotesShardIntegrity<'a> {
     pub shard_sha256: &'a str,
@@ -77,15 +72,35 @@ pub(super) fn load_and_validate_shard(
     expected_chunk_count: usize,
     expected_integrity: NotesShardIntegrity<'_>,
     expected_prepared: Option<&PreparedNotesDocument>,
-) -> Result<ValidatedNotesShard, NotesError> {
-    validate_revision(expected_integrity.shard_sha256).map_err(invalid_index_input)?;
-    validate_revision(expected_integrity.vectors_sha256).map_err(invalid_index_input)?;
-    let directory_metadata = fs::symlink_metadata(directory)?;
-    if !directory_metadata.file_type().is_dir() {
-        return Err(NotesError::InvalidIndex(
-            "shard path must be a directory".to_string(),
-        ));
-    }
+) -> Result<(), NotesError> {
+    let shard = load_and_validate_shard_metadata(
+        directory,
+        collection_id,
+        expected_document_id,
+        expected_revision,
+        expected_chunk_count,
+        expected_integrity.shard_sha256,
+        expected_prepared,
+    )?;
+    load_and_validate_vectors(
+        directory,
+        shard.chunks.len(),
+        expected_integrity.vectors_sha256,
+    )?;
+    Ok(())
+}
+
+pub(super) fn load_and_validate_shard_metadata(
+    directory: &Path,
+    collection_id: &str,
+    expected_document_id: &str,
+    expected_revision: &str,
+    expected_chunk_count: usize,
+    expected_shard_sha256: &str,
+    expected_prepared: Option<&PreparedNotesDocument>,
+) -> Result<NotesShard, NotesError> {
+    validate_revision(expected_shard_sha256).map_err(invalid_index_input)?;
+    validate_shard_directory(directory)?;
 
     let shard_path = directory.join(NOTES_SHARD_FILE);
     let shard_metadata = regular_file_metadata(&shard_path, "shard metadata")?;
@@ -96,7 +111,7 @@ pub(super) fn load_and_validate_shard(
     }
     let shard_bytes = fs::read(shard_path)?;
     if shard_bytes.len() as u64 != shard_metadata.len()
-        || sha256_hex(&shard_bytes) != expected_integrity.shard_sha256
+        || sha256_hex(&shard_bytes) != expected_shard_sha256
     {
         return Err(NotesError::InvalidIndex(
             "shard metadata digest does not match its manifest".to_string(),
@@ -111,14 +126,21 @@ pub(super) fn load_and_validate_shard(
         expected_chunk_count,
         expected_prepared,
     )?;
+    Ok(shard)
+}
 
+pub(super) fn load_and_validate_vectors(
+    directory: &Path,
+    expected_chunk_count: usize,
+    expected_vectors_sha256: &str,
+) -> Result<Vec<u8>, NotesError> {
+    validate_revision(expected_vectors_sha256).map_err(invalid_index_input)?;
+    validate_shard_directory(directory)?;
     let vectors_path = directory.join(NOTES_VECTORS_FILE);
     let vector_metadata = regular_file_metadata(&vectors_path, "shard vectors")?;
     let vector_dimension = usize::try_from(notes_index_contract().retrieval_dimension)
         .map_err(|_| NotesError::InvalidIndex("vector dimension is too large".to_string()))?;
-    let expected_vector_bytes = shard
-        .chunks
-        .len()
+    let expected_vector_bytes = expected_chunk_count
         .checked_mul(vector_dimension)
         .ok_or_else(|| NotesError::InvalidIndex("shard vector byte length overflow".to_string()))?;
     let vectors = fs::read(vectors_path)?;
@@ -129,12 +151,22 @@ pub(super) fn load_and_validate_shard(
             "shard vector byte length does not match its metadata".to_string(),
         ));
     }
-    if sha256_hex(&vectors) != expected_integrity.vectors_sha256 {
+    if sha256_hex(&vectors) != expected_vectors_sha256 {
         return Err(NotesError::InvalidIndex(
             "shard vector digest does not match its manifest".to_string(),
         ));
     }
-    Ok(ValidatedNotesShard { shard, vectors })
+    Ok(vectors)
+}
+
+fn validate_shard_directory(directory: &Path) -> Result<(), NotesError> {
+    let directory_metadata = fs::symlink_metadata(directory)?;
+    if !directory_metadata.file_type().is_dir() {
+        return Err(NotesError::InvalidIndex(
+            "shard path must be a directory".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_shard(

@@ -1,7 +1,11 @@
 use std::collections::{BTreeSet, HashMap};
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::fd::AsRawFd;
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+#[cfg(windows)]
+use std::os::windows::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -19,6 +23,8 @@ use tauri::{AppHandle, Manager, State as TauriState};
 use tauri_plugin_fs::FsExt;
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::ERROR_SHARING_VIOLATION;
 
 use crate::commands::common::ApiError;
 use crate::commands::llm::ModelDownloadState;
@@ -35,14 +41,12 @@ use source::{
     is_supported_file, read_collection_source, source_root_is_available, validate_new_source_root,
 };
 pub use watcher::initialize_for_app;
-pub(crate) use watcher::mark_reference_stale;
-use watcher::{
-    emit_state_changed, ensure_collection_watcher, install_collection_watcher,
-    mark_collection_dirty,
-};
+use watcher::{emit_state_changed, ensure_collection_watcher, install_collection_watcher};
+pub(crate) use watcher::{mark_collection_dirty, mark_reference_stale};
 
 const NOTES_DIRECTORY: &str = "notes";
 const NOTES_INDEX_DIRECTORY: &str = "indexes";
+const NOTES_OWNERSHIP_LOCK_FILE: &str = ".owner.lock";
 const NOTES_EMBEDDING_TITLE_MAX_UTF8_BYTES: usize = 512;
 const NOTES_QUIET_PERIOD_MS: i64 = 5 * 60 * 1_000;
 const NOTES_STATE_CHANGED_EVENT: &str = "notes-state-changed";
@@ -92,6 +96,7 @@ struct CollectionRuntime {
     indexed_document_count: u64,
     last_updated_at_ms: Option<i64>,
     last_error: Option<String>,
+    watcher_error: Option<String>,
 }
 
 impl CollectionRuntime {
@@ -103,6 +108,7 @@ impl CollectionRuntime {
             indexed_document_count: 0,
             last_updated_at_ms: None,
             last_error: None,
+            watcher_error: None,
         }
     }
 
@@ -126,6 +132,7 @@ pub struct NotesCollectionDto {
     last_updated_at_ms: Option<i64>,
     update_due_at_ms: Option<i64>,
     last_error: Option<String>,
+    watcher_error: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -219,6 +226,7 @@ impl IndexCache {
 struct DesktopUpdateState {
     forced_document_ids: BTreeSet<String>,
     force_full_hash: bool,
+    rebuild_derived_index: bool,
     quiet_deadline_ms: i64,
     generation: u64,
     bypass_quiet_period: bool,
@@ -233,7 +241,11 @@ impl DesktopUpdateState {
     ) {
         self.forced_document_ids.extend(forced_document_ids);
         self.force_full_hash |= force_full_hash;
-        self.quiet_deadline_ms = now_ms.saturating_add(NOTES_QUIET_PERIOD_MS);
+        self.quiet_deadline_ms = if self.rebuild_derived_index {
+            now_ms
+        } else {
+            now_ms.saturating_add(NOTES_QUIET_PERIOD_MS)
+        };
         self.generation = self.generation.wrapping_add(1);
         self.bypass_quiet_period = false;
     }
@@ -249,6 +261,17 @@ impl DesktopUpdateState {
             self.generation = self.generation.wrapping_add(1);
         }
         self.quiet_deadline_ms = now_ms;
+        self.bypass_quiet_period = false;
+        true
+    }
+
+    fn record_unreadable_index(&mut self, now_ms: i64) -> bool {
+        if self.rebuild_derived_index {
+            return false;
+        }
+        self.rebuild_derived_index = true;
+        self.quiet_deadline_ms = now_ms;
+        self.generation = self.generation.wrapping_add(1);
         self.bypass_quiet_period = false;
         true
     }
@@ -271,6 +294,7 @@ pub struct State {
     watchers: Mutex<HashMap<String, CollectionWatcher>>,
     watch_work: Mutex<HashMap<String, watcher::WatchWork>>,
     updates: Mutex<HashMap<String, DesktopUpdateState>>,
+    _ownership_lock: File,
 }
 
 #[derive(Clone)]
@@ -283,6 +307,8 @@ pub(crate) struct RetrievalHandle {
 impl State {
     pub fn new(app_data_dir: PathBuf) -> Result<Self, ApiError> {
         let notes_directory = app_data_dir.join(NOTES_DIRECTORY);
+        ensure_directory(&notes_directory)?;
+        let ownership_lock = acquire_notes_ownership(&notes_directory)?;
         let index_root = notes_directory.join(NOTES_INDEX_DIRECTORY);
         ensure_directory(&index_root)?;
         let registry = RegistryStore::open(notes_directory)?;
@@ -336,6 +362,7 @@ impl State {
             watchers: Mutex::new(HashMap::new()),
             watch_work: Mutex::new(HashMap::new()),
             updates: Mutex::new(HashMap::new()),
+            _ownership_lock: ownership_lock,
         })
     }
 
@@ -395,6 +422,21 @@ impl State {
             .unwrap_or_else(CollectionRuntime::pending)
     }
 
+    fn set_watcher_error(&self, collection_id: &str, error: Option<&ApiError>) -> bool {
+        let mut runtimes = self.runtimes.lock().unwrap_or_else(PoisonError::into_inner);
+        let Some(runtime) = runtimes.get_mut(collection_id) else {
+            return false;
+        };
+        let watcher_error = error.map(|_| {
+            "Changes cannot be watched automatically. Refresh this folder manually.".to_string()
+        });
+        if runtime.watcher_error == watcher_error {
+            return false;
+        }
+        runtime.watcher_error = watcher_error;
+        true
+    }
+
     fn prepare_update(
         &self,
         collection_id: &str,
@@ -422,7 +464,7 @@ impl State {
             generation: update.generation,
             forced_document_ids: update.forced_document_ids.iter().cloned().collect(),
             force_full_hash: update.force_full_hash,
-            rebuild_derived_index: false,
+            rebuild_derived_index: update.rebuild_derived_index,
         })
     }
 
@@ -591,6 +633,35 @@ impl State {
     }
 }
 
+pub(crate) fn mark_index_unreadable(app: &AppHandle, collection_id: &str) {
+    let state = app.state::<State>();
+    if state.registered_collection(collection_id).is_err() {
+        return;
+    }
+    state.evict_cached_index(collection_id);
+    {
+        let mut updates = state.updates.lock().unwrap_or_else(PoisonError::into_inner);
+        updates
+            .entry(collection_id.to_string())
+            .or_default()
+            .record_unreadable_index(now_ms());
+    }
+    {
+        let mut runtimes = state
+            .runtimes
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let Some(runtime) = runtimes.get_mut(collection_id) else {
+            return;
+        };
+        runtime.status = NotesCollectionStatusDto::Pending;
+        runtime.index_available = false;
+        runtime.indexing_progress = None;
+        runtime.last_error = None;
+    }
+    emit_state_changed(app, collection_id);
+}
+
 impl RetrievalHandle {
     pub(crate) fn collection_label(&self, collection_id: &str) -> Option<String> {
         self.registry
@@ -659,6 +730,7 @@ fn collection_dto(
         last_updated_at_ms: runtime.last_updated_at_ms,
         update_due_at_ms,
         last_error: runtime.last_error.clone(),
+        watcher_error: runtime.watcher_error.clone(),
     }
 }
 
@@ -751,13 +823,13 @@ fn register_collection(
     }
     notes_state.set_runtime(&collection.id, CollectionRuntime::pending());
     if let Err(error) = install_collection_watcher(app, &collection) {
-        notes_state.set_runtime(
-            &collection.id,
-            CollectionRuntime {
-                status: NotesCollectionStatusDto::Error,
-                last_error: Some(error.message),
-                ..CollectionRuntime::pending()
-            },
+        notes_state.set_watcher_error(&collection.id, Some(&error));
+        crate::logging::log(
+            "Notes",
+            format!(
+                "watcher unavailable collection={} error={}",
+                collection.id, error.message
+            ),
         );
     }
     let dto = notes_state.collection_dto(&collection.id)?;
@@ -906,16 +978,27 @@ pub async fn notes_index_collection(
         ensure_collection_watcher(&watcher_app, &watcher_collection)
     })
     .await
-    .map_err(|_| ApiError::new("watcher_thread", "Notes watcher task failed"))?;
-    if let Err(error) = watcher_result {
-        report_index_error(&app, &notes_state, &collection_id, None, &error);
-        return Err(error);
+    .unwrap_or_else(|_| Err(ApiError::new("watcher_thread", "Notes watcher task failed")));
+    match watcher_result {
+        Ok(()) => {
+            notes_state.set_watcher_error(&collection_id, None);
+        }
+        Err(error) => {
+            notes_state.set_watcher_error(&collection_id, Some(&error));
+            crate::logging::log(
+                "Notes",
+                format!(
+                    "watcher unavailable collection={collection_id} error={}",
+                    error.message
+                ),
+            );
+        }
     }
     let had_index = notes_state.has_available_index(&collection_id);
     let rebuild_derived_index =
         should_rebuild_derived_index(&notes_state.index_root, &collection_id, force, had_index)?;
     let mut update = notes_state.prepare_update(&collection_id, force, had_index)?;
-    update.rebuild_derived_index = rebuild_derived_index;
+    update.rebuild_derived_index |= rebuild_derived_index;
     let cancellation_epoch = llm_state.retrieval_epoch();
     if let Err(error) = check_cancelled(&cancellation_epoch, retrieval_epoch) {
         crate::logging::log(
@@ -1127,6 +1210,48 @@ fn available_state(app: &AppHandle) -> Result<TauriState<'_, State>, ApiError> {
     })
 }
 
+fn acquire_notes_ownership(notes_directory: &Path) -> Result<File, ApiError> {
+    let mut options = OpenOptions::new();
+    options.read(true).write(true).create(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    #[cfg(windows)]
+    options.share_mode(0);
+
+    let file = options
+        .open(notes_directory.join(NOTES_OWNERSHIP_LOCK_FILE))
+        .map_err(notes_ownership_open_error)?;
+
+    #[cfg(unix)]
+    {
+        let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+        if result != 0 {
+            let error = std::io::Error::last_os_error();
+            if error.kind() == std::io::ErrorKind::WouldBlock {
+                return Err(notes_in_use_error());
+            }
+            return Err(io_error(error));
+        }
+    }
+
+    Ok(file)
+}
+
+fn notes_ownership_open_error(error: std::io::Error) -> ApiError {
+    #[cfg(windows)]
+    if error.raw_os_error() == Some(ERROR_SHARING_VIOLATION as i32) {
+        return notes_in_use_error();
+    }
+    io_error(error)
+}
+
+fn notes_in_use_error() -> ApiError {
+    ApiError::new(
+        "notes_in_use",
+        "Your Notes is already open in another Ensu instance",
+    )
+}
+
 fn ensure_directory(path: &Path) -> Result<(), ApiError> {
     if !path_exists(path)? {
         fs::create_dir_all(path).map_err(io_error)?;
@@ -1227,6 +1352,59 @@ mod tests {
             .commit_document(&prepared, &[embedding], &metadata)
             .unwrap();
         writer.publish(true).unwrap();
+    }
+
+    #[test]
+    fn ownership_lock_excludes_another_owner_until_release() {
+        let temp = TestDirectory::new();
+        let first = acquire_notes_ownership(temp.path()).unwrap();
+
+        let error = acquire_notes_ownership(temp.path()).unwrap_err();
+        assert_eq!(error.name, Some("notes_in_use"));
+        assert_eq!(
+            error.message,
+            "Your Notes is already open in another Ensu instance"
+        );
+
+        drop(first);
+        acquire_notes_ownership(temp.path()).unwrap();
+    }
+
+    #[test]
+    fn watcher_warning_does_not_replace_ready_index_state() {
+        let temp = TestDirectory::new();
+        let collection = RegisteredCollection {
+            id: COLLECTION_ID.to_string(),
+            source_root: temp.path().to_path_buf(),
+        };
+        let runtime = CollectionRuntime {
+            status: NotesCollectionStatusDto::Ready,
+            index_available: true,
+            indexing_progress: None,
+            indexed_document_count: 1,
+            last_updated_at_ms: Some(1),
+            last_error: None,
+            watcher_error: Some("Watcher unavailable".to_string()),
+        };
+
+        let dto = collection_dto(&collection, &runtime, None);
+
+        assert_eq!(dto.status, NotesCollectionStatusDto::Ready);
+        assert_eq!(dto.watcher_error.as_deref(), Some("Watcher unavailable"));
+        assert_eq!(dto.last_error, None);
+    }
+
+    #[test]
+    fn unreadable_index_requests_one_immediate_derived_rebuild() {
+        let mut update = DesktopUpdateState::default();
+
+        assert!(update.record_unreadable_index(42));
+        assert!(update.rebuild_derived_index);
+        assert_eq!(update.quiet_deadline_ms, 42);
+        assert_eq!(update.generation, 1);
+        assert!(!update.record_unreadable_index(84));
+        assert_eq!(update.quiet_deadline_ms, 42);
+        assert_eq!(update.generation, 1);
     }
 
     #[test]

@@ -20,14 +20,25 @@ use super::shard::{
 use super::{
     NOTES_CHUNK_UTF8_BYTES, NOTES_MAX_COLLECTION_CHUNKS, NOTES_MAX_COLLECTION_DOCUMENTS,
     NOTES_MAX_COLLECTION_SOURCE_BYTES, NotesError, NotesReconciliationPlan, NotesSourceDocument,
-    PreparedNotesDocument, contains_unsupported_control, is_valid_label, sha256_hex,
-    validate_collection_id, validate_document_id, validate_revision,
+    PreparedNotesDocument, collection_reader_snapshot, contains_unsupported_control,
+    is_valid_label, pinned_revision_key, sha256_hex, validate_collection_id, validate_document_id,
+    validate_revision,
 };
 
 pub struct NotesIndexWriter {
     collection_id: String,
     collection_directory: PathBuf,
     manifest: NotesManifest,
+    source_bytes: u64,
+    chunk_count: u64,
+}
+
+pub struct ValidatedNotesDocument<'a> {
+    collection_id: String,
+    prepared: &'a PreparedNotesDocument,
+    source_metadata: &'a NotesSourceDocument,
+    shard_bytes: Vec<u8>,
+    shard_sha256: String,
 }
 
 impl NotesIndexWriter {
@@ -121,6 +132,7 @@ impl NotesIndexWriter {
         ensure_directory(index_root.as_ref())?;
         let collection_directory = collection_directory(index_root.as_ref(), &collection_id);
         ensure_directory(&collection_directory)?;
+        let collection_directory = fs::canonicalize(collection_directory)?;
         ensure_directory(&collection_directory.join(NOTES_DOCUMENTS_DIRECTORY))?;
         recover_manifest_publication(&collection_directory, &collection_id)?;
 
@@ -130,11 +142,14 @@ impl NotesIndexWriter {
         } else {
             empty_manifest(&collection_id)
         };
+        let (source_bytes, chunk_count) = manifest_capacity(&manifest)?;
         let _ = cleanup_unreferenced_shards(&collection_directory, &manifest.documents);
         Ok(Self {
             collection_id,
             collection_directory,
             manifest,
+            source_bytes,
+            chunk_count,
         })
     }
 
@@ -183,7 +198,29 @@ impl NotesIndexWriter {
         embeddings: &[Vec<f32>],
         source_metadata: &NotesSourceDocument,
     ) -> Result<(), NotesError> {
-        self.validate_document(prepared, source_metadata)?;
+        let validated = self.validate_document(prepared, source_metadata)?;
+        self.commit_validated_document(validated, embeddings)
+    }
+
+    pub fn commit_validated_document(
+        &mut self,
+        validated: ValidatedNotesDocument<'_>,
+        embeddings: &[Vec<f32>],
+    ) -> Result<(), NotesError> {
+        let ValidatedNotesDocument {
+            collection_id,
+            prepared,
+            source_metadata,
+            shard_bytes,
+            shard_sha256,
+        } = validated;
+        if collection_id != self.collection_id {
+            return Err(NotesError::InvalidInput(
+                "validated document belongs to another collection".to_string(),
+            ));
+        }
+        validate_prepared_document(prepared, source_metadata)?;
+        self.validate_document_capacity(prepared, source_metadata)?;
         if embeddings.len() != prepared.chunks.len() {
             return Err(NotesError::InvalidInput(
                 "embedding count does not match prepared chunks".to_string(),
@@ -214,9 +251,6 @@ impl NotesIndexWriter {
                     .clamp(-scale, scale) as i8 as u8
             }));
         }
-        let shard = NotesShard::from_prepared(&self.collection_id, prepared);
-        let shard_bytes = serialize_shard(&shard)?;
-        let shard_sha256 = sha256_hex(&shard_bytes);
         let vectors_sha256 = sha256_hex(&vector_bytes);
 
         let final_directory = shard_directory(
@@ -307,46 +341,69 @@ impl NotesIndexWriter {
         self.activate_document(prepared, source_metadata, &shard_sha256, &vectors_sha256)
     }
 
-    pub fn validate_document(
+    pub fn validate_document<'a>(
+        &self,
+        prepared: &'a PreparedNotesDocument,
+        source_metadata: &'a NotesSourceDocument,
+    ) -> Result<ValidatedNotesDocument<'a>, NotesError> {
+        validate_prepared_document(prepared, source_metadata)?;
+        self.validate_document_capacity(prepared, source_metadata)?;
+        let shard_bytes =
+            serialize_shard(&NotesShard::from_prepared(&self.collection_id, prepared))?;
+        let shard_sha256 = sha256_hex(&shard_bytes);
+        Ok(ValidatedNotesDocument {
+            collection_id: self.collection_id.clone(),
+            prepared,
+            source_metadata,
+            shard_bytes,
+            shard_sha256,
+        })
+    }
+
+    fn validate_document_capacity(
         &self,
         prepared: &PreparedNotesDocument,
         source_metadata: &NotesSourceDocument,
     ) -> Result<(), NotesError> {
-        validate_prepared_document(prepared, source_metadata)?;
-        let (existing_source_bytes, existing_chunks) = self
-            .manifest
-            .documents
-            .iter()
-            .filter(|(document_id, _)| *document_id != &prepared.document_id)
-            .try_fold(
-                (0_u64, 0_u64),
-                |(source_total, chunk_total), (_, document)| {
-                    let source_total = source_total
-                        .checked_add(document.source_size)
-                        .ok_or_else(source_content_too_large)?;
-                    let chunk_total = chunk_total
-                        .checked_add(u64::from(document.chunk_count))
-                        .ok_or_else(chunk_count_too_large)?;
-                    Ok::<_, NotesError>((source_total, chunk_total))
-                },
-            )?;
-        let source_bytes = existing_source_bytes
-            .checked_add(source_metadata.size)
+        let existing = self.manifest.documents.get(&prepared.document_id);
+        let source_bytes = self
+            .source_bytes
+            .checked_sub(existing.map_or(0, |document| document.source_size))
+            .and_then(|total| total.checked_add(source_metadata.size))
             .ok_or_else(source_content_too_large)?;
-        let chunk_count =
+        let document_chunks =
             u64::try_from(prepared.chunks.len()).map_err(|_| chunk_count_too_large())?;
-        let chunks = existing_chunks
-            .checked_add(chunk_count)
+        let chunks = self
+            .chunk_count
+            .checked_sub(existing.map_or(0, |document| u64::from(document.chunk_count)))
+            .and_then(|total| total.checked_add(document_chunks))
             .ok_or_else(chunk_count_too_large)?;
-        ensure_collection_capacity(source_bytes, chunks)?;
-        serialize_shard(&NotesShard::from_prepared(&self.collection_id, prepared))?;
-        Ok(())
+        ensure_collection_capacity(source_bytes, chunks)
     }
 
     pub fn commit_deletions(&mut self, document_ids: &[String]) -> Result<(), NotesError> {
         for document_id in document_ids {
             validate_document_id(document_id)?;
+            let Some(document) = self.manifest.documents.get(document_id) else {
+                continue;
+            };
+            let source_bytes = self
+                .source_bytes
+                .checked_sub(document.source_size)
+                .ok_or_else(|| {
+                    NotesError::InvalidIndex(
+                        "manifest source byte total is inconsistent".to_string(),
+                    )
+                })?;
+            let chunk_count = self
+                .chunk_count
+                .checked_sub(u64::from(document.chunk_count))
+                .ok_or_else(|| {
+                    NotesError::InvalidIndex("manifest chunk total is inconsistent".to_string())
+                })?;
             self.manifest.documents.remove(document_id);
+            self.source_bytes = source_bytes;
+            self.chunk_count = chunk_count;
         }
         Ok(())
     }
@@ -374,6 +431,18 @@ impl NotesIndexWriter {
         let chunk_count = u32::try_from(prepared.chunks.len()).map_err(|_| {
             NotesError::InvalidInput("prepared document has too many chunks".to_string())
         })?;
+        let existing = self.manifest.documents.get(&prepared.document_id);
+        let source_bytes = self
+            .source_bytes
+            .checked_sub(existing.map_or(0, |document| document.source_size))
+            .and_then(|total| total.checked_add(source_metadata.size))
+            .ok_or_else(source_content_too_large)?;
+        let total_chunks = self
+            .chunk_count
+            .checked_sub(existing.map_or(0, |document| u64::from(document.chunk_count)))
+            .and_then(|total| total.checked_add(u64::from(chunk_count)))
+            .ok_or_else(chunk_count_too_large)?;
+        ensure_collection_capacity(source_bytes, total_chunks)?;
         self.manifest.documents.insert(
             prepared.document_id.clone(),
             NotesManifestDocument {
@@ -385,8 +454,30 @@ impl NotesIndexWriter {
                 vectors_sha256: vectors_sha256.to_string(),
             },
         );
+        self.source_bytes = source_bytes;
+        self.chunk_count = total_chunks;
         Ok(())
     }
+}
+
+fn manifest_capacity(manifest: &NotesManifest) -> Result<(u64, u64), NotesError> {
+    let (source_bytes, chunks) = manifest.documents.values().try_fold(
+        (0_u64, 0_u64),
+        |(source_total, chunk_total), document| {
+            let source_total = source_total
+                .checked_add(document.source_size)
+                .ok_or_else(|| {
+                    NotesError::InvalidIndex("manifest source byte count overflow".to_string())
+                })?;
+            let chunk_total = chunk_total
+                .checked_add(u64::from(document.chunk_count))
+                .ok_or_else(|| {
+                    NotesError::InvalidIndex("manifest chunk count overflow".to_string())
+                })?;
+            Ok::<_, NotesError>((source_total, chunk_total))
+        },
+    )?;
+    Ok((source_bytes, chunks))
 }
 
 fn ensure_collection_capacity(source_bytes: u64, chunks: u64) -> Result<(), NotesError> {
@@ -559,6 +650,10 @@ fn cleanup_unreferenced_shards(
 ) -> Result<(), NotesError> {
     use super::manifest::document_storage_id;
 
+    let (reader_opening, pinned_revisions) = collection_reader_snapshot(collection_directory);
+    if reader_opening {
+        return Ok(());
+    }
     let keep = documents
         .iter()
         .map(|(document_id, document)| (document_storage_id(document_id), &document.revision))
@@ -567,19 +662,27 @@ fn cleanup_unreferenced_shards(
     for document_entry in fs::read_dir(&documents_directory)? {
         let document_entry = document_entry?;
         let name = document_entry.file_name().to_string_lossy().into_owned();
-        let Some(active_revision) = keep.get(&name) else {
-            remove_owned_entry(&document_entry.path())?;
-            continue;
-        };
         if !document_entry.file_type()?.is_dir() {
             remove_owned_entry(&document_entry.path())?;
             continue;
         }
         for revision_entry in fs::read_dir(document_entry.path())? {
             let revision_entry = revision_entry?;
-            if revision_entry.file_name().to_string_lossy() != active_revision.as_str() {
+            let revision = revision_entry.file_name().to_string_lossy().into_owned();
+            let is_active = keep
+                .get(&name)
+                .is_some_and(|active_revision| active_revision.as_str() == revision);
+            if !is_active && !pinned_revisions.contains(&pinned_revision_key(&name, &revision)) {
                 remove_owned_entry(&revision_entry.path())?;
             }
+        }
+        let document_key = ente_ensu_crypto::sha256(name.as_bytes());
+        if !keep.contains_key(&name)
+            && !pinned_revisions
+                .iter()
+                .any(|(document, _)| document == &document_key)
+        {
+            fs::remove_dir(document_entry.path())?;
         }
     }
     Ok(())
@@ -689,6 +792,37 @@ mod tests {
             NotesCollectionIndex::open(temp.path(), collection()),
             Err(NotesError::InvalidIndex(_))
         ));
+    }
+
+    #[test]
+    fn maintains_cached_capacity_totals_across_replacement_and_deletion() {
+        let temp = tempfile::tempdir().unwrap();
+        let first = prepared("first.md", "first");
+        let second = prepared("second.md", "second");
+        let mut writer = NotesIndexWriter::open(temp.path(), collection()).unwrap();
+        writer
+            .commit_document(&first, &embeddings(&first, &[1.0]), &metadata(&first, 5))
+            .unwrap();
+        writer
+            .commit_document(&second, &embeddings(&second, &[0.8]), &metadata(&second, 6))
+            .unwrap();
+        assert_eq!(writer.source_bytes, 11);
+        assert_eq!(writer.chunk_count, 2);
+
+        let replacement = prepared("first.md", "replacement");
+        writer
+            .commit_document(
+                &replacement,
+                &embeddings(&replacement, &[0.9]),
+                &metadata(&replacement, 11),
+            )
+            .unwrap();
+        assert_eq!(writer.source_bytes, 17);
+        assert_eq!(writer.chunk_count, 2);
+
+        writer.commit_deletions(&[second.document_id]).unwrap();
+        assert_eq!(writer.source_bytes, 11);
+        assert_eq!(writer.chunk_count, 1);
     }
 
     #[test]

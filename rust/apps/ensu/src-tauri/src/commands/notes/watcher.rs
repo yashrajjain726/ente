@@ -63,6 +63,15 @@ pub async fn initialize_for_app(app: AppHandle) {
         .collections
         .clone();
     for collection in collections {
+        let lifecycle = app.state::<State>().collection_lifecycle(&collection.id);
+        let _collection_lifecycle = lifecycle.lock().await;
+        if app
+            .state::<State>()
+            .registered_collection(&collection.id)
+            .is_err()
+        {
+            continue;
+        }
         let install_app = app.clone();
         let install_collection = collection.clone();
         let install_result = async_runtime::spawn_blocking(move || {
@@ -73,18 +82,21 @@ pub async fn initialize_for_app(app: AppHandle) {
             Ok(result) => result,
             Err(_) => Err(ApiError::new("watcher_thread", "Notes watcher task failed")),
         };
-        if let Err(error) = install_result {
-            let state = app.state::<State>();
-            let mut runtime = state.runtime(&collection.id);
-            runtime.status = if source_root_is_available(&collection.source_root) {
-                NotesCollectionStatusDto::Error
-            } else {
-                NotesCollectionStatusDto::Unavailable
-            };
-            runtime.last_error = Some(error.message);
-            state.set_runtime(&collection.id, runtime);
-            emit_state_changed(&app, &collection.id);
-            continue;
+        match install_result {
+            Ok(()) => {
+                app.state::<State>().set_watcher_error(&collection.id, None);
+            }
+            Err(error) => {
+                let state = app.state::<State>();
+                state.set_watcher_error(&collection.id, Some(&error));
+                crate::logging::log(
+                    "Notes",
+                    format!(
+                        "watcher unavailable collection={} error={}",
+                        collection.id, error.message
+                    ),
+                );
+            }
         }
         inspect_collection_on_startup(app.clone(), collection).await;
     }
@@ -92,8 +104,6 @@ pub async fn initialize_for_app(app: AppHandle) {
 
 async fn inspect_collection_on_startup(app: AppHandle, collection: RegisteredCollection) {
     let index_root = app.state::<State>().index_root.clone();
-    let lifecycle = app.state::<State>().collection_lifecycle(&collection.id);
-    let _collection_lifecycle = lifecycle.lock().await;
     if app
         .state::<State>()
         .registered_collection(&collection.id)
@@ -387,10 +397,19 @@ async fn process_watch_changes(app: AppHandle, collection_id: String, source_roo
             change
         };
         if change.refresh_watches {
+            let lifecycle = app.state::<State>().collection_lifecycle(&collection_id);
+            let _collection_lifecycle = lifecycle.lock().await;
+            if app
+                .state::<State>()
+                .registered_collection(&collection_id)
+                .is_err()
+            {
+                continue;
+            }
             let refresh_app = app.clone();
             let refresh_collection_id = collection_id.clone();
             let refresh_source_root = source_root.clone();
-            let _ = async_runtime::spawn_blocking(move || {
+            let refresh_result = async_runtime::spawn_blocking(move || {
                 refresh_collection_watches(
                     &refresh_app,
                     &refresh_collection_id,
@@ -399,6 +418,36 @@ async fn process_watch_changes(app: AppHandle, collection_id: String, source_roo
                 )
             })
             .await;
+            let refresh_result = match refresh_result {
+                Ok(Ok(true)) => Ok(()),
+                Ok(Ok(false)) => Err(ApiError::new(
+                    "watcher",
+                    "The Notes folder could not be watched",
+                )),
+                Ok(Err(error)) => Err(error),
+                Err(_) => Err(ApiError::new("watcher_thread", "Notes watcher task failed")),
+            };
+            let state = app.state::<State>();
+            match refresh_result {
+                Ok(()) => {
+                    if state.set_watcher_error(&collection_id, None) {
+                        emit_state_changed(&app, &collection_id);
+                    }
+                }
+                Err(error) => {
+                    let changed = state.set_watcher_error(&collection_id, Some(&error));
+                    crate::logging::log(
+                        "Notes",
+                        format!(
+                            "watcher refresh failed collection={collection_id} error={}",
+                            error.message
+                        ),
+                    );
+                    if changed {
+                        emit_state_changed(&app, &collection_id);
+                    }
+                }
+            }
         }
         mark_collection_dirty(
             &app,

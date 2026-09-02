@@ -8,7 +8,11 @@ mod shard;
 mod source;
 mod writer;
 
-use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock, PoisonError};
+
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -49,16 +53,154 @@ pub use indexing::{
 };
 pub use reconcile::NotesReconciliationPlan;
 pub use source::NoteSourceReference;
-pub use writer::NotesIndexWriter;
+pub use writer::{NotesIndexWriter, ValidatedNotesDocument};
 
 pub fn notes_content_revision(bytes: &[u8]) -> String {
     sha256_hex(bytes)
 }
 
+type PinnedRevision = ([u8; 32], [u8; 32]);
+
+fn pinned_revision_key(document_storage_id: &str, revision: &str) -> PinnedRevision {
+    (
+        ente_ensu_crypto::sha256(document_storage_id.as_bytes()),
+        ente_ensu_crypto::sha256(revision.as_bytes()),
+    )
+}
+
+#[derive(Default)]
+struct CollectionReaders {
+    opening: usize,
+    revisions: HashMap<PinnedRevision, usize>,
+}
+
+static ACTIVE_COLLECTION_READERS: OnceLock<Mutex<HashMap<PathBuf, CollectionReaders>>> =
+    OnceLock::new();
+
+struct NotesCollectionReadPin {
+    collection_directory: PathBuf,
+    opening: bool,
+    revisions: Vec<PinnedRevision>,
+}
+
+impl NotesCollectionReadPin {
+    fn acquire(collection_directory: &Path) -> Result<Self, NotesError> {
+        let collection_directory = fs::canonicalize(collection_directory)?;
+        let mut readers = active_collection_readers()
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let collection = readers.entry(collection_directory.clone()).or_default();
+        collection.opening = collection.opening.checked_add(1).ok_or_else(|| {
+            NotesError::InvalidIndex("active Notes reader count overflow".to_string())
+        })?;
+        Ok(Self {
+            collection_directory,
+            opening: true,
+            revisions: Vec::new(),
+        })
+    }
+
+    fn collection_directory(&self) -> &Path {
+        &self.collection_directory
+    }
+
+    fn estimated_heap_bytes(&self) -> usize {
+        let pinned_revision_bytes = std::mem::size_of::<PinnedRevision>();
+        self.collection_directory
+            .as_os_str()
+            .len()
+            .saturating_add(
+                self.revisions
+                    .capacity()
+                    .saturating_mul(pinned_revision_bytes),
+            )
+            .saturating_add(
+                self.revisions.len().saturating_mul(
+                    pinned_revision_bytes
+                        .saturating_add(std::mem::size_of::<usize>())
+                        .saturating_add(1),
+                ),
+            )
+    }
+
+    fn pin_revisions(
+        &mut self,
+        revisions: impl IntoIterator<Item = PinnedRevision>,
+    ) -> Result<(), NotesError> {
+        let revisions = revisions.into_iter().collect::<HashSet<_>>();
+        let mut readers = active_collection_readers()
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let collection = readers.get_mut(&self.collection_directory).ok_or_else(|| {
+            NotesError::InvalidIndex("active Notes reader registration is missing".to_string())
+        })?;
+        collection.opening = collection.opening.checked_sub(1).ok_or_else(|| {
+            NotesError::InvalidIndex("active Notes reader registration is inconsistent".to_string())
+        })?;
+        self.opening = false;
+        self.revisions.reserve(revisions.len());
+        for revision in revisions {
+            let reader_count = collection.revisions.entry(revision).or_default();
+            *reader_count = reader_count.checked_add(1).ok_or_else(|| {
+                NotesError::InvalidIndex("active Notes revision reader count overflow".to_string())
+            })?;
+            self.revisions.push(revision);
+        }
+        Ok(())
+    }
+}
+
+impl Drop for NotesCollectionReadPin {
+    fn drop(&mut self) {
+        let mut readers = active_collection_readers()
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let Some(collection) = readers.get_mut(&self.collection_directory) else {
+            return;
+        };
+        if self.opening {
+            collection.opening = collection.opening.saturating_sub(1);
+        } else {
+            for revision in &self.revisions {
+                let remove = collection
+                    .revisions
+                    .get_mut(revision)
+                    .is_some_and(|reader_count| {
+                        *reader_count = reader_count.saturating_sub(1);
+                        *reader_count == 0
+                    });
+                if remove {
+                    collection.revisions.remove(revision);
+                }
+            }
+        }
+        if collection.opening == 0 && collection.revisions.is_empty() {
+            readers.remove(&self.collection_directory);
+        }
+    }
+}
+
+fn active_collection_readers() -> &'static Mutex<HashMap<PathBuf, CollectionReaders>> {
+    ACTIVE_COLLECTION_READERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn collection_reader_snapshot(collection_directory: &Path) -> (bool, HashSet<PinnedRevision>) {
+    let readers = active_collection_readers()
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let Some(collection) = readers.get(collection_directory) else {
+        return (false, HashSet::new());
+    };
+    (
+        collection.opening > 0,
+        collection.revisions.keys().cloned().collect(),
+    )
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(64);
-    for byte in Sha256::digest(bytes) {
+    for byte in ente_ensu_crypto::sha256(bytes) {
         encoded.push(char::from(HEX[usize::from(byte >> 4)]));
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
