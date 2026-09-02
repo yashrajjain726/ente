@@ -6,7 +6,7 @@ import {
     onOpenSpaceShareLinkDialog,
     type SpaceShareLinkDialogMode,
 } from "services/share-link";
-import { spaceSurface, spaceText, spaceTextMuted } from "styles/colors";
+import { spaceText, spaceTextMuted } from "styles/colors";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
@@ -93,7 +93,6 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: spaceSurface,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",

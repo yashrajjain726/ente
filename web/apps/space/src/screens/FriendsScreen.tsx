@@ -35,7 +35,6 @@ import {
 import type { SpaceFriendRequest } from "services/space";
 import {
     spaceAppBackground,
-    spaceAppBackgroundColor,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -737,7 +736,6 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: spaceAppBackgroundColor,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",

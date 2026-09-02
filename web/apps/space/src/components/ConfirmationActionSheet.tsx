@@ -63,18 +63,10 @@ export const ConfirmationActionSheet: React.FC<
                     ? { transition: SpaceBottomSheetTransition }
                     : undefined
             }
-            sx={
-                isDark
-                    ? {
-                          zIndex: 1500,
-                          "--space-dialog-backdrop": "rgba(0 0 0 / 0.86)",
-                      }
-                    : undefined
-            }
+            sx={isDark ? { zIndex: 1500 } : undefined}
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: isDark ? "#1E1E1E" : spaceSurface,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",

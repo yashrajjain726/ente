@@ -18,7 +18,11 @@ import React from "react";
 import "react-easy-crop/react-easy-crop.css";
 import { registerSpaceServiceWorker } from "services/web-push";
 import { SpaceAppStateProvider } from "state/AppStateProvider";
-import { spaceAppBackground, spaceAppBackgroundColor } from "styles/colors";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceDialogBackground,
+} from "styles/colors";
 import "styles/globals.css";
 
 const spaceTheme = createTheme(shareTheme, {
@@ -32,10 +36,10 @@ const spaceTheme = createTheme(shareTheme, {
         },
         MuiDialog: {
             styleOverrides: {
+                paper: { backgroundColor: spaceDialogBackground },
                 root: {
                     ".MuiBackdrop-root": {
-                        backgroundColor:
-                            "var(--space-dialog-backdrop, rgba(0 0 0 / 0.48))",
+                        backgroundColor: "rgba(0 0 0 / 0.84)",
                     },
                 },
             },
