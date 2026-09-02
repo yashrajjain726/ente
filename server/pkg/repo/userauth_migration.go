@@ -18,7 +18,7 @@ func (repo *UserAuthRepository) MigratePlaintextTokens(ctx context.Context) (int
 			WHERE token IS NOT NULL
 			ORDER BY token
 			LIMIT $1
-			FOR UPDATE SKIP LOCKED
+			FOR UPDATE
 		)
 		UPDATE tokens SET token = NULL
 		FROM batch
