@@ -13,7 +13,10 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
-import { SpacePostUnreadBadge } from "components/PostUnreadBadge";
+import {
+    SpacePostBadge,
+    SpacePostUnreadBadge,
+} from "components/PostUnreadBadge";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import type { FriendProfile } from "data/friends";
@@ -491,21 +494,21 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     </>
                 ) : (
                     <Box
+                        aria-hidden
                         sx={{
-                            alignItems: "center",
-                            background:
-                                "linear-gradient(145deg, #ECF7ED, #D9EDDC)",
-                            color: green,
-                            display: "flex",
-                            fontSize: 40,
-                            fontWeight: 700,
+                            bgcolor: mediaPlaceholderColor,
                             height: "100%",
-                            justifyContent: "center",
                             width: "100%",
                         }}
+                    />
+                )}
+                {(!post || postUnavailable) && (
+                    <SpacePostBadge
+                        backgroundColor="rgba(255, 255, 255, 0.1)"
+                        color={textSecondary}
                     >
-                        {initial}
-                    </Box>
+                        {postUnavailable ? "Unavailable" : "No posts yet"}
+                    </SpacePostBadge>
                 )}
                 {!isRead && <SpacePostUnreadBadge count={posts.length} />}
             </Box>
@@ -518,9 +521,12 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 sx={{
                     appearance: "none",
                     bgcolor: "transparent",
-                    border: 0,
+                    border: displayAvatarUrl
+                        ? "2px solid rgba(255, 255, 255, 0.36)"
+                        : "2px solid rgba(255, 255, 255, 0.12)",
                     borderRadius: "50%",
                     bottom: "10%",
+                    boxSizing: "border-box",
                     cursor: onOpenFriend ? "pointer" : "default",
                     height: avatarSize,
                     left: "10%",
@@ -538,20 +544,30 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         variant="circular"
                         sx={{
                             bgcolor: mediaPlaceholderColor,
-                            border: "2px solid rgba(255, 255, 255, 0.36)",
-                            boxSizing: "border-box",
                             height: "100%",
                             transform: "none",
                             width: "100%",
                         }}
                     />
+                ) : displayAvatarUrl ? (
+                    <SpaceAvatarImage aria-hidden src={displayAvatarUrl} />
                 ) : (
-                    <SpaceAvatarImage
+                    <Box
                         aria-hidden
-                        border="2px solid rgba(255, 255, 255, 0.36)"
-                        borderRadius="50%"
-                        src={displayAvatarUrl}
-                    />
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "rgba(53, 65, 61, 0.72)",
+                            color: "rgba(244, 244, 244, 0.72)",
+                            display: "flex",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            height: "100%",
+                            justifyContent: "center",
+                            width: "100%",
+                        }}
+                    >
+                        {initial}
+                    </Box>
                 )}
             </Box>
         </Box>

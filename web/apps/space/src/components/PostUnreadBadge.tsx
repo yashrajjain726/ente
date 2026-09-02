@@ -1,17 +1,24 @@
 import { Box } from "@mui/material";
 import React from "react";
 
-export const SpacePostUnreadBadge: React.FC<{ count: number }> = ({
-    count,
+interface SpacePostBadgeProps extends React.PropsWithChildren {
+    backgroundColor: string;
+    color: string;
+}
+
+export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
+    backgroundColor,
+    children,
+    color,
 }) => (
     <Box
         component="span"
         aria-hidden
         sx={{
             alignItems: "center",
-            bgcolor: "#F63A3A",
+            bgcolor: backgroundColor,
             borderRadius: "999px",
-            color: "#FFFFFF",
+            color,
             display: "inline-flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 10,
@@ -30,6 +37,14 @@ export const SpacePostUnreadBadge: React.FC<{ count: number }> = ({
             zIndex: 1,
         }}
     >
-        {count}
+        {children}
     </Box>
+);
+
+export const SpacePostUnreadBadge: React.FC<{ count: number }> = ({
+    count,
+}) => (
+    <SpacePostBadge backgroundColor="#F63A3A" color="#FFFFFF">
+        {count}
+    </SpacePostBadge>
 );
