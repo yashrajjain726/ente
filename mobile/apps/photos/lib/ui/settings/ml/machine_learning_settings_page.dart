@@ -41,6 +41,7 @@ class _MachineLearningSettingsPageState
   Timer? _advancedOptionsTimer;
   bool _hasAcknowledgedMLConsent = false;
   bool _hasHandledDisabledExit = false;
+  bool _mlDecryptionRecordsReady = false;
 
   @override
   void initState() {
@@ -67,26 +68,22 @@ class _MachineLearningSettingsPageState
 
   Future<void> _pruneMlDecryptionRecords() async {
     final recordedFileIDs = mlDecryptionRecordStore.fileIDs;
-    if (recordedFileIDs.isEmpty) {
-      mlDecryptionRecordStore.logFileIDs();
-      return;
-    }
     try {
-      final existingFiles = await FilesDB.instance.getFileIDToFileFromIDs(
-        recordedFileIDs,
-      );
-      final errorResultFileIDs = await MLDataDB.instance
-          .getFileIDsWithErrorResults(recordedFileIDs);
-      final staleFileIDs = recordedFileIDs
-          .where(
-            (fileID) =>
-                !existingFiles.containsKey(fileID) ||
-                !errorResultFileIDs.contains(fileID),
-          )
-          .toSet();
-      await mlDecryptionRecordStore.removeAll(staleFileIDs);
-      if (staleFileIDs.isNotEmpty && mounted) {
-        setState(() {});
+      if (recordedFileIDs.isNotEmpty) {
+        await MLDataDB.instance.pruneResolvedFaceErrorResults(recordedFileIDs);
+        final existingFiles = await FilesDB.instance.getFileIDToFileFromIDs(
+          recordedFileIDs,
+        );
+        final errorResultFileIDs = await MLDataDB.instance
+            .getFileIDsWithErrorResults(recordedFileIDs);
+        final staleFileIDs = recordedFileIDs
+            .where(
+              (fileID) =>
+                  !existingFiles.containsKey(fileID) ||
+                  !errorResultFileIDs.contains(fileID),
+            )
+            .toSet();
+        await mlDecryptionRecordStore.removeAll(staleFileIDs);
       }
     } catch (error, stackTrace) {
       _logger.warning(
@@ -96,6 +93,9 @@ class _MachineLearningSettingsPageState
       );
     } finally {
       mlDecryptionRecordStore.logFileIDs();
+      if (mounted) {
+        setState(() => _mlDecryptionRecordsReady = true);
+      }
     }
   }
 
@@ -374,7 +374,7 @@ class _MachineLearningSettingsPageState
                   onlyIndexingModels: true,
                 ) ||
                 !localSettings.isMLLocalIndexingEnabled
-            ? const MLStatusWidget()
+            ? MLStatusWidget(showDecryptionWarning: _mlDecryptionRecordsReady)
             : const ModelLoadingState(),
       ],
     );
@@ -490,7 +490,9 @@ class _ModelLoadingStateState extends State<ModelLoadingState> {
 }
 
 class MLStatusWidget extends StatefulWidget {
-  const MLStatusWidget({super.key});
+  final bool showDecryptionWarning;
+
+  const MLStatusWidget({required this.showDecryptionWarning, super.key});
 
   @override
   State<MLStatusWidget> createState() => MLStatusWidgetState();
@@ -524,7 +526,9 @@ class MLStatusWidgetState extends State<MLStatusWidget> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final decryptionIssueCount = mlDecryptionRecordStore.count;
+    final decryptionIssueCount = widget.showDecryptionWarning
+        ? mlDecryptionRecordStore.count
+        : 0;
     return Column(
       children: [
         Padding(
