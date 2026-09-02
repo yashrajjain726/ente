@@ -290,7 +290,7 @@ export const attachMainWindowIPCHandlers = (mainWindow: BrowserWindow) => {
             userPreferences.set("themeMode", themeMode);
             nativeTheme.themeSource = themeMode;
 
-            if (process.platform != "win32") return;
+            if (process.platform == "darwin") return;
 
             const isDark = nativeTheme.shouldUseDarkColors || isFileViewerOpen;
             mainWindow.setTitleBarOverlay({

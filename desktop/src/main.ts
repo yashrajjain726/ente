@@ -179,20 +179,14 @@ const createMainWindow = () => {
         icon,
         ...(bounds ?? {}),
         ...minimumWindowSize(),
-        ...(process.platform == "linux"
-            ? {}
-            : {
-                  titleBarStyle: "hidden" as const,
-                  titleBarOverlay:
-                      process.platform == "win32"
-                          ? {
-                                color: shouldUseDarkColors ? "black" : "white",
-                                symbolColor: shouldUseDarkColors
-                                    ? "#cdcdcd"
-                                    : "black",
-                            }
-                          : true,
-              }),
+        titleBarStyle: "hidden",
+        titleBarOverlay:
+            process.platform == "darwin"
+                ? true
+                : {
+                      color: shouldUseDarkColors ? "black" : "white",
+                      symbolColor: shouldUseDarkColors ? "#cdcdcd" : "black",
+                  },
         backgroundColor: shouldUseDarkColors ? "black" : "white",
         show: false,
     });

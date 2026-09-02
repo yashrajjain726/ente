@@ -1,1 +1,1 @@
-- Improved desktop title bars to follow the selected theme and use native window decorations on Linux.
+- Improved desktop title bars to follow the selected theme on Windows and Linux.
