@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
+import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { HomeScreen } from "screens/HomeScreen";
@@ -16,11 +17,13 @@ import {
     loadCurrentSpacePostAssetURL,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
+    sendCurrentMessage,
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
+import { spaceWaveMessageText } from "utils/message-limits";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -154,6 +157,29 @@ const Page: React.FC = () => {
         [spaceId],
     );
 
+    const waveAtFriend = async (friend: FriendProfile) => {
+        if (!profile?.spaceId) throw new Error("Missing space.");
+
+        await sendCurrentMessage(
+            profile.spaceId,
+            friend.spaceId ?? friend.id,
+            spaceWaveMessageText,
+            {
+                avatarKeyVersion: profile.avatarKeyVersion,
+                avatarObjectID: profile.avatarObjectID,
+                avatarUpdatedAt: profile.avatarUpdatedAt,
+                avatarUrl: profile.avatarUrl,
+                friendsCount: 0,
+                fullName: profile.fullName,
+                id: profile.spaceId,
+                spaceId: profile.spaceId,
+                spaceSlug: profile.spaceSlug,
+                username: profile.username,
+            },
+            friend,
+        );
+    };
+
     if (
         profileLoadStatus == "error" ||
         (profileLoadStatus == "ready" && !profile)
@@ -234,6 +260,7 @@ const Page: React.FC = () => {
                         : undefined
                 }
                 onSetPostLiked={setLatestPostLiked}
+                onWaveFriend={profile?.spaceId ? waveAtFriend : undefined}
             />
         </>
     );

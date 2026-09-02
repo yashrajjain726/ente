@@ -38,7 +38,10 @@ import {
 } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
-import { clampSpaceMessageText } from "utils/message-limits";
+import {
+    clampSpaceMessageText,
+    spaceWaveMessageText,
+} from "utils/message-limits";
 import { spacePostImageInputAccept } from "utils/post-image";
 
 const green = "#08C225";
@@ -71,10 +74,8 @@ const messageLongPressMs = 520;
 const messageLongPressMoveTolerancePx = 10;
 const messageActionsTouchOpenMouseSuppressMs = 900;
 const dayMs = 24 * 60 * 60 * 1000;
-const waveMessageText = "👋";
-
 const isWaveMessageText = (text: string | undefined) =>
-    text?.trim() == waveMessageText;
+    text?.trim() == spaceWaveMessageText;
 
 const shouldShowPostSomething = (
     conversation: SpaceMessageConversation,
@@ -1826,7 +1827,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         stickToThreadBottomRef.current = true;
         smoothNextMessageScrollRef.current = true;
         setSendPhase("sending");
-        void onSendMessage(spaceId, waveMessageText)
+        void onSendMessage(spaceId, spaceWaveMessageText)
             .then(() => setSendPhase("idle"))
             .catch((error: unknown) => {
                 smoothNextMessageScrollRef.current = false;
@@ -2321,7 +2322,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         lineHeight: 1,
                                     }}
                                 >
-                                    {waveMessageText}
+                                    {spaceWaveMessageText}
                                 </Box>
                             </Box>
                         ) : (

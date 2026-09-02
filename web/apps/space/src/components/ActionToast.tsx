@@ -9,7 +9,7 @@ import { spaceTouchTargetSize } from "styles/touch-targets";
 const green = "#08C225";
 const textBase = spaceText;
 const toastHorizontalPadding = "12px";
-export const spaceToastAutoDismissDurationMs = 2400;
+export const spaceToastAutoDismissDurationMs = 1800;
 const toastEnter = keyframes`
     from {
         opacity: 0;

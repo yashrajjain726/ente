@@ -69,6 +69,9 @@ const headerIconSize = 22;
 const headerSideWidth = 36;
 const homeHorizontalPadding = "16px";
 const postCircleMediaLoadRootMargin = "640px 0px";
+const waveAnimationDurationMs = 1100;
+const waveHoldDurationMs = 500;
+const waveHoldMovementTolerancePx = 12;
 const avatarFadeSx = {
     "@keyframes spaceAvatarFade": { from: { opacity: 0 }, to: { opacity: 1 } },
     animation: "spaceAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
@@ -99,6 +102,7 @@ interface HomeScreenProps {
         text: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onWaveFriend?: (friend: FriendProfile) => Promise<void>;
     profile: SetupProfile | null;
     viewerSpaceId?: string;
 }
@@ -254,6 +258,7 @@ interface FriendPostCircleProps {
         posts: SpacePost[],
         photo: SpaceViewerPhoto,
     ) => void;
+    onWave?: () => Promise<void>;
     placement?: HomeCirclePlacement;
     posts: SpacePost[];
 }
@@ -270,11 +275,21 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     onLoadImage,
     onOpenFriend,
     onOpenPosts,
+    onWave,
     placement,
     posts,
 }) => {
     const rootRef = React.useRef<HTMLLIElement | null>(null);
+    const holdOriginRef = React.useRef<
+        { pointerID: number; x: number; y: number } | undefined
+    >(undefined);
+    const holdTimeoutRef = React.useRef<number | undefined>(undefined);
+    const suppressClickRef = React.useRef(false);
+    const waveAnimationTimeoutRef = React.useRef<number | undefined>(undefined);
     const [shouldLoadMedia, setShouldLoadMedia] = useState(Boolean(imageUrl));
+    const [isHoldingWave, setIsHoldingWave] = useState(false);
+    const [isWaveSending, setIsWaveSending] = useState(false);
+    const [waveAnimationID, setWaveAnimationID] = useState(0);
     const decodedPhoto = useDecodedImage(imageUrl, true);
     const decodedAvatar = useDecodedImage(
         avatarUrl ?? friend.avatarUrl ?? null,
@@ -348,7 +363,102 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
         shouldLoadMedia,
     ]);
 
+    React.useEffect(
+        () => () => {
+            if (holdTimeoutRef.current !== undefined) {
+                window.clearTimeout(holdTimeoutRef.current);
+            }
+            if (waveAnimationTimeoutRef.current !== undefined) {
+                window.clearTimeout(waveAnimationTimeoutRef.current);
+            }
+        },
+        [],
+    );
+
+    const cancelWaveHold = () => {
+        if (holdTimeoutRef.current !== undefined) {
+            window.clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = undefined;
+        }
+        holdOriginRef.current = undefined;
+        setIsHoldingWave(false);
+    };
+
+    const suppressPendingClick = () => {
+        suppressClickRef.current = true;
+        window.setTimeout(() => {
+            suppressClickRef.current = false;
+        }, 0);
+    };
+
+    const handlePointerDown: React.PointerEventHandler<HTMLButtonElement> = (
+        event,
+    ) => {
+        if (isWaveSending || !onWave || !event.isPrimary || event.button != 0) {
+            return;
+        }
+
+        cancelWaveHold();
+        holdOriginRef.current = {
+            pointerID: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+        };
+        setIsHoldingWave(true);
+        holdTimeoutRef.current = window.setTimeout(() => {
+            holdTimeoutRef.current = undefined;
+            suppressClickRef.current = true;
+            setIsHoldingWave(false);
+            setWaveAnimationID((currentID) => currentID + 1);
+            if (waveAnimationTimeoutRef.current !== undefined) {
+                window.clearTimeout(waveAnimationTimeoutRef.current);
+            }
+            waveAnimationTimeoutRef.current = window.setTimeout(() => {
+                waveAnimationTimeoutRef.current = undefined;
+                setWaveAnimationID(0);
+            }, waveAnimationDurationMs);
+            setIsWaveSending(true);
+            void onWave()
+                .catch((error: unknown) =>
+                    log.error("Failed to send wave", error),
+                )
+                .finally(() => setIsWaveSending(false));
+        }, waveHoldDurationMs);
+    };
+
+    const handlePointerMove: React.PointerEventHandler<HTMLButtonElement> = (
+        event,
+    ) => {
+        const origin = holdOriginRef.current;
+        if (origin?.pointerID != event.pointerId) return;
+
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const moved =
+            Math.hypot(event.clientX - origin.x, event.clientY - origin.y) >
+            waveHoldMovementTolerancePx;
+        const outside =
+            event.clientX < bounds.left ||
+            event.clientX > bounds.right ||
+            event.clientY < bounds.top ||
+            event.clientY > bounds.bottom;
+        if (!moved && !outside) return;
+
+        cancelWaveHold();
+        suppressClickRef.current = true;
+    };
+
+    const handlePointerEnd: React.PointerEventHandler<
+        HTMLButtonElement
+    > = () => {
+        cancelWaveHold();
+        if (suppressClickRef.current) suppressPendingClick();
+    };
+
     const openCircle = () => {
+        if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+        }
         if (!post || postUnavailable) {
             onOpenFriend?.(friend.id, friend.username);
             return;
@@ -372,6 +482,14 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
         });
     };
 
+    const openFriend = () => {
+        if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+        }
+        onOpenFriend?.(friend.id, friend.username);
+    };
+
     return (
         <Box
             ref={rootRef}
@@ -382,12 +500,14 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 minWidth: 0,
                 position: placement ? "absolute" : "relative",
                 transition: placement
-                    ? "left 420ms cubic-bezier(0.2, 0.8, 0.2, 1), top 420ms cubic-bezier(0.2, 0.8, 0.2, 1), width 420ms cubic-bezier(0.2, 0.8, 0.2, 1)"
-                    : "none",
+                    ? "left 420ms cubic-bezier(0.2, 0.8, 0.2, 1), top 420ms cubic-bezier(0.2, 0.8, 0.2, 1), width 420ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 160ms ease-out"
+                    : "transform 160ms ease-out",
+                transform: isHoldingWave ? "scale(0.98)" : "scale(1)",
                 width: placement?.size ?? "100%",
                 ...(placement && { left: placement.x, top: placement.y }),
                 "@media (prefers-reduced-motion: reduce)": {
                     transition: "none",
+                    transform: "none",
                 },
             }}
         >
@@ -407,6 +527,13 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 }
                 disabled={isCircleDisabled}
                 onClick={openCircle}
+                onContextMenu={(event) => {
+                    if (onWave) event.preventDefault();
+                }}
+                onPointerCancel={handlePointerEnd}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerEnd}
                 sx={{
                     alignItems: "center",
                     appearance: "none",
@@ -423,6 +550,8 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     overflow: "hidden",
                     p: 0,
                     position: "relative",
+                    userSelect: "none",
+                    WebkitTouchCallout: "none",
                     width: "100%",
                     zIndex: 1,
                 }}
@@ -517,7 +646,14 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 type="button"
                 aria-label={`Open ${firstName}'s profile`}
                 disabled={!onOpenFriend}
-                onClick={() => onOpenFriend?.(friend.id, friend.username)}
+                onClick={openFriend}
+                onContextMenu={(event) => {
+                    if (onWave) event.preventDefault();
+                }}
+                onPointerCancel={handlePointerEnd}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerEnd}
                 sx={{
                     appearance: "none",
                     bgcolor: "transparent",
@@ -570,6 +706,61 @@ const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     </Box>
                 )}
             </Box>
+            {waveAnimationID > 0 && (
+                <Box
+                    key={waveAnimationID}
+                    component="span"
+                    aria-hidden
+                    sx={{
+                        "@keyframes spaceHomeWaveSent": {
+                            "0%": {
+                                opacity: 0,
+                                transform:
+                                    "translateY(9px) scale(0.65) rotate(0deg)",
+                            },
+                            "12%": {
+                                opacity: 1,
+                                transform:
+                                    "translateY(0) scale(1.1) rotate(-22deg)",
+                            },
+                            "32%": {
+                                transform:
+                                    "translateY(-2px) scale(1.1) rotate(22deg)",
+                            },
+                            "52%": {
+                                transform:
+                                    "translateY(-5px) scale(1.08) rotate(-20deg)",
+                            },
+                            "72%": {
+                                opacity: 1,
+                                transform:
+                                    "translateY(-9px) scale(1.05) rotate(17deg)",
+                            },
+                            "100%": {
+                                opacity: 0,
+                                transform:
+                                    "translateY(-20px) scale(0.92) rotate(0deg)",
+                            },
+                        },
+                        animation: `spaceHomeWaveSent ${waveAnimationDurationMs}ms ease-out both`,
+                        bottom: "8%",
+                        fontSize: placement
+                            ? Math.max(32, Math.min(54, placement.size * 0.27))
+                            : 38,
+                        lineHeight: 1,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: "8%",
+                        transformOrigin: "70% 75%",
+                        zIndex: 3,
+                        "@media (prefers-reduced-motion: reduce)": {
+                            animation: "none",
+                        },
+                    }}
+                >
+                    👋
+                </Box>
+            )}
         </Box>
     );
 };
@@ -607,6 +798,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
+    onWaveFriend,
     profile,
     viewerSpaceId,
 }) => {
@@ -1009,6 +1201,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
                 onOpenFriend={onOpenFriend}
                 onOpenPosts={openPostPhotos}
+                onWave={onWaveFriend ? () => onWaveFriend(friend) : undefined}
                 placement={placement}
                 posts={posts}
             />
