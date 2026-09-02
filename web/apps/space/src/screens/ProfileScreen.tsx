@@ -33,6 +33,7 @@ import { openSpaceShareLinkDialog } from "services/share-link";
 import { isSpaceContentError, type SpacePostAsset } from "services/space";
 import {
     spaceAppBackground,
+    spaceAppBackgroundColor,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -54,9 +55,11 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 const green = "#08C225";
 const dangerColor = "#F63A3A";
 const textBase = spaceText;
-const textStrong = spaceText;
 const textSoft = spaceTextMuted;
 const coverForeground = "#FFFFFF";
+const profileIdentityColor = "#D0D0D0";
+const profileStatsColor = "#8C8C8C";
+const profileStatsValueColor = "#B8B8B8";
 const profileCoverBackground = "#1F1F1F";
 const profileCoverTopShadow =
     "linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.18) 36%, rgba(0, 0, 0, 0.08) 72%, rgba(0, 0, 0, 0) 100%)";
@@ -1067,7 +1070,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     const renderPostTile = (
         { dimensions, index, item }: PostMasonryTile,
-        borderRadius?: string,
+        borderRadius?: number | string,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
         return (
@@ -1418,7 +1421,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 alignItems: "center",
                                 aspectRatio: "1 / 1",
                                 bgcolor: profileCoverSkeletonBackground,
-                                border: "4px solid #FFFFFF",
+                                border: `4px solid ${spaceAppBackgroundColor}`,
                                 borderRadius: "50%",
                                 boxSizing: "border-box",
                                 cursor: canOpenProfilePhoto
@@ -1473,11 +1476,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         >
                             <Box
                                 sx={{
-                                    color: textStrong,
+                                    color: profileIdentityColor,
                                     fontFamily:
                                         '"Nunito", "Inter Variable", sans-serif',
                                     fontSize: 26,
-                                    fontWeight: 800,
+                                    fontWeight: 700,
                                     gridColumn: 2,
                                     lineHeight: "32px",
                                     maxWidth: "calc(100vw - 72px)",
@@ -1514,7 +1517,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         alignItems: "center",
                                         bgcolor: "transparent",
                                         border: 0,
-                                        color: textStrong,
+                                        color: profileIdentityColor,
                                         cursor: profileLink
                                             ? "pointer"
                                             : "default",
@@ -1565,7 +1568,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             alignItems: "center",
                                             bgcolor: "transparent",
                                             border: 0,
-                                            color: textStrong,
+                                            color: profileIdentityColor,
                                             cursor: "pointer",
                                             display: "flex",
                                             gridColumn: 3,
@@ -1725,7 +1728,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         ) : (
                             <Box
                                 sx={{
-                                    color: textSoft,
+                                    color: profileStatsColor,
                                     display: "flex",
                                     gap: "5px",
                                     alignItems: "baseline",
@@ -1734,7 +1737,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
                                     fontSize: 16,
-                                    fontWeight: 600,
+                                    fontWeight: 550,
                                     lineHeight: "20px",
                                     mt: "2px",
                                     maxWidth: "100%",
@@ -1743,7 +1746,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     whiteSpace: "nowrap",
                                 }}
                             >
-                                <Box component="span" sx={{ color: textBase }}>
+                                <Box
+                                    component="span"
+                                    sx={{ color: profileStatsValueColor }}
+                                >
                                     {displayedPostsCount}
                                 </Box>
                                 <Box component="span">
@@ -1789,7 +1795,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 >
                                     <Box
                                         component="span"
-                                        sx={{ color: textBase }}
+                                        sx={{ color: profileStatsValueColor }}
                                     >
                                         {friendsCount}
                                     </Box>
