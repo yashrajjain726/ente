@@ -394,11 +394,7 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
         switchOutCurve: Curves.easeIn,
         layoutBuilder: (currentChild, previousChildren) => Stack(
           fit: StackFit.expand,
-          children: [
-            for (final child in previousChildren)
-              HeroMode(enabled: false, child: child),
-            ?currentChild,
-          ],
+          children: [...previousChildren, ?currentChild],
         ),
         child: SizedBox.expand(
           key: ValueKey("album-slideshow-${file.tag}"),
