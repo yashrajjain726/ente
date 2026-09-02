@@ -62,7 +62,7 @@ import type {
     ModelInfo,
     ModelSettings,
 } from "@/services/llm/types";
-import { hasAvailableNotesIndex } from "@/services/notes";
+import { tauriCommandError } from "@/services/tauri-error";
 import { isTauriRuntime as detectTauriAppRuntime } from "@/services/tauri-runtime";
 import { Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -108,20 +108,6 @@ const DEFAULT_WEB_CONTEXT_SIZE = 4096;
 const ADVANCED_SETTINGS_UNLOCK_KEY = "ensu.advancedSettingsUnlocked";
 const MODEL_SETTINGS_STORAGE_KEY = "ensu.modelSettings";
 const SYSTEM_PROMPT_STORAGE_KEY = "ensu.systemPrompt";
-
-interface TauriCommandError {
-    name?: string;
-    message?: string;
-}
-
-const tauriCommandError = (error: unknown): TauriCommandError => {
-    if (!error || typeof error != "object") return {};
-    const record = error as Record<string, unknown>;
-    return {
-        name: typeof record.name == "string" ? record.name : undefined,
-        message: typeof record.message == "string" ? record.message : undefined,
-    };
-};
 
 const formatImageProcessingErrorForLog = (error: unknown) => {
     const { name, message } = tauriCommandError(error);
@@ -3059,15 +3045,6 @@ const Page: React.FC = () => {
                             enabledKnowledgePackIds.has(pack.stableId),
                     )
                     .map((pack) => pack.stableId);
-                let hasKnowledgeSource = enabledReadyPackIds.length > 0;
-                if (isTauriRuntime && !hasKnowledgeSource) {
-                    try {
-                        hasKnowledgeSource = await hasAvailableNotesIndex();
-                        if (!isActiveGeneration()) return;
-                    } catch (error) {
-                        log.warn("Your Notes availability check failed", error);
-                    }
-                }
                 const knowledgeQuery = parseDocumentBlocks(promptText)
                     .text.replaceAll(MEDIA_MARKER, "")
                     .replace(/\[\d+ image attachments? provided\]/gi, "")
@@ -3078,7 +3055,6 @@ const Page: React.FC = () => {
                 );
                 if (
                     isTauriRuntime &&
-                    hasKnowledgeSource &&
                     knowledgeQuery &&
                     remainingKnowledgeBytes > 0
                 ) {

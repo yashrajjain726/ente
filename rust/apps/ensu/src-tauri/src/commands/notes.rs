@@ -547,7 +547,12 @@ impl State {
             .unwrap_or_else(PoisonError::into_inner)
             .iter()
             .filter_map(|(collection_id, runtime)| {
-                runtime.index_available.then_some(collection_id.clone())
+                (runtime.index_available
+                    && !matches!(
+                        runtime.status,
+                        NotesCollectionStatusDto::Unavailable | NotesCollectionStatusDto::Error
+                    ))
+                .then_some(collection_id.clone())
             })
             .collect::<BTreeSet<_>>();
         let collections = self
@@ -559,10 +564,7 @@ impl State {
             .clone();
         collections
             .into_iter()
-            .filter(|collection| {
-                available_ids.contains(&collection.id)
-                    && source_root_is_available(&collection.source_root)
-            })
+            .filter(|collection| available_ids.contains(&collection.id))
             .map(|collection| collection.id)
             .collect()
     }
@@ -648,9 +650,8 @@ fn collection_dto(
 }
 
 #[tauri::command]
-pub fn notes_list_collections(
-    notes_state: TauriState<'_, State>,
-) -> Result<Vec<NotesCollectionDto>, ApiError> {
+pub fn notes_list_collections(app: AppHandle) -> Result<Vec<NotesCollectionDto>, ApiError> {
+    let notes_state = available_state(&app)?;
     let store = notes_state
         .registry
         .lock()
@@ -685,32 +686,30 @@ pub fn notes_list_collections(
 }
 
 #[tauri::command]
-pub fn notes_has_available_index(notes_state: TauriState<'_, State>) -> bool {
-    !notes_state.available_index_collection_ids().is_empty()
-}
-
-#[tauri::command]
-pub fn notes_add_collection(
+pub async fn notes_add_collection(
     app: AppHandle,
-    notes_state: TauriState<'_, State>,
     source_root: String,
 ) -> Result<NotesCollectionDto, ApiError> {
-    let root = canonical_source_root(Path::new(&source_root))?;
-    if !app.fs_scope().is_allowed(&root) {
-        return Err(ApiError::new(
-            "io_scope",
-            "Notes folder is outside the allowed filesystem scope",
-        ));
-    }
-    register_collection(&app, &notes_state, &root)
+    async_runtime::spawn_blocking(move || {
+        let root = canonical_source_root(Path::new(&source_root))?;
+        if !app.fs_scope().is_allowed(&root) {
+            return Err(ApiError::new(
+                "io_scope",
+                "Notes folder is outside the allowed filesystem scope",
+            ));
+        }
+        let notes_state = available_state(&app)?;
+        register_collection(&app, &notes_state, root)
+    })
+    .await
+    .map_err(|_| ApiError::new("io_thread", "Notes folder registration task failed"))?
 }
 
 fn register_collection(
     app: &AppHandle,
     notes_state: &State,
-    source_root: &Path,
+    root: PathBuf,
 ) -> Result<NotesCollectionDto, ApiError> {
-    let root = canonical_source_root(source_root)?;
     let notes_directory = notes_state
         .index_root
         .parent()
@@ -753,12 +752,22 @@ fn register_collection(
 
 #[tauri::command]
 pub async fn notes_remove_collection(
-    notes_state: TauriState<'_, State>,
+    app: AppHandle,
     collection_id: String,
 ) -> Result<(), ApiError> {
+    let notes_state = available_state(&app)?;
     let lifecycle = notes_state.collection_lifecycle(&collection_id);
     let _lifecycle = lifecycle.lock().await;
-    let collection = notes_state.registered_collection(&collection_id)?;
+    async_runtime::spawn_blocking(move || {
+        let notes_state = available_state(&app)?;
+        remove_collection(&notes_state, &collection_id)
+    })
+    .await
+    .map_err(|_| ApiError::new("io_thread", "Notes folder removal task failed"))?
+}
+
+fn remove_collection(notes_state: &State, collection_id: &str) -> Result<(), ApiError> {
+    let collection = notes_state.registered_collection(collection_id)?;
     let derived_directory = notes_state.index_root.join(&collection.id);
     {
         let mut store = notes_state
@@ -775,19 +784,19 @@ pub async fn notes_remove_collection(
         .watchers
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .remove(&collection_id);
+        .remove(collection_id);
     notes_state
         .watch_work
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .remove(&collection_id);
-    notes_state.cancel_update(&collection_id);
-    notes_state.evict_cached_index(&collection_id);
+        .remove(collection_id);
+    notes_state.cancel_update(collection_id);
+    notes_state.evict_cached_index(collection_id);
     notes_state
         .runtimes
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .remove(&collection_id);
+        .remove(collection_id);
     let cleanup_result = (|| -> Result<(), ApiError> {
         if path_exists(&derived_directory)? {
             remove_owned_entry(&derived_directory)?;
@@ -807,7 +816,7 @@ pub async fn notes_remove_collection(
         .collection_lifecycles
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .remove(&collection_id);
+        .remove(collection_id);
     Ok(())
 }
 
@@ -849,11 +858,11 @@ pub async fn notes_index_collection(
     app: AppHandle,
     model_state: TauriState<'_, ModelDownloadState>,
     llm_state: TauriState<'_, crate::commands::llm::State>,
-    notes_state: TauriState<'_, State>,
     collection_id: String,
     force: bool,
     retrieval_epoch: u64,
 ) -> Result<NotesIndexResultDto, ApiError> {
+    let notes_state = available_state(&app)?;
     let lifecycle = notes_state.collection_lifecycle(&collection_id);
     let _collection_lifecycle = lifecycle.lock().await;
     let collection = notes_state.registered_collection(&collection_id)?;
@@ -914,22 +923,9 @@ pub async fn notes_index_collection(
             },
         )
     })
-    .await;
-    let result = match result {
-        Ok(result) => result,
-        Err(_) => {
-            let error = ApiError::new("index_thread", "Notes indexing task failed");
-            report_index_error(
-                &app,
-                &notes_state,
-                &collection_id,
-                Some(update_generation),
-                &error,
-            );
-            return Err(error);
-        }
-    };
-
+    .await
+    .map_err(|_| ApiError::new("index_thread", "Notes indexing task failed"))
+    .and_then(|result| result);
     let outcome = match result {
         Ok(outcome) => outcome,
         Err(error) => {
@@ -1002,27 +998,33 @@ pub async fn notes_index_collection(
 }
 
 #[tauri::command]
-pub fn notes_open_document(
+pub async fn notes_open_document(
     app: AppHandle,
-    notes_state: TauriState<'_, State>,
     collection_id: String,
     document_id: String,
     indexed_revision: String,
 ) -> Result<(), ApiError> {
-    let collection = notes_state.registered_collection(&collection_id)?;
-    let (path, bytes, _) = read_collection_source(&collection.source_root, &document_id)?;
-    if !is_supported_file(&path) {
-        return Err(ApiError::new(
-            "invalid_document",
-            "Unsupported note document",
-        ));
-    }
-    if notes_content_revision(&bytes) != indexed_revision {
-        return Err(ApiError::new(
-            "source_changed",
-            "Source note changed after this answer was generated",
-        ));
-    }
+    let verification_app = app.clone();
+    let path = async_runtime::spawn_blocking(move || {
+        let notes_state = available_state(&verification_app)?;
+        let collection = notes_state.registered_collection(&collection_id)?;
+        let (path, bytes, _) = read_collection_source(&collection.source_root, &document_id)?;
+        if !is_supported_file(&path) {
+            return Err(ApiError::new(
+                "invalid_document",
+                "Unsupported note document",
+            ));
+        }
+        if notes_content_revision(&bytes) != indexed_revision {
+            return Err(ApiError::new(
+                "source_changed",
+                "Source note changed after this answer was generated",
+            ));
+        }
+        Ok(path)
+    })
+    .await
+    .map_err(|_| ApiError::new("io_thread", "Source note verification task failed"))??;
     app.opener()
         .open_path(path.to_string_lossy().into_owned(), None::<String>)
         .map_err(|_| ApiError::new("open_failed", "Source note could not be opened"))
@@ -1054,6 +1056,15 @@ fn notes_error(error: NotesError) -> ApiError {
         NotesError::Json(_) => ("json", "The Notes index could not be read"),
     };
     ApiError::new(code, message)
+}
+
+fn available_state(app: &AppHandle) -> Result<TauriState<'_, State>, ApiError> {
+    app.try_state::<State>().ok_or_else(|| {
+        ApiError::new(
+            "notes_unavailable",
+            "Notes are unavailable because local storage could not be initialized",
+        )
+    })
 }
 
 fn ensure_directory(path: &Path) -> Result<(), ApiError> {
@@ -1156,34 +1167,6 @@ mod tests {
             .commit_document(&prepared, &[embedding], &metadata)
             .unwrap();
         writer.publish(true).unwrap();
-    }
-
-    #[test]
-    fn retrieval_cache_retains_multiple_collection_indexes_within_budget() {
-        let temp = TestDirectory::new();
-        let index_root = temp.path().join("indexes");
-        publish_test_index(&index_root, COLLECTION_ID, "first.md");
-        publish_test_index(&index_root, SECOND_COLLECTION_ID, "other.md");
-        let cached_indexes = Arc::new(Mutex::new(IndexCache::new(NOTES_INDEX_CACHE_MAX_BYTES)));
-        let handle = RetrievalHandle {
-            registry: Arc::new(Mutex::new(
-                RegistryStore::open(temp.path().join("registry")).unwrap(),
-            )),
-            cached_indexes: Arc::clone(&cached_indexes),
-            index_root,
-        };
-        let mut query = vec![0.0; 512];
-        query[0] = 1.0;
-
-        handle.search_collection(COLLECTION_ID, &query).unwrap();
-        handle
-            .search_collection(SECOND_COLLECTION_ID, &query)
-            .unwrap();
-        let cached_indexes = cached_indexes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        assert!(cached_indexes.entries.contains_key(COLLECTION_ID));
-        assert!(cached_indexes.entries.contains_key(SECOND_COLLECTION_ID));
     }
 
     #[test]

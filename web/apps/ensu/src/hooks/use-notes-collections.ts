@@ -10,7 +10,7 @@ import {
     type NotesCollection,
 } from "@/services/notes";
 import { NotesLifecycleController } from "@/services/notes-lifecycle";
-import { isNamedError } from "ente-base/error";
+import { tauriCommandError } from "@/services/tauri-error";
 import log from "ente-base/log";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -170,9 +170,10 @@ export const useNotesCollections = ({
                 )
                 .catch((error: unknown) => {
                     if (controller.isRemoving(collectionId)) return;
-                    if (isNamedError(error, "cancelled")) {
+                    const { name } = tauriCommandError(error);
+                    if (name === "cancelled") {
                         controller.queueIndex(collectionId, force);
-                    } else if (!isNamedError(error, "not_due")) {
+                    } else if (name !== "not_due") {
                         setOperationError(notesErrorMessage(error));
                         log.error("Failed to index Your Notes", error);
                     }

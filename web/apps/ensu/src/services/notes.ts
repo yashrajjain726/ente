@@ -1,3 +1,4 @@
+import { tauriCommandError } from "@/services/tauri-error";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 
 export interface NotesCollection {
@@ -41,9 +42,6 @@ export const selectNotesFolder = async () => {
 export const listNotesCollections = () =>
     invokeNotes<NotesCollection[]>("notes_list_collections");
 
-export const hasAvailableNotesIndex = () =>
-    invokeNotes<boolean>("notes_has_available_index");
-
 export const addNotesCollection = (sourceRoot: string) =>
     invokeNotes<NotesCollection>("notes_add_collection", { sourceRoot });
 
@@ -80,14 +78,8 @@ export const openNoteDocument = (
         indexedRevision,
     });
 
-const commandError = (error: unknown) =>
-    (error && typeof error === "object" ? error : {}) as {
-        name?: unknown;
-        message?: unknown;
-    };
-
 export const notesErrorMessage = (error: unknown) => {
-    const { name, message } = commandError(error);
+    const { name, message } = tauriCommandError(error);
     switch (name) {
         case "duplicate":
             return "That folder is already in Your Notes.";
@@ -109,7 +101,7 @@ export const notesErrorMessage = (error: unknown) => {
 };
 
 export const noteSourceErrorMessage = (error: unknown) => {
-    const { name } = commandError(error);
+    const { name } = tauriCommandError(error);
     switch (name) {
         case "open_failed":
             return "The note could not be opened.";

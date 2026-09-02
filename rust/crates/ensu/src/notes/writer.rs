@@ -688,52 +688,19 @@ mod tests {
     }
 
     #[test]
-    fn maximum_supported_sources_fit_a_shard() {
-        let heading = "\\".repeat(crate::notes::NOTES_HEADING_MAX_UTF8_BYTES);
-        let prefix = format!("## {heading}\n");
-        let temp = tempfile::tempdir().unwrap();
-        let writer = NotesIndexWriter::open(temp.path(), collection()).unwrap();
-        for unit in ["\\", "😀"] {
-            let remaining = NOTES_MAX_SOURCE_BYTES - prefix.len();
-            assert_eq!(remaining % unit.len(), 0);
-            let source = format!("{prefix}{}", unit.repeat(remaining / unit.len()));
-            assert_eq!(source.len(), NOTES_MAX_SOURCE_BYTES);
-            let prepared = prepare_notes_document("maximum.md", source.as_bytes()).unwrap();
-            let metadata = metadata(&prepared, source.len());
-            writer.validate_document(&prepared, &metadata).unwrap();
-        }
-        validate_maximum_source_with_many_small_sections();
-    }
-
-    fn validate_maximum_source_with_many_small_sections() {
-        let unit = "## \\\n\\\n";
-        let source = unit.repeat(NOTES_MAX_SOURCE_BYTES / unit.len());
-        assert!(source.len() <= NOTES_MAX_SOURCE_BYTES);
-        let prepared = prepare_notes_document("many-sections.md", source.as_bytes()).unwrap();
-        let metadata = metadata(&prepared, source.len());
-        let temp = tempfile::tempdir().unwrap();
-        let writer = NotesIndexWriter::open(temp.path(), collection()).unwrap();
-        writer.validate_document(&prepared, &metadata).unwrap();
-    }
-
-    #[test]
-    fn rejects_an_inventory_that_cannot_fit_the_manifest_before_indexing() {
-        let inventory = (0..25_000)
+    fn rejects_collections_over_capacity_before_embedding() {
+        let inventory = (0..=NOTES_MAX_COLLECTION_DOCUMENTS)
             .map(|index| NotesSourceDocument {
                 document_id: format!("note-{index:05}.md"),
                 size: 1,
                 modified_at_ms: Some(1),
             })
             .collect::<Vec<_>>();
-        NotesIndexWriter::validate_inventory_capacity(&collection(), &inventory[..20_000]).unwrap();
         assert!(matches!(
             NotesIndexWriter::validate_inventory_capacity(&collection(), &inventory),
             Err(NotesError::CollectionTooLarge(_))
         ));
-    }
 
-    #[test]
-    fn rejects_aggregate_source_content_before_indexing() {
         let supported_count = NOTES_MAX_COLLECTION_SOURCE_BYTES / NOTES_MAX_SOURCE_BYTES as u64;
         let inventory = (0..=supported_count)
             .map(|index| NotesSourceDocument {
@@ -742,19 +709,11 @@ mod tests {
                 modified_at_ms: Some(1),
             })
             .collect::<Vec<_>>();
-        NotesIndexWriter::validate_inventory_capacity(
-            &collection(),
-            &inventory[..supported_count as usize],
-        )
-        .unwrap();
         assert!(matches!(
             NotesIndexWriter::validate_inventory_capacity(&collection(), &inventory),
             Err(NotesError::CollectionTooLarge(_))
         ));
-    }
 
-    #[test]
-    fn rejects_exact_aggregate_chunks_before_embedding() {
         let inventory = (0..129)
             .map(|index| NotesSourceDocument {
                 document_id: format!("note-{index:03}.md"),

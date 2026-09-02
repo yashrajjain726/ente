@@ -3,22 +3,12 @@ use ente_core::{
     crypto::{self, Header, Key, blob},
 };
 use hkdf::Hkdf;
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use thiserror::Error;
 
 const ATTACHMENT_KEY_INFO: &[u8] = b"llmchat_attachment_v1";
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut encoded = String::with_capacity(64);
-    for byte in Sha256::digest(bytes) {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
-}
 
 #[derive(Debug, Error)]
 pub enum Error {

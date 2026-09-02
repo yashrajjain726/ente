@@ -344,82 +344,8 @@ mod tests {
     fn coordinates_platform_callbacks_and_publishes_the_index() {
         let temp = tempfile::tempdir().unwrap();
         let prepared = prepare_notes_document("note.md", b"note").unwrap();
-        let progress = Cell::new(0);
-        let outcome = index_notes_collection::<()>(
-            NotesIndexInput {
-                index_root: temp.path(),
-                collection_id: COLLECTION_ID.to_string(),
-                inventory: vec![source()],
-                forced_document_ids: &[],
-                force_full_hash: false,
-            },
-            || Ok(()),
-            |_| {
-                Ok(NotesDocumentLoad::Prepared {
-                    document: prepared.clone(),
-                    source: source(),
-                })
-            },
-            |document| Ok(Some(embedding(document))),
-            |_, _| Ok(NotesRevisionStatus::Matches { source: source() }),
-            |value| progress.set(value),
-        )
-        .unwrap();
-
-        assert!(outcome.ready());
-        assert_eq!(progress.get(), 100);
-        assert_eq!(
-            NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string())
-                .unwrap()
-                .document_count(),
-            1
-        );
-    }
-
-    #[test]
-    fn preserves_the_previous_publication_when_a_source_changes() {
-        let temp = tempfile::tempdir().unwrap();
-        let prepared = prepare_notes_document("note.md", b"note").unwrap();
-        let load_count = Cell::new(0);
-        let outcome = index_notes_collection::<()>(
-            NotesIndexInput {
-                index_root: temp.path(),
-                collection_id: COLLECTION_ID.to_string(),
-                inventory: vec![source()],
-                forced_document_ids: &[],
-                force_full_hash: false,
-            },
-            || Ok(()),
-            |_| {
-                load_count.set(load_count.get() + 1);
-                Ok(if load_count.get() == 1 {
-                    NotesDocumentLoad::Prepared {
-                        document: prepared.clone(),
-                        source: source(),
-                    }
-                } else {
-                    NotesDocumentLoad::Changed
-                })
-            },
-            |document| Ok(Some(embedding(document))),
-            |_, _| Ok(NotesRevisionStatus::Matches { source: source() }),
-            |_| {},
-        )
-        .unwrap();
-
-        assert_eq!(outcome.changed_during_indexing.as_deref(), Some("note.md"));
-        assert_eq!(outcome.unchecked_document_ids, ["note.md"]);
-        assert!(matches!(
-            NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()),
-            Err(NotesError::NotReady)
-        ));
-    }
-
-    #[test]
-    fn commits_metadata_from_the_verified_source_reads() {
-        let temp = tempfile::tempdir().unwrap();
-        let prepared = prepare_notes_document("note.md", b"note").unwrap();
         let verified_source = source_at(2);
+        let progress = Cell::new(0);
         let outcome = index_notes_collection::<()>(
             NotesIndexInput {
                 index_root: temp.path(),
@@ -441,11 +367,14 @@ mod tests {
                     source: verified_source.clone(),
                 })
             },
-            |_| {},
+            |value| progress.set(value),
         )
         .unwrap();
 
         assert!(outcome.ready());
+        assert_eq!(progress.get(), 100);
+        let index = NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
+        assert_eq!(index.document_count(), 1);
         let writer = NotesIndexWriter::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
         assert!(
             writer
@@ -453,6 +382,57 @@ mod tests {
                 .unwrap()
                 .is_up_to_date()
         );
+    }
+
+    #[test]
+    fn preserves_the_previous_publication_when_a_source_changes() {
+        let temp = tempfile::tempdir().unwrap();
+        let previous = prepare_notes_document("note.md", b"previous note").unwrap();
+        let mut writer = NotesIndexWriter::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
+        writer
+            .commit_document(&previous, &embedding(&previous), &source())
+            .unwrap();
+        writer.publish(true).unwrap();
+
+        let prepared = prepare_notes_document("note.md", b"updated note").unwrap();
+        let updated_source = source_at(2);
+        let load_count = Cell::new(0);
+        let outcome = index_notes_collection::<()>(
+            NotesIndexInput {
+                index_root: temp.path(),
+                collection_id: COLLECTION_ID.to_string(),
+                inventory: vec![updated_source.clone()],
+                forced_document_ids: &[],
+                force_full_hash: false,
+            },
+            || Ok(()),
+            |_| {
+                load_count.set(load_count.get() + 1);
+                Ok(if load_count.get() == 1 {
+                    NotesDocumentLoad::Prepared {
+                        document: prepared.clone(),
+                        source: updated_source.clone(),
+                    }
+                } else {
+                    NotesDocumentLoad::Changed
+                })
+            },
+            |document| Ok(Some(embedding(document))),
+            |_, _| {
+                Ok(NotesRevisionStatus::Matches {
+                    source: updated_source.clone(),
+                })
+            },
+            |_| {},
+        )
+        .unwrap();
+
+        assert_eq!(outcome.changed_during_indexing.as_deref(), Some("note.md"));
+        assert_eq!(outcome.unchecked_document_ids, ["note.md"]);
+        let index = NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
+        let hits = index.search(&embedding(&previous)[0]).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].text, "previous note");
     }
 
     #[test]

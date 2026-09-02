@@ -52,8 +52,10 @@ pub(super) struct StartupInspection {
 }
 
 pub async fn initialize_for_app(app: AppHandle) {
-    let collections = app
-        .state::<State>()
+    let Some(state) = app.try_state::<State>() else {
+        return;
+    };
+    let collections = state
         .registry
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -682,49 +684,37 @@ mod tests {
     }
 
     #[test]
-    fn root_watch_events_request_identity_reattachment() {
-        let root = PathBuf::from("/notes");
-        let event = Event::new(EventKind::Create(CreateKind::Folder)).add_path(root.clone());
-
-        let change = classify_watch_event(&root, &event).unwrap();
-
-        assert!(change.force_full_hash);
-        assert!(change.reattach_root);
-    }
-
-    #[test]
-    fn moved_out_directories_force_reconciliation_and_watch_refresh() {
+    fn structural_watch_events_force_reconciliation_and_refresh() {
         let temp = TestDirectory::new();
         let root = temp.path().join("root");
         fs::create_dir(&root).unwrap();
+
+        let event = Event::new(EventKind::Create(CreateKind::Folder)).add_path(root.clone());
+        let change = classify_watch_event(&root, &event).unwrap();
+        assert!(change.force_full_hash);
+        assert!(change.refresh_watches);
+        assert!(change.reattach_root);
+
         let path = root.join("moved");
         let event =
             Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::From))).add_path(path);
-
         let change = classify_watch_event(&root, &event).unwrap();
-
         assert!(change.force_full_hash);
         assert!(change.refresh_watches);
-    }
 
-    #[cfg(unix)]
-    #[test]
-    fn symlink_replacements_force_reconciliation_and_watch_refresh() {
-        use std::os::unix::fs::symlink;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
 
-        let temp = TestDirectory::new();
-        let root = temp.path().join("root");
-        let outside = temp.path().join("outside");
-        fs::create_dir(&root).unwrap();
-        fs::write(&outside, "outside").unwrap();
-        let path = root.join("note.md");
-        symlink(outside, &path).unwrap();
-        let event = Event::new(EventKind::Modify(ModifyKind::Any)).add_path(path);
-
-        let change = classify_watch_event(&root, &event).unwrap();
-
-        assert!(change.force_full_hash);
-        assert!(change.refresh_watches);
+            let outside = temp.path().join("outside");
+            fs::write(&outside, "outside").unwrap();
+            let path = root.join("note.md");
+            symlink(outside, &path).unwrap();
+            let event = Event::new(EventKind::Modify(ModifyKind::Any)).add_path(path);
+            let change = classify_watch_event(&root, &event).unwrap();
+            assert!(change.force_full_hash);
+            assert!(change.refresh_watches);
+        }
     }
 
     #[test]

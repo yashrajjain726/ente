@@ -121,10 +121,7 @@ mod tests {
             assert!(overlap.len() <= NOTES_CHUNK_OVERLAP_UTF8_BYTES);
             assert_eq!(overlap, next);
         }
-    }
 
-    #[test]
-    fn preserves_heading_only_outlines() {
         let prepared =
             prepare_notes_document("outline.md", b"# Project\n## Alice\n## Bob\n## Carol\n")
                 .unwrap();
@@ -141,13 +138,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_controls_that_expand_unboundedly_in_json() {
+    fn rejects_unsafe_or_oversized_content() {
         let error = prepare_notes_document("controls.md", b"safe\x1funsafe").unwrap_err();
         assert!(matches!(error, NotesError::InvalidInput(_)));
-    }
 
-    #[test]
-    fn rejects_headings_above_the_serialization_bound() {
         let source = format!("# {}\n\nbody", "a".repeat(NOTES_HEADING_MAX_UTF8_BYTES + 1));
         assert!(matches!(
             prepare_notes_document("heading.md", source.as_bytes()),
@@ -156,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_heading_syntax_until_a_valid_fence_closer() {
+    fn handles_fenced_and_indented_code() {
         let source = "```rust\n```not-a-closer\n# Code heading\n```\n# Real title\nbody";
         let prepared = prepare_notes_document("fenced.md", source.as_bytes()).unwrap();
         assert_eq!(prepared.title, "Real title");
@@ -164,10 +158,7 @@ mod tests {
             chunk.section.as_deref() != Some("Code heading")
                 && !chunk.text.starts_with("Code heading")
         }));
-    }
 
-    #[test]
-    fn does_not_treat_indented_code_as_a_fence() {
         let source = "    ```\n# Real title\nbody";
         let prepared = prepare_notes_document("indented.md", source.as_bytes()).unwrap();
         assert_eq!(prepared.title, "Real title");

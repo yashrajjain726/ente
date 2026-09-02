@@ -63,23 +63,10 @@ pub(super) fn index_collection(
                 )
             })?;
             if embedding_context.is_none() {
-                let model = llm::Model::load(llm::ModelLoadParams {
-                    model_path: embedding_path.display().to_string(),
-                    n_gpu_layers: Some(0),
-                    use_mmap: Some(true),
-                    use_mlock: Some(false),
-                })
-                .map_err(crate::commands::llm::llm_api_error)?;
-                let threads = std::thread::available_parallelism()
-                    .map(|count| count.get().saturating_sub(1).max(1))
-                    .unwrap_or(1);
-                embedding_context = Some(
-                    llm::Context::new_knowledge_embedding(
-                        &model,
-                        Some(i32::try_from(threads).unwrap_or(1)),
-                    )
-                    .map_err(crate::commands::llm::llm_api_error)?,
-                );
+                embedding_context = Some(crate::commands::llm::load_knowledge_embedding_context(
+                    embedding_path,
+                    || check_cancelled(cancellation_epoch, retrieval_epoch),
+                )?);
             }
             let context = embedding_context
                 .as_ref()

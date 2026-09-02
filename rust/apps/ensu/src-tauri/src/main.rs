@@ -10,6 +10,12 @@ fn main() {
     logging::log("App", "starting Tauri backend");
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -25,20 +31,34 @@ fn main() {
             app.manage(commands::llm::ModelDownloadState::new(
                 app.path().app_data_dir()?,
             ));
-            app.manage(
-                commands::notes::State::new(app.path().app_data_dir()?)
-                    .map_err(|error| std::io::Error::other(error.message))?,
-            );
+            let notes_available = match commands::notes::State::new(app.path().app_data_dir()?) {
+                Ok(state) => {
+                    app.manage(state);
+                    true
+                }
+                Err(error) => {
+                    logging::log(
+                        "Notes",
+                        format!(
+                            "initialization failed; Notes disabled error={}",
+                            error.message
+                        ),
+                    );
+                    false
+                }
+            };
             if let Some(window) = app.get_webview_window("main")
                 && let Err(err) = window.show()
             {
                 logging::log("App", format!("failed to show main window error={err}"));
                 return Err(Box::new(err));
             }
-            let notes_app = app.handle().clone();
-            async_runtime::spawn(async move {
-                commands::notes::initialize_for_app(notes_app).await;
-            });
+            if notes_available {
+                let notes_app = app.handle().clone();
+                async_runtime::spawn(async move {
+                    commands::notes::initialize_for_app(notes_app).await;
+                });
+            }
             logging::log("App", "setup complete");
             Ok(())
         })
@@ -88,7 +108,6 @@ fn main() {
             commands::knowledge::knowledge_cancel_pack_download,
             commands::knowledge::knowledge_retrieve,
             commands::notes::notes_list_collections,
-            commands::notes::notes_has_available_index,
             commands::notes::notes_add_collection,
             commands::notes::notes_remove_collection,
             commands::notes::notes_index_collection,

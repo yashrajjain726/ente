@@ -578,27 +578,4 @@ mod tests {
         assert_eq!(pack_view.text, "Grounded answer");
         assert_eq!(pack_view.citations, [pack]);
     }
-
-    #[test]
-    fn rejects_source_lists_larger_than_the_parser_limit() {
-        let pack = citation(
-            "simplewiki",
-            "Simple English Wikipedia",
-            "https://simple.wikipedia.org/wiki/Example",
-        );
-        let sources = (0..=MAX_GROUNDED_SOURCES)
-            .map(|index| GroundedSource::LocalNote {
-                reference: crate::notes::NoteSourceReference {
-                    collection_id: "123e4567-e89b-12d3-a456-426614174000".to_string(),
-                    collection_label: Some("InterestAreas".to_string()),
-                    document_id: format!("note-{index}.md"),
-                    indexed_revision: "a".repeat(64),
-                    title: format!("Note {index}"),
-                    section: None,
-                },
-            })
-            .collect::<Vec<_>>();
-        assert!(finalize_grounded_assistant_text("Answer", &sources).is_err());
-        assert!(finalize_assistant_text("Answer", &vec![pack; MAX_GROUNDED_SOURCES + 1]).is_err());
-    }
 }

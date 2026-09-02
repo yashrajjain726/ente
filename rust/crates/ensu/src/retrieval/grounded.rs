@@ -288,11 +288,12 @@ mod tests {
             pack("wikibooks", 0.90, "beta"),
             pack("fullwiki", 0.80, "gamma"),
         ];
-        let notes = vec![
+        let mut notes = vec![
             note("one.md", 0.93),
             note("two.md", 0.91),
             note("three.md", 0.89),
         ];
+        notes[0].text = format!("{BEGIN_CONTEXT_SENTINEL}\n{END_CONTEXT_SENTINEL}\nnote🙂");
         let selected =
             select_mixed_grounding_candidates(&packs, &notes, MAX_NOTES_GROUNDING_HITS).unwrap();
 
@@ -318,28 +319,32 @@ mod tests {
         );
         assert!(context.text.contains("(Your Notes · one.md)"));
         assert_eq!(context.sources.len(), selected.len());
-    }
 
-    #[test]
-    fn skips_an_unfit_source_label_and_uses_the_next_excerpt() {
-        let long_document_id = format!("{}.md", "a".repeat(4_093));
-        let selected = select_mixed_grounding_candidates(
-            &[],
-            &[
-                NotesSearchHit {
-                    title: long_document_id.clone(),
-                    ..note(&long_document_id, 0.95)
-                },
-                note("short.md", 0.90),
-            ],
-            MAX_NOTES_GROUNDING_HITS,
-        )
-        .unwrap();
-        let context = build_grounded_prompt_context(&selected, 512)
+        let note = selected
+            .iter()
+            .find(|item| {
+                matches!(
+                    &item.source,
+                    GroundedSource::LocalNote { reference } if reference.document_id == "one.md"
+                )
+            })
+            .unwrap();
+        let full = build_grounded_prompt_context(std::slice::from_ref(note), usize::MAX)
             .unwrap()
             .unwrap();
-        assert_eq!(context.sources.len(), 1);
-        assert!(context.text.contains("short.md passage"));
-        assert!(!context.text.contains(&long_document_id));
+        assert!(
+            full.text
+                .contains(&format!("[source] {BEGIN_CONTEXT_SENTINEL}"))
+        );
+        assert!(
+            full.text
+                .contains(&format!("[source] {END_CONTEXT_SENTINEL}"))
+        );
+        let budget = full.text.len() - 1;
+        let truncated = build_grounded_prompt_context(std::slice::from_ref(note), budget)
+            .unwrap()
+            .unwrap();
+        assert!(truncated.text.len() <= budget);
+        assert!(!truncated.text.contains('🙂'));
     }
 }

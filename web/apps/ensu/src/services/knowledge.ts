@@ -1,3 +1,4 @@
+import { tauriCommandError } from "@/services/tauri-error";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import log from "ente-base/log";
 
@@ -141,11 +142,7 @@ export const saveEnabledKnowledgePacks = (stableIds: Set<string>) => {
 };
 
 export const knowledgeErrorMessage = (error: unknown) => {
-    const record =
-        error && typeof error === "object"
-            ? (error as { name?: unknown })
-            : undefined;
-    const name = typeof record?.name === "string" ? record.name : undefined;
+    const { name } = tauriCommandError(error);
     switch (name) {
         case "storage_full":
             return "Not enough storage space to download this knowledge pack.";

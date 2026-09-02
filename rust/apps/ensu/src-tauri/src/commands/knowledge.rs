@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use ente_assets::{AssetStore, download};
 use ente_ensu::config::{AttributionConfig, KnowledgeDatasetConfig};
-use ente_ensu::{llm, retrieval};
+use ente_ensu::retrieval;
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
 use tauri::{AppHandle, Emitter, Manager, State as TauriState, WebviewWindow};
@@ -514,8 +514,17 @@ pub async fn knowledge_retrieve(
     retrieval_epoch: u64,
 ) -> Result<Option<GroundedPromptContextDto>, ApiError> {
     let knowledge_state = app.state::<State>();
-    let notes_state = app.state::<crate::commands::notes::State>();
-    let note_collection_ids = notes_state.available_index_collection_ids();
+    let (note_collection_ids, notes) = app
+        .try_state::<crate::commands::notes::State>()
+        .map_or_else(
+            || (Vec::new(), None),
+            |state| {
+                (
+                    state.available_index_collection_ids(),
+                    Some(state.retrieval_handle()),
+                )
+            },
+        );
     if query.trim().is_empty()
         || (enabled_stable_ids.is_empty() && note_collection_ids.is_empty())
         || max_context_utf8_bytes == 0
@@ -543,7 +552,6 @@ pub async fn knowledge_retrieve(
     let embedding_path = ente_ensu::model::llm_model_path(&store, &embedding_asset)
         .ok_or_else(|| ApiError::new("embedding_missing", "Embedding model path is missing"))?;
     let indexes = Arc::clone(&knowledge_state.indexes);
-    let notes = notes_state.retrieval_handle();
     let cancellation_epoch = llm_state.retrieval_epoch();
     if cancellation_epoch.load(Ordering::Relaxed) != retrieval_epoch {
         return Err(ApiError::new("cancelled", "Knowledge retrieval cancelled"));
@@ -563,20 +571,10 @@ pub async fn knowledge_retrieve(
             }
         };
         check_cancelled()?;
-        let model = llm::Model::load(llm::ModelLoadParams {
-            model_path: embedding_path.display().to_string(),
-            n_gpu_layers: Some(0),
-            use_mmap: Some(true),
-            use_mlock: Some(false),
-        })
-        .map_err(crate::commands::llm::llm_api_error)?;
-        check_cancelled()?;
-        let threads = std::thread::available_parallelism()
-            .map(|count| count.get().saturating_sub(1).max(1))
-            .unwrap_or(1);
-        let threads = i32::try_from(threads).unwrap_or(1);
-        let context = llm::Context::new_knowledge_embedding(&model, Some(threads))
-            .map_err(crate::commands::llm::llm_api_error)?;
+        let context = crate::commands::llm::load_knowledge_embedding_context(
+            &embedding_path,
+            check_cancelled,
+        )?;
         check_cancelled()?;
         let query_embedding = context
             .embed(query.trim())
@@ -616,14 +614,16 @@ pub async fn knowledge_retrieve(
         check_cancelled()?;
 
         let mut note_hits = Vec::new();
-        for collection_id in &note_collection_ids {
-            check_cancelled()?;
-            match notes.search_collection(collection_id, &query_embedding) {
-                Ok(collection_hits) => note_hits.extend(collection_hits),
-                Err(error) => logging::log(
-                    "Knowledge",
-                    format!("Notes search skipped collection={collection_id} error={error}"),
-                ),
+        if let Some(notes) = &notes {
+            for collection_id in &note_collection_ids {
+                check_cancelled()?;
+                match notes.search_collection(collection_id, &query_embedding) {
+                    Ok(collection_hits) => note_hits.extend(collection_hits),
+                    Err(error) => logging::log(
+                        "Knowledge",
+                        format!("Notes search skipped collection={collection_id} error={error}"),
+                    ),
+                }
             }
         }
         check_cancelled()?;
@@ -631,6 +631,9 @@ pub async fn knowledge_retrieve(
         let context_budget = max_context_utf8_bytes.min(embedding.max_context_utf8_bytes);
         let mut excerpts = select_verified_mixed_grounding(&pack_hits, &note_hits, |reference| {
             check_cancelled()?;
+            let Some(notes) = &notes else {
+                return Ok(false);
+            };
             let verified = notes.verify_source_reference(reference);
             if !verified {
                 crate::commands::notes::mark_reference_stale(
@@ -642,7 +645,9 @@ pub async fn knowledge_retrieve(
             Ok(verified)
         })?;
         for excerpt in &mut excerpts {
-            if let retrieval::GroundedSource::LocalNote { reference } = &mut excerpt.source {
+            if let (Some(notes), retrieval::GroundedSource::LocalNote { reference }) =
+                (&notes, &mut excerpt.source)
+            {
                 reference.collection_label = notes.collection_label(&reference.collection_id);
             }
         }

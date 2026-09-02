@@ -237,6 +237,54 @@ type MessageSource = NonNullable<ChatMessage["sources"]>[number];
 type PackSource = Extract<MessageSource, { type: "ensuPack" }>;
 type LocalNoteSource = Extract<MessageSource, { type: "localNote" }>;
 
+const PackSourceCard = memo(
+    ({ source, number }: { source: PackSource; number: number }) => {
+        const { citation } = source;
+        return (
+            <Stack
+                sx={{
+                    gap: 1.25,
+                    p: 2,
+                    borderRadius: 1.5,
+                    bgcolor: "fill.faint",
+                }}
+            >
+                <Typography variant="mini" sx={{ color: "text.muted" }}>
+                    SOURCE {number} · ENSU PACK ·{" "}
+                    {citation.datasetLabel.toUpperCase()}
+                </Typography>
+                <Typography variant="h6">{citation.title}</Typography>
+                <Divider sx={{ my: 0.25 }} />
+                <Typography variant="small" sx={{ color: "text.muted" }}>
+                    {citation.credit}
+                </Typography>
+                <Stack direction="row" sx={{ gap: 2, flexWrap: "wrap" }}>
+                    <Link
+                        component="button"
+                        type="button"
+                        underline="hover"
+                        onClick={() => void openExternalUrl(citation.sourceUrl)}
+                        sx={sourceLinkSx}
+                    >
+                        Open source ↗
+                    </Link>
+                    <Link
+                        component="button"
+                        type="button"
+                        underline="hover"
+                        onClick={() =>
+                            void openExternalUrl(citation.licenseUrl)
+                        }
+                        sx={sourceLinkSx}
+                    >
+                        {citation.licenseLabel} ↗
+                    </Link>
+                </Stack>
+            </Stack>
+        );
+    },
+);
+
 const LocalNoteSourceCard = memo(
     ({ source, number }: { source: LocalNoteSource; number: number }) => {
         const [openError, setOpenError] = useState<string | null>(null);
@@ -251,8 +299,10 @@ const LocalNoteSourceCard = memo(
                 }}
             >
                 <Typography variant="mini" sx={{ color: "text.muted" }}>
-                    SOURCE {number} ·{" "}
-                    {(reference.collectionLabel ?? "Your Notes").toUpperCase()}
+                    SOURCE {number} · YOUR NOTES
+                    {reference.collectionLabel && (
+                        <> · {reference.collectionLabel.toUpperCase()}</>
+                    )}
                 </Typography>
                 <Typography variant="h6">{reference.title}</Typography>
                 {reference.section && (
@@ -294,15 +344,13 @@ const LocalNoteSourceCard = memo(
 
 const KnowledgeSourcesDialog = memo(
     ({
-        citations,
-        localNotes,
+        sources,
         onClose,
         dialogTitleSx,
         closeButtonSx,
         closeIconProps,
     }: {
-        citations: PackSource["citation"][];
-        localNotes: LocalNoteSource[];
+        sources: MessageSource[];
         onClose: () => void;
         dialogTitleSx: SystemStyleObject<Theme>;
         closeButtonSx: SystemStyleObject<Theme>;
@@ -339,87 +387,21 @@ const KnowledgeSourcesDialog = memo(
                 </IconButton>
             </DialogTitle>
             <DialogContent sx={{ px: 3, pt: 1, pb: 3 }}>
-                <Stack sx={{ gap: 2.5 }}>
-                    {citations.length > 0 && (
-                        <Stack sx={{ gap: 1.5 }}>
-                            <Typography component="h3" variant="h6">
-                                Ensu Packs
-                            </Typography>
-                            {citations.map((citation, index) => (
-                                <Stack
-                                    key={`${citation.datasetId}:${citation.sourceUrl}:${index}`}
-                                    sx={{
-                                        gap: 1.25,
-                                        p: 2,
-                                        borderRadius: 1.5,
-                                        bgcolor: "fill.faint",
-                                    }}
-                                >
-                                    <Typography
-                                        variant="mini"
-                                        sx={{ color: "text.muted" }}
-                                    >
-                                        SOURCE {index + 1} ·{" "}
-                                        {citation.datasetLabel.toUpperCase()}
-                                    </Typography>
-                                    <Typography variant="h6">
-                                        {citation.title}
-                                    </Typography>
-                                    <Divider sx={{ my: 0.25 }} />
-                                    <Typography
-                                        variant="small"
-                                        sx={{ color: "text.muted" }}
-                                    >
-                                        {citation.credit}
-                                    </Typography>
-                                    <Stack
-                                        direction="row"
-                                        sx={{ gap: 2, flexWrap: "wrap" }}
-                                    >
-                                        <Link
-                                            component="button"
-                                            type="button"
-                                            underline="hover"
-                                            onClick={() =>
-                                                void openExternalUrl(
-                                                    citation.sourceUrl,
-                                                )
-                                            }
-                                            sx={sourceLinkSx}
-                                        >
-                                            Open source ↗
-                                        </Link>
-                                        <Link
-                                            component="button"
-                                            type="button"
-                                            underline="hover"
-                                            onClick={() =>
-                                                void openExternalUrl(
-                                                    citation.licenseUrl,
-                                                )
-                                            }
-                                            sx={sourceLinkSx}
-                                        >
-                                            {citation.licenseLabel} ↗
-                                        </Link>
-                                    </Stack>
-                                </Stack>
-                            ))}
-                        </Stack>
-                    )}
-                    {localNotes.length > 0 && (
-                        <Stack sx={{ gap: 1.5 }}>
-                            <Typography component="h3" variant="h6">
-                                Your Notes
-                            </Typography>
-                            {localNotes.map((source, index) => (
-                                <LocalNoteSourceCard
-                                    key={`${source.reference.collectionId}:${source.reference.documentId}:${index}`}
-                                    source={source}
-                                    number={citations.length + index + 1}
-                                />
-                            ))}
-                        </Stack>
+                <Stack sx={{ gap: 1.5 }}>
+                    {sources.map((source, index) =>
+                        source.type === "ensuPack" ? (
+                            <PackSourceCard
+                                key={`${source.type}:${source.citation.datasetId}:${source.citation.sourceUrl}:${index}`}
+                                source={source}
+                                number={index + 1}
+                            />
+                        ) : (
+                            <LocalNoteSourceCard
+                                key={`${source.type}:${source.reference.collectionId}:${source.reference.documentId}:${index}`}
+                                source={source}
+                                number={index + 1}
+                            />
+                        ),
                     )}
                 </Stack>
             </DialogContent>
@@ -714,8 +696,7 @@ const MessageRow = memo(
                                     )}
                                     {showSources && (
                                         <KnowledgeSourcesDialog
-                                            citations={citations}
-                                            localNotes={localNotes}
+                                            sources={sources}
                                             onClose={() =>
                                                 setShowSources(false)
                                             }
