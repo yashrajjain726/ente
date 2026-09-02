@@ -5,11 +5,11 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use ente_ensu::model;
 use ente_ensu::notes::{
-    NoteSourceReference, NotesCollectionIndex, NotesError, NotesIndexOutcome,
+    NoteSourceReference, NotesCollectionIndex, NotesError, NotesIndexOutcome, NotesIndexProgress,
     notes_content_revision,
 };
 use notify::RecommendedWatcher;
@@ -525,18 +525,38 @@ impl State {
         (needs_rerun, update_completed)
     }
 
-    fn report_indexing_progress(app: &AppHandle, collection_id: &str, progress: u8) {
+    fn report_indexing_progress(
+        app: &AppHandle,
+        collection_id: &str,
+        progress: NotesIndexProgress,
+    ) {
         let state = app.state::<State>();
         let mut runtime = state.runtime(collection_id);
+        let previous_progress = runtime.indexing_progress;
         if !matches!(
             runtime.status,
             NotesCollectionStatusDto::Indexing | NotesCollectionStatusDto::Updating
-        ) || runtime.indexing_progress == Some(progress)
+        ) || previous_progress == Some(progress.percentage)
         {
             return;
         }
-        runtime.indexing_progress = Some(progress);
+        runtime.indexing_progress = Some(progress.percentage);
+        runtime.indexed_document_count = progress.indexed_document_count;
         state.set_runtime(collection_id, runtime);
+        if progress.percentage == 100
+            || previous_progress.is_none_or(|previous| previous / 10 != progress.percentage / 10)
+        {
+            crate::logging::log(
+                "Notes",
+                format!(
+                    "index progress collection={collection_id} percent={} processed={} indexed={} total={}",
+                    progress.percentage,
+                    progress.processed_document_count,
+                    progress.indexed_document_count,
+                    progress.total_document_count
+                ),
+            );
+        }
         emit_state_changed(app, collection_id);
     }
 
@@ -747,7 +767,12 @@ fn register_collection(
             },
         );
     }
-    notes_state.collection_dto(&collection.id)
+    let dto = notes_state.collection_dto(&collection.id)?;
+    crate::logging::log(
+        "Notes",
+        format!("collection registered collection={}", collection.id),
+    );
+    Ok(dto)
 }
 
 #[tauri::command]
@@ -817,6 +842,10 @@ fn remove_collection(notes_state: &State, collection_id: &str) -> Result<(), Api
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .remove(collection_id);
+    crate::logging::log(
+        "Notes",
+        format!("collection removed collection={collection_id}"),
+    );
     Ok(())
 }
 
@@ -850,6 +879,13 @@ fn report_index_error(
     };
     runtime.last_error = (!cancelled && !superseded_file_error).then(|| error.message.clone());
     state.set_runtime(collection_id, runtime);
+    crate::logging::log(
+        "Notes",
+        format!(
+            "index stopped collection={collection_id} reason={}",
+            error.name.unwrap_or("unknown")
+        ),
+    );
     emit_state_changed(app, collection_id);
 }
 
@@ -862,6 +898,11 @@ pub async fn notes_index_collection(
     force: bool,
     retrieval_epoch: u64,
 ) -> Result<NotesIndexResultDto, ApiError> {
+    let request_started_at = Instant::now();
+    crate::logging::log(
+        "Notes",
+        format!("index requested collection={collection_id} force={force}"),
+    );
     let notes_state = available_state(&app)?;
     let lifecycle = notes_state.collection_lifecycle(&collection_id);
     let _collection_lifecycle = lifecycle.lock().await;
@@ -883,9 +924,21 @@ pub async fn notes_index_collection(
     let mut update = notes_state.prepare_update(&collection_id, force, had_index)?;
     update.rebuild_derived_index = rebuild_derived_index;
     let cancellation_epoch = llm_state.retrieval_epoch();
-    check_cancelled(&cancellation_epoch, retrieval_epoch)?;
+    if let Err(error) = check_cancelled(&cancellation_epoch, retrieval_epoch) {
+        crate::logging::log(
+            "Notes",
+            format!("index cancelled before start collection={collection_id}"),
+        );
+        return Err(error);
+    }
     let _model_lifecycle = llm_state.lifecycle().lock().await;
-    check_cancelled(&cancellation_epoch, retrieval_epoch)?;
+    if let Err(error) = check_cancelled(&cancellation_epoch, retrieval_epoch) {
+        crate::logging::log(
+            "Notes",
+            format!("index cancelled while waiting collection={collection_id}"),
+        );
+        return Err(error);
+    }
     crate::commands::llm::replace_state(&llm_state, None, None)?;
 
     let mut runtime = notes_state.runtime(&collection_id);
@@ -902,6 +955,12 @@ pub async fn notes_index_collection(
     };
     runtime.last_error = None;
     notes_state.set_runtime(&collection_id, runtime);
+    crate::logging::log(
+        "Notes",
+        format!(
+            "index started collection={collection_id} updating={had_index} rebuild={rebuild_derived_index}"
+        ),
+    );
     emit_state_changed(&app, &collection_id);
     let store = model_state.store();
     let embedding_asset = model::knowledge_embedding_model_asset();
@@ -991,6 +1050,14 @@ pub async fn notes_index_collection(
     }
     emit_state_changed(&app, &collection_id);
     let dto = notes_state.collection_dto(&collection_id)?;
+    crate::logging::log(
+        "Notes",
+        format!(
+            "index completed collection={collection_id} indexed={} needs_rerun={needs_rerun} elapsed_ms={}",
+            outcome.indexed_document_count,
+            request_started_at.elapsed().as_millis()
+        ),
+    );
     Ok(NotesIndexResultDto {
         collection: dto,
         needs_rerun,

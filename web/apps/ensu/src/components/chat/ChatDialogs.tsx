@@ -1,5 +1,5 @@
 import type { KnowledgePack } from "@/services/knowledge";
-import type { NotesCollection } from "@/services/notes";
+import type { NotesCollectionView } from "@/services/notes-lifecycle";
 import { isTauriRuntime as detectTauriAppRuntime } from "@/services/tauri-runtime";
 import {
     ArrowLeft01Icon,
@@ -153,7 +153,7 @@ export interface ChatDialogsProps {
     handleDownloadKnowledgePack: (stableId: string) => void;
     handleCancelKnowledgePackDownload: (stableId: string) => void;
     handleSetKnowledgePackEnabled: (stableId: string, enabled: boolean) => void;
-    notesCollections: NotesCollection[];
+    notesCollections: NotesCollectionView[];
     notesCollectionsLoading: boolean;
     notesCollectionsError: string | null;
     retryNotesCollections: () => void;
@@ -823,16 +823,23 @@ export const ChatDialogs = memo(
                                 const indexing =
                                     collection.status === "indexing" ||
                                     collection.status === "updating";
+                                const starting =
+                                    collection.activity === "starting";
                                 const progress = collection.indexingProgress;
                                 const canRetry =
-                                    collection.status === "pending" ||
                                     collection.status === "error" ||
-                                    collection.status === "unavailable";
-                                const retryLabel =
-                                    collection.status === "error" ||
-                                    collection.status === "unavailable"
-                                        ? "Try again"
-                                        : "Continue indexing";
+                                    collection.status === "unavailable" ||
+                                    collection.activity === "failed";
+                                const waitingMessage =
+                                    collection.activity ===
+                                    "waitingForGeneration"
+                                        ? "Indexing will resume after the current response."
+                                        : collection.activity ===
+                                            "waitingForModel"
+                                          ? "Indexing will start when the model is ready."
+                                          : collection.activity === "scheduled"
+                                            ? "Indexing is scheduled after recent changes settle."
+                                            : null;
                                 return (
                                     <Stack
                                         key={collection.id}
@@ -861,13 +868,11 @@ export const ChatDialogs = memo(
                                                     noWrap
                                                     sx={{ color: "text.muted" }}
                                                 >
-                                                    {
-                                                        collection.indexedDocumentCount
-                                                    }{" "}
-                                                    {collection.indexedDocumentCount ===
-                                                    1
-                                                        ? "note indexed"
-                                                        : "notes indexed"}
+                                                    {starting &&
+                                                    collection.indexedDocumentCount ===
+                                                        0
+                                                        ? "Preparing notes…"
+                                                        : `${collection.indexedDocumentCount} ${collection.indexedDocumentCount === 1 ? "note indexed" : "notes indexed"}`}
                                                     {collection.lastUpdatedAtMs !=
                                                         null && (
                                                         <>
@@ -881,7 +886,7 @@ export const ChatDialogs = memo(
                                             </Stack>
                                             <IconButton
                                                 aria-label={`Remove ${collection.label}`}
-                                                disabled={indexing}
+                                                disabled={indexing || starting}
                                                 onClick={() =>
                                                     handleRemoveNotesCollection(
                                                         collection.id,
@@ -917,6 +922,15 @@ export const ChatDialogs = memo(
                                                 </Typography>
                                             </Stack>
                                         )}
+                                        {starting && <LinearProgress />}
+                                        {waitingMessage && (
+                                            <Typography
+                                                variant="small"
+                                                sx={{ color: "text.muted" }}
+                                            >
+                                                {waitingMessage}
+                                            </Typography>
+                                        )}
                                         {collection.lastError && (
                                             <Typography
                                                 variant="small"
@@ -936,7 +950,7 @@ export const ChatDialogs = memo(
                                                 }
                                                 sx={{ alignSelf: "flex-start" }}
                                             >
-                                                {retryLabel}
+                                                Try again
                                             </Button>
                                         )}
                                     </Stack>

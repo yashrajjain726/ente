@@ -74,8 +74,8 @@ impl Context {
                         message: err.to_string(),
                     })?;
             }
-            context.decode(&mut batch).map_err(|err| Error::Llama {
-                op: "Embedding decode failed",
+            context.encode(&mut batch).map_err(|err| Error::Llama {
+                op: "Embedding encode failed",
                 message: err.to_string(),
             })?;
             let native = context.embeddings_seq_ith(0).map_err(|err| Error::Llama {

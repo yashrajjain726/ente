@@ -1,8 +1,23 @@
+import type { NotesCollection } from "@/services/notes";
+
 type NotesIndexRequest = "start" | "queued" | "ignored";
 
 interface NotesIndexCompletion {
-    queuedForce?: boolean;
     clearedRemovalWait: boolean;
+}
+
+type NotesIndexActivity = "starting" | "queued" | "failed" | null;
+
+export type NotesCollectionActivity =
+    | "starting"
+    | "waitingForGeneration"
+    | "waitingForModel"
+    | "scheduled"
+    | "failed"
+    | null;
+
+export interface NotesCollectionView extends NotesCollection {
+    activity: NotesCollectionActivity;
 }
 
 type NotesRemovalStart =
@@ -12,8 +27,8 @@ type NotesRemovalStart =
 export class NotesLifecycleController {
     private readonly active = new Set<string>();
     private readonly queued = new Map<string, boolean>();
+    private readonly failed = new Set<string>();
     private readonly removing = new Set<string>();
-    private readonly resumed = new Set<string>();
     private removalWaitCollection: string | null = null;
     private mutation = 0;
     private refreshRequest = 0;
@@ -25,17 +40,40 @@ export class NotesLifecycleController {
         blocked: boolean,
     ): NotesIndexRequest {
         if (this.disposed || this.removing.has(collectionId)) return "ignored";
-        if (blocked || this.active.has(collectionId)) {
+        this.failed.delete(collectionId);
+        if (
+            blocked ||
+            this.active.has(collectionId) ||
+            this.queued.has(collectionId)
+        ) {
             this.queueIndex(collectionId, force);
             return "queued";
         }
-        this.resumed.add(collectionId);
+        this.active.add(collectionId);
+        return "start";
+    }
+
+    ensureIndex(collectionId: string, blocked: boolean): NotesIndexRequest {
+        if (
+            this.disposed ||
+            this.removing.has(collectionId) ||
+            this.failed.has(collectionId) ||
+            this.active.has(collectionId) ||
+            this.queued.has(collectionId)
+        ) {
+            return "ignored";
+        }
+        if (blocked) {
+            this.queueIndex(collectionId, false);
+            return "queued";
+        }
         this.active.add(collectionId);
         return "start";
     }
 
     queueIndex(collectionId: string, force: boolean) {
         if (this.disposed || this.removing.has(collectionId)) return;
+        this.failed.delete(collectionId);
         this.queued.set(
             collectionId,
             force || (this.queued.get(collectionId) ?? false),
@@ -52,11 +90,20 @@ export class NotesLifecycleController {
 
     finishIndex(collectionId: string): NotesIndexCompletion {
         this.active.delete(collectionId);
-        const queuedForce = this.queued.get(collectionId);
-        this.queued.delete(collectionId);
         const clearedRemovalWait = this.removalWaitCollection === collectionId;
         if (clearedRemovalWait) this.removalWaitCollection = null;
-        return { queuedForce, clearedRemovalWait };
+        return { clearedRemovalWait };
+    }
+
+    failIndex(collectionId: string) {
+        this.queued.delete(collectionId);
+        this.failed.add(collectionId);
+    }
+
+    indexActivity(collectionId: string): NotesIndexActivity {
+        if (this.failed.has(collectionId)) return "failed";
+        if (this.queued.has(collectionId)) return "queued";
+        return this.active.has(collectionId) ? "starting" : null;
     }
 
     drainQueued(blocked: boolean) {
@@ -92,7 +139,7 @@ export class NotesLifecycleController {
 
     finishRemoval(collectionId: string) {
         this.removing.delete(collectionId);
-        this.resumed.delete(collectionId);
+        this.failed.delete(collectionId);
         if (this.removalWaitCollection === collectionId) {
             this.removalWaitCollection = null;
         }
@@ -100,12 +147,6 @@ export class NotesLifecycleController {
 
     isRemoving(collectionId: string) {
         return this.removing.has(collectionId);
-    }
-
-    markResumed(collectionId: string) {
-        if (this.disposed || this.resumed.has(collectionId)) return false;
-        this.resumed.add(collectionId);
-        return true;
     }
 
     hasActiveJobs() {
@@ -145,6 +186,7 @@ export class NotesLifecycleController {
         this.disposed = true;
         this.active.clear();
         this.queued.clear();
+        this.failed.clear();
         this.removing.clear();
         this.cancelRefreshes();
     }

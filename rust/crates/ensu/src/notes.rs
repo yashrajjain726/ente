@@ -44,8 +44,8 @@ pub use document::{
 };
 pub use index::{NotesCollectionIndex, NotesCollectionIndexSummary, NotesSearchHit};
 pub use indexing::{
-    NotesDocumentLoad, NotesIndexInput, NotesIndexOutcome, NotesIndexingError, NotesRevisionStatus,
-    index_notes_collection,
+    NotesDocumentLoad, NotesIndexInput, NotesIndexOutcome, NotesIndexProgress, NotesIndexingError,
+    NotesRevisionStatus, index_notes_collection,
 };
 pub use reconcile::NotesReconciliationPlan;
 pub use source::NoteSourceReference;

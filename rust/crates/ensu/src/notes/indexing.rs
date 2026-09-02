@@ -50,6 +50,14 @@ pub struct NotesIndexInput<'a> {
     pub force_full_hash: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotesIndexProgress {
+    pub percentage: u8,
+    pub processed_document_count: u64,
+    pub indexed_document_count: u64,
+    pub total_document_count: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotesIndexOutcome {
     pub changed_during_indexing: Option<String>,
@@ -69,7 +77,7 @@ pub fn index_notes_collection<E>(
     mut load_document: impl FnMut(&str) -> Result<NotesDocumentLoad, E>,
     mut embed_document: impl FnMut(&PreparedNotesDocument) -> Result<Option<Vec<Vec<f32>>>, E>,
     mut verify_revision: impl FnMut(&str, &str) -> Result<NotesRevisionStatus, E>,
-    mut on_progress: impl FnMut(u8),
+    mut on_progress: impl FnMut(NotesIndexProgress),
 ) -> Result<NotesIndexOutcome, NotesIndexingError<E>> {
     let NotesIndexInput {
         index_root,
@@ -147,10 +155,12 @@ pub fn index_notes_collection<E>(
     writer.validate_reconciliation_capacity(&verified_inventory, &prepared_chunk_counts)?;
 
     let mut progress_document_count = source_document_count.saturating_sub(requested.len() as u64);
-    on_progress(indexing_progress(
+    report_indexing_progress(
+        &writer,
         progress_document_count,
         source_document_count,
-    ));
+        &mut on_progress,
+    );
     let mut processed_requested = 0_usize;
     let mut embedded_documents = 0_usize;
     let mut embedded_chunks = 0_usize;
@@ -197,10 +207,12 @@ pub fn index_notes_collection<E>(
             writer.commit_deletions(std::slice::from_ref(document_id))?;
             processed_requested += 1;
             progress_document_count += 1;
-            on_progress(indexing_progress(
+            report_indexing_progress(
+                &writer,
                 progress_document_count,
                 source_document_count,
-            ));
+                &mut on_progress,
+            );
             continue;
         };
         match writer.validate_document(&prepared, &source_metadata) {
@@ -209,10 +221,12 @@ pub fn index_notes_collection<E>(
                 writer.commit_deletions(std::slice::from_ref(document_id))?;
                 processed_requested += 1;
                 progress_document_count += 1;
-                on_progress(indexing_progress(
+                report_indexing_progress(
+                    &writer,
                     progress_document_count,
                     source_document_count,
-                ));
+                    &mut on_progress,
+                );
                 continue;
             }
             Err(error) => return Err(error.into()),
@@ -222,10 +236,12 @@ pub fn index_notes_collection<E>(
             writer.commit_deletions(std::slice::from_ref(document_id))?;
             processed_requested += 1;
             progress_document_count += 1;
-            on_progress(indexing_progress(
+            report_indexing_progress(
+                &writer,
                 progress_document_count,
                 source_document_count,
-            ));
+                &mut on_progress,
+            );
             continue;
         };
         check_for_cancellation().map_err(NotesIndexingError::Adapter)?;
@@ -254,10 +270,12 @@ pub fn index_notes_collection<E>(
         writer.commit_document(&prepared, &embeddings, &verified_source)?;
         processed_requested += 1;
         progress_document_count += 1;
-        on_progress(indexing_progress(
+        report_indexing_progress(
+            &writer,
             progress_document_count,
             source_document_count,
-        ));
+            &mut on_progress,
+        );
         embedded_documents += 1;
         embedded_chunks += prepared.chunks.len();
         if processed_requested < requested.len()
@@ -274,8 +292,22 @@ pub fn index_notes_collection<E>(
     Ok(NotesIndexOutcome {
         changed_during_indexing: None,
         unchecked_document_ids: Vec::new(),
-        indexed_document_count: writer.indexed_document_ids().count() as u64,
+        indexed_document_count: writer.indexed_document_count() as u64,
     })
+}
+
+fn report_indexing_progress(
+    writer: &NotesIndexWriter,
+    processed_document_count: u64,
+    total_document_count: u64,
+    on_progress: &mut impl FnMut(NotesIndexProgress),
+) {
+    on_progress(NotesIndexProgress {
+        percentage: indexing_progress(processed_document_count, total_document_count),
+        processed_document_count,
+        indexed_document_count: writer.indexed_document_count() as u64,
+        total_document_count,
+    });
 }
 
 fn indexing_progress(processed_document_count: u64, source_document_count: u64) -> u8 {
@@ -303,13 +335,13 @@ fn changed_during_indexing_outcome<E>(
             .skip(processed_requested)
             .cloned()
             .collect(),
-        indexed_document_count: writer.indexed_document_ids().count() as u64,
+        indexed_document_count: writer.indexed_document_count() as u64,
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
 
     use super::*;
     use crate::notes::{NotesCollectionIndex, prepare_notes_document};
@@ -345,7 +377,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let prepared = prepare_notes_document("note.md", b"note").unwrap();
         let verified_source = source_at(2);
-        let progress = Cell::new(0);
+        let progress = RefCell::new(Vec::new());
         let outcome = index_notes_collection::<()>(
             NotesIndexInput {
                 index_root: temp.path(),
@@ -367,12 +399,29 @@ mod tests {
                     source: verified_source.clone(),
                 })
             },
-            |value| progress.set(value),
+            |value| progress.borrow_mut().push(value),
         )
         .unwrap();
 
         assert!(outcome.ready());
-        assert_eq!(progress.get(), 100);
+        let progress = progress.borrow();
+        assert_eq!(
+            progress.as_slice(),
+            [
+                NotesIndexProgress {
+                    percentage: 0,
+                    processed_document_count: 0,
+                    indexed_document_count: 0,
+                    total_document_count: 1,
+                },
+                NotesIndexProgress {
+                    percentage: 100,
+                    processed_document_count: 1,
+                    indexed_document_count: 1,
+                    total_document_count: 1,
+                },
+            ]
+        );
         let index = NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
         assert_eq!(index.document_count(), 1);
         let writer = NotesIndexWriter::open(temp.path(), COLLECTION_ID.to_string()).unwrap();

@@ -146,6 +146,10 @@ impl NotesIndexWriter {
         self.manifest.documents.keys().map(String::as_str)
     }
 
+    pub fn indexed_document_count(&self) -> usize {
+        self.manifest.documents.len()
+    }
+
     pub fn indexed_revision(&self, document_id: &str) -> Option<&str> {
         self.manifest
             .documents

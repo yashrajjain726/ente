@@ -9,10 +9,14 @@ import {
     selectNotesFolder,
     type NotesCollection,
 } from "@/services/notes";
-import { NotesLifecycleController } from "@/services/notes-lifecycle";
+import {
+    NotesLifecycleController,
+    type NotesCollectionActivity,
+    type NotesCollectionView,
+} from "@/services/notes-lifecycle";
 import { tauriCommandError } from "@/services/tauri-error";
 import log from "ente-base/log";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const NOTES_INDEX_RERUN_YIELD_MS = 25;
 const NOTES_REMOVE_WAIT_ERROR =
@@ -45,14 +49,16 @@ export const useNotesCollections = ({
         null,
     );
     const [syncAttempt, setSyncAttempt] = useState(0);
+    const [lifecycleRevision, setLifecycleRevision] = useState(0);
     const controllerRef = useRef<NotesLifecycleController | null>(null);
     if (!controllerRef.current) {
         controllerRef.current = new NotesLifecycleController();
     }
     const controller = controllerRef.current;
-    const runIndexRef = useRef<
-        ((collectionId: string, force?: boolean) => void) | null
-    >(null);
+    const lifecycleChanged = useCallback(
+        () => setLifecycleRevision((revision) => revision + 1),
+        [],
+    );
 
     useEffect(() => {
         controller.activate();
@@ -122,15 +128,25 @@ export const useNotesCollections = ({
         [controller],
     );
 
-    const runIndex = useCallback(
-        (collectionId: string, force = false) => {
-            const request = controller.requestIndex(
-                collectionId,
-                force,
-                isGenerating || isGenerationStarting(),
-            );
-            if (request !== "start") return;
+    const startIndex = useCallback(
+        (collectionId: string, force = false, automatic = false) => {
+            const blocked =
+                !modelReady || isGenerating || isGenerationStarting();
+            const request = automatic
+                ? controller.ensureIndex(collectionId, blocked)
+                : controller.requestIndex(collectionId, force, blocked);
+            if (request === "ignored") return;
+            lifecycleChanged();
+            if (request === "queued") {
+                log.info("Your Notes indexing queued", { collectionId });
+                return;
+            }
             setOperationError(null);
+            log.info("Your Notes indexing started", {
+                collectionId,
+                automatic,
+                force,
+            });
 
             void ensureProvider()
                 .then((provider) =>
@@ -173,7 +189,12 @@ export const useNotesCollections = ({
                     const { name } = tauriCommandError(error);
                     if (name === "cancelled") {
                         controller.queueIndex(collectionId, force);
+                        log.info(
+                            "Your Notes indexing queued after cancellation",
+                            { collectionId },
+                        );
                     } else if (name !== "not_due") {
+                        controller.failIndex(collectionId);
                         setOperationError(notesErrorMessage(error));
                         log.error("Failed to index Your Notes", error);
                     }
@@ -181,12 +202,8 @@ export const useNotesCollections = ({
                 })
                 .finally(() => {
                     const completion = controller.finishIndex(collectionId);
-                    if (completion.queuedForce !== undefined) {
-                        runIndexRef.current?.(
-                            collectionId,
-                            completion.queuedForce,
-                        );
-                    } else if (completion.clearedRemovalWait) {
+                    lifecycleChanged();
+                    if (completion.clearedRemovalWait) {
                         setOperationError((current) =>
                             current === NOTES_REMOVE_WAIT_ERROR
                                 ? null
@@ -200,19 +217,37 @@ export const useNotesCollections = ({
             ensureProvider,
             isGenerating,
             isGenerationStarting,
+            lifecycleChanged,
+            modelReady,
             refresh,
             replaceCollection,
         ],
     );
-    runIndexRef.current = runIndex;
+
+    const runIndex = useCallback(
+        (collectionId: string, force = false) =>
+            startIndex(collectionId, force),
+        [startIndex],
+    );
 
     useEffect(() => {
-        for (const [collectionId, force] of controller.drainQueued(
-            isGenerating || isGenerationStarting(),
-        )) {
-            runIndex(collectionId, force);
+        const blocked = !modelReady || isGenerating || isGenerationStarting();
+        const queued = controller.drainQueued(blocked);
+        if (queued.length > 0) {
+            lifecycleChanged();
+            for (const [collectionId, force] of queued) {
+                startIndex(collectionId, force);
+            }
         }
-    }, [controller, isGenerating, isGenerationStarting, runIndex]);
+    }, [
+        controller,
+        isGenerating,
+        isGenerationStarting,
+        lifecycleChanged,
+        lifecycleRevision,
+        modelReady,
+        startIndex,
+    ]);
 
     useEffect(() => {
         if (!isTauriRuntime) return;
@@ -275,13 +310,18 @@ export const useNotesCollections = ({
         for (const collection of collections) {
             if (
                 collection.status === "pending" &&
-                collection.updateDueAtMs == null &&
-                controller.markResumed(collection.id)
+                collection.updateDueAtMs == null
             ) {
-                runIndex(collection.id);
+                startIndex(collection.id, false, true);
             }
         }
-    }, [collections, controller, isTauriRuntime, modelReady, runIndex]);
+    }, [
+        collections,
+        isTauriRuntime,
+        lifecycleRevision,
+        modelReady,
+        startIndex,
+    ]);
 
     const retry = useCallback(() => {
         setOperationError(null);
@@ -324,19 +364,57 @@ export const useNotesCollections = ({
                     log.error("Failed to remove Notes collection", error);
                     void refresh();
                     if (removal.queuedForce !== undefined) {
-                        runIndexRef.current?.(
-                            collectionId,
-                            removal.queuedForce,
-                        );
+                        startIndex(collectionId, removal.queuedForce);
                     }
                 }
             });
         },
-        [confirmRemoval, controller, refresh],
+        [confirmRemoval, controller, refresh, startIndex],
+    );
+
+    const collectionViews = useMemo<NotesCollectionView[]>(
+        () =>
+            collections.map((collection) => {
+                if (collection.status !== "pending") {
+                    return { ...collection, activity: null };
+                }
+                const lifecycleActivity = controller.indexActivity(
+                    collection.id,
+                );
+                let activity: NotesCollectionActivity;
+                if (lifecycleActivity === "failed") {
+                    activity = "failed";
+                } else if (lifecycleActivity === "starting") {
+                    activity = "starting";
+                } else if (lifecycleActivity === "queued") {
+                    activity = !modelReady
+                        ? "waitingForModel"
+                        : isGenerating || isGenerationStarting()
+                          ? "waitingForGeneration"
+                          : "starting";
+                } else if (collection.updateDueAtMs != null) {
+                    activity = "scheduled";
+                } else if (!modelReady) {
+                    activity = "waitingForModel";
+                } else if (isGenerating || isGenerationStarting()) {
+                    activity = "waitingForGeneration";
+                } else {
+                    activity = "starting";
+                }
+                return { ...collection, activity };
+            }),
+        [
+            collections,
+            controller,
+            isGenerating,
+            isGenerationStarting,
+            lifecycleRevision,
+            modelReady,
+        ],
     );
 
     return {
-        collections,
+        collections: collectionViews,
         loading,
         error: subscriptionError ?? listError ?? operationError,
         retry,

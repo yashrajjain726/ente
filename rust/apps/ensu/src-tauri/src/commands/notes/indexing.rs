@@ -3,8 +3,8 @@ use std::path::Path;
 use ente_ensu::llm;
 use ente_ensu::notes::{
     NotesCollectionIndex, NotesDocumentLoad, NotesError, NotesIndexInput, NotesIndexOutcome,
-    NotesIndexingError, NotesRevisionStatus, index_notes_collection, notes_content_revision,
-    prepare_notes_document,
+    NotesIndexProgress, NotesIndexingError, NotesRevisionStatus, index_notes_collection,
+    notes_content_revision, prepare_notes_document,
 };
 
 use crate::commands::common::ApiError;
@@ -25,7 +25,7 @@ pub(super) fn index_collection(
     cancellation_epoch: &std::sync::atomic::AtomicU64,
     retrieval_epoch: u64,
     update: &UpdateSnapshot,
-    on_progress: impl FnMut(u8),
+    on_progress: impl FnMut(NotesIndexProgress),
 ) -> Result<NotesIndexOutcome, ApiError> {
     check_cancelled(cancellation_epoch, retrieval_epoch)?;
     let canonical_root = canonical_source_root(&collection.source_root)?;
