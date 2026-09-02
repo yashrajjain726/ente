@@ -11,7 +11,7 @@ ente-assets.workspace = true
 ente-core.workspace = true
 ente-ensu.workspace = true
 ente-ensu-crypto.workspace = true
-keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
+keyring = { version = "3.0.0", default-features = false, features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -21,10 +21,10 @@ tauri-plugin-fs = "2.5.1"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = "2.10.1"
-uuid = { version = "1", features = ["v4"] }
+uuid = { workspace = true, features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = "0.2.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_System_SystemInformation"] }

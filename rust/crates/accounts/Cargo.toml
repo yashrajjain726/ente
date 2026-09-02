@@ -6,23 +6,23 @@ edition = "2024"
 museum = []
 
 [dependencies]
-bip39 = { version = "2", default-features = false, features = ["std"] }
+bip39 = { version = "2.0.0", default-features = false, features = ["std"] }
 ente-core.workspace = true
-getrandom = { version = "0.4", features = ["wasm_js"] }
-hex = "0.4"
+getrandom.workspace = true
+hex = "0.4.0"
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-srp = { version = "0.7.0-rc.3", default-features = false }
-subtle = "2"
+srp.workspace = true
+subtle.workspace = true
 thiserror.workspace = true
 urlencoding.workspace = true
-uuid = { version = "1.11", features = ["js", "serde", "v4"] }
+uuid = { workspace = true, features = ["js", "serde", "v4"] }
 zeroize.workspace = true
 
 [dev-dependencies]
 ente-test-support.workspace = true
-hmac = "0.13"
+hmac.workspace = true
 mockito.workspace = true
-sha1 = "0.11"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+sha1.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
