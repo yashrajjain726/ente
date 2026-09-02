@@ -50,8 +50,6 @@ Hiding differs from [Archiving](./archive) in that hidden content won't appear a
 3. Click **Add to album**
 4. Select another hidden album, or create a new one
 
-Albums created from this flow remain hidden. Adding a photo to another hidden album does not make it visible outside the **Hidden** section.
-
 ### Unhide album
 
 - Open the hidden album
