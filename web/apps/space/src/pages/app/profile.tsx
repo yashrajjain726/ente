@@ -5,7 +5,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ProfileScreen } from "screens/ProfileScreen";
 import { spaceInviteURL } from "services/invite";
 import {
-    createCurrentPhotoPost,
     deleteCurrentPost,
     loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostAssetURL,
@@ -17,7 +16,6 @@ import {
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
-import { prepareSpacePostImageFromEdit } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -25,7 +23,8 @@ const initialPostLoadingIndicatorDelayMs = 350;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
-    const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
+    const { profile, profileLoadError, profileLoadStatus, publishPost } =
+        useSpaceAppState();
     const [friendsCount, setFriendsCount] = useState(0);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
@@ -122,24 +121,14 @@ const Page: React.FC = () => {
                 showPostLoadingIndicator={showInitialPostLoadingIndicator}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
-                    const spaceId = profile.spaceId;
-                    if (!spaceId) throw new Error("Missing space.");
-
-                    const preparedImage = await prepareSpacePostImageFromEdit(
-                        image.file,
-                        image.cropArea,
-                        image.rotationDegrees,
-                    );
-                    await createCurrentPhotoPost({
-                        caption,
-                        file: preparedImage.file,
-                        height: preparedImage.height,
-                        spaceId,
-                        thumbHash: preparedImage.thumbHash,
-                        width: preparedImage.width,
-                    });
+                    const post = await publishPost(image, caption);
+                    setPosts((currentPosts) => [
+                        post,
+                        ...currentPosts.filter(
+                            (currentPost) => currentPost.postId != post.postId,
+                        ),
+                    ]);
                 }}
-                onDraftPostPublished={() => void router.push(spaceRoutes.home)}
                 onDeletePost={async (postId) => {
                     const spaceId = profile.spaceId;
                     if (!spaceId) throw new Error("Missing space.");

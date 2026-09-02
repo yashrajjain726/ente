@@ -11,7 +11,6 @@ import {
 import { consumeSentSpaceInviteFriend } from "services/invite";
 import { loadExistingSpaceId } from "services/profile";
 import {
-    createCurrentPhotoPost,
     loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
@@ -22,7 +21,6 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
-import { prepareSpacePostImageFromEdit } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -30,12 +28,11 @@ const Page: React.FC = () => {
     const router = useSpaceRouter();
     const {
         friends,
-        pendingPostPhotoFile,
         profile,
         profileLoadError,
         profileLoadStatus,
         setFriends,
-        setPendingPostPhotoFile,
+        publishPost,
     } = useSpaceAppState();
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
@@ -178,7 +175,6 @@ const Page: React.FC = () => {
                 friendRequestSentToastName={friendRequestSentToastName}
                 friends={friends}
                 hasUnreadMessages={hasUnreadMessages}
-                initialPostPhotoFile={pendingPostPhotoFile}
                 isLatestPostsLoading={isLatestPostsLoading}
                 isFriendsLoading={isFriendsLoading}
                 profile={profile}
@@ -190,27 +186,10 @@ const Page: React.FC = () => {
                     !isFriendsLoading
                 }
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
-                onInitialPostPhotoConsumed={() => setPendingPostPhotoFile(null)}
                 onCreatePost={
                     profile
                         ? async (image, caption) => {
-                              const spaceId = profile.spaceId;
-                              if (!spaceId) throw new Error("Missing space.");
-
-                              const preparedImage =
-                                  await prepareSpacePostImageFromEdit(
-                                      image.file,
-                                      image.cropArea,
-                                      image.rotationDegrees,
-                                  );
-                              await createCurrentPhotoPost({
-                                  caption,
-                                  file: preparedImage.file,
-                                  height: preparedImage.height,
-                                  spaceId,
-                                  thumbHash: preparedImage.thumbHash,
-                                  width: preparedImage.width,
-                              });
+                              await publishPost(image, caption);
                           }
                         : undefined
                 }

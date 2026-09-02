@@ -2,6 +2,8 @@ import "@fontsource-variable/inter";
 import "@fontsource/nunito/800.css";
 import { CssBaseline } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { SpacePostComposerHost } from "components/PostComposer";
+import { SpacePostToast } from "components/PostToast";
 import { SpaceRouteTransitionBoundary } from "components/RouteTransitionBoundary";
 import { SpaceShareLinkDialogHost } from "components/ShareLinkDialog";
 import "configure-zod";
@@ -89,6 +91,8 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             <SpaceRouteTransitionBoundary>
                 <SpaceAppStateProvider>
                     <Component {...pageProps} />
+                    <SpacePostComposerHost />
+                    <SpacePostToast />
                     <SpaceShareLinkDialogHost />
                 </SpaceAppStateProvider>
             </SpaceRouteTransitionBoundary>

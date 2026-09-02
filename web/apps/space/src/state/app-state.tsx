@@ -6,10 +6,13 @@ import type {
     SetupProfileDetails,
 } from "screens/SetupProfileScreen";
 import type { PendingSpacePasskeyVerification } from "services/passkey-verification";
+import type { SpacePost } from "services/space";
+import type { SpaceDraftPostImage } from "utils/post-image";
 import type { CreateProfileSource } from "utils/routes";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
+export type SpacePostPublishPhase = "posted" | "posting";
 export type PendingCreateProfile = SetupProfileDetails & {
     source: CreateProfileSource;
 };
@@ -31,7 +34,13 @@ export interface SpaceAppState {
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
+    postPublishPhase: SpacePostPublishPhase | null;
     signupEmail: string;
+    dismissPostPublishToast: () => void;
+    publishPost: (
+        image: SpaceDraftPostImage,
+        caption: string,
+    ) => Promise<SpacePost>;
     refreshProfile: (
         options?: RefreshSpaceProfileOptions,
     ) => Promise<SetupProfile | null>;

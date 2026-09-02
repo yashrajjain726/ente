@@ -9,7 +9,6 @@ import { SpaceAvatarImage } from "components/AvatarImage";
 import {
     SpaceFileViewer,
     SpaceViewerPostBackdrop,
-    type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
@@ -49,6 +48,7 @@ import {
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
     spacePostPreviewImageForFile,
+    type SpaceDraftPostImage,
 } from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
@@ -78,18 +78,16 @@ interface HomeScreenProps {
     friendRequestSentToastName?: string;
     friends: FriendProfile[];
     hasUnreadMessages?: boolean;
-    initialPostPhotoFile?: File | null;
     isLatestPostsLoading?: boolean;
     isFriendsLoading?: boolean;
     showInstallPrompt?: boolean;
     onCreatePost?: (
-        image: DraftSpacePostImage,
+        image: SpaceDraftPostImage,
         caption: string,
     ) => Promise<void>;
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
-    onInitialPostPhotoConsumed?: () => void;
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -128,14 +126,6 @@ interface SelectedHomeViewer {
     postIndex?: number;
     postActionMode?: SpaceViewerPostActionMode;
     posts?: SpacePost[];
-}
-
-interface DraftSpacePostImage {
-    cropArea?: SpaceViewerDraftPostEdit["cropArea"];
-    file: File;
-    height?: number;
-    rotationDegrees?: number;
-    width?: number;
 }
 
 interface AddedFriendToastProps {
@@ -671,7 +661,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     friendRequestSentToastName,
     friends,
     hasUnreadMessages,
-    initialPostPhotoFile,
     isLatestPostsLoading = false,
     isFriendsLoading = false,
     showInstallPrompt = false,
@@ -679,7 +668,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onLoadFriendAvatar,
     onLoadPostImage,
     onFriendRequestSentToastClose,
-    onInitialPostPhotoConsumed,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -707,7 +695,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     >({});
     const postCircleCanvasRef = React.useRef<HTMLDivElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
-    const initialPostPhotoFileRef = React.useRef<File | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
     const avatarLoadsInFlightRef = React.useRef<
@@ -1182,32 +1169,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         [profile, profileDisplayName],
     );
 
-    React.useEffect(() => {
-        if (
-            !initialPostPhotoFile ||
-            initialPostPhotoFileRef.current == initialPostPhotoFile ||
-            isPostPhotoButtonDisabled
-        ) {
-            return;
-        }
-
-        initialPostPhotoFileRef.current = initialPostPhotoFile;
-        setIsPostPhotoOpening(true);
-        void prepareSelectedPostPhoto(initialPostPhotoFile)
-            .catch((error: unknown) => {
-                log.error("Failed to open post photo draft", error);
-            })
-            .finally(() => {
-                onInitialPostPhotoConsumed?.();
-                setIsPostPhotoOpening(false);
-            });
-    }, [
-        initialPostPhotoFile,
-        isPostPhotoButtonDisabled,
-        onInitialPostPhotoConsumed,
-        prepareSelectedPostPhoto,
-    ]);
-
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
     ) => {
@@ -1495,8 +1456,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        {initialPostPhotoFile ? null : isFriendsLoading &&
-                          orderedFriends.length == 0 ? (
+                        {isFriendsLoading && orderedFriends.length == 0 ? (
                             <Box
                                 sx={{
                                     alignItems: "center",

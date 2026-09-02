@@ -24,8 +24,8 @@ export const SpacePostUnreadBadge: React.FC<{ count: number }> = ({
             pointerEvents: "none",
             position: "absolute",
             px: "7px",
-            right: "8%",
-            top: "8%",
+            right: "10%",
+            top: "10%",
             whiteSpace: "nowrap",
             zIndex: 1,
         }}

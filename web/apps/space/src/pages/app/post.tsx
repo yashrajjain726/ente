@@ -4,7 +4,6 @@ import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
-import log from "ente-base/log";
 import React from "react";
 import { useSpaceAppState } from "state/app-state";
 import {
@@ -29,10 +28,11 @@ const Page: React.FC = () => {
         profile,
         profileLoadError,
         profileLoadStatus,
+        pendingPostPhotoFile,
         setPendingPostPhotoFile,
     } = useSpaceAppState();
     const inputRef = React.useRef<HTMLInputElement | null>(null);
-    const [isOpeningPost, setIsOpeningPost] = React.useState(false);
+    const isOpeningPost = Boolean(pendingPostPhotoFile);
 
     React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -56,13 +56,7 @@ const Page: React.FC = () => {
         event.target.value = "";
         if (!file) return;
 
-        setIsOpeningPost(true);
         setPendingPostPhotoFile(file);
-        void router.push(spaceRoutes.home).catch((error: unknown) => {
-            log.error("Failed to open post photo draft", error);
-            setPendingPostPhotoFile(null);
-            setIsOpeningPost(false);
-        });
     };
 
     return (

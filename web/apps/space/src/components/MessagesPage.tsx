@@ -690,12 +690,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 onOpenThread={openConversation}
                 onPostPhotoSelect={(file) => {
                     setPendingPostPhotoFile(file);
-                    void router
-                        .push(spaceRoutes.home)
-                        .catch((error: unknown) => {
-                            log.error("Failed to open post photo draft", error);
-                            setPendingPostPhotoFile(null);
-                        });
                 }}
                 onLoadActivityPost={(post) =>
                     loadCurrentMessageActivityPostPreview(post, actorSpaceId)

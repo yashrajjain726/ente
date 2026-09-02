@@ -22,6 +22,7 @@ import {
 import {
     clearSpaceFriendsCache,
     clearSpaceMediaURLCache,
+    createCurrentPhotoPost,
 } from "services/space";
 import {
     type OnboardingEntrySource,
@@ -29,9 +30,11 @@ import {
     type RefreshSpaceProfileOptions,
     type SpaceAppState,
     SpaceAppStateContext,
+    type SpacePostPublishPhase,
     type SpaceProfileLoadStatus,
     initialFriends,
 } from "state/app-state";
+import { prepareSpacePostImageFromEdit } from "utils/post-image";
 
 export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     children,
@@ -57,11 +60,57 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [profileLoadError, setProfileLoadError] = useState<string>();
     const [profileLoadStatus, setProfileLoadStatus] =
         useState<SpaceProfileLoadStatus>("loading");
+    const [postPublishPhase, setPostPublishPhase] =
+        useState<SpacePostPublishPhase | null>(null);
     const [signupEmail, setSignupEmail] = useState("");
     const avatarURLRef = useRef<string | null>(null);
     const coverURLRef = useRef<string | null>(null);
     const profileRef = useRef<SetupProfile | null>(null);
     const profileLoadGenerationRef = useRef(0);
+    const postPublishGenerationRef = useRef(0);
+
+    const dismissPostPublishToast = useCallback(() => {
+        postPublishGenerationRef.current += 1;
+        setPostPublishPhase(null);
+    }, []);
+
+    const publishPost = useCallback(
+        async (
+            image: Parameters<SpaceAppState["publishPost"]>[0],
+            caption: string,
+        ) => {
+            const spaceId = profileRef.current?.spaceId;
+            if (!spaceId) throw new Error("Missing space.");
+
+            const generation = ++postPublishGenerationRef.current;
+            setPostPublishPhase("posting");
+            try {
+                const preparedImage = await prepareSpacePostImageFromEdit(
+                    image.file,
+                    image.cropArea,
+                    image.rotationDegrees,
+                );
+                const post = await createCurrentPhotoPost({
+                    caption,
+                    file: preparedImage.file,
+                    height: preparedImage.height,
+                    spaceId,
+                    thumbHash: preparedImage.thumbHash,
+                    width: preparedImage.width,
+                });
+                if (postPublishGenerationRef.current == generation) {
+                    setPostPublishPhase("posted");
+                }
+                return post;
+            } catch (error) {
+                if (postPublishGenerationRef.current == generation) {
+                    setPostPublishPhase(null);
+                }
+                throw error;
+            }
+        },
+        [],
+    );
 
     const applyProfile = useCallback((nextProfile: SetupProfile | null) => {
         const previousAvatarURL = avatarURLRef.current;
@@ -221,6 +270,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         applyProfile(null);
         setProfileLoadError(undefined);
         setProfileLoadStatus("ready");
+        dismissPostPublishToast();
         setPendingLoginCredentials(null);
         setPendingPasskeyVerification(null);
         setPendingPostPhotoFile(null);
@@ -229,7 +279,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingCreateProfile(null);
         setOnboardingEntrySource("direct");
         setFriends(initialFriends());
-    }, [applyProfile]);
+    }, [applyProfile, dismissPostPublishToast]);
 
     useEffect(() => {
         void refreshProfile();
@@ -246,11 +296,14 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
             pendingCreateProfile,
+            postPublishPhase,
             profile,
             profileLoadError,
             profileLoadStatus,
             refreshProfile,
             resetAfterLogout,
+            dismissPostPublishToast,
+            publishPost,
             setFriends,
             setIsLiveSignupVerification,
             setOnboardingEntrySource,
@@ -274,11 +327,14 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
             pendingCreateProfile,
+            postPublishPhase,
             profile,
             profileLoadError,
             profileLoadStatus,
             refreshProfile,
             resetAfterLogout,
+            dismissPostPublishToast,
+            publishPost,
             signupEmail,
             applyProfile,
         ],
