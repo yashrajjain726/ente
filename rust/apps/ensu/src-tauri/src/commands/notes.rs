@@ -448,13 +448,6 @@ impl State {
             .is_some_and(|runtime| runtime.index_available)
     }
 
-    fn has_pending_update(&self, collection_id: &str) -> bool {
-        self.updates
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .contains_key(collection_id)
-    }
-
     fn has_newer_update(&self, collection_id: &str, generation: u64) -> bool {
         self.updates
             .lock()

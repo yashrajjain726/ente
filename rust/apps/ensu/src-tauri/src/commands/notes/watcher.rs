@@ -149,7 +149,7 @@ async fn inspect_collection_on_startup(app: AppHandle, collection: RegisteredCol
                     .unwrap_or_else(PoisonError::into_inner)
                     .insert(collection.id.clone(), index);
             }
-            if changed && initial_complete && !state.has_pending_update(&collection.id) {
+            if changed && initial_complete {
                 mark_collection_dirty(&app, &collection.id, forced_document_ids, false);
             } else {
                 emit_state_changed(&app, &collection.id);
