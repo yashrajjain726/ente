@@ -3,18 +3,23 @@ import "dart:math";
 import "dart:typed_data";
 
 import "package:collection/collection.dart";
+import "package:ente_pure_utils/ente_pure_utils.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_animate/flutter_animate.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/event.dart";
+import "package:photos/events/files_updated_event.dart";
+import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/events/memories_changed_event.dart";
 import "package:photos/events/memories_setting_changed.dart";
 import "package:photos/events/memory_seen_event.dart";
 import "package:photos/events/ml_consent_changed_event.dart";
+import "package:photos/events/people_changed_event.dart";
+import "package:photos/models/file/file.dart";
 import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/models/memory_lane/memory_lane_models.dart";
 import "package:photos/service_locator.dart";
-import "package:photos/services/memory_lane/memory_lane_cache_service.dart";
+import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/memory_lane/memory_lane_service.dart";
 import "package:photos/ui/home/memories/crafting_memories_card.dart";
 import 'package:photos/ui/home/memories/memory_card.dart';
@@ -22,6 +27,7 @@ import "package:photos/ui/home/memories/memory_card_constants.dart";
 import "package:photos/ui/home/memories/memory_cover_util.dart";
 import "package:photos/ui/home/memories/memory_lane_card.dart";
 import "package:photos/ui/home/memories/memory_video_prefetcher.dart";
+import "package:photos/ui/viewer/people/memory_lane_page.dart";
 
 class MemoryCardWrapper {
   final String id;
@@ -42,6 +48,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   late StreamSubscription<MemoriesChangedEvent> _memoriesChangedSubscription;
   late StreamSubscription<MemorySeenEvent> _memorySeenSubscription;
   late StreamSubscription<MLConsentChangedEvent> _mlConsentChangedSubscription;
+  late StreamSubscription<PeopleChangedEvent> _peopleChangedSubscription;
+  late StreamSubscription<LocalPhotosUpdatedEvent>
+  _localPhotosUpdatedSubscription;
   late double _cardWidth;
 
   // Delay cover warming past startup; generations invalidate stale work.
@@ -50,13 +59,14 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   int _fetchMemoriesGeneration = 0;
   String? _lastWarmSignature;
   MemoryLanePersonTimeline? _memoryLane;
-  Uint8List? _oldestMemoryLaneFace;
+  EnteFile? _oldestMemoryLaneFile;
   Uint8List? _newestMemoryLaneFace;
+  String? _memoryLanePersonName;
   final _videoPrefetcher = MemoryVideoPrefetcher();
   final _scrollController = ScrollController();
   bool _shouldShowCraftingMemories = false;
   late Future<void> _shouldShowCraftingMemoriesLoaded;
-  late Future<void> _memoryLaneLoaded;
+  late final Future<void> _memoryLaneLoaded;
   late List<SmartMemory> _initialMemories;
   late Future<List<SmartMemory>> _memories;
 
@@ -83,6 +93,12 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _mlConsentChangedSubscription = Bus.instance
         .on<MLConsentChangedEvent>()
         .listen(_onMLConsentChanged);
+    _peopleChangedSubscription = Bus.instance.on<PeopleChangedEvent>().listen(
+      _onPeopleChanged,
+    );
+    _localPhotosUpdatedSubscription = Bus.instance
+        .on<LocalPhotosUpdatedEvent>()
+        .listen(_onLocalPhotosUpdated);
     _memoryLaneLoaded = _loadScheduledMemoryLane();
     MemoryLaneService.instance.readyPersonIds.addListener(
       _onMemoryLaneReadyTimelinesChanged,
@@ -95,6 +111,8 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _memoriesChangedSubscription.cancel();
     _memorySeenSubscription.cancel();
     _mlConsentChangedSubscription.cancel();
+    _peopleChangedSubscription.cancel();
+    _localPhotosUpdatedSubscription.cancel();
     _warmTimer?.cancel();
     _videoPrefetcher.dispose();
     _scrollController.dispose();
@@ -198,7 +216,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     double cardHeight,
   ) {
     final memoryLane = _memoryLane;
-    final oldestMemoryLaneFace = _oldestMemoryLaneFace;
+    final oldestMemoryLaneFile = _oldestMemoryLaneFile;
     final newestMemoryLaneFace = _newestMemoryLaneFace;
     final hasContent = memories.isNotEmpty || memoryLane != null;
     return [
@@ -221,14 +239,16 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       if (flagService.internalUser &&
           MemoryLaneService.instance.isFeatureEnabled &&
           memoryLane != null &&
-          oldestMemoryLaneFace != null &&
+          oldestMemoryLaneFile != null &&
           newestMemoryLaneFace != null)
         MemoryCardWrapper(
           id: "memoryLane_${memoryLane.personId}",
           widget: () => MemoryLaneCardWidget(
-            memoryLane,
-            oldestMemoryLaneFace,
-            newestMemoryLaneFace,
+            oldestFile: oldestMemoryLaneFile,
+            face: newestMemoryLaneFace,
+            personName: _memoryLanePersonName ?? "",
+            size: Size(_cardWidth, cardHeight),
+            onTap: () => _openMemoryLanePage(memoryLane),
           ),
         ),
       ...memories.indexed.map(
@@ -243,6 +263,21 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         ),
       ),
     ];
+  }
+
+  Future<void> _openMemoryLanePage(MemoryLanePersonTimeline memoryLane) async {
+    if (memoryLane.isCluster) {
+      await routeToPage(
+        context,
+        MemoryLanePage.cluster(clusterID: memoryLane.personId),
+      );
+    } else {
+      final person = await PersonService.instance.getPerson(
+        memoryLane.personId,
+      );
+      if (person == null || !mounted) return;
+      await routeToPage(context, MemoryLanePage(person: person));
+    }
   }
 
   void _fetchMemories(Event? event) {
@@ -331,8 +366,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   }
 
   Future<void> _loadScheduledMemoryLane() async {
-    if (!flagService.internalUser ||
-        !MemoryLaneService.instance.isFeatureEnabled) {
+    if (!flagService.internalUser) {
       return;
     }
     final timeline = await MemoryLaneService.instance
@@ -340,24 +374,75 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     if (timeline == null) {
       return;
     }
-    final faceCrops = await MemoryLaneService.instance
-        .getOldestAndNewestFaceCrops(timeline);
-    if (faceCrops == null || !hasGrantedMLConsent) {
+    final newestFaceCrop = await MemoryLaneService.instance.getNewestFaceCrop(
+      timeline,
+    );
+    final oldestEntry = timeline.entries.first;
+    final oldestFile = (await MemoryLaneService.instance.getTimelineFiles([
+      oldestEntry.fileId,
+    ]))[oldestEntry.fileId];
+    final personName = timeline.isCluster
+        ? null
+        : (await PersonService.instance.getPerson(
+            timeline.personId,
+          ))?.data.name;
+    if (!mounted ||
+        newestFaceCrop == null ||
+        oldestFile == null ||
+        !hasGrantedMLConsent) {
       return;
     }
     _memoryLane = timeline;
-    _oldestMemoryLaneFace = faceCrops.$1;
-    _newestMemoryLaneFace = faceCrops.$2;
+    _oldestMemoryLaneFile = oldestFile;
+    _newestMemoryLaneFace = newestFaceCrop;
+    _memoryLanePersonName = personName;
   }
 
   void _onMLConsentChanged(MLConsentChangedEvent event) {
-    if (event.enabled || !mounted || _memoryLane == null) {
+    if (event.enabled || !mounted) {
       return;
     }
     setState(() {
       _memoryLane = null;
-      _oldestMemoryLaneFace = null;
+      _oldestMemoryLaneFile = null;
       _newestMemoryLaneFace = null;
+      _memoryLanePersonName = null;
+    });
+  }
+
+  void _onPeopleChanged(PeopleChangedEvent _) {
+    if (!mounted || _memoryLane == null) {
+      return;
+    }
+    setState(() {
+      _memoryLane = null;
+      _oldestMemoryLaneFile = null;
+      _newestMemoryLaneFace = null;
+      _memoryLanePersonName = null;
+    });
+  }
+
+  void _onLocalPhotosUpdated(LocalPhotosUpdatedEvent event) {
+    if (!mounted ||
+        (event.type != EventType.hide &&
+            event.type != EventType.deletedFromEverywhere &&
+            event.type != EventType.deletedFromRemote)) {
+      return;
+    }
+    final memoryLane = _memoryLane;
+    if (memoryLane == null ||
+        !memoryLane.entries.any(
+          (entry) => event.updatedFiles.any(
+            (file) => file.uploadedFileID == entry.fileId,
+          ),
+        )) {
+      return;
+    }
+    setState(() {
+      _memoryLane = null;
+      _oldestMemoryLaneFile = null;
+      _newestMemoryLaneFace = null;
+      _memoryLanePersonName = null;
     });
   }
 
@@ -374,8 +459,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     }
     setState(() {
       _memoryLane = null;
-      _oldestMemoryLaneFace = null;
+      _oldestMemoryLaneFile = null;
       _newestMemoryLaneFace = null;
+      _memoryLanePersonName = null;
     });
   }
 }
