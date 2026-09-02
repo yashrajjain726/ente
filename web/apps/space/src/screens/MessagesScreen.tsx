@@ -31,6 +31,7 @@ import type {
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
+    spaceDialogBackground,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -47,12 +48,14 @@ import { spacePostImageInputAccept } from "utils/post-image";
 const green = "#08C225";
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
+const messageTimestampColor = "#7E8582";
+const messageActivityColor = "#929996";
 const lightSurface = spaceSurface;
 const lightSurfaceHover = spaceSurfaceHover;
 const composerSurface = lightSurface;
-const outgoingBubble = "#0DAF35";
+const outgoingBubble = "#DEDAD9";
 const incomingBubble = lightSurface;
-const outgoingMessageText = "#FFFFFF";
+const outgoingMessageText = "#111111";
 const incomingMessageText = spaceText;
 const outgoingQuoteBubble = "#9EDFAE";
 const incomingQuoteBubble = spaceSurfaceHover;
@@ -66,7 +69,7 @@ const messageBubblePaddingX = "16px";
 const messageBubblePaddingY = "14px";
 const composerPadding = 14;
 const composerPaddingLeft = 18;
-const postQuoteThumbnailSize = 164;
+const postQuoteThumbnailSize = 200;
 const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
 const messageTimeSeparatorThresholdMs = 60 * 60 * 1000;
@@ -417,7 +420,7 @@ const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
     <Box
         component="li"
         sx={{
-            color: textSecondary,
+            color: messageTimestampColor,
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 12,
             fontWeight: 500,
@@ -1119,7 +1122,7 @@ const MessageActionLabel: React.FC<{
         sx={{
             alignSelf: isOwn ? "flex-end" : "flex-start",
             alignItems: "center",
-            color: textSecondary,
+            color: messageActivityColor,
             display: "inline-flex",
             gap: "4px",
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1279,11 +1282,12 @@ const PostQuotePreview: React.FC<{
                     appearance: "none",
                     bgcolor: "transparent",
                     border: 0,
-                    borderRadius: "10px",
+                    borderRadius: "20%",
                     color: "inherit",
                     cursor: canOpen ? "pointer" : "default",
                     display: "inline-flex",
                     font: "inherit",
+                    overflow: "hidden",
                     p: 0,
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
@@ -1297,7 +1301,6 @@ const PostQuotePreview: React.FC<{
                         alt=""
                         src={imageUrl}
                         sx={{
-                            borderRadius: "8px",
                             display: "block",
                             height: postQuoteThumbnailSize,
                             objectFit: "cover",
@@ -1316,7 +1319,6 @@ const PostQuotePreview: React.FC<{
                         sx={{
                             alignItems: "center",
                             bgcolor: incomingQuoteBubble,
-                            borderRadius: "10px",
                             color: incomingQuoteText,
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1709,7 +1711,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         isThreadOpen && !isThreadReadOnly && !isThreadRecipientLoading;
     const canSend =
         canInteract && messageText.trim().length > 0 && sendPhase == "idle";
-    const canWave = canInteract && sendPhase == "idle";
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
@@ -1817,21 +1818,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 setReplyingTo(
                     (currentReplyingTo) => currentReplyingTo ?? repliedMessage,
                 );
-                setSendPhase("idle");
-            });
-    };
-
-    const sendWave = () => {
-        if (!selectedFriend || !canWave) return;
-        const spaceId = selectedFriend.spaceId ?? selectedFriend.id;
-        stickToThreadBottomRef.current = true;
-        smoothNextMessageScrollRef.current = true;
-        setSendPhase("sending");
-        void onSendMessage(spaceId, spaceWaveMessageText)
-            .then(() => setSendPhase("idle"))
-            .catch((error: unknown) => {
-                smoothNextMessageScrollRef.current = false;
-                log.error("Failed to send wave", error);
                 setSendPhase("idle");
             });
     };
@@ -2281,53 +2267,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 Messages
                             </Box>
                         )}
-                        {isThreadOpen && selectedFriend && canInteract ? (
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    selectedName
-                                        ? `Wave at ${selectedName}`
-                                        : "Send wave"
-                                }
-                                disabled={!canWave}
-                                onClick={sendWave}
-                                sx={{
-                                    alignItems: "center",
-                                    appearance: "none",
-                                    bgcolor: "transparent",
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    cursor: canWave ? "pointer" : "default",
-                                    display: "flex",
-                                    height: spaceTouchTargetSize,
-                                    justifyContent: "center",
-                                    justifySelf: "end",
-                                    mr: "-8px",
-                                    opacity: canWave ? 1 : 0.5,
-                                    p: 0,
-                                    width: spaceTouchTargetSize,
-                                    "&:focus-visible": {
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
-                                }}
-                            >
-                                <Box
-                                    component="span"
-                                    aria-hidden
-                                    sx={{
-                                        display: "block",
-                                        fontSize: 20,
-                                        lineHeight: 1,
-                                    }}
-                                >
-                                    {spaceWaveMessageText}
-                                </Box>
-                            </Box>
-                        ) : (
-                            <Box aria-hidden />
-                        )}
+                        <Box aria-hidden />
                     </Box>
 
                     {isThreadOpen && selectedFriend ? (
@@ -2533,7 +2473,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 sx={{
                                                     WebkitTapHighlightColor:
                                                         "transparent",
-                                                    bgcolor: "transparent",
+                                                    bgcolor:
+                                                        spaceDialogBackground,
                                                     borderRadius: "16px",
                                                     boxShadow:
                                                         "0 14px 40px rgba(0, 0, 0, 0.14)",
