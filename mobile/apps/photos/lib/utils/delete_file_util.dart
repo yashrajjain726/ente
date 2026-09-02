@@ -1137,7 +1137,6 @@ Future<bool?> showDeleteConfirmationSheet(
       files.every((file) => !file.isSharedMediaToAppSandbox) &&
       (Platform.isIOS ||
           (Platform.isAndroid &&
-              flagService.internalUser &&
               !await isAndroidSDKVersionLowerThan(android11SDKINT)));
   if (!context.mounted) return null;
   return showBottomSheetComponent<bool>(
