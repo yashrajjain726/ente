@@ -33,9 +33,7 @@ import { openSpaceShareLinkDialog } from "services/share-link";
 import { isSpaceContentError, type SpacePostAsset } from "services/space";
 import {
     spaceAppBackground,
-    spaceAppBackgroundColor,
     spaceSurface,
-    spaceSurfaceHover,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -70,7 +68,7 @@ const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "8px";
-const adaptivePhotoMasonryGap = "4px";
+const adaptivePhotoMasonryGap = "2px";
 const photoMasonryPlaceholderBackground = spaceSurface;
 const photoMasonryRadius = "14px";
 const profileCoverRadius = "12px";
@@ -613,8 +611,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const friendActionsMenuID = React.useId();
     const isFriendActionsOpen = Boolean(friendActionsAnchor);
     const isUnfriendActionRunning = unfriendActionPhase != null;
-    const canManageFriend =
-        isFriendProfile && Boolean(onMessageFriend || onUnfriend);
+    const canManageFriend = isFriendProfile && Boolean(onUnfriend);
     const displayName = profile.fullName.trim() || profile.username.trim();
     const coverUrl = profile.coverUrl ?? null;
     const isCoverURLPending = Boolean(profile.coverObjectID && !coverUrl);
@@ -663,11 +660,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const adaptiveMasonryRows = buildAdaptivePostMasonryRows(masonryTiles);
     const usesAdaptiveMasonryRows = isOwnerProfile || isFriendProfile;
     const closeFriendActions = () => setFriendActionsAnchor(null);
-
-    const messageFriend = () => {
-        closeFriendActions();
-        onMessageFriend?.();
-    };
 
     const requestUnfriend = () => {
         closeFriendActions();
@@ -1346,7 +1338,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     whiteSpace: "nowrap",
                                 }}
                             >
-                                {profile.username}
+                                {firstName}
                             </Box>
                             {isOwnerProfile ? (
                                 <Box
@@ -1378,6 +1370,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         icon={Menu01Icon}
                                         size={20}
                                         strokeWidth={2.4}
+                                    />
+                                </Box>
+                            ) : onMessageFriend ? (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    aria-label={`Message ${displayName}`}
+                                    onClick={onMessageFriend}
+                                    sx={{
+                                        alignItems: "center",
+                                        bgcolor: "transparent",
+                                        border: 0,
+                                        color: "inherit",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        height: spaceTouchTargetSize,
+                                        justifyContent: "flex-end",
+                                        p: 0,
+                                        width: spaceTouchTargetSize,
+                                        "& svg path:first-of-type": {
+                                            display: "none",
+                                        },
+                                        "&:focus-visible": {
+                                            borderRadius: "50%",
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                    }}
+                                >
+                                    <HugeiconsIcon
+                                        icon={BubbleChatIcon}
+                                        size={20}
+                                        strokeWidth={1.8}
                                     />
                                 </Box>
                             ) : (
@@ -1421,7 +1446,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 alignItems: "center",
                                 aspectRatio: "1 / 1",
                                 bgcolor: profileCoverSkeletonBackground,
-                                border: `4px solid ${spaceAppBackgroundColor}`,
+                                border: 0,
                                 borderRadius: "50%",
                                 boxSizing: "border-box",
                                 cursor: canOpenProfilePhoto
@@ -1503,8 +1528,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             width: 112,
                                         }}
                                     />
-                                ) : (
+                                ) : isPublicProfile ? (
                                     displayName
+                                ) : (
+                                    profile.username
                                 )}
                             </Box>
                             {isOwnerProfile ? (
@@ -1627,51 +1654,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                     }}
                                 >
-                                    {onMessageFriend && (
-                                        <MenuItem
-                                            dense
-                                            disableRipple
-                                            onClick={messageFriend}
-                                            sx={{
-                                                alignItems: "center",
-                                                borderRadius: "10px",
-                                                color: textBase,
-                                                display: "flex",
-                                                gap: "8px",
-                                                minHeight: 36,
-                                                px: "9px",
-                                                py: "4px",
-                                                whiteSpace: "nowrap",
-                                                "&.Mui-focusVisible": {
-                                                    bgcolor: spaceSurfaceHover,
-                                                },
-                                                "&:active": {
-                                                    bgcolor: spaceSurfaceHover,
-                                                },
-                                                "&:hover": {
-                                                    bgcolor: spaceSurfaceHover,
-                                                },
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={BubbleChatIcon}
-                                                size={18}
-                                                strokeWidth={1.8}
-                                                style={{ flexShrink: 0 }}
-                                            />
-                                            <Box
-                                                sx={{
-                                                    fontFamily:
-                                                        '"Inter Variable", Inter, sans-serif',
-                                                    fontSize: 13,
-                                                    fontWeight: 650,
-                                                    lineHeight: "18px",
-                                                }}
-                                            >
-                                                Message
-                                            </Box>
-                                        </MenuItem>
-                                    )}
                                     {onUnfriend && (
                                         <MenuItem
                                             dense
@@ -1827,10 +1809,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         flex: hasProfilePosts ? "0 0 auto" : "1 1 0",
                         flexDirection: "column",
                         minHeight: hasProfilePosts ? undefined : 0,
-                        mt: "24px",
-                        pb: usesAdaptiveMasonryRows
-                            ? adaptivePhotoMasonryGap
-                            : "16px",
+                        mt: "32px",
+                        pb: usesAdaptiveMasonryRows ? 0 : "16px",
                         px: 0,
                         width: "100%",
                     }}
@@ -1838,12 +1818,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {hasProfilePosts ? (
                         <Box
                             sx={{
-                                borderBottomLeftRadius: usesAdaptiveMasonryRows
-                                    ? photoMasonryRadius
-                                    : undefined,
-                                borderBottomRightRadius: usesAdaptiveMasonryRows
-                                    ? photoMasonryRadius
-                                    : undefined,
                                 borderTopLeftRadius: usesAdaptiveMasonryRows
                                     ? photoMasonryRadius
                                     : undefined,
@@ -1858,12 +1832,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     ? "minmax(0, 1fr)"
                                     : `repeat(${masonryColumns.length}, minmax(0, 1fr))`,
                                 mt: "6px",
-                                mx: usesAdaptiveMasonryRows ? "4px" : "16px",
+                                mx: usesAdaptiveMasonryRows ? 0 : "16px",
                                 overflow: usesAdaptiveMasonryRows
                                     ? "hidden"
                                     : undefined,
                                 width: usesAdaptiveMasonryRows
-                                    ? "calc(100% - 8px)"
+                                    ? "100%"
                                     : "calc(100% - 32px)",
                             }}
                         >
