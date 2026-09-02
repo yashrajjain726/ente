@@ -12,6 +12,7 @@ pub enum RustVecDbError {
     Closed { message: String },
     InvalidKey { message: String },
     InvalidVector { message: String },
+    InvalidAttributes { message: String },
     DimensionMismatch { message: String },
     InvalidDimensions { message: String },
     UnboundedSearch { message: String },
@@ -29,12 +30,58 @@ impl From<vecdb::VecDbError> for RustVecDbError {
             vecdb::VecDbError::Closed => Self::Closed { message },
             vecdb::VecDbError::InvalidKey(_) => Self::InvalidKey { message },
             vecdb::VecDbError::InvalidVector(_) => Self::InvalidVector { message },
+            vecdb::VecDbError::InvalidAttributes(_) => Self::InvalidAttributes { message },
             vecdb::VecDbError::DimensionMismatch { .. } => Self::DimensionMismatch { message },
             vecdb::VecDbError::InvalidDimensions(_) => Self::InvalidDimensions { message },
             vecdb::VecDbError::UnboundedSearch => Self::UnboundedSearch { message },
             vecdb::VecDbError::LengthMismatch { .. } => Self::LengthMismatch { message },
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum VecDbAttrValue {
+    Str(String),
+    Bool(bool),
+    I64(i64),
+    F64(f64),
+}
+
+#[derive(Clone, Debug)]
+pub struct VecDbAttr {
+    pub name: String,
+    pub value: VecDbAttrValue,
+}
+
+fn to_engine_attr(attr: VecDbAttr) -> vecdb::Attribute {
+    vecdb::Attribute {
+        name: attr.name,
+        value: match attr.value {
+            VecDbAttrValue::Str(value) => vecdb::AttrValue::Str(value),
+            VecDbAttrValue::Bool(value) => vecdb::AttrValue::Bool(value),
+            VecDbAttrValue::I64(value) => vecdb::AttrValue::I64(value),
+            VecDbAttrValue::F64(value) => vecdb::AttrValue::F64(value),
+        },
+    }
+}
+
+fn to_engine_attrs(attrs: Vec<VecDbAttr>) -> Vec<vecdb::Attribute> {
+    attrs.into_iter().map(to_engine_attr).collect()
+}
+
+fn to_api_attrs(attrs: Vec<vecdb::Attribute>) -> Vec<VecDbAttr> {
+    attrs
+        .into_iter()
+        .map(|attr| VecDbAttr {
+            name: attr.name,
+            value: match attr.value {
+                vecdb::AttrValue::Str(value) => VecDbAttrValue::Str(value),
+                vecdb::AttrValue::Bool(value) => VecDbAttrValue::Bool(value),
+                vecdb::AttrValue::I64(value) => VecDbAttrValue::I64(value),
+                vecdb::AttrValue::F64(value) => VecDbAttrValue::F64(value),
+            },
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +175,42 @@ impl VecDb {
         vectors: Vec<Vec<f32>>,
     ) -> Result<(), RustVecDbError> {
         Ok(self.inner.bulk_add(&keys, &vectors)?)
+    }
+
+    pub fn add_vector_with_attrs(
+        &self,
+        key: String,
+        vector: Vec<f32>,
+        attrs: Vec<VecDbAttr>,
+    ) -> Result<(), RustVecDbError> {
+        Ok(self
+            .inner
+            .add_with_attrs(&key, &vector, &to_engine_attrs(attrs))?)
+    }
+
+    pub fn bulk_add_vectors_with_attrs(
+        &self,
+        keys: Vec<String>,
+        vectors: Vec<Vec<f32>>,
+        attrs: Vec<Option<Vec<VecDbAttr>>>,
+    ) -> Result<(), RustVecDbError> {
+        let attrs: Vec<Option<Vec<vecdb::Attribute>>> = attrs
+            .into_iter()
+            .map(|entry| entry.map(to_engine_attrs))
+            .collect();
+        Ok(self.inner.bulk_add_with_attrs(&keys, &vectors, &attrs)?)
+    }
+
+    pub fn get_attrs(&self, key: String) -> Option<Vec<VecDbAttr>> {
+        self.inner.get_attrs(&key).map(to_api_attrs)
+    }
+
+    pub fn bulk_get_attrs(&self, keys: Vec<String>) -> Vec<Option<Vec<VecDbAttr>>> {
+        self.inner
+            .bulk_get_attrs(&keys)
+            .into_iter()
+            .map(|entry| entry.map(to_api_attrs))
+            .collect()
     }
 
     pub fn approx_search_vectors_within_similarity(
@@ -550,6 +633,95 @@ mod tests {
             .bulk_search_keys(vec![key("a")], 2, Some(0.5), false, false)
             .unwrap();
         assert!(cut[0].matches.is_empty());
+    }
+
+    #[test]
+    fn attrs_round_trip_through_the_api() {
+        let dir = TestDir::create();
+        let db = VecDb::new(dir.db_path(), DIMS).unwrap();
+        let attrs = vec![
+            VecDbAttr {
+                name: key("model"),
+                value: VecDbAttrValue::Str("clip".to_string()),
+            },
+            VecDbAttr {
+                name: key("version"),
+                value: VecDbAttrValue::I64(3),
+            },
+            VecDbAttr {
+                name: key("indexed"),
+                value: VecDbAttrValue::Bool(true),
+            },
+            VecDbAttr {
+                name: key("score"),
+                value: VecDbAttrValue::F64(0.75),
+            },
+        ];
+        db.add_vector_with_attrs(key("a"), basis(0), attrs.clone())
+            .unwrap();
+        let fetched = db.get_attrs(key("a")).unwrap();
+        assert_eq!(fetched.len(), 4);
+        assert!(matches!(
+            &fetched[0],
+            VecDbAttr { name, value: VecDbAttrValue::Str(value) }
+                if name == "model" && value == "clip"
+        ));
+        assert!(matches!(
+            &fetched[1],
+            VecDbAttr { name, value: VecDbAttrValue::I64(3) } if name == "version"
+        ));
+        assert!(matches!(
+            &fetched[2],
+            VecDbAttr { name, value: VecDbAttrValue::Bool(true) } if name == "indexed"
+        ));
+        assert!(matches!(
+            &fetched[3],
+            VecDbAttr { name, value: VecDbAttrValue::F64(value) } if name == "score" && *value == 0.75
+        ));
+        db.bulk_add_vectors_with_attrs(
+            vec![key("b"), key("c")],
+            vec![basis(1), basis(2)],
+            vec![
+                Some(vec![VecDbAttr {
+                    name: key("only"),
+                    value: VecDbAttrValue::Bool(false),
+                }]),
+                None,
+            ],
+        )
+        .unwrap();
+        let bulk = db.bulk_get_attrs(vec![key("b"), key("c"), key("missing")]);
+        assert_eq!(bulk.len(), 3);
+        assert!(matches!(
+            bulk[0].as_deref(),
+            Some([VecDbAttr { name, value: VecDbAttrValue::Bool(false) }]) if name == "only"
+        ));
+        assert!(bulk[1].is_none());
+        assert!(bulk[2].is_none());
+        db.add_vector(key("a"), basis(0)).unwrap();
+        assert!(db.get_attrs(key("a")).is_none());
+        assert!(matches!(
+            db.add_vector_with_attrs(
+                key("a"),
+                basis(0),
+                vec![
+                    VecDbAttr {
+                        name: key("dup"),
+                        value: VecDbAttrValue::Bool(true),
+                    },
+                    VecDbAttr {
+                        name: key("dup"),
+                        value: VecDbAttrValue::Bool(false),
+                    },
+                ],
+            ),
+            Err(RustVecDbError::InvalidAttributes { .. })
+        ));
+        assert!(matches!(
+            db.bulk_add_vectors_with_attrs(vec![key("x")], vec![basis(3)], vec![None, None]),
+            Err(RustVecDbError::LengthMismatch { .. })
+        ));
+        assert_eq!(db.get_index_stats().unwrap().live_count, 3);
     }
 
     #[test]

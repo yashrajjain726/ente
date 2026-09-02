@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::VecDbError;
 use super::arena::{MAX_KEY_BYTES, validate_key};
 use super::crc::{Crc32, crc32};
 use super::kernel::{LANE_WIDTH, splitmix64};
+use super::{AttrValue, Attribute, VecDbError};
 
 pub(crate) const HEADER_LEN: usize = 32;
 const MAGIC: [u8; 4] = *b"EVDB";
@@ -19,19 +19,39 @@ const RECORD_TYPE_TOMBSTONE: u8 = 2;
 const RECORD_PREFIX_LEN: usize = 3;
 const RECORD_CRC_LEN: usize = 4;
 const ENCODE_FLUSH_BYTES: usize = 64 * 1024;
+const MAX_ATTR_COUNT: usize = 16;
+const MAX_ATTR_NAME_BYTES: usize = 64;
+const MAX_ATTR_STR_BYTES: usize = 1024;
+const MAX_ATTRS_TOTAL_BYTES: usize = 4096;
+const ATTR_TAG_STR: u8 = 0;
+const ATTR_TAG_BOOL: u8 = 1;
+const ATTR_TAG_I64: u8 = 2;
+const ATTR_TAG_F64: u8 = 3;
 
 static GENERATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum LogEntry<'a> {
-    Add { key: &'a str, vector: &'a [f32] },
-    Tombstone { key: &'a str },
+    Add {
+        key: &'a str,
+        vector: &'a [f32],
+        attrs: &'a [Attribute],
+    },
+    Tombstone {
+        key: &'a str,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum LogRecord {
-    Add { key: String, vector: Vec<f32> },
-    Tombstone { key: String },
+    Add {
+        key: String,
+        vector: Vec<f32>,
+        attrs: Vec<Attribute>,
+    },
+    Tombstone {
+        key: String,
+    },
 }
 
 #[derive(Debug)]
@@ -246,7 +266,7 @@ impl LogScanner<'_> {
             self.done = true;
             return Ok(None);
         }
-        if remaining < RECORD_PREFIX_LEN as u64 {
+        if remaining < (RECORD_PREFIX_LEN + RECORD_CRC_LEN) as u64 {
             return Ok(self.stop());
         }
         let mut prefix = [0u8; RECORD_PREFIX_LEN];
@@ -255,58 +275,36 @@ impl LogScanner<'_> {
         }
         let record_type = prefix[0];
         let key_len = u16::from_le_bytes([prefix[1], prefix[2]]) as usize;
-        let payload_len = match record_type {
-            RECORD_TYPE_ADD => self.dims * size_of::<f32>(),
-            RECORD_TYPE_TOMBSTONE => 0,
-            _ => return Ok(self.stop()),
-        };
         if key_len == 0 || key_len > MAX_KEY_BYTES {
             return Ok(self.stop());
         }
-        let rest_len = key_len + payload_len + RECORD_CRC_LEN;
-        if remaining < (RECORD_PREFIX_LEN + rest_len) as u64 {
+        let fixed_len = match record_type {
+            RECORD_TYPE_ADD => key_len + self.dims * size_of::<f32>() + 1,
+            RECORD_TYPE_TOMBSTONE => key_len,
+            _ => return Ok(self.stop()),
+        };
+        let body_budget = remaining - (RECORD_PREFIX_LEN + RECORD_CRC_LEN) as u64;
+        self.scratch.clear();
+        if fixed_len as u64 > body_budget || !self.fill_scratch(fixed_len)? {
             return Ok(self.stop());
         }
-        let mut scratch = std::mem::take(&mut self.scratch);
-        scratch.resize(rest_len, 0);
-        let filled = self.fill(&mut scratch)?;
-        self.scratch = scratch;
-        if !filled {
+        if record_type == RECORD_TYPE_ADD && !self.read_attr_bytes(body_budget)? {
             return Ok(self.stop());
         }
-        let (body, stored_crc_bytes) = self.scratch.split_at(key_len + payload_len);
-        let stored_crc = u32::from_le_bytes([
-            stored_crc_bytes[0],
-            stored_crc_bytes[1],
-            stored_crc_bytes[2],
-            stored_crc_bytes[3],
-        ]);
+        let mut crc_bytes = [0u8; RECORD_CRC_LEN];
+        if !self.fill(&mut crc_bytes)? {
+            return Ok(self.stop());
+        }
         let mut hasher = Crc32::new();
         hasher.update(&prefix);
-        hasher.update(body);
-        if hasher.finalize() != stored_crc {
+        hasher.update(&self.scratch);
+        if hasher.finalize() != u32::from_le_bytes(crc_bytes) {
             return Ok(self.stop());
         }
-        let (key_bytes, payload) = body.split_at(key_len);
-        let Ok(key) = std::str::from_utf8(key_bytes) else {
+        let Some(record) = decode_body(record_type, key_len, self.dims, &self.scratch) else {
             return Ok(self.stop());
         };
-        let record = if record_type == RECORD_TYPE_ADD {
-            LogRecord::Add {
-                key: key.to_string(),
-                vector: payload
-                    .as_chunks::<4>()
-                    .0
-                    .iter()
-                    .map(|bytes| f32::from_le_bytes(*bytes))
-                    .collect(),
-            }
-        } else {
-            LogRecord::Tombstone {
-                key: key.to_string(),
-            }
-        };
-        self.offset = start + (RECORD_PREFIX_LEN + rest_len) as u64;
+        self.offset = start + (RECORD_PREFIX_LEN + self.scratch.len() + RECORD_CRC_LEN) as u64;
         Ok(Some((record, start)))
     }
 
@@ -319,6 +317,74 @@ impl LogScanner<'_> {
         None
     }
 
+    fn read_attr_bytes(&mut self, body_budget: u64) -> Result<bool, VecDbError> {
+        let attr_count = *self.scratch.last().unwrap();
+        if attr_count as usize > MAX_ATTR_COUNT {
+            return Ok(false);
+        }
+        let attrs_start = self.scratch.len();
+        for _ in 0..attr_count {
+            if !self.extend_within(body_budget, 1)? {
+                return Ok(false);
+            }
+            let name_len = *self.scratch.last().unwrap() as usize;
+            if name_len == 0 || name_len > MAX_ATTR_NAME_BYTES {
+                return Ok(false);
+            }
+            if !self.extend_within(body_budget, name_len + 1)? {
+                return Ok(false);
+            }
+            let value_len = match *self.scratch.last().unwrap() {
+                ATTR_TAG_STR => {
+                    if !self.extend_within(body_budget, 2)? {
+                        return Ok(false);
+                    }
+                    let len_start = self.scratch.len() - 2;
+                    let str_len =
+                        u16::from_le_bytes([self.scratch[len_start], self.scratch[len_start + 1]])
+                            as usize;
+                    if str_len > MAX_ATTR_STR_BYTES {
+                        return Ok(false);
+                    }
+                    str_len
+                }
+                ATTR_TAG_BOOL => 1,
+                ATTR_TAG_I64 | ATTR_TAG_F64 => 8,
+                _ => return Ok(false),
+            };
+            if !self.extend_within(body_budget, value_len)? {
+                return Ok(false);
+            }
+            if self.scratch.len() - attrs_start > MAX_ATTRS_TOTAL_BYTES {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn extend_within(&mut self, body_budget: u64, len: usize) -> Result<bool, VecDbError> {
+        if (self.scratch.len() + len) as u64 > body_budget {
+            return Ok(false);
+        }
+        self.fill_scratch(len)
+    }
+
+    fn fill_scratch(&mut self, len: usize) -> Result<bool, VecDbError> {
+        let old_len = self.scratch.len();
+        self.scratch.resize(old_len + len, 0);
+        match self.reader.read_exact(&mut self.scratch[old_len..]) {
+            Ok(()) => Ok(true),
+            Err(error) if error.kind() == ErrorKind::UnexpectedEof => {
+                self.scratch.truncate(old_len);
+                Ok(false)
+            }
+            Err(source) => {
+                self.done = true;
+                Err(VecDbError::io(self.path, source))
+            }
+        }
+    }
+
     fn fill(&mut self, buffer: &mut [u8]) -> Result<bool, VecDbError> {
         match self.reader.read_exact(buffer) {
             Ok(()) => Ok(true),
@@ -329,6 +395,68 @@ impl LogScanner<'_> {
             }
         }
     }
+}
+
+fn decode_body(record_type: u8, key_len: usize, dims: usize, body: &[u8]) -> Option<LogRecord> {
+    let (key_bytes, rest) = body.split_at(key_len);
+    let key = std::str::from_utf8(key_bytes).ok()?.to_string();
+    if record_type == RECORD_TYPE_TOMBSTONE {
+        return Some(LogRecord::Tombstone { key });
+    }
+    let (payload, attr_bytes) = rest.split_at(dims * size_of::<f32>());
+    let vector = payload
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| f32::from_le_bytes(*bytes))
+        .collect();
+    let attrs = decode_attrs(attr_bytes)?;
+    Some(LogRecord::Add { key, vector, attrs })
+}
+
+fn decode_attrs(bytes: &[u8]) -> Option<Vec<Attribute>> {
+    let (&count, mut rest) = bytes.split_first()?;
+    let mut attrs = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let (&name_len, after) = rest.split_first()?;
+        let (name_bytes, after) = after.split_at_checked(name_len as usize)?;
+        let name = std::str::from_utf8(name_bytes).ok()?.to_string();
+        let (&tag, after) = after.split_first()?;
+        let (value, after) = match tag {
+            ATTR_TAG_STR => {
+                let (len_bytes, after) = after.split_at_checked(2)?;
+                let str_len = u16::from_le_bytes([len_bytes[0], len_bytes[1]]) as usize;
+                let (value_bytes, after) = after.split_at_checked(str_len)?;
+                let value = std::str::from_utf8(value_bytes).ok()?.to_string();
+                (AttrValue::Str(value), after)
+            }
+            ATTR_TAG_BOOL => {
+                let (&value, after) = after.split_first()?;
+                if value > 1 {
+                    return None;
+                }
+                (AttrValue::Bool(value == 1), after)
+            }
+            ATTR_TAG_I64 => {
+                let (value_bytes, after) = after.split_at_checked(8)?;
+                (
+                    AttrValue::I64(i64::from_le_bytes(value_bytes.try_into().ok()?)),
+                    after,
+                )
+            }
+            ATTR_TAG_F64 => {
+                let (value_bytes, after) = after.split_at_checked(8)?;
+                (
+                    AttrValue::F64(f64::from_le_bytes(value_bytes.try_into().ok()?)),
+                    after,
+                )
+            }
+            _ => return None,
+        };
+        attrs.push(Attribute { name, value });
+        rest = after;
+    }
+    rest.is_empty().then_some(attrs)
 }
 
 fn encode_header(dims: u32, generation: &[u8; 16]) -> [u8; HEADER_LEN] {
@@ -397,7 +525,7 @@ fn validate_dims(dims: usize) -> Result<(), VecDbError> {
 
 fn validate_entry(entry: &LogEntry<'_>, dims: usize) -> Result<(), VecDbError> {
     match entry {
-        LogEntry::Add { key, vector } => {
+        LogEntry::Add { key, vector, attrs } => {
             validate_key(key)?;
             if vector.len() != dims {
                 return Err(VecDbError::DimensionMismatch {
@@ -405,26 +533,114 @@ fn validate_entry(entry: &LogEntry<'_>, dims: usize) -> Result<(), VecDbError> {
                     actual: vector.len(),
                 });
             }
-            Ok(())
+            validate_attrs(attrs)
         }
         LogEntry::Tombstone { key } => validate_key(key),
     }
 }
 
+fn validate_attrs(attrs: &[Attribute]) -> Result<(), VecDbError> {
+    if attrs.len() > MAX_ATTR_COUNT {
+        return Err(VecDbError::InvalidAttributes(format!(
+            "{} attributes, limit is {MAX_ATTR_COUNT}",
+            attrs.len()
+        )));
+    }
+    let mut total = 0usize;
+    for (index, attr) in attrs.iter().enumerate() {
+        if attr.name.is_empty() {
+            return Err(VecDbError::InvalidAttributes(format!(
+                "attribute {index} has an empty name"
+            )));
+        }
+        if attr.name.len() > MAX_ATTR_NAME_BYTES {
+            return Err(VecDbError::InvalidAttributes(format!(
+                "attribute name {:?} is {} bytes, limit is {MAX_ATTR_NAME_BYTES}",
+                attr.name,
+                attr.name.len()
+            )));
+        }
+        if let AttrValue::Str(value) = &attr.value
+            && value.len() > MAX_ATTR_STR_BYTES
+        {
+            return Err(VecDbError::InvalidAttributes(format!(
+                "value of attribute {:?} is {} bytes, limit is {MAX_ATTR_STR_BYTES}",
+                attr.name,
+                value.len()
+            )));
+        }
+        if attrs[..index].iter().any(|prior| prior.name == attr.name) {
+            return Err(VecDbError::InvalidAttributes(format!(
+                "duplicate attribute name {:?}",
+                attr.name
+            )));
+        }
+        total += encoded_attr_len(attr);
+    }
+    if total > MAX_ATTRS_TOTAL_BYTES {
+        return Err(VecDbError::InvalidAttributes(format!(
+            "attributes encode to {total} bytes, limit is {MAX_ATTRS_TOTAL_BYTES}"
+        )));
+    }
+    Ok(())
+}
+
+fn encoded_attr_len(attr: &Attribute) -> usize {
+    2 + attr.name.len()
+        + match &attr.value {
+            AttrValue::Str(value) => 2 + value.len(),
+            AttrValue::Bool(_) => 1,
+            AttrValue::I64(_) | AttrValue::F64(_) => 8,
+        }
+}
+
 fn encode_record_into(buffer: &mut Vec<u8>, entry: &LogEntry<'_>) {
-    let (record_type, key, payload) = match entry {
-        LogEntry::Add { key, vector } => (RECORD_TYPE_ADD, *key, *vector),
-        LogEntry::Tombstone { key } => (RECORD_TYPE_TOMBSTONE, *key, &[] as &[f32]),
-    };
     let start = buffer.len();
-    buffer.push(record_type);
-    buffer.extend_from_slice(&(key.len() as u16).to_le_bytes());
-    buffer.extend_from_slice(key.as_bytes());
-    for value in payload {
-        buffer.extend_from_slice(&value.to_le_bytes());
+    match entry {
+        LogEntry::Add { key, vector, attrs } => {
+            buffer.push(RECORD_TYPE_ADD);
+            buffer.extend_from_slice(&(key.len() as u16).to_le_bytes());
+            buffer.extend_from_slice(key.as_bytes());
+            for value in *vector {
+                buffer.extend_from_slice(&value.to_le_bytes());
+            }
+            buffer.push(attrs.len() as u8);
+            for attr in *attrs {
+                encode_attr_into(buffer, attr);
+            }
+        }
+        LogEntry::Tombstone { key } => {
+            buffer.push(RECORD_TYPE_TOMBSTONE);
+            buffer.extend_from_slice(&(key.len() as u16).to_le_bytes());
+            buffer.extend_from_slice(key.as_bytes());
+        }
     }
     let crc = crc32(&buffer[start..]);
     buffer.extend_from_slice(&crc.to_le_bytes());
+}
+
+fn encode_attr_into(buffer: &mut Vec<u8>, attr: &Attribute) {
+    buffer.push(attr.name.len() as u8);
+    buffer.extend_from_slice(attr.name.as_bytes());
+    match &attr.value {
+        AttrValue::Str(value) => {
+            buffer.push(ATTR_TAG_STR);
+            buffer.extend_from_slice(&(value.len() as u16).to_le_bytes());
+            buffer.extend_from_slice(value.as_bytes());
+        }
+        AttrValue::Bool(value) => {
+            buffer.push(ATTR_TAG_BOOL);
+            buffer.push(u8::from(*value));
+        }
+        AttrValue::I64(value) => {
+            buffer.push(ATTR_TAG_I64);
+            buffer.extend_from_slice(&value.to_le_bytes());
+        }
+        AttrValue::F64(value) => {
+            buffer.push(ATTR_TAG_F64);
+            buffer.extend_from_slice(&value.to_le_bytes());
+        }
+    }
 }
 
 fn fresh_generation() -> [u8; 16] {
@@ -521,7 +737,14 @@ mod tests {
 
     fn encoded_add(key: &str, vector: &[f32]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        encode_record_into(&mut bytes, &LogEntry::Add { key, vector });
+        encode_record_into(
+            &mut bytes,
+            &LogEntry::Add {
+                key,
+                vector,
+                attrs: &[],
+            },
+        );
         bytes
     }
 
@@ -536,9 +759,10 @@ mod tests {
 
     fn expected_record(entry: &LogEntry<'_>) -> LogRecord {
         match entry {
-            LogEntry::Add { key, vector } => LogRecord::Add {
+            LogEntry::Add { key, vector, attrs } => LogRecord::Add {
                 key: (*key).to_string(),
                 vector: vector.to_vec(),
+                attrs: attrs.to_vec(),
             },
             LogEntry::Tombstone { key } => LogRecord::Tombstone {
                 key: (*key).to_string(),
@@ -682,6 +906,7 @@ mod tests {
                 &[LogEntry::Add {
                     key: "reborn",
                     vector: &vector,
+                    attrs: &[],
                 }],
             );
             assert_eq!(start, HEADER_LEN as u64);
@@ -726,13 +951,39 @@ mod tests {
             0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
             0x56, 0x32, 0x6d, 0x51,
         ];
-        let golden_add: [u8; 41] = [
+        let golden_add: [u8; 42] = [
             0x01, 0x02, 0x00, 0x6b, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x3f, 0x00,
             0x00, 0x80, 0xbf, 0x00, 0x00, 0x00, 0x3f, 0x00, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x00,
-            0x40, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0xc0, 0x3f, 0x39, 0x42, 0xf6, 0x1d,
+            0x40, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0xc0, 0x3f, 0x00, 0xc7, 0x91, 0x1a, 0x8d,
+        ];
+        let golden_attr_add: [u8; 75] = [
+            0x01, 0x02, 0x00, 0x6b, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x3f, 0x00,
+            0x00, 0x80, 0xbf, 0x00, 0x00, 0x00, 0x3f, 0x00, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x00,
+            0x40, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0xc0, 0x3f, 0x04, 0x01, 0x6d, 0x00, 0x02,
+            0x00, 0x76, 0x31, 0x01, 0x62, 0x01, 0x01, 0x01, 0x69, 0x02, 0xfe, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0x01, 0x66, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8,
+            0x3f, 0x4a, 0x4a, 0x73, 0x96,
         ];
         let golden_tombstone: [u8; 9] = [0x02, 0x02, 0x00, 0x6b, 0x31, 0xa0, 0xde, 0x3c, 0xc1];
         let vector = [0.0f32, 1.0, -1.0, 0.5, -0.5, 2.0, -2.0, 1.5];
+        let attrs = vec![
+            Attribute {
+                name: "m".to_string(),
+                value: AttrValue::Str("v1".to_string()),
+            },
+            Attribute {
+                name: "b".to_string(),
+                value: AttrValue::Bool(true),
+            },
+            Attribute {
+                name: "i".to_string(),
+                value: AttrValue::I64(-2),
+            },
+            Attribute {
+                name: "f".to_string(),
+                value: AttrValue::F64(1.5),
+            },
+        ];
         assert_eq!(encode_header(8, &generation), golden_header);
         let mut encoded = Vec::new();
         encode_record_into(
@@ -740,9 +991,20 @@ mod tests {
             &LogEntry::Add {
                 key: "k1",
                 vector: &vector,
+                attrs: &[],
             },
         );
         assert_eq!(encoded, golden_add);
+        encoded.clear();
+        encode_record_into(
+            &mut encoded,
+            &LogEntry::Add {
+                key: "k2",
+                vector: &vector,
+                attrs: &attrs,
+            },
+        );
+        assert_eq!(encoded, golden_attr_add);
         encoded.clear();
         encode_record_into(&mut encoded, &LogEntry::Tombstone { key: "k1" });
         assert_eq!(encoded, golden_tombstone);
@@ -750,6 +1012,7 @@ mod tests {
         let path = dir.path().join("log");
         let mut bytes = golden_header.to_vec();
         bytes.extend_from_slice(&golden_add);
+        bytes.extend_from_slice(&golden_attr_add);
         bytes.extend_from_slice(&golden_tombstone);
         std::fs::write(&path, &bytes).unwrap();
         let mut log = reopen(&path, 8);
@@ -761,19 +1024,28 @@ mod tests {
                 (
                     LogRecord::Add {
                         key: "k1".to_string(),
-                        vector: vector.to_vec()
+                        vector: vector.to_vec(),
+                        attrs: Vec::new()
                     },
                     32
+                ),
+                (
+                    LogRecord::Add {
+                        key: "k2".to_string(),
+                        vector: vector.to_vec(),
+                        attrs: attrs.clone()
+                    },
+                    74
                 ),
                 (
                     LogRecord::Tombstone {
                         key: "k1".to_string()
                     },
-                    73
+                    149
                 )
             ]
         );
-        assert_eq!(recoverable_end, 82);
+        assert_eq!(recoverable_end, 158);
     }
 
     #[test]
@@ -787,6 +1059,7 @@ mod tests {
                 LogEntry::Add {
                     key: "alpha",
                     vector: &vector,
+                    attrs: &[],
                 },
                 LogEntry::Tombstone { key: "beta" },
             ];
@@ -826,6 +1099,7 @@ mod tests {
             log.append(&[LogEntry::Add {
                 key,
                 vector: &vector,
+                attrs: &[],
             }])
             .unwrap();
             log.append(&[LogEntry::Tombstone { key }]).unwrap();
@@ -837,7 +1111,8 @@ mod tests {
                 records[index * 2].0,
                 LogRecord::Add {
                     key: (*key).to_string(),
-                    vector: vector.clone()
+                    vector: vector.clone(),
+                    attrs: Vec::new()
                 }
             );
             assert_eq!(
@@ -867,12 +1142,14 @@ mod tests {
         log.append(&[LogEntry::Add {
             key: "weird",
             vector: &vector,
+            attrs: &[],
         }])
         .unwrap();
         let (records, _) = scan_all(&mut log);
         let LogRecord::Add {
             key,
             vector: decoded,
+            ..
         } = &records[0].0
         else {
             panic!("expected an add record");
@@ -894,7 +1171,11 @@ mod tests {
             let key = format!("key-{index}");
             boundaries.push(append_bounds(
                 &mut log,
-                &[LogEntry::Add { key: &key, vector }],
+                &[LogEntry::Add {
+                    key: &key,
+                    vector,
+                    attrs: &[],
+                }],
             ));
         }
         drop(log);
@@ -923,6 +1204,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "kept",
                 vector: &vector,
+                attrs: &[],
             }],
         );
         let (_, torn_end) = append_bounds(
@@ -930,6 +1212,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "torn",
                 vector: &vector,
+                attrs: &[],
             }],
         );
         drop(log);
@@ -950,6 +1233,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "fresh",
                 vector: &vector,
+                attrs: &[],
             }],
         );
         assert_eq!(start, first_end);
@@ -971,6 +1255,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "acked",
                 vector: &vector,
+                attrs: &[],
             }],
         );
         let phantom = encoded_add("phantom", &vector);
@@ -1000,6 +1285,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "kept",
                 vector: &vector,
+                attrs: &[],
             }],
         );
         drop(log);
@@ -1008,7 +1294,8 @@ mod tests {
         assert!(matches!(
             log.append(&[LogEntry::Add {
                 key: "lost",
-                vector: &vector
+                vector: &vector,
+                attrs: &[]
             }]),
             Err(VecDbError::Io { .. })
         ));
@@ -1032,6 +1319,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "first",
                 vector: &vector,
+                attrs: &[],
             }],
         );
         append_raw_bytes(&path, &encoded_add("ghost", &vector));
@@ -1041,6 +1329,7 @@ mod tests {
             &[LogEntry::Add {
                 key: "third",
                 vector: &replacement,
+                attrs: &[],
             }],
         );
         assert_eq!(start, acked_end);
@@ -1071,7 +1360,11 @@ mod tests {
             let key = format!("key-{index}");
             boundaries.push(append_bounds(
                 &mut log,
-                &[LogEntry::Add { key: &key, vector }],
+                &[LogEntry::Add {
+                    key: &key,
+                    vector,
+                    attrs: &[],
+                }],
             ));
         }
         drop(log);
@@ -1107,6 +1400,7 @@ mod tests {
             &LogEntry::Add {
                 key: "good",
                 vector: &vector,
+                attrs: &[],
             },
         );
         let payload: Vec<u8> = vector
@@ -1151,6 +1445,7 @@ mod tests {
                 &[LogEntry::Add {
                     key: &key,
                     vector: &vector,
+                    attrs: &[],
                 }],
             );
             assert_eq!(start, previous_end);
@@ -1178,14 +1473,16 @@ mod tests {
         assert!(matches!(
             log.append(&[LogEntry::Add {
                 key: "",
-                vector: &vector
+                vector: &vector,
+                attrs: &[]
             }]),
             Err(VecDbError::InvalidKey(_))
         ));
         assert!(matches!(
             log.append(&[LogEntry::Add {
                 key: "ok",
-                vector: &wrong_dims
+                vector: &wrong_dims,
+                attrs: &[]
             }]),
             Err(VecDbError::DimensionMismatch {
                 expected: 8,
@@ -1196,7 +1493,8 @@ mod tests {
             log.append(&[
                 LogEntry::Add {
                     key: "good",
-                    vector: &vector
+                    vector: &vector,
+                    attrs: &[]
                 },
                 LogEntry::Tombstone { key: "" }
             ])
@@ -1250,7 +1548,11 @@ mod tests {
         let entries: Vec<LogEntry<'_>> = keys
             .iter()
             .zip(&vectors)
-            .map(|(key, vector)| LogEntry::Add { key, vector })
+            .map(|(key, vector)| LogEntry::Add {
+                key,
+                vector,
+                attrs: &[],
+            })
             .collect();
         let mut bulk_log = Log::create(&bulk_path, dims).unwrap();
         let mut sequential_log = Log::create(&sequential_path, dims).unwrap();
@@ -1279,15 +1581,18 @@ mod tests {
             LogEntry::Add {
                 key: "a",
                 vector: &vectors[0],
+                attrs: &[],
             },
             LogEntry::Tombstone { key: "b" },
             LogEntry::Add {
                 key: "c",
                 vector: &vectors[2],
+                attrs: &[],
             },
             LogEntry::Add {
                 key: "d",
                 vector: &vectors[3],
+                attrs: &[],
             },
         ];
         let mut bulk_log = Log::create(&bulk_path, 8).unwrap();
@@ -1303,5 +1608,302 @@ mod tests {
         let sequential_bytes = std::fs::read(&sequential_path).unwrap();
         assert_eq!(bulk_bytes[HEADER_LEN..], sequential_bytes[HEADER_LEN..]);
         assert_eq!(scan_all(&mut bulk_log), scan_all(&mut sequential_log));
+    }
+
+    fn attr(name: &str, value: AttrValue) -> Attribute {
+        Attribute {
+            name: name.to_string(),
+            value,
+        }
+    }
+
+    fn scan_attrs_of_single_add(log: &mut Log) -> Vec<Attribute> {
+        let (records, _) = scan_all(log);
+        assert_eq!(records.len(), 1);
+        let LogRecord::Add { attrs, .. } = records[0].0.clone() else {
+            panic!("expected an add record");
+        };
+        attrs
+    }
+
+    #[test]
+    fn attr_records_round_trip_every_type_in_caller_order() {
+        let full_set = vec![
+            attr("zulu", AttrValue::I64(i64::MIN)),
+            attr("alpha", AttrValue::Str(String::new())),
+            attr("mike", AttrValue::Bool(false)),
+            attr("delta", AttrValue::F64(-0.0)),
+        ];
+        let singles: Vec<Vec<Attribute>> = vec![
+            vec![attr("s", AttrValue::Str("héllo-🔑".to_string()))],
+            vec![attr("b", AttrValue::Bool(true))],
+            vec![attr("i", AttrValue::I64(-1))],
+            vec![attr("f", AttrValue::F64(f64::MAX))],
+            Vec::new(),
+        ];
+        let dir = TempDir::new().unwrap();
+        let vector = seeded_vector(8, 8);
+        for (index, attrs) in singles.iter().chain([&full_set]).enumerate() {
+            let path = dir.path().join(format!("log-{index}"));
+            let mut log = Log::create(&path, 8).unwrap();
+            log.append(&[LogEntry::Add {
+                key: "k",
+                vector: &vector,
+                attrs,
+            }])
+            .unwrap();
+            assert_eq!(&scan_attrs_of_single_add(&mut log), attrs);
+            drop(log);
+            let mut reopened = reopen(&path, 8);
+            assert_eq!(&scan_attrs_of_single_add(&mut reopened), attrs);
+        }
+    }
+
+    #[test]
+    fn attr_boundary_sizes_round_trip() {
+        let cases = [
+            vec![attr(&"n".repeat(64), AttrValue::Bool(true))],
+            vec![attr("s", AttrValue::Str("v".repeat(1024)))],
+            (0..16)
+                .map(|index| attr(&format!("a{index:02}"), AttrValue::I64(index)))
+                .collect::<Vec<_>>(),
+            ["a", "b", "c", "d"]
+                .iter()
+                .map(|name| attr(name, AttrValue::Str("x".repeat(1019))))
+                .collect::<Vec<_>>(),
+        ];
+        assert_eq!(
+            cases[3].iter().map(encoded_attr_len).sum::<usize>(),
+            MAX_ATTRS_TOTAL_BYTES
+        );
+        let dir = TempDir::new().unwrap();
+        let vector = seeded_vector(9, 8);
+        for (index, attrs) in cases.iter().enumerate() {
+            let path = dir.path().join(format!("log-{index}"));
+            let mut log = Log::create(&path, 8).unwrap();
+            log.append(&[LogEntry::Add {
+                key: "k",
+                vector: &vector,
+                attrs,
+            }])
+            .unwrap();
+            assert_eq!(&scan_attrs_of_single_add(&mut log), attrs);
+        }
+    }
+
+    #[test]
+    fn append_rejects_attrs_beyond_the_caps() {
+        let over_total: Vec<Attribute> = ["a", "b", "c"]
+            .iter()
+            .map(|name| attr(name, AttrValue::Str("x".repeat(1019))))
+            .chain([attr("e", AttrValue::Str("x".repeat(1020)))])
+            .collect();
+        assert_eq!(
+            over_total.iter().map(encoded_attr_len).sum::<usize>(),
+            MAX_ATTRS_TOTAL_BYTES + 1
+        );
+        let invalid: Vec<Vec<Attribute>> = vec![
+            (0..17)
+                .map(|index| attr(&format!("a{index:02}"), AttrValue::Bool(true)))
+                .collect(),
+            vec![attr("", AttrValue::Bool(true))],
+            vec![attr(&"n".repeat(65), AttrValue::Bool(true))],
+            vec![attr("s", AttrValue::Str("v".repeat(1025)))],
+            over_total,
+            vec![
+                attr("same", AttrValue::Bool(true)),
+                attr("other", AttrValue::I64(1)),
+                attr("same", AttrValue::Str("again".to_string())),
+            ],
+        ];
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        let mut log = Log::create(&path, 8).unwrap();
+        let vector = seeded_vector(10, 8);
+        for attrs in &invalid {
+            assert!(matches!(
+                log.append(&[LogEntry::Add {
+                    key: "k",
+                    vector: &vector,
+                    attrs,
+                }]),
+                Err(VecDbError::InvalidAttributes(_))
+            ));
+            assert!(matches!(
+                log.append(&[
+                    LogEntry::Add {
+                        key: "good",
+                        vector: &vector,
+                        attrs: &[],
+                    },
+                    LogEntry::Add {
+                        key: "bad",
+                        vector: &vector,
+                        attrs,
+                    }
+                ]),
+                Err(VecDbError::InvalidAttributes(_))
+            ));
+        }
+        assert_eq!(log.current_end_offset(), HEADER_LEN as u64);
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), HEADER_LEN as u64);
+    }
+
+    #[test]
+    fn non_finite_f64_attrs_round_trip_bit_exactly() {
+        let payloads = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.0];
+        let attrs: Vec<Attribute> = payloads
+            .iter()
+            .enumerate()
+            .map(|(index, value)| attr(&format!("f{index}"), AttrValue::F64(*value)))
+            .collect();
+        let dir = TempDir::new().unwrap();
+        let mut log = Log::create(&dir.path().join("log"), 8).unwrap();
+        let vector = seeded_vector(11, 8);
+        log.append(&[LogEntry::Add {
+            key: "k",
+            vector: &vector,
+            attrs: &attrs,
+        }])
+        .unwrap();
+        let decoded = scan_attrs_of_single_add(&mut log);
+        assert_eq!(decoded.len(), payloads.len());
+        for (entry, expected) in decoded.iter().zip(&payloads) {
+            let AttrValue::F64(value) = entry.value else {
+                panic!("expected an f64 attribute");
+            };
+            assert_eq!(value.to_bits(), expected.to_bits());
+        }
+    }
+
+    #[test]
+    fn scanner_stops_at_malformed_attr_records() {
+        let dims = 8usize;
+        let vector = seeded_vector(12, dims);
+        let mut good = Vec::new();
+        encode_record_into(
+            &mut good,
+            &LogEntry::Add {
+                key: "good",
+                vector: &vector,
+                attrs: &[attr("kept", AttrValue::Bool(true))],
+            },
+        );
+        let vector_bytes: Vec<u8> = vector
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect();
+        let encoded_attr = |name: &[u8], tag: u8, value: &[u8]| {
+            let mut bytes = vec![name.len() as u8];
+            bytes.extend_from_slice(name);
+            bytes.push(tag);
+            bytes.extend_from_slice(value);
+            bytes
+        };
+        let str_value = |len: usize| {
+            let mut bytes = (len as u16).to_le_bytes().to_vec();
+            bytes.extend_from_slice(&vec![b'v'; len]);
+            bytes
+        };
+        let with_attrs = |attr_bytes: &[u8]| {
+            let mut payload = vector_bytes.clone();
+            payload.extend_from_slice(attr_bytes);
+            raw_record(RECORD_TYPE_ADD, 2, b"k1", &payload)
+        };
+        let five_over_total: Vec<u8> = {
+            let mut bytes = vec![5u8];
+            for name in [b"a", b"b", b"c", b"d", b"e"] {
+                bytes.extend_from_slice(&encoded_attr(name, ATTR_TAG_STR, &str_value(1019)));
+            }
+            bytes
+        };
+        let oversized_name: Vec<u8> = {
+            let mut bytes = vec![1u8];
+            bytes.extend_from_slice(&encoded_attr(&[b'n'; 65], ATTR_TAG_BOOL, &[1]));
+            bytes
+        };
+        let malformed = [
+            with_attrs(&[17]),
+            with_attrs(&[1, 0, ATTR_TAG_BOOL, 1]),
+            with_attrs(&oversized_name),
+            with_attrs(&{
+                let mut bytes = vec![1u8];
+                bytes.extend_from_slice(&encoded_attr(b"t", 4, &[0; 8]));
+                bytes
+            }),
+            with_attrs(&{
+                let mut bytes = vec![1u8];
+                bytes.extend_from_slice(&encoded_attr(b"s", ATTR_TAG_STR, &str_value(1025)));
+                bytes
+            }),
+            with_attrs(&{
+                let mut bytes = vec![1u8];
+                bytes.extend_from_slice(&encoded_attr(b"b", ATTR_TAG_BOOL, &[2]));
+                bytes
+            }),
+            with_attrs(&{
+                let mut bytes = vec![1u8];
+                bytes.extend_from_slice(&encoded_attr(&[0xFF, 0xFE], ATTR_TAG_BOOL, &[1]));
+                bytes
+            }),
+            with_attrs(&five_over_total),
+            with_attrs(&[2, 1, b'a', ATTR_TAG_BOOL, 1]),
+            with_attrs(&[1]),
+        ];
+        let dir = TempDir::new().unwrap();
+        for (index, bad) in malformed.iter().enumerate() {
+            let path = dir.path().join(format!("malformed-{index}"));
+            let mut record_bytes = good.clone();
+            record_bytes.extend_from_slice(bad);
+            write_log_file(&path, dims as u32, &record_bytes);
+            let mut log = reopen(&path, dims);
+            let (records, recoverable_end) = scan_all(&mut log);
+            assert_eq!(records.len(), 1, "case {index}");
+            assert_eq!(records[0].1, HEADER_LEN as u64, "case {index}");
+            assert_eq!(
+                recoverable_end,
+                HEADER_LEN as u64 + good.len() as u64,
+                "case {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn scanner_stops_when_attrs_are_cut_by_the_log_end() {
+        let dims = 8usize;
+        let vector = seeded_vector(13, dims);
+        let mut good = Vec::new();
+        encode_record_into(
+            &mut good,
+            &LogEntry::Add {
+                key: "good",
+                vector: &vector,
+                attrs: &[],
+            },
+        );
+        let mut torn = Vec::new();
+        encode_record_into(
+            &mut torn,
+            &LogEntry::Add {
+                key: "torn",
+                vector: &vector,
+                attrs: &[
+                    attr("first", AttrValue::Str("value".to_string())),
+                    attr("second", AttrValue::I64(7)),
+                ],
+            },
+        );
+        let attrs_start = 3 + 4 + dims * size_of::<f32>();
+        let dir = TempDir::new().unwrap();
+        for cut in attrs_start..torn.len() {
+            let path = dir.path().join(format!("cut-{cut}"));
+            let mut record_bytes = good.clone();
+            record_bytes.extend_from_slice(&torn[..cut]);
+            write_log_file(&path, dims as u32, &record_bytes);
+            let mut log = reopen(&path, dims);
+            let (records, recoverable_end) = scan_all(&mut log);
+            assert_eq!(records.len(), 1, "cut {cut}");
+            assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+        }
     }
 }

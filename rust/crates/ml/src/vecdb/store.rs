@@ -16,7 +16,7 @@ use super::log::{
     sync_parent_dir,
 };
 use super::snapshot::{load_snapshot, remove_snapshot, snapshot_path, write_snapshot};
-use super::{KeyMatches, Match, SearchParams, VecDbError};
+use super::{AttrValue, Attribute, KeyMatches, Match, SearchParams, VecDbError};
 
 const SNAPSHOT_HARD_CAP: usize = 5000;
 const SNAPSHOT_QUIET_THRESHOLD: usize = 1000;
@@ -63,7 +63,67 @@ struct Shared {
 struct SearchState {
     arena: VectorArena,
     graph: Graph,
+    attrs: AttrTable,
     total_records: u64,
+}
+
+#[derive(Default)]
+struct AttrTable(Option<Vec<Option<Box<[Attribute]>>>>);
+
+impl AttrTable {
+    fn set(&mut self, slot: u32, attrs: &[Attribute]) {
+        if attrs.is_empty() {
+            self.clear(slot);
+            return;
+        }
+        let table = self.0.get_or_insert_with(Vec::new);
+        let index = slot as usize;
+        if table.len() <= index {
+            table.resize_with(index + 1, || None);
+        }
+        table[index] = Some(attrs.to_vec().into_boxed_slice());
+    }
+
+    fn clear(&mut self, slot: u32) {
+        if let Some(table) = &mut self.0
+            && let Some(entry) = table.get_mut(slot as usize)
+        {
+            *entry = None;
+        }
+    }
+
+    fn get(&self, slot: u32) -> Option<&[Attribute]> {
+        self.0.as_ref()?.get(slot as usize)?.as_deref()
+    }
+
+    fn reset(&mut self) {
+        self.0 = None;
+    }
+
+    fn memory_bytes(&self) -> usize {
+        let Some(table) = &self.0 else {
+            return 0;
+        };
+        let mut bytes = table.capacity() * size_of::<Option<Box<[Attribute]>>>();
+        for entry in table.iter().flatten() {
+            bytes += entry.len() * size_of::<Attribute>();
+            for attr in entry.iter() {
+                bytes += attr.name.len();
+                if let AttrValue::Str(value) = &attr.value {
+                    bytes += value.len();
+                }
+            }
+        }
+        bytes
+    }
+}
+
+fn slot_of_outcome(outcome: UpsertOutcome) -> u32 {
+    match outcome {
+        UpsertOutcome::NewSlot(slot)
+        | UpsertOutcome::RecycledSlot(slot)
+        | UpsertOutcome::ReplacedInPlace(slot) => slot,
+    }
 }
 
 struct WriterHalf {
@@ -229,22 +289,60 @@ impl VecDb {
     }
 
     pub fn add(&self, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
+        self.add_with_attrs(key, vector, &[])
+    }
+
+    pub fn add_with_attrs(
+        &self,
+        key: &str,
+        vector: &[f32],
+        attrs: &[Attribute],
+    ) -> Result<(), VecDbError> {
         let now = Instant::now();
         let mut half = self.writable_half()?;
         let state = active_state(&mut half)?;
         ensure_finite(key, vector)?;
-        state.log.append(&[LogEntry::Add { key, vector }])?;
-        apply_add(&self.shared, key, vector)?;
+        state.log.append(&[LogEntry::Add { key, vector, attrs }])?;
+        apply_add(&self.shared, key, vector, attrs)?;
         apply_policy(&self.shared, &mut half, 1, now)
     }
 
     pub fn bulk_add(&self, keys: &[String], vectors: &[Vec<f32>]) -> Result<(), VecDbError> {
+        self.bulk_add_internal(keys, vectors, None)
+    }
+
+    pub fn bulk_add_with_attrs(
+        &self,
+        keys: &[String],
+        vectors: &[Vec<f32>],
+        attrs: &[Option<Vec<Attribute>>],
+    ) -> Result<(), VecDbError> {
+        if attrs.len() != keys.len() {
+            return Err(VecDbError::LengthMismatch {
+                keys: keys.len(),
+                vectors: attrs.len(),
+            });
+        }
+        self.bulk_add_internal(keys, vectors, Some(attrs))
+    }
+
+    fn bulk_add_internal(
+        &self,
+        keys: &[String],
+        vectors: &[Vec<f32>],
+        attrs: Option<&[Option<Vec<Attribute>>]>,
+    ) -> Result<(), VecDbError> {
         if keys.len() != vectors.len() {
             return Err(VecDbError::LengthMismatch {
                 keys: keys.len(),
                 vectors: vectors.len(),
             });
         }
+        let attrs_of = |index: usize| -> &[Attribute] {
+            attrs
+                .and_then(|entries| entries[index].as_deref())
+                .unwrap_or(&[])
+        };
         let now = Instant::now();
         let mut half = self.writable_half()?;
         let state = active_state(&mut half)?;
@@ -257,11 +355,16 @@ impl VecDb {
         let records: Vec<LogEntry<'_>> = keys
             .iter()
             .zip(vectors)
-            .map(|(key, vector)| LogEntry::Add { key, vector })
+            .enumerate()
+            .map(|(index, (key, vector))| LogEntry::Add {
+                key,
+                vector,
+                attrs: attrs_of(index),
+            })
             .collect();
         state.log.append(&records)?;
-        for (key, vector) in keys.iter().zip(vectors) {
-            apply_add(&self.shared, key, vector)?;
+        for (index, (key, vector)) in keys.iter().zip(vectors).enumerate() {
+            apply_add(&self.shared, key, vector, attrs_of(index))?;
         }
         apply_policy(&self.shared, &mut half, keys.len(), now)
     }
@@ -318,6 +421,22 @@ impl VecDb {
         let st = self.shared.state_read();
         let slot = st.arena.slot_of_key(key)?;
         Some(st.arena.vector_values(slot))
+    }
+
+    pub fn get_attrs(&self, key: &str) -> Option<Vec<Attribute>> {
+        let st = self.shared.state_read();
+        let slot = st.arena.slot_of_key(key)?;
+        st.attrs.get(slot).map(<[Attribute]>::to_vec)
+    }
+
+    pub fn bulk_get_attrs(&self, keys: &[String]) -> Vec<Option<Vec<Attribute>>> {
+        let st = self.shared.state_read();
+        keys.iter()
+            .map(|key| {
+                let slot = st.arena.slot_of_key(key)?;
+                st.attrs.get(slot).map(<[Attribute]>::to_vec)
+            })
+            .collect()
     }
 
     pub fn search(&self, query: &[f32], params: &SearchParams) -> Result<Vec<Match>, VecDbError> {
@@ -429,6 +548,7 @@ impl VecDb {
             let mut st = self.shared.state_write();
             st.arena = arena;
             st.graph = Graph::new();
+            st.attrs.reset();
             st.total_records = 0;
         }
         half.compaction_retry_at_dead = 0;
@@ -569,6 +689,7 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
     if let Ok(empty) = VectorArena::new(shared.dims) {
         st.arena = empty;
         st.graph = Graph::new();
+        st.attrs.reset();
         st.total_records = 0;
     }
     if let Some(key) = &shared.registry_key
@@ -585,14 +706,21 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
     removed
 }
 
-fn apply_add(shared: &Shared, key: &str, vector: &[f32]) -> Result<(), VecDbError> {
+fn apply_add(
+    shared: &Shared,
+    key: &str,
+    vector: &[f32],
+    attrs: &[Attribute],
+) -> Result<(), VecDbError> {
     let mut st = shared.state_write();
     let SearchState {
         arena,
         graph,
+        attrs: attr_table,
         total_records,
     } = &mut *st;
     let outcome = arena.upsert(key, vector)?;
+    attr_table.set(slot_of_outcome(outcome), attrs);
     apply_outcome(graph, arena, outcome);
     *total_records += 1;
     Ok(())
@@ -600,7 +728,9 @@ fn apply_add(shared: &Shared, key: &str, vector: &[f32]) -> Result<(), VecDbErro
 
 fn apply_remove(shared: &Shared, key: &str) {
     let mut st = shared.state_write();
-    st.arena.remove(key);
+    if let Some(slot) = st.arena.remove(key) {
+        st.attrs.clear(slot);
+    }
     st.total_records += 1;
 }
 
@@ -665,9 +795,10 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
     let dims = shared.dims;
     let (mut temp_log, temp_path) = Log::create_temp_sibling(&shared.path, dims)?;
     let mut compacted = VectorArena::new(dims)?;
+    let mut compacted_attrs = AttrTable::default();
     let staged = {
         let st = shared.state_read();
-        stage_live_entries(&st.arena, &mut compacted, &mut temp_log)
+        stage_live_entries(&st, &mut compacted, &mut compacted_attrs, &mut temp_log)
     };
     if let Err(error) = staged {
         drop(temp_log);
@@ -697,6 +828,7 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
         let mut st = shared.state_write();
         st.arena = compacted;
         st.graph = graph;
+        st.attrs = compacted_attrs;
         st.total_records = total_records;
     }
     let restored = restore_writer_mode(shared, half, lock, last_write);
@@ -750,6 +882,7 @@ fn recover_after_failed_reset(
         let mut st = shared.state_write();
         st.arena = empty;
         st.graph = Graph::new();
+        st.attrs.reset();
         st.total_records = 0;
         half.compaction_retry_at_dead = 0;
     }
@@ -812,6 +945,7 @@ fn build_writer(path: &Path, registry_key: PathBuf, dims: usize) -> Result<Share
         state: RwLock::new(SearchState {
             arena: replayed.arena,
             graph: replayed.graph,
+            attrs: replayed.attrs,
             total_records: replayed.total_records,
         }),
     })
@@ -840,6 +974,7 @@ fn build_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
         dims,
         replayed.arena,
         replayed.graph,
+        replayed.attrs,
         replayed.total_records,
         replayed.recoverable_end,
     ))
@@ -851,6 +986,7 @@ fn empty_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
         dims,
         VectorArena::new(dims)?,
         Graph::new(),
+        AttrTable::default(),
         0,
         0,
     ))
@@ -861,6 +997,7 @@ fn read_only_shared(
     dims: usize,
     arena: VectorArena,
     graph: Graph,
+    attrs: AttrTable,
     total_records: u64,
     log_bytes: u64,
 ) -> Shared {
@@ -876,6 +1013,7 @@ fn read_only_shared(
         state: RwLock::new(SearchState {
             arena,
             graph,
+            attrs,
             total_records,
         }),
     }
@@ -907,12 +1045,13 @@ fn approximate_memory_bytes(state: &SearchState) -> usize {
                     .sum::<usize>()
         })
         .sum();
-    vector_bytes + key_bytes + free_list_bytes + graph_bytes
+    vector_bytes + key_bytes + free_list_bytes + graph_bytes + state.attrs.memory_bytes()
 }
 
 struct ReplayedState {
     arena: VectorArena,
     graph: Graph,
+    attrs: AttrTable,
     total_records: u64,
     recoverable_end: u64,
     used_snapshot: bool,
@@ -925,6 +1064,7 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
         .as_ref()
         .map_or(u64::MAX, |loaded| loaded.covered_log_offset);
     let mut arena = VectorArena::new(dims)?;
+    let mut attrs = AttrTable::default();
     let mut tail_outcomes: Vec<UpsertOutcome> = Vec::new();
     let mut tail_records = 0u64;
     let mut total_records = 0u64;
@@ -940,14 +1080,21 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
                 tail_records += 1;
             }
             match record {
-                LogRecord::Add { key, vector } => {
+                LogRecord::Add {
+                    key,
+                    vector,
+                    attrs: record_attrs,
+                } => {
                     let outcome = arena.upsert(&key, &vector)?;
+                    attrs.set(slot_of_outcome(outcome), &record_attrs);
                     if in_tail {
                         tail_outcomes.push(outcome);
                     }
                 }
                 LogRecord::Tombstone { key } => {
-                    arena.remove(&key);
+                    if let Some(slot) = arena.remove(&key) {
+                        attrs.clear(slot);
+                    }
                 }
             }
         }
@@ -974,6 +1121,7 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
     Ok(ReplayedState {
         arena,
         graph,
+        attrs,
         total_records,
         recoverable_end,
         used_snapshot,
@@ -1025,26 +1173,37 @@ fn remove_data_files(path: &Path) -> Result<(), VecDbError> {
 }
 
 fn stage_live_entries(
-    source: &VectorArena,
+    source: &SearchState,
     target: &mut VectorArena,
+    target_attrs: &mut AttrTable,
     log: &mut Log,
 ) -> Result<(), VecDbError> {
-    let mut batch: Vec<(String, Vec<f32>)> = Vec::with_capacity(COMPACTION_BATCH_SIZE);
-    for slot in source.live_slots() {
-        let Some(key) = source.key_of_slot(slot) else {
+    let mut batch: Vec<(String, Vec<f32>, Vec<Attribute>)> =
+        Vec::with_capacity(COMPACTION_BATCH_SIZE);
+    for slot in source.arena.live_slots() {
+        let Some(key) = source.arena.key_of_slot(slot) else {
             continue;
         };
-        batch.push((key.to_string(), source.vector_values(slot)));
+        batch.push((
+            key.to_string(),
+            source.arena.vector_values(slot),
+            source
+                .attrs
+                .get(slot)
+                .map(<[Attribute]>::to_vec)
+                .unwrap_or_default(),
+        ));
         if batch.len() == COMPACTION_BATCH_SIZE {
-            flush_stage_batch(&mut batch, target, log)?;
+            flush_stage_batch(&mut batch, target, target_attrs, log)?;
         }
     }
-    flush_stage_batch(&mut batch, target, log)
+    flush_stage_batch(&mut batch, target, target_attrs, log)
 }
 
 fn flush_stage_batch(
-    batch: &mut Vec<(String, Vec<f32>)>,
+    batch: &mut Vec<(String, Vec<f32>, Vec<Attribute>)>,
     target: &mut VectorArena,
+    target_attrs: &mut AttrTable,
     log: &mut Log,
 ) -> Result<(), VecDbError> {
     if batch.is_empty() {
@@ -1052,11 +1211,12 @@ fn flush_stage_batch(
     }
     let records: Vec<LogEntry<'_>> = batch
         .iter()
-        .map(|(key, vector)| LogEntry::Add { key, vector })
+        .map(|(key, vector, attrs)| LogEntry::Add { key, vector, attrs })
         .collect();
     log.append(&records)?;
-    for (key, vector) in batch.drain(..) {
-        target.upsert(&key, &vector)?;
+    for (key, vector, attrs) in batch.drain(..) {
+        let outcome = target.upsert(&key, &vector)?;
+        target_attrs.set(slot_of_outcome(outcome), &attrs);
     }
     Ok(())
 }
@@ -1073,7 +1233,7 @@ mod tests {
     use super::*;
 
     const DIMS: usize = 16;
-    const ADD_RECORD_LEN: u64 = 3 + 5 + (DIMS as u64) * 4 + 4;
+    const ADD_RECORD_LEN: u64 = 3 + 5 + (DIMS as u64) * 4 + 1 + 4;
     const TOMBSTONE_RECORD_LEN: u64 = 3 + 5 + 4;
 
     fn seeded_unit_vector(seed: u64, dims: usize) -> Vec<f32> {
@@ -2914,5 +3074,296 @@ mod tests {
         assert!(fresh.is_empty());
         fresh.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
         assert_eq!(fresh.len(), 1);
+    }
+
+    fn attr(name: &str, value: AttrValue) -> Attribute {
+        Attribute {
+            name: name.to_string(),
+            value,
+        }
+    }
+
+    fn sample_attrs(seed: i64) -> Vec<Attribute> {
+        vec![
+            attr("model", AttrValue::Str(format!("model-{seed}"))),
+            attr("version", AttrValue::I64(seed)),
+            attr("indexed", AttrValue::Bool(seed % 2 == 0)),
+            attr("score", AttrValue::F64(seed as f64 * 0.5)),
+        ]
+    }
+
+    #[test]
+    fn attrs_round_trip_and_upserts_replace_them_wholesale() {
+        let dir = TempDir::new().unwrap();
+        let db = open_writer(&dir.path().join("db"));
+        let vector = seeded_unit_vector(1, DIMS);
+        db.add_with_attrs("k", &vector, &sample_attrs(1)).unwrap();
+        assert_eq!(db.get_attrs("k").unwrap(), sample_attrs(1));
+        assert_eq!(db.get("k").unwrap(), vector);
+        db.add_with_attrs("k", &vector, &[attr("only", AttrValue::Bool(true))])
+            .unwrap();
+        assert_eq!(
+            db.get_attrs("k").unwrap(),
+            vec![attr("only", AttrValue::Bool(true))]
+        );
+        db.add("k", &vector).unwrap();
+        assert_eq!(db.get_attrs("k"), None);
+        db.add_with_attrs("k", &vector, &sample_attrs(2)).unwrap();
+        assert_eq!(db.get_attrs("k").unwrap(), sample_attrs(2));
+        db.add_with_attrs("k", &vector, &[]).unwrap();
+        assert_eq!(db.get_attrs("k"), None);
+        db.add("plain", &vector).unwrap();
+        assert_eq!(db.get_attrs("plain"), None);
+        assert_eq!(db.get_attrs("missing"), None);
+        assert!(matches!(
+            db.add_with_attrs(
+                "k",
+                &vector,
+                &[
+                    attr("dup", AttrValue::Bool(true)),
+                    attr("dup", AttrValue::Bool(false))
+                ]
+            ),
+            Err(VecDbError::InvalidAttributes(_))
+        ));
+    }
+
+    #[test]
+    fn attrs_do_not_leak_across_remove_and_slot_recycle() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let vector = seeded_unit_vector(2, DIMS);
+        db.add_with_attrs("a", &vector, &sample_attrs(10)).unwrap();
+        db.add_with_attrs("b", &vector, &sample_attrs(11)).unwrap();
+        assert!(db.remove("a").unwrap());
+        assert_eq!(db.get_attrs("a"), None);
+        db.add("c", &vector).unwrap();
+        assert_eq!(db.shared.state_read().arena.slot_of_key("c"), Some(0));
+        assert_eq!(db.get_attrs("c"), None);
+        assert!(db.remove("b").unwrap());
+        db.add_with_attrs("d", &vector, &sample_attrs(12)).unwrap();
+        assert_eq!(db.shared.state_read().arena.slot_of_key("d"), Some(1));
+        assert_eq!(db.get_attrs("d").unwrap(), sample_attrs(12));
+        db.add("a", &vector).unwrap();
+        assert_eq!(db.get_attrs("a"), None);
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.get_attrs("a"), None);
+        assert_eq!(reopened.get_attrs("b"), None);
+        assert_eq!(reopened.get_attrs("c"), None);
+        assert_eq!(reopened.get_attrs("d").unwrap(), sample_attrs(12));
+    }
+
+    #[test]
+    fn attrs_replay_identically_across_reopen_and_read_only() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let vector = seeded_unit_vector(3, DIMS);
+        let ordered = vec![
+            attr("zulu", AttrValue::I64(-5)),
+            attr("alpha", AttrValue::Str("first".to_string())),
+            attr("mike", AttrValue::F64(2.25)),
+        ];
+        db.add("plain", &vector).unwrap();
+        db.add_with_attrs("rich", &vector, &ordered).unwrap();
+        db.add_with_attrs("cleared", &vector, &sample_attrs(20))
+            .unwrap();
+        db.add("cleared", &vector).unwrap();
+        db.add_with_attrs("removed", &vector, &sample_attrs(21))
+            .unwrap();
+        assert!(db.remove("removed").unwrap());
+        db.add_with_attrs("recycled", &vector, &sample_attrs(22))
+            .unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let verify = |db: &VecDb| {
+            assert_eq!(db.get_attrs("plain"), None);
+            assert_eq!(db.get_attrs("rich").unwrap(), ordered);
+            assert_eq!(db.get_attrs("cleared"), None);
+            assert_eq!(db.get_attrs("removed"), None);
+            assert_eq!(db.get_attrs("recycled").unwrap(), sample_attrs(22));
+        };
+        let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
+        verify(&read_only);
+        drop(read_only);
+        let reopened = open_writer(&path);
+        verify(&reopened);
+        drop(reopened);
+        fs::remove_file(snapshot_path(&path)).unwrap();
+        let rebuilt = open_writer(&path);
+        verify(&rebuilt);
+    }
+
+    #[test]
+    fn attrs_follow_entries_through_compaction() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let entries = bulk_entries(0, 120, 640);
+        let (keys, vectors): (Vec<String>, Vec<Vec<f32>>) = entries.iter().cloned().unzip();
+        let attrs: Vec<Option<Vec<Attribute>>> = (0..120)
+            .map(|index| (index % 2 == 0).then(|| sample_attrs(index)))
+            .collect();
+        db.bulk_add_with_attrs(&keys, &vectors, &attrs).unwrap();
+        let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
+        let verify = |db: &VecDb| {
+            for index in 64..120i64 {
+                let key = format!("key-{index}");
+                if index % 2 == 0 {
+                    assert_eq!(db.get_attrs(&key).unwrap(), sample_attrs(index));
+                } else {
+                    assert_eq!(db.get_attrs(&key), None);
+                }
+            }
+            for index in 0..64 {
+                assert_eq!(db.get_attrs(&format!("key-{index}")), None);
+            }
+        };
+        verify(&db);
+        drop(db);
+        let reopened = open_writer(&path);
+        verify(&reopened);
+    }
+
+    #[test]
+    fn attrs_survive_a_failed_compaction_and_its_retry() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let entries = bulk_entries(0, 120, 910);
+        let (keys, vectors): (Vec<String>, Vec<Vec<f32>>) = entries.iter().cloned().unzip();
+        let attrs: Vec<Option<Vec<Attribute>>> =
+            (0..120).map(|index| Some(sample_attrs(index))).collect();
+        db.bulk_add_with_attrs(&keys, &vectors, &attrs).unwrap();
+        let generation_before = generation_of(&path);
+        fs::create_dir(temp_sibling(&path)).unwrap();
+        let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
+        assert_eq!(db.stats().unwrap().dead_count, 128);
+        assert_eq!(generation_of(&path), generation_before);
+        let verify = |db: &VecDb| {
+            for index in 64..120i64 {
+                assert_eq!(
+                    db.get_attrs(&format!("key-{index}")).unwrap(),
+                    sample_attrs(index)
+                );
+            }
+            for index in 0..64 {
+                assert_eq!(db.get_attrs(&format!("key-{index}")), None);
+            }
+        };
+        verify(&db);
+        fs::remove_dir(temp_sibling(&path)).unwrap();
+        let rewrite = |range: std::ops::Range<usize>| {
+            let (keys, vectors): (Vec<String>, Vec<Vec<f32>>) =
+                bulk_entries(range.start, range.len(), 910)
+                    .iter()
+                    .cloned()
+                    .unzip();
+            let attrs: Vec<Option<Vec<Attribute>>> = range
+                .map(|index| Some(sample_attrs(index as i64)))
+                .collect();
+            db.bulk_add_with_attrs(&keys, &vectors, &attrs).unwrap();
+        };
+        rewrite(64..120);
+        assert_eq!(db.stats().unwrap().dead_count, 184);
+        assert_eq!(generation_of(&path), generation_before);
+        verify(&db);
+        rewrite(64..72);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
+        assert_ne!(generation_of(&path), generation_before);
+        verify(&db);
+        drop(db);
+        let reopened = open_writer(&path);
+        verify(&reopened);
+    }
+
+    #[test]
+    fn bulk_attrs_validate_before_any_io() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let vector = seeded_unit_vector(5, DIMS);
+        db.add("seed", &vector).unwrap();
+        let log_bytes = db.stats().unwrap().log_bytes;
+        let keys = vec!["x".to_string(), "y".to_string()];
+        let vectors = vec![vector.clone(), vector.clone()];
+        assert!(matches!(
+            db.bulk_add_with_attrs(&keys, &vectors, &[None]),
+            Err(VecDbError::LengthMismatch {
+                keys: 2,
+                vectors: 1
+            })
+        ));
+        let poisoned = vec![
+            Some(sample_attrs(1)),
+            Some(vec![
+                attr("dup", AttrValue::Bool(true)),
+                attr("dup", AttrValue::Bool(false)),
+            ]),
+        ];
+        assert!(matches!(
+            db.bulk_add_with_attrs(&keys, &vectors, &poisoned),
+            Err(VecDbError::InvalidAttributes(_))
+        ));
+        assert_eq!(db.len(), 1);
+        assert!(!db.contains("x"));
+        assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
+        let valid = vec![Some(sample_attrs(7)), None];
+        db.bulk_add_with_attrs(&keys, &vectors, &valid).unwrap();
+        assert_eq!(
+            db.bulk_get_attrs(&[
+                "x".to_string(),
+                "missing".to_string(),
+                "y".to_string(),
+                "seed".to_string()
+            ]),
+            vec![Some(sample_attrs(7)), None, None, None]
+        );
+        assert_eq!(db.get_attrs("x").unwrap(), sample_attrs(7));
+        let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert!(matches!(
+            read_only.bulk_add_with_attrs(&keys, &vectors, &[None]),
+            Err(VecDbError::LengthMismatch { .. })
+        ));
+        assert!(matches!(
+            read_only.bulk_add_with_attrs(&keys, &vectors, &valid),
+            Err(VecDbError::ReadOnly)
+        ));
+    }
+
+    #[test]
+    fn reset_clears_attrs() {
+        let dir = TempDir::new().unwrap();
+        let db = open_writer(&dir.path().join("db"));
+        let vector = seeded_unit_vector(6, DIMS);
+        db.add_with_attrs("k", &vector, &sample_attrs(30)).unwrap();
+        db.reset().unwrap();
+        assert_eq!(db.get_attrs("k"), None);
+        db.add("k", &vector).unwrap();
+        assert_eq!(db.get_attrs("k"), None);
+        db.add_with_attrs("k", &vector, &sample_attrs(31)).unwrap();
+        assert_eq!(db.get_attrs("k").unwrap(), sample_attrs(31));
+    }
+
+    #[test]
+    fn memory_estimate_counts_the_attr_table_once_allocated() {
+        let dir = TempDir::new().unwrap();
+        let db = open_writer(&dir.path().join("db"));
+        let vector = seeded_unit_vector(7, DIMS);
+        db.add("k", &vector).unwrap();
+        let without_attrs = db.stats().unwrap().approximate_memory_bytes;
+        db.add_with_attrs(
+            "k",
+            &vector,
+            &[attr("blob", AttrValue::Str("x".repeat(512)))],
+        )
+        .unwrap();
+        let with_attrs = db.stats().unwrap().approximate_memory_bytes;
+        assert!(with_attrs > without_attrs + 512);
     }
 }

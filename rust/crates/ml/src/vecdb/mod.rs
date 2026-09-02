@@ -13,6 +13,20 @@ mod store;
 
 pub use store::{Stats, VecDb};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum AttrValue {
+    Str(String),
+    Bool(bool),
+    I64(i64),
+    F64(f64),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Attribute {
+    pub name: String,
+    pub value: AttrValue,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SearchParams {
     pub limit: Option<usize>,
@@ -53,6 +67,8 @@ pub enum VecDbError {
     InvalidKey(String),
     #[error("invalid vector: {0}")]
     InvalidVector(String),
+    #[error("invalid attributes: {0}")]
+    InvalidAttributes(String),
     #[error("dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch { expected: usize, actual: usize },
     #[error("invalid dimensions {0}: must be a nonzero multiple of 8")]

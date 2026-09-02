@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use ente_ml::vecdb::{Match, SearchParams, VecDb};
+use ente_ml::vecdb::{AttrValue, Attribute, Match, SearchParams, VecDb};
 
 const SEED: u64 = 0xE47E_0000_0000_0001;
 const LATENT_DIMS: usize = 24;
@@ -19,6 +19,7 @@ const DEFAULT_DIMS: usize = 512;
 struct Config {
     scales: Vec<usize>,
     dims: usize,
+    attrs: bool,
 }
 
 struct BenchData {
@@ -57,8 +58,11 @@ struct VecdbReport {
 fn main() {
     let config = parse_args();
     println!(
-        "vecdb bench  dims={}  queries={}  seed={:#018x}",
-        config.dims, QUERY_COUNT, SEED
+        "vecdb bench  dims={}  queries={}  seed={:#018x}{}",
+        config.dims,
+        QUERY_COUNT,
+        SEED,
+        if config.attrs { "  attrs=on" } else { "" }
     );
     println!(
         "scales: {}",
@@ -71,13 +75,14 @@ fn main() {
     );
     let temp_root = tempfile::TempDir::new().expect("create bench temp dir");
     for &scale in &config.scales {
-        run_scale(scale, config.dims, temp_root.path());
+        run_scale(scale, config.dims, config.attrs, temp_root.path());
     }
 }
 
 fn parse_args() -> Config {
     let mut scales = parse_scales(DEFAULT_SCALES);
     let mut dims = DEFAULT_DIMS;
+    let mut attrs = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -87,6 +92,7 @@ fn parse_args() -> Config {
                     .parse()
                     .unwrap_or_else(|_| usage_exit())
             }
+            "--attrs" => attrs = true,
             _ => usage_exit(),
         }
     }
@@ -94,7 +100,11 @@ fn parse_args() -> Config {
         eprintln!("--dims must be a nonzero multiple of 8");
         std::process::exit(2);
     }
-    Config { scales, dims }
+    Config {
+        scales,
+        dims,
+        attrs,
+    }
 }
 
 fn required_value(value: Option<String>) -> String {
@@ -118,12 +128,12 @@ fn parse_scales(list: &str) -> Vec<usize> {
 fn usage_exit() -> ! {
     eprintln!(
         "usage: cargo run -p ente-ml --example vecdb_bench --release -- \
-         [--scales 10000,100000] [--dims 512]"
+         [--scales 10000,100000] [--dims 512] [--attrs]"
     );
     std::process::exit(2);
 }
 
-fn run_scale(scale: usize, dims: usize, temp_root: &Path) {
+fn run_scale(scale: usize, dims: usize, attrs: bool, temp_root: &Path) {
     let clusters = (scale / 150).max(1) as u64;
     println!();
     println!("=== scale {scale}  dims {dims}  clusters {clusters} ===");
@@ -131,7 +141,7 @@ fn run_scale(scale: usize, dims: usize, temp_root: &Path) {
     let data = generate_data(scale, dims, clusters);
     let dir = temp_root.join(format!("scale-{scale}-{dims}"));
     std::fs::create_dir_all(&dir).expect("create bench dir");
-    let vecdb = run_vecdb(&data, dims, &dir, scale);
+    let vecdb = run_vecdb(&data, dims, attrs, &dir, scale);
     print_vecdb_report(&vecdb);
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -255,10 +265,10 @@ struct CompactionTimings {
     compaction_fired: bool,
 }
 
-fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbReport {
+fn run_vecdb(data: &BenchData, dims: usize, attrs: bool, dir: &Path, scale: usize) -> VecdbReport {
     let path = dir.join("bench.vecdb");
     let mut db = VecDb::open(&path, dims).expect("open vecdb");
-    let ingest = ingest_phase(&mut db, data, scale);
+    let ingest = ingest_phase(&mut db, data, attrs, scale);
     let searches = search_phase(&db, data, scale);
     let stats = db.stats().expect("vecdb stats");
     let snapshot_file = PathBuf::from(format!("{}.graph", path.display()));
@@ -296,12 +306,41 @@ fn run_vecdb(data: &BenchData, dims: usize, dir: &Path, scale: usize) -> VecdbRe
     }
 }
 
-fn ingest_phase(db: &mut VecDb, data: &BenchData, scale: usize) -> IngestTimings {
+fn bench_attrs(index: usize) -> Vec<Attribute> {
+    vec![
+        Attribute {
+            name: "model".to_string(),
+            value: AttrValue::Str("mobileclip-s2-v2".to_string()),
+        },
+        Attribute {
+            name: "version".to_string(),
+            value: AttrValue::I64(index as i64),
+        },
+        Attribute {
+            name: "indexed".to_string(),
+            value: AttrValue::Bool(index.is_multiple_of(2)),
+        },
+    ]
+}
+
+fn ingest_phase(db: &mut VecDb, data: &BenchData, attrs: bool, scale: usize) -> IngestTimings {
     let single_count = SINGLE_ADD_COUNT.min(data.entries.len());
     eprintln!("[scale {scale}] vecdb single adds");
+    let single_attrs: Option<Vec<Vec<Attribute>>> =
+        attrs.then(|| (0..single_count).map(bench_attrs).collect());
     let started = Instant::now();
-    for (key, vector) in &data.entries[..single_count] {
-        db.add(key, vector).expect("vecdb add");
+    match &single_attrs {
+        Some(all) => {
+            for ((key, vector), entry_attrs) in data.entries[..single_count].iter().zip(all) {
+                db.add_with_attrs(key, vector, entry_attrs)
+                    .expect("vecdb add");
+            }
+        }
+        None => {
+            for (key, vector) in &data.entries[..single_count] {
+                db.add(key, vector).expect("vecdb add");
+            }
+        }
     }
     let single_total = started.elapsed();
     let rest = &data.entries[single_count..];
@@ -310,9 +349,34 @@ fn ingest_phase(db: &mut VecDb, data: &BenchData, scale: usize) -> IngestTimings
         .chunks(BULK_BATCH_SIZE)
         .map(|batch| batch.iter().cloned().unzip())
         .collect();
+    let bulk_attrs: Option<Vec<Vec<Option<Vec<Attribute>>>>> = attrs.then(|| {
+        batches
+            .iter()
+            .scan(single_count, |next_index, (keys, _)| {
+                let start = *next_index;
+                *next_index += keys.len();
+                Some(
+                    (start..start + keys.len())
+                        .map(bench_attrs)
+                        .map(Some)
+                        .collect(),
+                )
+            })
+            .collect()
+    });
     let started = Instant::now();
-    for (keys, vectors) in &batches {
-        db.bulk_add(keys, vectors).expect("vecdb bulk add");
+    match &bulk_attrs {
+        Some(all) => {
+            for ((keys, vectors), batch_attrs) in batches.iter().zip(all) {
+                db.bulk_add_with_attrs(keys, vectors, batch_attrs)
+                    .expect("vecdb bulk add");
+            }
+        }
+        None => {
+            for (keys, vectors) in &batches {
+                db.bulk_add(keys, vectors).expect("vecdb bulk add");
+            }
+        }
     }
     let bulk_total = started.elapsed();
     db.add("bench-probe", &data.probe).expect("vecdb probe add");
