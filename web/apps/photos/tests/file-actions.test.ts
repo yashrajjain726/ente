@@ -3,6 +3,39 @@ import { describe, expect, test } from "vitest";
 import { getAvailableFileActions } from "../src/utils/file-actions";
 
 describe("getAvailableFileActions", () => {
+    test("allows moving files between hidden albums", () => {
+        expect(
+            getAvailableFileActions({
+                barMode: "hidden-albums",
+                isInSearchMode: false,
+                collectionSummary: undefined,
+                hasOnlyOwnFiles: true,
+                showAddPerson: false,
+                showEditLocation: false,
+            }),
+        ).toEqual([
+            "sendLink",
+            "download",
+            "addToAlbum",
+            "moveToAlbum",
+            "unhide",
+            "trash",
+        ]);
+    });
+
+    test("does not allow moving unowned files between hidden albums", () => {
+        expect(
+            getAvailableFileActions({
+                barMode: "hidden-albums",
+                isInSearchMode: false,
+                collectionSummary: undefined,
+                hasOnlyOwnFiles: false,
+                showAddPerson: false,
+                showEditLocation: false,
+            }),
+        ).toEqual(["download", "addToAlbum", "unhide", "trash"]);
+    });
+
     test("uses shared actions for an incoming uncategorized collection", () => {
         const collectionSummary: CollectionSummary = {
             id: 1,

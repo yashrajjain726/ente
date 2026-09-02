@@ -9,4 +9,4 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
-uuid = { version = "1", features = ["v4", "js"] }
+uuid = { workspace = true, features = ["v4", "js"] }

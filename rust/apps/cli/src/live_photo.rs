@@ -102,17 +102,22 @@ mod tests {
     use std::io::{Cursor, Write};
     use std::path::Path;
 
+    use ente_core::{b64, crypto};
+    use mockito::Server;
     use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
     use super::{extract_live_photo, parse_entry_name};
+    use crate::api::client::AppClient;
+    use crate::models::{account::App, file::RemoteFile};
+    use crate::sync::DownloadManager;
 
-    fn archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
+    fn archive(entries: &[(&str, &[u8])], compression: CompressionMethod) -> Vec<u8> {
         let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
         for (name, data) in entries {
             writer
                 .start_file(
                     *name,
-                    SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+                    SimpleFileOptions::default().compression_method(compression),
                 )
                 .unwrap();
             writer.write_all(data).unwrap();
@@ -130,31 +135,89 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn extracts_image_and_video() {
-        let data = archive(&[("image.jpg", b"image"), ("video.mov", b"video")]);
+    async fn extracts_stored_and_deflated_components() {
+        for compression in [CompressionMethod::Stored, CompressionMethod::Deflated] {
+            let data = archive(
+                &[("image.jpg", b"image"), ("video.mov", b"video")],
+                compression,
+            );
+            let directory =
+                std::env::temp_dir().join(format!("ente-live-photo-test-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir(&directory).unwrap();
+
+            extract_live_photo(&data, &directory.join("photo.zip"))
+                .await
+                .unwrap();
+            assert_eq!(
+                std::fs::read(directory.join("photo.jpg")).unwrap(),
+                b"image"
+            );
+            assert_eq!(
+                std::fs::read(directory.join("photo.mov")).unwrap(),
+                b"video"
+            );
+
+            std::fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn download_preserves_invalid_live_photo_archive() {
+        let data = archive(&[("image.jpg", b"image")], CompressionMethod::Deflated);
+        let collection_key = crypto::Key::generate();
+        let file_key = crypto::Key::generate();
+        let encrypted_key = crypto::secretbox::encrypt(file_key.as_bytes(), &collection_key);
+        let mut encrypted_data = Vec::new();
+        let header =
+            crypto::stream::encrypt_file(&mut data.as_slice(), &mut encrypted_data, &file_key)
+                .unwrap();
+        let file_id = uuid::Uuid::new_v4().as_u64_pair().0 as i64;
+        let file: RemoteFile = serde_json::from_value(serde_json::json!({
+            "id": file_id,
+            "collectionID": 1,
+            "ownerID": 1,
+            "encryptedKey": b64::encode(&encrypted_key.encrypted_data),
+            "keyDecryptionNonce": b64::encode(encrypted_key.nonce.as_bytes()),
+            "file": { "decryptionHeader": b64::encode(header.as_bytes()) },
+            "thumbnail": { "decryptionHeader": "" },
+            "metadata": { "encryptedData": "", "decryptionHeader": "" },
+            "isDeleted": false,
+            "updatedAt": 0
+        }))
+        .unwrap();
+        let mut server = Server::new_async().await;
+        let url_mock = server
+            .mock("GET", format!("/files/download/v3/{file_id}").as_str())
+            .with_body(serde_json::json!({ "url": format!("{}/object", server.url()) }).to_string())
+            .create_async()
+            .await;
+        let download_mock = server
+            .mock("GET", "/object")
+            .with_body(encrypted_data)
+            .create_async()
+            .await;
+        let client = AppClient::new(Some(server.url()), App::Photos).unwrap();
+        let mut manager = DownloadManager::new(client).unwrap();
+        manager.set_collection_keys([(1, collection_key.as_bytes().to_vec())].into());
         let directory =
             std::env::temp_dir().join(format!("ente-live-photo-test-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir(&directory).unwrap();
+        let destination = directory.join("photo.zip");
 
-        extract_live_photo(&data, &directory.join("photo.zip"))
-            .await
-            .unwrap();
-        assert_eq!(
-            std::fs::read(directory.join("photo.jpg")).unwrap(),
-            b"image"
-        );
-        assert_eq!(
-            std::fs::read(directory.join("photo.mov")).unwrap(),
-            b"video"
-        );
+        manager.download_file(&file, &destination).await.unwrap();
 
+        url_mock.assert_async().await;
+        download_mock.assert_async().await;
+        assert_eq!(std::fs::read(destination).unwrap(), data);
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[tokio::test]
     async fn rejects_excessive_expansion() {
         let oversized = vec![0; super::MAX_EXPANDED_OVERHEAD as usize + 1024 * 1024];
-        let data = archive(&[("image.jpg", &oversized), ("video.mov", b"video")]);
+        let data = archive(
+            &[("image.jpg", &oversized), ("video.mov", b"video")],
+            CompressionMethod::Deflated,
+        );
         assert!(
             extract_live_photo(&data, Path::new("photo.zip"))
                 .await

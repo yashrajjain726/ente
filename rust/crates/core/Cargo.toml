@@ -5,37 +5,37 @@ edition = "2024"
 [dependencies]
 # Keep argon2 on stable 0.5.x for now. This retains a second digest 0.10
 # chain (via blake2 0.10) until argon2 0.6 reaches stable.
-argon2 = "0.5"
-base64 = "0.22"
-blake2b_simd = "1.0"
-crypto_secretbox = { version = "0.1", default-features = false, features = ["alloc", "salsa20"] }
+argon2 = "0.5.0"
+base64 = "0.22.0"
+blake2b_simd = "1.0.0"
+crypto_secretbox = { version = "0.1.0", default-features = false, features = ["alloc", "salsa20"] }
 crypto_secretstream = "=0.2.0"
-getrandom = { version = "0.4", features = ["wasm_js"] }
-hpke = { version = "0.14", default-features = false, features = ["alloc", "chacha", "getrandom", "mlkem", "x25519"] }
+getrandom.workspace = true
+hpke = { version = "0.14.0", default-features = false, features = ["alloc", "chacha", "getrandom", "mlkem", "x25519"] }
 log.workspace = true
 md-5.workspace = true
-rand_core_06 = { package = "rand_core", version = "0.6", features = ["getrandom"] }
+rand_core_06 = { package = "rand_core", version = "0.6.0", features = ["getrandom"] }
 reqwest = { workspace = true, features = ["http2", "charset", "system-proxy", "json", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
-salsa20 = "0.10"
+salsa20 = "0.10.0"
 serde.workspace = true
 serde_json.workspace = true
-subtle = "2"
+subtle.workspace = true
 thiserror.workspace = true
 # Remove when hpke fix for accidentally not enabling xwing zeroize is released.
 # https://github.com/rozbb/rust-hpke/issues/110
-x-wing = { version = "0.1", default-features = false, features = ["zeroize"] }
-x25519-dalek = { version = "3.0", features = ["static_secrets"] }
+x-wing = { version = "0.1.0", default-features = false, features = ["zeroize"] }
+x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 zeroize.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 reqwest = { workspace = true, features = ["stream"] }
 bytes = "1.11.1"
 futures-core = "0.3.32"
-tokio = { version = "1", features = ["time"] }
+tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 gloo-timers = { version = "0.3.0", features = ["futures"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 mockito.workspace = true

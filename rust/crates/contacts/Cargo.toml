@@ -15,11 +15,11 @@ thiserror.workspace = true
 ente-accounts.workspace = true
 ente-legacy.workspace = true
 ente-test-support.workspace = true
-hmac = "0.13"
+hmac.workspace = true
 mockito.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 serde_json.workspace = true
-sha1 = "0.11"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-uuid = { version = "1", features = ["v4", "js"] }
+sha1.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+uuid = { workspace = true, features = ["v4", "js"] }
 zeroize.workspace = true

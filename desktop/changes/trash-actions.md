@@ -1,0 +1,1 @@
+- Fixed the duplicate Empty Trash action and disabled it while photos are selected.

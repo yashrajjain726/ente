@@ -43,10 +43,6 @@ jobs:
                   save-if: false
                   cache-directories: rust/.cache
 
-            - run: cargo fmt --check
-
-            - run: cargo clippy --locked --all-targets --features museum,ente-ml/ml-assets
-
             - run: cargo install cargo-audit --version 0.22.2 --locked
 
-            - run: cargo audit
+            - run: ./scripts/lint.sh
