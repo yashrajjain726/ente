@@ -1,5 +1,6 @@
 import { AuthPageShell } from "ente-accounts/components/auth/AuthPageShell";
 import type { AuthPresentationConfig } from "ente-accounts/components/auth/styles";
+import { isDesktop } from "ente-base/app";
 import { t } from "i18next";
 import type React from "react";
 
@@ -42,6 +43,11 @@ export function PhotosAuthShell({
             }}
             presentationConfig={photosAuthTheme}
             contentWidth={contentWidth}
+            viewportHeight={
+                isDesktop
+                    ? "calc(100svh - env(titlebar-area-height, 30px))"
+                    : undefined
+            }
         >
             {children}
         </AuthPageShell>

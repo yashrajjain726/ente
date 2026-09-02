@@ -21,6 +21,7 @@ export interface AuthPageShellProps extends React.PropsWithChildren {
     brand: AuthBrandCopy;
     presentationConfig: AuthPresentationConfig;
     contentWidth?: 400 | 420;
+    viewportHeight?: string;
 }
 
 export function AuthPageShell({
@@ -28,9 +29,10 @@ export function AuthPageShell({
     presentationConfig,
     children,
     contentWidth = 400,
+    viewportHeight = "100svh",
 }: AuthPageShellProps): React.JSX.Element {
     return (
-        <PageRoot>
+        <PageRoot $viewportHeight={viewportHeight}>
             <GlobalStyles
                 styles={createAuthColorVariables(presentationConfig)}
             />
@@ -163,10 +165,12 @@ function BrandPanel({
     );
 }
 
-const PageRoot = styled("main")(({ theme }) => ({
+const PageRoot = styled("main", {
+    shouldForwardProp: (prop) => prop !== "$viewportHeight",
+})<{ $viewportHeight: string }>(({ theme, $viewportHeight }) => ({
     width: "100%",
-    height: "100svh",
-    minHeight: "100svh",
+    height: $viewportHeight,
+    minHeight: $viewportHeight,
     display: "flex",
     position: "relative",
     overflow: "hidden",
