@@ -37,7 +37,7 @@ import {
     type RemotePullOpts,
 } from "@/components/gallery";
 import {
-    findCollectionCreatingUncategorizedIfNeeded,
+    findCollectionCreatingIfNeeded,
     performCollectionOp,
     validateKey,
 } from "@/components/gallery/helpers";
@@ -386,6 +386,10 @@ const Page: React.FC = () => {
     } = state;
 
     const barMode = state.view?.type ?? "albums";
+    const quickLinkVisibility =
+        barMode == "hidden-albums"
+            ? ItemVisibility.hidden
+            : ItemVisibility.visible;
     const activeCollectionID =
         state.view?.type == "people"
             ? undefined
@@ -987,7 +991,7 @@ const Page: React.FC = () => {
         (op: CollectionOp) => {
             setPostCreateAlbumOp(op);
             postCreateAlbumHidden.current =
-                op == "add" && barMode == "hidden-albums";
+                (op == "add" || op == "move") && barMode == "hidden-albums";
             return showAlbumNameInput;
         },
         [showAlbumNameInput, barMode],
@@ -1120,6 +1124,7 @@ const Page: React.FC = () => {
                         const quickLinkCollection =
                             await createQuickLinkCollection(
                                 quickLinkNameForFiles(ownedSelectedFiles),
+                                quickLinkVisibility,
                             );
                         await addToCollection(
                             quickLinkCollection,
@@ -1431,6 +1436,7 @@ const Page: React.FC = () => {
             try {
                 const quickLinkCollection = await createQuickLinkCollection(
                     quickLinkNameForFiles([file]),
+                    quickLinkVisibility,
                 );
                 await addToCollection(quickLinkCollection, [file]);
                 const publicURL = await createPublicURL(
@@ -1455,6 +1461,7 @@ const Page: React.FC = () => {
             showLoadingBar,
             hideLoadingBar,
             customDomain,
+            quickLinkVisibility,
             remotePull,
             onGenericError,
         ],
@@ -1620,6 +1627,7 @@ const Page: React.FC = () => {
                     handleOpenCollectionSelector({
                         action: "move",
                         sourceCollectionSummaryID: activeCollectionSummary?.id,
+                        showHiddenCollections: barMode == "hidden-albums",
                         onCreateCollection:
                             createOnCreateForCollectionOp("move"),
                         onSelectCollection:
@@ -1829,10 +1837,7 @@ const Page: React.FC = () => {
                         : normalCollectionSummaries
                 }
                 collectionForCollectionSummaryID={(id) =>
-                    findCollectionCreatingUncategorizedIfNeeded(
-                        state.collections,
-                        id,
-                    )
+                    findCollectionCreatingIfNeeded(state.collections, id)
                 }
             />
             <DownloadStatusNotifications

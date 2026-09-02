@@ -1,0 +1,1 @@
+- Added support for moving photos between hidden albums.

@@ -9,6 +9,7 @@ import type { EnteFile } from "ente-media/file";
 import {
     addOrCopyToCollection,
     createUncategorizedCollection,
+    getOrCreateDefaultHiddenCollection,
     moveFromCollection,
     moveToCollection,
     restoreToCollection,
@@ -26,14 +27,16 @@ export const validateKey = async () => {
     }
 };
 
-export const findCollectionCreatingUncategorizedIfNeeded = async (
+export const findCollectionCreatingIfNeeded = async (
     collections: Collection[],
     collectionSummaryID: number,
 ): Promise<Collection> =>
     collectionSummaryID == PseudoCollectionID.uncategorizedPlaceholder
         ? createUncategorizedCollection()
-        : // The selector only exposes summaries backed by collections.
-          collections.find(({ id }) => id == collectionSummaryID)!;
+        : collectionSummaryID == PseudoCollectionID.hiddenItems
+          ? getOrCreateDefaultHiddenCollection()
+          : // The selector only exposes summaries backed by collections.
+            collections.find(({ id }) => id == collectionSummaryID)!;
 
 // Adds may copy non-owned files or reuse an owned file with the same hash.
 // Moves remain owner-only; shared contributor flows are adds.
@@ -48,11 +51,15 @@ export const performCollectionOp = async (
             await addOrCopyToCollection(selectedCollection, selectedFiles);
             break;
         case "move":
-            await moveFromCollection(
-                sourceCollectionID!,
-                selectedCollection,
-                selectedFiles,
-            );
+            if (sourceCollectionID == PseudoCollectionID.hiddenItems) {
+                await moveToCollection(selectedCollection, selectedFiles);
+            } else {
+                await moveFromCollection(
+                    sourceCollectionID!,
+                    selectedCollection,
+                    selectedFiles,
+                );
+            }
             break;
         case "restore":
             await restoreToCollection(selectedCollection, selectedFiles);
