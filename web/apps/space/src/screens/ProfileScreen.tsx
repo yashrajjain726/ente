@@ -1874,12 +1874,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                           sx={{
                                               display: "grid",
                                               gap: adaptivePhotoMasonryGap,
-                                              gridTemplateColumns: tiles
-                                                  .map(
-                                                      ({ aspectRatio }) =>
-                                                          `minmax(0, ${aspectRatio}fr)`,
-                                                  )
-                                                  .join(" "),
+                                              gridTemplateColumns:
+                                                  tiles.length == 1
+                                                      ? "minmax(0, 1fr)"
+                                                      : tiles
+                                                            .map(
+                                                                ({
+                                                                    aspectRatio,
+                                                                }) =>
+                                                                    `minmax(0, ${aspectRatio}fr)`,
+                                                            )
+                                                            .join(" "),
                                               minWidth: 0,
                                           }}
                                       >
