@@ -16,6 +16,7 @@ import type {
     NativeDeviceLockCapability,
     PendingUploads,
     PersistedAppLockConfig,
+    ThemeMode,
     UtilityProcessType,
     ZipItem,
 } from "./types/ipc";
@@ -104,6 +105,9 @@ const onMainWindowBlur = (cb: (() => void) | undefined) => {
     ipcRenderer.removeAllListeners("mainWindowBlur");
     if (cb) ipcRenderer.on("mainWindowBlur", cb);
 };
+
+const setTitleBarOverlay = (themeMode: ThemeMode, isFileViewerOpen: boolean) =>
+    ipcRenderer.send("setTitleBarOverlay", themeMode, isFileViewerOpen);
 
 const onOpenEnteURL = (cb: ((url: string) => void) | undefined) => {
     ipcRenderer.removeAllListeners("openEnteURL");
@@ -289,6 +293,7 @@ contextBridge.exposeInMainWorld("electron", {
     promptDeviceLock,
     onMainWindowFocus,
     onMainWindowBlur,
+    setTitleBarOverlay,
     onOpenEnteURL,
 
     onAppUpdateAvailable,
