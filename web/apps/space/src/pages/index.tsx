@@ -34,7 +34,7 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState, type OnboardingEntrySource } from "state/app-state";
-import { spaceAppBackground, spaceAppBackgroundColor } from "styles/colors";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -126,7 +126,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
     <Box
         component="main"
         sx={{
-            background: spaceAppBackground,
+            background: "white",
             boxSizing: "border-box",
             display: "grid",
             minHeight: "100svh",
