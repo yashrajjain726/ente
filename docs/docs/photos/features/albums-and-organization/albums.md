@@ -140,7 +140,7 @@ Open **All Albums** to search your album names or filter the list. The available
 - **Links** for albums created by quick links
 - **Shared** for albums you shared with others
 - **Received** for albums shared with you
-- **Empty** for albums without photos or videos
+- **Empty** for albums you own that aren't shared or archived and contain no photos or videos
 
 ## Empty albums
 

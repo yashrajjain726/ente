@@ -82,7 +82,8 @@ Once faces are grouped, you can assign names to identify people:
 
 1. Open a person grouping
 2. Click **Add a name**
-3. Enter the person's name. Use the search field to filter existing names before selecting one when needed.
+3. If other named people exist, search for and select the person, or select **New person** to create one
+4. When creating a new person, enter the name and click **Add**
 
 After naming, you can search for that person by typing their name in the search bar.
 

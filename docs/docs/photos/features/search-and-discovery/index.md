@@ -40,7 +40,7 @@ Search for albums by name or search within specific albums to narrow down result
 
 ### Photos without location data
 
-On web and desktop, select **No location** from the search suggestions to find photos and videos that do not have GPS coordinates in their metadata. This can help identify items that need a [location added manually](/photos/faq/metadata-and-editing#add-location).
+On web and desktop, select **No location** from the search suggestions to find photos and videos you own that do not have GPS coordinates in their metadata. This can help identify items that need a [location added manually](/photos/faq/metadata-and-editing#add-location).
 
 ### Settings search
 
