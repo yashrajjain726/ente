@@ -10,6 +10,53 @@ const kVideoProgressRowHeight = 32.0;
 const kVideoCaptionGap = 6.0;
 const kVideoCaptionLineHeight = 16.0;
 const kVideoScrimTopPadding = 12.0;
+const kVideoLongPressPlaybackSpeed = 2.0;
+
+OverlayEntry showVideoLongPressSpeedIndicator(BuildContext context) {
+  final entry = OverlayEntry(
+    builder: (context) {
+      final screenSize = MediaQuery.sizeOf(context);
+      final isLandscape = screenSize.width > screenSize.height;
+      return Positioned(
+        top:
+            MediaQuery.paddingOf(context).top +
+            (isLandscape ? 12 : kToolbarHeight + 16),
+        left: 0,
+        right: 0,
+        child: const IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Center(child: VideoLongPressSpeedIndicator()),
+          ),
+        ),
+      );
+    },
+  );
+  Overlay.of(context, rootOverlay: true).insert(entry);
+  return entry;
+}
+
+class VideoLongPressSpeedIndicator extends StatelessWidget {
+  const VideoLongPressSpeedIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = getEnteTextTheme(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Text(
+          "2x",
+          style: textTheme.smallBold.copyWith(color: textBaseDark),
+        ),
+      ),
+    );
+  }
+}
 
 class EqualHeightSliderTrackShape extends RoundedRectSliderTrackShape {
   const EqualHeightSliderTrackShape();

@@ -101,6 +101,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   StreamSubscription<DownloadTask>? downloadTaskSubscription;
   final _transformationController = TransformationController();
   bool _isZooming = false;
+  OverlayEntry? _longPressSpeedIndicatorEntry;
 
   @override
   void initState() {
@@ -278,6 +279,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   @override
   void dispose() {
+    _longPressSpeedIndicatorEntry?.remove();
     widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     _subscription?.cancel();
     _controller?.stop().ignore();
@@ -324,6 +326,20 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   void _onPlaybackSpeedChanged() {
     _controller?.setPlaybackSpeed(widget.playbackSpeed.value);
+  }
+
+  void _startLongPressSpeed() {
+    final controller = _controller;
+    if (_longPressSpeedIndicatorEntry != null || controller == null) return;
+    _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
+    controller.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
+  }
+
+  void _restorePlaybackSpeed() {
+    if (_longPressSpeedIndicatorEntry == null) return;
+    _longPressSpeedIndicatorEntry?.remove();
+    _longPressSpeedIndicatorEntry = null;
+    _controller?.setPlaybackSpeed(widget.playbackSpeed.value).ignore();
   }
 
   void _onInteractionLockChanged(bool shouldLock) {
@@ -424,25 +440,31 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                       );
                                     }
                                   },
-                            onLongPress: widget.isFromMemories
-                                ? () {
-                                    widget.playbackCallback?.call(
-                                      false,
-                                      FullScreenRequestReason.userInteraction,
-                                    );
-                                    _controller?.pause();
-                                  }
-                                : null,
-                            onLongPressUp: widget.isFromMemories
-                                ? () {
-                                    if (!widget.isActive) return;
-                                    widget.playbackCallback?.call(
-                                      true,
-                                      FullScreenRequestReason.userInteraction,
-                                    );
-                                    _controller?.play();
-                                  }
-                                : null,
+                            onLongPress: () {
+                              if (widget.isFromMemories) {
+                                widget.playbackCallback?.call(
+                                  false,
+                                  FullScreenRequestReason.userInteraction,
+                                );
+                                _controller?.pause();
+                              } else {
+                                _startLongPressSpeed();
+                              }
+                            },
+                            onLongPressUp: () {
+                              if (widget.isFromMemories && widget.isActive) {
+                                widget.playbackCallback?.call(
+                                  true,
+                                  FullScreenRequestReason.userInteraction,
+                                );
+                                _controller?.play();
+                              } else if (!widget.isFromMemories) {
+                                _restorePlaybackSpeed();
+                              }
+                            },
+                            onLongPressCancel: widget.isFromMemories
+                                ? null
+                                : _restorePlaybackSpeed,
                           ),
                           if (!widget.isFromMemories && isPlaybackReady)
                             Positioned.fill(
