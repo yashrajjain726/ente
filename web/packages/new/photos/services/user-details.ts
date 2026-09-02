@@ -217,7 +217,8 @@ export const cancelStripeSubscription = async () => {
     return pullUserDetails();
 };
 
-const paymentsAppOrigin = "https://payments.ente.com";
+const paymentsAppOrigin =
+    process.env.NEXT_PUBLIC_PAYMENTS_APP_ORIGIN ?? "https://payments.ente.com";
 
 export const redirectToPaymentsApp = async (
     productID: string,

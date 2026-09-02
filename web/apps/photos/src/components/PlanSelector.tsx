@@ -88,20 +88,23 @@ export const PlanSelector: React.FC<PlanSelectorProps> = ({
                 backdrop: { sx: { backdropFilter: "blur(30px) opacity(95%)" } },
             }}
         >
-            <PlanSelectorCard {...{ onClose, setLoading, onManageFamily }} />
+            <PlanSelectorContents
+                {...{ onClose, setLoading, onManageFamily }}
+            />
         </Dialog>
     );
 };
 
-type PlanSelectorCardProps = Pick<
+export type PlanSelectorContentsProps = Pick<
     PlanSelectorProps,
     "onClose" | "setLoading" | "onManageFamily"
->;
+> & { onBeginCheckout?: () => void };
 
-const PlanSelectorCard: React.FC<PlanSelectorCardProps> = ({
+export const PlanSelectorContents: React.FC<PlanSelectorContentsProps> = ({
     onClose,
     setLoading,
     onManageFamily,
+    onBeginCheckout,
 }) => {
     const { showMiniDialog } = useBaseContext();
 
@@ -161,6 +164,7 @@ const PlanSelectorCard: React.FC<PlanSelectorCardProps> = ({
         switch (planSelectionOutcome(subscription)) {
             case "buyPlan":
                 try {
+                    onBeginCheckout?.();
                     setLoading(true);
                     await redirectToPaymentsApp(plan.stripeID!, "buy");
                 } catch (e) {

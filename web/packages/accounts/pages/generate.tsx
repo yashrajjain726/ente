@@ -47,11 +47,13 @@ import {
 export interface GeneratePageProps {
     passwordPresentation?: ComponentType<NewPasswordPresentationProps>;
     recoveryKeyPresentation?: ComponentType<RecoveryKeyPresentationProps>;
+    onRecoveryKeyClose?: () => void;
 }
 
 const Page: React.FC<GeneratePageProps> = ({
     passwordPresentation,
     recoveryKeyPresentation,
+    onRecoveryKeyClose,
 }) => {
     const { logout, showMiniDialog } = useBaseContext();
 
@@ -106,7 +108,11 @@ const Page: React.FC<GeneratePageProps> = ({
     );
 
     function handleRecoveryKeyClose() {
-        void router.push(appHomeRoute);
+        if (onRecoveryKeyClose) {
+            onRecoveryKeyClose();
+        } else {
+            void router.push(appHomeRoute);
+        }
     }
 
     if (openRecoveryKey && recoveryKeyPresentation) {
