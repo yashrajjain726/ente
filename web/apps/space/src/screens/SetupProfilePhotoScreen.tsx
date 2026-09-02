@@ -44,7 +44,11 @@ interface SetupProfilePhotoScreenProps {
 }
 
 const AvatarPlaceholder: React.FC = () => (
-    <SpaceAvatarImage aria-hidden border="4px solid white" borderRadius="50%" />
+    <SpaceAvatarImage
+        aria-hidden
+        border={`4px solid ${spaceSurface}`}
+        borderRadius="50%"
+    />
 );
 
 export const SetupProfilePhotoScreen: React.FC<
