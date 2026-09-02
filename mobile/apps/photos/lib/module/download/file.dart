@@ -34,6 +34,7 @@ Future<File?> getFile(
   bool liveVideo = false,
   bool isOrigin = false,
   bool forGalleryDownload = false, // only relevant for live photos
+  bool throwOnDecryptionFailure = false,
 }) async {
   try {
     if (file.isRemoteOnlyFile) {
@@ -41,6 +42,7 @@ Future<File?> getFile(
         file,
         liveVideo: liveVideo,
         forGalleryDownload: forGalleryDownload,
+        throwOnDecryptionFailure: throwOnDecryptionFailure,
       );
     } else {
       final String key = file.tag + liveVideo.toString() + isOrigin.toString();
@@ -62,7 +64,8 @@ Future<File?> getFile(
     }
   } catch (e, s) {
     _logger.warning("Failed to get file", e, s);
-    if (forGalleryDownload) {
+    if (forGalleryDownload ||
+        (throwOnDecryptionFailure && e is DownloadDecryptionError)) {
       rethrow;
     }
     return null;
@@ -160,6 +163,7 @@ Future<File?> getFileFromServer(
   ProgressCallback? progressCallback,
   bool liveVideo = false, // only needed in case of live photos
   bool forGalleryDownload = false,
+  bool throwOnDecryptionFailure = false,
 }) async {
   final cacheManager = (file.fileType == FileType.video || liveVideo)
       ? VideoCacheManager.instance
@@ -174,7 +178,7 @@ Future<File?> getFileFromServer(
     _progressCallbacks[downloadID] = progressCallback;
   }
 
-  return _runOncePerKey(
+  final download = _runOncePerKey(
     _fileDownloadsInProgress,
     downloadID,
     () {
@@ -202,6 +206,14 @@ Future<File?> getFileFromServer(
     },
     onComplete: () => _progressCallbacks.remove(downloadID),
   );
+  try {
+    return await download;
+  } on DownloadDecryptionError {
+    if (forGalleryDownload || throwOnDecryptionFailure) {
+      rethrow;
+    }
+    return null;
+  }
 }
 
 Future<bool> isFileCached(EnteFile file, {bool liveVideo = false}) async {
@@ -238,7 +250,7 @@ Future<File?> _getLivePhotoFromServer(
     return needLiveVideo ? livePhoto.video : livePhoto.image;
   } catch (e, s) {
     _logger.warning("live photo get failed", e, s);
-    if (forGalleryDownload) {
+    if (forGalleryDownload || e is DownloadDecryptionError) {
       rethrow;
     }
     return null;
