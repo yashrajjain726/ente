@@ -307,6 +307,7 @@ const ProfilePostLoadingIndicator: React.FC = () => (
 );
 
 interface ProfilePostTileProps {
+    aspectRatio?: number;
     borderRadius?: number | string;
     dimensions: ProfilePhotoDimensions;
     displayName: string;
@@ -322,6 +323,7 @@ interface ProfilePostTileProps {
 }
 
 const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
+    aspectRatio,
     borderRadius = photoMasonryRadius,
     dimensions,
     displayName,
@@ -400,7 +402,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
             }}
             sx={{
                 appearance: "none",
-                aspectRatio: photoAspectRatio(dimensions),
+                aspectRatio: aspectRatio ?? photoAspectRatio(dimensions),
                 bgcolor: photoMasonryPlaceholderBackground,
                 border: 0,
                 borderRadius,
@@ -658,8 +660,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         loadedPhotoDimensionsByID,
     );
     const masonryColumns = buildPostMasonryColumns(masonryTiles);
-    const adaptiveMasonryRows = buildAdaptivePostMasonryRows(masonryTiles);
     const usesAdaptiveMasonryRows = isOwnerProfile || isFriendProfile;
+    const usesSparseProfileLayout =
+        masonryTiles.length > 0 && masonryTiles.length <= 3;
+    const usesFullWidthPostRows =
+        usesAdaptiveMasonryRows || usesSparseProfileLayout;
+    const adaptiveMasonryRows = usesSparseProfileLayout
+        ? masonryTiles.map((tile) => [tile])
+        : buildAdaptivePostMasonryRows(masonryTiles);
     const closeFriendActions = () => setFriendActionsAnchor(null);
 
     const requestUnfriend = () => {
@@ -1064,11 +1072,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const renderPostTile = (
         { dimensions, index, item }: PostMasonryTile,
         borderRadius?: number | string,
+        aspectRatio?: number,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
         return (
             <ProfilePostTile
                 key={`${item.id}-${index}`}
+                aspectRatio={aspectRatio}
                 borderRadius={borderRadius}
                 dimensions={dimensions}
                 displayName={displayName}
@@ -1824,7 +1834,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         flexDirection: "column",
                         minHeight: hasProfilePosts ? undefined : 0,
                         mt: "32px",
-                        pb: usesAdaptiveMasonryRows ? 0 : "16px",
+                        pb: usesFullWidthPostRows ? 0 : "16px",
                         px: 0,
                         width: "100%",
                     }}
@@ -1832,30 +1842,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {hasProfilePosts ? (
                         <Box
                             sx={{
-                                borderTopLeftRadius: usesAdaptiveMasonryRows
+                                borderTopLeftRadius: usesFullWidthPostRows
                                     ? photoMasonryRadius
                                     : undefined,
-                                borderTopRightRadius: usesAdaptiveMasonryRows
+                                borderTopRightRadius: usesFullWidthPostRows
                                     ? photoMasonryRadius
                                     : undefined,
                                 display: "grid",
-                                gap: usesAdaptiveMasonryRows
-                                    ? adaptivePhotoMasonryGap
+                                gap: usesFullWidthPostRows
+                                    ? usesSparseProfileLayout
+                                        ? photoMasonryGap
+                                        : adaptivePhotoMasonryGap
                                     : photoMasonryGap,
-                                gridTemplateColumns: usesAdaptiveMasonryRows
+                                gridTemplateColumns: usesFullWidthPostRows
                                     ? "minmax(0, 1fr)"
                                     : `repeat(${masonryColumns.length}, minmax(0, 1fr))`,
                                 mt: "6px",
-                                mx: usesAdaptiveMasonryRows ? 0 : "16px",
-                                overflow: usesAdaptiveMasonryRows
+                                mx: usesFullWidthPostRows ? 0 : "16px",
+                                overflow: usesFullWidthPostRows
                                     ? "hidden"
                                     : undefined,
-                                width: usesAdaptiveMasonryRows
+                                width: usesFullWidthPostRows
                                     ? "100%"
                                     : "calc(100% - 32px)",
                             }}
                         >
-                            {usesAdaptiveMasonryRows
+                            {usesFullWidthPostRows
                                 ? adaptiveMasonryRows.map((tiles, rowIndex) => (
                                       <Box
                                           key={rowIndex}
@@ -1877,7 +1889,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                           }}
                                       >
                                           {tiles.map((tile) =>
-                                              renderPostTile(tile, 0),
+                                              renderPostTile(
+                                                  tile,
+                                                  usesSparseProfileLayout
+                                                      ? photoMasonryRadius
+                                                      : 0,
+                                                  usesSparseProfileLayout
+                                                      ? Math.min(
+                                                            tile.aspectRatio,
+                                                            1,
+                                                        )
+                                                      : undefined,
+                                              ),
                                           )}
                                       </Box>
                                   ))
