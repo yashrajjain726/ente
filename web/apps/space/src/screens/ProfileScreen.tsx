@@ -33,6 +33,7 @@ import { openSpaceShareLinkDialog } from "services/share-link";
 import { isSpaceContentError, type SpacePostAsset } from "services/space";
 import {
     spaceAppBackground,
+    spaceAppBackgroundColor,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -1445,7 +1446,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             sx={{
                                 alignItems: "center",
                                 aspectRatio: "1 / 1",
-                                bgcolor: profileCoverSkeletonBackground,
+                                bgcolor: spaceAppBackgroundColor,
                                 border: 0,
                                 borderRadius: "50%",
                                 boxSizing: "border-box",
@@ -1456,6 +1457,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 justifyContent: "center",
                                 overflow: "hidden",
                                 p: 0,
+                                position: "relative",
                                 width: "100%",
                                 "&:focus-visible": {
                                     outline: `2px solid ${green}`,
@@ -1463,19 +1465,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                             }}
                         >
-                            {profile.avatarUrl || !profile.avatarObjectID ? (
-                                <SpaceAvatarImage src={profile.avatarUrl} />
-                            ) : (
-                                <Skeleton
-                                    variant="circular"
-                                    sx={{
-                                        bgcolor: profileCoverSkeletonBackground,
-                                        height: "100%",
-                                        transform: "none",
-                                        width: "100%",
-                                    }}
-                                />
-                            )}
+                            <Box
+                                sx={{
+                                    bgcolor: profileCoverSkeletonBackground,
+                                    borderRadius: "50%",
+                                    inset: 2,
+                                    overflow: "hidden",
+                                    position: "absolute",
+                                }}
+                            >
+                                {profile.avatarUrl ||
+                                !profile.avatarObjectID ? (
+                                    <SpaceAvatarImage src={profile.avatarUrl} />
+                                ) : (
+                                    <Skeleton
+                                        variant="circular"
+                                        sx={{
+                                            bgcolor:
+                                                profileCoverSkeletonBackground,
+                                            height: "100%",
+                                            transform: "none",
+                                            width: "100%",
+                                        }}
+                                    />
+                                )}
+                            </Box>
                         </Box>
                     </Box>
                     <Box

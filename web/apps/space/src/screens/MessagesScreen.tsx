@@ -48,6 +48,7 @@ import { spacePostImageInputAccept } from "utils/post-image";
 const green = "#08C225";
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
+const conversationPrimaryText = "#E6E9E7";
 const messageTimestampColor = "#7E8582";
 const messageActivityColor = "#929996";
 const lightSurface = spaceSurface;
@@ -258,7 +259,7 @@ const ConversationPreviewLine: React.FC<{
 }> = ({ conversation }) => {
     const activity = conversation.latestActivity;
     const previewLineSx = {
-        color: textSecondary,
+        color: messageActivityColor,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
         fontWeight: 500,
@@ -508,7 +509,8 @@ const ConversationListItem: React.FC<{
                 sx={{
                     alignItems: "center",
                     borderRadius: "8px",
-                    color: textBase,
+                    boxSizing: "border-box",
+                    color: conversationPrimaryText,
                     display: "grid",
                     gap: "10px",
                     gridTemplateColumns:
@@ -516,9 +518,13 @@ const ConversationListItem: React.FC<{
                             ? "44px minmax(0, 1fr) auto"
                             : "44px minmax(0, 1fr)",
                     minHeight: 64,
-                    p: "8px 0",
+                    mx: "-8px",
+                    p: "8px",
                     textAlign: "left",
-                    width: "100%",
+                    transition: "background-color 140ms ease",
+                    width: "calc(100% + 16px)",
+                    "&:active": { bgcolor: spaceDialogBackground },
+                    "&:hover": { bgcolor: spaceDialogBackground },
                 }}
             >
                 <Box
@@ -668,7 +674,7 @@ const ConversationListItem: React.FC<{
                                 aria-hidden
                                 component="span"
                                 sx={{
-                                    color: textSecondary,
+                                    color: messageTimestampColor,
                                     flexShrink: 0,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
@@ -685,7 +691,7 @@ const ConversationListItem: React.FC<{
                                     conversation.latestActivity.createdAtMs,
                                 ).toISOString()}
                                 sx={{
-                                    color: textSecondary,
+                                    color: messageTimestampColor,
                                     flexShrink: 0,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
@@ -707,7 +713,7 @@ const ConversationListItem: React.FC<{
                                 alt=""
                                 src={postThumbnailUrl}
                                 sx={{
-                                    borderRadius: "6px",
+                                    borderRadius: "20%",
                                     display: "block",
                                     height: 44,
                                     objectFit: "cover",
@@ -726,7 +732,7 @@ const ConversationListItem: React.FC<{
                                 sx={{
                                     alignItems: "center",
                                     bgcolor: incomingQuoteBubble,
-                                    borderRadius: "6px",
+                                    borderRadius: "20%",
                                     color: incomingQuoteText,
                                     display: "flex",
                                     height: 44,
@@ -861,7 +867,7 @@ const ConversationSection: React.FC<{
             <Box
                 component="h2"
                 sx={{
-                    color: textSecondary,
+                    color: messageActivityColor,
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 13,
                     fontWeight: 700,
@@ -2152,7 +2158,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 alignItems: "center",
                                 bgcolor: "transparent",
                                 border: 0,
-                                color: "inherit",
+                                color: conversationPrimaryText,
                                 cursor:
                                     isThreadOpen || onBack
                                         ? "pointer"
