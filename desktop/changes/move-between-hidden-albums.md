@@ -1,0 +1,2 @@
+- Added support for moving photos between hidden albums.
+- Fix hidden album quick link visiblity.

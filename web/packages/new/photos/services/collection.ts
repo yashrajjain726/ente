@@ -63,10 +63,13 @@ const copyRequestBatchSize = 100;
 export const createAlbum = (albumName: string) =>
     createCollection(albumName, "album");
 
-export const createQuickLinkCollection = (name: string) =>
+export const createQuickLinkCollection = (
+    name: string,
+    visibility: ItemVisibility,
+) =>
     createCollection(name, "album", {
         subType: CollectionSubType.quicklink,
-        visibility: ItemVisibility.visible,
+        visibility,
     });
 
 export const createHiddenAlbum = (albumName: string) =>
@@ -1208,7 +1211,7 @@ const resolveFavoritesFilesForRemoval = async (
     });
 };
 
-const savedOrCreateDefaultHiddenCollection = async () =>
+export const getOrCreateDefaultHiddenCollection = async () =>
     (await savedDefaultHiddenCollection()) ?? createDefaultHiddenCollection();
 
 const savedDefaultHiddenCollection = async () =>
@@ -1269,8 +1272,7 @@ export const canRemoveFilesFromAllParticipants = (collection: Collection) => {
 
 export const hideFiles = async (files: EnteFile[]) => {
     const userID = ensureLocalUser().id;
-    const defaultHiddenCollection =
-        await savedOrCreateDefaultHiddenCollection();
+    const defaultHiddenCollection = await getOrCreateDefaultHiddenCollection();
     const collections = await savedCollections();
     const collectionsByID = new Map(collections.map((c) => [c.id, c]));
 

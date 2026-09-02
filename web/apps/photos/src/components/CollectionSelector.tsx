@@ -112,6 +112,14 @@ export const CollectionSelector: React.FC<CollectionSelectorProps> = (
                     return false;
                 }
 
+                if (
+                    attributes.action === "move" &&
+                    attributes.showHiddenCollections &&
+                    collectionSummary.type === "hiddenItems"
+                ) {
+                    return true;
+                }
+
                 const isUserFavorites =
                     collectionSummary.type === "userFavorites";
                 if (
