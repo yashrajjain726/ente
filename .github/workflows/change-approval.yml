@@ -1,0 +1,69 @@
+name: Change approval
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - run: node --test .github/scripts/change-approval.test.mjs
+
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      categories: ${{ steps.scan.outputs.categories }}
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 2
+
+      - name: Checkout trusted scanner
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          sparse-checkout: .github/scripts/change-approval.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Scan changes
+        id: scan
+        run: node "$scanner" ${{ github.event.pull_request.base.sha }}
+        env:
+          scanner: ${{ hashFiles('trusted/.github/scripts/change-approval.mjs') && 'trusted/.github/scripts/change-approval.mjs' || '.github/scripts/change-approval.mjs' }}
+
+  approve:
+    needs: detect
+    if: needs.detect.outputs.categories != '[]'
+    name: Approve ${{ matrix.category }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        category: ${{ fromJSON(needs.detect.outputs.categories) }}
+    environment:
+      # Require admin approval for flagged changes.
+      name: change-approval
+    steps:
+      - run: "true"
+
+  gate:
+    needs: [test, detect, approve]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "$test" = success && test "$detect" = success && { test "$approve" = success || test "$approve" = skipped; }
+        env:
+          test: ${{ needs.test.result }}
+          detect: ${{ needs.detect.result }}
+          approve: ${{ needs.approve.result }}
