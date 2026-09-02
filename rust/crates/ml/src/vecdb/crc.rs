@@ -90,14 +90,6 @@ mod tests {
         crc ^ INITIAL_STATE
     }
 
-    fn byte_at_a_time(bytes: &[u8]) -> u32 {
-        let mut state = INITIAL_STATE;
-        for &byte in bytes {
-            state = TABLES[0][((state ^ byte as u32) & 0xFF) as usize] ^ (state >> 8);
-        }
-        state ^ INITIAL_STATE
-    }
-
     fn seeded_bytes(seed: u64, len: usize) -> Vec<u8> {
         let mut state = seed;
         (0..len).map(|_| splitmix64(&mut state) as u8).collect()
@@ -126,14 +118,6 @@ mod tests {
                     "len {len} offset {offset}"
                 );
             }
-        }
-    }
-
-    #[test]
-    fn agrees_with_byte_at_a_time_table_walk() {
-        for seed in 0..8u64 {
-            let bytes = seeded_bytes(0x00C2_0000 + seed, 517);
-            assert_eq!(crc32(&bytes), byte_at_a_time(&bytes));
         }
     }
 

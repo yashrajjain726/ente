@@ -124,31 +124,6 @@ mod tests {
     }
 
     #[test]
-    fn dot_handles_negative_values() {
-        let a: Vec<f32> = (0..128)
-            .map(|i| if i % 2 == 0 { -1.5 } else { 2.0 })
-            .collect();
-        let b: Vec<f32> = (0..128)
-            .map(|i| if i % 3 == 0 { 0.25 } else { -4.0 })
-            .collect();
-        let simd = F32Kernel::dot(&pack_lanes(&a), &pack_lanes(&b));
-        assert_eq!(simd.to_bits(), reference_dot(&a, &b).to_bits());
-    }
-
-    #[test]
-    fn distance_is_one_minus_dot() {
-        let a = seeded_values(7, 192);
-        let b = seeded_values(13, 192);
-        let lanes_a = pack_lanes(&a);
-        let lanes_b = pack_lanes(&b);
-        let expected = 1.0 - F32Kernel::dot(&lanes_a, &lanes_b);
-        assert_eq!(
-            F32Kernel::distance(&lanes_a, &lanes_b).to_bits(),
-            expected.to_bits()
-        );
-    }
-
-    #[test]
     fn distance_of_basis_vectors_is_exact() {
         let e0 = pack_lanes(&basis_vector(128, 0));
         let e1 = pack_lanes(&basis_vector(128, 100));

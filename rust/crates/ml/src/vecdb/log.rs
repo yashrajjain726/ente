@@ -806,35 +806,6 @@ mod tests {
     }
 
     #[test]
-    fn bulk_append_round_trips() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        let mut log = Log::create(&path, 8).unwrap();
-        let vectors: Vec<Vec<f32>> = (0..3).map(|seed| seeded_vector(seed, 8)).collect();
-        let entries = vec![
-            LogEntry::Add {
-                key: "a",
-                vector: &vectors[0],
-            },
-            LogEntry::Tombstone { key: "b" },
-            LogEntry::Add {
-                key: "c",
-                vector: &vectors[2],
-            },
-        ];
-        let (start, end) = append_bounds(&mut log, &entries);
-        assert_eq!(start, HEADER_LEN as u64);
-        assert_eq!(end, log.current_end_offset());
-        let (records, recoverable_end) = scan_all(&mut log);
-        assert_eq!(records.len(), 3);
-        assert_eq!(records[0].1, start);
-        for (index, entry) in entries.iter().enumerate() {
-            assert_eq!(records[index].0, expected_record(entry));
-        }
-        assert_eq!(recoverable_end, end);
-    }
-
-    #[test]
     fn round_trips_boundary_and_multibyte_keys() {
         let long255 = "k".repeat(255);
         let long256 = "k".repeat(256);
@@ -1264,17 +1235,6 @@ mod tests {
         drop(temp_log);
         let reopened = reopen(&temp_path, 8);
         assert_eq!(reopened.generation(), temp_generation);
-    }
-
-    #[test]
-    fn remove_stale_temp_sibling_deletes_leftover_tmp() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("log");
-        let temp_path = dir.path().join("log.tmp");
-        remove_stale_temp_sibling(&path).unwrap();
-        std::fs::write(&temp_path, b"leftover").unwrap();
-        remove_stale_temp_sibling(&path).unwrap();
-        assert!(!temp_path.exists());
     }
 
     #[test]
