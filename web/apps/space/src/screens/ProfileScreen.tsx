@@ -18,7 +18,6 @@ import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     SpaceFileViewer,
     SpaceViewerPostBackdrop,
-    type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
@@ -48,6 +47,7 @@ import {
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
     spacePostPreviewImageForFile,
+    type SpaceDraftPostImage,
 } from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
@@ -67,6 +67,7 @@ const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "8px";
+const adaptivePhotoMasonryGap = "4px";
 const photoMasonryPlaceholderBackground = spaceSurface;
 const photoMasonryRadius = "14px";
 const profileCoverRadius = "12px";
@@ -109,40 +110,83 @@ interface SelectedProfilePost {
     postActionMode?: SpaceViewerPostActionMode;
 }
 
-interface DraftSpacePostImage {
-    cropArea?: SpaceViewerDraftPostEdit["cropArea"];
-    file: File;
-    height?: number;
-    previewUrl?: string;
-    rotationDegrees?: number;
-    width?: number;
-}
-
 interface PostMasonryTile {
+    aspectRatio: number;
     dimensions: ProfilePhotoDimensions;
     index: number;
     item: ProfilePostItem;
 }
 
-const buildPostMasonryColumns = (
+const buildPostMasonryTiles = (
     items: ProfilePostItem[],
     loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
-) => {
-    const columnCount = Math.min(3, items.length);
-    const columns: PostMasonryTile[][] = Array.from(
-        { length: columnCount },
-        () => [],
-    );
-
-    items.forEach((item, index) => {
+) =>
+    items.map((item, index) => {
         const dimensions = loadedDimensionsByID[item.id] ?? {
             height: item.height ?? 1,
             width: item.width ?? 1,
         };
-        columns[index % columnCount]!.push({ dimensions, index, item });
+        return {
+            aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
+            dimensions,
+            index,
+            item,
+        };
     });
 
+const buildPostMasonryColumns = (tiles: PostMasonryTile[]) => {
+    const columns: PostMasonryTile[][] = Array.from(
+        { length: Math.min(3, tiles.length) },
+        () => [],
+    );
+    tiles.forEach((tile, index) => columns[index % columns.length]!.push(tile));
     return columns;
+};
+
+const preferredMobileMasonryRowItemCount = (
+    tiles: PostMasonryTile[],
+    startIndex: number,
+    rowIndex: number,
+) => {
+    const first = tiles[startIndex];
+    const second = tiles[startIndex + 1];
+    const third = tiles[startIndex + 2];
+    if (!first || !second) return 1;
+
+    if (first.aspectRatio >= 1.25) return 1;
+
+    const firstIsPortrait = first.aspectRatio < 0.9;
+    const secondIsPortrait = second.aspectRatio < 0.9;
+    const thirdIsPortrait = !!third && third.aspectRatio < 0.9;
+
+    if (first.aspectRatio <= 0.62 && rowIndex % 4 == 1) return 1;
+    if (firstIsPortrait && secondIsPortrait && thirdIsPortrait) {
+        return rowIndex % 3 == 0 ? 3 : 2;
+    }
+    if (firstIsPortrait && secondIsPortrait) return 2;
+    if (first.aspectRatio + second.aspectRatio >= 1.6) return 2;
+    if (
+        third &&
+        first.aspectRatio + second.aspectRatio + third.aspectRatio >= 1.9
+    )
+        return 3;
+    return 2;
+};
+
+const buildAdaptivePostMasonryRows = (tiles: PostMasonryTile[]) => {
+    const rows = new Array<PostMasonryTile[]>();
+    let tileIndex = 0;
+
+    while (tileIndex < tiles.length) {
+        const rowSize = Math.min(
+            preferredMobileMasonryRowItemCount(tiles, tileIndex, rows.length),
+            tiles.length - tileIndex,
+        );
+        rows.push(tiles.slice(tileIndex, tileIndex + rowSize));
+        tileIndex += rowSize;
+    }
+
+    return rows;
 };
 
 const profilePostImageCacheKey = (item: ProfilePostItem) =>
@@ -261,6 +305,7 @@ const ProfilePostLoadingIndicator: React.FC = () => (
 );
 
 interface ProfilePostTileProps {
+    borderRadius?: number | string;
     dimensions: ProfilePhotoDimensions;
     displayName: string;
     imageUrl?: string;
@@ -275,6 +320,7 @@ interface ProfilePostTileProps {
 }
 
 const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
+    borderRadius = photoMasonryRadius,
     dimensions,
     displayName,
     imageUrl,
@@ -355,7 +401,7 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                 aspectRatio: photoAspectRatio(dimensions),
                 bgcolor: photoMasonryPlaceholderBackground,
                 border: 0,
-                borderRadius: photoMasonryRadius,
+                borderRadius,
                 cursor: imageUrl && !isUnavailable ? "pointer" : "default",
                 display: "block",
                 height: "auto",
@@ -461,11 +507,10 @@ interface ProfileScreenProps {
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
     onCreateSpace?: () => void;
     onCreatePost?: (
-        image: DraftSpacePostImage,
+        image: SpaceDraftPostImage,
         caption: string,
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
-    onDraftPostPublished?: () => void;
     onOpenFriends?: () => void;
     onOpenPost?: (post: ProfilePostItem) => void;
     onOpenProfileCover?: () => void;
@@ -503,7 +548,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onCreateSpace,
     onCreatePost,
     onDeletePost,
-    onDraftPostPublished,
     onOpenFriends,
     onOpenPost,
     onOpenProfileCover,
@@ -608,10 +652,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const postImageLoadRootMargin = isAnonymousPublicProfile
         ? publicPhotoMasonryLoadRootMargin
         : photoMasonryLoadRootMargin;
-    const masonryColumns = buildPostMasonryColumns(
+    const masonryTiles = buildPostMasonryTiles(
         visiblePostItems,
         loadedPhotoDimensionsByID,
     );
+    const masonryColumns = buildPostMasonryColumns(masonryTiles);
+    const adaptiveMasonryRows = buildAdaptivePostMasonryRows(masonryTiles);
+    const usesAdaptiveMasonryRows = isOwnerProfile || isFriendProfile;
     const closeFriendActions = () => setFriendActionsAnchor(null);
 
     const messageFriend = () => {
@@ -671,6 +718,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }, []);
     const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
         localPostObjectUrlsRef.current.delete(objectUrl);
+        URL.revokeObjectURL(objectUrl);
     }, []);
     const openPostPhotoPicker = () => {
         if (isPostPhotoOpening) return;
@@ -684,14 +732,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
     };
-    const { clearBrowserBackState: clearSelectedPostHistory } =
-        useBrowserBackClose({
-            open: Boolean(selectedPost),
-            onClose: () => {
-                if (!isDraftPostExiting) closeSelectedPost();
-            },
-            stateKey: "space-profile-viewer",
-        });
+    useBrowserBackClose({
+        open: Boolean(selectedPost),
+        onClose: () => {
+            if (!isDraftPostExiting) closeSelectedPost();
+        },
+        stateKey: "space-profile-viewer",
+    });
     const rememberLoadedPhotoDimensions = (
         itemID: string,
         image: HTMLImageElement,
@@ -1018,6 +1065,47 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         [revokeLocalPostObjectUrls],
     );
 
+    const renderPostTile = (
+        { dimensions, index, item }: PostMasonryTile,
+        borderRadius?: string,
+    ) => {
+        const imageUrl = loadedPostImageURLFor(item);
+        return (
+            <ProfilePostTile
+                key={`${item.id}-${index}`}
+                borderRadius={borderRadius}
+                dimensions={dimensions}
+                displayName={displayName}
+                imageUrl={imageUrl}
+                index={index}
+                isUnavailable={
+                    Boolean(item.isUnavailable) ||
+                    Boolean(
+                        unavailablePostsByKey[profilePostImageCacheKey(item)],
+                    )
+                }
+                item={item}
+                loadRootMargin={postImageLoadRootMargin}
+                onLoadImage={() => loadPostImage(item)}
+                onImageDecodeError={() =>
+                    setUnavailablePostsByKey((current) => ({
+                        ...current,
+                        [profilePostImageCacheKey(item)]: true,
+                    }))
+                }
+                onOpen={(openedImageUrl) => {
+                    const postIndex = viewerPostIndexByID.get(item.id);
+                    if (postIndex == undefined) return;
+                    onOpenPost?.(item);
+                    setSelectedPost(
+                        selectedPostForItem(item, postIndex, openedImageUrl),
+                    );
+                }}
+                onRememberDimensions={rememberLoadedPhotoDimensions}
+            />
+        );
+    };
+
     return (
         <Box
             component="main"
@@ -1063,6 +1151,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         bgcolor: shouldShowCoverSkeleton
                             ? profileCoverSkeletonBackground
                             : profileCoverBackground,
+                        borderBottomLeftRadius: profileCoverRadius,
+                        borderBottomRightRadius: profileCoverRadius,
                         height: profileCoverHeight,
                         insetInline: 0,
                         overflow: "hidden",
@@ -1070,10 +1160,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         top: 0,
                         width: "100%",
                         zIndex: 0,
-                        "@media (min-width: 600px)": {
-                            borderBottomLeftRadius: profileCoverRadius,
-                            borderBottomRightRadius: profileCoverRadius,
-                        },
                     }}
                 >
                     {shouldShowCoverSkeleton && (
@@ -1736,7 +1822,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         flexDirection: "column",
                         minHeight: hasProfilePosts ? undefined : 0,
                         mt: "24px",
-                        pb: "16px",
+                        pb: usesAdaptiveMasonryRows
+                            ? adaptivePhotoMasonryGap
+                            : "16px",
                         px: 0,
                         width: "100%",
                     }}
@@ -1744,95 +1832,71 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {hasProfilePosts ? (
                         <Box
                             sx={{
+                                borderBottomLeftRadius: usesAdaptiveMasonryRows
+                                    ? photoMasonryRadius
+                                    : undefined,
+                                borderBottomRightRadius: usesAdaptiveMasonryRows
+                                    ? photoMasonryRadius
+                                    : undefined,
+                                borderTopLeftRadius: usesAdaptiveMasonryRows
+                                    ? photoMasonryRadius
+                                    : undefined,
+                                borderTopRightRadius: usesAdaptiveMasonryRows
+                                    ? photoMasonryRadius
+                                    : undefined,
                                 display: "grid",
-                                gap: photoMasonryGap,
-                                gridTemplateColumns: `repeat(${masonryColumns.length}, minmax(0, 1fr))`,
-                                mb: isOwnerProfile ? "100px" : undefined,
+                                gap: usesAdaptiveMasonryRows
+                                    ? adaptivePhotoMasonryGap
+                                    : photoMasonryGap,
+                                gridTemplateColumns: usesAdaptiveMasonryRows
+                                    ? "minmax(0, 1fr)"
+                                    : `repeat(${masonryColumns.length}, minmax(0, 1fr))`,
                                 mt: "6px",
-                                mx: "16px",
-                                width: "calc(100% - 32px)",
+                                mx: usesAdaptiveMasonryRows ? "4px" : "16px",
+                                overflow: usesAdaptiveMasonryRows
+                                    ? "hidden"
+                                    : undefined,
+                                width: usesAdaptiveMasonryRows
+                                    ? "calc(100% - 8px)"
+                                    : "calc(100% - 32px)",
                             }}
                         >
-                            {masonryColumns.map((tiles, columnIndex) => (
-                                <Box
-                                    key={columnIndex}
-                                    sx={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: photoMasonryGap,
-                                        minWidth: 0,
-                                    }}
-                                >
-                                    {tiles.map(
-                                        ({ dimensions, index, item }) => {
-                                            const imageUrl =
-                                                loadedPostImageURLFor(item);
-                                            return (
-                                                <ProfilePostTile
-                                                    key={`${item.id}-${index}`}
-                                                    dimensions={dimensions}
-                                                    displayName={displayName}
-                                                    imageUrl={imageUrl}
-                                                    index={index}
-                                                    isUnavailable={
-                                                        Boolean(
-                                                            item.isUnavailable,
-                                                        ) ||
-                                                        Boolean(
-                                                            unavailablePostsByKey[
-                                                                profilePostImageCacheKey(
-                                                                    item,
-                                                                )
-                                                            ],
-                                                        )
-                                                    }
-                                                    item={item}
-                                                    loadRootMargin={
-                                                        postImageLoadRootMargin
-                                                    }
-                                                    onLoadImage={() =>
-                                                        loadPostImage(item)
-                                                    }
-                                                    onImageDecodeError={() =>
-                                                        setUnavailablePostsByKey(
-                                                            (current) => ({
-                                                                ...current,
-                                                                [profilePostImageCacheKey(
-                                                                    item,
-                                                                )]: true,
-                                                            }),
-                                                        )
-                                                    }
-                                                    onOpen={(
-                                                        openedImageUrl,
-                                                    ) => {
-                                                        const postIndex =
-                                                            viewerPostIndexByID.get(
-                                                                item.id,
-                                                            );
-                                                        if (
-                                                            postIndex ==
-                                                            undefined
-                                                        )
-                                                            return;
-                                                        onOpenPost?.(item);
-                                                        setSelectedPost(
-                                                            selectedPostForItem(
-                                                                item,
-                                                                postIndex,
-                                                                openedImageUrl,
-                                                            ),
-                                                        );
-                                                    }}
-                                                    onRememberDimensions={
-                                                        rememberLoadedPhotoDimensions
-                                                    }
-                                                />
-                                            );
-                                        },
-                                    )}
-                                </Box>
-                            ))}
+                            {usesAdaptiveMasonryRows
+                                ? adaptiveMasonryRows.map((tiles, rowIndex) => (
+                                      <Box
+                                          key={rowIndex}
+                                          sx={{
+                                              display: "grid",
+                                              gap: adaptivePhotoMasonryGap,
+                                              gridTemplateColumns: tiles
+                                                  .map(
+                                                      ({ aspectRatio }) =>
+                                                          `minmax(0, ${aspectRatio}fr)`,
+                                                  )
+                                                  .join(" "),
+                                              minWidth: 0,
+                                          }}
+                                      >
+                                          {tiles.map((tile) =>
+                                              renderPostTile(tile, 0),
+                                          )}
+                                      </Box>
+                                  ))
+                                : masonryColumns.map((tiles, columnIndex) => (
+                                      <Box
+                                          key={columnIndex}
+                                          sx={{
+                                              display: "flex",
+                                              flexDirection: "column",
+                                              gap: photoMasonryGap,
+                                              minWidth: 0,
+                                          }}
+                                      >
+                                          {tiles.map((tile) =>
+                                              renderPostTile(tile),
+                                          )}
+                                      </Box>
+                                  ))}
                         </Box>
                     ) : shouldShowPostLoadingIndicator ? (
                         <ProfilePostLoadingIndicator />
@@ -1990,17 +2054,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                           },
                                           caption,
                                       );
-                                      releaseLocalPostObjectUrl(previewUrl);
-                                      return publishPromise;
-                                  }
-                                : undefined
-                        }
-                        onDraftPostPublished={
-                            onDraftPostPublished
-                                ? () => {
-                                      void clearSelectedPostHistory(
-                                          "back",
-                                      ).finally(onDraftPostPublished);
+                                      return publishPromise.finally(() =>
+                                          releaseLocalPostObjectUrl(previewUrl),
+                                      );
                                   }
                                 : undefined
                         }
