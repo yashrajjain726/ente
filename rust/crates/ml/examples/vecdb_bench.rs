@@ -19,7 +19,6 @@ const DEFAULT_DIMS: usize = 512;
 struct Config {
     scales: Vec<usize>,
     dims: usize,
-    compare_usearch: bool,
 }
 
 struct BenchData {
@@ -62,29 +61,23 @@ fn main() {
         config.dims, QUERY_COUNT, SEED
     );
     println!(
-        "scales: {}   usearch comparison: {}",
+        "scales: {}",
         config
             .scales
             .iter()
             .map(|scale| scale.to_string())
             .collect::<Vec<_>>()
-            .join(", "),
-        if config.compare_usearch {
-            "enabled"
-        } else {
-            "disabled"
-        }
+            .join(", ")
     );
     let temp_root = tempfile::TempDir::new().expect("create bench temp dir");
     for &scale in &config.scales {
-        run_scale(scale, config.dims, config.compare_usearch, temp_root.path());
+        run_scale(scale, config.dims, temp_root.path());
     }
 }
 
 fn parse_args() -> Config {
     let mut scales = parse_scales(DEFAULT_SCALES);
     let mut dims = DEFAULT_DIMS;
-    let mut compare_usearch = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -94,7 +87,6 @@ fn parse_args() -> Config {
                     .parse()
                     .unwrap_or_else(|_| usage_exit())
             }
-            "--compare-usearch" => compare_usearch = true,
             _ => usage_exit(),
         }
     }
@@ -102,18 +94,7 @@ fn parse_args() -> Config {
         eprintln!("--dims must be a nonzero multiple of 8");
         std::process::exit(2);
     }
-    if compare_usearch && !cfg!(feature = "usearch") {
-        eprintln!(
-            "--compare-usearch requires a build with the usearch feature: cargo run -p ente-ml \
-             --example vecdb_bench --release --features usearch -- --compare-usearch"
-        );
-        std::process::exit(2);
-    }
-    Config {
-        scales,
-        dims,
-        compare_usearch,
-    }
+    Config { scales, dims }
 }
 
 fn required_value(value: Option<String>) -> String {
@@ -136,13 +117,13 @@ fn parse_scales(list: &str) -> Vec<usize> {
 
 fn usage_exit() -> ! {
     eprintln!(
-        "usage: cargo run -p ente-ml --example vecdb_bench --release [--features usearch] -- \
-         [--scales 10000,100000] [--dims 512] [--compare-usearch]"
+        "usage: cargo run -p ente-ml --example vecdb_bench --release -- \
+         [--scales 10000,100000] [--dims 512]"
     );
     std::process::exit(2);
 }
 
-fn run_scale(scale: usize, dims: usize, compare_usearch: bool, temp_root: &Path) {
+fn run_scale(scale: usize, dims: usize, temp_root: &Path) {
     let clusters = (scale / 150).max(1) as u64;
     println!();
     println!("=== scale {scale}  dims {dims}  clusters {clusters} ===");
@@ -152,9 +133,6 @@ fn run_scale(scale: usize, dims: usize, compare_usearch: bool, temp_root: &Path)
     std::fs::create_dir_all(&dir).expect("create bench dir");
     let vecdb = run_vecdb(&data, dims, &dir, scale);
     print_vecdb_report(&vecdb);
-    if compare_usearch {
-        run_comparison(&data, dims, &dir, scale, &vecdb);
-    }
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -671,393 +649,5 @@ fn fmt_bytes(bytes: u64) -> String {
         format!("{:.1} KB", value / 1024.0)
     } else {
         format!("{:.2} MB", value / (1024.0 * 1024.0))
-    }
-}
-
-#[cfg(not(feature = "usearch"))]
-fn run_comparison(
-    _data: &BenchData,
-    _dims: usize,
-    _dir: &Path,
-    _scale: usize,
-    _vecdb: &VecdbReport,
-) {
-}
-
-#[cfg(feature = "usearch")]
-fn run_comparison(data: &BenchData, dims: usize, dir: &Path, scale: usize, vecdb: &VecdbReport) {
-    let usearch = usearch_bench::run(data, dims, dir, scale, vecdb.threshold);
-    usearch_bench::print_report(&usearch);
-    usearch_bench::print_side_by_side(vecdb, &usearch, scale);
-}
-
-#[cfg(feature = "usearch")]
-mod usearch_bench {
-    use std::collections::HashSet;
-    use std::path::Path;
-    use std::time::{Duration, Instant};
-
-    use ente_ml::vector_db::VectorDB;
-    use usearch::{Index, IndexOptions, MetricKind, ScalarKind};
-
-    use super::{
-        BenchData, QUERY_COUNT, SEARCH_K, SINGLE_ADD_COUNT, VecdbReport, WARMUP_QUERIES, fmt_bytes,
-        fmt_duration, per_op_text, row,
-    };
-
-    const THRESHOLD_STEP_COUNTS: [usize; 5] = [200, 500, 2000, 5000, 10000];
-
-    pub struct UsearchReport {
-        legacy: Option<(Duration, usize)>,
-        pure_add_total: Duration,
-        pure_add_count: usize,
-        save: Duration,
-        approx_total: Duration,
-        exact_total: Duration,
-        recall: f64,
-        threshold: f32,
-        threshold_total: Duration,
-        threshold_avg_hits: f64,
-        filtered_total: Duration,
-        file_bytes: u64,
-        memory_bytes: u64,
-    }
-
-    pub fn run(
-        data: &BenchData,
-        dims: usize,
-        dir: &Path,
-        scale: usize,
-        threshold: f32,
-    ) -> UsearchReport {
-        let options = IndexOptions {
-            dimensions: dims,
-            metric: MetricKind::IP,
-            quantization: ScalarKind::F32,
-            ..IndexOptions::default()
-        };
-        let index = Index::new(&options).expect("create usearch index");
-        index
-            .reserve(data.entries.len() + 1)
-            .expect("usearch reserve");
-        eprintln!("[scale {scale}] usearch pure adds");
-        let started = Instant::now();
-        for (slot, (_, vector)) in data.entries.iter().enumerate() {
-            index.add(slot as u64, vector).expect("usearch add");
-        }
-        let pure_add_total = started.elapsed();
-        index
-            .add(data.entries.len() as u64, &data.probe)
-            .expect("usearch probe add");
-        let save_path = dir.join("bench.usearch");
-        let save_str = save_path.to_str().expect("usearch save path").to_string();
-        let started = Instant::now();
-        index.save(&save_str).expect("usearch save");
-        let save = started.elapsed();
-        let file_bytes = std::fs::metadata(&save_path)
-            .map(|meta| meta.len())
-            .unwrap_or(0);
-        let memory_bytes = index.memory_usage() as u64;
-
-        eprintln!("[scale {scale}] usearch searches");
-        for query in data.queries.iter().take(WARMUP_QUERIES) {
-            index.search(query, SEARCH_K).expect("usearch warmup");
-        }
-        let started = Instant::now();
-        let approx: Vec<Vec<u64>> = data
-            .queries
-            .iter()
-            .map(|query| index.search(query, SEARCH_K).expect("usearch search").keys)
-            .collect();
-        let approx_total = started.elapsed();
-        for query in data.queries.iter().take(WARMUP_QUERIES) {
-            index
-                .exact_search(query, SEARCH_K)
-                .expect("usearch exact warmup");
-        }
-        let started = Instant::now();
-        let exact: Vec<Vec<u64>> = data
-            .queries
-            .iter()
-            .map(|query| {
-                index
-                    .exact_search(query, SEARCH_K)
-                    .expect("usearch exact search")
-                    .keys
-            })
-            .collect();
-        let exact_total = started.elapsed();
-        let recall = key_recall(&exact, &approx);
-
-        for query in data.queries.iter().take(WARMUP_QUERIES) {
-            threshold_search(&index, query, threshold);
-        }
-        let started = Instant::now();
-        let threshold_hits: Vec<usize> = data
-            .queries
-            .iter()
-            .map(|query| threshold_search(&index, query, threshold).len())
-            .collect();
-        let threshold_total = started.elapsed();
-        let threshold_avg_hits =
-            threshold_hits.iter().sum::<usize>() as f64 / threshold_hits.len().max(1) as f64;
-
-        for query in data.queries.iter().take(WARMUP_QUERIES) {
-            filtered_search(&index, query, &data.allowed_indices);
-        }
-        let started = Instant::now();
-        for query in &data.queries {
-            filtered_search(&index, query, &data.allowed_indices);
-        }
-        let filtered_total = started.elapsed();
-
-        let legacy = if scale <= 10_000 {
-            eprintln!("[scale {scale}] usearch legacy save-per-add");
-            let legacy_path = dir.join("legacy.usearch");
-            let mut wrapper =
-                VectorDB::new(legacy_path.to_str().expect("legacy usearch path"), dims)
-                    .expect("legacy usearch wrapper");
-            let count = SINGLE_ADD_COUNT.min(data.entries.len());
-            let started = Instant::now();
-            for (slot, (_, vector)) in data.entries.iter().take(count).enumerate() {
-                wrapper
-                    .add_vector(slot as u64, vector)
-                    .expect("legacy usearch add");
-            }
-            Some((started.elapsed(), count))
-        } else {
-            None
-        };
-
-        UsearchReport {
-            legacy,
-            pure_add_total,
-            pure_add_count: data.entries.len(),
-            save,
-            approx_total,
-            exact_total,
-            recall,
-            threshold,
-            threshold_total,
-            threshold_avg_hits,
-            filtered_total,
-            file_bytes,
-            memory_bytes,
-        }
-    }
-
-    fn threshold_search(index: &Index, query: &[f32], max_distance: f32) -> Vec<u64> {
-        let index_size = index.size();
-        if index_size == 0 {
-            return Vec::new();
-        }
-        let mut previous_count = 0usize;
-        for step_count in THRESHOLD_STEP_COUNTS {
-            let count = step_count.min(index_size);
-            if count <= previous_count {
-                continue;
-            }
-            previous_count = count;
-            let matches = index
-                .search(query, count)
-                .expect("usearch threshold search");
-            let should_expand = count < index_size
-                && matches
-                    .distances
-                    .last()
-                    .is_some_and(|distance| *distance <= max_distance);
-            if should_expand {
-                continue;
-            }
-            return keys_within(matches.keys, &matches.distances, max_distance);
-        }
-        let matches = index
-            .search(query, index_size)
-            .expect("usearch threshold search");
-        keys_within(matches.keys, &matches.distances, max_distance)
-    }
-
-    fn keys_within(mut keys: Vec<u64>, distances: &[f32], max_distance: f32) -> Vec<u64> {
-        let keep = distances.partition_point(|distance| *distance <= max_distance);
-        keys.truncate(keep);
-        keys
-    }
-
-    fn filtered_search(index: &Index, query: &[f32], allowed_indices: &[usize]) -> Vec<u64> {
-        let allowed: HashSet<u64> = allowed_indices.iter().map(|index| *index as u64).collect();
-        index
-            .filtered_search(query, SEARCH_K, |key| allowed.contains(&key))
-            .expect("usearch filtered search")
-            .keys
-    }
-
-    fn key_recall(truth: &[Vec<u64>], found: &[Vec<u64>]) -> f64 {
-        let mut hits = 0usize;
-        let mut total = 0usize;
-        for (expected, actual) in truth.iter().zip(found) {
-            let wanted: HashSet<u64> = expected.iter().copied().collect();
-            total += wanted.len();
-            hits += actual.iter().filter(|key| wanted.contains(key)).count();
-        }
-        if total == 0 {
-            return 1.0;
-        }
-        hits as f64 / total as f64
-    }
-
-    pub fn print_report(report: &UsearchReport) {
-        println!("  usearch");
-        match report.legacy {
-            Some((total, count)) => row(
-                "legacy add (save per add)",
-                format!("{count} ops"),
-                total,
-                per_op_text(total, count, "op"),
-            ),
-            None => println!(
-                "    {:<44} skipped at this scale (would take hours)",
-                "legacy add (save per add)"
-            ),
-        }
-        row(
-            "pure add (in-memory, no save)",
-            format!("{} vecs", report.pure_add_count),
-            report.pure_add_total,
-            per_op_text(report.pure_add_total, report.pure_add_count, "vec"),
-        );
-        row(
-            "one save at full scale",
-            "-".to_string(),
-            report.save,
-            String::new(),
-        );
-        row(
-            "search approx k=10",
-            format!("{QUERY_COUNT} queries"),
-            report.approx_total,
-            per_op_text(report.approx_total, QUERY_COUNT, "query"),
-        );
-        row(
-            "search exact k=10",
-            format!("{QUERY_COUNT} queries"),
-            report.exact_total,
-            per_op_text(report.exact_total, QUERY_COUNT, "query"),
-        );
-        println!(
-            "    {:<44} {:.4}",
-            "recall@10 (approx vs exact)", report.recall
-        );
-        row(
-            &format!(
-                "search approx threshold d<={:.4} (stepped)",
-                report.threshold
-            ),
-            format!("{QUERY_COUNT} queries"),
-            report.threshold_total,
-            per_op_text(report.threshold_total, QUERY_COUNT, "query"),
-        );
-        println!(
-            "    {:<44} {:.1}",
-            "avg hits per threshold query", report.threshold_avg_hits
-        );
-        row(
-            "search approx k=10 filtered (10% allowed)",
-            format!("{QUERY_COUNT} queries"),
-            report.filtered_total,
-            per_op_text(report.filtered_total, QUERY_COUNT, "query"),
-        );
-        println!(
-            "    {:<44} file {}  reported mem {}",
-            "sizes at full scale",
-            fmt_bytes(report.file_bytes),
-            fmt_bytes(report.memory_bytes)
-        );
-    }
-
-    pub fn print_side_by_side(vecdb: &VecdbReport, usearch: &UsearchReport, scale: usize) {
-        println!("  side by side (scale {scale})");
-        pair("metric", "vecdb".to_string(), "usearch".to_string());
-        pair(
-            "durable add per op",
-            per_op_text(vecdb.single_total, vecdb.single_count, "op"),
-            usearch
-                .legacy
-                .map(|(total, count)| per_op_text(total, count, "op"))
-                .unwrap_or_else(|| "- (skipped)".to_string()),
-        );
-        pair(
-            "bulk/pure add per vec",
-            per_op_text(vecdb.bulk_total, vecdb.bulk_count, "vec"),
-            per_op_text(usearch.pure_add_total, usearch.pure_add_count, "vec"),
-        );
-        pair(
-            "full build wall time",
-            fmt_duration(vecdb.single_total + vecdb.bulk_total),
-            fmt_duration(usearch.pure_add_total),
-        );
-        pair(
-            "approx search per query",
-            per_op_text(vecdb.approx_total, QUERY_COUNT, "query"),
-            per_op_text(usearch.approx_total, QUERY_COUNT, "query"),
-        );
-        pair(
-            "recall@10 vs own exact",
-            format!("{:.4}", vecdb.recall),
-            format!("{:.4}", usearch.recall),
-        );
-        pair(
-            "exact search per query",
-            per_op_text(vecdb.exact_total, QUERY_COUNT, "query"),
-            per_op_text(usearch.exact_total, QUERY_COUNT, "query"),
-        );
-        pair(
-            "threshold search per query",
-            per_op_text(vecdb.threshold_total, QUERY_COUNT, "query"),
-            per_op_text(usearch.threshold_total, QUERY_COUNT, "query"),
-        );
-        pair(
-            "threshold avg hits",
-            format!("{:.1}", vecdb.threshold_avg_hits),
-            format!("{:.1}", usearch.threshold_avg_hits),
-        );
-        pair(
-            "filtered search per query",
-            per_op_text(vecdb.filtered_total, QUERY_COUNT, "query"),
-            per_op_text(usearch.filtered_total, QUERY_COUNT, "query"),
-        );
-        pair(
-            "full save / snapshot",
-            fmt_duration(vecdb.snapshot_write),
-            fmt_duration(usearch.save),
-        );
-        pair(
-            "on-disk bytes",
-            fmt_bytes(vecdb.log_bytes + vecdb.snapshot_bytes),
-            fmt_bytes(usearch.file_bytes),
-        );
-        pair(
-            "approx memory",
-            fmt_bytes(vecdb.memory_bytes as u64),
-            fmt_bytes(usearch.memory_bytes),
-        );
-        println!(
-            "    note: vecdb adds are durable (fsync per op/batch, periodic snapshots); usearch \
-             pure adds are in-memory only"
-        );
-        println!(
-            "    note: usearch legacy save-per-add rewrites the whole index file per add, \
-             without fsync"
-        );
-        println!(
-            "    note: vecdb on-disk = log + graph snapshot; usearch on-disk = single index file"
-        );
-        println!(
-            "    note: threshold uses vecdb's ~1% distance on both engines (usearch via legacy \
-             stepped expansion); filtered restricts to the same seeded 10% key subset, k=10"
-        );
-    }
-
-    fn pair(label: &str, vecdb_value: String, usearch_value: String) {
-        println!("    {label:<28} {vecdb_value:>18} {usearch_value:>18}");
     }
 }
