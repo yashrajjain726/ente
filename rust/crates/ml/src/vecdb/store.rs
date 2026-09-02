@@ -222,6 +222,9 @@ fn remove_path_slot_if_unused(key: &Path) {
 }
 
 fn registry_key_for(path: &Path) -> Result<PathBuf, VecDbError> {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        return Ok(canonical);
+    }
     let file_name = path.file_name().ok_or_else(|| {
         VecDbError::io(
             path,
@@ -256,7 +259,7 @@ impl VecDb {
             drop(guard);
             return join_live(shared, dims, false);
         }
-        let shared = match build_writer(path, key.clone(), dims) {
+        let shared = match build_writer(&key, key.clone(), dims) {
             Ok(built) => Arc::new(built),
             Err(error) => {
                 drop(guard);
@@ -274,16 +277,15 @@ impl VecDb {
     }
 
     pub fn open_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
-        if let Ok(key) = registry_key_for(path)
-            && let Some(slot) = existing_path_slot(&key)
-        {
+        let resolved = registry_key_for(path).unwrap_or_else(|_| path.to_path_buf());
+        if let Some(slot) = existing_path_slot(&resolved) {
             let live = lock_slot(&slot).live.upgrade();
             if let Some(shared) = live {
                 return join_live(shared, dims, true);
             }
         }
         Ok(Self {
-            shared: Arc::new(build_read_only(path, dims)?),
+            shared: Arc::new(build_read_only(&resolved, dims)?),
             read_only: true,
         })
     }
@@ -570,15 +572,23 @@ impl VecDb {
     }
 
     pub fn purge(path: &Path) -> Result<(), VecDbError> {
-        if let Ok(key) = registry_key_for(path)
-            && let Some(slot) = existing_path_slot(&key)
-        {
+        let key = match registry_key_for(path) {
+            Ok(key) => key,
+            Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::NotFound => {
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
+        if let Some(slot) = existing_path_slot(&key) {
             let live = lock_slot(&slot).live.upgrade();
             if let Some(shared) = live {
                 return close_live_instance(&shared);
             }
         }
-        remove_index_files(path)
+        let lock = WriterLock::acquire(&key)?;
+        remove_index_files(&key)?;
+        drop(lock);
+        Ok(())
     }
 
     pub fn stats(&self) -> Result<Stats, VecDbError> {
@@ -3069,11 +3079,80 @@ mod tests {
         assert!(!temp_sibling(&path).exists());
         assert!(!lock_path(&path).exists());
         VecDb::purge(&path).unwrap();
-        VecDb::purge(&dir.path().join("never-created")).unwrap();
+        let never_created = dir.path().join("never-created");
+        VecDb::purge(&never_created).unwrap();
+        assert!(!lock_path(&never_created).exists());
         let fresh = open_writer(&path);
         assert!(fresh.is_empty());
         fresh.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
         assert_eq!(fresh.len(), 1);
+    }
+
+    #[test]
+    fn purge_refuses_while_a_foreign_writer_holds_the_lock() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("kept", &seeded_unit_vector(4, DIMS)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let held = WriterLock::acquire(&path).unwrap();
+        assert!(matches!(VecDb::purge(&path), Err(VecDbError::Locked(_))));
+        assert!(path.exists());
+        assert!(snapshot_exists(&path));
+        drop(held);
+        VecDb::purge(&path).unwrap();
+        assert!(!path.exists());
+        assert!(!lock_path(&path).exists());
+    }
+
+    #[test]
+    fn purge_of_a_missing_parent_directory_is_ok() {
+        let dir = TempDir::new().unwrap();
+        VecDb::purge(&dir.path().join("absent").join("db")).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_paths_share_one_instance_and_one_lock() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let via_path = open_writer(&path);
+        std::os::unix::fs::symlink(&path, &alias).unwrap();
+        let via_alias = VecDb::open(&alias, DIMS).unwrap();
+        via_path
+            .add("through-real", &seeded_unit_vector(5, DIMS))
+            .unwrap();
+        via_alias
+            .add("through-alias", &seeded_unit_vector(6, DIMS))
+            .unwrap();
+        assert!(via_path.contains("through-alias"));
+        assert!(via_alias.contains("through-real"));
+        assert_eq!(via_path.len(), 2);
+        assert!(lock_path(&path).exists());
+        assert!(!lock_path(&alias).exists());
+        let read_alias = VecDb::open_read_only(&alias, DIMS).unwrap();
+        via_path.add("late", &seeded_unit_vector(7, DIMS)).unwrap();
+        assert!(read_alias.contains("late"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn purge_through_a_symlink_removes_the_real_files() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let db = open_writer(&path);
+        db.add("gone", &seeded_unit_vector(8, DIMS)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        std::os::unix::fs::symlink(&path, &alias).unwrap();
+        VecDb::purge(&alias).unwrap();
+        assert!(!path.exists());
+        assert!(!snapshot_exists(&path));
+        assert!(!lock_path(&path).exists());
+        assert!(fs::symlink_metadata(&alias).is_ok());
     }
 
     fn attr(name: &str, value: AttrValue) -> Attribute {
