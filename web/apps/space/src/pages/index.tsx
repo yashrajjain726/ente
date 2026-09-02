@@ -266,10 +266,10 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         appearance: "none",
-                        bgcolor: { xs: "white", sm: "black" },
+                        bgcolor: "white",
                         border: 0,
                         borderRadius: "24px",
-                        color: { xs: "black", sm: "white" },
+                        color: "black",
                         cursor: isAddingFriend ? "default" : "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -283,7 +283,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         width: "min(100%, 300px)",
                         "&:hover": isAddingFriend
                             ? undefined
-                            : { bgcolor: { xs: "#F4F4F4", sm: "#121212" } },
+                            : { bgcolor: "#F4F4F4" },
                         "&:focus-visible": {
                             outline: "2px solid rgba(255 255 255 / 0.88)",
                             outlineOffset: 3,

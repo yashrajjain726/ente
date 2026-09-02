@@ -9,7 +9,7 @@ import {
     patchCachedSpaceHomePost,
     refreshSpaceHomePosts,
 } from "services/home-posts";
-import { consumeSentSpaceInviteFriend } from "services/invite";
+import { consumeSentSpaceInviteFriend, spaceInviteURL } from "services/invite";
 import { loadExistingSpaceId } from "services/profile";
 import {
     loadCurrentFriendAvatarURL,
@@ -204,6 +204,11 @@ const Page: React.FC = () => {
                 isLatestPostsLoading={isLatestPostsLoading}
                 isFriendsLoading={isFriendsLoading}
                 profile={profile}
+                profileLink={
+                    profile
+                        ? spaceInviteURL({ spaceUsername: profile.username })
+                        : undefined
+                }
                 viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&

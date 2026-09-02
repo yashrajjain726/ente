@@ -4,12 +4,14 @@ import React from "react";
 interface SpacePostBadgeProps extends React.PropsWithChildren {
     backgroundColor: string;
     color: string;
+    placement?: "center" | "top-right";
 }
 
 export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
     backgroundColor,
     children,
     color,
+    placement = "top-right",
 }) => (
     <Box
         component="span"
@@ -21,20 +23,25 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
             color,
             display: "inline-flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
-            fontSize: 10,
+            fontSize: placement == "center" ? 12 : 10,
             fontVariantNumeric: "tabular-nums",
             fontWeight: 700,
-            height: 20,
+            height: placement == "center" ? 24 : 20,
             justifyContent: "center",
             lineHeight: 1,
             minWidth: 20,
             pointerEvents: "none",
             position: "absolute",
-            px: "7px",
-            right: "10%",
-            top: "10%",
+            px: placement == "center" ? "10px" : "7px",
             whiteSpace: "nowrap",
             zIndex: 1,
+            ...(placement == "center"
+                ? {
+                      left: "50%",
+                      top: "50%",
+                      transform: "translate(-50%, -50%)",
+                  }
+                : { right: "10%", top: "10%" }),
         }}
     >
         {children}
