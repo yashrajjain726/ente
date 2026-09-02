@@ -1236,6 +1236,13 @@
       "title": "Jottacloud"
     },
     {
+      "title": "Jotty Page",
+      "slug": "jotty",
+      "altNames": [
+        "Jotty"
+      ]
+    },
+    {
       "title": "JOYclub",
       "slug": "joyclub",
       "hex": "000000",
