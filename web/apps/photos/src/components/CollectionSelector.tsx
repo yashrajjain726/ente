@@ -17,6 +17,7 @@ import {
     collectionDialogTitleSx as titleSx,
 } from "@/components/CollectionDialog/styles";
 import { CollectionsSortOptions } from "@/components/CollectionsSortOptions";
+import ArchiveIcon from "@mui/icons-material/Archive";
 import CloseIcon from "@mui/icons-material/Close";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -317,6 +318,7 @@ const CollectionSummaryButton: React.FC<CollectionSummaryButtonProps> = ({
     const isPinned =
         collectionSummary.attributes.has("pinned") ||
         collectionSummary.attributes.has("shareePinned");
+    const isArchived = collectionSummary.attributes.has("archived");
 
     return (
         <ItemCard
@@ -342,7 +344,7 @@ const CollectionSummaryButton: React.FC<CollectionSummaryButtonProps> = ({
                     </Typography>
                 </Tooltip>
             </TopGradientOverlay>
-            {(isFavorite || isPinned) && (
+            {(isFavorite || isPinned || isArchived) && (
                 <Box
                     sx={{
                         position: "absolute",
@@ -357,6 +359,9 @@ const CollectionSummaryButton: React.FC<CollectionSummaryButtonProps> = ({
                     )}
                     {isPinned && (
                         <PushPinIcon sx={{ fontSize: 20, color: "white" }} />
+                    )}
+                    {isArchived && (
+                        <ArchiveIcon sx={{ fontSize: 20, color: "white" }} />
                     )}
                 </Box>
             )}

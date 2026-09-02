@@ -24,6 +24,7 @@ import type { RemotePullOpts } from "@/components/gallery";
 import { StarIcon } from "@/components/icons/StarIcon";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import ArchiveIcon from "@mui/icons-material/Archive";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -792,6 +793,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
 }) => {
     const isFavorite = collectionSummary.type === "userFavorites";
     const isPinned = collectionSummary.attributes.has("pinned");
+    const isArchived = collectionSummary.attributes.has("archived");
 
     return (
         <ItemCard
@@ -810,7 +812,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
                     {t("photos_count", { count: collectionSummary.fileCount })}
                 </Typography>
             </TileTextOverlay>
-            {(isFavorite || isPinned) && (
+            {(isFavorite || isPinned || isArchived) && (
                 <Box
                     sx={{
                         position: "absolute",
@@ -825,6 +827,9 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
                     )}
                     {isPinned && (
                         <PushPinIcon sx={{ fontSize: 20, color: "white" }} />
+                    )}
+                    {isArchived && (
+                        <ArchiveIcon sx={{ fontSize: 20, color: "white" }} />
                     )}
                 </Box>
             )}
