@@ -36,6 +36,21 @@ export const photosLogout = async () => {
         ignoreError("ML/worker", e);
     }
 
+    try {
+        logoutSearch();
+    } catch (e) {
+        ignoreError("Search", e);
+    }
+
+    const electron = globalThis.electron;
+    if (electron) {
+        try {
+            exportService.disableContinuousExport();
+        } catch (e) {
+            ignoreError("Export", e);
+        }
+    }
+
     await accountLogout();
 
     log.info("logout (photos)");
@@ -83,12 +98,6 @@ export const photosLogout = async () => {
     }
 
     try {
-        logoutSearch();
-    } catch (e) {
-        ignoreError("Search", e);
-    }
-
-    try {
         resetVideoState();
     } catch (e) {
         ignoreError("Video", e);
@@ -100,7 +109,6 @@ export const photosLogout = async () => {
         ignoreError("File viewer", e);
     }
 
-    const electron = globalThis.electron;
     if (electron) {
         try {
             await logoutAppLock();
@@ -112,12 +120,6 @@ export const photosLogout = async () => {
             await logoutML();
         } catch (e) {
             ignoreError("ML", e);
-        }
-
-        try {
-            exportService.disableContinuousExport();
-        } catch (e) {
-            ignoreError("Export", e);
         }
 
         try {
