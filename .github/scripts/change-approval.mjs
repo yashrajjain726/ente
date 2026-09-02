@@ -166,7 +166,7 @@ const moved = dependencies.reduce((n, { moved }) => n + moved.length, 0);
 const guardrails = kept.filter(
     (file) => guardrailDirs.some((dir) => file.startsWith(dir)) || guardrailFiles.has(path.basename(file)),
 );
-const configs = kept.filter((file) => configFile.test(file));
+const configs = [...numstat(), ...additions].map(([, , file]) => file).filter((file) => configFile.test(file));
 
 const categories = [
     ["binary file", "binary files", binaries.length],

@@ -339,7 +339,7 @@ test("guardrail paths modified or deleted, not added", (t) => {
     );
 });
 
-test("toolchain and registry config modified, not added", (t) => {
+test("toolchain and registry config added, modified, or deleted", (t) => {
     const output = scan(
         t,
         { "web/.npmrc": "", "rust/.cargo/config.toml": "" },
@@ -347,8 +347,14 @@ test("toolchain and registry config modified, not added", (t) => {
     );
     assert.equal(
         output,
-        "2 config files\n\n## Toolchain and registry config\n\n- `rust/.cargo/config.toml`\n- `web/.npmrc`\n\n",
+        "3 config files\n\n## Toolchain and registry config\n\n- `.nvmrc`\n- `rust/.cargo/config.toml`\n- `web/.npmrc`\n\n",
     );
+});
+
+test("new root .cargo/config.toml is a config file, even untracked", (t) => {
+    const expected = "1 config file\n\n## Toolchain and registry config\n\n- `.cargo/config.toml`\n\n";
+    assert.equal(scan(t, { "a.txt": "a\n" }, { ".cargo/config.toml": "[registries]\n" }), expected);
+    assert.equal(scan(t, { "a.txt": "a\n" }, { ".cargo/config.toml": "[registries]\n" }, { commit: false }), expected);
 });
 
 test("uncommitted and untracked changes are scanned locally", (t) => {
