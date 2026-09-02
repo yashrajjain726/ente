@@ -1,1 +1,0 @@
-- Simplified the skipped files experience in device folders.
