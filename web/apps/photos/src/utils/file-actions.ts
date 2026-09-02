@@ -127,7 +127,12 @@ function getBaseActions(
     }
 
     if (barMode === "hidden-albums") {
-        return ["download", "addToAlbum", "moveToAlbum", "unhide", "trash"];
+        const actions: FileContextAction[] = ["download", "addToAlbum"];
+        if (hasOnlyOwnFiles) {
+            actions.push("moveToAlbum");
+        }
+        actions.push("unhide", "trash");
+        return actions;
     }
 
     const isUserFavorites =

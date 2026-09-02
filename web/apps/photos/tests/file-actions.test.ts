@@ -23,6 +23,19 @@ describe("getAvailableFileActions", () => {
         ]);
     });
 
+    test("does not allow moving unowned files between hidden albums", () => {
+        expect(
+            getAvailableFileActions({
+                barMode: "hidden-albums",
+                isInSearchMode: false,
+                collectionSummary: undefined,
+                hasOnlyOwnFiles: false,
+                showAddPerson: false,
+                showEditLocation: false,
+            }),
+        ).toEqual(["download", "addToAlbum", "unhide", "trash"]);
+    });
+
     test("uses shared actions for an incoming uncategorized collection", () => {
         const collectionSummary: CollectionSummary = {
             id: 1,
