@@ -1,1 +1,0 @@
-- Reduced memory spikes while loading very large photo libraries.
