@@ -1,10 +1,8 @@
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashSet};
 
-use wide::f32x8;
-
 use super::arena::VectorArena;
-use super::kernel::splitmix64;
+use super::kernel::{Lane, splitmix64};
 use super::{Match, SearchParams, VecDbError};
 
 const M: usize = 16;
@@ -364,7 +362,7 @@ impl Graph {
 struct QueryContext<'a> {
     graph: &'a Graph,
     arena: &'a VectorArena,
-    query: &'a [f32x8],
+    query: &'a [Lane],
 }
 
 impl QueryContext<'_> {
@@ -461,7 +459,7 @@ impl QueryContext<'_> {
 pub(crate) fn search(
     graph: &Graph,
     arena: &VectorArena,
-    query: &[f32x8],
+    query: &[Lane],
     params: &SearchParams,
     allowed_slots: Option<&HashSet<u32>>,
 ) -> Vec<Match> {
@@ -471,7 +469,7 @@ pub(crate) fn search(
 pub(crate) fn search_excluding(
     graph: &Graph,
     arena: &VectorArena,
-    query: &[f32x8],
+    query: &[Lane],
     params: &SearchParams,
     allowed_slots: Option<&HashSet<u32>>,
     banned_slot: Option<u32>,
@@ -520,7 +518,7 @@ pub(crate) fn search_excluding(
     }
 }
 
-fn query_is_finite(query: &[f32x8]) -> bool {
+fn query_is_finite(query: &[Lane]) -> bool {
     query
         .iter()
         .all(|lane| lane.to_array().iter().all(|value| value.is_finite()))
@@ -601,7 +599,7 @@ fn approx_threshold(
 
 fn brute_force(
     arena: &VectorArena,
-    query: &[f32x8],
+    query: &[Lane],
     params: &SearchParams,
     allowed: Option<&HashSet<u32>>,
     banned: Option<u32>,
@@ -818,7 +816,7 @@ mod tests {
 
     fn reference_ranking(
         arena: &VectorArena,
-        query: &[f32x8],
+        query: &[Lane],
         allowed: Option<&HashSet<u32>>,
     ) -> Vec<(f32, u32)> {
         let mut scored: Vec<(f32, u32)> = arena

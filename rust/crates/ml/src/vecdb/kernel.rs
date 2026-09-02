@@ -1,6 +1,22 @@
-use wide::f32x8;
-
 pub(crate) const LANE_WIDTH: usize = 8;
+
+#[repr(C, align(32))]
+#[derive(Clone, Copy)]
+pub(crate) struct Lane([f32; LANE_WIDTH]);
+
+impl Lane {
+    pub(crate) const ZERO: Self = Self([0.0; LANE_WIDTH]);
+
+    pub(crate) fn to_array(self) -> [f32; LANE_WIDTH] {
+        self.0
+    }
+}
+
+impl From<[f32; LANE_WIDTH]> for Lane {
+    fn from(values: [f32; LANE_WIDTH]) -> Self {
+        Self(values)
+    }
+}
 
 pub(crate) fn splitmix64(state: &mut u64) -> u64 {
     *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -23,35 +39,37 @@ pub(crate) trait VectorKernel {
 pub(crate) struct F32Kernel;
 
 impl VectorKernel for F32Kernel {
-    type Lane = f32x8;
+    type Lane = Lane;
 
-    fn dot(a: &[f32x8], b: &[f32x8]) -> f32 {
+    fn dot(a: &[Lane], b: &[Lane]) -> f32 {
         debug_assert_eq!(a.len(), b.len());
-        let mut acc = f32x8::ZERO;
+        let mut partials = [0.0f32; LANE_WIDTH];
         for (x, y) in a.iter().zip(b.iter()) {
-            acc += *x * *y;
+            for (partial, (left, right)) in partials.iter_mut().zip(x.0.iter().zip(&y.0)) {
+                *partial += left * right;
+            }
         }
-        acc.to_array().iter().sum()
+        partials.iter().sum()
     }
 }
 
-pub(crate) fn pack_lanes(values: &[f32]) -> Vec<f32x8> {
+pub(crate) fn pack_lanes(values: &[f32]) -> Vec<Lane> {
     debug_assert_eq!(values.len() % LANE_WIDTH, 0);
-    let mut lanes = vec![f32x8::ZERO; values.len() / LANE_WIDTH];
+    let mut lanes = vec![Lane::ZERO; values.len() / LANE_WIDTH];
     pack_lanes_into(values, &mut lanes);
     lanes
 }
 
-pub(crate) fn pack_lanes_into(values: &[f32], lanes: &mut [f32x8]) {
+pub(crate) fn pack_lanes_into(values: &[f32], lanes: &mut [Lane]) {
     debug_assert_eq!(values.len(), lanes.len() * LANE_WIDTH);
     let (groups, remainder) = values.as_chunks::<LANE_WIDTH>();
     debug_assert!(remainder.is_empty());
     for (lane, group) in lanes.iter_mut().zip(groups) {
-        *lane = f32x8::from(*group);
+        *lane = Lane::from(*group);
     }
 }
 
-pub(crate) fn unpack_lanes(lanes: &[f32x8]) -> Vec<f32> {
+pub(crate) fn unpack_lanes(lanes: &[Lane]) -> Vec<f32> {
     let mut values = Vec::with_capacity(lanes.len() * LANE_WIDTH);
     for lane in lanes {
         values.extend_from_slice(&lane.to_array());
@@ -148,7 +166,7 @@ mod tests {
 
     #[test]
     fn packed_lanes_are_32_byte_aligned() {
-        assert_eq!(align_of::<f32x8>(), 32);
+        assert_eq!(align_of::<Lane>(), 32);
         for dims in [128, 192, 512] {
             let lanes = pack_lanes(&seeded_values(5, dims));
             assert_eq!(lanes.as_ptr() as usize % 32, 0);

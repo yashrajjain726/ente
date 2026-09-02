@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use wide::f32x8;
-
 use super::VecDbError;
 use super::kernel::{
-    F32Kernel, LANE_WIDTH, VectorKernel, pack_lanes, pack_lanes_into, unpack_lanes,
+    F32Kernel, LANE_WIDTH, Lane, VectorKernel, pack_lanes, pack_lanes_into, unpack_lanes,
 };
 
 pub(crate) const VECTORS_PER_CHUNK: usize = 4096;
@@ -33,7 +31,7 @@ pub(crate) fn validate_key(key: &str) -> Result<(), VecDbError> {
 pub(crate) struct VectorArena {
     dims: usize,
     lanes_per_vector: usize,
-    chunks: Vec<Vec<f32x8>>,
+    chunks: Vec<Vec<Lane>>,
     keys_to_slots: HashMap<Box<str>, u32>,
     slots_to_keys: Vec<Box<str>>,
     alive: Vec<u64>,
@@ -105,7 +103,7 @@ impl VectorArena {
         let slot = self.slots_to_keys.len() as u32;
         if slot as usize == self.chunks.len() * VECTORS_PER_CHUNK {
             self.chunks
-                .push(vec![f32x8::ZERO; VECTORS_PER_CHUNK * self.lanes_per_vector]);
+                .push(vec![Lane::ZERO; VECTORS_PER_CHUNK * self.lanes_per_vector]);
         }
         if slot as usize / 64 == self.alive.len() {
             self.alive.push(0);
@@ -148,7 +146,7 @@ impl VectorArena {
         (0..self.slots_to_keys.len() as u32).filter(|slot| self.is_alive(*slot))
     }
 
-    pub(crate) fn vector_lanes(&self, slot: u32) -> &[f32x8] {
+    pub(crate) fn vector_lanes(&self, slot: u32) -> &[Lane] {
         let start = (slot as usize % VECTORS_PER_CHUNK) * self.lanes_per_vector;
         &self.chunks[slot as usize / VECTORS_PER_CHUNK][start..start + self.lanes_per_vector]
     }
@@ -157,7 +155,7 @@ impl VectorArena {
         unpack_lanes(self.vector_lanes(slot))
     }
 
-    pub(crate) fn pack_query(&self, values: &[f32]) -> Result<Vec<f32x8>, VecDbError> {
+    pub(crate) fn pack_query(&self, values: &[f32]) -> Result<Vec<Lane>, VecDbError> {
         if values.len() != self.dims {
             return Err(VecDbError::DimensionMismatch {
                 expected: self.dims,
@@ -171,11 +169,11 @@ impl VectorArena {
         F32Kernel::distance(self.vector_lanes(a), self.vector_lanes(b))
     }
 
-    pub(crate) fn distance_to_query(&self, query: &[f32x8], slot: u32) -> f32 {
+    pub(crate) fn distance_to_query(&self, query: &[Lane], slot: u32) -> f32 {
         F32Kernel::distance(query, self.vector_lanes(slot))
     }
 
-    fn vector_lanes_mut(&mut self, slot: u32) -> &mut [f32x8] {
+    fn vector_lanes_mut(&mut self, slot: u32) -> &mut [Lane] {
         let start = (slot as usize % VECTORS_PER_CHUNK) * self.lanes_per_vector;
         &mut self.chunks[slot as usize / VECTORS_PER_CHUNK][start..start + self.lanes_per_vector]
     }

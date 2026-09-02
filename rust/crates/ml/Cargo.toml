@@ -25,7 +25,6 @@ thiserror.workspace = true
 # The FRB photos bridge calls the SimSIMD symbol exported by usearch 2.21.x.
 # Newer usearch releases switched that implementation to numkong symbols.
 usearch = { version = "=2.21.4", optional = true }
-wide = "0.7"
 
 # Cargokit sets ORT_LIB_PATH to Ente's verified iOS archive.
 [target.'cfg(target_os = "ios")'.dependencies]
