@@ -36,12 +36,6 @@ export const photosLogout = async () => {
         ignoreError("ML/worker", e);
     }
 
-    try {
-        logoutSearch();
-    } catch (e) {
-        ignoreError("Search", e);
-    }
-
     const electron = globalThis.electron;
     if (electron) {
         try {
@@ -95,6 +89,12 @@ export const photosLogout = async () => {
         resetSaveGroups();
     } catch (e) {
         ignoreError("Download UI", e);
+    }
+
+    try {
+        logoutSearch();
+    } catch (e) {
+        ignoreError("Search", e);
     }
 
     try {
