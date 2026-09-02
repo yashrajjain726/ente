@@ -386,29 +386,28 @@ class _AlbumSlideshowPageState extends State<AlbumSlideshowPage>
   Widget _buildSlide() {
     final file = _currentFile;
     return IgnorePointer(
-      child: AnimatedSwitcher(
-        duration: _autoAdvanceTransition
-            ? _autoCrossFadeDuration
-            : _manualCrossFadeDuration,
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        layoutBuilder: (currentChild, previousChildren) => Stack(
-          fit: StackFit.expand,
-          children: [
-            for (final child in previousChildren)
-              HeroMode(enabled: false, child: child),
-            ?currentChild,
-          ],
-        ),
-        child: SizedBox.expand(
-          key: ValueKey("album-slideshow-${file.tag}"),
-          child: FileWidget(
-            file,
-            tagPrefix: "album_slideshow",
-            backgroundDecoration: const BoxDecoration(),
-            isFromMemories: true,
-            onFinalFileLoad: ({required int memoryDuration}) =>
-                _onSlideReady(file.tag),
+      child: HeroMode(
+        enabled: false,
+        child: AnimatedSwitcher(
+          duration: _autoAdvanceTransition
+              ? _autoCrossFadeDuration
+              : _manualCrossFadeDuration,
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            fit: StackFit.expand,
+            children: [...previousChildren, ?currentChild],
+          ),
+          child: SizedBox.expand(
+            key: ValueKey("album-slideshow-${file.tag}"),
+            child: FileWidget(
+              file,
+              tagPrefix: "album_slideshow",
+              backgroundDecoration: const BoxDecoration(),
+              isFromMemories: true,
+              onFinalFileLoad: ({required int memoryDuration}) =>
+                  _onSlideReady(file.tag),
+            ),
           ),
         ),
       ),
