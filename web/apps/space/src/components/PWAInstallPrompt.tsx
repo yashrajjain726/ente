@@ -206,7 +206,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                     : undefined,
             boxSizing: "border-box",
             left: "50%",
-            px: "16px",
+            px: "12px",
             pointerEvents: "none",
             position: "fixed",
             top:

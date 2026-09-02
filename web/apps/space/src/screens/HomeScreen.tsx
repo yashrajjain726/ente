@@ -1,10 +1,10 @@
-import {
-    BubbleChatIcon,
-    MultiplicationSignIcon,
-    UserAdd02Icon,
-} from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, UserAdd02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import {
+    SpaceActionToast,
+    spaceToastAutoDismissDurationMs,
+} from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import {
     SpaceFileViewer,
@@ -30,7 +30,6 @@ import {
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
-    spaceSurface,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -563,96 +562,15 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
     message,
     onClose,
 }) => (
-    <Box
-        sx={{
-            boxSizing: "border-box",
-            left: "50%",
-            px: homeHorizontalPadding,
-            pointerEvents: "none",
-            position: "fixed",
-            top: "calc(env(safe-area-inset-top) + 10px)",
-            transform: "translateX(-50%)",
-            width: "100%",
-            zIndex: 20,
-            "@media (min-width: 600px)": { maxWidth: 390 },
-        }}
-    >
-        <Box
-            role="status"
-            aria-live="polite"
-            sx={{
-                alignItems: "center",
-                bgcolor: spaceSurface,
-                borderRadius: "18px",
-                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
-                boxSizing: "border-box",
-                color: textBase,
-                display: "flex",
-                fontFamily: '"Inter Variable", Inter, sans-serif',
-                fontSize: 14,
-                fontWeight: 650,
-                gap: "10px",
-                lineHeight: "20px",
-                minHeight: 50,
-                pointerEvents: "auto",
-                pl: "16px",
-                pr: "6px",
-                py: "3px",
-                width: "100%",
-            }}
-        >
-            <Box component="span" sx={{ display: "flex", flexShrink: 0 }}>
-                <HugeiconsIcon
-                    icon={UserAdd02Icon}
-                    size={20}
-                    strokeWidth={1.8}
-                />
-            </Box>
-            <Box
-                component="span"
-                sx={{
-                    flex: "1 1 auto",
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                }}
-            >
-                {message}
-            </Box>
-            <Box
-                component="button"
-                type="button"
-                aria-label="Close"
-                onClick={onClose}
-                sx={{
-                    alignItems: "center",
-                    appearance: "none",
-                    bgcolor: "transparent",
-                    border: 0,
-                    color: textBase,
-                    cursor: onClose ? "pointer" : "default",
-                    display: "flex",
-                    flexShrink: 0,
-                    height: spaceTouchTargetSize,
-                    justifyContent: "center",
-                    opacity: 0.9,
-                    p: 0,
-                    width: spaceTouchTargetSize,
-                    "&:focus-visible": {
-                        outline: "2px solid rgba(255 255 255 / 0.72)",
-                        outlineOffset: 2,
-                    },
-                }}
-            >
-                <HugeiconsIcon
-                    icon={MultiplicationSignIcon}
-                    size={16}
-                    strokeWidth={2}
-                />
-            </Box>
-        </Box>
-    </Box>
+    <SpaceActionToast
+        autoDismissAfterMs={spaceToastAutoDismissDurationMs}
+        closeLabel="Dismiss friend request status"
+        icon={
+            <HugeiconsIcon icon={UserAdd02Icon} size={20} strokeWidth={1.8} />
+        }
+        message={message}
+        onClose={onClose}
+    />
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({

@@ -43,7 +43,7 @@ export const SpaceMobileBestToast: React.FC = () => {
                 py: "4px",
                 right: "calc(env(safe-area-inset-right) + 24px)",
                 top: "calc(env(safe-area-inset-top) + 24px)",
-                width: 336,
+                width: 366,
                 zIndex: 20,
             }}
         >

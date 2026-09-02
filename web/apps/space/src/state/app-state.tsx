@@ -12,7 +12,7 @@ import type { CreateProfileSource } from "utils/routes";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
-export type SpacePostPublishPhase = "posted" | "posting";
+export type SpacePostPublishPhase = "failed" | "posted" | "posting";
 export type PendingCreateProfile = SetupProfileDetails & {
     source: CreateProfileSource;
 };
