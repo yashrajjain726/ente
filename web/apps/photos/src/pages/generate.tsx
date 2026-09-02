@@ -4,6 +4,7 @@ import type { RecoveryKeyPresentationProps } from "ente-accounts/components/Reco
 import { RecoveryKeyForm } from "ente-accounts/components/auth/RecoveryKeyForm";
 import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
 import AccountsGeneratePage from "ente-accounts/pages/generate";
+import { useRouter } from "next/router";
 import type React from "react";
 
 function RecoveryKeyPresentation(
@@ -27,10 +28,17 @@ function SetPasswordPresentation(
 }
 
 function GeneratePage(): React.JSX.Element {
+    const router = useRouter();
+
+    function handleRecoveryKeyClose() {
+        void router.push("/plan");
+    }
+
     return (
         <AccountsGeneratePage
             passwordPresentation={SetPasswordPresentation}
             recoveryKeyPresentation={RecoveryKeyPresentation}
+            onRecoveryKeyClose={handleRecoveryKeyClose}
         />
     );
 }

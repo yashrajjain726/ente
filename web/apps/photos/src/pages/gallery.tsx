@@ -62,7 +62,7 @@ import { IconButton, Link, Stack, Typography } from "@mui/material";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import {
     getAndClearIsFirstLogin,
-    getAndClearJustSignedUp,
+    savedJustSignedUp,
 } from "ente-accounts/services/accounts-db";
 import { stashRedirect } from "ente-accounts/services/redirect";
 import { isSessionInvalid } from "ente-accounts/services/session";
@@ -492,6 +492,11 @@ const Page: React.FC = () => {
                 return;
             }
 
+            if (savedJustSignedUp()) {
+                void router.replace("/plan");
+                return;
+            }
+
             if (!(await validateKey())) {
                 logout();
                 return;
@@ -504,10 +509,6 @@ const Page: React.FC = () => {
             dispatch({ type: "showAll" });
 
             setIsFirstLoad(getAndClearIsFirstLogin());
-
-            if (getAndClearJustSignedUp()) {
-                showPlanSelector();
-            }
 
             const user = ensureLocalUser();
             const masterKey = await masterKeyFromSession();
