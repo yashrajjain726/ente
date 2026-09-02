@@ -1,0 +1,1 @@
+- Show person-aware avatars in the file details "Added by" row when the uploader resolves to a person.

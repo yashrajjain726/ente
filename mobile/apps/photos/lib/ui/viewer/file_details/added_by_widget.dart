@@ -17,13 +17,29 @@ class AddedByWidget extends StatelessWidget {
     if (!file.isUploaded) {
       return const SizedBox.shrink();
     }
-    late final AvatarIdentity identity;
     if (file.isOwner) {
       final uploaderName = file.uploaderName?.trim();
       if (uploaderName == null || uploaderName.isEmpty) {
         return const SizedBox.shrink();
       }
-      identity = AvatarIdentity.publicUploader(uploaderName);
+      final identity = AvatarIdentity.publicUploader(uploaderName);
+      final colors = context.componentColors;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: Spacing.lg),
+        child: Row(
+          children: [
+            AvatarIdentityWidget(identity, AvatarType.medium),
+            const SizedBox(width: Spacing.sm),
+            Flexible(
+              child: Text(
+                context.strings.addedBy(emailOrName: identity.label),
+                style: TextStyles.mini.copyWith(color: colors.textLighter),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
     } else {
       if (file.ownerID == null) {
         return const SizedBox.shrink();
@@ -32,29 +48,24 @@ class AddedByWidget extends StatelessWidget {
         file.ownerID!,
         file.collectionID,
       );
-      identity = getUserAvatarIdentity(fileOwner);
-    }
-    final colors = context.componentColors;
-    final avatar = AvatarComponent(
-      initials: identity.initials,
-      color: avatarComponentColorForAvatarIdentity(identity),
-      size: AvatarComponentSize.defaultSize,
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.lg),
-      child: Row(
-        children: [
-          avatar,
-          const SizedBox(width: Spacing.sm),
-          Flexible(
-            child: Text(
-              context.strings.addedBy(emailOrName: identity.label),
-              style: TextStyles.mini.copyWith(color: colors.textLighter),
-              overflow: TextOverflow.ellipsis,
+      final identity = getUserAvatarIdentity(fileOwner);
+      final colors = context.componentColors;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: Spacing.lg),
+        child: Row(
+          children: [
+            UserAvatarWidget(fileOwner, type: AvatarType.medium),
+            const SizedBox(width: Spacing.sm),
+            Flexible(
+              child: Text(
+                context.strings.addedBy(emailOrName: identity.label),
+                style: TextStyles.mini.copyWith(color: colors.textLighter),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
   }
 }
