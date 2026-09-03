@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
+      - '.github/checks/change-approval/**'
       - '.github/checks/workflow-security/**'
 
 permissions:
@@ -13,9 +14,6 @@ permissions:
 jobs:
   workflow-security-checks:
     runs-on: ubuntu-latest
-    environment:
-      # Require admin approval for workflow changes.
-      name: workflow-change-approval
     steps:
       - name: Checkout PR
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -23,10 +21,12 @@ jobs:
       - name: Checkout trusted checker
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.base_ref }}
           path: trusted
           sparse-checkout: .github/checks/workflow-security/check.rb
           sparse-checkout-cone-mode: false
 
       - name: Run workflow security checks
         run: ruby trusted/.github/checks/workflow-security/check.rb
+
+      - run: node --test .github/checks/change-approval/test.mjs

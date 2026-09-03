@@ -11,57 +11,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout PR
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - run: node --test .github/checks/change-approval/test.mjs
-
   detect:
+    name: Scan changes
     runs-on: ubuntu-latest
     outputs:
-      categories: ${{ steps.scan.outputs.categories }}
+      environment: ${{ steps.scan.outputs.categories != '[]' && 'change-approval' || 'no-approval' }}
     steps:
       - name: Checkout PR
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
-
-      - name: Checkout trusted scanner
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: trusted
-          sparse-checkout: .github/checks/change-approval/check.mjs
-          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - name: Scan changes
         id: scan
-        run: node trusted/.github/checks/change-approval/check.mjs ${{ github.event.pull_request.base.sha }}
-
-  approve:
-    needs: detect
-    if: needs.detect.outputs.categories != '[]'
-    name: Approve ${{ matrix.category }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        category: ${{ fromJSON(needs.detect.outputs.categories) }}
-    environment:
-      # Require admin approval for flagged changes.
-      name: change-approval
-    steps:
-      - run: "true"
+        run: |
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          git show origin/main:.github/checks/change-approval/check.mjs > "$RUNNER_TEMP/change-approval.mjs"
+          node "$RUNNER_TEMP/change-approval.mjs" HEAD^1
 
   gate:
-    needs: [test, detect, approve]
-    if: always()
+    name: Change approval
+    needs: detect
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    permissions: {}
+    environment: ${{ needs.detect.result == 'success' && needs.detect.outputs.environment || 'no-approval' }}
     steps:
-      - run: test "$test" = success && test "$detect" = success && { test "$approve" = success || test "$approve" = skipped; }
+      - run: test "$SCAN_RESULT" = success
         env:
-          test: ${{ needs.test.result }}
-          detect: ${{ needs.detect.result }}
-          approve: ${{ needs.approve.result }}
+          SCAN_RESULT: ${{ needs.detect.result }}
