@@ -35,7 +35,8 @@ import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
 const textBase = spaceText;
-const rowBackground = spaceSurface;
+const rowBackground = "#F7F7F7";
+const rowHover = "#F0F0F0";
 const dangerColor = "#F63A3A";
 const iconMuted = spaceTextMuted;
 const textLight = spaceTextMuted;
@@ -149,12 +150,12 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
                 transition: "background-color 120ms ease",
                 width: "100%",
                 ...(rowInteractive && {
-                    "&:active": { bgcolor: spaceSurfaceHover },
+                    "&:active": { bgcolor: rowHover },
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: spaceSurfaceHover },
+                    "&:hover": { bgcolor: rowHover },
                 }),
             }}
         >
@@ -744,7 +745,7 @@ export const ChangeNameSettingsScreen: React.FC<
                         <Box
                             sx={{
                                 alignItems: "center",
-                                bgcolor: rowBackground,
+                                bgcolor: spaceSurface,
                                 borderRadius: "16px",
                                 display: "flex",
                                 height: 52,
