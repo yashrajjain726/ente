@@ -82,6 +82,9 @@ func (c *CollectionController) RestoreFiles(ctx *gin.Context, userID int64, cID 
 }
 
 func (c *CollectionController) MoveFiles(ctx *gin.Context, req ente.MoveFilesRequest) error {
+	if req.FromCollectionID == req.ToCollectionID {
+		return stacktrace.Propagate(ente.ErrBadRequest, "source and destination collections are the same")
+	}
 	userID := auth.GetUserID(ctx.Request.Header)
 	r1, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID:   req.FromCollectionID,
