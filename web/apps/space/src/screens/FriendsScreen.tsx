@@ -20,11 +20,12 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/ActionFeedback";
+import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
-import { SpaceShareInviteButton } from "components/ShareInviteButton";
+import { SpaceShareIcon } from "components/ShareInviteButton";
 import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import React, { useState } from "react";
@@ -968,11 +969,53 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
         Record<string, string>
     >({});
-    const [isInviteSharing, setIsInviteSharing] = React.useState(false);
+    const [inviteShareStatus, setInviteShareStatus] = React.useState<
+        "idle" | "sharing" | "copied"
+    >("idle");
     const avatarLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | null | undefined>>
     >(new Map());
     const isUnfriendActionRunning = unfriendActionPhase != null;
+
+    React.useEffect(() => {
+        if (inviteShareStatus != "copied") return;
+        const timeoutID = window.setTimeout(
+            () => setInviteShareStatus("idle"),
+            spaceToastAutoDismissDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [inviteShareStatus]);
+
+    const shareInvite = async () => {
+        if (!profileLink || inviteShareStatus == "sharing") return;
+
+        setInviteShareStatus("sharing");
+        try {
+            if (typeof navigator.share == "function") {
+                try {
+                    await navigator.share({ url: profileLink });
+                    return;
+                } catch (error) {
+                    if (
+                        error instanceof DOMException &&
+                        error.name == "AbortError"
+                    ) {
+                        return;
+                    }
+                    log.warn("Failed to share Space invite link", error);
+                }
+            }
+
+            await navigator.clipboard.writeText(profileLink);
+            setInviteShareStatus("copied");
+        } catch (error) {
+            log.error("Failed to copy Space invite link", error);
+        } finally {
+            setInviteShareStatus((status) =>
+                status == "sharing" ? "idle" : status,
+            );
+        }
+    };
 
     const loadedAvatarURLFor = React.useCallback(
         (friend: FriendProfile) =>
@@ -1235,7 +1278,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             justifyContent: "center",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
-                            fontWeight: 600,
+                            fontWeight: 500,
                             lineHeight: "20px",
                             pointerEvents: "none",
                             position: "absolute",
@@ -1243,15 +1286,16 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             textAlign: "center",
                         }}
                     >
-                        Add the people you want to keep up with.
-                        <SpaceShareInviteButton
-                            label="Invite friends"
-                            profileLink={profileLink}
-                            sharing={isInviteSharing}
-                            onShareError={(error) =>
-                                log.error("Failed to share space invite", error)
+                        Invite your close friends and family. Share everyday
+                        photos and keep up with each other.
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-live="polite"
+                            disabled={
+                                !profileLink || inviteShareStatus == "sharing"
                             }
-                            onSharingChange={setIsInviteSharing}
+                            onClick={() => void shareInvite()}
                             sx={{
                                 alignItems: "center",
                                 bgcolor: spaceSurface,
@@ -1259,7 +1303,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 borderRadius: "18px",
                                 color: textBase,
                                 cursor:
-                                    profileLink && !isInviteSharing
+                                    profileLink &&
+                                    inviteShareStatus != "sharing"
                                         ? "pointer"
                                         : "default",
                                 display: "inline-flex",
@@ -1281,11 +1326,17 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     outlineOffset: 2,
                                 },
                                 "&:hover":
-                                    profileLink && !isInviteSharing
+                                    profileLink &&
+                                    inviteShareStatus != "sharing"
                                         ? { bgcolor: spaceSurfaceHover }
                                         : undefined,
                             }}
-                        />
+                        >
+                            <SpaceShareIcon />
+                            {inviteShareStatus == "copied"
+                                ? "Copied"
+                                : "Share invite"}
+                        </Box>
                     </Box>
                 )}
             </Box>

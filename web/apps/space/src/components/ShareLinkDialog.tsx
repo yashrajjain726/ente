@@ -167,7 +167,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                             copied
                                 ? "Copied"
                                 : useNativeShare
-                                  ? "Share profile"
+                                  ? "Share invite"
                                   : "Copy link"
                         }
                         onClick={share}

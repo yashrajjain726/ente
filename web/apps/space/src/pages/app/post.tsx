@@ -149,7 +149,7 @@ const Page: React.FC = () => {
                                 color: textSecondary,
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
+                                fontSize: 14,
                                 fontWeight: 500,
                                 lineHeight: "22px",
                                 m: 0,

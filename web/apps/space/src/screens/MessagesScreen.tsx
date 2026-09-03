@@ -2324,13 +2324,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 fontFamily:
                                                     '"Inter Variable", Inter, sans-serif',
                                                 fontSize: 14,
-                                                fontWeight: 650,
+                                                fontWeight: 500,
                                                 lineHeight: "20px",
                                                 m: 0,
                                             }}
                                         >
                                             {isThreadReadOnly
-                                                ? "No messages"
+                                                ? "No messages."
                                                 : "Say hello!"}
                                         </Box>
                                     </Box>

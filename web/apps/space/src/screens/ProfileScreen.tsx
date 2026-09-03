@@ -1529,7 +1529,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 <Box
                                     component="button"
                                     type="button"
-                                    aria-label="Share profile"
+                                    aria-label="Share invite"
                                     onClick={shareProfile}
                                     sx={{
                                         alignItems: "center",
