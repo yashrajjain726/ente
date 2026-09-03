@@ -1,3 +1,4 @@
+import type { RawExifTags } from "ente-gallery/services/exif";
 import {
     parseDateFromDigitGroups,
     tryParseEpochMicrosecondsFromFileName,
@@ -5,6 +6,8 @@ import {
 import {
     matchJSONMetadata,
     metadataJSONMapKeyForJSON,
+    metadataJSONMapKeyForXMP,
+    parseXMPSidecarTags,
 } from "ente-gallery/services/upload/metadata-json";
 import { describe, expect, test } from "vitest";
 
@@ -89,6 +92,18 @@ const formatLocalDateTime = (date: Date | undefined) => {
 
 const formatTwoDigits = (value: number) => value.toString().padStart(2, "0");
 
+const xmpTag = (value: string) => ({
+    value,
+    description: value,
+    attributes: {},
+});
+
+const xmpDescriptionTag = (description: string) => ({
+    value: [xmpTag(description)],
+    description,
+    attributes: {},
+});
+
 describe("upload filename metadata", () => {
     test.each(dateCases)("parses %s", (fileName, expected) => {
         expect(formatLocalDateTime(parseDateFromDigitGroups(fileName))).toBe(
@@ -121,5 +136,114 @@ describe("upload filename metadata", () => {
         ]);
 
         expect(matchJSONMetadata(undefined, 0, fileName, map)).toBe(metadata);
+    });
+});
+
+describe("Apple Photos XMP sidecars", () => {
+    test("parses DateCreated with an offset", () => {
+        const metadata = parseXMPSidecarTags({
+            xmp: { DateCreated: xmpTag("2023-04-27T14:51:16+05:30") },
+        });
+
+        expect(metadata?.creationDate).toMatchObject({
+            dateTime: "2023-04-27T14:51:16.000",
+            offset: "+05:30",
+        });
+        expect(metadata?.creationTime).toBe(metadata?.creationDate?.timestamp);
+    });
+
+    test("parses a Z offset date", () => {
+        expect(
+            parseXMPSidecarTags({
+                xmp: { DateCreated: xmpTag("2023-04-27T09:21:16Z") },
+            })?.creationDate,
+        ).toMatchObject({ dateTime: "2023-04-27T09:21:16.000", offset: "Z" });
+    });
+
+    test("prefers DateTimeOriginal over DateCreated", () => {
+        expect(
+            parseXMPSidecarTags({
+                xmp: {
+                    DateTimeOriginal: xmpTag("2022-01-02T03:04:05Z"),
+                    DateCreated: xmpTag("2023-04-27T09:21:16Z"),
+                },
+            })?.creationDate?.dateTime,
+        ).toBe("2022-01-02T03:04:05.000");
+    });
+
+    test.each([
+        ["12.97236N", "77.59457E", 12.97236, 77.59457],
+        ["33.8688S", "151.2093W", -33.8688, -151.2093],
+    ])("parses GPS coordinates %s, %s", (lat, long, latitude, longitude) => {
+        expect(
+            parseXMPSidecarTags({
+                xmp: { GPSLatitude: xmpTag(lat), GPSLongitude: xmpTag(long) },
+            })?.location,
+        ).toEqual({ latitude, longitude });
+    });
+
+    test("omits a location with only one GPS axis", () => {
+        expect(
+            parseXMPSidecarTags({ xmp: { GPSLatitude: xmpTag("12.97236N") } }),
+        ).toBeUndefined();
+    });
+
+    test("parses the caption", () => {
+        expect(
+            parseXMPSidecarTags({
+                xmp: { description: xmpDescriptionTag("Sunset at the lake") },
+            })?.description,
+        ).toBe("Sunset at the lake");
+    });
+
+    test.each([{ xmp: {} }, {}] satisfies RawExifTags[])(
+        "ignores empty tags",
+        (tags) => {
+            expect(parseXMPSidecarTags(tags)).toBeUndefined();
+        },
+    );
+
+    test("keys and matches sidecars by original stem and upload scope", () => {
+        const metadata = { description: "original" };
+        const duplicateMetadata = { description: "duplicate" };
+        const uppercaseMetadata = { description: "uppercase" };
+        const jsonMetadata = { description: "json" };
+        const map = new Map([
+            [metadataJSONMapKeyForXMP(undefined, 0, "IMG_1234.xmp"), metadata],
+            [
+                metadataJSONMapKeyForXMP(undefined, 0, "IMG_1234 (1).xmp"),
+                duplicateMetadata,
+            ],
+            [
+                metadataJSONMapKeyForXMP(undefined, 0, "IMG_9.XMP"),
+                uppercaseMetadata,
+            ],
+            [
+                metadataJSONMapKeyForJSON(undefined, 0, "photo.json"),
+                jsonMetadata,
+            ],
+        ]);
+
+        expect(matchJSONMetadata(undefined, 0, "IMG_1234.HEIC", map)).toBe(
+            metadata,
+        );
+        expect(matchJSONMetadata(undefined, 0, "IMG_1234.MOV", map)).toBe(
+            metadata,
+        );
+        expect(matchJSONMetadata(undefined, 0, "IMG_1234 (1).HEIC", map)).toBe(
+            duplicateMetadata,
+        );
+        expect(matchJSONMetadata("other", 0, "IMG_1234.HEIC", map)).toBe(
+            undefined,
+        );
+        expect(matchJSONMetadata(undefined, 1, "IMG_1234.HEIC", map)).toBe(
+            undefined,
+        );
+        expect(matchJSONMetadata(undefined, 0, "photo.jpg", map)).toBe(
+            undefined,
+        );
+        expect(matchJSONMetadata(undefined, 0, "IMG_9.HEIC", map)).toBe(
+            uppercaseMetadata,
+        );
     });
 });

@@ -797,9 +797,11 @@ const clusterLivePhotos = async (
     return result;
 };
 
+export type ImportSource = "generic" | "google-takeout" | "apple-photos";
+
 export const uploadableMediaCount = async (
     itemGroups: UploadItemAndPath[][],
-): Promise<{ count: number; isTakeout: boolean }> => {
+): Promise<{ count: number; importSource: ImportSource }> => {
     let localID = 0;
     const namedItems = itemGroups.flatMap((items, collectionID) =>
         items.map(([uploadItem, path]) =>
@@ -814,6 +816,7 @@ export const uploadableMediaCount = async (
     const [metadataItems, mediaItems] = splitMetadataAndMediaItems(namedItems);
     const parsedMetadataJSONMap = new Map<string, ParsedMetadataJSON>();
     let parsedJSONCount = 0;
+    let parsedXMPCount = 0;
 
     for (const item of metadataItems) {
         const parsedMetadata = await tryParseMetadataItem(item);
@@ -822,13 +825,19 @@ export const uploadableMediaCount = async (
             if (isJSON || !parsedMetadataJSONMap.has(key))
                 parsedMetadataJSONMap.set(key, metadata);
             if (isJSON) parsedJSONCount++;
+            else parsedXMPCount++;
         }
     }
 
     return {
         count: (await clusterLivePhotos(mediaItems, parsedMetadataJSONMap))
             .length,
-        isTakeout: parsedJSONCount > 0,
+        importSource:
+            parsedJSONCount > 0
+                ? "google-takeout"
+                : parsedXMPCount > 0
+                  ? "apple-photos"
+                  : "generic",
     };
 };
 

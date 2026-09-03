@@ -1,5 +1,6 @@
 import { Album02Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import AppleIcon from "@mui/icons-material/Apple";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import GoogleIcon from "@mui/icons-material/Google";
@@ -29,8 +30,16 @@ interface DefaultOptionsBaseProps {
 
 type DefaultOptionsProps = DefaultOptionsBaseProps &
     (
-        | { intent: UploadTypeSelectorIntent; onSelectGooglePhotos: () => void }
-        | { intent: "collect"; onSelectGooglePhotos?: never }
+        | {
+              intent: UploadTypeSelectorIntent;
+              onSelectApplePhotos: () => void;
+              onSelectGooglePhotos: () => void;
+          }
+        | {
+              intent: "collect";
+              onSelectApplePhotos?: never;
+              onSelectGooglePhotos?: never;
+          }
     );
 
 export function DefaultOptions({
@@ -38,6 +47,7 @@ export function DefaultOptions({
     isFileSelectionPending,
     isFolderSelectionPending,
     onClose,
+    onSelectApplePhotos,
     onSelectFiles,
     onSelectGooglePhotos,
     onSelectFolder,
@@ -89,6 +99,7 @@ export function DefaultOptions({
                 <ImportOptions
                     {...{
                         isFolderSelectionPending,
+                        onSelectApplePhotos,
                         onSelectGooglePhotos,
                         onSelectFolder,
                     }}
@@ -107,6 +118,7 @@ export function DefaultOptions({
                     {...{
                         isFileSelectionPending,
                         isFolderSelectionPending,
+                        onSelectApplePhotos,
                         onSelectFiles,
                         onSelectGooglePhotos,
                         onSelectFolder,
@@ -120,16 +132,23 @@ export function DefaultOptions({
 type ImportOptionsProps = Pick<
     DefaultOptionsBaseProps,
     "isFolderSelectionPending" | "onSelectFolder"
-> & { onSelectGooglePhotos: () => void };
+> & { onSelectApplePhotos: () => void; onSelectGooglePhotos: () => void };
 
 function ImportOptions({
     isFolderSelectionPending,
+    onSelectApplePhotos,
     onSelectGooglePhotos,
     onSelectFolder,
 }: ImportOptionsProps): React.JSX.Element {
     return (
         <Stack sx={{ gap: "20px" }}>
-            <Stack direction="row" sx={{ gap: "10px" }}>
+            <Stack
+                direction="row"
+                sx={{
+                    gap: "10px",
+                    [uploadSheetMediaQuery]: { flexWrap: "wrap" },
+                }}
+            >
                 <ImportProviderButton
                     icon={
                         <HugeiconsIcon
@@ -140,6 +159,13 @@ function ImportOptions({
                     }
                     label={t("google_photos")}
                     onClick={onSelectGooglePhotos}
+                />
+                <ImportProviderButton
+                    icon={
+                        <AppleIcon sx={{ color: "text.muted", fontSize: 22 }} />
+                    }
+                    label={t("apple_photos")}
+                    onClick={onSelectApplePhotos}
                 />
                 <ImportProviderButton
                     icon={
@@ -166,11 +192,12 @@ type UploadOptionsProps = Pick<
     | "isFolderSelectionPending"
     | "onSelectFiles"
     | "onSelectFolder"
-> & { onSelectGooglePhotos: () => void };
+> & { onSelectApplePhotos: () => void; onSelectGooglePhotos: () => void };
 
 function UploadOptions({
     isFileSelectionPending,
     isFolderSelectionPending,
+    onSelectApplePhotos,
     onSelectFiles,
     onSelectGooglePhotos,
     onSelectFolder,
@@ -208,15 +235,26 @@ function UploadOptions({
             </ImportSection>
 
             <ImportSection title={t("import_from")} gap="20px">
-                <OptionRowButton
-                    icon={
-                        <GoogleIcon
-                            sx={{ color: "text.muted", fontSize: "20px" }}
-                        />
-                    }
-                    label={t("google_takeout")}
-                    onClick={onSelectGooglePhotos}
-                />
+                <Stack sx={{ gap: 1 }}>
+                    <OptionRowButton
+                        icon={
+                            <GoogleIcon
+                                sx={{ color: "text.muted", fontSize: "20px" }}
+                            />
+                        }
+                        label={t("google_takeout")}
+                        onClick={onSelectGooglePhotos}
+                    />
+                    <OptionRowButton
+                        icon={
+                            <AppleIcon
+                                sx={{ color: "text.muted", fontSize: "20px" }}
+                            />
+                        }
+                        label={t("apple_photos")}
+                        onClick={onSelectApplePhotos}
+                    />
+                </Stack>
             </ImportSection>
         </Stack>
     );
@@ -313,6 +351,7 @@ function ImportProviderButton({
             onClick={onClick}
             sx={(theme) => ({
                 flex: 1,
+                [uploadSheetMediaQuery]: { flexBasis: "calc(50% - 5px)" },
                 minWidth: 0,
                 height: "74px",
                 p: "12px",

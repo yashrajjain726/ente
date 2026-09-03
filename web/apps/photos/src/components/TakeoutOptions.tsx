@@ -28,7 +28,15 @@ const optionsTitleSx = {
     [uploadSheetMediaQuery]: { fontFamily: '"Inter Variable", sans-serif' },
 };
 
+const stepSx = {
+    color: "text.muted",
+    fontSize: "14px",
+    fontWeight: 500,
+    lineHeight: "20px",
+};
+
 interface TakeoutOptionsProps {
+    provider: "google" | "apple";
     isFolderSelectionPending?: boolean;
     onBack: () => void;
     onClose: () => void;
@@ -37,6 +45,7 @@ interface TakeoutOptionsProps {
 }
 
 export function TakeoutOptions({
+    provider,
     isFolderSelectionPending,
     onBack,
     onClose,
@@ -76,9 +85,13 @@ export function TakeoutOptions({
                     </IconButton>
                     <Typography sx={optionsTitleSx}>
                         {t(
-                            isSheet
-                                ? "google_takeout"
-                                : "import_from_google_photos",
+                            provider == "apple"
+                                ? isSheet
+                                    ? "apple_photos"
+                                    : "import_from_apple_photos"
+                                : isSheet
+                                  ? "google_takeout"
+                                  : "import_from_google_photos",
                         )}
                     </Typography>
                 </Stack>
@@ -100,11 +113,32 @@ export function TakeoutOptions({
             </Stack>
 
             <Stack sx={{ gap: "20px" }}>
+                {provider == "apple" && (
+                    <Stack sx={{ gap: "4px" }}>
+                        <Typography sx={stepSx}>
+                            {t("apple_export_step_1")}
+                        </Typography>
+                        <Typography sx={stepSx}>
+                            {t("apple_export_step_2")}
+                        </Typography>
+                        <Typography sx={stepSx}>
+                            {t("apple_export_step_3")}
+                        </Typography>
+                    </Stack>
+                )}
                 <Stack sx={{ gap: 1 }}>
                     <TakeoutOptionButton
                         icon={<HugeiconsIcon icon={Folder01Icon} size={18} />}
-                        label={t("unzipped_folder")}
-                        description={t("unzipped_folder_hint")}
+                        label={t(
+                            provider == "apple"
+                                ? "exported_folder"
+                                : "unzipped_folder",
+                        )}
+                        description={t(
+                            provider == "apple"
+                                ? "apple_export_folder_hint"
+                                : "unzipped_folder_hint",
+                        )}
                         pending={isFolderSelectionPending}
                         onClick={onSelectFolder}
                     />
@@ -131,7 +165,11 @@ export function TakeoutOptions({
                         {t("takeout_help_prompt")}{" "}
                     </span>
                     <Link
-                        href="https://ente.com/help/photos/migration/from-google-photos/"
+                        href={
+                            provider == "apple"
+                                ? "https://ente.com/help/photos/faq/migration/#can-i-import-apple-photos-via-desktop"
+                                : "https://ente.com/help/photos/migration/from-google-photos/"
+                        }
                         target="_blank"
                         rel="noopener"
                         sx={{

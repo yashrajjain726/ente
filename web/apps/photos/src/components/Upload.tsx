@@ -6,6 +6,7 @@ import { TakeoutOptions } from "@/components/TakeoutOptions";
 import { UploadConfirmationDialog } from "@/components/UploadConfirmationDialog";
 import { downloadAppDialogAttributes } from "@/components/utils/download";
 import type {
+    ImportSource,
     InProgressUpload,
     SegregatedFinishedUploads,
     UploadBatchResult,
@@ -154,17 +155,25 @@ interface UploadConfirmation {
     pendingUpload: PendingUpload;
     fileCount: number;
     albumCount: number;
-    isTakeout: boolean;
+    importSource: ImportSource;
     importFavorites: boolean;
     includePartnerSharedFiles: boolean;
 }
 
 type UploadConfirmationState =
-    | { phase: "counting"; isTakeout: boolean }
+    | { phase: "counting"; importSource: ImportSource }
     | ({ phase: "ready" } & UploadConfirmation);
 
-const containsJSONFiles = (uploadItemAndPaths: UploadItemAndPath[]) =>
-    uploadItemAndPaths.some(([, path]) => lowercaseExtension(path) == "json");
+const importSourceHint = (
+    uploadItemAndPaths: UploadItemAndPath[],
+): ImportSource =>
+    uploadItemAndPaths.some(([, path]) => lowercaseExtension(path) == "json")
+        ? "google-takeout"
+        : uploadItemAndPaths.some(
+                ([, path]) => lowercaseExtension(path) == "xmp",
+            )
+          ? "apple-photos"
+          : "generic";
 
 export const Upload: React.FC<UploadProps> = ({
     user,
@@ -669,19 +678,15 @@ export const Upload: React.FC<UploadProps> = ({
     ) => {
         if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
 
-        const isTakeoutHint = containsJSONFiles(uploadItemAndPaths);
-        if (uploadItemAndPaths.length > 1 || isTakeoutHint)
-            setUploadConfirmation({
-                phase: "counting",
-                isTakeout: isTakeoutHint,
-            });
+        const hint = importSourceHint(uploadItemAndPaths);
+        if (uploadItemAndPaths.length > 1 || hint != "generic")
+            setUploadConfirmation({ phase: "counting", importSource: hint });
 
         try {
-            const { count: fileCount, isTakeout } = await uploadableMediaCount([
-                uploadItemAndPaths,
-            ]);
+            const { count: fileCount, importSource } =
+                await uploadableMediaCount([uploadItemAndPaths]);
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
-            if (fileCount == 1 && !isTakeout) {
+            if (fileCount == 1 && importSource == "generic") {
                 setUploadConfirmation(undefined);
                 void commitUploadToExistingCollection(
                     collection,
@@ -699,7 +704,7 @@ export const Upload: React.FC<UploadProps> = ({
                 },
                 fileCount,
                 albumCount: 1,
-                isTakeout,
+                importSource,
                 importFavorites: true,
                 includePartnerSharedFiles: true,
             });
@@ -772,15 +777,12 @@ export const Upload: React.FC<UploadProps> = ({
         }: NewCollectionsOptions = {},
     ) => {
         const uploadItemAndPaths = uploadItemsAndPaths.current;
-        const isTakeoutHint = containsJSONFiles(uploadItemAndPaths);
+        const hint = importSourceHint(uploadItemAndPaths);
         if (
             !skipConfirmation &&
-            (uploadItemAndPaths.length > 1 || isTakeoutHint)
+            (uploadItemAndPaths.length > 1 || hint != "generic")
         )
-            setUploadConfirmation({
-                phase: "counting",
-                isTakeout: isTakeoutHint,
-            });
+            setUploadConfirmation({ phase: "counting", importSource: hint });
 
         let collectionNameToUploadItems = new Map<
             string,
@@ -822,11 +824,12 @@ export const Upload: React.FC<UploadProps> = ({
         }
 
         try {
-            const { count: fileCount, isTakeout } = await uploadableMediaCount([
-                ...collectionNameToUploadItems.values(),
-            ]);
+            const { count: fileCount, importSource } =
+                await uploadableMediaCount([
+                    ...collectionNameToUploadItems.values(),
+                ]);
             if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
-            if (fileCount == 1 && !isTakeout) {
+            if (fileCount == 1 && importSource == "generic") {
                 setUploadConfirmation(undefined);
                 void commitUploadToNewCollections(
                     uploadItemAndPaths,
@@ -848,7 +851,7 @@ export const Upload: React.FC<UploadProps> = ({
                 },
                 fileCount,
                 albumCount: collectionNameToUploadItems.size,
-                isTakeout,
+                importSource,
                 importFavorites: importTakeoutFavorites ?? true,
                 includePartnerSharedFiles: includePartnerSharedFiles ?? true,
             });
@@ -1235,7 +1238,7 @@ export const Upload: React.FC<UploadProps> = ({
             <UploadConfirmationDialog
                 open={!!uploadConfirmation}
                 loading={uploadConfirmation?.phase == "counting"}
-                isTakeout={uploadConfirmation?.isTakeout ?? false}
+                importSource={uploadConfirmation?.importSource ?? "generic"}
                 fileCount={readyConfirmation?.fileCount ?? 0}
                 albumCount={readyConfirmation?.albumCount ?? 0}
                 importFavorites={readyConfirmation?.importFavorites ?? true}
@@ -1566,38 +1569,15 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
     onClose,
 }) => {
     // Keep dialog state in this child so it resets when the dialog closes.
-    const [showTakeoutOptions, setShowTakeoutOptions] = useState(false);
+    const [provider, setProvider] = useState<"google" | "apple">();
 
-    const handleTakeoutClose = () => setShowTakeoutOptions(false);
-
-    const handleSelect = (option: UploadType) => {
-        switch (option) {
-            case "files":
-                onSelect("files");
-                break;
-            case "folders":
-                onSelect("folders");
-                break;
-            case "zips":
-                if (!showTakeoutOptions) {
-                    setShowTakeoutOptions(true);
-                } else {
-                    onSelect("zips");
-                }
-                break;
-        }
-    };
-
-    const handleSelectFiles = () => handleSelect("files");
-    const handleSelectGooglePhotos = () => handleSelect("zips");
-    const handleSelectFolder = () => handleSelect("folders");
-
-    return showTakeoutOptions ? (
+    return provider ? (
         <TakeoutOptions
+            provider={provider}
             isFolderSelectionPending={pendingUploadType == "folders"}
-            onBack={handleTakeoutClose}
-            onSelectFolder={handleSelectFolder}
-            onSelectZips={handleSelectGooglePhotos}
+            onBack={() => setProvider(undefined)}
+            onSelectFolder={() => onSelect("folders")}
+            onSelectZips={() => onSelect("zips")}
             {...{ onClose }}
         />
     ) : (
@@ -1605,9 +1585,10 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
             intent={intent}
             isFileSelectionPending={pendingUploadType == "files"}
             isFolderSelectionPending={pendingUploadType == "folders"}
-            onSelectFiles={handleSelectFiles}
-            onSelectGooglePhotos={handleSelectGooglePhotos}
-            onSelectFolder={handleSelectFolder}
+            onSelectFiles={() => onSelect("files")}
+            onSelectFolder={() => onSelect("folders")}
+            onSelectGooglePhotos={() => setProvider("google")}
+            onSelectApplePhotos={() => setProvider("apple")}
             {...{ onClose }}
         />
     );
