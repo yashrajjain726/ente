@@ -255,20 +255,21 @@ impl Log {
         if start >= self.end_offset {
             return Ok(false);
         }
-        let tail_len = (self.end_offset - start) as usize;
+        let tail_len = self.end_offset - start;
         let step = step_bytes.max(1);
         let overlap = max_record_len(self.dims).saturating_sub(1);
-        let mut window = vec![0u8; step.saturating_add(overlap).min(tail_len)];
-        let mut base = 0usize;
+        let window_len = (step.saturating_add(overlap) as u64).min(tail_len) as usize;
+        let mut window = vec![0u8; window_len];
+        let mut base = 0u64;
         loop {
-            let len = window.len().min(tail_len - base);
+            let len = (window.len() as u64).min(tail_len - base) as usize;
             self.file
-                .seek(SeekFrom::Start(start + base as u64))
+                .seek(SeekFrom::Start(start + base))
                 .map_err(|source| VecDbError::io(&self.path, source))?;
             self.file
                 .read_exact(&mut window[..len])
                 .map_err(|source| VecDbError::io(&self.path, source))?;
-            let reaches_end = base + len == tail_len;
+            let reaches_end = base + len as u64 == tail_len;
             let probe_end = if reaches_end { len } else { step.min(len) };
             if (0..probe_end).any(|offset| valid_record_at(&window[offset..len], self.dims)) {
                 return Ok(true);
@@ -276,7 +277,7 @@ impl Log {
             if reaches_end {
                 return Ok(false);
             }
-            base += step;
+            base += step as u64;
         }
     }
 

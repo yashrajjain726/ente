@@ -653,16 +653,14 @@ impl VecDb {
 
     pub fn stats(&self) -> Result<Stats, VecDbError> {
         self.shared.ensure_open()?;
-        let (log_bytes, records_since_snapshot) = {
-            let half = self.shared.writer_half();
-            self.shared.ensure_open()?;
-            match &half.mode {
-                WriterMode::Active(state) => (
-                    state.log.current_end_offset(),
-                    state.mutations_since_snapshot,
-                ),
-                WriterMode::ReadOnly { log_bytes } => (*log_bytes, 0),
-            }
+        let half = self.shared.writer_half();
+        self.shared.ensure_open()?;
+        let (log_bytes, records_since_snapshot) = match &half.mode {
+            WriterMode::Active(state) => (
+                state.log.current_end_offset(),
+                state.mutations_since_snapshot,
+            ),
+            WriterMode::ReadOnly { log_bytes } => (*log_bytes, 0),
         };
         let st = self.shared.state_read();
         let live_count = st.arena.live_count();
