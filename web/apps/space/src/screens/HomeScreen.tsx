@@ -640,7 +640,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         color={textSecondary}
                         placement="center"
                     >
-                        No posts yet.
+                        No posts
                     </SpacePostBadge>
                 )}
                 {!isLoading && postUnavailable && (
