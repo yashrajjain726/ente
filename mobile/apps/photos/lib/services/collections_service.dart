@@ -80,8 +80,6 @@ class CollectionsService {
   final _cachedUserIdToUser = <int, User>{};
   Collection? cachedDefaultHiddenCollection;
   Future<Map<int, int>>? _collectionIDToNewestFileTime;
-  Future<Collection>? _uncategorizedCollectionFuture;
-  int? _uncategorizedCollectionFutureOwnerID;
   final Map<String, EnteFile> _coverCache = <String, EnteFile>{};
   final Map<int, int> _countCache = <int, int>{};
 
@@ -220,8 +218,6 @@ class CollectionsService {
     _localPathToCollectionID.clear();
     _collectionIDToCollections.clear();
     cachedDefaultHiddenCollection = null;
-    _uncategorizedCollectionFuture = null;
-    _uncategorizedCollectionFutureOwnerID = null;
     _cachedPublicAlbumToken.clear();
     _cachedPublicAlbumJWT.clear();
     _cachedPublicCollectionID.clear();
@@ -558,23 +554,7 @@ class CollectionsService {
       return matchedCollection;
     }
 
-    final inFlightCreation = _uncategorizedCollectionFuture;
-    if (inFlightCreation != null &&
-        _uncategorizedCollectionFutureOwnerID == userID) {
-      return await inFlightCreation;
-    }
-
-    final creation = _createUncategorizedCollection();
-    _uncategorizedCollectionFutureOwnerID = userID;
-    _uncategorizedCollectionFuture = creation;
-    try {
-      return await creation;
-    } finally {
-      if (identical(_uncategorizedCollectionFuture, creation)) {
-        _uncategorizedCollectionFuture = null;
-        _uncategorizedCollectionFutureOwnerID = null;
-      }
-    }
+    return _createUncategorizedCollection();
   }
 
   Future<void> _ensureUncategorizedCollection() async {
