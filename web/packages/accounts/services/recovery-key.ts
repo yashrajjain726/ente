@@ -1,11 +1,11 @@
 import { savedKeyAttributes } from "ente-accounts/services/accounts-db";
+import { ensureMasterKeyFromSession } from "ente-accounts/services/core-session";
 import {
     decryptBox,
     encryptBox,
     generateKey,
     recoveryKeyFromMnemonicOrHex,
 } from "ente-accounts/services/crypto";
-import { ensureMasterKeyFromSession } from "ente-accounts/services/session-storage";
 import { saveKeyAttributes } from "./accounts-db";
 import { putUserRecoveryKeyAttributes, type KeyAttributes } from "./user";
 

@@ -2485,8 +2485,6 @@ dependencies = [
  "ente-core",
  "ente-wasm-lib",
  "ente-wasm-log",
- "js-sys",
- "thiserror 2.0.18",
  "wasm-bindgen",
 ]
 
@@ -2855,6 +2853,7 @@ dependencies = [
 name = "ente-wasm-lib"
 version = "0.0.0"
 dependencies = [
+ "ente-accounts",
  "ente-contacts",
  "ente-core",
  "js-sys",

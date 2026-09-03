@@ -1,66 +1,7 @@
 use ente_accounts::auth;
 use ente_core::b64;
+use ente_wasm_lib::accounts::{Error, GeneratedKek};
 use wasm_bindgen::prelude::*;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error(transparent)]
-    Accounts(#[from] ente_accounts::Error),
-}
-
-impl Error {
-    fn name(&self) -> Option<&'static str> {
-        match self {
-            Self::Accounts(ente_accounts::Error::InsufficientMemory) => Some("insufficient_memory"),
-            _ => None,
-        }
-    }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
-}
-
-impl From<Error> for JsValue {
-    fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
-    }
-}
-
-#[wasm_bindgen]
-pub struct GeneratedKek {
-    key: String,
-    salt: String,
-    mem_limit: u32,
-    ops_limit: u32,
-}
-
-#[wasm_bindgen]
-impl GeneratedKek {
-    #[wasm_bindgen(getter)]
-    pub fn key(&self) -> String {
-        self.key.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn salt(&self) -> String {
-        self.salt.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn mem_limit(&self) -> u32 {
-        self.mem_limit
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn ops_limit(&self) -> u32 {
-        self.ops_limit
-    }
-}
 
 #[wasm_bindgen]
 pub struct GeneratedSrpSetup {
@@ -100,24 +41,7 @@ pub fn auth_derive_kek(
 
 #[wasm_bindgen]
 pub fn auth_generate_sensitive_kek(password: &str) -> Result<GeneratedKek, Error> {
-    let generated = auth::generate_sensitive_kek(password)?;
-    Ok(GeneratedKek {
-        key: b64::encode(&generated.key),
-        salt: b64::encode(&generated.salt),
-        mem_limit: generated.mem_limit,
-        ops_limit: generated.ops_limit,
-    })
-}
-
-#[wasm_bindgen]
-pub fn auth_generate_interactive_kek(password: &str) -> Result<GeneratedKek, Error> {
-    let generated = auth::generate_interactive_kek(password)?;
-    Ok(GeneratedKek {
-        key: b64::encode(&generated.key),
-        salt: b64::encode(&generated.salt),
-        mem_limit: generated.mem_limit,
-        ops_limit: generated.ops_limit,
-    })
+    Ok(auth::generate_sensitive_kek(password)?.into())
 }
 
 #[wasm_bindgen]

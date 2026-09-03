@@ -4,11 +4,7 @@ import type {
     LockerItem,
     LockerItemType,
 } from "@/types";
-import { deriveInteractiveKey } from "ente-accounts/services/crypto";
-import {
-    ensureLocalUser,
-    ensureUserKeyPair,
-} from "ente-accounts/services/user";
+import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
@@ -18,12 +14,14 @@ import {
     boxSealOpen,
     decryptBox,
     decryptMetadataJSON,
+    deriveInteractiveKey,
     encryptBlob,
     encryptBox,
     generateKey,
     stringToB64,
 } from "ente-locker-wasm";
 import { z } from "zod";
+import { ensureUserKeyPair } from "./account-keys";
 import {
     clearLockerCache,
     findCollectionByType,

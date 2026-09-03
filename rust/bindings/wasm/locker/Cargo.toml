@@ -6,5 +6,5 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-ente-wasm-lib = { workspace = true, features = ["contacts", "crypto-file", "crypto-seal"] }
+ente-wasm-lib = { workspace = true, features = ["accounts", "contacts", "crypto-file", "crypto-seal"] }
 ente-wasm-log.workspace = true
