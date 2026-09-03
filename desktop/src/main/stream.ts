@@ -17,12 +17,12 @@ import {
 
 // This protocol avoids contextBridge's buffer copies for large files.
 export const registerStreamProtocol = (mainWindow: BrowserWindow) => {
-    protocol.handle("stream", (request: Request) => {
+    protocol.handle("stream", async (request: Request) => {
         try {
-            return handleStreamRequest(mainWindow, request);
+            return await handleStreamRequest(mainWindow, request);
         } catch (e) {
-            log.error(`Failed to handle stream request for ${request.url}`, e);
-            return new Response(String(e), { status: 500 });
+            log.error("Failed to handle stream request", e);
+            return new Response("Internal stream error", { status: 500 });
         }
     });
 };
@@ -197,8 +197,9 @@ const handleGenerateHLSWrite = async (
 ) => {
     const fileID = parseInt(params.get("fileID") ?? "", 10);
     const fetchURL = params.get("fetchURL");
-    const authToken = params.get("authToken");
-    if (!fileID || !fetchURL || !authToken) throw new Error("Missing params");
+    const authToken = request.headers.get("X-Auth-Token");
+    if (!fileID || !fetchURL || !authToken)
+        return new Response("Invalid generate HLS request", { status: 400 });
 
     let inputItem: Parameters<typeof makeFileForStreamOrPathOrZipItem>[0];
     const path = params.get("path");
