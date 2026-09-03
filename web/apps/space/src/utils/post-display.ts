@@ -16,7 +16,6 @@ export const profilePostItemsFromPosts = (
         name: post.name,
         postId: post.postId,
         spaceId: post.spaceId,
-        timestampMicros: post.timestampMicros,
         timestampMs: post.timestampMs,
         thumbHash: post.thumbHash,
         viewerLiked: post.viewerLiked,

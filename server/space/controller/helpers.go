@@ -110,7 +110,6 @@ func toPostResponse(post *spacerepo.SpacePostRecord, assets []spacerepo.SpacePos
 		CaptionCipher:    encodeSpaceField(post.CaptionCipher),
 		KeyVersion:       post.KeyVersion,
 		CreatedAt:        formatMicros(post.CreatedAt),
-		CreatedAtMicros:  post.CreatedAt,
 		ViewerLiked:      post.ViewerLiked,
 	}
 	if len(assets) > 0 {

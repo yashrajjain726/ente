@@ -245,7 +245,6 @@ pub struct PostResponse {
     #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
     pub created_at: String,
-    pub created_at_micros: i64,
     pub viewer_liked: bool,
 }
 

@@ -6,7 +6,7 @@ import { apiOrigin } from "ente-base/origins";
 import { loadCurrentHomePostsPage, type SpacePost } from "services/space";
 import { z } from "zod";
 
-const homePostsVersion = 2;
+const homePostsVersion = 1;
 
 const CachedSpacePostAsset = z.object({
     encryptedPostKey: z.string(),
@@ -31,7 +31,6 @@ const CachedSpacePost = z.object({
     postId: z.number(),
     spaceId: z.string(),
     thumbHash: z.string().optional(),
-    timestampMicros: z.number().int().nonnegative(),
     timestampMs: z.number(),
     username: z.string().optional(),
     viewerLiked: z.boolean(),
@@ -40,7 +39,7 @@ const CachedSpacePost = z.object({
 
 const PostMarker = z.object({
     postId: z.number().int().positive(),
-    timestampMicros: z.number().int().nonnegative(),
+    timestampMs: z.number().nonnegative(),
 });
 
 const SpaceHomePostsStateSchema = z.object({
@@ -65,7 +64,7 @@ export interface SpaceHomePostsState {
 
 interface SpacePostMarker {
     postId: number;
-    timestampMicros: number;
+    timestampMs: number;
 }
 
 const memoryCache = new Map<string, SpaceHomePostsState | undefined>();
@@ -112,16 +111,15 @@ const cloneState = (state: SpaceHomePostsState): SpaceHomePostsState => ({
 });
 
 const descendingPostOrder = (a: SpacePostMarker, b: SpacePostMarker) =>
-    b.timestampMicros - a.timestampMicros || b.postId - a.postId;
+    b.timestampMs - a.timestampMs || b.postId - a.postId;
 
 const isAfter = (post: SpacePostMarker, marker: SpacePostMarker) =>
-    post.timestampMicros > marker.timestampMicros ||
-    (post.timestampMicros == marker.timestampMicros &&
-        post.postId > marker.postId);
+    post.timestampMs > marker.timestampMs ||
+    (post.timestampMs == marker.timestampMs && post.postId > marker.postId);
 
 const markerFor = (post: SpacePostMarker): SpacePostMarker => ({
     postId: post.postId,
-    timestampMicros: post.timestampMicros,
+    timestampMs: post.timestampMs,
 });
 
 const markerFromCursor = (cursor: string): SpacePostMarker | undefined => {
@@ -130,21 +128,13 @@ const markerFromCursor = (cursor: string): SpacePostMarker | undefined => {
     const postId = Number(parts[1]);
     if (
         !Number.isSafeInteger(createdAt) ||
-        createdAt < 0 ||
+        createdAt <= 0 ||
         !Number.isSafeInteger(postId) ||
         postId < 0
     ) {
         return undefined;
     }
-    return { postId, timestampMicros: createdAt };
-};
-
-const laterCursor = (first: string, second: string) => {
-    const firstMarker = markerFromCursor(first);
-    const secondMarker = markerFromCursor(second);
-    if (!firstMarker) return second;
-    if (!secondMarker || isAfter(firstMarker, secondMarker)) return first;
-    return second;
+    return { postId, timestampMs: Math.floor(createdAt / 1000) };
 };
 
 const normalizedState = (state: SpaceHomePostsState): SpaceHomePostsState => ({
@@ -304,7 +294,7 @@ const loadAllHomePosts = async (viewerSpaceId: string, after?: string) => {
 const refreshAfterCursor = (state: SpaceHomePostsState) => {
     const oldestUnreadPost = state.unreadPosts[state.unreadPosts.length - 1];
     return oldestUnreadPost
-        ? `${oldestUnreadPost.timestampMicros}:0`
+        ? `${oldestUnreadPost.timestampMs * 1000}:0`
         : state.syncCursor;
 };
 
@@ -393,29 +383,14 @@ export const refreshSpaceHomePosts = async (
         refreshAfterCursor(savedState),
     );
     const latestPosts = latestPostsFor(result.items, currentFriendSpaceIdSet);
-    const savedLatestPosts = new Map(
-        savedState.latestPosts.map((post) => [post.spaceId, post]),
-    );
     const returnedPostsByID = new Map(
         result.items.map((post) => [post.postId, post]),
     );
     const discoveredPosts = savedMarker
-        ? result.items.filter((post) => {
-              if (isAfter(post, savedMarker)) return true;
-              if (latestPosts.get(post.spaceId)?.postId != post.postId) {
-                  return false;
-              }
-              const savedLatestPost = savedLatestPosts.get(post.spaceId);
-              return (
-                  !savedLatestPost ||
-                  (savedLatestPost.postId != post.postId &&
-                      isAfter(post, savedLatestPost))
-              );
-          })
+        ? result.items.filter((post) => isAfter(post, savedMarker))
         : [];
+    const nextMarker = markerFromCursor(result.syncCursor);
     return updateState(viewerSpaceId, (state) => {
-        const syncCursor = laterCursor(state.syncCursor, result.syncCursor);
-        const nextMarker = markerFromCursor(syncCursor);
         const readAheadPostIds = new Set(
             state.readAheadPosts.map((post) => post.postId),
         );
@@ -450,7 +425,7 @@ export const refreshSpaceHomePosts = async (
                       isAfter(post, nextMarker),
                   )
                 : state.readAheadPosts,
-            syncCursor,
+            syncCursor: result.syncCursor,
             unreadPosts: [...unreadPostsByID.values()],
         };
     });

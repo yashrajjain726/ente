@@ -95,7 +95,6 @@ export interface ProfilePostItem {
     name?: string;
     postId?: number;
     spaceId?: string;
-    timestampMicros: number;
     timestampMs: number;
     thumbHash?: string;
     viewerLiked?: boolean;
@@ -811,7 +810,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     name: displayName,
                     postId: item.postId,
                     spaceId: item.spaceId,
-                    timestampMicros: item.timestampMicros,
                     timestampMs: item.timestampMs,
                     viewerLiked: item.viewerLiked,
                     width: dimensions.width,
@@ -839,7 +837,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     name: displayName,
                     postId: item.postId,
                     spaceId: item.spaceId,
-                    timestampMicros: item.timestampMicros,
                     timestampMs: item.timestampMs,
                     viewerLiked: item.viewerLiked,
                     width: dimensions.width,
