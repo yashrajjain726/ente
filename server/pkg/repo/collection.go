@@ -867,6 +867,9 @@ func (repo *CollectionRepository) MoveFiles(ctx context.Context,
 	if collectionOwner != fileOwner {
 		return fmt.Errorf("move is not supported when collection and file onwer are different")
 	}
+	if toCollectionID == fromCollectionID {
+		return fmt.Errorf("source and destination collections must differ")
+	}
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
