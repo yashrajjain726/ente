@@ -154,13 +154,24 @@ impl Log {
     }
 
     pub(crate) fn append(&mut self, entries: &[LogEntry<'_>]) -> Result<(), VecDbError> {
+        self.append_records(entries, true)
+    }
+
+    pub(crate) fn append_unsynced_for_staging(
+        &mut self,
+        entries: &[LogEntry<'_>],
+    ) -> Result<(), VecDbError> {
+        self.append_records(entries, false)
+    }
+
+    fn append_records(&mut self, entries: &[LogEntry<'_>], sync: bool) -> Result<(), VecDbError> {
         if entries.is_empty() {
             return Ok(());
         }
         for entry in entries {
             validate_entry(entry, self.dims)?;
         }
-        match self.write_records(entries) {
+        match self.write_records(entries, sync) {
             Ok(written) => {
                 self.end_offset += written;
                 Ok(())
@@ -172,7 +183,7 @@ impl Log {
         }
     }
 
-    fn write_records(&mut self, entries: &[LogEntry<'_>]) -> Result<u64, VecDbError> {
+    fn write_records(&mut self, entries: &[LogEntry<'_>], sync: bool) -> Result<u64, VecDbError> {
         self.file
             .seek(SeekFrom::Start(self.end_offset))
             .map_err(|source| VecDbError::io(&self.path, source))?;
@@ -185,9 +196,11 @@ impl Log {
             }
         }
         written += self.drain_encode_buffer()?;
-        self.file
-            .sync_all()
-            .map_err(|source| VecDbError::io(&self.path, source))?;
+        if sync {
+            self.file
+                .sync_all()
+                .map_err(|source| VecDbError::io(&self.path, source))?;
+        }
         Ok(written)
     }
 
@@ -1362,6 +1375,58 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "acked"));
         assert_eq!(recoverable_end, acked_end);
+    }
+
+    #[test]
+    fn unsynced_staging_appends_produce_bytes_identical_to_synced_appends() {
+        let dir = TempDir::new().unwrap();
+        let synced_path = dir.path().join("synced");
+        let staged_path = dir.path().join("staged");
+        let mut synced = Log::create(&synced_path, 8).unwrap();
+        let mut staged = Log::create(&staged_path, 8).unwrap();
+        let vectors: Vec<Vec<f32>> = (0..3).map(|seed| seeded_vector(seed, 8)).collect();
+        let attrs = [Attribute {
+            name: "model".to_string(),
+            value: AttrValue::Str("v1".to_string()),
+        }];
+        let batches: Vec<Vec<LogEntry<'_>>> = vec![
+            vec![
+                LogEntry::Add {
+                    key: "a",
+                    vector: &vectors[0],
+                    attrs: &[],
+                },
+                LogEntry::Add {
+                    key: "b",
+                    vector: &vectors[1],
+                    attrs: &attrs,
+                },
+            ],
+            vec![
+                LogEntry::Tombstone { key: "a" },
+                LogEntry::Add {
+                    key: "c",
+                    vector: &vectors[2],
+                    attrs: &[],
+                },
+            ],
+        ];
+        for batch in &batches {
+            synced.append(batch).unwrap();
+            staged.append_unsynced_for_staging(batch).unwrap();
+        }
+        assert_eq!(staged.current_end_offset(), synced.current_end_offset());
+        staged.into_file().sync_all().unwrap();
+        drop(synced);
+        let synced_bytes = std::fs::read(&synced_path).unwrap();
+        let staged_bytes = std::fs::read(&staged_path).unwrap();
+        assert_eq!(staged_bytes.len(), synced_bytes.len());
+        assert_eq!(staged_bytes[HEADER_LEN..], synced_bytes[HEADER_LEN..]);
+        let (synced_records, synced_end) = scan_all(&mut reopen(&synced_path, 8));
+        let (staged_records, staged_end) = scan_all(&mut reopen(&staged_path, 8));
+        assert_eq!(staged_records.len(), 4);
+        assert_eq!(staged_records, synced_records);
+        assert_eq!(staged_end, synced_end);
     }
 
     #[test]

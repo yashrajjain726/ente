@@ -16,7 +16,9 @@ use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, header_generation, remove_if_present,
     remove_stale_temp_sibling, sync_parent_dir,
 };
-use super::snapshot::{load_snapshot, remove_snapshot, snapshot_path, write_snapshot};
+use super::snapshot::{
+    LoadedSnapshot, load_snapshot, remove_snapshot, snapshot_path, write_snapshot,
+};
 use super::{AttrValue, Attribute, KeyMatches, Match, SearchParams, VecDbError};
 
 const SNAPSHOT_HARD_CAP: usize = 5000;
@@ -1283,7 +1285,7 @@ struct ReplayedState {
 }
 
 fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
-    let snapshot = load_snapshot(log.path(), log.generation());
+    let mut snapshot = load_snapshot(log.path(), log.generation());
     if let Some(loaded) = &snapshot
         && loaded.covered_log_offset > log.current_end_offset()
     {
@@ -1294,23 +1296,21 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
             log.current_end_offset()
         )));
     }
-    let covered = snapshot
-        .as_ref()
-        .map_or(u64::MAX, |loaded| loaded.covered_log_offset);
+    let snapshot_covered = snapshot.as_ref().map(|loaded| loaded.covered_log_offset);
+    let covered = snapshot_covered.unwrap_or(u64::MAX);
+    let path = log.path().to_path_buf();
     let mut arena = VectorArena::new(dims)?;
     let mut attrs = AttrTable::default();
-    let mut tail_outcomes: Vec<UpsertOutcome> = Vec::new();
+    let mut graph: Option<Graph> = None;
     let mut tail_records = 0u64;
     let mut total_records = 0u64;
-    let mut covered_slot_count: Option<usize> = None;
     let recoverable_end;
     {
         let mut scanner = log.scan()?;
         while let Some((record, offset)) = scanner.next_record()? {
             total_records += 1;
-            let in_tail = offset >= covered;
-            if in_tail {
-                covered_slot_count.get_or_insert(arena.slot_count());
+            if offset >= covered {
+                attach_snapshot_graph(&mut graph, &mut snapshot, &arena, &path);
                 tail_records += 1;
             }
             match record {
@@ -1321,8 +1321,8 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
                 } => {
                     let outcome = arena.upsert(&key, &vector)?;
                     attrs.set(slot_of_outcome(outcome), &record_attrs);
-                    if in_tail {
-                        tail_outcomes.push(outcome);
+                    if let Some(graph) = &mut graph {
+                        apply_outcome(graph, &arena, outcome);
                     }
                 }
                 LogRecord::Tombstone { key } => {
@@ -1336,13 +1336,12 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
     }
     let physical_end = log.current_end_offset();
     if recoverable_end < physical_end {
-        if let Some(loaded) = &snapshot
-            && loaded.covered_log_offset > recoverable_end
+        if let Some(snapshot_covered) = snapshot_covered
+            && snapshot_covered > recoverable_end
         {
             return Err(VecDbError::Corrupt(format!(
-                "{}: log unreadable past offset {recoverable_end}, but its snapshot covers {} of {physical_end} bytes; preserving the file",
-                log.path().display(),
-                loaded.covered_log_offset
+                "{}: log unreadable past offset {recoverable_end}, but its snapshot covers {snapshot_covered} of {physical_end} bytes; preserving the file",
+                log.path().display()
             )));
         }
         if log.tail_contains_valid_record(recoverable_end)? {
@@ -1352,29 +1351,9 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
             )));
         }
     }
-    let graph = match snapshot {
-        Some(loaded) if loaded.covered_log_offset <= recoverable_end => {
-            let snapshot_slots = covered_slot_count.unwrap_or(arena.slot_count());
-            match Graph::from_parts(
-                loaded.entry_point,
-                loaded.parts,
-                snapshot_slots,
-                loaded.insert_ordinal,
-            ) {
-                Ok(mut graph) => {
-                    for outcome in tail_outcomes {
-                        apply_outcome(&mut graph, &arena, outcome);
-                    }
-                    Some(graph)
-                }
-                Err(error) => {
-                    log::debug!("discarding snapshot for {}: {error}", log.path().display());
-                    None
-                }
-            }
-        }
-        _ => None,
-    };
+    if covered <= recoverable_end {
+        attach_snapshot_graph(&mut graph, &mut snapshot, &arena, &path);
+    }
     Ok(ReplayedState {
         arena,
         graph,
@@ -1383,6 +1362,28 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
         recoverable_end,
         tail_records,
     })
+}
+
+fn attach_snapshot_graph(
+    graph: &mut Option<Graph>,
+    snapshot: &mut Option<LoadedSnapshot>,
+    arena: &VectorArena,
+    path: &Path,
+) {
+    let Some(loaded) = snapshot.take() else {
+        return;
+    };
+    match Graph::from_parts(
+        loaded.entry_point,
+        loaded.parts,
+        arena.slot_count(),
+        loaded.insert_ordinal,
+    ) {
+        Ok(attached) => *graph = Some(attached),
+        Err(error) => {
+            log::debug!("discarding snapshot for {}: {error}", path.display());
+        }
+    }
 }
 
 fn apply_outcome(graph: &mut Graph, arena: &VectorArena, outcome: UpsertOutcome) {
@@ -1419,13 +1420,15 @@ fn promote_compacted_log(temp_path: &Path, path: &Path) -> Result<(), VecDbError
 
 fn remove_index_files(path: &Path) -> Result<(), VecDbError> {
     remove_data_files(path)?;
-    remove_if_present(&lock_path(path))
+    remove_if_present(&lock_path(path))?;
+    sync_parent_dir(path)
 }
 
 fn remove_data_files(path: &Path) -> Result<(), VecDbError> {
     remove_if_present(path)?;
     remove_snapshot(path)?;
-    remove_stale_temp_sibling(path)
+    remove_stale_temp_sibling(path)?;
+    sync_parent_dir(path)
 }
 
 fn stage_live_entries(
@@ -1469,7 +1472,7 @@ fn flush_stage_batch(
         .iter()
         .map(|(key, vector, attrs)| LogEntry::Add { key, vector, attrs })
         .collect();
-    log.append(&records)?;
+    log.append_unsynced_for_staging(&records)?;
     for (key, vector, attrs) in batch.drain(..) {
         let outcome = target.upsert(&key, &vector)?;
         target_attrs.set(slot_of_outcome(outcome), &attrs);
@@ -1487,6 +1490,7 @@ mod tests {
 
     use super::super::crc::crc32;
     use super::super::kernel::splitmix64;
+    use super::super::test_support;
     use super::*;
 
     const DIMS: usize = 16;
@@ -2574,10 +2578,20 @@ mod tests {
     }
 
     #[test]
-    fn interrupted_sessions_draw_the_same_levels_as_one_uninterrupted_session() {
+    fn interrupted_sessions_build_the_same_graph_as_one_uninterrupted_session() {
         let dir = TempDir::new().unwrap();
         let split_path = dir.path().join("split");
         let whole_path = dir.path().join("whole");
+        let tail_new = seeded_unit_vector(4242, DIMS);
+        let older_upsert = {
+            let mut values = tail_new.clone();
+            values[0] += 0.05;
+            let norm = values.iter().map(|value| value * value).sum::<f32>().sqrt();
+            for value in &mut values {
+                *value /= norm;
+            }
+            values
+        };
         {
             let db = open_writer(&split_path);
             bulk_add(&db, &bulk_entries(0, 40, 500)).unwrap();
@@ -2591,41 +2605,36 @@ mod tests {
         );
         {
             let db = open_writer(&split_path);
-            bulk_add(&db, &bulk_entries(40, 30, 500)).unwrap();
-            db.add("key-3", &seeded_unit_vector(999, DIMS)).unwrap();
-        }
-        {
-            let db = open_writer(&split_path);
-            bulk_add(&db, &bulk_entries(70, 30, 500)).unwrap();
-            db.flush().unwrap();
+            db.add("tail-new", &tail_new).unwrap();
+            db.add("key-3", &older_upsert).unwrap();
         }
         let split = open_writer(&split_path);
         let whole = open_writer(&whole_path);
         bulk_add(&whole, &bulk_entries(0, 40, 500)).unwrap();
-        bulk_add(&whole, &bulk_entries(40, 30, 500)).unwrap();
-        whole.add("key-3", &seeded_unit_vector(999, DIMS)).unwrap();
-        bulk_add(&whole, &bulk_entries(70, 30, 500)).unwrap();
+        whole.add("tail-new", &tail_new).unwrap();
+        whole.add("key-3", &older_upsert).unwrap();
         let split_state = split.shared.state_read();
         let whole_state = whole.shared.state_read();
         let split_graph = split_state.graph.as_ref().unwrap();
         let whole_graph = whole_state.graph.as_ref().unwrap();
-        assert_eq!(split_graph.insert_ordinal(), 101);
-        assert_eq!(whole_graph.insert_ordinal(), 101);
-        let mut upper_levels = 0usize;
-        for index in 0..100 {
-            let key = format!("key-{index}");
-            let split_slot = split_state.arena.slot_of_key(&key).unwrap();
-            let whole_slot = whole_state.arena.slot_of_key(&key).unwrap();
-            assert_eq!(split_slot, whole_slot);
-            let level = split_graph.level_of(split_slot).unwrap();
+        assert_eq!(split_graph.insert_ordinal(), 42);
+        assert_eq!(whole_graph.insert_ordinal(), 42);
+        for key in (0..40)
+            .map(|index| format!("key-{index}"))
+            .chain(["tail-new".to_string()])
+        {
             assert_eq!(
-                level,
-                whole_graph.level_of(whole_slot).unwrap(),
-                "level diverges for {key}"
+                split_state.arena.slot_of_key(&key),
+                whole_state.arena.slot_of_key(&key),
+                "slot diverges for {key}"
             );
-            upper_levels += usize::from(level > 0);
         }
-        assert!(upper_levels > 0);
+        assert!(
+            split_graph
+                .slots()
+                .any(|slot| split_graph.level_of(slot).unwrap() > 0)
+        );
+        test_support::assert_identical_graphs(split_graph, whole_graph);
     }
 
     #[test]
