@@ -1286,8 +1286,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             textAlign: "center",
                         }}
                     >
-                        Invite your close friends and family. Share everyday
-                        photos and keep up with each other.
+                        <Box component="p" sx={{ m: 0, maxWidth: 260 }}>
+                            Invite your close friends and family. Share everyday
+                            photos and keep up with each other.
+                        </Box>
                         <Box
                             component="button"
                             type="button"

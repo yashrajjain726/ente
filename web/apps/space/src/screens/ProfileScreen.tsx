@@ -1912,7 +1912,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         alignItems: "center",
                                         bgcolor: green,
                                         border: 0,
-                                        borderRadius: "20px",
+                                        borderRadius: "22px",
                                         boxSizing: "border-box",
                                         color: "#FFFFFF",
                                         cursor: isPostPhotoOpening
@@ -1921,13 +1921,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         display: "inline-flex",
                                         fontFamily:
                                             '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 14,
-                                        fontWeight: 600,
+                                        fontSize: 15,
+                                        fontWeight: 700,
                                         gap: "8px",
-                                        height: spaceTouchTargetSize,
+                                        height: 48,
                                         justifyContent: "center",
                                         lineHeight: "20px",
-                                        px: "16px",
+                                        px: "22px",
                                         py: 0,
                                         pointerEvents: "auto",
                                         whiteSpace: "nowrap",
@@ -1937,7 +1937,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                         "&:focus-visible": {
                                             outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
+                                            outlineOffset: 3,
                                         },
                                         "&:hover": isPostPhotoOpening
                                             ? undefined
