@@ -28,14 +28,6 @@ const optionsTitleSx = {
     [uploadSheetMediaQuery]: { fontFamily: '"Inter Variable", sans-serif' },
 };
 
-const stepSx = {
-    color: "text.muted",
-    fontSize: "13px",
-    fontWeight: 400,
-    lineHeight: "18px",
-    opacity: 0.7,
-};
-
 interface TakeoutOptionsProps {
     provider: "google" | "apple";
     isFolderSelectionPending?: boolean;
@@ -114,19 +106,6 @@ export function TakeoutOptions({
             </Stack>
 
             <Stack sx={{ gap: "20px" }}>
-                {provider == "apple" && (
-                    <Stack sx={{ gap: "6px" }}>
-                        <Typography sx={stepSx}>
-                            {t("apple_export_step_1")}
-                        </Typography>
-                        <Typography sx={stepSx}>
-                            {t("apple_export_step_2")}
-                        </Typography>
-                        <Typography sx={stepSx}>
-                            {t("apple_export_step_3")}
-                        </Typography>
-                    </Stack>
-                )}
                 <Stack sx={{ gap: 1 }}>
                     <TakeoutOptionButton
                         icon={<HugeiconsIcon icon={Folder01Icon} size={18} />}
@@ -143,16 +122,23 @@ export function TakeoutOptions({
                         pending={isFolderSelectionPending}
                         onClick={onSelectFolder}
                     />
-                    <TakeoutOptionButton
-                        icon={<HugeiconsIcon icon={FileZipIcon} size={18} />}
-                        label={t("zip_files")}
-                        description={
-                            isDesktop ? t("zip_files_hint") : t("desktop_only")
-                        }
-                        disabled={!isDesktop}
-                        onClick={onSelectZips}
-                    />
+                    {provider == "google" && (
+                        <TakeoutOptionButton
+                            icon={
+                                <HugeiconsIcon icon={FileZipIcon} size={18} />
+                            }
+                            label={t("zip_files")}
+                            description={
+                                isDesktop
+                                    ? t("zip_files_hint")
+                                    : t("desktop_only")
+                            }
+                            disabled={!isDesktop}
+                            onClick={onSelectZips}
+                        />
+                    )}
                 </Stack>
+                {provider == "apple" && <AppleExportSteps />}
                 <Typography
                     sx={{
                         alignSelf: "center",
@@ -183,6 +169,70 @@ export function TakeoutOptions({
                     </Link>
                 </Typography>
             </Stack>
+        </Stack>
+    );
+}
+
+function AppleExportSteps(): React.JSX.Element {
+    const steps = [
+        t("apple_export_step_1"),
+        t("apple_export_step_2"),
+        t("apple_export_step_3"),
+    ];
+
+    return (
+        <Stack component="ol" sx={{ m: 0, p: 0 }}>
+            {steps.map((step, index) => (
+                <Stack
+                    component="li"
+                    direction="row"
+                    key={step}
+                    sx={{ gap: "12px", listStyle: "none" }}
+                >
+                    <Stack sx={{ alignItems: "center" }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                width: "24px",
+                                height: "24px",
+                                flexShrink: 0,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                border: "1px solid",
+                                borderColor: "stroke.muted",
+                                borderRadius: "50%",
+                                color: "text.muted",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                lineHeight: 1,
+                            }}
+                        >
+                            {index + 1}
+                        </Box>
+                        {index < steps.length - 1 && (
+                            <Box
+                                sx={{
+                                    width: "1px",
+                                    minHeight: "16px",
+                                    flex: 1,
+                                    backgroundColor: "stroke.muted",
+                                }}
+                            />
+                        )}
+                    </Stack>
+                    <Typography
+                        sx={{
+                            pb: index < steps.length - 1 ? "16px" : 0,
+                            color: "text.muted",
+                            fontSize: "13px",
+                            fontWeight: 400,
+                            lineHeight: "20px",
+                        }}
+                    >
+                        {step}
+                    </Typography>
+                </Stack>
+            ))}
         </Stack>
     );
 }
