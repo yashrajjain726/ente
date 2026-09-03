@@ -6,6 +6,7 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import React from "react";
 import { useSpaceAppState } from "state/app-state";
+import { spaceEmptyStateButtonSx } from "styles/buttons";
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
@@ -173,36 +174,11 @@ const Page: React.FC = () => {
                             type="button"
                             disabled={isOpeningPost}
                             onClick={() => inputRef.current?.click()}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: green,
-                                border: 0,
-                                borderRadius: "22px",
-                                color: "#FFFFFF",
-                                cursor: isOpeningPost ? "default" : "pointer",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
-                                fontWeight: 700,
-                                gap: "8px",
-                                height: 48,
-                                justifyContent: "center",
-                                mt: "28px",
-                                opacity: isOpeningPost ? 0.65 : 1,
-                                px: "22px",
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 3,
-                                },
-                                "&:hover": isOpeningPost
-                                    ? undefined
-                                    : { bgcolor: "#07AE22" },
-                            }}
+                            sx={{ ...spaceEmptyStateButtonSx, mt: "28px" }}
                         >
                             <HugeiconsIcon
                                 icon={AddSquareIcon}
-                                size={20}
+                                size={18}
                                 strokeWidth={1.8}
                             />
                             Post

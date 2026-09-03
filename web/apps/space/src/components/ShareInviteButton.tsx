@@ -1,51 +1,68 @@
 import { Share08Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, type SxProps, type Theme } from "@mui/material";
+import { Box } from "@mui/material";
+import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import React from "react";
-import { openSpaceShareLinkDialog } from "services/share-link";
+import { spaceEmptyStateButtonSx } from "styles/buttons";
 
-export const SpaceShareIcon: React.FC<{ strokeWidth?: number }> = ({
-    strokeWidth = 1.8,
-}) => <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={strokeWidth} />;
+export const SpaceShareIcon: React.FC<{
+    size?: number;
+    strokeWidth?: number;
+}> = ({ size = 18, strokeWidth = 1.8 }) => (
+    <HugeiconsIcon icon={Share08Icon} size={size} strokeWidth={strokeWidth} />
+);
 
 interface SpaceShareInviteButtonProps {
-    className?: string;
-    iconStrokeWidth?: number;
-    label?: string;
     profileLink?: string;
-    showIcon?: boolean;
     sharing?: boolean;
-    sx?: SxProps<Theme>;
-    onShareComplete?: () => void;
     onShareError?: (error: unknown) => void;
-    onShareStart?: () => void;
     onSharingChange?: (sharing: boolean) => void;
 }
 
 export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
-    className,
-    iconStrokeWidth,
-    label,
     profileLink,
-    showIcon = true,
     sharing,
-    sx,
-    onShareComplete,
     onShareError,
-    onShareStart,
     onSharingChange,
 }) => {
+    const [copied, setCopied] = React.useState(false);
+    const [canShare, setCanShare] = React.useState(false);
     const isSharing = sharing ?? false;
     const isDisabled = isSharing || !profileLink;
-    const buttonLabel = label ?? "Share invite";
 
-    const shareInvite = () => {
+    React.useEffect(() => {
+        setCanShare(typeof navigator.share == "function");
+    }, []);
+
+    React.useEffect(() => {
+        if (!copied) return;
+        const timeoutID = window.setTimeout(
+            () => setCopied(false),
+            spaceToastAutoDismissDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [copied]);
+
+    const shareInvite = async () => {
         if (isDisabled || !profileLink) return;
-        onShareStart?.();
+        onSharingChange?.(true);
         try {
-            onSharingChange?.(true);
-            openSpaceShareLinkDialog(profileLink, "invite");
-            onShareComplete?.();
+            if (typeof navigator.share == "function") {
+                try {
+                    await navigator.share({ url: profileLink });
+                } catch (error) {
+                    if (
+                        error instanceof DOMException &&
+                        error.name == "AbortError"
+                    ) {
+                        return;
+                    }
+                    throw error;
+                }
+            } else {
+                await navigator.clipboard.writeText(profileLink);
+                setCopied(true);
+            }
         } catch (error) {
             onShareError?.(error);
         } finally {
@@ -55,15 +72,16 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
 
     return (
         <Box
-            className={className}
+            className="green-bg"
             component="button"
             type="button"
+            aria-live="polite"
             disabled={isDisabled}
-            onClick={shareInvite}
-            sx={sx}
+            onClick={() => void shareInvite()}
+            sx={spaceEmptyStateButtonSx}
         >
-            {showIcon && <SpaceShareIcon strokeWidth={iconStrokeWidth} />}
-            {buttonLabel}
+            <SpaceShareIcon />
+            {copied ? "Copied" : canShare ? "Share invite" : "Copy invite"}
         </Box>
     );
 };

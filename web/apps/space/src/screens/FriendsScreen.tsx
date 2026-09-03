@@ -20,12 +20,11 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/ActionFeedback";
-import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
-import { SpaceShareIcon } from "components/ShareInviteButton";
+import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import React, { useState } from "react";
@@ -969,53 +968,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
         Record<string, string>
     >({});
-    const [inviteShareStatus, setInviteShareStatus] = React.useState<
-        "idle" | "sharing" | "copied"
-    >("idle");
+    const [isInviteSharing, setIsInviteSharing] = React.useState(false);
     const avatarLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | null | undefined>>
     >(new Map());
     const isUnfriendActionRunning = unfriendActionPhase != null;
-
-    React.useEffect(() => {
-        if (inviteShareStatus != "copied") return;
-        const timeoutID = window.setTimeout(
-            () => setInviteShareStatus("idle"),
-            spaceToastAutoDismissDurationMs,
-        );
-        return () => window.clearTimeout(timeoutID);
-    }, [inviteShareStatus]);
-
-    const shareInvite = async () => {
-        if (!profileLink || inviteShareStatus == "sharing") return;
-
-        setInviteShareStatus("sharing");
-        try {
-            if (typeof navigator.share == "function") {
-                try {
-                    await navigator.share({ url: profileLink });
-                    return;
-                } catch (error) {
-                    if (
-                        error instanceof DOMException &&
-                        error.name == "AbortError"
-                    ) {
-                        return;
-                    }
-                    log.warn("Failed to share Space invite link", error);
-                }
-            }
-
-            await navigator.clipboard.writeText(profileLink);
-            setInviteShareStatus("copied");
-        } catch (error) {
-            log.error("Failed to copy Space invite link", error);
-        } finally {
-            setInviteShareStatus((status) =>
-                status == "sharing" ? "idle" : status,
-            );
-        }
-    };
 
     const loadedAvatarURLFor = React.useCallback(
         (friend: FriendProfile) =>
@@ -1274,6 +1231,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             color: textSoft,
                             display: "flex",
                             flexDirection: "column",
+                            gap: "22px",
                             inset: 0,
                             justifyContent: "center",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1290,55 +1248,17 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             Invite your close friends and family. Share everyday
                             photos and keep up with each other.
                         </Box>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-live="polite"
-                            disabled={
-                                !profileLink || inviteShareStatus == "sharing"
+                        <SpaceShareInviteButton
+                            profileLink={profileLink}
+                            sharing={isInviteSharing}
+                            onShareError={(error) =>
+                                log.error(
+                                    "Failed to share Space invite link",
+                                    error,
+                                )
                             }
-                            onClick={() => void shareInvite()}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: spaceSurface,
-                                border: 0,
-                                borderRadius: "18px",
-                                color: textBase,
-                                cursor:
-                                    profileLink &&
-                                    inviteShareStatus != "sharing"
-                                        ? "pointer"
-                                        : "default",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                gap: "6px",
-                                height: spaceTouchTargetSize,
-                                justifyContent: "center",
-                                lineHeight: "18px",
-                                mt: "22px",
-                                pointerEvents: "auto",
-                                px: "14px",
-                                whiteSpace: "nowrap",
-                                "&:disabled": { opacity: 0.45 },
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                                "&:hover":
-                                    profileLink &&
-                                    inviteShareStatus != "sharing"
-                                        ? { bgcolor: spaceSurfaceHover }
-                                        : undefined,
-                            }}
-                        >
-                            <SpaceShareIcon />
-                            {inviteShareStatus == "copied"
-                                ? "Copied"
-                                : "Share invite"}
-                        </Box>
+                            onSharingChange={setIsInviteSharing}
+                        />
                     </Box>
                 )}
             </Box>

@@ -1137,11 +1137,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             if (!post || !friend) return;
 
             markPostRead(post);
-            const updateSelectedViewer = (imageUrl: string) => {
+            const updateSelectedViewer = (
+                imageUrl: string,
+                requireActivePost = false,
+            ) => {
                 setSelectedViewer((viewer) => {
                     if (
                         !viewer?.posts ||
-                        viewer.posts !== currentViewer.posts
+                        viewer.posts !== currentViewer.posts ||
+                        (requireActivePost &&
+                            (viewer.postIndex != postIndex ||
+                                viewer.photo.postId != post.postId))
                     ) {
                         return viewer;
                     }
@@ -1166,7 +1172,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             updateSelectedViewer("");
             void loadPostImage(post).then((loadedImageUrl) => {
-                if (loadedImageUrl) updateSelectedViewer(loadedImageUrl);
+                if (loadedImageUrl) {
+                    updateSelectedViewer(loadedImageUrl, true);
+                }
             });
         },
         [loadPostImage, loadedPostImageURLFor, markPostRead, selectedViewer],

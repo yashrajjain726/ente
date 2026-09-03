@@ -29,8 +29,8 @@ import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpaceInviteIntent } from "services/invite";
-import { openSpaceShareLinkDialog } from "services/share-link";
 import { isSpaceContentError, type SpacePostAsset } from "services/space";
+import { spaceEmptyStateButtonSx } from "styles/buttons";
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
@@ -1011,9 +1011,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             });
     };
 
-    const shareProfile = () => {
-        if (!profileLink) return;
-        openSpaceShareLinkDialog(profileLink);
+    const shareInvite = async () => {
+        if (!profileLink || typeof navigator.share != "function") return;
+
+        try {
+            await navigator.share({ url: profileLink });
+        } catch (error) {
+            if (
+                !(error instanceof DOMException && error.name == "AbortError")
+            ) {
+                log.warn("Failed to share Space invite link", error);
+            }
+        }
     };
 
     const deleteSelectedPost = async () => {
@@ -1530,7 +1539,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     component="button"
                                     type="button"
                                     aria-label="Share invite"
-                                    onClick={shareProfile}
+                                    onClick={() => void shareInvite()}
                                     sx={{
                                         alignItems: "center",
                                         bgcolor: "transparent",
@@ -1907,46 +1916,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     type="button"
                                     disabled={isPostPhotoOpening}
                                     onClick={openPostPhotoPicker}
-                                    sx={{
-                                        appearance: "none",
-                                        alignItems: "center",
-                                        bgcolor: green,
-                                        border: 0,
-                                        borderRadius: "22px",
-                                        boxSizing: "border-box",
-                                        color: "#FFFFFF",
-                                        cursor: isPostPhotoOpening
-                                            ? "default"
-                                            : "pointer",
-                                        display: "inline-flex",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 15,
-                                        fontWeight: 700,
-                                        gap: "8px",
-                                        height: 48,
-                                        justifyContent: "center",
-                                        lineHeight: "20px",
-                                        px: "22px",
-                                        py: 0,
-                                        pointerEvents: "auto",
-                                        whiteSpace: "nowrap",
-                                        "& svg": {
-                                            display: "block",
-                                            flexShrink: 0,
-                                        },
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 3,
-                                        },
-                                        "&:hover": isPostPhotoOpening
-                                            ? undefined
-                                            : { bgcolor: "#07AE22" },
-                                    }}
+                                    sx={spaceEmptyStateButtonSx}
                                 >
                                     <HugeiconsIcon
                                         icon={AddSquareIcon}
-                                        size={20}
+                                        size={18}
                                         strokeWidth={1.8}
                                     />
                                     Post

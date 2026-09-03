@@ -2817,7 +2817,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     </Box>
                                     {showInviteEmptyState && (
                                         <SpaceShareInviteButton
-                                            label="Invite friends"
                                             profileLink={profileLink}
                                             sharing={isInviteSharing}
                                             onShareError={(error) =>
@@ -2827,43 +2826,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 )
                                             }
                                             onSharingChange={setIsInviteSharing}
-                                            sx={{
-                                                alignItems: "center",
-                                                bgcolor: spaceSurface,
-                                                border: 0,
-                                                borderRadius: "18px",
-                                                color: textBase,
-                                                cursor:
-                                                    profileLink &&
-                                                    !isInviteSharing
-                                                        ? "pointer"
-                                                        : "default",
-                                                display: "inline-flex",
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 13,
-                                                fontWeight: 600,
-                                                gap: "6px",
-                                                height: spaceTouchTargetSize,
-                                                justifyContent: "center",
-                                                lineHeight: "18px",
-                                                pointerEvents: "auto",
-                                                px: "14px",
-                                                whiteSpace: "nowrap",
-                                                "&:disabled": { opacity: 0.45 },
-                                                "&:focus-visible": {
-                                                    outline: `2px solid ${green}`,
-                                                    outlineOffset: 2,
-                                                },
-                                                "&:hover":
-                                                    profileLink &&
-                                                    !isInviteSharing
-                                                        ? {
-                                                              bgcolor:
-                                                                  spaceSurfaceHover,
-                                                          }
-                                                        : undefined,
-                                            }}
                                         />
                                     )}
                                 </Box>
