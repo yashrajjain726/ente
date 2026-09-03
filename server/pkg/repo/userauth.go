@@ -174,7 +174,7 @@ func (repo *UserAuthRepository) AddToken(userID int64, app ente.App, token strin
 	return stacktrace.Propagate(err, "")
 }
 
-func (repo *UserAuthRepository) AddLoginResult(ctx context.Context, userID int64, srpAuth *ente.SRPAuthEntity,
+func (repo *UserAuthRepository) AddLoginResult(ctx context.Context, userID int64, srpAuth *ente.SRPAuthEntity, expectedKeyAttributes *ente.KeyAttributes,
 	app ente.App, token, ip, userAgent, passkeySessionID, twoFactorSessionID string, expirationTime int64,
 ) error {
 	tx, err := repo.DB.BeginTx(ctx, nil)
@@ -182,7 +182,7 @@ func (repo *UserAuthRepository) AddLoginResult(ctx context.Context, userID int64
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	if err = lockUserForLogin(ctx, tx, userID, srpAuth); err != nil {
+	if err = lockUserForLogin(ctx, tx, userID, srpAuth, expectedKeyAttributes); err != nil {
 		return err
 	}
 	now := time.Microseconds()
@@ -213,7 +213,7 @@ func (repo *UserAuthRepository) AddTokenForPendingLogin(ctx context.Context, use
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	if err = lockUserForLogin(ctx, tx, userID, nil); err != nil {
+	if err = lockUserForLogin(ctx, tx, userID, nil, nil); err != nil {
 		return err
 	}
 	now := time.Microseconds()
@@ -242,25 +242,35 @@ func (repo *UserAuthRepository) AddTokenForPendingLogin(ctx context.Context, use
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
-func lockUserForLogin(ctx context.Context, tx *sql.Tx, userID int64, srpAuth *ente.SRPAuthEntity) error {
+func lockUserForLogin(ctx context.Context, tx *sql.Tx, userID int64, srpAuth *ente.SRPAuthEntity, expectedKeyAttributes *ente.KeyAttributes) error {
 	var lockedUserID int64
 	if err := tx.QueryRowContext(ctx, `SELECT user_id FROM users WHERE user_id = $1 FOR NO KEY UPDATE`, userID).Scan(&lockedUserID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if srpAuth == nil {
-		return nil
-	}
-	var currentSRPUserID uuid.UUID
-	var currentSRPSalt string
-	var currentSRPVerifier string
-	if err := tx.QueryRowContext(ctx, `SELECT srp_user_id, salt, verifier FROM srp_auth WHERE user_id = $1`, userID).Scan(&currentSRPUserID, &currentSRPSalt, &currentSRPVerifier); err != nil {
-		if err == sql.ErrNoRows {
+	if srpAuth != nil {
+		var currentSRPUserID uuid.UUID
+		var currentSRPSalt string
+		var currentSRPVerifier string
+		if err := tx.QueryRowContext(ctx, `SELECT srp_user_id, salt, verifier FROM srp_auth WHERE user_id = $1`, userID).Scan(&currentSRPUserID, &currentSRPSalt, &currentSRPVerifier); err != nil {
+			if err == sql.ErrNoRows {
+				return stacktrace.Propagate(ente.ErrInvalidPassword, "stale SRP login")
+			}
+			return stacktrace.Propagate(err, "")
+		}
+		if currentSRPUserID != srpAuth.SRPUserID || currentSRPSalt != srpAuth.Salt || currentSRPVerifier != srpAuth.Verifier {
 			return stacktrace.Propagate(ente.ErrInvalidPassword, "stale SRP login")
 		}
-		return stacktrace.Propagate(err, "")
 	}
-	if currentSRPUserID != srpAuth.SRPUserID || currentSRPSalt != srpAuth.Salt || currentSRPVerifier != srpAuth.Verifier {
-		return stacktrace.Propagate(ente.ErrInvalidPassword, "stale SRP login")
+	if expectedKeyAttributes != nil {
+		var matches bool
+		err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM key_attributes WHERE user_id = $1 AND kek_salt = $2 AND encrypted_key = $3 AND key_decryption_nonce = $4 AND mem_limit = $5 AND ops_limit = $6)`,
+			userID, expectedKeyAttributes.KEKSalt, expectedKeyAttributes.EncryptedKey, expectedKeyAttributes.KeyDecryptionNonce, expectedKeyAttributes.MemLimit, expectedKeyAttributes.OpsLimit).Scan(&matches)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		if !matches {
+			return stacktrace.Propagate(ente.ErrAuthenticationRequired, "key attributes changed during login")
+		}
 	}
 	return nil
 }

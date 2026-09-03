@@ -146,3 +146,51 @@ func TestAddTokenForPendingLoginConsumesPasskeyRecoverySession(t *testing.T) {
 		t.Fatalf("replayed recovery returned %v, want no rows", err)
 	}
 }
+
+func TestAddLoginResultRejectsStaleCredentials(t *testing.T) {
+	testutil.WithServerRoot(t)
+
+	db := testutil.RequireTestDB(t)
+	testutil.ResetTables(t, db)
+	t.Cleanup(func() { testutil.ResetTables(t, db) })
+
+	userID := testutil.InsertUser(t, db, testutil.UserFixture{Email: "stale-login@example.com", CreationTime: 1})
+	keyAttributes := ente.KeyAttributes{
+		KEKSalt: "old-salt", EncryptedKey: "old-key", KeyDecryptionNonce: "old-nonce",
+		PublicKey: "public-key", EncryptedSecretKey: "secret-key", SecretKeyDecryptionNonce: "secret-nonce",
+		MemLimit: 1, OpsLimit: 1,
+	}
+	if err := (&UserRepository{DB: db}).SetKeyAttributes(userID, keyAttributes); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, '00000000-0000-0000-0000-000000000001', 'old-srp-salt', 'old-verifier')`, userID); err != nil {
+		t.Fatal(err)
+	}
+	repo := &UserAuthRepository{DB: db}
+	srpAuth, err := repo.GetSRPAuthEntity(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE key_attributes SET encrypted_key = 'new-key' WHERE user_id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.AddLoginResult(context.Background(), userID, srpAuth, &keyAttributes, ente.Photos, "token", "", "", "", "", 0)
+	if !errors.Is(err, ente.ErrAuthenticationRequired) {
+		t.Fatalf("stale key attributes returned %v", err)
+	}
+	if _, err = db.Exec(`UPDATE key_attributes SET encrypted_key = 'old-key' WHERE user_id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`UPDATE srp_auth SET verifier = 'new-verifier' WHERE user_id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	err = repo.AddLoginResult(context.Background(), userID, srpAuth, &keyAttributes, ente.Photos, "token", "", "", "", "", 0)
+	if !errors.Is(err, ente.ErrInvalidPassword) {
+		t.Fatalf("stale SRP returned %v", err)
+	}
+	var tokenCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM tokens WHERE user_id = $1`, userID).Scan(&tokenCount); err != nil || tokenCount != 0 {
+		t.Fatalf("token count = %d, err = %v", tokenCount, err)
+	}
+}

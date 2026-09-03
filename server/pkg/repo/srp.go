@@ -124,7 +124,7 @@ func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Cont
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	if err = lockUserForLogin(ctx, tx, userID, nil); err != nil {
+	if err = lockUserForLogin(ctx, tx, userID, nil, nil); err != nil {
 		return nil, err
 	}
 	if len(currentTokenHash) != 0 {
