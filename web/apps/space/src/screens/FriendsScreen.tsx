@@ -1243,7 +1243,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             textAlign: "center",
                         }}
                     >
-                        No friends yet
+                        Add the people you want to keep up with.
                         <SpaceShareInviteButton
                             label="Invite friends"
                             profileLink={profileLink}

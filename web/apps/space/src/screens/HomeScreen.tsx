@@ -33,7 +33,6 @@ import {
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
-    spaceSurface,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -64,6 +63,8 @@ const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
 const headerChromeColor = "#F0F0F0";
+const avatarFallbackColor = "#888888";
+const avatarFallbackTextColor = "#FFFFFF";
 const mediaPlaceholderColor = "#E5E7EA";
 const headerHeight = 64;
 const headerIconSize = 22;
@@ -703,8 +704,8 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         aria-hidden
                         sx={{
                             alignItems: "center",
-                            bgcolor: spaceSurface,
-                            color: textSecondary,
+                            bgcolor: avatarFallbackColor,
+                            color: avatarFallbackTextColor,
                             display: "flex",
                             fontSize: 14,
                             fontWeight: 700,
@@ -1740,7 +1741,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 whiteSpace: "nowrap",
                                             }}
                                         >
-                                            Invite your friends and family
+                                            Invite your close friends and family
                                         </Box>
                                         <Box
                                             component="span"
@@ -1753,7 +1754,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 whiteSpace: "nowrap",
                                             }}
                                         >
-                                            Each friend gets their own tile with
+                                            Each person gets their own tile with
                                             their latest post
                                         </Box>
                                         <Box
