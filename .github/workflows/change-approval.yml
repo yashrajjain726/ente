@@ -30,6 +30,13 @@ jobs:
           git show origin/main:.github/checks/change-approval/check.mjs > "$RUNNER_TEMP/change-approval.mjs"
           node "$RUNNER_TEMP/change-approval.mjs" HEAD^1
 
+      - name: Run workflow security checks
+        run: |
+          git show origin/main:.github/checks/workflow-security/check.rb > "$RUNNER_TEMP/workflow-security.rb"
+          ruby "$RUNNER_TEMP/workflow-security.rb"
+
+      - run: node --test .github/checks/change-approval/test.mjs
+
   gate:
     name: Change approval
     needs: detect
