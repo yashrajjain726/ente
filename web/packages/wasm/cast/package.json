@@ -13,6 +13,9 @@
     "scripts": {
         "build": "cd ../../../../rust/bindings/wasm/cast && wasm-pack build . --target bundler --out-dir ../../../../web/packages/wasm/cast/pkg --no-pack -- -Z build-std=panic_abort,std"
     },
+    "dependencies": {
+        "ente-utils": "*"
+    },
     "devDependencies": {
         "ente-build-config": "*",
         "wasm-pack": "0.15.0"

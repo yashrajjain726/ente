@@ -4,17 +4,23 @@ edition = "2024"
 
 [features]
 contacts = [
+    "session",
     "dep:ente-contacts",
     "dep:serde",
     "dep:serde-wasm-bindgen",
     "dep:tsify",
     "dep:wasm-bindgen-futures",
 ]
+crypto = []
+crypto-file = ["crypto", "dep:md-5"]
+crypto-seal = ["crypto"]
+session = []
 
 [dependencies]
 ente-contacts = { workspace = true, optional = true }
 ente-core.workspace = true
 js-sys.workspace = true
+md-5 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror.workspace = true

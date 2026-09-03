@@ -1,6 +1,6 @@
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { encryptBox, generateKey, stringToB64 } from "ente-core-wasm";
+import { encryptBox, generateKey, stringToB64 } from "ente-locker-wasm";
 import { RemoteCollectionCreateResponseSchema } from "./remote-types";
 
 interface CollectionRecordLike {
