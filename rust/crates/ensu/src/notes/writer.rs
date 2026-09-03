@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::manifest::{
     NOTES_DOCUMENTS_DIRECTORY, NOTES_MANIFEST_BACKUP_FILE, NOTES_MANIFEST_FILE, NotesManifest,
     NotesManifestDocument, collection_directory, empty_manifest, load_manifest_file,
-    notes_index_contract, serialize_manifest_for_publish, shard_directory,
+    load_published_manifest, notes_index_contract, serialize_manifest_for_publish, shard_directory,
 };
 use super::reconcile::{IndexedNotesDocument, plan_notes_reconciliation};
 use super::shard::{
@@ -39,6 +39,17 @@ pub struct ValidatedNotesDocument<'a> {
     source_metadata: &'a NotesSourceDocument,
     shard_bytes: Vec<u8>,
     shard_sha256: String,
+}
+
+pub fn cleanup_unreferenced_notes_shards(
+    index_root: impl AsRef<Path>,
+    collection_id: &str,
+) -> Result<(), NotesError> {
+    validate_collection_id(collection_id)?;
+    let collection_directory =
+        fs::canonicalize(collection_directory(index_root.as_ref(), collection_id))?;
+    let (manifest, _) = load_published_manifest(&collection_directory, collection_id, false)?;
+    cleanup_unreferenced_shards(&collection_directory, &manifest.documents)
 }
 
 impl NotesIndexWriter {

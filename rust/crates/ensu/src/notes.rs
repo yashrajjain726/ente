@@ -53,7 +53,7 @@ pub use indexing::{
 };
 pub use reconcile::NotesReconciliationPlan;
 pub use source::NoteSourceReference;
-pub use writer::{NotesIndexWriter, ValidatedNotesDocument};
+pub use writer::{NotesIndexWriter, ValidatedNotesDocument, cleanup_unreferenced_notes_shards};
 
 pub fn notes_content_revision(bytes: &[u8]) -> String {
     sha256_hex(bytes)

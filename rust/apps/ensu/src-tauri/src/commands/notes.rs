@@ -14,7 +14,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use ente_ensu::model;
 use ente_ensu::notes::{
     NoteSourceReference, NotesCollectionIndex, NotesError, NotesIndexOutcome, NotesIndexProgress,
-    notes_content_revision,
+    cleanup_unreferenced_notes_shards, notes_content_revision,
 };
 use notify::RecommendedWatcher;
 use serde::Serialize;
@@ -445,7 +445,10 @@ impl State {
     ) -> Result<UpdateSnapshot, ApiError> {
         let mut updates = self.updates.lock().unwrap_or_else(PoisonError::into_inner);
         let Some(update) = updates.get_mut(collection_id) else {
-            return Ok(UpdateSnapshot::default());
+            return Ok(UpdateSnapshot {
+                force_full_hash: force,
+                ..UpdateSnapshot::default()
+            });
         };
         if force {
             update.bypass_quiet_period = true;
@@ -463,7 +466,7 @@ impl State {
         Ok(UpdateSnapshot {
             generation: update.generation,
             forced_document_ids: update.forced_document_ids.iter().cloned().collect(),
-            force_full_hash: update.force_full_hash,
+            force_full_hash: force || update.force_full_hash,
             rebuild_derived_index: update.rebuild_derived_index,
         })
     }
@@ -1078,7 +1081,10 @@ pub async fn notes_index_collection(
     let opened_index = if outcome.ready() {
         notes_state.evict_cached_index(&collection_id);
         match NotesCollectionIndex::open(&notes_state.index_root, collection_id.clone()) {
-            Ok(index) => Some(index),
+            Ok(index) => {
+                let _ = cleanup_unreferenced_notes_shards(&notes_state.index_root, &collection_id);
+                Some(index)
+            }
             Err(error) => {
                 let error = notes_error(error);
                 report_index_error(
@@ -1122,6 +1128,7 @@ pub async fn notes_index_collection(
                 .insert(collection_id.clone(), index);
         } else {
             notes_state.evict_cached_index(&collection_id);
+            let _ = cleanup_unreferenced_notes_shards(&notes_state.index_root, &collection_id);
         }
     }
     emit_state_changed(&app, &collection_id);

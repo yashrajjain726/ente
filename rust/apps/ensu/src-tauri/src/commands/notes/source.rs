@@ -226,13 +226,27 @@ fn open_collection_source(root: &Path, document_id: &str, _path: &Path) -> Resul
         libc::openat(
             directory.as_raw_fd(),
             file_name.as_ptr(),
-            libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+            libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK,
         )
     };
     if fd < 0 {
         return Err(scoped_open_error(std::io::Error::last_os_error()));
     }
-    Ok(unsafe { File::from_raw_fd(fd) })
+    let file = unsafe { File::from_raw_fd(fd) };
+    if !file.metadata().map_err(source_file_error)?.is_file() {
+        return Err(ApiError::new(
+            "invalid_document",
+            "Source note is not supported",
+        ));
+    }
+    let flags = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFL) };
+    if flags < 0 {
+        return Err(source_file_error(std::io::Error::last_os_error()));
+    }
+    if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_SETFL, flags & !libc::O_NONBLOCK) } < 0 {
+        return Err(source_file_error(std::io::Error::last_os_error()));
+    }
+    Ok(file)
 }
 
 #[cfg(unix)]

@@ -307,7 +307,7 @@ mod tests {
     use crate::notes::shard::{NOTES_SHARD_FILE, NOTES_VECTORS_FILE};
     use crate::notes::{
         NotesIndexWriter, NotesSourceDocument, PreparedNotesChunk, PreparedNotesDocument,
-        notes_content_revision,
+        cleanup_unreferenced_notes_shards, notes_content_revision,
     };
 
     const COLLECTION_ID: &str = "123e4567-e89b-12d3-a456-426614174000";
@@ -407,7 +407,7 @@ mod tests {
         drop(index);
         let replacement_index =
             NotesCollectionIndex::open(temp.path(), COLLECTION_ID.to_string()).unwrap();
-        writer.publish(true).unwrap();
+        cleanup_unreferenced_notes_shards(temp.path(), COLLECTION_ID).unwrap();
         assert!(!original_directory.exists());
         assert_eq!(
             replacement_index.search(&embedding(1, 1.0)).unwrap()[0].text,
