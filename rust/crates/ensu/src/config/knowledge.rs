@@ -30,6 +30,7 @@ const MODIFICATION_NOTICE: &str = "Adapted by Ente";
 #[derive(Debug, Clone, PartialEq)]
 pub struct KnowledgeEmbeddingConfig {
     pub model_url: String,
+    pub model_size: u64,
     pub model_sha256: String,
     pub target_id: String,
     pub source_dim: u32,
@@ -57,6 +58,7 @@ pub struct KnowledgeDatasetConfig {
     pub label: String,
     pub current_download_identity: String,
     pub artifact_base_url: String,
+    pub artifact_sizes: Vec<u64>,
     pub artifact_sha256: Vec<String>,
     pub download_size_bytes: i64,
     pub max_chars: u32,
@@ -97,6 +99,7 @@ pub(crate) fn knowledge_index_contract() -> KnowledgeIndexContract {
 pub(crate) fn knowledge_embedding_config() -> KnowledgeEmbeddingConfig {
     KnowledgeEmbeddingConfig {
         model_url: EMBEDDING_MODEL_URL.to_owned(),
+        model_size: 333_590_944,
         model_sha256: EMBEDDING_MODEL_SHA256.to_owned(),
         target_id: EMBEDDING_TARGET_ID.to_owned(),
         source_dim: SOURCE_DIM,
@@ -117,6 +120,7 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             label: "Simple English Wikipedia".to_owned(),
             current_download_identity: "simplewiki-2026-07-02".to_owned(),
             artifact_base_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/resolve/a13b90e443dcdc1561ac777ea17ee6ed4703e35f/simplewiki/data/".to_owned(),
+            artifact_sizes: vec![554, 134_535_168, 33_297_292, 16_432],
             artifact_sha256: vec![
                 "118dfc77aef7c7186c8b15551ec94e8b8878fde0b3ca20c97cc8222e5b70b309".to_owned(),
                 "ed90f60e757784fd4752652139299be792948628be5d7455847333f362d30cd5".to_owned(),
@@ -140,6 +144,7 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             label: "Wikibooks".to_owned(),
             current_download_identity: "enwikibooks-2026-07-02".to_owned(),
             artifact_base_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/resolve/a13b90e443dcdc1561ac777ea17ee6ed4703e35f/wikibooks/data/".to_owned(),
+            artifact_sizes: vec![556, 128_000_000, 74_579_279, 15_640],
             artifact_sha256: vec![
                 "2076386cdc215ca4950aa92c4b6bcac605a63e76fda4989677eb5f9a637bba14".to_owned(),
                 "bcf4f5d15b78470def1908aaddcb2abae17fbe7752d60c90d11fd4d951b0b591".to_owned(),
@@ -163,6 +168,7 @@ pub(crate) fn knowledge_datasets() -> Vec<KnowledgeDatasetConfig> {
             label: "English Wikipedia".to_owned(),
             current_download_identity: "enwiki-2026-07-07".to_owned(),
             artifact_base_url: "https://huggingface.co/datasets/ente-ai/ensu-knowledge-packs/resolve/61f12c75fe451efe6c0d06af3903add4292e06af/fullwiki/data/".to_owned(),
+            artifact_sizes: vec![608, 269_391_360, 93_626_839, 32_896],
             artifact_sha256: vec![
                 "0c000cf313b642c9a25695c645c9cef2062e3d4c9e33d0cb05f19bf3145c8084".to_owned(),
                 "36fcb1045e20aac98f8477cbd4f15b79ffb337ced756a457d55180fa862c5453".to_owned(),
@@ -248,11 +254,16 @@ mod tests {
         assert_eq!(datasets[0].download_size_bytes, 167_849_446);
         assert_eq!(datasets[1].download_size_bytes, 202_595_475);
         assert_eq!(datasets[2].download_size_bytes, 363_051_703);
+        assert!(datasets.iter().all(|dataset| {
+            dataset.artifact_sizes.iter().sum::<u64>()
+                == u64::try_from(dataset.download_size_bytes).unwrap()
+        }));
         assert_eq!(datasets[0].relevance_threshold, 0.55);
         assert_eq!(datasets[1].relevance_threshold, 0.58);
         assert_eq!(datasets[2].relevance_threshold, 0.55);
         assert!(datasets.iter().all(|dataset| {
-            dataset.artifact_sha256.len() == KNOWLEDGE_ARTIFACT_FILENAMES.len()
+            dataset.artifact_sizes.len() == KNOWLEDGE_ARTIFACT_FILENAMES.len()
+                && dataset.artifact_sha256.len() == KNOWLEDGE_ARTIFACT_FILENAMES.len()
                 && dataset
                     .artifact_sha256
                     .iter()

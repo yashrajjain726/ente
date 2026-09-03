@@ -36,6 +36,7 @@ fn model_asset(model: Model) -> Asset {
             .map(|file| AssetFile {
                 name: file.name.to_string(),
                 url: format!("https://models.ente.com/{}", file.name),
+                size: file.size,
                 sha256: file.sha256.to_string(),
             })
             .collect(),
@@ -317,12 +318,14 @@ mod tests {
         let lock: serde_json::Value = serde_json::from_str(&contents).unwrap();
         for model in lock["models"].as_object().unwrap().values() {
             let name = model["file_name"].as_str().unwrap();
+            let size = model["size"].as_u64().unwrap();
             let sha256 = model["sha256"].as_str().unwrap();
             let catalog_file = Model::ALL
                 .iter()
                 .flat_map(|model| model_asset_spec(*model).files)
                 .find(|file| file.name == name)
                 .unwrap_or_else(|| panic!("{name} is missing from the Photos model catalog"));
+            assert_eq!(catalog_file.size, size, "{name}");
             assert_eq!(catalog_file.sha256, sha256, "{name}");
         }
     }

@@ -23,13 +23,18 @@ pub struct Asset {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AssetKind {
     Files(Vec<AssetFile>),
-    TarGz { url: String, sha256: String },
+    TarGz {
+        url: String,
+        size: u64,
+        sha256: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssetFile {
     pub name: String,
     pub url: String,
+    pub size: u64,
     pub sha256: String,
 }
 
@@ -77,12 +82,17 @@ impl Asset {
         })
     }
 
-    pub fn tar_gz(components: Vec<String>, url: String, sha256: String) -> Result<Self, Error> {
+    pub fn tar_gz(
+        components: Vec<String>,
+        url: String,
+        size: u64,
+        sha256: String,
+    ) -> Result<Self, Error> {
         validate_components(&components)?;
         download::validate_sha256(&sha256)?;
         Ok(Self {
             components,
-            kind: AssetKind::TarGz { url, sha256 },
+            kind: AssetKind::TarGz { url, size, sha256 },
         })
     }
 }
@@ -286,13 +296,15 @@ impl AssetStore {
                 .map(|file| DownloadTarget {
                     label: file.name.clone(),
                     url: file.url.clone(),
+                    expected_size: file.size,
                     sha256: file.sha256.clone(),
                     destination: staging.join(&file.name),
                 })
                 .collect(),
-            AssetKind::TarGz { url, sha256 } => vec![DownloadTarget {
+            AssetKind::TarGz { url, size, sha256 } => vec![DownloadTarget {
                 label: asset.components.last().cloned().unwrap_or_default(),
                 url: url.clone(),
+                expected_size: *size,
                 sha256: sha256.clone(),
                 destination: staging.join(ARCHIVE_FILE),
             }],
@@ -763,6 +775,7 @@ mod tests {
         let asset = Asset::tar_gz(
             key(&["models", "parakeet"]),
             "https://example.invalid/parakeet.tar.gz".to_string(),
+            archive.len() as u64,
             sha(&archive),
         )
         .unwrap();
@@ -797,6 +810,7 @@ mod tests {
         let asset = Asset::tar_gz(
             key(&["models", "linked"]),
             "https://example.invalid/linked.tar.gz".to_string(),
+            archive.len() as u64,
             sha(&archive),
         )
         .unwrap();
@@ -855,6 +869,7 @@ mod tests {
         AssetFile {
             name: name.to_string(),
             url: format!("https://example.invalid/{name}"),
+            size: bytes.len() as u64,
             sha256: sha(bytes),
         }
     }

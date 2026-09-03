@@ -15,10 +15,12 @@ pub fn knowledge_asset(expected_pack: &KnowledgeDatasetConfig) -> Result<Asset, 
     let files = KNOWLEDGE_ARTIFACT_FILENAMES
         .into_iter()
         .zip(urls)
+        .zip(expected_pack.artifact_sizes.iter().copied())
         .zip(expected_pack.artifact_sha256.iter().cloned())
-        .map(|((filename, url), sha256)| AssetFile {
+        .map(|(((filename, url), size), sha256)| AssetFile {
             name: filename.to_owned(),
             url,
+            size,
             sha256,
         })
         .collect();

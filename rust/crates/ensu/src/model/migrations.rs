@@ -258,8 +258,10 @@ mod tests {
             id: id.to_string(),
             title: String::new(),
             url: model_url.to_string(),
+            size: 1,
             sha256: "0".repeat(64),
             mmproj_url: Some(mmproj_url.to_string()),
+            mmproj_size: Some(1),
             mmproj_sha256: Some("0".repeat(64)),
         };
         LlmMigration {
