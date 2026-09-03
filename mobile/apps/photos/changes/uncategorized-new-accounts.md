@@ -1,0 +1,1 @@
+- Fixed Uncategorized being unavailable when adding items on new accounts.
