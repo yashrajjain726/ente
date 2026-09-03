@@ -1069,7 +1069,17 @@ struct ReplayedState {
 }
 
 fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
-    let snapshot = load_snapshot(log.path(), log.generation(), log.current_end_offset());
+    let snapshot = load_snapshot(log.path(), log.generation());
+    if let Some(loaded) = &snapshot
+        && loaded.covered_log_offset > log.current_end_offset()
+    {
+        return Err(VecDbError::Corrupt(format!(
+            "{}: snapshot covers {} bytes but the log is only {} bytes; preserving the file",
+            log.path().display(),
+            loaded.covered_log_offset,
+            log.current_end_offset()
+        )));
+    }
     let covered = snapshot
         .as_ref()
         .map_or(u64::MAX, |loaded| loaded.covered_log_offset);
@@ -1622,6 +1632,25 @@ mod tests {
     }
 
     #[test]
+    fn externally_shortened_log_below_the_snapshot_frontier_is_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("first", &seeded_unit_vector(1, DIMS)).unwrap();
+        let boundary = db.stats().unwrap().log_bytes;
+        db.add("second", &seeded_unit_vector(2, DIMS)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let clean = fs::read(&path).unwrap();
+        fs::write(&path, &clean[..boundary as usize]).unwrap();
+        assert_corrupt_open_preserves(&path);
+        fs::write(&path, &clean).unwrap();
+        let recovered = open_writer(&path);
+        assert_eq!(recovered.len(), 2);
+        assert!(recovered.contains("second"));
+    }
+
+    #[test]
     fn mid_log_corruption_below_the_snapshot_frontier_is_preserved() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -1793,23 +1822,6 @@ mod tests {
         assert!(reopened.contains("fresh"));
         assert!(!reopened.contains("key-0"));
         assert_own_nearest(&reopened, "fresh", &seeded_unit_vector(1, DIMS));
-    }
-
-    #[test]
-    fn snapshot_claiming_offset_beyond_log_end_is_discarded() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("db");
-        let db = open_writer(&path);
-        bulk_add(&db, &bulk_entries(0, 5, 80)).unwrap();
-        db.flush().unwrap();
-        drop(db);
-        let bytes = fs::read(&path).unwrap();
-        fs::write(&path, &bytes[..bytes.len() - ADD_RECORD_LEN as usize]).unwrap();
-        let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 4);
-        assert!(reopened.contains("key-3"));
-        assert!(!reopened.contains("key-4"));
-        assert_own_nearest(&reopened, "key-0", &seeded_unit_vector(80, DIMS));
     }
 
     #[test]
@@ -2336,7 +2348,7 @@ mod tests {
         drop(open_writer(&path));
         assert!(snapshot_exists(&path));
         let log_len = fs::metadata(&path).unwrap().len();
-        let loaded = load_snapshot(&path, generation_of(&path), log_len).unwrap();
+        let loaded = load_snapshot(&path, generation_of(&path)).unwrap();
         assert_eq!(loaded.covered_log_offset, log_len);
         let snapshot_bytes = fs::read(snapshot_path(&path)).unwrap();
         drop(open_writer(&path));
@@ -2368,7 +2380,7 @@ mod tests {
         assert_eq!(stats.records_since_snapshot, 0);
         assert!(stats.log_bytes < log_bytes_before);
         assert_ne!(generation_of(&path), generation_before);
-        let loaded = load_snapshot(&path, generation_of(&path), stats.log_bytes).unwrap();
+        let loaded = load_snapshot(&path, generation_of(&path)).unwrap();
         assert_eq!(loaded.covered_log_offset, stats.log_bytes);
         let live_vector = |index: u64| {
             if index < 40 {
@@ -2453,7 +2465,7 @@ mod tests {
         assert_own_nearest(&reopened, "key-100", &seeded_unit_vector(310, DIMS));
         let stats = reopened.stats().unwrap();
         assert_eq!(stats.dead_count, 0);
-        let loaded = load_snapshot(&path, generation_of(&path), stats.log_bytes).unwrap();
+        let loaded = load_snapshot(&path, generation_of(&path)).unwrap();
         assert_eq!(loaded.covered_log_offset, stats.log_bytes);
         assert_ne!(fs::read(snapshot_path(&path)).unwrap(), stale_snapshot);
     }

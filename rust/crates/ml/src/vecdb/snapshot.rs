@@ -42,7 +42,6 @@ pub(crate) fn write_snapshot(
 pub(crate) fn load_snapshot(
     log_path: &Path,
     expected_generation: [u8; 16],
-    log_end_offset: u64,
 ) -> Option<LoadedSnapshot> {
     let path = snapshot_path(log_path);
     let bytes = match std::fs::read(&path) {
@@ -53,7 +52,7 @@ pub(crate) fn load_snapshot(
             return None;
         }
     };
-    match decode_snapshot(&bytes, &expected_generation, log_end_offset) {
+    match decode_snapshot(&bytes, &expected_generation) {
         Ok(loaded) => Some(loaded),
         Err(reason) => {
             log::debug!("discarding snapshot {}: {reason}", path.display());
@@ -98,11 +97,7 @@ fn encode_snapshot(generation: &[u8; 16], covered_log_offset: u64, graph: &Graph
     bytes
 }
 
-fn decode_snapshot(
-    bytes: &[u8],
-    expected_generation: &[u8; 16],
-    log_end_offset: u64,
-) -> Result<LoadedSnapshot, String> {
+fn decode_snapshot(bytes: &[u8], expected_generation: &[u8; 16]) -> Result<LoadedSnapshot, String> {
     if bytes.len() < MIN_SNAPSHOT_LEN {
         return Err(format!(
             "{} bytes is shorter than the {MIN_SNAPSHOT_LEN}-byte minimum",
@@ -141,11 +136,6 @@ fn decode_snapshot(
         return Err("generation does not match the log".to_string());
     }
     let covered_log_offset = reader.read_u64().ok_or("truncated header")?;
-    if covered_log_offset > log_end_offset {
-        return Err(format!(
-            "covered offset {covered_log_offset} is past the log end {log_end_offset}"
-        ));
-    }
     let entry_marker = reader.read_u32().ok_or("truncated header")?;
     let top_level = reader.read_u8().ok_or("truncated header")?;
     let node_count = reader.read_u32().ok_or("truncated header")? as usize;
@@ -311,7 +301,7 @@ mod tests {
     }
 
     fn load_golden(log_path: &Path) -> Option<LoadedSnapshot> {
-        load_snapshot(log_path, golden_generation(), 300)
+        load_snapshot(log_path, golden_generation())
     }
 
     fn refresh_crc(bytes: &mut [u8]) {
@@ -450,7 +440,7 @@ mod tests {
         let generation = [7u8; 16];
         write_snapshot(&log_path, generation, 4096, &graph).unwrap();
         assert!(!temp_snapshot_path(&log_path).exists());
-        let loaded = load_snapshot(&log_path, generation, 4096).unwrap();
+        let loaded = load_snapshot(&log_path, generation).unwrap();
         assert_eq!(loaded.covered_log_offset, 4096);
         assert_eq!(loaded.entry_point, graph.entry_point());
         let rebuilt =
@@ -482,7 +472,7 @@ mod tests {
             std::fs::read(snapshot_path(&log_path)).unwrap().len(),
             MIN_SNAPSHOT_LEN
         );
-        let loaded = load_snapshot(&log_path, [3u8; 16], 32).unwrap();
+        let loaded = load_snapshot(&log_path, [3u8; 16]).unwrap();
         assert_eq!(loaded.covered_log_offset, 32);
         assert_eq!(loaded.entry_point, None);
         assert!(loaded.parts.is_empty());
@@ -538,7 +528,7 @@ mod tests {
         let mut decoded = 0usize;
         let mut searched = 0usize;
         let mut exercise = |bytes: &[u8]| {
-            let Ok(loaded) = decode_snapshot(bytes, &generation, 300) else {
+            let Ok(loaded) = decode_snapshot(bytes, &generation) else {
                 return;
             };
             decoded += 1;
@@ -591,7 +581,7 @@ mod tests {
         bytes.extend_from_slice(&0u16.to_le_bytes());
         let crc = crc32(&bytes[MAGIC.len()..]);
         bytes.extend_from_slice(&crc.to_le_bytes());
-        let loaded = decode_snapshot(&bytes, &golden_generation(), 300).unwrap();
+        let loaded = decode_snapshot(&bytes, &golden_generation()).unwrap();
         assert_eq!(loaded.entry_point, Some(slot));
         assert!(Graph::from_parts(loaded.entry_point, loaded.parts, 3).is_err());
     }
@@ -614,18 +604,17 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let log_path = dir.path().join("log");
         std::fs::write(snapshot_path(&log_path), GOLDEN).unwrap();
-        assert!(load_snapshot(&log_path, [9u8; 16], 300).is_none());
+        assert!(load_snapshot(&log_path, [9u8; 16]).is_none());
         assert!(load_golden(&log_path).is_some());
     }
 
     #[test]
-    fn covered_offset_beyond_log_end_is_discarded() {
+    fn loading_exposes_the_covered_offset_for_the_caller_to_judge() {
         let dir = TempDir::new().unwrap();
         let log_path = dir.path().join("log");
         std::fs::write(snapshot_path(&log_path), GOLDEN).unwrap();
-        assert!(load_snapshot(&log_path, golden_generation(), 299).is_none());
-        assert!(load_snapshot(&log_path, golden_generation(), 300).is_some());
-        assert!(load_snapshot(&log_path, golden_generation(), 301).is_some());
+        let loaded = load_snapshot(&log_path, golden_generation()).unwrap();
+        assert_eq!(loaded.covered_log_offset, 300);
     }
 
     #[test]
@@ -715,7 +704,7 @@ mod tests {
         write_snapshot(&log_path, generation, 100, &golden_graph()).unwrap();
         write_snapshot(&log_path, generation, 999, &golden_graph()).unwrap();
         assert!(!temp_snapshot_path(&log_path).exists());
-        let loaded = load_snapshot(&log_path, generation, 1000).unwrap();
+        let loaded = load_snapshot(&log_path, generation).unwrap();
         assert_eq!(loaded.covered_log_offset, 999);
         assert_eq!(loaded.parts.len(), 3);
     }
