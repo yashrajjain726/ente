@@ -166,9 +166,10 @@ const dependencies = present
 const added = dependencies.reduce((n, { added }) => n + added.length, 0);
 const moved = dependencies.reduce((n, { moved }) => n + moved.length, 0);
 
-const guardrails = kept.filter(
-    (file) => guardrailDirs.some((dir) => file.startsWith(dir)) || guardrailFiles.has(path.basename(file)),
-);
+const guardrails = [
+    ...kept.filter((file) => guardrailDirs.some((dir) => file.startsWith(dir)) || guardrailFiles.has(path.basename(file))),
+    ...[...numstat("--diff-filter=A"), ...additions].map(([, , file]) => file).filter((file) => file.startsWith(".github/")),
+];
 const configs = [...numstat(), ...additions].map(([, , file]) => file).filter((file) => configFile.test(file));
 
 const categories = [
@@ -199,4 +200,5 @@ if (local) {
 }
 
 appendFileSync(GITHUB_OUTPUT, `categories=${JSON.stringify(categories.map(([, many]) => many))}\n`);
-if (detail) appendFileSync(GITHUB_STEP_SUMMARY, `${detail}\n`);
+if (summary) console.log(`::warning title=Change approval needed::${summary}`);
+appendFileSync(GITHUB_STEP_SUMMARY, summary ? `${summary}\n\n${detail}\n` : "No approval needed.\n");
