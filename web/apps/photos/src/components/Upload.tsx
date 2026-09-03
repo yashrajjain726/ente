@@ -76,6 +76,7 @@ import { hasReliableCanvasReadback } from "ente-gallery/utils/upload/canvas-inte
 import { CollectionSubType, type Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { SlideUpTransition } from "ente-new/photos/components/mui/SlideUpTransition";
+import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { suppressAutoLockOnBlurForTrustedPrompt } from "ente-new/photos/services/app-lock";
 import {
     addOrCopyToCollection,
@@ -166,10 +167,12 @@ type UploadConfirmationState =
 
 const importSourceHint = (
     uploadItemAndPaths: UploadItemAndPath[],
+    isInternalUser: boolean,
 ): ImportSource =>
     uploadItemAndPaths.some(([, path]) => lowercaseExtension(path) == "json")
         ? "google-takeout"
-        : uploadItemAndPaths.some(
+        : isInternalUser &&
+            uploadItemAndPaths.some(
                 ([, path]) => lowercaseExtension(path) == "xmp",
             )
           ? "apple-photos"
@@ -190,6 +193,7 @@ export const Upload: React.FC<UploadProps> = ({
 }) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
     const { showNotification, watchFolderView } = usePhotosAppContext();
+    const { isInternalUser } = useSettingsSnapshot();
 
     const [uploadProgressView, setUploadProgressView] = useState(false);
     const [
@@ -678,7 +682,7 @@ export const Upload: React.FC<UploadProps> = ({
     ) => {
         if (uploadItemsAndPaths.current !== uploadItemAndPaths) return;
 
-        const hint = importSourceHint(uploadItemAndPaths);
+        const hint = importSourceHint(uploadItemAndPaths, isInternalUser);
         if (uploadItemAndPaths.length > 1 || hint != "generic")
             setUploadConfirmation({ phase: "counting", importSource: hint });
 
@@ -777,7 +781,7 @@ export const Upload: React.FC<UploadProps> = ({
         }: NewCollectionsOptions = {},
     ) => {
         const uploadItemAndPaths = uploadItemsAndPaths.current;
-        const hint = importSourceHint(uploadItemAndPaths);
+        const hint = importSourceHint(uploadItemAndPaths, isInternalUser);
         if (
             !skipConfirmation &&
             (uploadItemAndPaths.length > 1 || hint != "generic")
@@ -1212,6 +1216,7 @@ export const Upload: React.FC<UploadProps> = ({
                 open={props.uploadTypeSelectorView}
                 onClose={props.closeUploadTypeSelector}
                 intent={props.uploadTypeSelectorIntent}
+                isInternalUser={isInternalUser}
                 pendingUploadType={
                     isInputPending ? selectedUploadType.current : undefined
                 }
@@ -1485,6 +1490,7 @@ const setPendingUploads = async (
 
 type UploadTypeSelectorProps = ModalVisibilityProps & {
     intent: UploadTypeSelectorIntent;
+    isInternalUser: boolean;
     pendingUploadType: UploadType | undefined;
     onSelect: (type: UploadType) => void;
 };
@@ -1493,6 +1499,7 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
     open,
     onClose,
     intent,
+    isInternalUser,
     pendingUploadType,
     onSelect,
 }) => {
@@ -1551,7 +1558,13 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
             }}
         >
             <UploadOptions
-                {...{ intent, pendingUploadType, onSelect, onClose }}
+                {...{
+                    intent,
+                    isInternalUser,
+                    pendingUploadType,
+                    onSelect,
+                    onClose,
+                }}
             />
         </Dialog>
     );
@@ -1559,21 +1572,24 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
 
 type UploadOptionsProps = Pick<
     UploadTypeSelectorProps,
-    "onClose" | "intent" | "pendingUploadType" | "onSelect"
+    "onClose" | "intent" | "isInternalUser" | "pendingUploadType" | "onSelect"
 >;
 
 const UploadOptions: React.FC<UploadOptionsProps> = ({
     intent,
+    isInternalUser,
     pendingUploadType,
     onSelect,
     onClose,
 }) => {
     // Keep dialog state in this child so it resets when the dialog closes.
     const [provider, setProvider] = useState<"google" | "apple">();
+    const selectedProvider =
+        provider == "apple" && !isInternalUser ? undefined : provider;
 
-    return provider ? (
+    return selectedProvider ? (
         <TakeoutOptions
-            provider={provider}
+            provider={selectedProvider}
             isFolderSelectionPending={pendingUploadType == "folders"}
             onBack={() => setProvider(undefined)}
             onSelectFolder={() => onSelect("folders")}
@@ -1588,7 +1604,9 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
             onSelectFiles={() => onSelect("files")}
             onSelectFolder={() => onSelect("folders")}
             onSelectGooglePhotos={() => setProvider("google")}
-            onSelectApplePhotos={() => setProvider("apple")}
+            {...(isInternalUser && {
+                onSelectApplePhotos: () => setProvider("apple"),
+            })}
             {...{ onClose }}
         />
     );

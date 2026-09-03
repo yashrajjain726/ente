@@ -32,7 +32,7 @@ type DefaultOptionsProps = DefaultOptionsBaseProps &
     (
         | {
               intent: UploadTypeSelectorIntent;
-              onSelectApplePhotos: () => void;
+              onSelectApplePhotos?: () => void;
               onSelectGooglePhotos: () => void;
           }
         | {
@@ -132,7 +132,7 @@ export function DefaultOptions({
 type ImportOptionsProps = Pick<
     DefaultOptionsBaseProps,
     "isFolderSelectionPending" | "onSelectFolder"
-> & { onSelectApplePhotos: () => void; onSelectGooglePhotos: () => void };
+> & { onSelectApplePhotos?: () => void; onSelectGooglePhotos: () => void };
 
 function ImportOptions({
     isFolderSelectionPending,
@@ -155,15 +155,17 @@ function ImportOptions({
                         label={t("google_photos")}
                         onClick={onSelectGooglePhotos}
                     />
-                    <ImportProviderButton
-                        icon={
-                            <AppleIcon
-                                sx={{ color: "text.muted", fontSize: 22 }}
-                            />
-                        }
-                        label={t("apple_photos")}
-                        onClick={onSelectApplePhotos}
-                    />
+                    {onSelectApplePhotos ? (
+                        <ImportProviderButton
+                            icon={
+                                <AppleIcon
+                                    sx={{ color: "text.muted", fontSize: 22 }}
+                                />
+                            }
+                            label="Apple Photos"
+                            onClick={onSelectApplePhotos}
+                        />
+                    ) : null}
                 </Stack>
             </ImportSection>
             <ImportSection title={t("upload_from")}>
@@ -194,7 +196,7 @@ type UploadOptionsProps = Pick<
     | "isFolderSelectionPending"
     | "onSelectFiles"
     | "onSelectFolder"
-> & { onSelectApplePhotos: () => void; onSelectGooglePhotos: () => void };
+> & { onSelectApplePhotos?: () => void; onSelectGooglePhotos: () => void };
 
 function UploadOptions({
     isFileSelectionPending,
@@ -247,15 +249,20 @@ function UploadOptions({
                         label={t("google_takeout")}
                         onClick={onSelectGooglePhotos}
                     />
-                    <OptionRowButton
-                        icon={
-                            <AppleIcon
-                                sx={{ color: "text.muted", fontSize: "20px" }}
-                            />
-                        }
-                        label={t("apple_photos")}
-                        onClick={onSelectApplePhotos}
-                    />
+                    {onSelectApplePhotos ? (
+                        <OptionRowButton
+                            icon={
+                                <AppleIcon
+                                    sx={{
+                                        color: "text.muted",
+                                        fontSize: "20px",
+                                    }}
+                                />
+                            }
+                            label="Apple Photos"
+                            onClick={onSelectApplePhotos}
+                        />
+                    ) : null}
                 </Stack>
             </ImportSection>
         </Stack>

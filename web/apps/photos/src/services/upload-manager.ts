@@ -705,7 +705,7 @@ const tryParseMetadataItem = async (
     const metadata =
         extension == "json"
             ? await tryParseTakeoutMetadataJSON(uploadItem!)
-            : extension == "xmp"
+            : extension == "xmp" && settingsSnapshot().isInternalUser
               ? await tryParseXMPSidecar(uploadItem!)
               : undefined;
     if (!metadata) return undefined;

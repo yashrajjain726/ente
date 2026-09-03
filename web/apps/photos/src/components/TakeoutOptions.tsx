@@ -77,15 +77,15 @@ export function TakeoutOptions({
                         <ArrowBackIcon sx={{ fontSize: "24px" }} />
                     </IconButton>
                     <Typography sx={optionsTitleSx}>
-                        {t(
-                            provider == "apple"
-                                ? isSheet
-                                    ? "apple_photos"
-                                    : "import_from_apple_photos"
-                                : isSheet
-                                  ? "google_takeout"
-                                  : "import_from_google_photos",
-                        )}
+                        {provider == "apple"
+                            ? isSheet
+                                ? "Apple Photos"
+                                : "Import from Apple Photos"
+                            : t(
+                                  isSheet
+                                      ? "google_takeout"
+                                      : "import_from_google_photos",
+                              )}
                     </Typography>
                 </Stack>
                 <IconButton
@@ -109,16 +109,16 @@ export function TakeoutOptions({
                 <Stack sx={{ gap: 1 }}>
                     <TakeoutOptionButton
                         icon={<HugeiconsIcon icon={Folder01Icon} size={18} />}
-                        label={t(
+                        label={
                             provider == "apple"
-                                ? "exported_folder"
-                                : "unzipped_folder",
-                        )}
-                        description={t(
+                                ? "Exported folder"
+                                : t("unzipped_folder")
+                        }
+                        description={
                             provider == "apple"
-                                ? "apple_export_folder_hint"
-                                : "unzipped_folder_hint",
-                        )}
+                                ? "Select the folder exported from Photos"
+                                : t("unzipped_folder_hint")
+                        }
                         pending={isFolderSelectionPending}
                         onClick={onSelectFolder}
                     />
@@ -175,9 +175,9 @@ export function TakeoutOptions({
 
 function AppleExportSteps(): React.JSX.Element {
     const steps = [
-        t("apple_export_step_1"),
-        t("apple_export_step_2"),
-        t("apple_export_step_3"),
+        "In Photos, select your photos and choose File > Export > Export Unmodified Originals",
+        "Set File Name to Sequential so Live Photos pair correctly",
+        "Select Export IPTC as XMP so dates, locations, and captions come along",
     ];
 
     return (

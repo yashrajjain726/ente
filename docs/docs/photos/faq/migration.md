@@ -233,33 +233,31 @@ This only applies to partner-shared photos that Google included in your Takeout.
 
 ### Why is it recommended to migrate Apple Photos from mobile? {#why-migrate-apple-photos-from-mobile}
 
-It is highly recommended to import from Apple Photos via mobile rather than desktop, as desktop import requires a manual export with XMP sidecars and sequential naming for Live Photos.
+It is highly recommended to import from Apple Photos via mobile rather than desktop, as mobile upload preserves metadata, while desktop upload may lose metadata (reason stated [below](#can-i-import-apple-photos-via-desktop)), requires manual export and sequential naming for live photos.
 
 ### Can I import Apple Photos via desktop? {#can-i-import-apple-photos-via-desktop}
 
-Importing via the mobile app remains the easiest option.
+It is highly recommended to import from Apple Photos via mobile rather than desktop.
 
-Some photos lack EXIF metadata embedded directly within the image file. Apple Photos can export this metadata, including corrections made in the app, into separate `.xmp` sidecar files instead of rewriting the original file.
+Some photos may not have EXIF metadata embedded directly within the image file. In these cases, Apple Photos exports metadata into separate `.XMP` sidecar files instead of writing it into the photo itself.
 
-The desktop and web apps read these sidecars during manual folder imports, and the desktop app also reads them during ZIP imports, preserving capture dates with timezone offsets, locations, and captions.
+Currently, the desktop app does not read metadata from separate XMP sidecar files - it can only recognize metadata that is embedded within the file.
 
-If you need to import manually, follow the steps below:
+We recommend to upload the photos using the iPhone app as iOS exports typically include embedded metadata, which ensures dates and other details are preserved correctly.
+
+However, for any reason, if desktop is the only way to import, you can follow the steps below:
 
 #### 1. Export your data from the Apple Photos app.
 
 Select the files you want to export (`Command + A` to select them all), and click on `File` > `Export` > `Export Unmodified Originals`.
 
-In the dialog that pops up, select File Name as `Sequential`, provide any prefix you'd like, and select **Export IPTC as XMP**. Sequential names ensure that we combine the photo and video portions of your Live Photos correctly. The XMP option writes one `.xmp` file next to each photo, which Ente uses for the date, location, and caption.
+In the dialog that pops up, select File Name as `Sequential` and provide any prefix you'd like. This is to make sure that we combine the photo and video portions of your Live Photos correctly.
 
 Finally, choose an export directory and confirm by clicking `Export Originals`. You will receive a notification from the app once your export is complete.
 
 #### 2. Import into Ente
 
-Alternatively, open the uploader, click **Apple Photos** under **Import from**, and select the exported folder; the screen repeats these export steps.
-
 Now simply drag and drop the downloaded folders into [our desktop app](https://ente.com/download/desktop) and grab a cup of coffee (or a good night's sleep, depending on the size of your library) while we handle the rest.
-
-Keep the `.xmp` files alongside the photos in the same folder when you drag it in; they are read and are not uploaded as separate files.
 
 > Note: In case your uploads get interrupted, just drag and drop the folders into the same albums again, and we will ignore already backed up files and upload just the rest.
 
