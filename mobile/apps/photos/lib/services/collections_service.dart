@@ -561,8 +561,6 @@ class CollectionsService {
     try {
       await getUncategorizedCollection();
     } catch (e, s) {
-      // This is retried by the next collection sync. An empty system album
-      // should not prevent remote collections and files from being synced.
       _logger.warning("Failed to ensure Uncategorized collection", e, s);
     }
   }
