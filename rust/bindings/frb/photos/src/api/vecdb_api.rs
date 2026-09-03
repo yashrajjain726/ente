@@ -774,7 +774,7 @@ mod tests {
         delete_vec_db_files(dir.db_path()).unwrap();
         assert!(!PathBuf::from(dir.db_path()).exists());
         assert!(!PathBuf::from(format!("{}.graph", dir.db_path())).exists());
-        assert!(!PathBuf::from(format!("{}.lock", dir.db_path())).exists());
+        assert!(PathBuf::from(format!("{}.lock", dir.db_path())).exists());
         assert!(matches!(
             db.get_index_stats(),
             Err(RustVecDbError::Closed { .. })

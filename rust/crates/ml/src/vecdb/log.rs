@@ -27,6 +27,7 @@ const ATTR_TAG_STR: u8 = 0;
 const ATTR_TAG_BOOL: u8 = 1;
 const ATTR_TAG_I64: u8 = 2;
 const ATTR_TAG_F64: u8 = 3;
+const TAIL_PROBE_STEP_BYTES: usize = 4 * 1024 * 1024;
 
 static GENERATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -242,18 +243,41 @@ impl Log {
     }
 
     pub(crate) fn tail_contains_valid_record(&mut self, after: u64) -> Result<bool, VecDbError> {
+        self.tail_contains_valid_record_windowed(after, TAIL_PROBE_STEP_BYTES)
+    }
+
+    fn tail_contains_valid_record_windowed(
+        &mut self,
+        after: u64,
+        step_bytes: usize,
+    ) -> Result<bool, VecDbError> {
         let start = after + 1;
         if start >= self.end_offset {
             return Ok(false);
         }
-        self.file
-            .seek(SeekFrom::Start(start))
-            .map_err(|source| VecDbError::io(&self.path, source))?;
-        let mut region = vec![0u8; (self.end_offset - start) as usize];
-        self.file
-            .read_exact(&mut region)
-            .map_err(|source| VecDbError::io(&self.path, source))?;
-        Ok((0..region.len()).any(|offset| valid_record_at(&region[offset..], self.dims)))
+        let tail_len = (self.end_offset - start) as usize;
+        let step = step_bytes.max(1);
+        let overlap = max_record_len(self.dims).saturating_sub(1);
+        let mut window = vec![0u8; step.saturating_add(overlap).min(tail_len)];
+        let mut base = 0usize;
+        loop {
+            let len = window.len().min(tail_len - base);
+            self.file
+                .seek(SeekFrom::Start(start + base as u64))
+                .map_err(|source| VecDbError::io(&self.path, source))?;
+            self.file
+                .read_exact(&mut window[..len])
+                .map_err(|source| VecDbError::io(&self.path, source))?;
+            let reaches_end = base + len == tail_len;
+            let probe_end = if reaches_end { len } else { step.min(len) };
+            if (0..probe_end).any(|offset| valid_record_at(&window[offset..len], self.dims)) {
+                return Ok(true);
+            }
+            if reaches_end {
+                return Ok(false);
+            }
+            base += step;
+        }
     }
 
     pub(crate) fn current_end_offset(&self) -> u64 {
@@ -485,6 +509,12 @@ fn decode_attrs(bytes: &[u8]) -> Option<Vec<Attribute>> {
         rest = after;
     }
     rest.is_empty().then_some(attrs)
+}
+
+fn max_record_len(dims: usize) -> usize {
+    dims.saturating_mul(size_of::<f32>()).saturating_add(
+        RECORD_PREFIX_LEN + MAX_KEY_BYTES + 1 + MAX_ATTRS_TOTAL_BYTES + RECORD_CRC_LEN,
+    )
 }
 
 fn valid_record_at(bytes: &[u8], dims: usize) -> bool {
@@ -2138,5 +2168,148 @@ mod tests {
                 "case {index}"
             );
         }
+    }
+
+    #[test]
+    fn windowed_probe_finds_the_only_valid_record_straddling_a_window_boundary() {
+        let dims = 8usize;
+        let step = 4096usize;
+        let vector = seeded_vector(31, dims);
+        let good = encoded_add("good", &vector);
+        let straddler = encoded_add("straddler", &vector);
+        let mut record_bytes = good.clone();
+        record_bytes.extend_from_slice(&vec![0xAA; step - 19]);
+        record_bytes.extend_from_slice(&straddler);
+        record_bytes.extend_from_slice(&vec![0xAA; step + max_record_len(dims)]);
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        write_log_file(&path, dims as u32, &record_bytes);
+        let mut log = reopen(&path, dims);
+        let (records, recoverable_end) = scan_all(&mut log);
+        assert_eq!(records.len(), 1);
+        assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+        let straddler_start = (step - 20) as u64;
+        let straddler_end = straddler_start + straddler.len() as u64;
+        assert!(straddler_start < step as u64);
+        assert!(straddler_end > step as u64);
+        let tail_len = log.current_end_offset() - recoverable_end - 1;
+        assert!(tail_len as usize > step + max_record_len(dims) - 1);
+        assert!(
+            log.tail_contains_valid_record_windowed(recoverable_end, step)
+                .unwrap()
+        );
+        assert!(log.tail_contains_valid_record(recoverable_end).unwrap());
+    }
+
+    #[test]
+    fn windowed_probe_scans_an_all_garbage_multi_window_tail_without_a_false_positive() {
+        let dims = 8usize;
+        let step = 64usize;
+        let vector = seeded_vector(32, dims);
+        let good = encoded_add("good", &vector);
+        let mut record_bytes = good.clone();
+        record_bytes.extend_from_slice(&vec![0x01; 3 * (step + max_record_len(dims))]);
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        write_log_file(&path, dims as u32, &record_bytes);
+        let mut log = reopen(&path, dims);
+        let (records, recoverable_end) = scan_all(&mut log);
+        assert_eq!(records.len(), 1);
+        assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+        assert!(
+            !log.tail_contains_valid_record_windowed(recoverable_end, step)
+                .unwrap()
+        );
+        assert!(!log.tail_contains_valid_record(recoverable_end).unwrap());
+    }
+
+    #[test]
+    fn windowed_probe_with_a_step_smaller_than_a_record_terminates_and_finds_a_straddler() {
+        let dims = 8usize;
+        let step = 4usize;
+        let vector = seeded_vector(33, dims);
+        let good = encoded_add("good", &vector);
+        let straddler = encoded_add("straddler", &vector);
+        assert!(step < straddler.len());
+        let mut record_bytes = good.clone();
+        record_bytes.extend_from_slice(&vec![0x01; 5000]);
+        record_bytes.extend_from_slice(&straddler);
+        record_bytes.extend_from_slice(&[0x01; 20]);
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        write_log_file(&path, dims as u32, &record_bytes);
+        let mut log = reopen(&path, dims);
+        let (records, recoverable_end) = scan_all(&mut log);
+        assert_eq!(records.len(), 1);
+        assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+        let tail_len = log.current_end_offset() - recoverable_end - 1;
+        assert!(tail_len as usize > step + max_record_len(dims) - 1);
+        assert!(
+            log.tail_contains_valid_record_windowed(recoverable_end, step)
+                .unwrap()
+        );
+        assert!(
+            !log.tail_contains_valid_record_windowed(recoverable_end - 1 + tail_len, step)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn windowed_probe_sees_a_max_length_record_ending_exactly_at_the_window_visible_end() {
+        let dims = 8usize;
+        let step = 4096usize;
+        let overlap = max_record_len(dims) - 1;
+        let vector = seeded_vector(34, dims);
+        let good = encoded_add("good", &vector);
+        let attrs: Vec<Attribute> = (b'a'..b'a' + 16)
+            .map(|name| Attribute {
+                name: (name as char).to_string(),
+                value: AttrValue::Str("v".repeat(251)),
+            })
+            .collect();
+        let key = "k".repeat(256);
+        let mut max_record = Vec::new();
+        encode_record_into(
+            &mut max_record,
+            &LogEntry::Add {
+                key: &key,
+                vector: &vector,
+                attrs: &attrs,
+            },
+        );
+        assert_eq!(max_record.len(), max_record_len(dims));
+        let mut record_bytes = good.clone();
+        record_bytes.extend_from_slice(&vec![0xAA; step]);
+        record_bytes.extend_from_slice(&max_record);
+        record_bytes.extend_from_slice(&vec![0xAA; 256]);
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        write_log_file(&path, dims as u32, &record_bytes);
+        let mut log = reopen(&path, dims);
+        let (records, recoverable_end) = scan_all(&mut log);
+        assert_eq!(records.len(), 1);
+        assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+        let record_tail_start = step - 1;
+        assert_eq!(record_tail_start + max_record.len(), step + overlap);
+        let tail_len = (log.current_end_offset() - recoverable_end - 1) as usize;
+        assert!(tail_len > step + overlap);
+        assert!(
+            log.tail_contains_valid_record_windowed(recoverable_end, step)
+                .unwrap()
+        );
+        assert!(log.tail_contains_valid_record(recoverable_end).unwrap());
+        let mut corrupted_bytes = record_bytes.clone();
+        let crc_last = good.len() + step + max_record.len() - 1;
+        corrupted_bytes[crc_last] ^= 0xFF;
+        let corrupted_path = dir.path().join("log-corrupted");
+        write_log_file(&corrupted_path, dims as u32, &corrupted_bytes);
+        let mut corrupted_log = reopen(&corrupted_path, dims);
+        let (corrupted_records, corrupted_end) = scan_all(&mut corrupted_log);
+        assert_eq!(corrupted_records.len(), 1);
+        assert!(
+            !corrupted_log
+                .tail_contains_valid_record_windowed(corrupted_end, step)
+                .unwrap()
+        );
     }
 }

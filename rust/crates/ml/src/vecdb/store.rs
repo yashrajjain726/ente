@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
 use super::graph::{Graph, search as graph_search, search_excluding};
-use super::lock::{WriterLock, lock_path};
+use super::lock::WriterLock;
 use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, header_generation, remove_if_present,
     remove_stale_temp_sibling, sync_parent_dir,
@@ -646,7 +646,7 @@ impl VecDb {
             }
         }
         let lock = WriterLock::acquire(&key)?;
-        remove_index_files(&key)?;
+        remove_data_files(&key)?;
         drop(lock);
         Ok(())
     }
@@ -796,7 +796,7 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
     let mut st = shared.state_write();
     shared.closed.store(true, Ordering::Release);
     drop(log);
-    let removed = remove_index_files(&shared.path);
+    let removed = remove_data_files(&shared.path);
     if let Ok(empty) = VectorArena::new(shared.dims) {
         st.arena = empty;
         st.graph = Some(Graph::new());
@@ -1418,12 +1418,6 @@ fn promote_compacted_log(temp_path: &Path, path: &Path) -> Result<(), VecDbError
     sync_parent_dir(path)
 }
 
-fn remove_index_files(path: &Path) -> Result<(), VecDbError> {
-    remove_data_files(path)?;
-    remove_if_present(&lock_path(path))?;
-    sync_parent_dir(path)
-}
-
 fn remove_data_files(path: &Path) -> Result<(), VecDbError> {
     remove_if_present(path)?;
     remove_snapshot(path)?;
@@ -1490,6 +1484,7 @@ mod tests {
 
     use super::super::crc::crc32;
     use super::super::kernel::splitmix64;
+    use super::super::lock::lock_path;
     use super::super::test_support;
     use super::*;
 
@@ -3102,7 +3097,7 @@ mod tests {
     }
 
     #[test]
-    fn delete_removes_all_files() {
+    fn delete_removes_data_files_and_keeps_the_lock_sidecar() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
@@ -3116,7 +3111,39 @@ mod tests {
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
         assert!(!temp_sibling(&path).exists());
-        assert!(!lock_path(&path).exists());
+        assert!(lock_path(&path).exists());
+    }
+
+    #[test]
+    fn reopen_after_delete_reuses_the_persistent_lock_sidecar() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("doomed", &seeded_unit_vector(2, DIMS)).unwrap();
+        db.delete().unwrap();
+        assert!(lock_path(&path).exists());
+        #[cfg(unix)]
+        let sidecar_inode = {
+            use std::os::unix::fs::MetadataExt;
+            fs::metadata(lock_path(&path)).unwrap().ino()
+        };
+        let reopened = open_writer(&path);
+        assert!(reopened.is_empty());
+        assert!(matches!(
+            WriterLock::acquire(&path),
+            Err(VecDbError::Locked(_))
+        ));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            assert_eq!(fs::metadata(lock_path(&path)).unwrap().ino(), sidecar_inode);
+        }
+        reopened.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
+        drop(reopened);
+        let third = open_writer(&path);
+        assert_eq!(third.len(), 1);
+        assert!(third.contains("fresh"));
+        assert!(lock_path(&path).exists());
     }
 
     #[test]
@@ -3131,7 +3158,7 @@ mod tests {
         first.delete().unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
-        assert!(!lock_path(&path).exists());
+        assert!(lock_path(&path).exists());
         let query = seeded_unit_vector(1, DIMS);
         assert!(matches!(
             survivor.search(&query, &limit_params(3)),
@@ -3540,7 +3567,7 @@ mod tests {
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
         assert!(!temp_sibling(&path).exists());
-        assert!(!lock_path(&path).exists());
+        assert!(lock_path(&path).exists());
         let query = seeded_unit_vector(1, DIMS);
         assert!(matches!(
             survivor.search(&query, &limit_params(3)),
@@ -3595,11 +3622,12 @@ mod tests {
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
         assert!(!temp_sibling(&path).exists());
-        assert!(!lock_path(&path).exists());
+        assert!(lock_path(&path).exists());
         VecDb::purge(&path).unwrap();
+        assert!(lock_path(&path).exists());
         let never_created = dir.path().join("never-created");
         VecDb::purge(&never_created).unwrap();
-        assert!(!lock_path(&never_created).exists());
+        assert!(lock_path(&never_created).exists());
         let fresh = open_writer(&path);
         assert!(fresh.is_empty());
         fresh.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
@@ -3621,7 +3649,7 @@ mod tests {
         drop(held);
         VecDb::purge(&path).unwrap();
         assert!(!path.exists());
-        assert!(!lock_path(&path).exists());
+        assert!(lock_path(&path).exists());
     }
 
     #[test]
@@ -3669,7 +3697,8 @@ mod tests {
         VecDb::purge(&alias).unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
-        assert!(!lock_path(&path).exists());
+        assert!(lock_path(&path).exists());
+        assert!(!lock_path(&alias).exists());
         assert!(fs::symlink_metadata(&alias).is_ok());
     }
 
