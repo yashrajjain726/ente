@@ -59,6 +59,7 @@ const viewerPhotoFromPost = (post: SpacePost) => ({
     name: post.name,
     postId: post.postId,
     spaceId: post.spaceId,
+    timestampMicros: post.timestampMicros,
     timestampMs: post.timestampMs,
     viewerLiked: post.viewerLiked,
     width: post.width,

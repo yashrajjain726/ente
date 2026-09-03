@@ -3,8 +3,7 @@ package controller
 import (
 	"crypto/sha256"
 	"database/sql"
-	"strconv"
-	"strings"
+	"fmt"
 	"testing"
 
 	timeutil "github.com/ente/museum/pkg/utils/time"
@@ -99,26 +98,31 @@ func TestListPostsHydratesPostAssets(t *testing.T) {
 	require.Equal(t, int64(123), page.Items[0].Objects[0].Size)
 	require.Equal(t, 1, page.Items[0].Objects[0].Position)
 	require.Equal(t, "bWV0YWRhdGE=", page.Items[0].Objects[0].MetadataCipher)
+	post, err := repos.Posts.GetPost(ctx, page.Items[0].PostID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, post.CreatedAt, page.Items[0].CreatedAtMicros)
 }
 
-func TestListHomePostsSyncCursorUsesDatabaseTime(t *testing.T) {
+func TestListHomePostsSyncCursorUsesNewestVisiblePost(t *testing.T) {
 	controller, repos, ctx := setupPostsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-home-sync@example.com", "alice-public")
 	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_home_sync", "alice-space-key", "alice-home-sync-public", "alice-home-sync-secret", "alice-home-sync-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
-	before, err := repos.Posts.CurrentDatabaseTimeMicroseconds(ctx)
-	require.NoError(t, err)
 	page, err := controller.ListHomePosts(ctx, aliceSpace, models.ListHomePostsRequest{Limit: 10})
 	require.NoError(t, err)
-	after, err := repos.Posts.CurrentDatabaseTimeMicroseconds(ctx)
+	require.Equal(t, "0:0", page.SyncCursor)
+
+	bobID := insertSpaceControllerUser(t, repos, "bob-home-sync@example.com", "bob-public")
+	bobSpace, err := testCreateSpace(ctx, repos, bobID, "bob_home_sync", "bob-space-key", "bob-home-sync-public", "bob-home-sync-secret", "bob-home-sync-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+	require.NoError(t, testAddFriend(ctx, repos, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
+	postID, err := testCreatePost(ctx, repos, bobID, bobSpace.SpaceID, "post-key", nil, bobSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+	post, err := repos.Posts.GetPost(ctx, postID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 
-	createdAt, postID, found := strings.Cut(page.SyncCursor, ":")
-	require.True(t, found)
-	syncCreatedAt, err := strconv.ParseInt(createdAt, 10, 64)
+	page, err = controller.ListHomePosts(ctx, aliceSpace, models.ListHomePostsRequest{Limit: 10})
 	require.NoError(t, err)
-	require.Equal(t, "0", postID)
-	require.GreaterOrEqual(t, syncCreatedAt, before)
-	require.LessOrEqual(t, syncCreatedAt, after)
+	require.Equal(t, fmt.Sprintf("%d:%d", post.CreatedAt, post.PostID), page.SyncCursor)
 }

@@ -8,20 +8,13 @@ import (
 	"strings"
 
 	"github.com/ente/museum/ente/base"
+	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
 )
 
 const MaxPostsPerSpace = 250
 
 var ErrSpacePostLimitReached = errors.New("space post limit reached")
-
-func (r *PostsRepository) CurrentDatabaseTimeMicroseconds(ctx context.Context) (int64, error) {
-	var currentTime int64
-	if err := r.DB.QueryRowContext(ctx, `SELECT now_utc_micro_seconds()`).Scan(&currentTime); err != nil {
-		return 0, stacktrace.Propagate(err, "")
-	}
-	return currentTime, nil
-}
 
 func (r *PostsRepository) CountPosts(ctx context.Context, spaceID string) (int64, error) {
 	var count int64
@@ -104,12 +97,13 @@ func (r *PostsRepository) CreatePost(ctx context.Context, spaceID string, encryp
 	if captionCipher != nil {
 		caption = captionCipher
 	}
+	createdAt := timeutil.Microseconds()
 	var postID int64
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO space_posts (space_id, encrypted_post_key, caption_cipher, key_version)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO space_posts (space_id, encrypted_post_key, caption_cipher, key_version, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $5)
 		RETURNING post_id
-	`, spaceID, encryptedPostKey, caption, keyVersion).Scan(&postID); err != nil {
+	`, spaceID, encryptedPostKey, caption, keyVersion, createdAt).Scan(&postID); err != nil {
 		return 0, 0, stacktrace.Propagate(err, "")
 	}
 	for _, obj := range objects {
@@ -417,17 +411,17 @@ func parsePostBoundary(cursor string) (int64, int64, bool) {
 	return parsePostPosition(cursor, true)
 }
 
-func parsePostPosition(cursor string, allowZeroPostID bool) (int64, int64, bool) {
+func parsePostPosition(cursor string, allowZero bool) (int64, int64, bool) {
 	createdAtText, postIDText, ok := strings.Cut(strings.TrimSpace(cursor), ":")
 	if !ok {
 		return 0, 0, false
 	}
 	createdAt, err := strconv.ParseInt(createdAtText, 10, 64)
-	if err != nil || createdAt <= 0 {
+	if err != nil || createdAt < 0 || (!allowZero && createdAt == 0) {
 		return 0, 0, false
 	}
 	postID, err := strconv.ParseInt(postIDText, 10, 64)
-	if err != nil || postID < 0 || (!allowZeroPostID && postID == 0) {
+	if err != nil || postID < 0 || (!allowZero && postID == 0) {
 		return 0, 0, false
 	}
 	return createdAt, postID, true

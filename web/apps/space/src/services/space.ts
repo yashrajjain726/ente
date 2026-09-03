@@ -75,6 +75,7 @@ interface SpacePostResponse {
     author: SpaceActor;
     caption?: string;
     createdAt: string;
+    createdAtMicros: number;
     encryptedPostKey: string;
     keyVersion: number;
     objects?: SpacePostObject[];
@@ -189,6 +190,7 @@ interface SpacePostBase {
     name: string;
     postId: number;
     timestampMs: number;
+    timestampMicros: number;
     thumbHash?: string;
     username?: string;
     viewerLiked: boolean;
@@ -621,7 +623,8 @@ const postBaseFromResponse = (
     name: author.fullName || author.username,
     postId: post.postId,
     spaceId: post.spaceId,
-    timestampMs: timestampMsFromSpaceDate(post.createdAt),
+    timestampMicros: post.createdAtMicros,
+    timestampMs: Math.floor(post.createdAtMicros / 1000),
     username: author.username,
     viewerLiked: post.viewerLiked,
 });

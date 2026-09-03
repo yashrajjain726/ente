@@ -1788,6 +1788,7 @@ async fn list_home_posts_uses_home_posts_endpoint() {
                     "keyVersion": 3,
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
+                    "createdAtMicros": 1776297600123456_i64,
                     "viewerLiked": true
                 }],
                 "nextCursor": "cursor-2",
@@ -1810,6 +1811,7 @@ async fn list_home_posts_uses_home_posts_endpoint() {
 
     assert_eq!(page.items.len(), 1);
     assert_eq!(page.items[0].post_id, 42);
+    assert_eq!(page.items[0].created_at_micros, 1776297600123456);
     assert_eq!(page.next_cursor, "cursor-2");
     assert_eq!(page.sync_cursor, "2000:42");
     shares.assert_async().await;
@@ -1844,6 +1846,7 @@ async fn list_posts_uses_space_posts_page_endpoint() {
                     "keyVersion": 3,
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
+                    "createdAtMicros": 1776297600123456_i64,
                     "viewerLiked": true
                 }],
                 "nextCursor": "41"
@@ -1912,6 +1915,7 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
                     "keyVersion": 3,
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
+                    "createdAtMicros": 1776297600123456_i64,
                     "viewerLiked": false
                 })
                 .to_string(),

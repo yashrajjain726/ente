@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/internal/testutil"
@@ -26,6 +27,29 @@ func newSpaceTestModule(t *testing.T) *Module {
 		testutil.ResetTables(t, db)
 	})
 	return NewModule(db, nil)
+}
+
+func waitForSpaceLockWaiter(t *testing.T, db *sql.DB) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var count int
+		err := db.QueryRow(`
+			SELECT COUNT(*)
+			FROM pg_stat_activity
+			WHERE datname = current_database()
+			  AND pid <> pg_backend_pid()
+			  AND wait_event_type = 'Lock'
+			  AND query LIKE '%FROM spaces%'
+			  AND query LIKE '%FOR UPDATE%'
+		`).Scan(&count)
+		require.NoError(t, err)
+		if count > 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for space-lock waiter")
 }
 
 type SpaceMessageConversationRecord struct {
@@ -282,6 +306,44 @@ func TestCreatePostEnforcesSpacePostLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, postID)
 	require.Equal(t, MaxPostsPerSpace, postCount)
+}
+
+func TestCreatePostStampsAfterSpaceLock(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	userID := insertSpaceUser(t, module, "post-lock@example.com", "post-lock-public")
+	space, err := testCreateSpace(ctx, module, userID, "post_lock", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+
+	blocker, err := module.Posts.DB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	defer blocker.Rollback()
+	_, err = blocker.ExecContext(ctx, `
+		SELECT space_id
+		FROM spaces
+		WHERE space_id = $1
+		FOR UPDATE
+	`, space.SpaceID)
+	require.NoError(t, err)
+
+	type result struct {
+		postID int64
+		err    error
+	}
+	created := make(chan result, 1)
+	go func() {
+		postID, _, err := module.Posts.CreatePost(ctx, space.SpaceID, testSpaceBytes("post-key"), nil, space.CurrentVersion, nil)
+		created <- result{postID, err}
+	}()
+
+	waitForSpaceLockWaiter(t, module.Posts.DB)
+	lockReleaseTime := time.Now().UnixMicro()
+	require.NoError(t, blocker.Commit())
+	createResult := <-created
+	require.NoError(t, createResult.err)
+	post, err := module.Posts.GetPost(ctx, createResult.postID, space.SpaceID)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, post.CreatedAt, lockReleaseTime)
 }
 
 func TestCreateMessageEnforcesSenderLimit(t *testing.T) {
@@ -2082,6 +2144,14 @@ func TestListHomePostsReturnsFriendLatestAndPostsAfterCursor(t *testing.T) {
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, bobSpace.SpaceID, page[0].SpaceID)
 	require.False(t, page[0].ViewerLiked)
+	require.Empty(t, nextCursor)
+
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "0:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 3)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, second, page[1].PostID)
+	require.Equal(t, third, page[2].PostID)
 	require.Empty(t, nextCursor)
 
 	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)

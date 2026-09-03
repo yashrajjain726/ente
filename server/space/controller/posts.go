@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/ente/museum/ente"
@@ -154,10 +153,6 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 }
 
 func (c *PostsController) ListHomePosts(ctx context.Context, viewerSpace *repo.SpaceRecord, req models.ListHomePostsRequest) (*models.HomePostPage, error) {
-	syncCreatedAt, err := c.PostsRepo.CurrentDatabaseTimeMicroseconds(ctx)
-	if err != nil {
-		return nil, err
-	}
 	posts, nextCursor, err := c.PostsRepo.ListHomePosts(ctx, viewerSpace.SpaceID, req.After, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
@@ -166,15 +161,15 @@ func (c *PostsController) ListHomePosts(ctx context.Context, viewerSpace *repo.S
 	if err != nil {
 		return nil, err
 	}
-	syncPostID := int64(0)
-	if len(posts) > 0 && posts[0].CreatedAt >= syncCreatedAt {
+	syncCreatedAt, syncPostID := int64(0), int64(0)
+	if len(posts) > 0 {
 		syncCreatedAt = posts[0].CreatedAt
 		syncPostID = posts[0].PostID
 	}
 	return &models.HomePostPage{
 		Items:      items,
 		NextCursor: nextCursor,
-		SyncCursor: strconv.FormatInt(syncCreatedAt, 10) + ":" + strconv.FormatInt(syncPostID, 10),
+		SyncCursor: fmt.Sprintf("%d:%d", syncCreatedAt, syncPostID),
 	}, nil
 }
 

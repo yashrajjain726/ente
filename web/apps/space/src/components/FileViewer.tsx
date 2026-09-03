@@ -138,6 +138,7 @@ export interface SpaceViewerPhoto {
     name: string;
     postId?: number;
     spaceId?: string;
+    timestampMicros?: number;
     timestampMs: number;
     username?: string;
     viewerLiked?: boolean;

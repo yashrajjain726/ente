@@ -180,7 +180,7 @@ export const AuthenticatedFriendProfile: React.FC<
                     if (!post.postId) return;
                     void markSpaceHomePostRead(actorSpaceId, {
                         postId: post.postId,
-                        timestampMs: post.timestampMs,
+                        timestampMicros: post.timestampMicros,
                     }).catch((error: unknown) =>
                         log.warn("Failed to mark Space post as read", error),
                     );

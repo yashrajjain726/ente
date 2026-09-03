@@ -390,6 +390,7 @@ type PostResponse struct {
 	KeyVersion       int                 `json:"keyVersion"`
 	Objects          []PostObjectPayload `json:"objects,omitempty"`
 	CreatedAt        string              `json:"createdAt"`
+	CreatedAtMicros  int64               `json:"createdAtMicros"`
 	ViewerLiked      bool                `json:"viewerLiked"`
 }
 

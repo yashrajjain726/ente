@@ -159,6 +159,7 @@ const viewerPhotoForPost = (
         name: displayName,
         postId: post.postId,
         spaceId: post.spaceId,
+        timestampMicros: post.timestampMicros,
         timestampMs: post.timestampMs,
         username: friend.username,
         viewerLiked: post.viewerLiked,
@@ -478,6 +479,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             name: displayName,
             postId: post.postId,
             spaceId: post.spaceId,
+            timestampMicros: post.timestampMicros,
             timestampMs: post.timestampMs,
             username: friend.username,
             viewerLiked: post.viewerLiked,
@@ -870,7 +872,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
         for (const posts of postsByFriendID.values()) {
             posts.sort(
-                (a, b) => b.timestampMs - a.timestampMs || b.postId - a.postId,
+                (a, b) =>
+                    b.timestampMicros - a.timestampMicros ||
+                    b.postId - a.postId,
             );
         }
         return postsByFriendID;
@@ -971,7 +975,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
     };
     const markPostRead = React.useCallback(
-        (post: Pick<SpacePost, "postId" | "timestampMs">) => {
+        (post: Pick<SpacePost, "postId" | "timestampMicros">) => {
             if (!viewerSpaceId) return;
             setOpenedPostIds((current) => new Set(current).add(post.postId));
             void markSpaceHomePostRead(viewerSpaceId, post).catch(
@@ -986,10 +990,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         posts: SpacePost[],
         photo: SpaceViewerPhoto,
     ) => {
-        if (photo.postId) {
+        if (photo.postId && photo.timestampMicros) {
             markPostRead({
                 postId: photo.postId,
-                timestampMs: photo.timestampMs,
+                timestampMicros: photo.timestampMicros,
             });
         }
         const isOwnPost =
@@ -1754,8 +1758,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 whiteSpace: "nowrap",
                                             }}
                                         >
-                                            Each person gets their own tile with
-                                            their latest post
+                                            Every friend you add gets their own
+                                            tile, showing their latest post
                                         </Box>
                                         <Box
                                             component="button"

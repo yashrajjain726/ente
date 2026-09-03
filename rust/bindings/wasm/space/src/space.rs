@@ -139,6 +139,7 @@ struct PostJs {
     key_version: i32,
     objects: Vec<PostObjectJs>,
     created_at: String,
+    created_at_micros: i64,
     viewer_liked: bool,
     is_unavailable: bool,
 }
@@ -406,6 +407,7 @@ async fn account_post_to_js(
         key_version: post.key_version,
         objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
+        created_at_micros: post.created_at_micros,
         viewer_liked: post.viewer_liked,
         is_unavailable: false,
     })
@@ -422,6 +424,7 @@ fn unavailable_post_to_js(post: PostResponse) -> Result<PostJs, Error> {
         key_version: post.key_version,
         objects: Vec::new(),
         created_at: post.created_at,
+        created_at_micros: post.created_at_micros,
         viewer_liked: post.viewer_liked,
         is_unavailable: true,
     })
@@ -488,6 +491,7 @@ fn link_post_to_js(post: PostResponse, decrypted: DecryptedPost) -> Result<PostJ
         key_version: post.key_version,
         objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
+        created_at_micros: post.created_at_micros,
         viewer_liked: false,
         is_unavailable: false,
     })
@@ -1501,6 +1505,7 @@ mod tests {
             key_version: 1,
             objects: Vec::new(),
             created_at: format!("2026-08-0{post_id}T00:00:00Z"),
+            created_at_micros: 1_775_000_000_000_000 + post_id,
             viewer_liked: false,
         }
     }
