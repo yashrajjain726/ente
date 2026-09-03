@@ -1,3 +1,4 @@
+import type { ImportSource } from "@/services/upload-manager";
 import {
     Cancel01Icon,
     Loading03Icon,
@@ -28,7 +29,7 @@ import type { ChangeEvent, ReactElement } from "react";
 interface UploadConfirmationDialogProps {
     open: boolean;
     loading: boolean;
-    isTakeout: boolean;
+    importSource: ImportSource;
     fileCount: number;
     albumCount: number;
     importFavorites: boolean;
@@ -48,7 +49,7 @@ interface UploadConfirmationDialogProps {
 export function UploadConfirmationDialog({
     open,
     loading,
-    isTakeout,
+    importSource,
     fileCount,
     albumCount,
     importFavorites,
@@ -59,6 +60,7 @@ export function UploadConfirmationDialog({
     onCancel,
 }: UploadConfirmationDialogProps): ReactElement {
     const isSheet = useIsUploadSheet();
+    const isImport = importSource != "generic";
 
     return (
         <Dialog
@@ -73,13 +75,17 @@ export function UploadConfirmationDialog({
             <Stack sx={contentSx}>
                 <Stack direction="row" sx={headerSx}>
                     <Typography sx={displayTitleSx}>
-                        {isTakeout
+                        {importSource == "google-takeout"
                             ? t(
                                   isSheet
                                       ? "google_takeout"
                                       : "import_from_google_photos",
                               )
-                            : t("upload_to_ente")}
+                            : importSource == "apple-photos"
+                              ? isSheet
+                                  ? "Apple Photos"
+                                  : "Import from Apple Photos"
+                              : t("upload_to_ente")}
                     </Typography>
                     <Stack direction="row" sx={headerActionsSx}>
                         <IconButton
@@ -123,7 +129,7 @@ export function UploadConfirmationDialog({
                                 {loading
                                     ? t("calculating_title")
                                     : t(
-                                          isTakeout
+                                          isImport
                                               ? "ready_to_import"
                                               : "ready_to_upload",
                                       )}
@@ -131,7 +137,7 @@ export function UploadConfirmationDialog({
                             {loading && (
                                 <Typography sx={calculatingDescriptionSx}>
                                     {t(
-                                        isTakeout
+                                        isImport
                                             ? "calculating_takeout_description"
                                             : "calculating_upload_description",
                                     )}
@@ -160,7 +166,7 @@ export function UploadConfirmationDialog({
                         </Stack>
                     </Stack>
 
-                    {isTakeout && (
+                    {importSource == "google-takeout" && (
                         <Stack
                             sx={{
                                 gap: "20px",
@@ -240,7 +246,7 @@ export function UploadConfirmationDialog({
                             {t("calculating_title")}
                         </>
                     ) : (
-                        t(isTakeout ? "start_import" : "start_upload")
+                        t(isImport ? "start_import" : "start_upload")
                     )}
                 </FocusVisibleButton>
             </Stack>
