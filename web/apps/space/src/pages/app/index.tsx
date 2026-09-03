@@ -13,12 +13,14 @@ import { consumeSentSpaceInviteFriend, spaceInviteURL } from "services/invite";
 import { loadExistingSpaceId } from "services/profile";
 import {
     loadCurrentFriendAvatarURL,
+    loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
     sendCurrentMessage,
     setCurrentPostLiked,
+    type SpaceFriendRequest,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
@@ -39,11 +41,16 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
+    const [sentFriendRequests, setSentFriendRequests] = useState<
+        SpaceFriendRequest[]
+    >([]);
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
+    const [isFriendRequestsLoading, setIsFriendRequestsLoading] =
+        useState(true);
     const [spaceId, setSpaceId] = useState<string>();
     const closeFriendRequestSentToast = React.useCallback(
         () => setFriendRequestSentToastName(undefined),
@@ -69,11 +76,13 @@ const Page: React.FC = () => {
         const request = { cancelled: false };
         const isCancelled = () => request.cancelled;
         setSpaceId(undefined);
+        setSentFriendRequests([]);
         setLatestPosts([]);
         setUnreadPosts([]);
         setHasUnreadMessages(undefined);
         setIsLatestPostsLoading(true);
         setIsFriendsLoading(true);
+        setIsFriendRequestsLoading(true);
         void (async () => {
             try {
                 const nextSpaceId = await loadExistingSpaceId();
@@ -95,14 +104,30 @@ const Page: React.FC = () => {
                         log.error("Failed to load space unread status", error),
                     );
 
-                const [nextFriends, savedHomePosts] = await Promise.all([
-                    loadCurrentSpaceFriends(nextSpaceId),
-                    loadSpaceHomePosts(nextSpaceId),
-                ]);
+                const [nextFriends, nextFriendRequests, savedHomePosts] =
+                    await Promise.all([
+                        loadCurrentSpaceFriends(nextSpaceId),
+                        loadCurrentFriendRequests(nextSpaceId).catch(
+                            (error: unknown) => {
+                                log.error(
+                                    "Failed to load Space friend requests",
+                                    error,
+                                );
+                                return [];
+                            },
+                        ),
+                        loadSpaceHomePosts(nextSpaceId),
+                    ]);
                 if (isCancelled()) return;
 
                 setFriends(nextFriends);
+                setSentFriendRequests(
+                    nextFriendRequests.filter(
+                        (request) => request.direction == "sent",
+                    ),
+                );
                 setIsFriendsLoading(false);
+                setIsFriendRequestsLoading(false);
                 if (savedHomePosts) {
                     setLatestPosts(savedHomePosts.latestPosts);
                     setUnreadPosts(savedHomePosts.unreadPosts);
@@ -122,6 +147,7 @@ const Page: React.FC = () => {
                 if (!isCancelled()) {
                     setIsLatestPostsLoading(false);
                     setIsFriendsLoading(false);
+                    setIsFriendRequestsLoading(false);
                 }
             }
         })();
@@ -200,9 +226,11 @@ const Page: React.FC = () => {
                 unreadPosts={unreadPosts}
                 friendRequestSentToastName={friendRequestSentToastName}
                 friends={friends}
+                sentFriendRequests={sentFriendRequests}
                 hasUnreadMessages={hasUnreadMessages}
                 isLatestPostsLoading={isLatestPostsLoading}
                 isFriendsLoading={isFriendsLoading}
+                isFriendRequestsLoading={isFriendRequestsLoading}
                 profile={profile}
                 profileLink={
                     profile
@@ -241,6 +269,9 @@ const Page: React.FC = () => {
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
+                onOpenFriendRequests={() =>
+                    void router.push(spaceRoutes.friends)
+                }
                 onOpenProfile={
                     profile
                         ? () => void router.push(spaceRoutes.profile)

@@ -19,6 +19,7 @@ import {
 } from "components/PostUnreadBadge";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
+import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
@@ -27,6 +28,7 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import { markSpaceHomePostRead } from "services/home-posts";
 import {
     isSpaceContentError,
+    type SpaceFriendRequest,
     type SpacePost,
     type SpacePostAssetURLLoader,
 } from "services/space";
@@ -84,9 +86,11 @@ interface HomeScreenProps {
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
     friends: FriendProfile[];
+    sentFriendRequests: SpaceFriendRequest[];
     hasUnreadMessages?: boolean;
     isLatestPostsLoading?: boolean;
     isFriendsLoading?: boolean;
+    isFriendRequestsLoading?: boolean;
     showInstallPrompt?: boolean;
     onCreatePost?: (
         image: SpaceDraftPostImage,
@@ -96,6 +100,7 @@ interface HomeScreenProps {
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
     onOpenFriend?: (friendID: string, username?: string) => void;
+    onOpenFriendRequests?: () => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
@@ -252,10 +257,12 @@ interface FriendPostCircleProps {
     isAvatarPending: boolean;
     isLoading: boolean;
     isRead: boolean;
+    isRequestPending?: boolean;
     isUnavailable: boolean;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
     onOpenFriend?: (friendID: string, username?: string) => void;
+    onOpenFriendRequest?: () => void;
     onOpenPosts: (
         friend: FriendProfile,
         posts: SpacePost[],
@@ -273,10 +280,12 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     isAvatarPending,
     isLoading,
     isRead,
+    isRequestPending = false,
     isUnavailable,
     onLoadAvatar,
     onLoadImage,
     onOpenFriend,
+    onOpenFriendRequest,
     onOpenPosts,
     onWave,
     placement,
@@ -322,7 +331,9 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
     const isPhotoReady = Boolean(displayImageUrl) && decodedPhoto.ready;
     const canOpenPost = Boolean(post) && !postUnavailable && isPhotoReady;
     const isCircleDisabled =
-        isLoading || Boolean(post && !postUnavailable && !isPhotoReady);
+        isLoading ||
+        (isRequestPending && !onOpenFriendRequest) ||
+        Boolean(post && !postUnavailable && !isPhotoReady);
     const avatarSize = placement ? Math.min(32, placement.size * 0.2) : "20%";
 
     const hasMediaToLoad =
@@ -462,6 +473,10 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             suppressClickRef.current = false;
             return;
         }
+        if (isRequestPending) {
+            onOpenFriendRequest?.();
+            return;
+        }
         if (!post || postUnavailable) {
             onOpenFriend?.(friend.id, friend.username);
             return;
@@ -490,8 +505,15 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             suppressClickRef.current = false;
             return;
         }
+        if (isRequestPending) {
+            onOpenFriendRequest?.();
+            return;
+        }
         onOpenFriend?.(friend.id, friend.username);
     };
+    const canOpenFriend = isRequestPending
+        ? Boolean(onOpenFriendRequest)
+        : Boolean(onOpenFriend);
 
     return (
         <Box
@@ -520,13 +542,15 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 aria-label={
                     isLoading
                         ? `Loading ${firstName}'s latest post`
-                        : post && !postUnavailable
-                          ? posts.length > 1
-                              ? `Open ${posts.length} new posts from ${firstName}`
-                              : isRead
-                                ? `Open ${firstName}'s latest post`
-                                : `Open ${firstName}'s new post`
-                          : `Open ${firstName}'s profile`
+                        : isRequestPending
+                          ? `Manage friend request sent to ${firstName}`
+                          : post && !postUnavailable
+                            ? posts.length > 1
+                                ? `Open ${posts.length} new posts from ${firstName}`
+                                : isRead
+                                  ? `Open ${firstName}'s latest post`
+                                  : `Open ${firstName}'s new post`
+                            : `Open ${firstName}'s profile`
                 }
                 disabled={isCircleDisabled}
                 onClick={openCircle}
@@ -541,7 +565,9 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     alignItems: "center",
                     appearance: "none",
                     aspectRatio: "1",
-                    bgcolor: mediaPlaceholderColor,
+                    bgcolor: isRequestPending
+                        ? "rgba(8, 194, 37, 0.12)"
+                        : mediaPlaceholderColor,
                     border: 0,
                     borderRadius: "20%",
                     color: textBase,
@@ -640,7 +666,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         color={textSecondary}
                         placement="center"
                     >
-                        No posts
+                        {isRequestPending ? "Friend request sent" : "No posts"}
                     </SpacePostBadge>
                 )}
                 {!isLoading && postUnavailable && (
@@ -656,8 +682,12 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
             <Box
                 component="button"
                 type="button"
-                aria-label={`Open ${firstName}'s profile`}
-                disabled={!onOpenFriend}
+                aria-label={
+                    isRequestPending
+                        ? `Manage friend request sent to ${firstName}`
+                        : `Open ${firstName}'s profile`
+                }
+                disabled={!canOpenFriend}
                 onClick={openFriend}
                 onContextMenu={(event) => {
                     if (onWave) event.preventDefault();
@@ -675,7 +705,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     borderRadius: "50%",
                     bottom: "10%",
                     boxSizing: "border-box",
-                    cursor: onOpenFriend ? "pointer" : "default",
+                    cursor: canOpenFriend ? "pointer" : "default",
                     height: avatarSize,
                     left: "10%",
                     maxHeight: 32,
@@ -797,15 +827,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     unreadPosts,
     friendRequestSentToastName,
     friends,
+    sentFriendRequests,
     hasUnreadMessages,
     isLatestPostsLoading = false,
     isFriendsLoading = false,
+    isFriendRequestsLoading = false,
     showInstallPrompt = false,
     onCreatePost,
     onLoadFriendAvatar,
     onLoadPostImage,
     onFriendRequestSentToastClose,
     onOpenFriend,
+    onOpenFriendRequests,
     onOpenMessages,
     onOpenProfile,
     onReplyToPost,
@@ -824,9 +857,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
-    const [inviteShareStatus, setInviteShareStatus] = useState<
-        "idle" | "sharing" | "copied"
-    >("idle");
     const [loadedFriendAvatarURLsByKey, setLoadedFriendAvatarURLsByKey] =
         useState<Record<string, string | null>>({});
     const [loadedPostImageURLsByKey, setLoadedPostImageURLsByKey] = useState<
@@ -875,22 +905,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
         return postsByFriendID;
     }, [openedPostIds, unreadPosts]);
-    const orderedFriends = React.useMemo(
-        () =>
-            [...friends].sort((a, b) =>
-                (a.spaceId ?? a.id).localeCompare(b.spaceId ?? b.id),
-            ),
-        [friends],
-    );
-    React.useEffect(() => setOpenedPostIds(new Set()), [viewerSpaceId]);
-    React.useEffect(() => {
-        if (inviteShareStatus != "copied") return;
-        const timeoutID = window.setTimeout(
-            () => setInviteShareStatus("idle"),
-            spaceToastAutoDismissDurationMs,
+    const orderedHomeItems = React.useMemo(() => {
+        const friendIDs = new Set(
+            friends.map((friend) => friend.spaceId ?? friend.id),
         );
-        return () => window.clearTimeout(timeoutID);
-    }, [inviteShareStatus]);
+        return [
+            ...friends.map((friend) => ({ friend, type: "friend" as const })),
+            ...sentFriendRequests
+                .filter(
+                    (request) =>
+                        !friendIDs.has(
+                            request.friend.spaceId ?? request.friend.id,
+                        ),
+                )
+                .map((request) => ({ request, type: "request" as const })),
+        ].sort((a, b) => {
+            const aFriend = a.type == "friend" ? a.friend : a.request.friend;
+            const bFriend = b.type == "friend" ? b.friend : b.request.friend;
+            return (aFriend.spaceId ?? aFriend.id).localeCompare(
+                bFriend.spaceId ?? bFriend.id,
+            );
+        });
+    }, [friends, sentFriendRequests]);
+    React.useEffect(() => setOpenedPostIds(new Set()), [viewerSpaceId]);
     React.useEffect(() => {
         const canvas = postCircleCanvasRef.current;
         if (!canvas) return;
@@ -905,13 +942,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         return () => observer.disconnect();
     }, []);
     const postCirclePlacements = homeCirclePlacements(
-        orderedFriends.length,
+        orderedHomeItems.length,
         postCircleCanvasSize.width,
         postCircleCanvasSize.height,
     );
-    const usesPostGrid = usesHomeCircleGrid(orderedFriends.length);
+    const usesPostGrid = usesHomeCircleGrid(orderedHomeItems.length);
     const postGridLayout = homeCircleGridLayout(
-        orderedFriends.length,
+        orderedHomeItems.length,
         postCircleCanvasSize.width,
         postCircleCanvasSize.height,
     );
@@ -921,6 +958,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
+    const isHomeItemsLoading = isFriendsLoading || isFriendRequestsLoading;
     const showUnreadIndicator = hasUnreadMessages === true;
     const profileDisplayName =
         profile?.fullName.trim() || profile?.username.trim() || "";
@@ -939,36 +977,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         if (isPostPhotoButtonDisabled) return;
 
         postInputRef.current?.click();
-    };
-    const shareInviteLink = async () => {
-        if (!profileLink || inviteShareStatus == "sharing") return;
-
-        setInviteShareStatus("sharing");
-        try {
-            if (typeof navigator.share == "function") {
-                try {
-                    await navigator.share({ url: profileLink });
-                    return;
-                } catch (error) {
-                    if (
-                        error instanceof DOMException &&
-                        error.name == "AbortError"
-                    ) {
-                        return;
-                    }
-                    log.warn("Failed to share Space invite link", error);
-                }
-            }
-
-            await navigator.clipboard.writeText(profileLink);
-            setInviteShareStatus("copied");
-        } catch (error) {
-            log.error("Failed to copy Space invite link", error);
-        } finally {
-            setInviteShareStatus((status) =>
-                status == "sharing" ? "idle" : status,
-            );
-        }
     };
     const markPostRead = React.useCallback(
         (post: Pick<SpacePost, "postId" | "timestampMs">) => {
@@ -1270,6 +1278,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onWave={onWaveFriend ? () => onWaveFriend(friend) : undefined}
                 placement={placement}
                 posts={posts}
+            />
+        );
+    };
+    const friendRequestCircleFor = (
+        request: SpaceFriendRequest,
+        index: number,
+    ) => {
+        const friend = request.friend;
+        const avatarUrl = loadedFriendAvatarURLFor(friend);
+        return (
+            <FriendPostCircle
+                key={`request:${request.requestId}`}
+                avatarUrl={avatarUrl}
+                friend={friend}
+                isAvatarPending={Boolean(
+                    friend.avatarObjectID && avatarUrl === undefined,
+                )}
+                isLoading={isHomeItemsLoading}
+                isRead
+                isRequestPending
+                isUnavailable={false}
+                onLoadAvatar={() => loadFriendAvatar(friend)}
+                onOpenFriendRequest={onOpenFriendRequests}
+                onOpenPosts={openPostPhotos}
+                placement={
+                    usesPostGrid ? undefined : postCirclePlacements[index]
+                }
+                posts={[]}
             />
         );
     };
@@ -1641,7 +1677,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 112px)",
                         px: homeHorizontalPadding,
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${headerHeight}px)`,
+                        pt: "8px",
                         width: "100%",
                     }}
                 >
@@ -1654,7 +1690,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        {isFriendsLoading && orderedFriends.length == 0 ? (
+                        {isHomeItemsLoading && orderedHomeItems.length == 0 ? (
                             <Box
                                 sx={{
                                     alignItems: "center",
@@ -1664,12 +1700,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     width: "100%",
                                 }}
                             >
-                                <SpaceLoadingSpinner ariaLabel="Loading friends" />
+                                <SpaceLoadingSpinner ariaLabel="Loading friends and requests" />
                             </Box>
-                        ) : orderedFriends.length > 0 ? (
+                        ) : orderedHomeItems.length > 0 ? (
                             <Box
                                 component="ul"
-                                aria-label="Friends' latest posts"
+                                aria-label="Friends and sent friend requests"
                                 sx={{
                                     display: usesPostGrid ? "grid" : "block",
                                     gap: postGridLayout
@@ -1695,8 +1731,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 {((usesPostGrid && postGridLayout) ||
                                     (!usesPostGrid &&
                                         postCirclePlacements.length ==
-                                            orderedFriends.length)) &&
-                                    orderedFriends.map(friendPostCircleFor)}
+                                            orderedHomeItems.length)) &&
+                                    orderedHomeItems.map((item, index) =>
+                                        item.type == "friend"
+                                            ? friendPostCircleFor(
+                                                  item.friend,
+                                                  index,
+                                              )
+                                            : friendRequestCircleFor(
+                                                  item.request,
+                                                  index,
+                                              ),
+                                    )}
                             </Box>
                         ) : (
                             <Box
@@ -1712,16 +1758,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             >
                                 {emptyFriendTileSize > 0 && (
                                     <Box
+                                        className="green-bg"
                                         sx={{
-                                            alignItems: "center",
-                                            aspectRatio: "1",
-                                            bgcolor: mediaPlaceholderColor,
-                                            backgroundImage:
-                                                'url("/images/invite-bg.jpg")',
-                                            backgroundPosition: "center",
-                                            backgroundSize: "cover",
+                                            alignItems: "flex-start",
+                                            bgcolor: green,
                                             border: 0,
-                                            borderRadius: "20%",
+                                            borderRadius: "24px",
+                                            boxSizing: "border-box",
                                             color: "#FFF",
                                             display: "flex",
                                             flex: "0 0 auto",
@@ -1729,93 +1772,96 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
                                             gap: "7px",
-                                            height: emptyFriendTileSize,
-                                            justifyContent: "center",
+                                            height: "100%",
+                                            justifyContent: "flex-start",
                                             overflow: "hidden",
-                                            p: 0,
+                                            px: "24px",
+                                            pt: "32px",
                                             position: "relative",
-                                            width: emptyFriendTileSize,
+                                            width: "100%",
                                         }}
                                     >
                                         <Box
-                                            component="span"
                                             sx={{
-                                                color: "#FFF",
-                                                fontFamily:
-                                                    '"Nunito", "Inter Variable", sans-serif',
-                                                fontSize: 19,
-                                                fontWeight: 800,
-                                                lineHeight: "24px",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            Invite your close friends and family
-                                        </Box>
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                color: "rgba(244, 244, 244, 0.72)",
-                                                fontSize: 13,
-                                                fontWeight: 500,
-                                                lineHeight: "18px",
-                                                textAlign: "center",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            Each person gets their own tile with
-                                            their latest post
-                                        </Box>
-                                        <Box
-                                            component="button"
-                                            type="button"
-                                            aria-live="polite"
-                                            disabled={
-                                                !profileLink ||
-                                                inviteShareStatus == "sharing"
-                                            }
-                                            onClick={() =>
-                                                void shareInviteLink()
-                                            }
-                                            sx={{
-                                                appearance: "none",
-                                                bgcolor:
-                                                    "rgba(255, 255, 255, 0.94)",
-                                                border: 0,
-                                                borderRadius: "999px",
-                                                color: "#101815",
-                                                cursor: profileLink
-                                                    ? "pointer"
-                                                    : "default",
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 13,
-                                                fontWeight: 700,
-                                                lineHeight: "18px",
-                                                minWidth: 184,
-                                                mt: "15px",
-                                                px: "16px",
-                                                py: "9px",
-                                                transition:
-                                                    "background-color 120ms ease, transform 120ms ease",
-                                                "&:active": profileLink
-                                                    ? {
-                                                          transform:
-                                                              "scale(0.98)",
-                                                      }
-                                                    : undefined,
-                                                "&:focus-visible": {
-                                                    outline: `2px solid ${green}`,
-                                                    outlineOffset: 2,
+                                                alignItems: "center",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                mt: "64px",
+                                                position: "relative",
+                                                width: "100%",
+                                                zIndex: 1,
+                                                "@media (max-height: 720px)": {
+                                                    mt: "24px",
                                                 },
-                                                "&:hover": profileLink
-                                                    ? { bgcolor: "white" }
-                                                    : undefined,
                                             }}
                                         >
-                                            {inviteShareStatus == "copied"
-                                                ? "Copied"
-                                                : "Invite your first friend"}
+                                            <Box
+                                                component="h1"
+                                                sx={{
+                                                    color: "#FFF",
+                                                    fontFamily:
+                                                        '"Nunito", "Inter Variable", sans-serif',
+                                                    fontSize: 25,
+                                                    fontWeight: 800,
+                                                    lineHeight: "30px",
+                                                    m: 0,
+                                                    maxWidth: 260,
+                                                    textAlign: "center",
+                                                }}
+                                            >
+                                                Invite your close friends and
+                                                family
+                                            </Box>
+                                            <Box
+                                                component="p"
+                                                sx={{
+                                                    color: "rgba(255, 255, 255, 0.84)",
+                                                    fontSize: 15,
+                                                    fontWeight: 500,
+                                                    lineHeight: "21px",
+                                                    m: 0,
+                                                    mt: "10px",
+                                                    maxWidth: 260,
+                                                    textAlign: "center",
+                                                }}
+                                            >
+                                                Each person gets a little spot
+                                                of their own in your Space.
+                                            </Box>
+                                            <Box sx={{ mt: "24px" }}>
+                                                <SpaceShareInviteButton
+                                                    profileLink={profileLink}
+                                                    variant="white"
+                                                    onShareError={(error) =>
+                                                        log.error(
+                                                            "Failed to share Space invite link",
+                                                            error,
+                                                        )
+                                                    }
+                                                />
+                                            </Box>
                                         </Box>
+                                        <Box
+                                            component="img"
+                                            alt=""
+                                            aria-hidden
+                                            src="/images/ducky-space.svg"
+                                            sx={{
+                                                bottom: 0,
+                                                height: "auto",
+                                                left: "52%",
+                                                maxWidth: 300,
+                                                pointerEvents: "none",
+                                                position: "absolute",
+                                                transform:
+                                                    "translate(-50%, 4%)",
+                                                width: "84%",
+                                                "@media (max-height: 720px)": {
+                                                    maxWidth: 228,
+                                                    width: "64%",
+                                                },
+                                            }}
+                                        />
                                     </Box>
                                 )}
                             </Box>

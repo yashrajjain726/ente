@@ -15,6 +15,7 @@ export const SpaceShareIcon: React.FC<{
 interface SpaceShareInviteButtonProps {
     profileLink?: string;
     sharing?: boolean;
+    variant?: "green" | "white";
     onShareError?: (error: unknown) => void;
     onSharingChange?: (sharing: boolean) => void;
 }
@@ -22,6 +23,7 @@ interface SpaceShareInviteButtonProps {
 export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
     profileLink,
     sharing,
+    variant = "green",
     onShareError,
     onSharingChange,
 }) => {
@@ -72,13 +74,26 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
 
     return (
         <Box
-            className="green-bg"
+            className={variant == "green" ? "green-bg" : undefined}
             component="button"
             type="button"
             aria-live="polite"
             disabled={isDisabled}
             onClick={() => void shareInvite()}
-            sx={spaceEmptyStateButtonSx}
+            sx={
+                variant == "white"
+                    ? {
+                          ...spaceEmptyStateButtonSx,
+                          bgcolor: "#FFF",
+                          color: "#303030",
+                          "&:focus-visible": {
+                              outline: "2px solid #303030",
+                              outlineOffset: 2,
+                          },
+                          "&:hover:not(:disabled)": { bgcolor: "#F4F4F4" },
+                      }
+                    : spaceEmptyStateButtonSx
+            }
         >
             <SpaceShareIcon />
             {copied ? "Copied" : canShare ? "Share invite" : "Copy invite"}
