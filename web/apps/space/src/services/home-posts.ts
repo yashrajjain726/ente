@@ -137,6 +137,12 @@ const markerFromCursor = (cursor: string): SpacePostMarker | undefined => {
     return { postId, timestampMs: Math.floor(createdAt / 1000) };
 };
 
+const compareCursors = (a: string, b: string) => {
+    const [aCreatedAt, aPostID] = a.split(":", 2).map(Number);
+    const [bCreatedAt, bPostID] = b.split(":", 2).map(Number);
+    return aCreatedAt! - bCreatedAt! || aPostID! - bPostID!;
+};
+
 const normalizedState = (state: SpaceHomePostsState): SpaceHomePostsState => ({
     ...state,
     friendSpaceIds: [...new Set(state.friendSpaceIds)].sort(),
@@ -391,6 +397,15 @@ export const refreshSpaceHomePosts = async (
         : [];
     const nextMarker = markerFromCursor(result.syncCursor);
     return updateState(viewerSpaceId, (state) => {
+        const currentMarker = markerFromCursor(state.syncCursor);
+        if (
+            currentMarker &&
+            (!nextMarker ||
+                compareCursors(result.syncCursor, state.syncCursor) <= 0)
+        ) {
+            return state;
+        }
+
         const readAheadPostIds = new Set(
             state.readAheadPosts.map((post) => post.postId),
         );
