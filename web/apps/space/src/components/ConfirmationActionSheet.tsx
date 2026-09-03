@@ -5,7 +5,12 @@ import {
 } from "components/ActionFeedback";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import React from "react";
-import { spaceSurface, spaceText, spaceTextMuted } from "styles/colors";
+import {
+    spaceDialogBackground,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
@@ -32,7 +37,7 @@ interface ConfirmationActionSheetProps {
 export const ConfirmationActionSheet: React.FC<
     ConfirmationActionSheetProps
 > = ({
-    appearance = "dark",
+    appearance = "light",
     open,
     title,
     description,
@@ -63,10 +68,18 @@ export const ConfirmationActionSheet: React.FC<
                     ? { transition: SpaceBottomSheetTransition }
                     : undefined
             }
-            sx={isDark ? { zIndex: 1500 } : undefined}
+            sx={
+                isDark
+                    ? {
+                          zIndex: 1500,
+                          "--space-dialog-backdrop": "rgba(0 0 0 / 0.86)",
+                      }
+                    : undefined
+            }
             slotProps={{
                 paper: {
                     sx: {
+                        bgcolor: isDark ? "#1E1E1E" : spaceDialogBackground,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",

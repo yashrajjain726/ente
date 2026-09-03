@@ -1,10 +1,9 @@
-export const spaceAppBackgroundColor = "#0C1014";
+export const spaceAppBackgroundColor = "#FFFFFF";
 
-export const spaceAppBackground =
-    "radial-gradient(ellipse 120% 95% at 50% 58%, rgba(38, 78, 52, 0.16), transparent 72%), #0C1014";
+export const spaceAppBackground = spaceAppBackgroundColor;
 
-export const spaceDialogBackground = "#171C1A";
-export const spaceSurface = "#202825";
-export const spaceSurfaceHover = "#29322F";
-export const spaceText = "#F4F4F4";
-export const spaceTextMuted = "#A6A6A6";
+export const spaceDialogBackground = "#FFFFFF";
+export const spaceSurface = "#F2F2F2";
+export const spaceSurfaceHover = "#E8E8E8";
+export const spaceText = "#000000";
+export const spaceTextMuted = "#777777";

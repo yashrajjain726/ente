@@ -39,7 +39,8 @@ const spaceTheme = createTheme(shareTheme, {
                 paper: { backgroundColor: spaceDialogBackground },
                 root: {
                     ".MuiBackdrop-root": {
-                        backgroundColor: "rgba(0 0 0 / 0.84)",
+                        backgroundColor:
+                            "var(--space-dialog-backdrop, rgba(0 0 0 / 0.48))",
                     },
                 },
             },

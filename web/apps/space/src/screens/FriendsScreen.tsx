@@ -35,6 +35,7 @@ import {
 import type { SpaceFriendRequest } from "services/space";
 import {
     spaceAppBackground,
+    spaceDialogBackground,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -333,7 +334,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 slotProps={{
                     paper: {
                         sx: {
-                            bgcolor: spaceSurface,
+                            bgcolor: spaceDialogBackground,
                             borderRadius: "14px",
                             boxShadow: "0 14px 40px rgba(0, 0, 0, 0.16)",
                             mt: "6px",
@@ -359,12 +360,10 @@ const FriendRow: React.FC<FriendRowProps> = ({
                             py: "4px",
                             whiteSpace: "nowrap",
                             "&.Mui-focusVisible": {
-                                bgcolor: "rgba(255, 255, 255, 0.06)",
+                                bgcolor: "rgba(0, 0, 0, 0.04)",
                             },
-                            "&:active": {
-                                bgcolor: "rgba(255, 255, 255, 0.06)",
-                            },
-                            "&:hover": { bgcolor: "rgba(255, 255, 255, 0.06)" },
+                            "&:active": { bgcolor: "rgba(0, 0, 0, 0.04)" },
+                            "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" },
                         }}
                     >
                         <HugeiconsIcon

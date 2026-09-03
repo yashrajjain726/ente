@@ -34,6 +34,7 @@ import { isSpaceContentError, type SpacePostAsset } from "services/space";
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
+    spaceDialogBackground,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -56,9 +57,9 @@ const dangerColor = "#F63A3A";
 const textBase = spaceText;
 const textSoft = spaceTextMuted;
 const coverForeground = "#FFFFFF";
-const profileIdentityColor = "#D0D0D0";
-const profileStatsColor = "#8C8C8C";
-const profileStatsValueColor = "#B8B8B8";
+const profileIdentityColor = "#303030";
+const profileStatsColor = spaceTextMuted;
+const profileStatsValueColor = spaceText;
 const profileCoverBackground = "#1F1F1F";
 const profileCoverTopShadow =
     "linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.18) 36%, rgba(0, 0, 0, 0.08) 72%, rgba(0, 0, 0, 0) 100%)";
@@ -1660,7 +1661,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     slotProps={{
                                         paper: {
                                             sx: {
-                                                bgcolor: spaceSurface,
+                                                bgcolor: spaceDialogBackground,
                                                 borderRadius: "14px",
                                                 boxShadow:
                                                     "0 14px 40px rgba(0, 0, 0, 0.16)",

@@ -62,8 +62,8 @@ const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
-const headerChromeColor = "#202825";
-const mediaPlaceholderColor = headerChromeColor;
+const headerChromeColor = "#EFEFEF";
+const mediaPlaceholderColor = "#E5E7EA";
 const headerHeight = 64;
 const headerIconSize = 22;
 const headerSideWidth = 36;
@@ -634,7 +634,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 )}
                 {!isLoading && !post && (
                     <SpacePostBadge
-                        backgroundColor="rgba(0, 0, 0, 0.18)"
+                        backgroundColor="rgba(255, 255, 255, 0.82)"
                         color={textSecondary}
                         placement="center"
                     >
@@ -643,7 +643,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                 )}
                 {!isLoading && postUnavailable && (
                     <SpacePostBadge
-                        backgroundColor="rgba(255, 255, 255, 0.1)"
+                        backgroundColor="rgba(255, 255, 255, 0.82)"
                         color={textSecondary}
                     >
                         Unavailable
@@ -702,8 +702,8 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         aria-hidden
                         sx={{
                             alignItems: "center",
-                            bgcolor: "rgba(255, 255, 255, 0.18)",
-                            color: "rgba(255, 255, 255, 0.92)",
+                            bgcolor: "rgba(255, 255, 255, 0.86)",
+                            color: textSecondary,
                             display: "flex",
                             fontSize: 14,
                             fontWeight: 700,
@@ -1416,7 +1416,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: "12px",
                         gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
                         height: headerHeight,
-                        color: "#FFF",
+                        color: textBase,
                         maxWidth: "100%",
                         pb: 2,
                         position: "relative",
@@ -1429,7 +1429,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             WebkitMaskImage:
                                 "linear-gradient(to bottom, #000 0%, transparent 100%)",
                             backdropFilter: "blur(4px)",
-                            background: `linear-gradient(to bottom, ${spaceAppBackgroundColor}, rgba(0, 0, 0, 0.35) 75%, transparent)`,
+                            background: `linear-gradient(to bottom, ${spaceAppBackgroundColor}, rgba(255, 255, 255, 0.35) 75%, transparent)`,
                             content: '""',
                             height: "calc(100% + 28px)",
                             left: 0,
@@ -1541,7 +1541,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             component="img"
                             alt="Space"
                             src="/images/space.svg"
-                            sx={{ display: "block", height: 18, width: "auto" }}
+                            sx={{
+                                display: "block",
+                                filter: "invert(1)",
+                                height: 18,
+                                width: "auto",
+                            }}
                         />
                     </Box>
                     <Box
@@ -1559,7 +1564,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             bgcolor: "transparent",
                             border: 0,
                             boxSizing: "border-box",
-                            color: "#FFF",
+                            color: textBase,
                             cursor: onOpenMessages ? "pointer" : "default",
                             display: "flex",
                             fontSize: 0,
@@ -1707,7 +1712,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             backgroundSize: "cover",
                                             border: 0,
                                             borderRadius: "20%",
-                                            color: textBase,
+                                            color: "#FFF",
                                             display: "flex",
                                             flex: "0 0 auto",
                                             flexDirection: "column",
@@ -1725,7 +1730,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         <Box
                                             component="span"
                                             sx={{
-                                                color: textBase,
+                                                color: "#FFF",
                                                 fontFamily:
                                                     '"Nunito", "Inter Variable", sans-serif',
                                                 fontSize: 19,

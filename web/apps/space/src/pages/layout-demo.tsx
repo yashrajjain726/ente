@@ -4,7 +4,7 @@ import { Box } from "@mui/material";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import React from "react";
 import { FriendPostCircle } from "screens/HomeScreen";
-import { spaceAppBackground } from "styles/colors";
+import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
 import {
     homeCircleGridLayout,
     homeCirclePlacements,
@@ -12,7 +12,7 @@ import {
     type HomeCirclePlacement,
 } from "utils/home-circle-layout";
 
-const headerChromeColor = "#202825";
+const headerChromeColor = spaceSurface;
 const headerHeight = 64;
 const maximumFriendCount = 15;
 
@@ -101,7 +101,7 @@ const LayoutDemoPage: React.FC = () => {
             component="main"
             sx={{
                 background: spaceAppBackground,
-                color: "#FFF",
+                color: spaceText,
                 display: "grid",
                 minHeight: "100svh",
                 overflowX: "hidden",
@@ -146,7 +146,7 @@ const LayoutDemoPage: React.FC = () => {
                             bgcolor: headerChromeColor,
                             border: 0,
                             borderRadius: "50%",
-                            color: "#FFF",
+                            color: spaceText,
                             cursor: friendCount == 1 ? "default" : "pointer",
                             display: "flex",
                             height: 36,
@@ -178,7 +178,12 @@ const LayoutDemoPage: React.FC = () => {
                             component="img"
                             alt="Space"
                             src="/images/space.svg"
-                            sx={{ display: "block", height: 18, width: "auto" }}
+                            sx={{
+                                display: "block",
+                                filter: "invert(1)",
+                                height: 18,
+                                width: "auto",
+                            }}
                         />
                     </Box>
                     <Box
@@ -197,7 +202,7 @@ const LayoutDemoPage: React.FC = () => {
                             bgcolor: headerChromeColor,
                             border: 0,
                             borderRadius: "50%",
-                            color: "#FFF",
+                            color: spaceText,
                             cursor:
                                 friendCount == maximumFriendCount
                                     ? "default"

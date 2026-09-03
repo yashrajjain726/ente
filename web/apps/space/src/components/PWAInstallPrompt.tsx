@@ -17,8 +17,7 @@ import { useSpacePWAInstallPrompt } from "hooks/use-pwa-install-prompt";
 import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
 import {
-    spaceSurface,
-    spaceSurfaceHover,
+    spaceDialogBackground,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -230,7 +229,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: spaceSurface,
+                bgcolor: spaceDialogBackground,
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 color: textBase,
@@ -610,7 +609,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: spaceSurfaceHover,
+            bgcolor: "#FAFAFA",
             borderRadius: "18px",
             color: textSoft,
             display: "flex",

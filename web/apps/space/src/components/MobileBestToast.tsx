@@ -5,7 +5,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import React from "react";
-import { spaceSurface, spaceText } from "styles/colors";
+import { spaceDialogBackground, spaceText } from "styles/colors";
 
 const green = "#08C225";
 const dismissedKey = "spaceMobileBestToastDismissed";
@@ -25,7 +25,7 @@ export const SpaceMobileBestToast: React.FC = () => {
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: spaceSurface,
+                bgcolor: spaceDialogBackground,
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 boxSizing: "border-box",
@@ -91,7 +91,7 @@ export const SpaceMobileBestToast: React.FC = () => {
                     p: 0,
                     width: 40,
                     "&:focus-visible": {
-                        outline: "2px solid rgba(255 255 255 / 0.72)",
+                        outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
                     },
                 }}

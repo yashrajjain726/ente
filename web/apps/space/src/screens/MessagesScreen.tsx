@@ -48,21 +48,19 @@ import { spacePostImageInputAccept } from "utils/post-image";
 const green = "#08C225";
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
-const conversationPrimaryText = "#E6E9E7";
-const messageTimestampColor = "#7E8582";
-const messageActivityColor = "#929996";
+const conversationPrimaryText = spaceText;
 const lightSurface = spaceSurface;
 const lightSurfaceHover = spaceSurfaceHover;
 const composerSurface = lightSurface;
-const outgoingBubble = "#DEDAD9";
+const outgoingBubble = "#0DAF35";
 const incomingBubble = lightSurface;
-const outgoingMessageText = "#111111";
+const outgoingMessageText = "#FFFFFF";
 const incomingMessageText = spaceText;
 const outgoingQuoteBubble = "#9EDFAE";
 const incomingQuoteBubble = spaceSurfaceHover;
 const incomingQuoteText = spaceTextMuted;
-const outgoingQuoteText = "#FFFFFF";
-const quoteRule = "rgba(255, 255, 255, 0.16)";
+const outgoingQuoteText = "#176B2A";
+const quoteRule = "#D6D6D6";
 const dangerColor = "#F63A3A";
 const composerHeight = 48;
 const composerMaxHeight = 112;
@@ -259,7 +257,7 @@ const ConversationPreviewLine: React.FC<{
 }> = ({ conversation }) => {
     const activity = conversation.latestActivity;
     const previewLineSx = {
-        color: messageActivityColor,
+        color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
         fontWeight: 500,
@@ -421,7 +419,7 @@ const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
     <Box
         component="li"
         sx={{
-            color: messageTimestampColor,
+            color: textSecondary,
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 12,
             fontWeight: 500,
@@ -523,8 +521,8 @@ const ConversationListItem: React.FC<{
                     textAlign: "left",
                     transition: "background-color 140ms ease",
                     width: "calc(100% + 16px)",
-                    "&:active": { bgcolor: spaceDialogBackground },
-                    "&:hover": { bgcolor: spaceDialogBackground },
+                    "&:active": { bgcolor: spaceSurface },
+                    "&:hover": { bgcolor: spaceSurface },
                     "&:has(> [data-space-row-action]:active)": {
                         bgcolor: "transparent",
                     },
@@ -680,7 +678,7 @@ const ConversationListItem: React.FC<{
                                 aria-hidden
                                 component="span"
                                 sx={{
-                                    color: messageTimestampColor,
+                                    color: textSecondary,
                                     flexShrink: 0,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
@@ -697,7 +695,7 @@ const ConversationListItem: React.FC<{
                                     conversation.latestActivity.createdAtMs,
                                 ).toISOString()}
                                 sx={{
-                                    color: messageTimestampColor,
+                                    color: textSecondary,
                                     flexShrink: 0,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
@@ -874,7 +872,7 @@ const ConversationSection: React.FC<{
             <Box
                 component="h2"
                 sx={{
-                    color: messageActivityColor,
+                    color: textSecondary,
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 13,
                     fontWeight: 700,
@@ -1135,7 +1133,7 @@ const MessageActionLabel: React.FC<{
         sx={{
             alignSelf: isOwn ? "flex-end" : "flex-start",
             alignItems: "center",
-            color: messageActivityColor,
+            color: textSecondary,
             display: "inline-flex",
             gap: "4px",
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -2534,7 +2532,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     {replyingTo && (
                                         <Box
                                             sx={{
-                                                bgcolor: spaceDialogBackground,
+                                                bgcolor: spaceSurface,
                                                 borderLeft: `3px solid ${green}`,
                                                 borderRadius: "12px",
                                                 boxSizing: "border-box",

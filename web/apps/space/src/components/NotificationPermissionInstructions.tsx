@@ -2,7 +2,7 @@ import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import { isSpaceIOS } from "hooks/use-pwa-install-prompt";
 import React from "react";
-import { spaceSurfaceHover, spaceText, spaceTextMuted } from "styles/colors";
+import { spaceText, spaceTextMuted } from "styles/colors";
 
 const green = "#08C225";
 const textBase = spaceText;
@@ -121,7 +121,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
                             key={step}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: spaceSurfaceHover,
+                                bgcolor: "#FAFAFA",
                                 borderRadius: "18px",
                                 color: textSoft,
                                 display: "flex",
