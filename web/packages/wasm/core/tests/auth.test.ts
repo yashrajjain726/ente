@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
     auth_generate_interactive_kek,
     auth_generate_srp_setup,
-    crypto_generate_key,
+    cryptoGenerateKey,
 } from "../pkg/ente_core_wasm.js";
 
 test("generates an interactive kek bundle", () => {
@@ -17,7 +17,7 @@ test("generates an interactive kek bundle", () => {
 });
 
 test("generates SRP setup attributes from a kek", () => {
-    const kek = crypto_generate_key();
+    const kek = cryptoGenerateKey();
     const generated = auth_generate_srp_setup(kek, "test-user-id");
 
     expect(Buffer.from(generated.srp_salt, "base64")).toHaveLength(16);

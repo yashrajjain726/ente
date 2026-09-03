@@ -19,7 +19,7 @@ import {
     decryptMetadataJSON,
     encryptBox,
     stringToB64,
-} from "ente-core-wasm";
+} from "ente-locker-wasm";
 import { z } from "zod";
 import { fromInfoTypeWireValue } from "./info-type-wire";
 import {
@@ -1095,13 +1095,9 @@ export const downloadLockerFile = async (
                     }
 
                     while (data.length >= streamDecryptor.decryptionChunkSize) {
-                        const decryptedChunk =
-                            await streamDecryptor.decryptChunk(
-                                data.slice(
-                                    0,
-                                    streamDecryptor.decryptionChunkSize,
-                                ),
-                            );
+                        const decryptedChunk = streamDecryptor.decryptChunk(
+                            data.slice(0, streamDecryptor.decryptionChunkSize),
+                        );
                         controller.enqueue(decryptedChunk);
                         didEnqueue = true;
                         data = data.slice(streamDecryptor.decryptionChunkSize);
@@ -1110,7 +1106,7 @@ export const downloadLockerFile = async (
                     if (done) {
                         if (data.length > 0) {
                             const decryptedChunk =
-                                await streamDecryptor.decryptChunk(data);
+                                streamDecryptor.decryptChunk(data);
                             controller.enqueue(decryptedChunk);
                         }
                         if (!streamDecryptor.isFinalized()) {

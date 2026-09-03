@@ -11,10 +11,16 @@
     "module": "./index.ts",
     "types": "./index.ts",
     "scripts": {
-        "build": "wasm-pack build ../../../../rust/bindings/wasm/locker --target bundler --out-dir ../../../../web/packages/wasm/locker/pkg --no-pack"
+        "build": "wasm-pack build ../../../../rust/bindings/wasm/locker --target bundler --out-dir ../../../../web/packages/wasm/locker/pkg --no-pack",
+        "test": "vitest --run"
+    },
+    "dependencies": {
+        "ente-utils": "*"
     },
     "devDependencies": {
         "ente-build-config": "*",
+        "vite-plugin-wasm": "3.6.0",
+        "vitest": "4.1.8",
         "wasm-pack": "0.15.0"
     }
 }

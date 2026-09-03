@@ -22,7 +22,7 @@ import {
     encryptBox,
     generateKey,
     stringToB64,
-} from "ente-core-wasm";
+} from "ente-locker-wasm";
 import { z } from "zod";
 import {
     clearLockerCache,

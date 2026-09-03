@@ -2,7 +2,7 @@ import type { LockerCollectionParticipant } from "@/types";
 import { getPublicKey } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { boxSeal } from "ente-core-wasm";
+import { boxSeal } from "ente-locker-wasm";
 import { z } from "zod";
 import {
     RemoteCollectionUserSchema,

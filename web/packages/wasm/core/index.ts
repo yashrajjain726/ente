@@ -1,6 +1,8 @@
+import { readAndFree } from "ente-utils/wasm";
 import type { SrpSession } from "./pkg/ente_core_wasm";
 
-export type { SrpSession };
+export type EncryptedBoxB64 = Awaited<ReturnType<typeof encryptBox>>;
+export type KeyPair = Awaited<ReturnType<typeof generateKeyPair>>;
 
 const wasm = () => import("./pkg/ente_core_wasm");
 
@@ -13,32 +15,12 @@ export interface DerivedKey {
     memLimit: number;
 }
 
-export interface EncryptedBlob {
-    encryptedData: BytesOrB64;
-    decryptionHeader: BytesOrB64;
-}
-
-export interface EncryptedBlobB64 {
-    encryptedData: string;
-    decryptionHeader: string;
-}
-
-export interface EncryptedBox {
+interface EncryptedBox {
     encryptedData: BytesOrB64;
     nonce: BytesOrB64;
 }
 
-export interface EncryptedBoxB64 {
-    encryptedData: string;
-    nonce: string;
-}
-
-export interface KeyPair {
-    publicKey: string;
-    privateKey: string;
-}
-
-export interface SRPSetupAttributes {
+interface SRPSetupAttributes {
     srpSalt: string;
     srpVerifier: string;
     loginSubKey: string;
@@ -54,7 +36,7 @@ export const deriveKey = async (
 export const deriveSensitiveKey = async (
     password: string,
 ): Promise<DerivedKey> =>
-    plainValue(
+    readAndFree(
         (await wasm()).auth_generate_sensitive_kek(password),
         derivedKeyValue,
     );
@@ -62,7 +44,7 @@ export const deriveSensitiveKey = async (
 export const deriveInteractiveKey = async (
     password: string,
 ): Promise<DerivedKey> =>
-    plainValue(
+    readAndFree(
         (await wasm()).auth_generate_interactive_kek(password),
         derivedKeyValue,
     );
@@ -71,7 +53,7 @@ export const generateSRPSetup = async (
     kekB64: string,
     srpUserID: string,
 ): Promise<SRPSetupAttributes> =>
-    plainValue(
+    readAndFree(
         (await wasm()).auth_generate_srp_setup(kekB64, srpUserID),
         (setup) => ({
             srpSalt: setup.srp_salt,
@@ -93,20 +75,17 @@ export const createSRPSession = async (
 ): Promise<SrpSession> =>
     new (await wasm()).SrpSession(srpUserID, srpSaltB64, loginKeyB64);
 
-export const generateKey = async () => (await wasm()).crypto_generate_key();
+export const generateKey = async () => (await wasm()).cryptoGenerateKey();
 
-export const generateKeyPair = async (): Promise<KeyPair> =>
-    plainValue((await wasm()).crypto_generate_keypair(), (keyPair) => ({
-        publicKey: keyPair.public_key,
-        privateKey: keyPair.secret_key,
+export const generateKeyPair = async () =>
+    readAndFree((await wasm()).cryptoGenerateKeyPair(), (keyPair) => ({
+        publicKey: keyPair.publicKey,
+        privateKey: keyPair.privateKey,
     }));
 
-export const encryptBox = async (
-    dataB64: string,
-    keyB64: string,
-): Promise<EncryptedBoxB64> =>
-    plainValue((await wasm()).crypto_encrypt_box(dataB64, keyB64), (box) => ({
-        encryptedData: box.encrypted_data,
+export const encryptBox = async (dataB64: string, keyB64: string) =>
+    readAndFree((await wasm()).cryptoEncryptBox(dataB64, keyB64), (box) => ({
+        encryptedData: box.encryptedData,
         nonce: box.nonce,
     }));
 
@@ -114,65 +93,17 @@ export const decryptBox = async (
     box: EncryptedBox,
     key: Uint8Array | string,
 ): Promise<string> =>
-    (await wasm()).crypto_decrypt_box(
+    (await wasm()).cryptoDecryptBox(
         toB64String(box.encryptedData),
         toB64String(box.nonce),
         toB64String(key),
     );
 
-export const decryptBoxBytes = async (
-    box: EncryptedBox,
-    key: Uint8Array | string,
-): Promise<Uint8Array<ArrayBuffer>> =>
-    fromB64String(await decryptBox(box, key));
-
-export const encryptBlob = async (
-    dataB64: string,
-    keyB64: string,
-): Promise<EncryptedBlobB64> =>
-    plainValue((await wasm()).crypto_encrypt_blob(dataB64, keyB64), (blob) => ({
-        encryptedData: blob.encrypted_data,
-        decryptionHeader: blob.decryption_header,
-    }));
-
-export const decryptMetadataJSON = async (
-    blob: EncryptedBlob,
-    key: Uint8Array | string,
-): Promise<unknown> => {
-    const wasmModule = await wasm();
-    const encryptedData = toB64String(blob.encryptedData);
-    const decryptionHeader = toB64String(blob.decryptionHeader);
-    const keyB64 = toB64String(key);
-    let plaintextB64: string;
-    try {
-        plaintextB64 = wasmModule.crypto_decrypt_blob(
-            encryptedData,
-            decryptionHeader,
-            keyB64,
-        );
-    } catch (error) {
-        if (!(error instanceof Error && error.name == "stream_truncated")) {
-            throw error;
-        }
-        plaintextB64 = wasmModule.crypto_decrypt_blob_legacy(
-            encryptedData,
-            decryptionHeader,
-            keyB64,
-        );
-    }
-    return JSON.parse(new TextDecoder().decode(fromB64String(plaintextB64)));
-};
-
-export const boxSeal = async (
-    dataB64: string,
-    publicKeyB64: string,
-): Promise<string> => (await wasm()).crypto_box_seal(dataB64, publicKeyB64);
-
 export const boxSealOpen = async (
     encryptedData: string,
     keyPair: KeyPair,
 ): Promise<string> =>
-    (await wasm()).crypto_box_seal_open(
+    (await wasm()).cryptoBoxSealOpen(
         encryptedData,
         keyPair.publicKey,
         keyPair.privateKey,
@@ -191,80 +122,13 @@ export const deriveSubKeyBytes = async (
     context: string,
 ): Promise<Uint8Array<ArrayBuffer>> =>
     fromB64String(
-        (await wasm()).crypto_derive_subkey(
+        (await wasm()).cryptoDeriveSubKey(
             keyB64,
             subKeyLength,
             BigInt(subKeyID),
             context,
         ),
     );
-
-export const md5Base64 = async (data: Uint8Array) =>
-    (await wasm()).crypto_md5_base64(data);
-
-export interface StreamEncryptorHandle {
-    key: string;
-    decryptionHeader: string;
-    encryptChunk: (data: Uint8Array, isFinal: boolean) => Promise<Uint8Array>;
-    free: () => void;
-}
-
-export const createStreamEncryptor =
-    async (): Promise<StreamEncryptorHandle> => {
-        const encryptor = new (await wasm()).CryptoStreamEncryptor();
-        return {
-            key: encryptor.key,
-            decryptionHeader: encryptor.decryption_header,
-            encryptChunk: (data, isFinal) =>
-                Promise.resolve(encryptor.encrypt_chunk(data, isFinal)),
-            free: () => encryptor.free(),
-        };
-    };
-
-export interface StreamDecryptorHandle {
-    decryptionChunkSize: number;
-    decryptChunk: (data: Uint8Array) => Promise<Uint8Array>;
-    isFinalized: () => boolean;
-    free: () => void;
-}
-
-export const createStreamDecryptor = async (
-    decryptionHeaderB64: string,
-    keyB64: string,
-): Promise<StreamDecryptorHandle> => {
-    const decryptor = new (await wasm()).CryptoStreamDecryptor(
-        decryptionHeaderB64,
-        keyB64,
-    );
-    return {
-        decryptionChunkSize: decryptor.decryption_chunk_size,
-        decryptChunk: (data) => Promise.resolve(decryptor.decrypt_chunk(data)),
-        isFinalized: () => decryptor.is_finalized,
-        free: () => decryptor.free(),
-    };
-};
-
-export interface EncryptedFileResult {
-    encryptedData: string;
-    decryptionHeader: string;
-    md5Hash: string;
-    key: string;
-}
-
-export const encryptFileStreamWithKey = async (
-    dataB64: string,
-    keyB64: string,
-): Promise<EncryptedFileResult> =>
-    plainValue(
-        (await wasm()).crypto_encrypt_stream_with_key(dataB64, keyB64),
-        encryptedFileValue,
-    );
-
-export const stringToB64 = (value: string): string =>
-    toB64String(new TextEncoder().encode(value));
-
-export const b64ToBytes = (value: string): Uint8Array<ArrayBuffer> =>
-    fromB64String(value);
 
 const derivedKeyValue = (key: {
     key: string;
@@ -277,29 +141,6 @@ const derivedKeyValue = (key: {
     opsLimit: key.ops_limit,
     memLimit: key.mem_limit,
 });
-
-const encryptedFileValue = (file: {
-    encrypted_data: string;
-    decryption_header: string;
-    key: string;
-    md5_hash: string;
-}): EncryptedFileResult => ({
-    encryptedData: file.encrypted_data,
-    decryptionHeader: file.decryption_header,
-    key: file.key,
-    md5Hash: file.md5_hash,
-});
-
-const plainValue = <T extends { free: () => void }, U>(
-    value: T,
-    read: (value: T) => U,
-) => {
-    try {
-        return read(value);
-    } finally {
-        value.free();
-    }
-};
 
 const toB64String = (value: Uint8Array | string): string => {
     if (typeof value == "string") return value;
