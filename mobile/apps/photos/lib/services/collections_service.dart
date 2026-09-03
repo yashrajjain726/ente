@@ -80,7 +80,6 @@ class CollectionsService {
   final _cachedUserIdToUser = <int, User>{};
   Collection? cachedDefaultHiddenCollection;
   Future<Map<int, int>>? _collectionIDToNewestFileTime;
-  Collection? _cachedUncategorizedCollection;
   Future<Collection>? _uncategorizedCollectionFuture;
   int? _uncategorizedCollectionFutureOwnerID;
   final Map<String, EnteFile> _coverCache = <String, EnteFile>{};
@@ -221,7 +220,6 @@ class CollectionsService {
     _localPathToCollectionID.clear();
     _collectionIDToCollections.clear();
     cachedDefaultHiddenCollection = null;
-    _cachedUncategorizedCollection = null;
     _uncategorizedCollectionFuture = null;
     _uncategorizedCollectionFutureOwnerID = null;
     _cachedPublicAlbumToken.clear();
@@ -543,21 +541,11 @@ class CollectionsService {
         .toList();
   }
 
-  Future<Collection> getUncategorizedCollection() {
+  Future<Collection> getUncategorizedCollection() async {
     final int? userID = _config.getUserID();
     if (userID == null) {
-      return Future.error(
-        StateError("Cannot get Uncategorized without a configured user"),
-      );
+      throw StateError("Cannot get Uncategorized without a configured user");
     }
-
-    final cachedCollection = _cachedUncategorizedCollection;
-    if (cachedCollection != null &&
-        !cachedCollection.isDeleted &&
-        cachedCollection.isOwner(userID)) {
-      return Future.value(cachedCollection);
-    }
-    _cachedUncategorizedCollection = null;
 
     final matchedCollection = _collectionIDToCollections.values
         .firstWhereOrNull(
@@ -567,33 +555,26 @@ class CollectionsService {
               collection.isOwner(userID),
         );
     if (matchedCollection != null) {
-      _cachedUncategorizedCollection = matchedCollection;
-      return Future.value(matchedCollection);
+      return matchedCollection;
     }
 
     final inFlightCreation = _uncategorizedCollectionFuture;
     if (inFlightCreation != null &&
         _uncategorizedCollectionFutureOwnerID == userID) {
-      return inFlightCreation;
+      return await inFlightCreation;
     }
 
-    late final Future<Collection> creation;
-    creation = _createUncategorizedCollection()
-        .then((collection) {
-          if (_config.getUserID() == userID) {
-            _cachedUncategorizedCollection = collection;
-          }
-          return collection;
-        })
-        .whenComplete(() {
-          if (identical(_uncategorizedCollectionFuture, creation)) {
-            _uncategorizedCollectionFuture = null;
-            _uncategorizedCollectionFutureOwnerID = null;
-          }
-        });
+    final creation = _createUncategorizedCollection();
     _uncategorizedCollectionFutureOwnerID = userID;
     _uncategorizedCollectionFuture = creation;
-    return creation;
+    try {
+      return await creation;
+    } finally {
+      if (identical(_uncategorizedCollectionFuture, creation)) {
+        _uncategorizedCollectionFuture = null;
+        _uncategorizedCollectionFutureOwnerID = null;
+      }
+    }
   }
 
   Future<void> _ensureUncategorizedCollection() async {
