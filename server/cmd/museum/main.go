@@ -1097,6 +1097,12 @@ func main() {
 		if err := remoteStoreRepository.MigrateCustomDomainCanonicalValues(context.Background()); err != nil {
 			log.WithError(err).Error("Failed to backfill custom domain canonical values")
 		}
+		migrated, err := userAuthRepo.MigratePlaintextTokens(context.Background())
+		if err != nil {
+			log.WithError(err).Error("Failed to clear plaintext tokens")
+		} else if migrated > 0 {
+			log.WithField("tokens", migrated).Info("Cleared plaintext tokens")
+		}
 	})
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
