@@ -151,7 +151,7 @@ class CollectionsService {
     watch.log("remote fetch collections ${fetchedCollections.length}");
 
     if (fetchedCollections.isEmpty) {
-      await _ensureUncategorizedCollection();
+      await _ensureUncategorizedCollectionExists();
       return;
     }
     final updatedCollections = <Collection>[];
@@ -211,7 +211,7 @@ class CollectionsService {
       );
     }
 
-    await _ensureUncategorizedCollection();
+    await _ensureUncategorizedCollectionExists();
   }
 
   void clearCache() {
@@ -557,7 +557,7 @@ class CollectionsService {
     return _createUncategorizedCollection();
   }
 
-  Future<void> _ensureUncategorizedCollection() async {
+  Future<void> _ensureUncategorizedCollectionExists() async {
     try {
       await getUncategorizedCollection();
     } catch (e, s) {
