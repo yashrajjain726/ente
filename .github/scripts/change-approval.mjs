@@ -20,7 +20,7 @@ const guardrailFiles = new Set([
     "analysis_options.yaml",
 ]);
 const configFile =
-    /(^|\/)(rust-toolchain\.toml|\.cargo\/(config|audit)\.toml|\.npmrc|\.nvmrc|\.tool-versions|\.node-version|\.python-version|gradle-wrapper\.properties)$/;
+    /(^|\/)(\.gitattributes|rust-toolchain\.toml|\.cargo\/(config|audit)\.toml|\.npmrc|\.nvmrc|\.tool-versions|\.node-version|\.python-version|gradle-wrapper\.properties)$/;
 
 const tomlPackages = (text) =>
     text
@@ -101,7 +101,7 @@ const numstat = (...filter) =>
     git("diff", "--numstat", "--no-renames", "-z", ...filter, mergeBase, ...(local ? [] : ["HEAD"]))
         .split("\0")
         .filter(Boolean)
-        .map((row) => row.split("\t"));
+        .map((row) => row.match(/^([^\t]+)\t([^\t]+)\t(.*)$/s).slice(1));
 const untracked = local
     ? git("ls-files", "--others", "--exclude-standard", "-z")
           .split("\0")
@@ -114,7 +114,7 @@ const kept = numstat("--diff-filter=a").map(([, , file]) => file);
 const treeSizes = () =>
     git("--literal-pathspecs", "ls-tree", "-l", "-z", "HEAD", "--", ...present.map(([, , file]) => file))
         .split("\0")
-        .map((line) => line.match(/ blob \S+ +(\d+)\t(.*)$/))
+        .map((line) => line.match(/ blob \S+ +(\d+)\t(.*)$/s))
         .filter(Boolean)
         .map(([, size, file]) => [file, Number(size)]);
 const diskSizes = () =>
