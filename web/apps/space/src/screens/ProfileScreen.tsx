@@ -69,10 +69,9 @@ const profileAvatarTopOffset = 54;
 const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
-const photoMasonryGap = "8px";
-const adaptivePhotoMasonryGap = "2px";
+const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = spaceSurface;
-const photoMasonryRadius = "14px";
+const photoMasonryRadius = "12px";
 const profileCoverRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
 const publicPhotoMasonryLoadRootMargin = "400px 0px";
@@ -120,11 +119,16 @@ interface PostMasonryTile {
     item: ProfilePostItem;
 }
 
-const buildPostMasonryTiles = (
+interface PostMasonryRow {
+    aspectRatio: number;
+    tiles: PostMasonryTile[];
+}
+
+const buildPostMasonryRows = (
     items: ProfilePostItem[],
     loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
-) =>
-    items.map((item, index) => {
+): PostMasonryRow[] => {
+    const tiles = items.map((item, index) => {
         const dimensions = loadedDimensionsByID[item.id] ?? {
             height: item.height ?? 1,
             width: item.width ?? 1,
@@ -136,60 +140,31 @@ const buildPostMasonryTiles = (
             item,
         };
     });
+    const rows = new Array<PostMasonryRow>();
+    let nextTileIndex = 0;
 
-const buildPostMasonryColumns = (tiles: PostMasonryTile[]) => {
-    const columns: PostMasonryTile[][] = Array.from(
-        { length: Math.min(3, tiles.length) },
-        () => [],
-    );
-    tiles.forEach((tile, index) => columns[index % columns.length]!.push(tile));
-    return columns;
-};
-
-const preferredMobileMasonryRowItemCount = (
-    tiles: PostMasonryTile[],
-    startIndex: number,
-    rowIndex: number,
-) => {
-    const first = tiles[startIndex];
-    const second = tiles[startIndex + 1];
-    const third = tiles[startIndex + 2];
-    if (!first || !second) return 1;
-
-    if (first.aspectRatio >= 1.25) return 1;
-
-    const firstIsPortrait = first.aspectRatio < 0.9;
-    const secondIsPortrait = second.aspectRatio < 0.9;
-    const thirdIsPortrait = !!third && third.aspectRatio < 0.9;
-
-    if (first.aspectRatio <= 0.62 && rowIndex % 4 == 1) return 1;
-    if (firstIsPortrait && secondIsPortrait && thirdIsPortrait) {
-        return rowIndex % 3 == 0 ? 3 : 2;
-    }
-    if (firstIsPortrait && secondIsPortrait) return 2;
-    if (first.aspectRatio + second.aspectRatio >= 1.6) return 2;
-    if (
-        third &&
-        first.aspectRatio + second.aspectRatio + third.aspectRatio >= 1.9
-    )
-        return 3;
-    return 2;
-};
-
-const buildAdaptivePostMasonryRows = (tiles: PostMasonryTile[]) => {
-    const rows = new Array<PostMasonryTile[]>();
-    let tileIndex = 0;
-
-    while (tileIndex < tiles.length) {
-        const rowSize = Math.min(
-            preferredMobileMasonryRowItemCount(tiles, tileIndex, rows.length),
-            tiles.length - tileIndex,
+    while (nextTileIndex < tiles.length) {
+        const rowSize = preferredPostMasonryRowSize(
+            tiles.length - nextTileIndex,
         );
-        rows.push(tiles.slice(tileIndex, tileIndex + rowSize));
-        tileIndex += rowSize;
+        const rowTiles = tiles.slice(nextTileIndex, nextTileIndex + rowSize);
+        rows.push({
+            aspectRatio: rowTiles.reduce(
+                (aspectRatio, tile) => aspectRatio + tile.aspectRatio,
+                0,
+            ),
+            tiles: rowTiles,
+        });
+        nextTileIndex += rowSize;
     }
 
     return rows;
+};
+
+const preferredPostMasonryRowSize = (remainingTiles: number) => {
+    if (remainingTiles <= 3) return remainingTiles;
+    if (remainingTiles == 4 || remainingTiles == 5) return 2;
+    return remainingTiles % 2 == 0 ? 2 : 3;
 };
 
 const profilePostImageCacheKey = (item: ProfilePostItem) =>
@@ -308,12 +283,12 @@ const ProfilePostLoadingIndicator: React.FC = () => (
 );
 
 interface ProfilePostTileProps {
-    aspectRatio?: number;
-    borderRadius?: number | string;
+    aspectRatio: number;
     dimensions: ProfilePhotoDimensions;
     displayName: string;
     imageUrl?: string;
     index: number;
+    isSingleItemRow: boolean;
     isUnavailable: boolean;
     item: ProfilePostItem;
     loadRootMargin: string;
@@ -325,11 +300,11 @@ interface ProfilePostTileProps {
 
 const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     aspectRatio,
-    borderRadius = photoMasonryRadius,
     dimensions,
     displayName,
     imageUrl,
     index,
+    isSingleItemRow,
     isUnavailable: isPostUnavailable,
     item,
     loadRootMargin,
@@ -403,19 +378,20 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
             }}
             sx={{
                 appearance: "none",
-                aspectRatio: aspectRatio ?? photoAspectRatio(dimensions),
+                aspectRatio: isSingleItemRow
+                    ? `${dimensions.width} / ${dimensions.height}`
+                    : undefined,
                 bgcolor: photoMasonryPlaceholderBackground,
                 border: 0,
-                borderRadius,
                 cursor: imageUrl && !isUnavailable ? "pointer" : "default",
                 display: "block",
-                height: "auto",
+                flex: isSingleItemRow ? "0 0 100%" : `${aspectRatio} 1 0`,
+                height: isSingleItemRow ? "auto" : "100%",
                 minWidth: 0,
                 opacity: 1,
                 overflow: "hidden",
                 p: 0,
                 position: "relative",
-                width: "100%",
                 "&:focus-visible": {
                     outline: `2px solid ${green}`,
                     outlineOffset: -2,
@@ -656,18 +632,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const postImageLoadRootMargin = isAnonymousPublicProfile
         ? publicPhotoMasonryLoadRootMargin
         : photoMasonryLoadRootMargin;
-    const masonryTiles = buildPostMasonryTiles(
+    const masonryRows = buildPostMasonryRows(
         visiblePostItems,
         loadedPhotoDimensionsByID,
     );
-    const masonryColumns = buildPostMasonryColumns(masonryTiles);
-    const usesAdaptiveMasonryRows = isOwnerProfile || isFriendProfile;
-    const usesSinglePostLayout = masonryTiles.length == 1;
-    const usesFullWidthPostRows =
-        usesAdaptiveMasonryRows || usesSinglePostLayout;
-    const adaptiveMasonryRows = usesSinglePostLayout
-        ? masonryTiles.map((tile) => [tile])
-        : buildAdaptivePostMasonryRows(masonryTiles);
     const closeFriendActions = () => setFriendActionsAnchor(null);
 
     const requestUnfriend = () => {
@@ -1070,20 +1038,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
 
     const renderPostTile = (
-        { dimensions, index, item }: PostMasonryTile,
-        borderRadius?: number | string,
-        aspectRatio?: number,
+        { aspectRatio, dimensions, index, item }: PostMasonryTile,
+        isSingleItemRow: boolean,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
         return (
             <ProfilePostTile
                 key={`${item.id}-${index}`}
                 aspectRatio={aspectRatio}
-                borderRadius={borderRadius}
                 dimensions={dimensions}
                 displayName={displayName}
                 imageUrl={imageUrl}
                 index={index}
+                isSingleItemRow={isSingleItemRow}
                 isUnavailable={
                     Boolean(item.isUnavailable) ||
                     Boolean(
@@ -1833,8 +1800,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         flex: hasProfilePosts ? "0 0 auto" : "1 1 0",
                         flexDirection: "column",
                         minHeight: hasProfilePosts ? undefined : 0,
-                        mt: usesSinglePostLayout ? "20px" : "32px",
-                        pb: usesFullWidthPostRows ? 0 : "16px",
+                        mt: "24px",
+                        pb: "16px",
                         px: 0,
                         width: "100%",
                     }}
@@ -1842,81 +1809,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {hasProfilePosts ? (
                         <Box
                             sx={{
-                                borderTopLeftRadius: usesFullWidthPostRows
-                                    ? photoMasonryRadius
-                                    : undefined,
-                                borderTopRightRadius: usesFullWidthPostRows
-                                    ? photoMasonryRadius
-                                    : undefined,
-                                display: "grid",
-                                gap: usesFullWidthPostRows
-                                    ? adaptivePhotoMasonryGap
-                                    : photoMasonryGap,
-                                gridTemplateColumns: usesFullWidthPostRows
-                                    ? "minmax(0, 1fr)"
-                                    : `repeat(${masonryColumns.length}, minmax(0, 1fr))`,
-                                mt: usesSinglePostLayout ? "4px" : "6px",
-                                mx: usesFullWidthPostRows ? 0 : "16px",
-                                overflow: usesFullWidthPostRows
-                                    ? "hidden"
-                                    : undefined,
-                                width: usesFullWidthPostRows
-                                    ? "100%"
-                                    : "calc(100% - 32px)",
+                                borderRadius: photoMasonryRadius,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: photoMasonryGap,
+                                mt: "6px",
+                                mx: "16px",
+                                overflow: "hidden",
+                                width: "calc(100% - 32px)",
                             }}
                         >
-                            {usesFullWidthPostRows
-                                ? adaptiveMasonryRows.map((tiles, rowIndex) => (
-                                      <Box
-                                          key={rowIndex}
-                                          sx={{
-                                              display: "grid",
-                                              gap: adaptivePhotoMasonryGap,
-                                              gridTemplateColumns:
-                                                  tiles.length == 1
-                                                      ? "minmax(0, 1fr)"
-                                                      : tiles
-                                                            .map(
-                                                                ({
-                                                                    aspectRatio,
-                                                                }) =>
-                                                                    `minmax(0, ${aspectRatio}fr)`,
-                                                            )
-                                                            .join(" "),
-                                              minWidth: 0,
-                                          }}
-                                      >
-                                          {tiles.map((tile) =>
-                                              renderPostTile(
-                                                  tile,
-                                                  usesSinglePostLayout
-                                                      ? photoMasonryRadius
-                                                      : 0,
-                                                  usesSinglePostLayout
-                                                      ? Math.min(
-                                                            tile.aspectRatio,
-                                                            1,
-                                                        )
-                                                      : undefined,
-                                              ),
-                                          )}
-                                      </Box>
-                                  ))
-                                : masonryColumns.map((tiles, columnIndex) => (
-                                      <Box
-                                          key={columnIndex}
-                                          sx={{
-                                              display: "flex",
-                                              flexDirection: "column",
-                                              gap: photoMasonryGap,
-                                              minWidth: 0,
-                                          }}
-                                      >
-                                          {tiles.map((tile) =>
-                                              renderPostTile(tile),
-                                          )}
-                                      </Box>
-                                  ))}
+                            {masonryRows.map((row, rowIndex) => {
+                                const isSingleItemRow = row.tiles.length == 1;
+                                return (
+                                    <Box
+                                        key={`row-${rowIndex}`}
+                                        sx={{
+                                            aspectRatio: isSingleItemRow
+                                                ? undefined
+                                                : `${row.aspectRatio} / 1`,
+                                            display: "flex",
+                                            gap: photoMasonryGap,
+                                            width: "100%",
+                                        }}
+                                    >
+                                        {row.tiles.map((tile) =>
+                                            renderPostTile(
+                                                tile,
+                                                isSingleItemRow,
+                                            ),
+                                        )}
+                                    </Box>
+                                );
+                            })}
                         </Box>
                     ) : shouldShowPostLoadingIndicator ? (
                         <ProfilePostLoadingIndicator />
