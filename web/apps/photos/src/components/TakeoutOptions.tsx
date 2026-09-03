@@ -176,7 +176,6 @@ export function TakeoutOptions({
 function AppleExportSteps(): React.JSX.Element {
     const steps = [
         "In Photos, select your photos and choose File > Export > Export Unmodified Originals",
-        "Set File Name to Sequential so Live Photos pair correctly",
         "Select Export IPTC as XMP so dates, locations, and captions come along",
     ];
 
