@@ -1,17 +1,6 @@
 import { readAndFree } from "ente-utils/wasm";
 import type { WrappedRootContactKey } from "./pkg/ente_locker_wasm";
 
-export type {
-    CryptoStreamDecryptor as StreamDecryptorHandle,
-    CryptoStreamEncryptor as StreamEncryptorHandle,
-} from "./pkg/ente_locker_wasm";
-
-export type EncryptedBlobB64 = Awaited<ReturnType<typeof encryptBlob>>;
-export type EncryptedBoxB64 = Awaited<ReturnType<typeof encryptBox>>;
-export type EncryptedFileResult = Awaited<
-    ReturnType<typeof encryptFileStreamWithKey>
->;
-
 interface OpenSessionInput {
     baseUrl: string;
     authToken: string;
@@ -67,17 +56,17 @@ export const contactsGetProfilePicture = async (
 
 type BytesOrB64 = Uint8Array | string;
 
-export interface EncryptedBlob {
+interface EncryptedBlob {
     encryptedData: BytesOrB64;
     decryptionHeader: BytesOrB64;
 }
 
-export interface EncryptedBox {
+interface EncryptedBox {
     encryptedData: BytesOrB64;
     nonce: BytesOrB64;
 }
 
-export interface KeyPair {
+interface KeyPair {
     publicKey: string;
     privateKey: string;
 }
@@ -176,7 +165,6 @@ export const encryptFileStreamWithKey = async (
             encryptedData: file.encryptedData,
             decryptionHeader: file.decryptionHeader,
             md5Hash: file.md5Hash,
-            key: file.key,
         }),
     );
 

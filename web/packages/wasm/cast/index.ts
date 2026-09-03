@@ -4,13 +4,13 @@ const wasm = () => import("./pkg/ente_cast_wasm");
 
 export type CastReceiver = import("./pkg/ente_cast_wasm").CastReceiver;
 
-export interface CastPayload {
+interface CastPayload {
     castToken: string;
     collectionID: number;
     collectionKey: string;
 }
 
-export interface PreparedCastPayload {
+interface PreparedCastPayload {
     castToken: string;
     encryptedPayload: string;
 }

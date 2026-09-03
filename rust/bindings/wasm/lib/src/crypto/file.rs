@@ -155,8 +155,6 @@ pub struct EncryptedStreamResult {
     pub decryption_header: String,
     #[wasm_bindgen(readonly, js_name = md5Hash)]
     pub md5_hash: String,
-    #[wasm_bindgen(readonly)]
-    pub key: String,
 }
 
 #[wasm_bindgen(js_name = cryptoEncryptStreamWithKey)]
@@ -177,6 +175,5 @@ pub fn crypto_encrypt_stream_with_key(
         encrypted_data: b64::encode(&encrypted),
         decryption_header: b64::encode(header.as_bytes()),
         md5_hash: b64::encode(&md5),
-        key: b64::encode(key.as_bytes()),
     })
 }

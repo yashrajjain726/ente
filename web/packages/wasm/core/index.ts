@@ -1,7 +1,6 @@
 import { readAndFree } from "ente-utils/wasm";
 import type { SrpSession } from "./pkg/ente_core_wasm";
 
-export type { SrpSession };
 export type EncryptedBoxB64 = Awaited<ReturnType<typeof encryptBox>>;
 export type KeyPair = Awaited<ReturnType<typeof generateKeyPair>>;
 
@@ -16,12 +15,12 @@ export interface DerivedKey {
     memLimit: number;
 }
 
-export interface EncryptedBox {
+interface EncryptedBox {
     encryptedData: BytesOrB64;
     nonce: BytesOrB64;
 }
 
-export interface SRPSetupAttributes {
+interface SRPSetupAttributes {
     srpSalt: string;
     srpVerifier: string;
     loginSubKey: string;

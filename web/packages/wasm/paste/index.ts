@@ -1,9 +1,6 @@
 import { wrap, type Remote } from "comlink";
 import type { PasteWorker } from "./worker";
 
-export type CreatedPaste = Awaited<ReturnType<PasteWorker["create"]>>;
-export type OpenedPaste = Awaited<ReturnType<PasteWorker["open"]>>;
-
 export class PasteClient {
     private constructor(
         private worker: Worker,

@@ -6,11 +6,8 @@ import type {
 
 export type {
     LegacyContactRecord,
-    LegacyContactState,
     LegacyInfo,
     LegacyRecoverySession,
-    LegacyRecoveryStatus,
-    LegacyUser,
     Session,
 } from "./pkg/ente_legacy_wasm";
 
