@@ -5,6 +5,35 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
+/** @param {import("next/dist/compiled/webpack/webpack").webpack.Compiler} compiler */
+function checkWasmChunks(compiler) {
+    compiler.hooks.afterCompile.tap(
+        "CheckWasmChunks",
+        /** @param {import("next/dist/compiled/webpack/webpack").webpack.Compilation} compilation */
+        (compilation) => {
+            const wasmRoot = path.resolve(__dirname, "../wasm") + path.sep;
+            for (const module of compilation.modules) {
+                if (
+                    !module.type.startsWith("webassembly/") ||
+                    !module.resource.startsWith(wasmRoot)
+                ) {
+                    continue;
+                }
+                const chunk = [
+                    ...compilation.chunkGraph.getModuleChunksIterable(module),
+                ].find((chunk) => chunk.canBeInitial());
+                if (chunk) {
+                    compilation.errors.push(
+                        new compiler.webpack.WebpackError(
+                            `${module.readableIdentifier(compilation.requestShortener)} is in initial chunk ${chunk.name ?? chunk.id}. Load generated WASM through a dynamic import().`,
+                        ),
+                    );
+                }
+            }
+        },
+    );
+}
+
 const gitSHA = (() => {
     const command =
         os.platform() == "win32"
@@ -87,9 +116,10 @@ const nextConfig = {
     ...(process.env.NODE_ENV != "production" &&
         isDesktop && { allowedDevOrigins: ["app"], distDir: ".next-desktop" }),
 
-    webpack: (config, { isServer }) => {
+    webpack: (config, { dev, isServer }) => {
         if (!isServer) {
             config.resolve.fallback.fs = false;
+            if (!dev) config.plugins.push(checkWasmChunks);
         }
 
         // libheif-js triggers an unavoidable dynamic-require warning.
