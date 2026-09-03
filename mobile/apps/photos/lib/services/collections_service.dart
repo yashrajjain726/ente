@@ -561,7 +561,7 @@ class CollectionsService {
     try {
       await getUncategorizedCollection();
     } catch (e, s) {
-      _logger.warning("Failed to ensure Uncategorized collection", e, s);
+      _logger.warning("Failed to ensure Uncategorized collection exists", e, s);
     }
   }
 
