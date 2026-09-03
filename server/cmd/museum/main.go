@@ -482,10 +482,9 @@ func main() {
 		UserRepo: userRepo,
 	}
 	legacyKitController := &legacykitctrl.Controller{
-		Repo:              legacyKitRepository,
-		UserRepo:          userRepo,
-		UserCtrl:          userController,
-		PasskeyController: passkeyCtrl,
+		Repo:     legacyKitRepository,
+		UserRepo: userRepo,
+		UserCtrl: userController,
 	}
 
 	authMiddleware := middleware.AuthMiddleware{UserAuthRepo: userAuthRepo, Cache: authCache, UserController: userController}
@@ -673,12 +672,11 @@ func main() {
 	storageAPI.GET("/comments-reactions/updated-at", socialHandler.LatestUpdates)
 
 	emergencyCtrl := &emergency.Controller{
-		Repo:              emergencyContactRepository,
-		UserRepo:          userRepo,
-		UserLookup:        userLookupController,
-		UserCtrl:          userController,
-		PasskeyController: passkeyCtrl,
-		LockCtrl:          lockController,
+		Repo:       emergencyContactRepository,
+		UserRepo:   userRepo,
+		UserLookup: userLookupController,
+		UserCtrl:   userController,
+		LockCtrl:   lockController,
 	}
 	userHandler := &api.UserHandler{
 		UserController:      userController,

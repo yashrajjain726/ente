@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	ctrl "github.com/ente/museum/pkg/controller"
 	"github.com/ente/museum/pkg/controller/user"
 	"github.com/ente/museum/pkg/repo"
 	legacykitrepo "github.com/ente/museum/pkg/repo/legacy_kit"
@@ -36,10 +35,9 @@ const (
 )
 
 type Controller struct {
-	Repo              *legacykitrepo.Repository
-	UserRepo          *repo.UserRepository
-	UserCtrl          *user.UserController
-	PasskeyController *ctrl.PasskeyController
+	Repo     *legacykitrepo.Repository
+	UserRepo *repo.UserRepository
+	UserCtrl *user.UserController
 }
 
 func (c *Controller) CreateKit(ctx *gin.Context, userID int64, req ente.CreateLegacyKitRequest) (*ente.LegacyKit, error) {
@@ -287,19 +285,6 @@ func (c *Controller) ChangePassword(ctx *gin.Context, req ente.LegacyKitRecovery
 	}
 	if session.Status != ente.LegacyKitRecoveryStatusReady {
 		return nil, stacktrace.Propagate(ente.NewBadRequestWithMessage("legacy kit recovery is not ready"), "")
-	}
-	if err := req.UpdateSrpAndKeysRequest.Validate(); err != nil {
-		return nil, stacktrace.Propagate(err, "invalid request")
-	}
-	// Known and accepted for the current recovery flow: once a legacy-kit session
-	// is READY, we clear existing second-factor requirements before applying the
-	// recovered password update, so an old TOTP/passkey enrollment does not block
-	// the beneficiary from completing takeover.
-	if err := c.UserCtrl.DisableTwoFactor(session.UserID); err != nil {
-		return nil, stacktrace.Propagate(err, "failed to disable two-factor")
-	}
-	if err := c.PasskeyController.RemovePasskey2FA(session.UserID); err != nil {
-		return nil, stacktrace.Propagate(err, "failed to disable passkeys")
 	}
 	logOutAllSessions := req.UpdateSrpAndKeysRequest.LogOutOtherDevices == nil || *req.UpdateSrpAndKeysRequest.LogOutOtherDevices
 	resp, err := c.UserCtrl.RecoverSrpAndKeyAttributes(ctx, session.UserID, req.UpdateSrpAndKeysRequest, logOutAllSessions)

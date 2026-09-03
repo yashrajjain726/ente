@@ -2,8 +2,10 @@ package repo
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/ente/museum/ente"
@@ -117,5 +119,30 @@ func TestUserAuthRepositoryRemoveOTTReturnsWhetherRowWasConsumed(t *testing.T) {
 	}
 	if removed {
 		t.Fatal("second remove should report that the ott was already consumed")
+	}
+}
+
+func TestAddTokenForPendingLoginConsumesPasskeyRecoverySession(t *testing.T) {
+	testutil.WithServerRoot(t)
+
+	db := testutil.RequireTestDB(t)
+	testutil.ResetTables(t, db)
+	t.Cleanup(func() { testutil.ResetTables(t, db) })
+
+	userID := testutil.InsertUser(t, db, testutil.UserFixture{
+		Email:        "passkey-recovery@example.com",
+		CreationTime: 1,
+	})
+	sessionID := "passkey-recovery-session"
+	if _, err := db.Exec(`INSERT INTO passkey_login_sessions(user_id, session_id, creation_time, expiration_time) VALUES($1, $2, $3, $4)`, userID, sessionID, 1, time.Microseconds()+1000000); err != nil {
+		t.Fatalf("failed to insert session: %v", err)
+	}
+
+	repo := &UserAuthRepository{DB: db}
+	if err := repo.AddTokenForPendingLogin(context.Background(), userID, sessionID, PasskeyPendingLogin, false, ente.Photos, "first-token", "", "", nil); err != nil {
+		t.Fatalf("first recovery failed: %v", err)
+	}
+	if err := repo.AddTokenForPendingLogin(context.Background(), userID, sessionID, PasskeyPendingLogin, false, ente.Photos, "second-token", "", "", nil); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("replayed recovery returned %v, want no rows", err)
 	}
 }

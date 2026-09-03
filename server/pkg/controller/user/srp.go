@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/ente/go-srp"
 	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/controller/authsession"
 	"github.com/ente/museum/pkg/utils/auth"
 	emailUtil "github.com/ente/museum/pkg/utils/email"
 	"github.com/ente/stacktrace"
@@ -108,20 +109,18 @@ func (c *UserController) updateSrpAndKeyAttributes(context *gin.Context,
 			return nil, err
 		}
 	}
-	err = c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, *req.UpdateAttributes, setup)
+	var currentTokenHash []byte
+	if revocationScope == revokeOtherSessions {
+		tokenHash := auth.HashToken(auth.GetToken(context))
+		currentTokenHash = tokenHash[:]
+	}
+	revokedTokens, err := c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, *req.UpdateAttributes, setup, shouldClearTokens, currentTokenHash, revocationScope == revokeAllSessions)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to add entry in srp auth")
 	}
 
 	if shouldClearTokens {
-		if revocationScope == revokeAllSessions {
-			err = c.RemoveAllTokens(userID)
-		} else {
-			err = c.RemoveAllOtherTokens(userID, auth.GetToken(context))
-		}
-		if err != nil {
-			return nil, err
-		}
+		authsession.MarkRevoked(c.Cache, revokedTokens)
 		if c.SpaceAccessResetter != nil {
 			if sweepErr := c.SpaceAccessResetter.RevokeBrowserSessions(context, userID); sweepErr != nil {
 				logrus.WithError(sweepErr).WithField("user_id", userID).Warn("failed to sweep space browser sessions after password update")
@@ -206,7 +205,7 @@ func (c *UserController) VerifySRPSession(context *gin.Context, req ente.VerifyS
 	if err != nil {
 		return nil, err
 	}
-	verResponse, err := c.onVerificationSuccess(context, user.Email, nil)
+	verResponse, err := c.onVerificationSuccess(context, user.Email, nil, srpAuthEntity)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

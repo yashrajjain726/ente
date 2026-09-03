@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/ente/museum/ente"
@@ -8,6 +9,7 @@ import (
 	"github.com/ente/museum/pkg/utils/network"
 	"github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -19,6 +21,14 @@ type RevokedToken struct {
 	App       ente.App
 	TokenHash []byte
 }
+
+type PendingLoginSession int
+
+const (
+	NoPendingLogin PendingLoginSession = iota
+	TOTPPendingLogin
+	PasskeyPendingLogin
+)
 
 func (repo *UserAuthRepository) AddOTT(emailHash string, app ente.App, ott string, expirationTime int64) error {
 	_, err := repo.DB.Exec(`INSERT INTO otts(email_hash, ott, creation_time, expiration_time, app)
@@ -164,6 +174,97 @@ func (repo *UserAuthRepository) AddToken(userID int64, app ente.App, token strin
 	return stacktrace.Propagate(err, "")
 }
 
+func (repo *UserAuthRepository) AddLoginResult(ctx context.Context, userID int64, srpAuth *ente.SRPAuthEntity,
+	app ente.App, token, ip, userAgent, passkeySessionID, twoFactorSessionID string, expirationTime int64,
+) error {
+	tx, err := repo.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+	if err = lockUserForLogin(ctx, tx, userID, srpAuth); err != nil {
+		return err
+	}
+	now := time.Microseconds()
+	if passkeySessionID != "" {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO passkey_login_sessions(user_id, session_id, creation_time, expiration_time) VALUES($1, $2, $3, $4)`, userID, passkeySessionID, now, expirationTime); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	if twoFactorSessionID != "" {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO two_factor_sessions(user_id, session_id, creation_time, expiration_time) VALUES($1, $2, $3, $4)`, userID, twoFactorSessionID, now, expirationTime); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	if token != "" {
+		tokenHash := auth.HashToken(token)
+		if _, err = tx.ExecContext(ctx, `INSERT INTO tokens(user_id, app, token_hash, creation_time, ip, user_agent) VALUES($1, $2, $3, $4, $5, $6)`, userID, app, tokenHash[:], now, ip, userAgent); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	return stacktrace.Propagate(tx.Commit(), "")
+}
+
+func (repo *UserAuthRepository) AddTokenForPendingLogin(ctx context.Context, userID int64, sessionID string,
+	session PendingLoginSession, disableTwoFactor bool, app ente.App, token, ip, userAgent string, tokenData []byte,
+) error {
+	tx, err := repo.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+	if err = lockUserForLogin(ctx, tx, userID, nil); err != nil {
+		return err
+	}
+	now := time.Microseconds()
+	sessionQuery := `DELETE FROM two_factor_sessions WHERE session_id = $1 AND user_id = $2 AND expiration_time > $3 RETURNING user_id`
+	sessionArgs := []interface{}{sessionID, userID, now}
+	if session == PasskeyPendingLogin {
+		sessionQuery = `DELETE FROM passkey_login_sessions WHERE session_id = $1 AND user_id = $2 AND expiration_time > $3 AND verified_at IS NULL RETURNING user_id`
+		if len(tokenData) != 0 {
+			sessionQuery = `UPDATE passkey_login_sessions SET token_data = $4, verified_at = $3 WHERE session_id = $1 AND user_id = $2 AND expiration_time > $3 AND verified_at IS NULL RETURNING user_id`
+			sessionArgs = append(sessionArgs, tokenData)
+		}
+	}
+	var sessionUserID int64
+	if err = tx.QueryRowContext(ctx, sessionQuery, sessionArgs...).Scan(&sessionUserID); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if disableTwoFactor {
+		if _, err = tx.ExecContext(ctx, `UPDATE users SET is_two_factor_enabled = false WHERE user_id = $1`, userID); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	tokenHash := auth.HashToken(token)
+	if _, err = tx.ExecContext(ctx, `INSERT INTO tokens(user_id, app, token_hash, creation_time, ip, user_agent) VALUES($1, $2, $3, $4, $5, $6)`, userID, app, tokenHash[:], now, ip, userAgent); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return stacktrace.Propagate(tx.Commit(), "")
+}
+
+func lockUserForLogin(ctx context.Context, tx *sql.Tx, userID int64, srpAuth *ente.SRPAuthEntity) error {
+	var lockedUserID int64
+	if err := tx.QueryRowContext(ctx, `SELECT user_id FROM users WHERE user_id = $1 FOR NO KEY UPDATE`, userID).Scan(&lockedUserID); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if srpAuth == nil {
+		return nil
+	}
+	var currentSRPUserID uuid.UUID
+	var currentSRPSalt string
+	var currentSRPVerifier string
+	if err := tx.QueryRowContext(ctx, `SELECT srp_user_id, salt, verifier FROM srp_auth WHERE user_id = $1`, userID).Scan(&currentSRPUserID, &currentSRPSalt, &currentSRPVerifier); err != nil {
+		if err == sql.ErrNoRows {
+			return stacktrace.Propagate(ente.ErrInvalidPassword, "stale SRP login")
+		}
+		return stacktrace.Propagate(err, "")
+	}
+	if currentSRPUserID != srpAuth.SRPUserID || currentSRPSalt != srpAuth.Salt || currentSRPVerifier != srpAuth.Verifier {
+		return stacktrace.Propagate(ente.ErrInvalidPassword, "stale SRP login")
+	}
+	return nil
+}
+
 func (repo *UserAuthRepository) GetUserIDWithTokenHash(tokenHash []byte, app ente.App) (int64, bool, error) {
 	row := repo.DB.QueryRow(`
 		SELECT 
@@ -231,7 +332,15 @@ func (repo *UserAuthRepository) RemoveAllTokens(userID int64) ([]RevokedToken, e
 }
 
 func (repo *UserAuthRepository) markTokensDeleted(query string, args ...interface{}) ([]RevokedToken, error) {
-	rows, err := repo.DB.Query(query, args...)
+	return markTokensDeleted(repo.DB, query, args...)
+}
+
+type rowsQueryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+func markTokensDeleted(queryer rowsQueryer, query string, args ...interface{}) ([]RevokedToken, error) {
+	rows, err := queryer.Query(query, args...)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

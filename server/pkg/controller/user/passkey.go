@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
@@ -52,7 +53,7 @@ func (c *UserController) SkipPasskeyVerification(context *gin.Context, req *ente
 	if !exists {
 		return nil, stacktrace.Propagate(ente.ErrPermissionDenied, "")
 	}
-	response, err := c.GetKeyAttributeAndToken(context, userID)
+	response, err := c.GetKeyAttributeAndToken(context, userID, req.SessionID, repo.PasskeyPendingLogin, false, false)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

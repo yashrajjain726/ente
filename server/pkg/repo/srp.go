@@ -116,26 +116,72 @@ func (repo *UserAuthRepository) InsertSRPAuth(ctx context.Context, userID int64,
 	return stacktrace.Propagate(err, "")
 }
 
-func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Context, userID int64, updateKeyAttr ente.UpdateKeysRequest, setup *ente.SRPSetupEntity) error {
+func (repo *UserAuthRepository) InsertOrUpdateSRPAuthAndKeyAttr(ctx context.Context, userID int64, updateKeyAttr ente.UpdateKeysRequest,
+	setup *ente.SRPSetupEntity, clearTokens bool, currentTokenHash []byte, disableSecondFactors bool,
+) ([]RevokedToken, error) {
 	tx, err := repo.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	if err = lockUserForLogin(ctx, tx, userID, nil); err != nil {
+		return nil, err
+	}
+	if len(currentTokenHash) != 0 {
+		var tokenUserID int64
+		if err = tx.QueryRowContext(ctx, `SELECT user_id FROM tokens WHERE user_id = $1 AND token_hash = $2 AND is_deleted = false`, userID, currentTokenHash).Scan(&tokenUserID); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, stacktrace.Propagate(ente.ErrAuthenticationRequired, "token revoked during password update")
+			}
+			return nil, stacktrace.Propagate(err, "")
+		}
+	}
+	if disableSecondFactors {
+		if _, err = tx.ExecContext(ctx, `UPDATE users SET is_two_factor_enabled = false WHERE user_id = $1`, userID); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE passkeys SET friendly_name = id::text, deleted_at = now_utc_micro_seconds() WHERE user_id = $1 AND deleted_at IS NULL`, userID); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, $2, $3, $4)
 		ON CONFLICT (user_id) DO UPDATE SET
 			srp_user_id = EXCLUDED.srp_user_id, salt = EXCLUDED.salt, verifier = EXCLUDED.verifier`,
 		userID, setup.SRPUserID, setup.Salt, setup.Verifier)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return nil, stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE key_attributes SET kek_salt = $1, encrypted_key = $2, key_decryption_nonce = $3, mem_limit = $4, ops_limit = $5 WHERE user_id = $6`,
 		updateKeyAttr.KEKSalt, updateKeyAttr.EncryptedKey, updateKeyAttr.KeyDecryptionNonce, updateKeyAttr.MemLimit, updateKeyAttr.OpsLimit, userID)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return nil, stacktrace.Propagate(err, "")
 	}
-	return tx.Commit()
+	_, err = tx.ExecContext(ctx, `
+		WITH deleted_two_factor_sessions AS (
+			DELETE FROM two_factor_sessions WHERE user_id = $1
+		)
+		DELETE FROM passkey_login_sessions WHERE user_id = $1 AND ($2 OR verified_at IS NULL)`, userID, clearTokens)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	var revokedTokens []RevokedToken
+	if clearTokens {
+		query := `UPDATE tokens SET is_deleted = true WHERE user_id = $1 AND is_deleted = false RETURNING app, token_hash`
+		args := []interface{}{userID}
+		if len(currentTokenHash) != 0 {
+			query = `UPDATE tokens SET is_deleted = true WHERE user_id = $1 AND token_hash <> $2 AND is_deleted = false RETURNING app, token_hash`
+			args = append(args, currentTokenHash)
+		}
+		revokedTokens, err = markTokensDeleted(tx, query, args...)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return revokedTokens, nil
 }
 
 func (repo *UserAuthRepository) GetSrpSessionEntity(ctx context.Context, sessionID uuid.UUID) (*ente.SRPSessionEntity, error) {
