@@ -93,7 +93,7 @@ pub(crate) struct GraphNodeParts {
 pub(crate) struct Graph {
     nodes: Vec<Option<Node>>,
     entry_point: Option<u32>,
-    level_state: u64,
+    insert_ordinal: u64,
 }
 
 impl Graph {
@@ -101,7 +101,7 @@ impl Graph {
         Self {
             nodes: Vec::new(),
             entry_point: None,
-            level_state: LEVEL_SEED,
+            insert_ordinal: 0,
         }
     }
 
@@ -117,6 +117,7 @@ impl Graph {
         entry_point: Option<u32>,
         parts: Vec<GraphNodeParts>,
         slot_count: usize,
+        insert_ordinal: u64,
     ) -> Result<Self, VecDbError> {
         let mut slots: HashSet<u32> = HashSet::with_capacity(parts.len());
         for part in &parts {
@@ -181,7 +182,7 @@ impl Graph {
         Ok(Self {
             nodes,
             entry_point,
-            level_state: LEVEL_SEED,
+            insert_ordinal,
         })
     }
 
@@ -250,6 +251,10 @@ impl Graph {
 
     pub(crate) fn entry_point(&self) -> Option<u32> {
         self.entry_point
+    }
+
+    pub(crate) fn insert_ordinal(&self) -> u64 {
+        self.insert_ordinal
     }
 
     pub(crate) fn node_count(&self) -> usize {
@@ -353,7 +358,9 @@ impl Graph {
     }
 
     fn next_level(&mut self) -> usize {
-        let raw = splitmix64(&mut self.level_state);
+        let mut state = LEVEL_SEED ^ self.insert_ordinal;
+        self.insert_ordinal = self.insert_ordinal.wrapping_add(1);
+        let raw = splitmix64(&mut state);
         let unit = ((raw >> 11) + 1) as f64 / (1u64 << 53) as f64;
         (-unit.ln() * (M as f64).ln().recip()) as usize
     }
@@ -1541,7 +1548,13 @@ mod tests {
         let (arena, graph) = build_fixture(300, 16, 0x8000_0000);
         let parts = graph_parts(&graph);
         assert_eq!(parts.len(), graph.node_count());
-        let rebuilt = Graph::from_parts(graph.entry_point(), parts, arena.slot_count()).unwrap();
+        let rebuilt = Graph::from_parts(
+            graph.entry_point(),
+            parts,
+            arena.slot_count(),
+            graph.insert_ordinal(),
+        )
+        .unwrap();
         assert_identical_graphs(&rebuilt, &graph);
         let query = arena
             .pack_query(&seeded_unit_vector(0x8111_0000, 16))
@@ -1558,23 +1571,36 @@ mod tests {
     }
 
     #[test]
+    fn inserts_after_a_maximal_persisted_ordinal_wrap_instead_of_panicking() {
+        let arena = build_arena(2, 8, 0x00D0_0000);
+        let mut graph = Graph::from_parts(None, Vec::new(), arena.slot_count(), u64::MAX).unwrap();
+        graph.insert(0, &arena);
+        assert_eq!(graph.insert_ordinal(), 0);
+        graph.insert(1, &arena);
+        assert_eq!(graph.insert_ordinal(), 1);
+        assert!(graph.level_of(0).is_some());
+        assert!(graph.level_of(1).is_some());
+    }
+
+    #[test]
     fn from_parts_rejects_malformed_parts() {
         let node = |slot: u32, level: u8, neighbors: Vec<Vec<u32>>| GraphNodeParts {
             slot,
             level,
             neighbors,
         };
-        assert!(Graph::from_parts(None, Vec::new(), 0).is_ok());
-        assert!(Graph::from_parts(Some(0), vec![node(0, 0, vec![Vec::new()])], 1).is_ok());
-        assert!(Graph::from_parts(Some(0), vec![node(0, 1, vec![Vec::new()])], 1).is_err());
-        assert!(Graph::from_parts(Some(0), vec![node(0, 0, vec![vec![9]])], 10).is_err());
-        assert!(Graph::from_parts(None, vec![node(0, 0, vec![Vec::new()])], 1).is_err());
-        assert!(Graph::from_parts(Some(5), vec![node(0, 0, vec![Vec::new()])], 6).is_err());
+        assert!(Graph::from_parts(None, Vec::new(), 0, 0).is_ok());
+        assert!(Graph::from_parts(Some(0), vec![node(0, 0, vec![Vec::new()])], 1, 0).is_ok());
+        assert!(Graph::from_parts(Some(0), vec![node(0, 1, vec![Vec::new()])], 1, 0).is_err());
+        assert!(Graph::from_parts(Some(0), vec![node(0, 0, vec![vec![9]])], 10, 0).is_err());
+        assert!(Graph::from_parts(None, vec![node(0, 0, vec![Vec::new()])], 1, 0).is_err());
+        assert!(Graph::from_parts(Some(5), vec![node(0, 0, vec![Vec::new()])], 6, 0).is_err());
         assert!(
             Graph::from_parts(
                 Some(0),
                 vec![node(0, 0, vec![Vec::new()]), node(0, 0, vec![Vec::new()])],
-                1
+                1,
+                0
             )
             .is_err()
         );
@@ -1585,7 +1611,8 @@ mod tests {
                     node(0, 0, vec![vec![1]]),
                     node(1, 1, vec![vec![0], Vec::new()])
                 ],
-                2
+                2,
+                0
             )
             .is_ok()
         );
@@ -1598,13 +1625,14 @@ mod tests {
             level,
             neighbors,
         };
-        assert!(Graph::from_parts(Some(0), vec![node(0, 0, vec![Vec::new()])], 0).is_err());
-        assert!(Graph::from_parts(Some(2), vec![node(2, 0, vec![Vec::new()])], 2).is_err());
+        assert!(Graph::from_parts(Some(0), vec![node(0, 0, vec![Vec::new()])], 0, 0).is_err());
+        assert!(Graph::from_parts(Some(2), vec![node(2, 0, vec![Vec::new()])], 2, 0).is_err());
         assert!(
             Graph::from_parts(
                 Some(u32::MAX - 1),
                 vec![node(u32::MAX - 1, 0, vec![Vec::new()])],
-                3
+                3,
+                0
             )
             .is_err()
         );
@@ -1625,6 +1653,7 @@ mod tests {
                 node(2, 0, vec![vec![1]]),
             ],
             3,
+            0,
         )
         .unwrap();
         let mut arena = VectorArena::new(8).unwrap();
@@ -1656,7 +1685,7 @@ mod tests {
                 }],
             })
             .collect();
-        let graph = Graph::from_parts(Some(0), parts, arena.slot_count()).unwrap();
+        let graph = Graph::from_parts(Some(0), parts, arena.slot_count(), 0).unwrap();
         assert!(graph.neighbors_of(0, 0).len() > neighbor_cap(0));
         let query = arena
             .pack_query(&seeded_unit_vector(0x00E1_0000, dims))
@@ -1720,6 +1749,7 @@ mod tests {
                 node(2, 2, vec![vec![0], vec![0], vec![0]]),
             ],
             3,
+            0,
         )
         .unwrap();
         let mut arena = VectorArena::new(8).unwrap();
@@ -1747,9 +1777,13 @@ mod tests {
             graph.reinsert(victim, &arena);
             stale_seen |= stale_downward_edge_exists(&graph);
             assert_graph_invariants(&graph);
-            let reloaded =
-                Graph::from_parts(graph.entry_point(), graph_parts(&graph), arena.slot_count())
-                    .unwrap();
+            let reloaded = Graph::from_parts(
+                graph.entry_point(),
+                graph_parts(&graph),
+                arena.slot_count(),
+                graph.insert_ordinal(),
+            )
+            .unwrap();
             assert_identical_graphs(&reloaded, &graph);
             let query = arena.pack_query(&vector).unwrap();
             let top = search(&graph, &arena, &query, &params(Some(1), None, false), None);
@@ -1764,9 +1798,13 @@ mod tests {
             assert_eq!(everything.len(), 600);
         }
         assert!(stale_seen);
-        let rebuilt =
-            Graph::from_parts(graph.entry_point(), graph_parts(&graph), arena.slot_count())
-                .unwrap();
+        let rebuilt = Graph::from_parts(
+            graph.entry_point(),
+            graph_parts(&graph),
+            arena.slot_count(),
+            graph.insert_ordinal(),
+        )
+        .unwrap();
         assert_identical_graphs(&rebuilt, &graph);
         let query = arena
             .pack_query(&seeded_unit_vector(0xB200_0000, 16))
@@ -1826,9 +1864,13 @@ mod tests {
             let (arena, graph) = (&primary.0, &primary.1);
             assert_graph_invariants(graph);
             assert_eq!(arena.live_count(), live.len());
-            let reloaded =
-                Graph::from_parts(graph.entry_point(), graph_parts(graph), arena.slot_count())
-                    .unwrap();
+            let reloaded = Graph::from_parts(
+                graph.entry_point(),
+                graph_parts(graph),
+                arena.slot_count(),
+                graph.insert_ordinal(),
+            )
+            .unwrap();
             assert_identical_graphs(&reloaded, graph);
             for _ in 0..3 {
                 let query_vector = seeded_unit_vector(splitmix64(&mut state), dims);
@@ -1900,8 +1942,13 @@ mod tests {
         }
         assert_identical_graphs(&primary.1, &shadow.1);
         let (arena, graph) = (&primary.0, &primary.1);
-        let rebuilt =
-            Graph::from_parts(graph.entry_point(), graph_parts(graph), arena.slot_count()).unwrap();
+        let rebuilt = Graph::from_parts(
+            graph.entry_point(),
+            graph_parts(graph),
+            arena.slot_count(),
+            graph.insert_ordinal(),
+        )
+        .unwrap();
         assert_identical_graphs(&rebuilt, graph);
         let query = arena
             .pack_query(&seeded_unit_vector(0xC900_0000, dims))

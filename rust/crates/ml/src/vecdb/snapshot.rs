@@ -11,12 +11,13 @@ const MAGIC: [u8; 4] = *b"EVDG";
 const FORMAT_VERSION: u16 = 1;
 const NO_ENTRY_POINT: u32 = u32::MAX;
 const CRC_LEN: usize = 4;
-const FIXED_PREFIX_LEN: usize = 39;
+const FIXED_PREFIX_LEN: usize = 47;
 const MIN_SNAPSHOT_LEN: usize = FIXED_PREFIX_LEN + CRC_LEN;
 const MIN_NODE_LEN: usize = 7;
 
 pub(crate) struct LoadedSnapshot {
     pub(crate) covered_log_offset: u64,
+    pub(crate) insert_ordinal: u64,
     pub(crate) entry_point: Option<u32>,
     pub(crate) parts: Vec<GraphNodeParts>,
 }
@@ -72,6 +73,7 @@ fn encode_snapshot(generation: &[u8; 16], covered_log_offset: u64, graph: &Graph
     bytes.extend_from_slice(&FORMAT_VERSION.to_le_bytes());
     bytes.extend_from_slice(generation);
     bytes.extend_from_slice(&covered_log_offset.to_le_bytes());
+    bytes.extend_from_slice(&graph.insert_ordinal().to_le_bytes());
     let entry_marker = graph.entry_point().unwrap_or(NO_ENTRY_POINT);
     bytes.extend_from_slice(&entry_marker.to_le_bytes());
     let top_level = graph
@@ -136,6 +138,7 @@ fn decode_snapshot(bytes: &[u8], expected_generation: &[u8; 16]) -> Result<Loade
         return Err("generation does not match the log".to_string());
     }
     let covered_log_offset = reader.read_u64().ok_or("truncated header")?;
+    let insert_ordinal = reader.read_u64().ok_or("truncated header")?;
     let entry_marker = reader.read_u32().ok_or("truncated header")?;
     let top_level = reader.read_u8().ok_or("truncated header")?;
     let node_count = reader.read_u32().ok_or("truncated header")? as usize;
@@ -183,6 +186,7 @@ fn decode_snapshot(bytes: &[u8], expected_generation: &[u8; 16]) -> Result<Loade
     }
     Ok(LoadedSnapshot {
         covered_log_offset,
+        insert_ordinal,
         entry_point,
         parts,
     })
@@ -262,13 +266,14 @@ mod tests {
     use super::super::test_support::{assert_identical_graphs, stale_downward_edge_exists};
     use super::*;
 
-    const GOLDEN: [u8; 86] = [
+    const GOLDEN: [u8; 94] = [
         0x45, 0x56, 0x44, 0x47, 0x01, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
         0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x2c, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x01, 0x00, 0x00, 0x00, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
-        0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x64, 0xa1, 0xbc, 0xba,
+        0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x03, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x10, 0xe9, 0x5e, 0xe7,
     ];
 
     fn golden_generation() -> [u8; 16] {
@@ -296,6 +301,7 @@ mod tests {
                 },
             ],
             3,
+            7,
         )
         .unwrap()
     }
@@ -415,6 +421,7 @@ mod tests {
         std::fs::write(snapshot_path(&literal_path), GOLDEN).unwrap();
         let loaded = load_golden(&literal_path).unwrap();
         assert_eq!(loaded.covered_log_offset, 300);
+        assert_eq!(loaded.insert_ordinal, 7);
         assert_eq!(loaded.entry_point, Some(1));
         assert_eq!(loaded.parts.len(), 3);
         let expected: [(u32, u8, Vec<Vec<u32>>); 3] = [
@@ -427,8 +434,10 @@ mod tests {
             assert_eq!(part.level, *level);
             assert_eq!(&part.neighbors, neighbors);
         }
-        let rebuilt = Graph::from_parts(loaded.entry_point, loaded.parts, 3).unwrap();
+        let rebuilt =
+            Graph::from_parts(loaded.entry_point, loaded.parts, 3, loaded.insert_ordinal).unwrap();
         assert_identical_graphs(&rebuilt, &golden_graph());
+        assert_eq!(rebuilt.insert_ordinal(), 7);
     }
 
     #[test]
@@ -442,10 +451,17 @@ mod tests {
         assert!(!temp_snapshot_path(&log_path).exists());
         let loaded = load_snapshot(&log_path, generation).unwrap();
         assert_eq!(loaded.covered_log_offset, 4096);
+        assert_eq!(loaded.insert_ordinal, graph.insert_ordinal());
         assert_eq!(loaded.entry_point, graph.entry_point());
-        let rebuilt =
-            Graph::from_parts(loaded.entry_point, loaded.parts, arena.slot_count()).unwrap();
+        let rebuilt = Graph::from_parts(
+            loaded.entry_point,
+            loaded.parts,
+            arena.slot_count(),
+            loaded.insert_ordinal,
+        )
+        .unwrap();
         assert_identical_graphs(&rebuilt, &graph);
+        assert_eq!(rebuilt.insert_ordinal(), graph.insert_ordinal());
         for seed in 0..6u64 {
             let query = arena
                 .pack_query(&seeded_unit_vector(0x00A4_0000 + seed, dims))
@@ -474,9 +490,11 @@ mod tests {
         );
         let loaded = load_snapshot(&log_path, [3u8; 16]).unwrap();
         assert_eq!(loaded.covered_log_offset, 32);
+        assert_eq!(loaded.insert_ordinal, 0);
         assert_eq!(loaded.entry_point, None);
         assert!(loaded.parts.is_empty());
-        let rebuilt = Graph::from_parts(loaded.entry_point, loaded.parts, 0).unwrap();
+        let rebuilt =
+            Graph::from_parts(loaded.entry_point, loaded.parts, 0, loaded.insert_ordinal).unwrap();
         assert_eq!(rebuilt.entry_point(), None);
         assert_eq!(rebuilt.node_count(), 0);
     }
@@ -532,8 +550,12 @@ mod tests {
                 return;
             };
             decoded += 1;
-            let Ok(graph) = Graph::from_parts(loaded.entry_point, loaded.parts, arena.slot_count())
-            else {
+            let Ok(graph) = Graph::from_parts(
+                loaded.entry_point,
+                loaded.parts,
+                arena.slot_count(),
+                loaded.insert_ordinal,
+            ) else {
                 return;
             };
             for search_params in [params(Some(2), None), params(None, Some(2.5))] {
@@ -573,6 +595,7 @@ mod tests {
         bytes.extend_from_slice(&FORMAT_VERSION.to_le_bytes());
         bytes.extend_from_slice(&golden_generation());
         bytes.extend_from_slice(&300u64.to_le_bytes());
+        bytes.extend_from_slice(&7u64.to_le_bytes());
         bytes.extend_from_slice(&slot.to_le_bytes());
         bytes.push(0);
         bytes.extend_from_slice(&1u32.to_le_bytes());
@@ -583,7 +606,9 @@ mod tests {
         bytes.extend_from_slice(&crc.to_le_bytes());
         let loaded = decode_snapshot(&bytes, &golden_generation()).unwrap();
         assert_eq!(loaded.entry_point, Some(slot));
-        assert!(Graph::from_parts(loaded.entry_point, loaded.parts, 3).is_err());
+        assert!(
+            Graph::from_parts(loaded.entry_point, loaded.parts, 3, loaded.insert_ordinal).is_err()
+        );
     }
 
     #[test]
@@ -619,7 +644,7 @@ mod tests {
 
     #[test]
     fn flipped_body_byte_is_discarded() {
-        assert_discarded(|bytes| bytes[57] ^= 0x01);
+        assert_discarded(|bytes| bytes[65] ^= 0x01);
     }
 
     #[test]
@@ -635,11 +660,11 @@ mod tests {
     #[test]
     fn wrong_node_count_is_discarded() {
         assert_discarded(|bytes| {
-            bytes[35] = 4;
+            bytes[43] = 4;
             refresh_crc(bytes);
         });
         assert_discarded(|bytes| {
-            bytes[35] = 2;
+            bytes[43] = 2;
             refresh_crc(bytes);
         });
     }
@@ -647,7 +672,7 @@ mod tests {
     #[test]
     fn oversized_neighbor_count_is_discarded() {
         assert_discarded(|bytes| {
-            bytes[44..46].copy_from_slice(&u16::MAX.to_le_bytes());
+            bytes[52..54].copy_from_slice(&u16::MAX.to_le_bytes());
             refresh_crc(bytes);
         });
     }
@@ -655,11 +680,11 @@ mod tests {
     #[test]
     fn wrong_top_level_is_discarded() {
         assert_discarded(|bytes| {
-            bytes[34] = 0;
+            bytes[42] = 0;
             refresh_crc(bytes);
         });
         assert_discarded(|bytes| {
-            bytes[34] = 2;
+            bytes[42] = 2;
             refresh_crc(bytes);
         });
     }
@@ -667,7 +692,7 @@ mod tests {
     #[test]
     fn entry_marker_inconsistencies_are_discarded() {
         assert_discarded(|bytes| {
-            bytes[30..34].copy_from_slice(&NO_ENTRY_POINT.to_le_bytes());
+            bytes[38..42].copy_from_slice(&NO_ENTRY_POINT.to_le_bytes());
             refresh_crc(bytes);
         });
         let dir = TempDir::new().unwrap();
@@ -675,7 +700,7 @@ mod tests {
         write_snapshot(&log_path, golden_generation(), 300, &Graph::new()).unwrap();
         let path = snapshot_path(&log_path);
         let mut bytes = std::fs::read(&path).unwrap();
-        bytes[30..34].copy_from_slice(&0u32.to_le_bytes());
+        bytes[38..42].copy_from_slice(&0u32.to_le_bytes());
         refresh_crc(&mut bytes);
         std::fs::write(&path, &bytes).unwrap();
         assert!(load_golden(&log_path).is_none());

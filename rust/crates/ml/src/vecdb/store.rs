@@ -447,6 +447,7 @@ impl VecDb {
             return Ok(Vec::new());
         }
         let st = self.shared.state_read();
+        self.shared.ensure_open()?;
         let allowed_slots = resolve_allowed_slots(&st, params.allowed_keys.as_deref());
         search_in_state(&st, query, params, allowed_slots.as_ref())
     }
@@ -461,6 +462,7 @@ impl VecDb {
             return Ok(queries.iter().map(|_| Vec::new()).collect());
         }
         let st = self.shared.state_read();
+        self.shared.ensure_open()?;
         let allowed_slots = resolve_allowed_slots(&st, params.allowed_keys.as_deref());
         queries
             .iter()
@@ -478,6 +480,7 @@ impl VecDb {
     ) -> Result<Vec<KeyMatches>, VecDbError> {
         self.shared.ensure_open()?;
         let st = self.shared.state_read();
+        self.shared.ensure_open()?;
         let resolved: Vec<(&String, u32)> = keys
             .iter()
             .filter_map(|key| st.arena.slot_of_key(key).map(|slot| (key, slot)))
@@ -532,7 +535,12 @@ impl VecDb {
 
     pub fn reset(&self) -> Result<(), VecDbError> {
         let mut half = self.writable_half()?;
-        let WriterState { lock, log, .. } = take_writer_state(&mut half)?;
+        let WriterState {
+            lock,
+            log,
+            mutations_since_snapshot,
+            ..
+        } = take_writer_state(&mut half)?;
         let old_generation = log.generation();
         drop(log);
         let dims = self.shared.dims;
@@ -541,7 +549,13 @@ impl VecDb {
         let log = match recreated {
             Ok(log) => log,
             Err(error) => {
-                recover_after_failed_reset(&self.shared, &mut half, lock, old_generation);
+                recover_after_failed_reset(
+                    &self.shared,
+                    &mut half,
+                    lock,
+                    old_generation,
+                    mutations_since_snapshot,
+                );
                 return Err(error);
             }
         };
@@ -825,13 +839,14 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
     let WriterState {
         lock,
         log,
+        mutations_since_snapshot,
         last_write,
-        ..
     } = take_writer_state(half)?;
     drop(log);
     let promoted = promote_compacted_log(&temp_path, &shared.path);
-    if temp_path.exists() {
+    let pending = if temp_path.exists() {
         let _ = std::fs::remove_file(&temp_path);
+        mutations_since_snapshot
     } else {
         let graph = Graph::rebuild(&compacted);
         let total_records = compacted.live_count() as u64;
@@ -840,8 +855,9 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
         st.graph = graph;
         st.attrs = compacted_attrs;
         st.total_records = total_records;
-    }
-    let restored = restore_writer_mode(shared, half, lock, last_write);
+        total_records as usize
+    };
+    let restored = restore_writer_mode(shared, half, lock, last_write, pending);
     promoted?;
     restored?;
     write_snapshot_now(shared, half)
@@ -852,13 +868,14 @@ fn restore_writer_mode(
     half: &mut WriterHalf,
     lock: WriterLock,
     last_write: Option<Instant>,
+    mutations_since_snapshot: usize,
 ) -> Result<(), VecDbError> {
     match reopen_log(&shared.path, shared.dims) {
         Ok(log) => {
             half.mode = WriterMode::Active(WriterState {
                 lock,
                 log,
-                mutations_since_snapshot: 0,
+                mutations_since_snapshot,
                 last_write,
             });
             Ok(())
@@ -882,8 +899,9 @@ fn recover_after_failed_reset(
     half: &mut WriterHalf,
     lock: WriterLock,
     old_generation: [u8; 16],
+    old_pending: usize,
 ) {
-    let old_log_restored = restore_writer_mode(shared, half, lock, None).is_ok()
+    let old_log_restored = restore_writer_mode(shared, half, lock, None, old_pending).is_ok()
         && matches!(&half.mode, WriterMode::Active(state) if state.log.generation() == old_generation);
     if old_log_restored {
         return;
@@ -895,6 +913,9 @@ fn recover_after_failed_reset(
         st.attrs.reset();
         st.total_records = 0;
         half.compaction_retry_at_dead = 0;
+    }
+    if let WriterMode::Active(state) = &mut half.mode {
+        state.mutations_since_snapshot = 0;
     }
 }
 
@@ -1141,7 +1162,12 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
     let (graph, used_snapshot) = match snapshot {
         Some(loaded) if loaded.covered_log_offset <= recoverable_end => {
             let snapshot_slots = covered_slot_count.unwrap_or(arena.slot_count());
-            match Graph::from_parts(loaded.entry_point, loaded.parts, snapshot_slots) {
+            match Graph::from_parts(
+                loaded.entry_point,
+                loaded.parts,
+                snapshot_slots,
+                loaded.insert_ordinal,
+            ) {
                 Ok(mut graph) => {
                     for outcome in tail_outcomes {
                         apply_outcome(&mut graph, &arena, outcome);
@@ -2356,6 +2382,59 @@ mod tests {
     }
 
     #[test]
+    fn interrupted_sessions_draw_the_same_levels_as_one_uninterrupted_session() {
+        let dir = TempDir::new().unwrap();
+        let split_path = dir.path().join("split");
+        let whole_path = dir.path().join("whole");
+        {
+            let db = open_writer(&split_path);
+            bulk_add(&db, &bulk_entries(0, 40, 500)).unwrap();
+            db.flush().unwrap();
+        }
+        assert_eq!(
+            load_snapshot(&split_path, generation_of(&split_path))
+                .unwrap()
+                .insert_ordinal,
+            40
+        );
+        {
+            let db = open_writer(&split_path);
+            bulk_add(&db, &bulk_entries(40, 30, 500)).unwrap();
+            db.add("key-3", &seeded_unit_vector(999, DIMS)).unwrap();
+        }
+        {
+            let db = open_writer(&split_path);
+            bulk_add(&db, &bulk_entries(70, 30, 500)).unwrap();
+            db.flush().unwrap();
+        }
+        let split = open_writer(&split_path);
+        let whole = open_writer(&whole_path);
+        bulk_add(&whole, &bulk_entries(0, 40, 500)).unwrap();
+        bulk_add(&whole, &bulk_entries(40, 30, 500)).unwrap();
+        whole.add("key-3", &seeded_unit_vector(999, DIMS)).unwrap();
+        bulk_add(&whole, &bulk_entries(70, 30, 500)).unwrap();
+        let split_state = split.shared.state_read();
+        let whole_state = whole.shared.state_read();
+        assert_eq!(split_state.graph.insert_ordinal(), 101);
+        assert_eq!(whole_state.graph.insert_ordinal(), 101);
+        let mut upper_levels = 0usize;
+        for index in 0..100 {
+            let key = format!("key-{index}");
+            let split_slot = split_state.arena.slot_of_key(&key).unwrap();
+            let whole_slot = whole_state.arena.slot_of_key(&key).unwrap();
+            assert_eq!(split_slot, whole_slot);
+            let level = split_state.graph.level_of(split_slot).unwrap();
+            assert_eq!(
+                level,
+                whole_state.graph.level_of(whole_slot).unwrap(),
+                "level diverges for {key}"
+            );
+            upper_levels += usize::from(level > 0);
+        }
+        assert!(upper_levels > 0);
+    }
+
+    #[test]
     fn compaction_rewrites_log_and_preserves_live_data() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -2382,6 +2461,7 @@ mod tests {
         assert_ne!(generation_of(&path), generation_before);
         let loaded = load_snapshot(&path, generation_of(&path)).unwrap();
         assert_eq!(loaded.covered_log_offset, stats.log_bytes);
+        assert_eq!(loaded.insert_ordinal, 90);
         let live_vector = |index: u64| {
             if index < 40 {
                 seeded_unit_vector(5000 + index, DIMS)
@@ -2529,8 +2609,14 @@ mod tests {
         let path = dir.path().join("db");
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 3, 260)).unwrap();
-        let WriterState { lock, log, .. } = take_writer(&db);
+        let WriterState {
+            lock,
+            log,
+            mutations_since_snapshot,
+            ..
+        } = take_writer(&db);
         drop(log);
+        assert_eq!(mutations_since_snapshot, 3);
         assert!(is_degraded(&db));
         let vector = seeded_unit_vector(4, DIMS);
         assert!(matches!(
@@ -2543,8 +2629,10 @@ mod tests {
         ));
         {
             let mut half = db.shared.writer_half();
-            restore_writer_mode(&db.shared, &mut half, lock, None).unwrap();
+            restore_writer_mode(&db.shared, &mut half, lock, None, mutations_since_snapshot)
+                .unwrap();
         }
+        assert_eq!(mutations(&db), 3);
         db.add("after", &vector).unwrap();
         assert!(matches!(
             WriterLock::acquire(&path),
@@ -2571,7 +2659,7 @@ mod tests {
         {
             let mut half = db.shared.writer_half();
             assert!(matches!(
-                restore_writer_mode(&db.shared, &mut half, lock, None),
+                restore_writer_mode(&db.shared, &mut half, lock, None, 3),
                 Err(VecDbError::Corrupt(_))
             ));
             assert!(
@@ -2632,6 +2720,37 @@ mod tests {
         assert!(reopened.contains("probe"));
         assert!(reopened.contains("key-64"));
         assert!(!reopened.contains("key-0"));
+    }
+
+    #[test]
+    fn failed_post_compaction_snapshot_leaves_the_state_dirty_until_flush_succeeds() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 100, 970)).unwrap();
+        fs::create_dir(snapshot_path(&path)).unwrap();
+        let removals: Vec<String> = (0..64).map(|index| format!("key-{index}")).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 64);
+        let stats = db.stats().unwrap();
+        assert_eq!(stats.live_count, 36);
+        assert_eq!(stats.dead_count, 0);
+        assert_eq!(stats.records_since_snapshot, 36);
+        assert!(matches!(db.flush(), Err(VecDbError::Io { .. })));
+        assert_eq!(db.stats().unwrap().records_since_snapshot, 36);
+        drop(db);
+        let blocked = open_writer(&path);
+        assert_eq!(blocked.len(), 36);
+        assert!(blocked.contains("key-64"));
+        assert!(!blocked.contains("key-0"));
+        assert_eq!(blocked.stats().unwrap().records_since_snapshot, 36);
+        fs::remove_dir(snapshot_path(&path)).unwrap();
+        blocked.flush().unwrap();
+        assert_eq!(blocked.stats().unwrap().records_since_snapshot, 0);
+        assert!(snapshot_exists(&path));
+        drop(blocked);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 36);
+        assert_own_nearest(&reopened, "key-99", &seeded_unit_vector(970 + 99, DIMS));
     }
 
     #[test]
@@ -2742,6 +2861,7 @@ mod tests {
         };
         assert_eq!(db.len(), 5);
         assert!(db.contains("key-0"));
+        assert_eq!(db.stats().unwrap().records_since_snapshot, 5);
         db.add("after", &seeded_unit_vector(6, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
@@ -2763,11 +2883,12 @@ mod tests {
         drop(Log::create(&path, DIMS).unwrap().into_file());
         {
             let mut half = db.shared.writer_half();
-            recover_after_failed_reset(&db.shared, &mut half, lock, old_generation);
+            recover_after_failed_reset(&db.shared, &mut half, lock, old_generation, 5);
         }
         assert!(db.is_empty());
         assert!(!db.contains("key-0"));
         assert_eq!(db.stats().unwrap().log_bytes, 32);
+        assert_eq!(db.stats().unwrap().records_since_snapshot, 0);
         db.add("fresh", &seeded_unit_vector(7, DIMS)).unwrap();
         assert_eq!(db.len(), 1);
         drop(db);
@@ -2811,6 +2932,14 @@ mod tests {
         let query = seeded_unit_vector(1, DIMS);
         assert!(matches!(
             survivor.search(&query, &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(
+            survivor.bulk_search(std::slice::from_ref(&query), &limit_params(3)),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(
+            survivor.bulk_search_stored(&["key-0".to_string()], 3, None, false, false),
             Err(VecDbError::Closed)
         ));
         assert!(matches!(survivor.add("x", &query), Err(VecDbError::Closed)));
