@@ -42,9 +42,22 @@ const handleStreamRequest = async (
     )
         return new Response("", { status: 403 });
 
-    const url = request.url;
+    const { host, searchParams } = new URL(request.url);
+    if (
+        request.method == "OPTIONS" &&
+        host == "video" &&
+        searchParams.get("op") == "generate-hls"
+    ) {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                "Access-Control-Allow-Origin": rendererOrigin,
+                "Access-Control-Allow-Methods": "POST",
+                "Access-Control-Allow-Headers": "X-Auth-Token",
+            },
+        });
+    }
 
-    const { host, searchParams } = new URL(url);
     switch (host) {
         case "read":
             return handleRead(searchParams.get("path")!);
