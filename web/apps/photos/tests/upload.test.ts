@@ -174,6 +174,8 @@ describe("Apple Photos XMP sidecars", () => {
     test.each([
         ["12.97236N", "77.59457E", 12.97236, 77.59457],
         ["33.8688S", "151.2093W", -33.8688, -151.2093],
+        ["37,46.5N", "122,25W", 37.775, -(122 + 25 / 60)],
+        ["33,52.128S", "151,12.558E", -(33 + 52.128 / 60), 151 + 12.558 / 60],
     ])("parses GPS coordinates %s, %s", (lat, long, latitude, longitude) => {
         expect(
             parseXMPSidecarTags({

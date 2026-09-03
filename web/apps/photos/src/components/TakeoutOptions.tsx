@@ -30,9 +30,10 @@ const optionsTitleSx = {
 
 const stepSx = {
     color: "text.muted",
-    fontSize: "14px",
-    fontWeight: 500,
-    lineHeight: "20px",
+    fontSize: "13px",
+    fontWeight: 400,
+    lineHeight: "18px",
+    opacity: 0.7,
 };
 
 interface TakeoutOptionsProps {
@@ -114,7 +115,7 @@ export function TakeoutOptions({
 
             <Stack sx={{ gap: "20px" }}>
                 {provider == "apple" && (
-                    <Stack sx={{ gap: "4px" }}>
+                    <Stack sx={{ gap: "6px" }}>
                         <Typography sx={stepSx}>
                             {t("apple_export_step_1")}
                         </Typography>

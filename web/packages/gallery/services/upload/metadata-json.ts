@@ -123,11 +123,13 @@ export const parseXMPSidecarTags = (
 ): ParsedMetadataJSON | undefined => {
     const { creationDate, description } = parseExif(tags);
     const parseCoordinate = (value: string | undefined) => {
-        const match = /^(\d+(?:\.\d+)?)([NSEW])$/.exec(value ?? "");
+        const match = /^(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?([NSEW])$/.exec(
+            value ?? "",
+        );
         if (!match) return undefined;
 
-        const coordinate = Number(match[1]);
-        return match[2] == "S" || match[2] == "W" ? -coordinate : coordinate;
+        const coordinate = Number(match[1]) + Number(match[2] ?? 0) / 60;
+        return match[3] == "S" || match[3] == "W" ? -coordinate : coordinate;
     };
     const latitude = parseCoordinate(tags.xmp?.GPSLatitude?.description);
     const longitude = parseCoordinate(tags.xmp?.GPSLongitude?.description);

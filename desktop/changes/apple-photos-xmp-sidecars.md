@@ -1,0 +1,1 @@
+- Added support for reading Apple Photos XMP sidecar files during folder and ZIP imports, preserving dates, locations, and captions.

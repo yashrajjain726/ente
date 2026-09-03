@@ -141,46 +141,48 @@ function ImportOptions({
     onSelectFolder,
 }: ImportOptionsProps): React.JSX.Element {
     return (
-        <Stack sx={{ gap: "20px" }}>
-            <Stack
-                direction="row"
-                sx={{
-                    gap: "10px",
-                    [uploadSheetMediaQuery]: { flexWrap: "wrap" },
-                }}
-            >
-                <ImportProviderButton
-                    icon={
-                        <HugeiconsIcon
-                            icon={Album02Icon}
-                            size={22}
-                            color="var(--mui-palette-text-muted)"
-                        />
-                    }
-                    label={t("google_photos")}
-                    onClick={onSelectGooglePhotos}
-                />
-                <ImportProviderButton
-                    icon={
-                        <AppleIcon sx={{ color: "text.muted", fontSize: 22 }} />
-                    }
-                    label={t("apple_photos")}
-                    onClick={onSelectApplePhotos}
-                />
-                <ImportProviderButton
-                    icon={
-                        <HugeiconsIcon
-                            icon={Folder01Icon}
-                            size={22}
-                            color="var(--mui-palette-text-muted)"
-                        />
-                    }
-                    label={t("folder")}
-                    pending={isFolderSelectionPending}
-                    onClick={onSelectFolder}
-                />
-            </Stack>
-            <DragAndDropHint />
+        <Stack sx={{ gap: "24px" }}>
+            <ImportSection title={t("import_from")}>
+                <Stack direction="row" sx={{ gap: "10px" }}>
+                    <ImportProviderButton
+                        icon={
+                            <HugeiconsIcon
+                                icon={Album02Icon}
+                                size={22}
+                                color="var(--mui-palette-text-muted)"
+                            />
+                        }
+                        label={t("google_photos")}
+                        onClick={onSelectGooglePhotos}
+                    />
+                    <ImportProviderButton
+                        icon={
+                            <AppleIcon
+                                sx={{ color: "text.muted", fontSize: 22 }}
+                            />
+                        }
+                        label={t("apple_photos")}
+                        onClick={onSelectApplePhotos}
+                    />
+                </Stack>
+            </ImportSection>
+            <ImportSection title={t("upload_from")}>
+                <Stack direction="row">
+                    <ImportProviderButton
+                        icon={
+                            <HugeiconsIcon
+                                icon={Folder01Icon}
+                                size={22}
+                                color="var(--mui-palette-text-muted)"
+                            />
+                        }
+                        label={t("folder")}
+                        pending={isFolderSelectionPending}
+                        onClick={onSelectFolder}
+                    />
+                </Stack>
+                <DragAndDropHint />
+            </ImportSection>
             <ImportHelp />
         </Stack>
     );
