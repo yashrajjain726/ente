@@ -21,7 +21,9 @@ import {
 import {
     matchJSONMetadata,
     metadataJSONMapKeyForJSON,
+    metadataJSONMapKeyForXMP,
     tryParseTakeoutMetadataJSON,
+    tryParseXMPSidecar,
     type ParsedMetadataJSON,
 } from "ente-gallery/services/upload/metadata-json";
 import UploadService, {
@@ -493,18 +495,14 @@ class UploadManager {
         for (const item of items) {
             this.abortIfCancelled();
 
-            const { uploadItem, pathPrefix, fileName, collectionID } = item;
-            log.info(`Parsing metadata JSON ${fileName}`);
-            const metadataJSON = await tryParseTakeoutMetadataJSON(uploadItem!);
-            if (metadataJSON) {
-                const key = metadataJSONMapKeyForJSON(
-                    pathPrefix,
-                    collectionID,
-                    fileName,
-                );
-                this.parsedMetadataJSONMap.set(key, metadataJSON);
-                this.uiService.increaseFileUploaded();
+            log.info(`Parsing metadata ${item.fileName}`);
+            const parsedMetadata = await tryParseMetadataItem(item);
+            if (parsedMetadata) {
+                const [key, metadata, isJSON] = parsedMetadata;
+                if (isJSON || !this.parsedMetadataJSONMap.has(key))
+                    this.parsedMetadataJSONMap.set(key, metadata);
             }
+            this.uiService.increaseFileUploaded();
         }
     }
 
@@ -699,6 +697,26 @@ const makeUploadItemWithCollectionIDAndName = (
     externalParsedMetadata: f.externalParsedMetadata,
 });
 
+const tryParseMetadataItem = async (
+    item: UploadItemWithCollectionIDAndName,
+) => {
+    const { uploadItem, pathPrefix, collectionID, fileName } = item;
+    const extension = lowercaseExtension(fileName);
+    const metadata =
+        extension == "json"
+            ? await tryParseTakeoutMetadataJSON(uploadItem!)
+            : extension == "xmp"
+              ? await tryParseXMPSidecar(uploadItem!)
+              : undefined;
+    if (!metadata) return undefined;
+
+    const key =
+        extension == "json"
+            ? metadataJSONMapKeyForJSON(pathPrefix, collectionID, fileName)
+            : metadataJSONMapKeyForXMP(pathPrefix, collectionID, fileName);
+    return [key, metadata, extension == "json"] as const;
+};
+
 const splitMetadataAndMediaItems = (
     items: UploadItemWithCollectionIDAndName[],
 ): [
@@ -707,7 +725,8 @@ const splitMetadataAndMediaItems = (
 ] =>
     items.reduce(
         ([metadata, media], f) => {
-            if (lowercaseExtension(f.fileName) == "json") metadata.push(f);
+            if (["json", "xmp"].includes(lowercaseExtension(f.fileName) ?? ""))
+                metadata.push(f);
             else media.push(f);
             return [metadata, media];
         },
@@ -794,27 +813,22 @@ export const uploadableMediaCount = async (
     );
     const [metadataItems, mediaItems] = splitMetadataAndMediaItems(namedItems);
     const parsedMetadataJSONMap = new Map<string, ParsedMetadataJSON>();
+    let parsedJSONCount = 0;
 
-    for (const {
-        uploadItem,
-        pathPrefix,
-        collectionID,
-        fileName,
-    } of metadataItems) {
-        const metadataJSON = await tryParseTakeoutMetadataJSON(uploadItem!);
-        if (metadataJSON) {
-            parsedMetadataJSONMap.set(
-                metadataJSONMapKeyForJSON(pathPrefix, collectionID, fileName),
-                metadataJSON,
-            );
+    for (const item of metadataItems) {
+        const parsedMetadata = await tryParseMetadataItem(item);
+        if (parsedMetadata) {
+            const [key, metadata, isJSON] = parsedMetadata;
+            if (isJSON || !parsedMetadataJSONMap.has(key))
+                parsedMetadataJSONMap.set(key, metadata);
+            if (isJSON) parsedJSONCount++;
         }
     }
 
     return {
         count: (await clusterLivePhotos(mediaItems, parsedMetadataJSONMap))
             .length,
-        // Metadata sidecars identify a Takeout import.
-        isTakeout: parsedMetadataJSONMap.size > 0,
+        isTakeout: parsedJSONCount > 0,
     };
 };
 
