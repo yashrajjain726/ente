@@ -34,6 +34,7 @@ fn segmentation_model_asset() -> Result<Asset, ScanError> {
         AssetFile {
             name: SEGMENTATION_MODEL_FILE.to_string(),
             url: SEGMENTATION_MODEL_URL.to_string(),
+            size: 5_085_426,
             sha256: SEGMENTATION_MODEL_SHA256.to_string(),
         },
     )

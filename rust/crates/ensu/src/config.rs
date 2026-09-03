@@ -14,8 +14,10 @@ pub struct ModelPreset {
     pub id: String,
     pub title: String,
     pub url: String,
+    pub size: u64,
     pub sha256: String,
     pub mmproj_url: Option<String>,
+    pub mmproj_size: Option<u64>,
     pub mmproj_sha256: Option<String>,
 }
 
@@ -62,11 +64,13 @@ fn lfm_vl_1_6b() -> ModelPreset {
         id: "lfm-vl-1.6b".to_string(),
         title: "LFM 2.5 VL 1.6B (Q4_0)".to_string(),
         url: "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_0.gguf?download=true".to_string(),
+        size: 695_752_480,
         sha256: "8186364a4e7c3ad30f6dd3d3b7a4e0074c77dd91eed6cad5d8be9090ce285804".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/mmproj-LFM2.5-VL-1.6b-Q8_0.gguf"
                 .to_string(),
         ),
+        mmproj_size: Some(583_109_888),
         mmproj_sha256: Some("2ce89e610c56f3198ece2b86cf61743a08b9307279c89125eb2412ebb908689d".to_string()),
     }
 }
@@ -76,11 +80,13 @@ fn qwen_0_8b() -> ModelPreset {
         id: "qwen-0.8b".to_string(),
         title: "Qwen 3.5 0.8B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf?download=true".to_string(),
+        size: 532_517_120,
         sha256: "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
         ),
+        mmproj_size: Some(204_987_232),
         mmproj_sha256: Some("56e4c6cfe73b0c82e3e82bc518d7591997e61d81f723fc41a586f4fa69ea2453".to_string()),
     }
 }
@@ -90,11 +96,13 @@ fn qwen_2b_q8() -> ModelPreset {
         id: "qwen-2b-q8".to_string(),
         title: "Qwen 3.5 2B (Q8_0)".to_string(),
         url: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q8_0.gguf?download=true".to_string(),
+        size: 2_012_012_800,
         sha256: "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
         ),
+        mmproj_size: Some(668_227_264),
         mmproj_sha256: Some("7035e9cb8d7c6a9681d07eef9a364783e86ea4cd73faab2eabb4f43a101830c7".to_string()),
     }
 }
@@ -104,11 +112,13 @@ fn qwen_4b_q4km() -> ModelPreset {
         id: "qwen-4b-q4km".to_string(),
         title: "Qwen 3.5 4B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf?download=true".to_string(),
+        size: 2_740_937_888,
         sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/mmproj-F16.gguf"
                 .to_string(),
         ),
+        mmproj_size: Some(672_423_616),
         mmproj_sha256: Some("cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864".to_string()),
     }
 }
@@ -118,11 +128,13 @@ fn gemma_4_e4b_q4km() -> ModelPreset {
         id: "gemma-4-e4b-q4km".to_string(),
         title: "Gemma 4 E4B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/gemma-4-E4B-it-Q4_K_M.gguf?download=true".to_string(),
+        size: 4_977_171_584,
         sha256: "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/ente-ai/gemma-4-E4B-it-GGUF/resolve/f0089e04ac8494e513619d18b44c829c6b815440/mmproj-F16.gguf"
                 .to_string(),
         ),
+        mmproj_size: Some(990_372_672),
         mmproj_sha256: Some("ddf46c21d7078e95338cfc22306b19b276a29a5ad089023449dd54d4b6170a51".to_string()),
     }
 }
@@ -132,11 +144,13 @@ fn gemma_4_e2b_q4km() -> ModelPreset {
         id: "gemma-4-e2b-q4km".to_string(),
         title: "Gemma 4 E2B (Q4_K_M)".to_string(),
         url: "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/gemma-4-E2B-it-Q4_K_M.gguf?download=true".to_string(),
+        size: 3_106_738_272,
         sha256: "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8".to_string(),
         mmproj_url: Some(
             "https://huggingface.co/ente-ai/gemma-4-E2B-it-GGUF/resolve/d9f70b02c9a2193b7263daee865dfa93276fd99a/mmproj-F16.gguf"
                 .to_string(),
         ),
+        mmproj_size: Some(985_654_080),
         mmproj_sha256: Some("140be8d7849741f88c50757d529b84373ee8e27052cc2236855b537f4a8215fa".to_string()),
     }
 }
@@ -146,8 +160,10 @@ fn parakeet_v3_int8() -> ModelPreset {
         id: "parakeet-v3-int8".to_string(),
         title: "Transcription model".to_string(),
         url: "https://models.ente.com/parakeet-v3-int8.tar.gz".to_string(),
+        size: 478_517_071,
         sha256: "43d37191602727524a7d8c6da0eef11c4ba24320f5b4730f1a2497befc2efa77".to_string(),
         mmproj_url: None,
+        mmproj_size: None,
         mmproj_sha256: None,
     }
 }
@@ -157,8 +173,10 @@ fn silero_vad_v4() -> ModelPreset {
         id: "silero-vad-v4".to_string(),
         title: "Voice activity model".to_string(),
         url: "https://models.ente.com/silero_vad_v4.onnx".to_string(),
+        size: 1_807_522,
         sha256: "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28".to_string(),
         mmproj_url: None,
+        mmproj_size: None,
         mmproj_sha256: None,
     }
 }
@@ -295,19 +313,20 @@ mod tests {
     }
 
     #[test]
-    fn catalog_presets_pair_mmproj_url_with_checksum() {
+    fn catalog_presets_pair_mmproj_metadata() {
         for preset in llm_catalog() {
             let has_url = preset
                 .mmproj_url
                 .as_deref()
                 .is_some_and(|u| !u.trim().is_empty());
+            let has_size = preset.mmproj_size.is_some();
             let has_sha = preset
                 .mmproj_sha256
                 .as_deref()
                 .is_some_and(|s| !s.trim().is_empty());
-            assert_eq!(
-                has_url, has_sha,
-                "preset {} must pair mmproj URL with its checksum",
+            assert!(
+                has_url == has_size && has_size == has_sha,
+                "preset {} must pair mmproj URL, size, and checksum",
                 preset.id
             );
         }

@@ -472,6 +472,7 @@ struct AssetLock {
 struct DocumentAsset {
     path: String,
     url: String,
+    size: u64,
     sha256: String,
 }
 
@@ -483,6 +484,7 @@ struct OnnxRuntimeAssets {
 #[derive(Debug, Deserialize)]
 struct OnnxRuntimeArchive {
     url: String,
+    size: u64,
     sha256: String,
     library_path: String,
     library_sha256: String,
@@ -503,6 +505,7 @@ struct ModelAssets {
 struct ModelAsset {
     file_name: String,
     url: String,
+    size: u64,
     sha256: String,
 }
 
@@ -527,6 +530,7 @@ struct FixtureManifest {
 #[derive(Debug, Deserialize)]
 struct FixtureFile {
     path: String,
+    size: u64,
     sha256: String,
 }
 
@@ -625,6 +629,7 @@ async fn resolve_document_asset(
         label,
         &file_id_for_manifest_path(&asset.path)?,
         &asset.url,
+        asset.size,
         &asset.sha256,
     )
     .await
@@ -653,6 +658,7 @@ async fn fetch_fixtures(
                 &label,
                 &label,
                 &fixture_url(fixture_base_url, &fixture.path)?,
+                fixture.size,
                 &fixture.sha256,
             )
             .await?,
@@ -685,6 +691,7 @@ async fn resolve_onnx_runtime_library(
         &target_key,
         &archive_name,
         &archive.url,
+        archive.size,
         &archive.sha256,
     )
     .await?;
@@ -830,6 +837,7 @@ async fn golden_model(
             label,
             &model.file_name,
             &model.url,
+            model.size,
             &model.sha256,
         )
         .await?,
@@ -848,6 +856,7 @@ async fn resolve_model_asset(
         label,
         &asset.file_name,
         &asset.url,
+        asset.size,
         &asset.sha256,
     )
     .await
@@ -859,6 +868,7 @@ async fn download_file(
     key: &str,
     name: &str,
     url: &str,
+    size: u64,
     expected_sha256: &str,
 ) -> Result<PathBuf> {
     let sha256 = normalize_sha256(expected_sha256);
@@ -867,6 +877,7 @@ async fn download_file(
         AssetFile {
             name: name.to_string(),
             url: url.to_string(),
+            size,
             sha256,
         },
     )

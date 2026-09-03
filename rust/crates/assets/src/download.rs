@@ -68,6 +68,7 @@ impl From<std::io::Error> for Error {
 pub struct DownloadTarget {
     pub label: String,
     pub url: String,
+    pub expected_size: u64,
     pub sha256: String,
     pub destination: PathBuf,
 }
@@ -237,10 +238,9 @@ impl Downloader {
                 continue;
             }
             let probe = fetch_download_probe(&self.client, &target.url).await;
-            let total = probe.content_length?;
-            let downloaded =
-                existing_download_bytes(target, &target.destination, &probe, false).min(total);
-            remaining = remaining.saturating_add(total - downloaded);
+            let downloaded = existing_download_bytes(target, &target.destination, &probe, false)
+                .min(target.expected_size);
+            remaining = remaining.checked_add(target.expected_size - downloaded)?;
         }
         Some(remaining)
     }
@@ -281,7 +281,7 @@ async fn fetch_async(
         cached.push(is_cached);
         if is_cached {
             download_probes.push(DownloadProbe {
-                content_length: file_size(destination),
+                content_length: Some(target.expected_size),
                 supports_ranges: false,
                 response_metadata: None,
             });
@@ -290,30 +290,22 @@ async fn fetch_async(
         }
     }
 
-    let total_bytes = if download_probes
+    let total_bytes = targets
         .iter()
-        .all(|probe| probe.content_length.is_some())
-    {
-        let total = download_probes
-            .iter()
-            .filter_map(|probe| probe.content_length)
-            .sum::<u64>();
-        (total > 0).then_some(total)
-    } else {
-        None
-    };
+        .try_fold(0u64, |total, target| {
+            total.checked_add(target.expected_size)
+        })
+        .filter(|total| *total > 0);
 
     let mut file_states = targets
         .iter()
-        .zip(&download_probes)
         .zip(&cached)
-        .map(|((target, probe), cached)| {
+        .zip(&download_probes)
+        .map(|((target, cached), probe)| {
             let existing = existing_download_bytes(target, &target.destination, probe, *cached);
             FileProgress {
-                downloaded_bytes: probe
-                    .content_length
-                    .map_or(existing, |value| existing.min(value)),
-                total_bytes: probe.content_length,
+                downloaded_bytes: existing.min(target.expected_size),
+                total_bytes: Some(target.expected_size),
                 network_downloaded_bytes: 0,
                 elapsed: Duration::ZERO,
                 retry_count: 0,
@@ -339,7 +331,7 @@ async fn fetch_async(
             .get(index)
             .cloned()
             .unwrap_or_else(DownloadProbe::default);
-        let expected_file_total = download_probe.content_length;
+        let expected_file_total = target.expected_size;
         let target_label = target.label.clone();
         let file_report = download_file(
             client,
@@ -374,7 +366,7 @@ async fn fetch_async(
 
         if let Some(state) = file_states.get_mut(index) {
             state.downloaded_bytes = file_report.final_size;
-            state.total_bytes = expected_file_total.or(Some(file_report.final_size));
+            state.total_bytes = Some(expected_file_total);
             state.network_downloaded_bytes = file_report.network_downloaded_bytes;
             state.elapsed = file_report.elapsed;
             state.retry_count = file_report.retry_count;
@@ -426,46 +418,36 @@ async fn download_file(
         .parent()
         .ok_or_else(|| Error::InvalidTarget(destination.display().to_string()))?;
     fs::create_dir_all(parent)?;
+    validate_reported_size(download_probe.content_length, target.expected_size)?;
 
     let mut range_error = None;
-    if let Some(total) = download_probe.content_length {
-        if should_use_range_download(total, download_probe) {
-            match download_file_ranged(
-                client,
-                target,
-                destination,
-                total,
-                download_probe.response_metadata.clone(),
-                &mut on_progress,
-                is_cancelled,
-            )
-            .await
-            {
-                Ok(report) => return Ok(report),
-                Err(err @ (Error::Cancelled | Error::Validation(_) | Error::StorageFull)) => {
-                    return Err(err);
-                }
-                Err(err) => {
-                    range_error = Some(err);
-                    cleanup_range_download(destination);
-                }
+    if should_use_range_download(target.expected_size, download_probe) {
+        match download_file_ranged(
+            client,
+            target,
+            destination,
+            target.expected_size,
+            download_probe.response_metadata.clone(),
+            &mut on_progress,
+            is_cancelled,
+        )
+        .await
+        {
+            Ok(report) => return Ok(report),
+            Err(err @ (Error::Cancelled | Error::Validation(_) | Error::StorageFull)) => {
+                return Err(err);
             }
-        } else if range_metadata_path_for(destination).exists() {
-            cleanup_range_download(destination);
+            Err(err) => {
+                range_error = Some(err);
+                cleanup_range_download(destination);
+            }
         }
     } else if range_metadata_path_for(destination).exists() {
         cleanup_range_download(destination);
     }
 
-    let single_result = download_file_single(
-        client,
-        target,
-        destination,
-        download_probe.content_length,
-        &mut on_progress,
-        is_cancelled,
-    )
-    .await;
+    let single_result =
+        download_file_single(client, target, destination, &mut on_progress, is_cancelled).await;
 
     match (single_result, range_error) {
         (Ok(report), _) => Ok(report),
@@ -481,10 +463,10 @@ async fn download_file_single(
     client: &Client,
     target: &DownloadTarget,
     destination: &Path,
-    expected_file_total: Option<u64>,
     on_progress: &mut (dyn FnMut(FileProgress) + Send),
     is_cancelled: &(impl Fn() -> bool + Sync),
 ) -> Result<FileDownloadReport, Error> {
+    let expected_size = target.expected_size;
     let tmp_path = tmp_path_for(destination);
     let partial_metadata_path = partial_metadata_path_for(destination);
     let file_started_at = Instant::now();
@@ -496,7 +478,11 @@ async fn download_file_single(
             return Err(Error::Cancelled);
         }
 
-        let tmp_size = file_size(&tmp_path).unwrap_or(0);
+        let mut tmp_size = file_size(&tmp_path).unwrap_or(0);
+        if tmp_size > expected_size {
+            cleanup_range_download(destination);
+            tmp_size = 0;
+        }
         let resume_validator = if tmp_size > 0 {
             partial_download_validator(destination, target)
         } else {
@@ -558,7 +544,12 @@ async fn download_file_single(
         }
         let resume_from = if append { resume_from } else { 0 };
         let response_metadata = response_metadata(&response);
-        let file_total = content_total(&response, resume_from).or(expected_file_total);
+        if let Err(error) =
+            validate_reported_size(content_total(&response, resume_from), expected_size)
+        {
+            cleanup_range_download(destination);
+            return Err(error);
+        }
 
         if !append {
             if if_range_header_value(Some(&response_metadata)).is_some() {
@@ -581,7 +572,7 @@ async fn download_file_single(
 
         on_progress(FileProgress {
             downloaded_bytes: downloaded,
-            total_bytes: file_total,
+            total_bytes: Some(expected_size),
             network_downloaded_bytes,
             elapsed: file_started_at.elapsed(),
             retry_count,
@@ -609,14 +600,23 @@ async fn download_file_single(
                 break;
             };
 
+            let chunk_len = chunk.len() as u64;
+            if chunk_len > expected_size - downloaded {
+                drop(file);
+                cleanup_range_download(destination);
+                return Err(Error::SizeMismatch {
+                    expected: expected_size,
+                    actual: downloaded.saturating_add(chunk_len),
+                });
+            }
             file.write_all(&chunk)?;
-            downloaded = downloaded.saturating_add(chunk.len() as u64);
-            network_downloaded_bytes = network_downloaded_bytes.saturating_add(chunk.len() as u64);
+            downloaded += chunk_len;
+            network_downloaded_bytes = network_downloaded_bytes.saturating_add(chunk_len);
 
             if last_progress.elapsed() >= PROGRESS_INTERVAL {
                 on_progress(FileProgress {
                     downloaded_bytes: downloaded,
-                    total_bytes: file_total,
+                    total_bytes: Some(expected_size),
                     network_downloaded_bytes,
                     elapsed: file_started_at.elapsed(),
                     retry_count,
@@ -635,22 +635,16 @@ async fn download_file_single(
 
         on_progress(FileProgress {
             downloaded_bytes: downloaded,
-            total_bytes: file_total,
+            total_bytes: Some(expected_size),
             network_downloaded_bytes,
             elapsed: file_started_at.elapsed(),
             retry_count,
         });
 
-        if let Some(total) = file_total
-            && downloaded != total
-        {
-            if downloaded > total {
-                let _ = fs::remove_file(&tmp_path);
-                let _ = fs::remove_file(&partial_metadata_path);
-            }
+        if downloaded != expected_size {
             if attempt == MAX_ATTEMPTS {
                 return Err(Error::SizeMismatch {
-                    expected: total,
+                    expected: expected_size,
                     actual: downloaded,
                 });
             }
@@ -883,14 +877,14 @@ impl RangeDownloadContext<'_, '_> {
                 };
 
                 let chunk_len = chunk.len() as u64;
-                if downloaded_in_range.saturating_add(chunk_len) > range_len {
+                if chunk_len > range_len - downloaded_in_range {
                     return Err(Error::Protocol(
                         "received more bytes than requested".to_string(),
                     ));
                 }
 
                 write_all_at(file, chunk.as_ref(), range.start + downloaded_in_range)?;
-                downloaded_in_range = downloaded_in_range.saturating_add(chunk_len);
+                downloaded_in_range += chunk_len;
 
                 {
                     let mut states = self.range_states.lock().expect("range state lock");
@@ -1054,6 +1048,15 @@ async fn fetch_download_probe(client: &Client, url: &str) -> DownloadProbe {
 
 fn should_use_range_download(total: u64, probe: &DownloadProbe) -> bool {
     total >= MIN_RANGE_DOWNLOAD_BYTES && probe.supports_ranges
+}
+
+fn validate_reported_size(reported: Option<u64>, expected: u64) -> Result<(), Error> {
+    if let Some(actual) = reported
+        && actual != expected
+    {
+        return Err(Error::SizeMismatch { expected, actual });
+    }
+    Ok(())
 }
 
 fn prepare_range_download_metadata(
@@ -1334,7 +1337,7 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
 }
 
 async fn prepare_cached_download(target: &DownloadTarget, destination: &Path) -> bool {
-    if !destination.exists()
+    if file_size(destination) != Some(target.expected_size)
         || check_sha256(destination, &target.sha256, &target.label)
             .await
             .is_err()
@@ -1474,7 +1477,11 @@ fn existing_download_bytes(
     }
 
     if range_metadata_path_for(destination).exists() {
-        if let Some(total) = probe.content_length {
+        let total = target.expected_size;
+        if probe
+            .content_length
+            .is_none_or(|reported| reported == total)
+        {
             let ranges = range_download_parts(total, RANGE_DOWNLOAD_CONCURRENCY);
             if let Some(metadata) = read_range_download_metadata(destination)
                 && file_size(&tmp_path_for(destination)) == Some(total)
@@ -1499,6 +1506,7 @@ fn existing_download_bytes(
 
     partial_download_validator(destination, target)
         .and_then(|_| file_size(&tmp_path_for(destination)))
+        .filter(|size| *size <= target.expected_size)
         .unwrap_or(0)
 }
 
@@ -1708,6 +1716,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url,
+                expected_size: bytes.len() as u64,
                 destination: destination.clone(),
                 sha256: sha_hex(&bytes),
             }],
@@ -1758,6 +1767,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
+                expected_size: bytes.len() as u64,
                 destination: destination.clone(),
                 sha256: sha_hex(&bytes),
             }],
@@ -1767,6 +1777,135 @@ mod tests {
         .await;
 
         result.expect("single-stream download succeeds");
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(get_count.load(Ordering::SeqCst), 1);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[tokio::test]
+    async fn reported_size_mismatch_is_rejected_before_preallocation() {
+        let expected_size = MIN_RANGE_DOWNLOAD_BYTES;
+        let reported_size = expected_size * 2;
+        let get_count = Arc::new(AtomicUsize::new(0));
+        let server = {
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |mut stream| {
+                let Some(request) = read_test_request(&stream) else {
+                    return;
+                };
+                if request.line.starts_with("HEAD ") {
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {reported_size}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n"
+                    );
+                    let _ = stream.write_all(response.as_bytes());
+                } else {
+                    get_count.fetch_add(1, Ordering::SeqCst);
+                }
+            })
+        };
+
+        let test_dir = scratch_dir("reported-size-mismatch");
+        let destination = test_dir.join("model.bin");
+        let result = download(
+            vec![DownloadTarget {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                expected_size,
+                destination: destination.clone(),
+                sha256: "0".repeat(64),
+            }],
+            |_| {},
+            false,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(Error::Target { source, .. })
+                if matches!(*source, Error::SizeMismatch { expected, actual }
+                    if expected == expected_size && actual == reported_size)
+        ));
+        assert_eq!(get_count.load(Ordering::SeqCst), 0);
+        assert!(!tmp_path_for(&destination).exists());
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[tokio::test]
+    async fn headerless_stream_is_bounded_by_expected_size() {
+        let expected = Arc::new(sample_bytes(512));
+        let served = Arc::new(sample_bytes(513));
+        let expected_size = expected.len() as u64;
+        let served_size = served.len() as u64;
+        let get_count = Arc::new(AtomicUsize::new(0));
+        let server = {
+            let served = Arc::clone(&served);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_headerless_test_request(stream, Arc::clone(&served), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("bounded-headerless-download");
+        let destination = test_dir.join("model.bin");
+        let result = download(
+            vec![DownloadTarget {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                expected_size,
+                destination: destination.clone(),
+                sha256: sha_hex(&expected),
+            }],
+            |_| {},
+            false,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(Error::Target { source, .. })
+                if matches!(*source, Error::SizeMismatch { expected, actual }
+                    if expected == expected_size && actual == served_size)
+        ));
+        assert_eq!(get_count.load(Ordering::SeqCst), 1);
+        assert!(!destination.exists());
+        assert!(!tmp_path_for(&destination).exists());
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[tokio::test]
+    async fn headerless_stream_with_expected_size_succeeds() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_headerless_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("expected-headerless-download");
+        let destination = test_dir.join("model.bin");
+        download(
+            vec![DownloadTarget {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                expected_size: bytes.len() as u64,
+                destination: destination.clone(),
+                sha256: sha_hex(&bytes),
+            }],
+            |_| {},
+            false,
+        )
+        .await
+        .expect("headerless download succeeds");
+
         assert_eq!(
             fs::read(&destination).expect("read downloaded file"),
             *bytes
@@ -1803,6 +1942,7 @@ mod tests {
         let targets = ["model", "projector"].map(|label| DownloadTarget {
             label: label.to_string(),
             url: server.url(&format!("/{label}.bin")),
+            expected_size: bytes.len() as u64,
             destination: test_dir.join(format!("{label}.bin")),
             sha256: sha_hex(&bytes),
         });
@@ -1843,6 +1983,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -1885,6 +2026,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -1931,6 +2073,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -1977,6 +2120,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -2039,6 +2183,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -2091,6 +2236,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -2137,6 +2283,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -2232,6 +2379,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
+                expected_size: 1,
                 destination: destination.clone(),
                 sha256: "0".repeat(64),
             }],
@@ -2262,6 +2410,7 @@ mod tests {
         let target = DownloadTarget {
             label: "Model".to_string(),
             url: server.url("/model.bin"),
+            expected_size: bytes.len() as u64,
             destination: destination.clone(),
             sha256: sha_hex(&bytes),
         };
@@ -2296,6 +2445,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url: "http://127.0.0.1:1/model.bin".to_string(),
+                expected_size: b"complete-model".len() as u64,
                 destination: destination.clone(),
                 sha256: sha_hex(b"complete-model"),
             }],
@@ -2336,6 +2486,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
+                expected_size: bytes.len() as u64,
                 destination: destination.clone(),
                 sha256: expected,
             }],
@@ -2371,6 +2522,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
+                expected_size: bytes.len() as u64,
                 destination: destination.clone(),
                 sha256: "0".repeat(64),
             }],
@@ -2415,6 +2567,7 @@ mod tests {
             vec![DownloadTarget {
                 label: "Model".to_string(),
                 url: server.url("/model.bin"),
+                expected_size: bytes.len() as u64,
                 destination: destination.clone(),
                 sha256: "0".repeat(64),
             }],
@@ -2444,6 +2597,7 @@ mod tests {
         let old_target = DownloadTarget {
             label: "Model".to_string(),
             url: "http://cache.example.org/old-location".to_string(),
+            expected_size: b"model-bytes".len() as u64,
             destination: destination.clone(),
             sha256: sha.clone(),
         };
@@ -2561,6 +2715,22 @@ mod tests {
             bytes.len()
         );
         let _ = stream.write_all(response.as_bytes());
+        if request.line.starts_with("HEAD ") {
+            return;
+        }
+        get_count.fetch_add(1, Ordering::SeqCst);
+        let _ = stream.write_all(bytes.as_slice());
+    }
+
+    fn handle_headerless_test_request(
+        mut stream: TcpStream,
+        bytes: Arc<Vec<u8>>,
+        get_count: Arc<AtomicUsize>,
+    ) {
+        let Some(request) = read_test_request(&stream) else {
+            return;
+        };
+        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n");
         if request.line.starts_with("HEAD ") {
             return;
         }
