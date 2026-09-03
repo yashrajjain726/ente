@@ -3,7 +3,7 @@
 require "json"
 require "yaml"
 
-MOBILE_ROOT = File.expand_path("..", __dir__)
+MOBILE_ROOT = File.expand_path("../..", __dir__)
 EXACT_ONE_SELECTOR = /=1\s*\{/.freeze
 
 def source_arbs

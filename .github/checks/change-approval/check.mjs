@@ -8,8 +8,11 @@ const routineBinary = (file) =>
     /\.(png|jpe?g|webp|gif|ico|icns|ttf|otf|woff2?|riv|mp3)$/i.test(file) || file.includes("Assets.xcassets/");
 const guardrailDirs = [
     ".github/",
+    "mobile/checks/",
     "mobile/scripts/",
+    "rust/checks/",
     "rust/scripts/",
+    "web/checks/",
     "web/scripts/",
     "server/scripts/",
     "web/packages/build-config/",

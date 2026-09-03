@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-const script = join(import.meta.dirname, "change-approval.mjs");
+const script = join(import.meta.dirname, "check.mjs");
 const env = {
     PATH: process.env.PATH,
     GIT_CONFIG_GLOBAL: "/dev/null",
@@ -334,17 +334,27 @@ test("go.sum new module", (t) => {
 test("guardrail paths modified or deleted, not added", (t) => {
     const output = scan(
         t,
-        { ".github/scripts/x.mjs": "", ".github/workflows/x.yml": "on: push\n", "web/apps/x/eslint.config.mjs": "" },
+        {
+            ".github/scripts/x.mjs": "",
+            ".github/workflows/x.yml": "on: push\n",
+            "mobile/checks/x/check.rb": "",
+            "rust/checks/x/check.py": "",
+            "web/apps/x/eslint.config.mjs": "",
+            "web/checks/x/check.mjs": "",
+        },
         {
             ".github/scripts/x.mjs": "export {};\n",
             ".github/workflows/x.yml": "on: pull_request\n",
+            "mobile/checks/x/check.rb": "\n",
+            "rust/checks/x/check.py": "\n",
             "web/apps/x/eslint.config.mjs": null,
+            "web/checks/x/check.mjs": "\n",
             ".github/CODEOWNERS": "",
         },
     );
     assert.equal(
         output,
-        "3 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `web/apps/x/eslint.config.mjs`\n\n",
+        "6 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
     );
 });
 
