@@ -50,7 +50,7 @@ const circleSlotsForCount = (count: number) => {
 
     const columns = 2;
     const rows = Math.ceil(count / columns);
-    const singleCircleRow = count % columns ? (count == 5 ? 1 : rows - 1) : -1;
+    const singleCircleRow = count % columns ? rows - 1 : -1;
     const slots: CircleSlot[] = [];
     for (let row = 0; row < rows; row++) {
         if (row == singleCircleRow) {
