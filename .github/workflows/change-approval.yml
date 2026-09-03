@@ -17,7 +17,7 @@ jobs:
       - name: Checkout PR
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - run: node --test .github/scripts/change-approval.test.mjs
+      - run: node --test .github/checks/change-approval/test.mjs
 
   detect:
     runs-on: ubuntu-latest
@@ -34,14 +34,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: trusted
-          sparse-checkout: .github/scripts/change-approval.mjs
+          sparse-checkout: .github/checks/change-approval/check.mjs
           sparse-checkout-cone-mode: false
 
       - name: Scan changes
         id: scan
-        run: node "$scanner" ${{ github.event.pull_request.base.sha }}
-        env:
-          scanner: ${{ hashFiles('trusted/.github/scripts/change-approval.mjs') && 'trusted/.github/scripts/change-approval.mjs' || '.github/scripts/change-approval.mjs' }}
+        run: node trusted/.github/checks/change-approval/check.mjs ${{ github.event.pull_request.base.sha }}
 
   approve:
     needs: detect

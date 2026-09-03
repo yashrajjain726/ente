@@ -33,7 +33,7 @@
         "build:space-wasm": "npm run build --workspace ente-space-wasm",
         "build:twoof3": "npm exec --workspace twoof3 -- next build --webpack",
         "build:wasm": "npm run build:core-wasm && npm run build:cast-wasm && npm run build:ensu-wasm && npm run build:legacy-wasm && npm run build:locker-wasm && npm run build:paste-wasm && npm run build:photos-wasm && npm run build:space-wasm",
-        "check:wasm-imports": "eslint --config scripts/wasm-imports/eslint.config.mjs --parser @typescript-eslint/parser --no-inline-config --max-warnings 0 apps packages && node scripts/wasm-imports/entrypoints.mjs && node --test scripts/wasm-imports/test.mjs",
+        "check:wasm-imports": "eslint --config checks/wasm-imports/eslint.config.mjs --parser @typescript-eslint/parser --no-inline-config --max-warnings 0 apps packages && node checks/wasm-imports/entrypoints.mjs && node --test checks/wasm-imports/test.mjs",
         "dev": "npm run dev:photos",
         "dev:accounts": "npm run build:core-wasm && npm exec --workspace accounts -- next dev --webpack -p 3001",
         "dev:albums": "npm run build:core-wasm && npm exec --workspace albums -- next dev --webpack -p 3002",

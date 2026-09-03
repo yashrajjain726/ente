@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-const script = join(import.meta.dirname, "change-approval.mjs");
+const script = join(import.meta.dirname, "check.mjs");
 const env = {
     PATH: process.env.PATH,
     GIT_CONFIG_GLOBAL: "/dev/null",
@@ -106,6 +106,15 @@ test("binary modified", (t) => {
 
 test("binary deleted is ignored", (t) => {
     assert.equal(scan(t, { "a.bin": Buffer.alloc(16) }, { "a.bin": null }), "");
+});
+
+test("CI preserves tabs and newlines in binary and large filenames", (t) => {
+    const binary = "image.png\tpayload.jar";
+    const large = "large\nfile.txt";
+    const size = 1024 * 1024 + 1;
+    const { output, summary } = scan(t, {}, { [binary]: Buffer.alloc(16), [large]: "a".repeat(size) }, { ci: true });
+    assert.equal(output, 'categories=["binary files","large files"]\n');
+    assert.equal(summary, `## Binary files\n\n- \`${binary}\` (16 bytes)\n\n## Large files\n\n- \`${large}\` (${size} bytes)\n`);
 });
 
 test("routine image, font, and xcassets binaries are ignored", (t) => {
@@ -325,17 +334,27 @@ test("go.sum new module", (t) => {
 test("guardrail paths modified or deleted, not added", (t) => {
     const output = scan(
         t,
-        { ".github/scripts/x.mjs": "", ".github/workflows/x.yml": "on: push\n", "web/apps/x/eslint.config.mjs": "" },
+        {
+            ".github/scripts/x.mjs": "",
+            ".github/workflows/x.yml": "on: push\n",
+            "mobile/checks/x/check.rb": "",
+            "rust/checks/x/check.py": "",
+            "web/apps/x/eslint.config.mjs": "",
+            "web/checks/x/check.mjs": "",
+        },
         {
             ".github/scripts/x.mjs": "export {};\n",
             ".github/workflows/x.yml": "on: pull_request\n",
+            "mobile/checks/x/check.rb": "\n",
+            "rust/checks/x/check.py": "\n",
             "web/apps/x/eslint.config.mjs": null,
+            "web/checks/x/check.mjs": "\n",
             ".github/CODEOWNERS": "",
         },
     );
     assert.equal(
         output,
-        "3 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `web/apps/x/eslint.config.mjs`\n\n",
+        "6 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
     );
 });
 
@@ -355,6 +374,23 @@ test("new root .cargo/config.toml is a config file, even untracked", (t) => {
     const expected = "1 config file\n\n## Toolchain and registry config\n\n- `.cargo/config.toml`\n\n";
     assert.equal(scan(t, { "a.txt": "a\n" }, { ".cargo/config.toml": "[registries]\n" }), expected);
     assert.equal(scan(t, { "a.txt": "a\n" }, { ".cargo/config.toml": "[registries]\n" }, { commit: false }), expected);
+});
+
+test("Git attributes require config approval even when they hide binary changes", (t) => {
+    const { output, summary } = scan(
+        t,
+        { "modified/.gitattributes": "", "deleted/.gitattributes": "", "a.jar": Buffer.alloc(16) },
+        {
+            ".gitattributes": "*.jar diff\n",
+            "added/.gitattributes": "*.jar diff\n",
+            "modified/.gitattributes": "*.jar diff\n",
+            "deleted/.gitattributes": null,
+            "a.jar": Buffer.alloc(32),
+        },
+        { ci: true },
+    );
+    assert.equal(output, 'categories=["config files"]\n');
+    assert.equal(summary, "## Toolchain and registry config\n\n- `.gitattributes`\n- `added/.gitattributes`\n- `deleted/.gitattributes`\n- `modified/.gitattributes`\n");
 });
 
 test("uncommitted and untracked changes are scanned locally", (t) => {

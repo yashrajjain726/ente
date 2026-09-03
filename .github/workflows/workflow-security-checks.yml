@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
-      - '.github/scripts/check_workflow_security.rb'
+      - '.github/checks/workflow-security/**'
 
 permissions:
   contents: read
@@ -25,8 +25,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: trusted
-          sparse-checkout: .github/scripts/check_workflow_security.rb
+          sparse-checkout: .github/checks/workflow-security/check.rb
           sparse-checkout-cone-mode: false
 
       - name: Run workflow security checks
-        run: ruby trusted/.github/scripts/check_workflow_security.rb
+        run: ruby trusted/.github/checks/workflow-security/check.rb
