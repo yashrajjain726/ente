@@ -163,12 +163,22 @@ export const tryParseXMPSidecar = async (
     uploadItem: UploadItem,
 ): Promise<ParsedMetadataJSON | undefined> => {
     try {
-        const text = await uploadItemText(uploadItem);
+        const text = normalizeXMPSidecarText(await uploadItemText(uploadItem));
         return parseXMPSidecarTags(await extractRawExif(new Blob([text])));
     } catch (e) {
         log.error("Failed to parse XMP sidecar", e);
         return undefined;
     }
+};
+
+const normalizeXMPSidecarText = (text: string) => {
+    const source = text
+        .replace(/^\uFEFF/, "")
+        .trimStart()
+        .replace(/^<\?xml\s+[^>]*\?>\s*/i, "");
+    return source.startsWith("<?xpacket begin")
+        ? source
+        : `<?xpacket begin=""?>\n${source}`;
 };
 
 export const tryParseTakeoutAlbumNameMetadataJSON = async (

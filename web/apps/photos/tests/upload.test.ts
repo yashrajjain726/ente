@@ -8,6 +8,7 @@ import {
     metadataJSONMapKeyForJSON,
     metadataJSONMapKeyForXMP,
     parseXMPSidecarTags,
+    tryParseXMPSidecar,
 } from "ente-gallery/services/upload/metadata-json";
 import { describe, expect, test } from "vitest";
 
@@ -140,6 +141,27 @@ describe("upload filename metadata", () => {
 });
 
 describe("Apple Photos XMP sidecars", () => {
+    test("parses a wrapperless sidecar with a BOM and XML declaration", async () => {
+        const sidecar = new File(
+            [
+                `\uFEFF  <?xml version="1.0" encoding="UTF-8"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/">
+    <rdf:RDF>
+        <rdf:Description photoshop:DateCreated="2023-04-27T14:51:16+05:30" />
+    </rdf:RDF>
+</x:xmpmeta>`,
+            ],
+            "278.xmp",
+        );
+
+        await expect(tryParseXMPSidecar(sidecar)).resolves.toMatchObject({
+            creationDate: {
+                dateTime: "2023-04-27T14:51:16.000",
+                offset: "+05:30",
+            },
+        });
+    });
+
     test("parses DateCreated with an offset", () => {
         const metadata = parseXMPSidecarTags({
             xmp: { DateCreated: xmpTag("2023-04-27T14:51:16+05:30") },
