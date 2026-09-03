@@ -26,6 +26,7 @@ import {
     saveSRPAttributes,
     updateSavedLocalUser,
 } from "ente-accounts/services/accounts-db";
+import { masterKeyFromSession } from "ente-accounts/services/core-session";
 import { decryptBox } from "ente-accounts/services/crypto";
 import {
     openPasskeyVerificationURL,
@@ -38,7 +39,6 @@ import {
 } from "ente-accounts/services/redirect";
 import { checkSessionValidity } from "ente-accounts/services/session";
 import {
-    masterKeyFromSession,
     saveMasterKeyInSessionAndSafeStore,
     stashKeyEncryptionKeyInSessionStore,
     unstashKeyEncryptionKeyFromSession,

@@ -1,3 +1,5 @@
+#[cfg(feature = "accounts")]
+pub mod accounts;
 #[cfg(feature = "contacts")]
 pub mod contacts;
 #[cfg(feature = "crypto")]

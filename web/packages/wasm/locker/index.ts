@@ -1,4 +1,6 @@
+import { wrap } from "comlink";
 import { readAndFree } from "ente-utils/wasm";
+import type { KDFWorker } from "./kdf.worker";
 import type { WrappedRootContactKey } from "./pkg/ente_locker_wasm";
 
 interface OpenSessionInput {
@@ -70,6 +72,17 @@ interface KeyPair {
     publicKey: string;
     privateKey: string;
 }
+
+export const deriveInteractiveKey = async (password: string) => {
+    const worker = new Worker(new URL("kdf.worker.ts", import.meta.url));
+    try {
+        const RemoteWorker = wrap<typeof KDFWorker>(worker);
+        const remote = await new RemoteWorker();
+        return await remote.deriveInteractiveKey(password);
+    } finally {
+        worker.terminate();
+    }
+};
 
 export const generateKey = async () => (await wasm()).cryptoGenerateKey();
 

@@ -8,8 +8,6 @@ crate-type = ["cdylib"]
 [dependencies]
 ente-accounts.workspace = true
 ente-core.workspace = true
-ente-wasm-lib = { workspace = true, features = ["crypto"] }
+ente-wasm-lib = { workspace = true, features = ["accounts", "crypto"] }
 ente-wasm-log.workspace = true
-js-sys.workspace = true
-thiserror.workspace = true
 wasm-bindgen.workspace = true

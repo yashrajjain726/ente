@@ -20,7 +20,7 @@ vi.mock("ente-base/log", () => ({
     default: { info: vi.fn(), error: vi.fn() },
 }));
 vi.mock("ente-base/token", () => ({ savedAuthToken: vi.fn() }));
-vi.mock("ente-accounts/services/session-storage", () => ({
+vi.mock("../src/services/account-keys", () => ({
     masterKeyFromSession: vi.fn(),
 }));
 vi.mock("ente-accounts/services/user", () => ({

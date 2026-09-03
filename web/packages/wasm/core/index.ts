@@ -45,7 +45,7 @@ export const deriveInteractiveKey = async (
     password: string,
 ): Promise<DerivedKey> =>
     readAndFree(
-        (await wasm()).auth_generate_interactive_kek(password),
+        (await wasm()).authGenerateInteractiveKek(password),
         derivedKeyValue,
     );
 
@@ -130,16 +130,11 @@ export const deriveSubKeyBytes = async (
         ),
     );
 
-const derivedKeyValue = (key: {
-    key: string;
-    salt: string;
-    ops_limit: number;
-    mem_limit: number;
-}): DerivedKey => ({
+const derivedKeyValue = (key: DerivedKey): DerivedKey => ({
     key: key.key,
     salt: key.salt,
-    opsLimit: key.ops_limit,
-    memLimit: key.mem_limit,
+    opsLimit: key.opsLimit,
+    memLimit: key.memLimit,
 });
 
 const toB64String = (value: Uint8Array | string): string => {

@@ -6,6 +6,7 @@ import {
     saveKeyAttributes,
     updateSavedLocalUser,
 } from "ente-accounts/services/accounts-db";
+import { ensureMasterKeyFromSession } from "ente-accounts/services/core-session";
 import {
     boxSealOpenBytes,
     decryptBox,
@@ -16,7 +17,10 @@ import {
     generateKeyPair,
     toB64URLSafe,
 } from "ente-accounts/services/crypto";
-import { ensureMasterKeyFromSession } from "ente-accounts/services/session-storage";
+import {
+    ensureMasterKeyFromSession as readMasterKeyFromSession,
+    type DecryptBox,
+} from "ente-accounts/services/session-storage";
 import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,
@@ -104,12 +108,14 @@ export interface UserKeyPair {
     privateKey: string;
 }
 
-export const ensureUserKeyPair = async (): Promise<UserKeyPair> => {
+export const ensureUserKeyPair = async (
+    decrypt: DecryptBox,
+): Promise<UserKeyPair> => {
     const { encryptedSecretKey, secretKeyDecryptionNonce, publicKey } =
         ensureSavedKeyAttributes();
-    const privateKey = await decryptBox(
+    const privateKey = await decrypt(
         { encryptedData: encryptedSecretKey, nonce: secretKeyDecryptionNonce },
-        await ensureMasterKeyFromSession(),
+        await readMasterKeyFromSession(decrypt),
     );
     return { publicKey, privateKey };
 };

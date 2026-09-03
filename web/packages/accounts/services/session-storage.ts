@@ -11,14 +11,19 @@ const SessionKeyData = z.object({
 
 type SessionKeyData = z.infer<typeof SessionKeyData>;
 
+export type DecryptBox = (
+    box: { encryptedData: string; nonce: string },
+    key: string,
+) => Promise<string>;
+
 const sessionKeyData = async (keyData: string): Promise<SessionKeyData> => {
     const key = await generateKey();
     const box = await encryptBox(keyData, key);
     return { key, ...box };
 };
 
-export const ensureMasterKeyFromSession = async () => {
-    const key = await masterKeyFromSession();
+export const ensureMasterKeyFromSession = async (decrypt: DecryptBox) => {
+    const key = await masterKeyFromSession(decrypt);
     if (!key) throw new Error("Master key not found in session");
     return key;
 };
@@ -26,14 +31,14 @@ export const ensureMasterKeyFromSession = async () => {
 export const haveMasterKeyInSession = () =>
     !!sessionStorage.getItem("encryptionKey");
 
-export const masterKeyFromSession = async () => {
+export const masterKeyFromSession = async (decrypt: DecryptBox) => {
     const value = sessionStorage.getItem("encryptionKey");
     if (!value) return undefined;
 
     const { encryptedData, key, nonce } = SessionKeyData.parse(
         JSON.parse(value),
     );
-    return decryptBox({ encryptedData, nonce }, key);
+    return decrypt({ encryptedData, nonce }, key);
 };
 
 export const saveMasterKeyInSessionAndSafeStore = async (masterKey: string) => {
