@@ -33,6 +33,7 @@ import {
 import {
     spaceAppBackground,
     spaceAppBackgroundColor,
+    spaceSurface,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -62,7 +63,7 @@ const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
-const headerChromeColor = "#EFEFEF";
+const headerChromeColor = "#F0F0F0";
 const mediaPlaceholderColor = "#E5E7EA";
 const headerHeight = 64;
 const headerIconSize = 22;
@@ -702,7 +703,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                         aria-hidden
                         sx={{
                             alignItems: "center",
-                            bgcolor: "rgba(255, 255, 255, 0.86)",
+                            bgcolor: spaceSurface,
                             color: textSecondary,
                             display: "flex",
                             fontSize: 14,

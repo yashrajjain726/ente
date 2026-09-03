@@ -1852,6 +1852,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 boxSizing: "border-box",
                                 display: "flex",
                                 flexDirection: "column",
+                                gap: "16px",
                                 justifyContent: "center",
                                 minHeight: 0,
                                 pb: 0,
@@ -1880,6 +1881,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     }}
                                 >
                                     {`${firstName} hasn't posted anything yet.`}
+                                </Box>
+                            )}
+                            {isOwnerProfile && (
+                                <Box
+                                    component="p"
+                                    sx={{
+                                        color: textSoft,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        lineHeight: "20px",
+                                        m: 0,
+                                        maxWidth: 250,
+                                    }}
+                                >
+                                    Share something from your day.
                                 </Box>
                             )}
                             {isOwnerProfile && (
@@ -1931,7 +1949,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         size={20}
                                         strokeWidth={1.8}
                                     />
-                                    Share a moment
+                                    Post
                                 </Box>
                             )}
                         </Box>
