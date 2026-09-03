@@ -557,6 +557,11 @@ fn encode_header(dims: u32, generation: &[u8; 16]) -> [u8; HEADER_LEN] {
     bytes
 }
 
+pub(crate) fn header_generation(bytes: &[u8; HEADER_LEN]) -> Result<[u8; 16], VecDbError> {
+    let dims = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+    decode_header(bytes, dims)
+}
+
 fn decode_header(bytes: &[u8; HEADER_LEN], expected_dims: usize) -> Result<[u8; 16], VecDbError> {
     if bytes[0..4] != MAGIC {
         return Err(VecDbError::Corrupt(format!(

@@ -11,7 +11,7 @@ mod log;
 mod snapshot;
 mod store;
 
-pub use store::{Stats, VecDb};
+pub use store::{OpenCost, Stats, VecDb};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
