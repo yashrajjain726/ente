@@ -206,6 +206,32 @@ describe("Apple Photos XMP sidecars", () => {
         ).toEqual({ latitude, longitude });
     });
 
+    test.each([
+        [
+            "8.5683539130357",
+            "N",
+            "76.873247987321",
+            "E",
+            8.5683539130357,
+            76.873247987321,
+        ],
+        ["33.448889", "S", "70.669265", "W", -33.448889, -70.669265],
+    ])(
+        "parses decimal GPS coordinates with separate %s/%s references",
+        (lat, latRef, long, longRef, latitude, longitude) => {
+            expect(
+                parseXMPSidecarTags({
+                    xmp: {
+                        GPSLatitude: xmpTag(lat),
+                        GPSLatitudeRef: xmpTag(latRef),
+                        GPSLongitude: xmpTag(long),
+                        GPSLongitudeRef: xmpTag(longRef),
+                    },
+                })?.location,
+            ).toEqual({ latitude, longitude });
+        },
+    );
+
     test("omits a location with only one GPS axis", () => {
         expect(
             parseXMPSidecarTags({ xmp: { GPSLatitude: xmpTag("12.97236N") } }),

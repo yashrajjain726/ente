@@ -122,17 +122,29 @@ export const parseXMPSidecarTags = (
     tags: RawExifTags,
 ): ParsedMetadataJSON | undefined => {
     const { creationDate, description } = parseExif(tags);
-    const parseCoordinate = (value: string | undefined) => {
-        const match = /^(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?([NSEW])$/.exec(
+    const parseCoordinate = (
+        value: string | undefined,
+        reference: string | undefined,
+    ) => {
+        const match = /^(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?([NSEW])?$/.exec(
             value ?? "",
         );
         if (!match) return undefined;
 
+        const direction = match[3] ?? reference?.trim().toUpperCase();
+        if (!direction || !/^[NSEW]$/.test(direction)) return undefined;
+
         const coordinate = Number(match[1]) + Number(match[2] ?? 0) / 60;
-        return match[3] == "S" || match[3] == "W" ? -coordinate : coordinate;
+        return direction == "S" || direction == "W" ? -coordinate : coordinate;
     };
-    const latitude = parseCoordinate(tags.xmp?.GPSLatitude?.description);
-    const longitude = parseCoordinate(tags.xmp?.GPSLongitude?.description);
+    const latitude = parseCoordinate(
+        tags.xmp?.GPSLatitude?.description,
+        tags.xmp?.GPSLatitudeRef?.description,
+    );
+    const longitude = parseCoordinate(
+        tags.xmp?.GPSLongitude?.description,
+        tags.xmp?.GPSLongitudeRef?.description,
+    );
     const location =
         latitude != undefined && longitude != undefined
             ? { latitude, longitude }
