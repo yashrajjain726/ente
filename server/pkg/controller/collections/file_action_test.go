@@ -13,7 +13,8 @@ func TestMoveFilesRejectsSameCollection(t *testing.T) {
 		FromCollectionID: collectionID,
 		ToCollectionID:   collectionID,
 	})
-	if !errors.Is(err, ente.ErrBadRequest) {
-		t.Fatalf("MoveFiles() error = %v, want %v", err, ente.ErrBadRequest)
+	var apiErr *ente.ApiError
+	if !errors.As(err, &apiErr) || apiErr.Code != ente.BadRequest {
+		t.Fatalf("MoveFiles() error = %v, want %s", err, ente.BadRequest)
 	}
 }

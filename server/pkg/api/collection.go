@@ -291,11 +291,6 @@ func (h *CollectionHandler) MoveFiles(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(ente.ErrBatchSizeTooLarge, ""))
 		return
 	}
-	if request.ToCollectionID == request.FromCollectionID {
-		handler.Error(c, stacktrace.Propagate(ente.ErrBadRequest, "to and fromCollection should be different"))
-		return
-	}
-
 	if err := h.Controller.MoveFiles(c, request); err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
