@@ -181,7 +181,7 @@ function AppleExportSteps(): React.JSX.Element {
     ];
 
     return (
-        <Stack component="ol" sx={{ m: 0, p: 0 }}>
+        <Stack component="ol" sx={{ m: 0, py: 0, pr: 0, pl: "16px" }}>
             {steps.map((step, index) => (
                 <Stack
                     component="li"
