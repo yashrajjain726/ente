@@ -228,6 +228,21 @@ impl Log {
         Ok(())
     }
 
+    pub(crate) fn tail_contains_valid_record(&mut self, after: u64) -> Result<bool, VecDbError> {
+        let start = after + 1;
+        if start >= self.end_offset {
+            return Ok(false);
+        }
+        self.file
+            .seek(SeekFrom::Start(start))
+            .map_err(|source| VecDbError::io(&self.path, source))?;
+        let mut region = vec![0u8; (self.end_offset - start) as usize];
+        self.file
+            .read_exact(&mut region)
+            .map_err(|source| VecDbError::io(&self.path, source))?;
+        Ok((0..region.len()).any(|offset| valid_record_at(&region[offset..], self.dims)))
+    }
+
     pub(crate) fn current_end_offset(&self) -> u64 {
         self.end_offset
     }
@@ -457,6 +472,76 @@ fn decode_attrs(bytes: &[u8]) -> Option<Vec<Attribute>> {
         rest = after;
     }
     rest.is_empty().then_some(attrs)
+}
+
+fn valid_record_at(bytes: &[u8], dims: usize) -> bool {
+    let Some(record_len) = plausible_record_len(bytes, dims) else {
+        return false;
+    };
+    let crc_start = record_len - RECORD_CRC_LEN;
+    let stored = u32::from_le_bytes([
+        bytes[crc_start],
+        bytes[crc_start + 1],
+        bytes[crc_start + 2],
+        bytes[crc_start + 3],
+    ]);
+    crc32(&bytes[..crc_start]) == stored
+}
+
+fn plausible_record_len(bytes: &[u8], dims: usize) -> Option<usize> {
+    if bytes.len() < RECORD_PREFIX_LEN + RECORD_CRC_LEN {
+        return None;
+    }
+    let key_len = u16::from_le_bytes([bytes[1], bytes[2]]) as usize;
+    if key_len == 0 || key_len > MAX_KEY_BYTES {
+        return None;
+    }
+    let body_len = match bytes[0] {
+        RECORD_TYPE_ADD => {
+            let fixed = key_len + dims * size_of::<f32>();
+            fixed + plausible_attrs_len(bytes.get(RECORD_PREFIX_LEN + fixed..)?)?
+        }
+        RECORD_TYPE_TOMBSTONE => key_len,
+        _ => return None,
+    };
+    let total = RECORD_PREFIX_LEN + body_len + RECORD_CRC_LEN;
+    (bytes.len() >= total).then_some(total)
+}
+
+fn plausible_attrs_len(bytes: &[u8]) -> Option<usize> {
+    let (&count, mut rest) = bytes.split_first()?;
+    if count as usize > MAX_ATTR_COUNT {
+        return None;
+    }
+    let mut attr_bytes = 0usize;
+    for _ in 0..count {
+        let (&name_len, after) = rest.split_first()?;
+        if name_len == 0 || name_len as usize > MAX_ATTR_NAME_BYTES {
+            return None;
+        }
+        let (_, after) = after.split_at_checked(name_len as usize)?;
+        let (&tag, after) = after.split_first()?;
+        let value_len = match tag {
+            ATTR_TAG_STR => {
+                let (len_bytes, _) = after.split_at_checked(2)?;
+                let str_len = u16::from_le_bytes([len_bytes[0], len_bytes[1]]) as usize;
+                if str_len > MAX_ATTR_STR_BYTES {
+                    return None;
+                }
+                2 + str_len
+            }
+            ATTR_TAG_BOOL => 1,
+            ATTR_TAG_I64 | ATTR_TAG_F64 => 8,
+            _ => return None,
+        };
+        let (_, after) = after.split_at_checked(value_len)?;
+        attr_bytes += 2 + name_len as usize + value_len;
+        if attr_bytes > MAX_ATTRS_TOTAL_BYTES {
+            return None;
+        }
+        rest = after;
+    }
+    Some(1 + attr_bytes)
 }
 
 fn encode_header(dims: u32, generation: &[u8; 16]) -> [u8; HEADER_LEN] {
@@ -1904,6 +1989,84 @@ mod tests {
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(records.len(), 1, "cut {cut}");
             assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+        }
+    }
+
+    #[test]
+    fn tail_probe_finds_an_intact_record_beyond_mid_log_damage() {
+        let dims = 8usize;
+        let vector = seeded_vector(21, dims);
+        let first = encoded_add("first", &vector);
+        let mut tombstone = Vec::new();
+        encode_record_into(&mut tombstone, &LogEntry::Tombstone { key: "gone" });
+        let survivors = [encoded_add("second", &vector), tombstone];
+        let dir = TempDir::new().unwrap();
+        for (index, survivor) in survivors.iter().enumerate() {
+            for garbage_len in [1usize, 7, 19] {
+                let path = dir.path().join(format!("log-{index}-{garbage_len}"));
+                let mut record_bytes = first.clone();
+                record_bytes.extend_from_slice(&vec![0xAA; garbage_len]);
+                record_bytes.extend_from_slice(survivor);
+                write_log_file(&path, dims as u32, &record_bytes);
+                let mut log = reopen(&path, dims);
+                let (records, recoverable_end) = scan_all(&mut log);
+                assert_eq!(records.len(), 1);
+                assert_eq!(recoverable_end, HEADER_LEN as u64 + first.len() as u64);
+                assert!(log.tail_contains_valid_record(recoverable_end).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn tail_probe_rejects_regions_without_a_crc_valid_record() {
+        let dims = 8usize;
+        let vector = seeded_vector(22, dims);
+        let good = encoded_add("good", &vector);
+        let payload: Vec<u8> = vector
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect();
+        let mut crc_flipped_add = encoded_add("evil", &vector);
+        *crc_flipped_add.last_mut().unwrap() ^= 0x01;
+        let mut crc_flipped_tombstone = Vec::new();
+        encode_record_into(
+            &mut crc_flipped_tombstone,
+            &LogEntry::Tombstone { key: "gone" },
+        );
+        *crc_flipped_tombstone.last_mut().unwrap() ^= 0x01;
+        let mut oversized_key_payload = payload.clone();
+        oversized_key_payload.push(0);
+        let mut over_counted_attrs = payload.clone();
+        over_counted_attrs.push(17);
+        let mut truncated = good.clone();
+        truncated.pop();
+        let tails = [
+            vec![0xFF; 64],
+            vec![0x00; 64],
+            vec![0x01; 64],
+            vec![0x02; 64],
+            crc_flipped_add,
+            crc_flipped_tombstone,
+            raw_record(RECORD_TYPE_ADD, 257, &[b'k'; 257], &oversized_key_payload),
+            raw_record(RECORD_TYPE_ADD, 2, b"k1", &over_counted_attrs),
+            truncated,
+            Vec::new(),
+        ];
+        let dir = TempDir::new().unwrap();
+        for (index, tail) in tails.iter().enumerate() {
+            let path = dir.path().join(format!("tail-{index}"));
+            let mut record_bytes = good.clone();
+            record_bytes.push(0xAA);
+            record_bytes.extend_from_slice(tail);
+            write_log_file(&path, dims as u32, &record_bytes);
+            let mut log = reopen(&path, dims);
+            let (records, recoverable_end) = scan_all(&mut log);
+            assert_eq!(records.len(), 1, "case {index}");
+            assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
+            assert!(
+                !log.tail_contains_valid_record(recoverable_end).unwrap(),
+                "case {index}"
+            );
         }
     }
 }

@@ -1110,6 +1110,24 @@ fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
         }
         recoverable_end = scanner.recoverable_end();
     }
+    let physical_end = log.current_end_offset();
+    if recoverable_end < physical_end {
+        if let Some(loaded) = &snapshot
+            && loaded.covered_log_offset > recoverable_end
+        {
+            return Err(VecDbError::Corrupt(format!(
+                "{}: log unreadable past offset {recoverable_end}, but its snapshot covers {} of {physical_end} bytes; preserving the file",
+                log.path().display(),
+                loaded.covered_log_offset
+            )));
+        }
+        if log.tail_contains_valid_record(recoverable_end)? {
+            return Err(VecDbError::Corrupt(format!(
+                "{}: log unreadable at offset {recoverable_end} despite intact records before the end at {physical_end}; preserving the file",
+                log.path().display()
+            )));
+        }
+    }
     let (graph, used_snapshot) = match snapshot {
         Some(loaded) if loaded.covered_log_offset <= recoverable_end => {
             let snapshot_slots = covered_slot_count.unwrap_or(arena.slot_count());
@@ -1239,6 +1257,7 @@ mod tests {
 
     use tempfile::TempDir;
 
+    use super::super::crc::crc32;
     use super::super::kernel::splitmix64;
     use super::*;
 
@@ -1582,6 +1601,161 @@ mod tests {
         assert!(reopened.contains("key-3"));
         drop(reopened);
         assert_eq!(fs::metadata(&path).unwrap().len(), clean_len);
+    }
+
+    fn assert_corrupt_open_preserves(path: &Path) {
+        let log_bytes = fs::read(path).unwrap();
+        let snapshot_bytes = snapshot_exists(path).then(|| fs::read(snapshot_path(path)).unwrap());
+        assert!(matches!(
+            VecDb::open(path, DIMS),
+            Err(VecDbError::Corrupt(_))
+        ));
+        assert!(matches!(
+            VecDb::open_read_only(path, DIMS),
+            Err(VecDbError::Corrupt(_))
+        ));
+        assert_eq!(fs::read(path).unwrap(), log_bytes);
+        assert_eq!(
+            snapshot_exists(path).then(|| fs::read(snapshot_path(path)).unwrap()),
+            snapshot_bytes
+        );
+    }
+
+    #[test]
+    fn mid_log_corruption_below_the_snapshot_frontier_is_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 5, 300)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let clean = fs::read(&path).unwrap();
+        let mut bytes = clean.clone();
+        bytes[HEADER_LEN + ADD_RECORD_LEN as usize + 10] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        assert_corrupt_open_preserves(&path);
+        fs::write(&path, &clean).unwrap();
+        let recovered = open_writer(&path);
+        assert_eq!(recovered.len(), 5);
+        assert_own_nearest(&recovered, "key-1", &seeded_unit_vector(301, DIMS));
+    }
+
+    #[test]
+    fn corruption_at_the_first_record_with_a_snapshot_is_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 3, 420)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[HEADER_LEN + 10] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        assert_corrupt_open_preserves(&path);
+    }
+
+    #[test]
+    fn mid_log_corruption_in_the_unsnapshotted_tail_is_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 4, 320)).unwrap();
+        drop(db);
+        assert!(!snapshot_exists(&path));
+        let clean = fs::read(&path).unwrap();
+        let mut bytes = clean.clone();
+        bytes[HEADER_LEN + ADD_RECORD_LEN as usize + 10] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        assert_corrupt_open_preserves(&path);
+        assert!(!snapshot_exists(&path));
+        fs::write(&path, &clean).unwrap();
+        assert_eq!(open_writer(&path).len(), 4);
+    }
+
+    #[test]
+    fn mid_log_corruption_above_the_snapshot_frontier_is_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 2, 340)).unwrap();
+        db.flush().unwrap();
+        bulk_add(&db, &bulk_entries(2, 2, 340)).unwrap();
+        drop(db);
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[HEADER_LEN + 2 * ADD_RECORD_LEN as usize + 10] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        assert_corrupt_open_preserves(&path);
+    }
+
+    #[test]
+    fn unknown_record_type_mid_log_with_valid_records_after_is_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 3, 360)).unwrap();
+        drop(db);
+        let clean = fs::read(&path).unwrap();
+        let first_end = HEADER_LEN + ADD_RECORD_LEN as usize;
+        let mut bytes = clean[..first_end].to_vec();
+        bytes.extend_from_slice(&[3, 5, 0, b'j', b'u', b'n', b'k', b'y', 9, 9, 9, 9]);
+        bytes.extend_from_slice(&clean[first_end..]);
+        fs::write(&path, &bytes).unwrap();
+        assert_corrupt_open_preserves(&path);
+    }
+
+    #[test]
+    fn damaged_final_record_truncates_even_with_a_snapshot_below_the_stop() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 3, 380)).unwrap();
+        db.flush().unwrap();
+        db.add("key-3", &seeded_unit_vector(383, DIMS)).unwrap();
+        drop(db);
+        let mut bytes = fs::read(&path).unwrap();
+        let last_start = bytes.len() - ADD_RECORD_LEN as usize;
+        bytes[last_start + 10] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        let read_only = VecDb::open_read_only(&path, DIMS).unwrap();
+        assert_eq!(read_only.len(), 3);
+        assert!(!read_only.contains("key-3"));
+        drop(read_only);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 3);
+        assert!(!reopened.contains("key-3"));
+        assert_own_nearest(&reopened, "key-2", &seeded_unit_vector(382, DIMS));
+        drop(reopened);
+        assert_eq!(fs::metadata(&path).unwrap().len(), last_start as u64);
+    }
+
+    #[test]
+    fn future_format_version_is_rejected_with_the_file_preserved() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 3, 400)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let clean = fs::read(&path).unwrap();
+        let mut bytes = clean.clone();
+        bytes[4..6].copy_from_slice(&2u16.to_le_bytes());
+        let crc = crc32(&bytes[0..28]);
+        bytes[28..32].copy_from_slice(&crc.to_le_bytes());
+        fs::write(&path, &bytes).unwrap();
+        let snapshot_bytes = fs::read(snapshot_path(&path)).unwrap();
+        assert!(matches!(
+            VecDb::open(&path, DIMS),
+            Err(VecDbError::Corrupt(message)) if message.contains("version")
+        ));
+        assert!(matches!(
+            VecDb::open_read_only(&path, DIMS),
+            Err(VecDbError::Corrupt(message)) if message.contains("version")
+        ));
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(fs::read(snapshot_path(&path)).unwrap(), snapshot_bytes);
+        fs::write(&path, &clean).unwrap();
+        assert_eq!(open_writer(&path).len(), 3);
     }
 
     #[test]
