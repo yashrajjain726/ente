@@ -170,12 +170,16 @@ void main() {
       expect(rowAcrossLegacyBoundary.firstIndex, 39);
       expect(rowAcrossLegacyBoundary.lastIndex, 41);
 
-      for (final index in [75, fileCount - 1]) {
-        final fileOffset = groups.getOffsetOfFile(files[index]);
+      for (final row in section.rows) {
+        final firstFileInRow = files[row.firstIndex];
+        final fileOffset = groups.getOffsetOfFile(firstFileInRow);
         expect(fileOffset, isNotNull);
-        expect(groups.getFileAtScrollOffset(fileOffset!), same(files[index]));
+        expect(groups.getFileAtScrollOffset(fileOffset!), same(firstFileInRow));
       }
-      expect(groups.getFileAtScrollOffset(section.maxOffset), same(files.last));
+      expect(
+        groups.getFileAtScrollOffset(section.maxOffset),
+        same(files[section.rows.last.firstIndex]),
+      );
     },
   );
 
