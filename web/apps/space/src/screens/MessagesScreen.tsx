@@ -784,7 +784,10 @@ const ConversationListItem: React.FC<{
                     </Box>
                 )}
                 {isFriendRequest && (
-                    <Box sx={{ display: "flex", flexShrink: 0, gap: "6px" }}>
+                    <Box
+                        data-space-row-action
+                        sx={{ display: "flex", flexShrink: 0, gap: "6px" }}
+                    >
                         <Box
                             className="green-bg"
                             component="button"
