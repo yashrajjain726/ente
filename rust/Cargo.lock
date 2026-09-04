@@ -2710,6 +2710,7 @@ dependencies = [
  "ente-assets",
  "ente-location",
  "quick-xml",
+ "rusqlite",
  "tempfile",
  "thiserror 2.0.18",
 ]
