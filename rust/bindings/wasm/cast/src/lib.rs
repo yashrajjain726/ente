@@ -1,7 +1,6 @@
 use ente_cast::ReceiverCredentials;
+use ente_wasm_lib as _;
 use wasm_bindgen::prelude::*;
-
-use ente_wasm_log as _;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
