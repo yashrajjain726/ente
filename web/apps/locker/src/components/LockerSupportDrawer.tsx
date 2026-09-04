@@ -5,8 +5,7 @@ import {
     NewsIcon,
 } from "@hugeicons/core-free-icons";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import NorthEastIcon from "@mui/icons-material/NorthEast";
-import { Box, Stack, Tooltip, Typography, useTheme } from "@mui/material";
+import { Stack, Tooltip, Typography } from "@mui/material";
 import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
 import { savedLogs } from "ente-base/log-web";
@@ -25,8 +24,6 @@ export const LockerSupportDrawer: React.FC<
     LockerNestedSidebarDrawerVisibilityProps
 > = ({ open, onClose, onRootClose }) => {
     const { showMiniDialog } = useBaseContext();
-    const theme = useTheme();
-
     const handleRootClose = () => {
         onClose();
         onRootClose();
@@ -62,33 +59,23 @@ export const LockerSupportDrawer: React.FC<
             title={t("help_and_support")}
             hideRootCloseButton
         >
-            <Stack
-                sx={{
-                    px: 2,
-                    py: 1,
-                    gap: 1,
-                    backgroundColor: "background.default",
-                    ...theme.applyStyles("dark", {
-                        backgroundColor: "background.paper",
-                    }),
-                }}
-            >
+            <Stack sx={{ px: 2, py: 1, gap: 1 }}>
                 <LockerSidebarCardButton
                     icon={InformationCircleIcon}
                     label={t("help")}
-                    endIcon={<NorthEastIcon />}
+                    endIcon={<ChevronRightIcon />}
                     onClick={handleHelp}
                 />
                 <LockerSidebarCardButton
                     icon={NewsIcon}
                     label={t("blog")}
-                    endIcon={<NorthEastIcon />}
+                    endIcon={<ChevronRightIcon />}
                     onClick={handleBlog}
                 />
                 <LockerSidebarCardButton
                     icon={MessageQuestionIcon}
                     label={t("request_feature")}
-                    endIcon={<NorthEastIcon />}
+                    endIcon={<ChevronRightIcon />}
                     onClick={handleRequestFeature}
                 />
                 <LockerSidebarCardButton
@@ -105,9 +92,6 @@ export const LockerSupportDrawer: React.FC<
                     }
                     endIcon={<ChevronRightIcon />}
                     onClick={handleSupport}
-                />
-                <Box
-                    sx={{ borderTop: 1, borderColor: "divider", mx: 1, my: 1 }}
                 />
                 <LockerSidebarCardButton
                     icon={InformationCircleIcon}

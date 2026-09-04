@@ -43,12 +43,12 @@ export const LockerSidebarCardButton: React.FC<
         <Stack
             direction="row"
             sx={(theme) => ({
-                minHeight: 56,
-                px: 2,
+                minHeight: 54,
+                px: 1.5,
                 gap: 1.5,
                 alignItems: "center",
                 borderRadius: "20px",
-                backgroundColor: "backdrop.base",
+                backgroundColor: "#ffffff",
                 color: color ?? "text.base",
                 transition: theme.transitions.create(
                     ["background-color", "border-color", "color"],
@@ -63,38 +63,52 @@ export const LockerSidebarCardButton: React.FC<
                 "&:hover": {
                     backgroundColor: selected
                         ? "rgba(16, 113, 255, 0.16)"
-                        : "fill.faint",
+                        : "#eaeaea",
                 },
-                ...theme.applyStyles("light", {
+                "&:active": {
+                    backgroundColor: selected
+                        ? "rgba(16, 113, 255, 0.18)"
+                        : "#dedede",
+                },
+                ...theme.applyStyles("dark", {
+                    backgroundColor: "#212121",
                     ...(selected && {
-                        backgroundColor: "rgba(16, 113, 255, 0.10)",
+                        backgroundColor: "rgba(16, 113, 255, 0.12)",
                     }),
                     "&:hover": {
                         backgroundColor: selected
-                            ? "rgba(16, 113, 255, 0.14)"
-                            : theme.vars.palette.fill.faint,
+                            ? "rgba(16, 113, 255, 0.16)"
+                            : "#1b1b1b",
+                    },
+                    "&:active": {
+                        backgroundColor: selected
+                            ? "rgba(16, 113, 255, 0.18)"
+                            : "#141414",
                     },
                 }),
             })}
         >
-            {iconNode ? (
+            {iconNode || icon ? (
                 <Box
                     sx={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: "inherit",
+                        width: 36,
+                        height: 36,
+                        flexShrink: 0,
                     }}
                 >
-                    {iconNode}
+                    {iconNode ?? (
+                        <HugeiconsIcon
+                            icon={icon!}
+                            size={18}
+                            color="currentColor"
+                            strokeWidth={1.6}
+                        />
+                    )}
                 </Box>
-            ) : icon ? (
-                <HugeiconsIcon
-                    icon={icon}
-                    size={24}
-                    color="currentColor"
-                    strokeWidth={1.9}
-                />
             ) : null}
             <Box sx={{ flex: 1, minWidth: 0 }}>
                 {typeof label === "string" ? (
@@ -102,7 +116,9 @@ export const LockerSidebarCardButton: React.FC<
                         variant="small"
                         sx={{
                             color: "inherit",
-                            fontWeight: selected ? 700 : 500,
+                            fontSize: 14,
+                            lineHeight: "20px",
+                            fontWeight: selected ? 600 : 500,
                         }}
                     >
                         {label}
@@ -112,18 +128,40 @@ export const LockerSidebarCardButton: React.FC<
                 )}
             </Box>
             {caption && (
-                <Typography
-                    variant="mini"
+                <Box
                     sx={{
+                        width: 36,
+                        height: 36,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                    }}
+                >
+                    <Typography
+                        variant="mini"
+                        sx={{
+                            color: selected ? "accent.main" : "text.muted",
+                            fontSize: 14,
+                            lineHeight: "20px",
+                        }}
+                    >
+                        {caption}
+                    </Typography>
+                </Box>
+            )}
+            {endIcon && (
+                <Box
+                    sx={{
+                        width: 36,
+                        height: 36,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         color: selected ? "accent.main" : "text.muted",
                         flexShrink: 0,
                     }}
                 >
-                    {caption}
-                </Typography>
-            )}
-            {endIcon && (
-                <Box sx={{ color: selected ? "accent.main" : "text.muted" }}>
                     {endIcon}
                 </Box>
             )}
