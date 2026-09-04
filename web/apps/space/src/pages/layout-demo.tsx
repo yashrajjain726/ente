@@ -5,6 +5,7 @@ import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import React from "react";
 import { FriendPostTile } from "screens/HomeScreen";
+import type { SpacePost } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
 import {
@@ -25,31 +26,99 @@ interface CanvasSize {
 }
 
 interface LayoutDemoPostProps {
+    count: number;
     index: number;
     placement?: HomeTilePlacement;
 }
 
 const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
+    count,
     index,
     placement,
-}) => (
-    <FriendPostTile
-        avatarUrl={null}
-        friend={{
-            friendsCount: 0,
-            fullName: `Friend ${index + 1}`,
-            id: `demo-friend-${index + 1}`,
-            username: `friend${index + 1}`,
-        }}
-        isAvatarPending={false}
-        isLoading={false}
-        isRead
-        isUnavailable={false}
-        onOpenPosts={() => undefined}
-        placement={placement}
-        posts={[]}
-    />
-);
+}) => {
+    const showAllVariants = count >= 5;
+    const friendRequestDirection = showAllVariants
+        ? index == 0
+            ? ("sent" as const)
+            : index == 1
+              ? ("received" as const)
+              : undefined
+        : count >= 2 && index == 0
+          ? ("received" as const)
+          : undefined;
+    const seenPostIndex = showAllVariants ? 2 : count >= 3 ? 1 : undefined;
+    const unseenPostIndex = showAllVariants
+        ? 3
+        : count >= 3
+          ? 2
+          : count >= 2
+            ? 1
+            : undefined;
+    const hasPlaceholderMedia = index == seenPostIndex;
+    const isUnread = index == unseenPostIndex;
+    const username = friendRequestDirection
+        ? friendRequestDirection == "sent"
+            ? "request_pending"
+            : "new_friend"
+        : `friend${index + 1}`;
+    const friend = {
+        friendsCount: 0,
+        fullName: `Friend ${index + 1}`,
+        id: `demo-friend-${index + 1}`,
+        username,
+    };
+    const post: SpacePost | undefined =
+        hasPlaceholderMedia || isUnread
+            ? {
+                  friendID: friend.id,
+                  name: friend.fullName,
+                  postId: index + 1,
+                  spaceId: friend.id,
+                  timestampMs: 1_700_000_000_000 - index * 60_000,
+                  username,
+                  viewerLiked: false,
+              }
+            : undefined;
+
+    return (
+        <FriendPostTile
+            avatarUrl={
+                hasPlaceholderMedia ? "/images/default-profile-pic.png" : null
+            }
+            friend={friend}
+            friendRequestDirection={friendRequestDirection}
+            imageUrl={
+                hasPlaceholderMedia
+                    ? "/images/invite-bg.jpg"
+                    : isUnread
+                      ? "/images/default-cover-image.jpg"
+                      : undefined
+            }
+            isAvatarPending={false}
+            isLoading={false}
+            isRead={!isUnread}
+            isUnavailable={false}
+            onAcceptFriendRequest={
+                friendRequestDirection == "received"
+                    ? () => Promise.resolve()
+                    : undefined
+            }
+            onDiscardFriendRequest={
+                friendRequestDirection == "received"
+                    ? () => Promise.resolve()
+                    : undefined
+            }
+            onOpenFriendRequest={
+                friendRequestDirection ? () => undefined : undefined
+            }
+            onOpenPosts={() => undefined}
+            isTwoTileLayout={count == 2}
+            placement={placement}
+            posts={post ? [post] : []}
+            showFriendRequestDetails={count <= 2}
+        />
+    );
+};
 
 const LayoutDemoPage: React.FC = () => {
     const router = useSpaceRouter();
@@ -175,6 +244,7 @@ const LayoutDemoPage: React.FC = () => {
                                   (_, index) => (
                                       <LayoutDemoPost
                                           key={index}
+                                          count={friendCount}
                                           index={index}
                                       />
                                   ),
@@ -182,6 +252,7 @@ const LayoutDemoPage: React.FC = () => {
                             : placements.map((placement, index) => (
                                   <LayoutDemoPost
                                       key={index}
+                                      count={friendCount}
                                       index={index}
                                       placement={placement}
                                   />

@@ -1,6 +1,7 @@
-import { UserAdd02Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, UserAdd02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { SpaceActionFeedbackIcon } from "components/ActionFeedback";
 import {
     SpaceActionToast,
     spaceToastAutoDismissDurationMs,
@@ -57,7 +58,7 @@ const textBase = spaceText;
 const textSecondary = spaceTextMuted;
 const avatarFallbackColor = "#888888";
 const avatarFallbackTextColor = "#FFFFFF";
-const mediaPlaceholderColor = "#E5E7EA";
+const mediaPlaceholderColor = "#E9EAEC";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 const waveAnimationDurationMs = 1100;
@@ -67,8 +68,8 @@ interface HomeScreenProps {
     latestPosts: SpacePost[];
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
+    friendRequests: SpaceFriendRequest[];
     friends: FriendProfile[];
-    sentFriendRequests: SpaceFriendRequest[];
     hasUnreadMessages?: boolean;
     isLatestPostsLoading?: boolean;
     isFriendsLoading?: boolean;
@@ -81,6 +82,8 @@ interface HomeScreenProps {
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
+    onAcceptFriendRequest?: (requestID: number) => Promise<void>;
+    onDiscardFriendRequest?: (requestID: number) => Promise<void>;
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenFriendRequests?: () => void;
     onOpenMessages?: () => void;
@@ -239,10 +242,12 @@ interface FriendPostTileProps {
     isAvatarPending: boolean;
     isLoading: boolean;
     isRead: boolean;
-    isRequestPending?: boolean;
+    friendRequestDirection?: SpaceFriendRequest["direction"];
     isUnavailable: boolean;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
+    onAcceptFriendRequest?: () => Promise<void>;
+    onDiscardFriendRequest?: () => Promise<void>;
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenFriendRequest?: () => void;
     onOpenPosts: (
@@ -251,27 +256,33 @@ interface FriendPostTileProps {
         photo: SpaceViewerPhoto,
     ) => void;
     onWave?: () => Promise<void>;
+    isTwoTileLayout?: boolean;
     placement?: HomeTilePlacement;
     posts: SpacePost[];
+    showFriendRequestDetails?: boolean;
 }
 
 export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     avatarUrl,
     friend,
+    friendRequestDirection,
     imageUrl,
     isAvatarPending,
     isLoading,
     isRead,
-    isRequestPending = false,
     isUnavailable,
+    onAcceptFriendRequest,
+    onDiscardFriendRequest,
     onLoadAvatar,
     onLoadImage,
     onOpenFriend,
     onOpenFriendRequest,
     onOpenPosts,
     onWave,
+    isTwoTileLayout = false,
     placement,
     posts,
+    showFriendRequestDetails = false,
 }) => {
     const rootRef = React.useRef<HTMLLIElement | null>(null);
     const holdOriginRef = React.useRef<
@@ -283,6 +294,9 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     const [shouldLoadMedia, setShouldLoadMedia] = useState(Boolean(imageUrl));
     const [isHoldingWave, setIsHoldingWave] = useState(false);
     const [isWaveSending, setIsWaveSending] = useState(false);
+    const [friendRequestAction, setFriendRequestAction] = useState<
+        "accept" | "discard" | null
+    >(null);
     const [waveAnimationID, setWaveAnimationID] = useState(0);
     const decodedPhoto = useDecodedImage(imageUrl, true);
     const decodedAvatar = useDecodedImage(
@@ -290,6 +304,10 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         true,
     );
     const post = posts[0];
+    const isRequestPending = Boolean(friendRequestDirection);
+    const isFriendRequestActionBusy = friendRequestAction != null;
+    const canOpenFriendRequest =
+        friendRequestDirection == "sent" && Boolean(onOpenFriendRequest);
     const thumbHashDataURL = React.useMemo(
         () => thumbHashDataURLFromBase64(post?.thumbHash),
         [post?.thumbHash],
@@ -314,9 +332,56 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     const canOpenPost = Boolean(post) && !postUnavailable && isPhotoReady;
     const isTileDisabled =
         isLoading ||
-        (isRequestPending && !onOpenFriendRequest) ||
+        isFriendRequestActionBusy ||
+        (isRequestPending && !canOpenFriendRequest) ||
         Boolean(post && !postUnavailable && !isPhotoReady);
     const avatarSize = placement ? Math.min(36, placement.size * 0.22) : "22%";
+    const requestActionSize = placement
+        ? showFriendRequestDetails
+            ? Math.min(44, Math.max(40, placement.size * 0.13))
+            : Math.min(40, Math.max(26, placement.size * 0.14))
+        : 26;
+    const requestUsernameTextSize = isTwoTileLayout
+        ? 14
+        : showFriendRequestDetails
+          ? placement
+              ? Math.min(18, Math.max(15, placement.size * 0.05))
+              : 15
+          : 11;
+    const requestActionTextSize = isTwoTileLayout
+        ? 12
+        : showFriendRequestDetails
+          ? 13
+          : placement
+            ? Math.min(13, Math.max(10, placement.size * 0.04))
+            : 10;
+    const requestActionInset = placement
+        ? placement.size * 0.2 - requestActionSize / 2
+        : `calc(20% - ${requestActionSize / 2}px)`;
+    const requestCloseIconSize = 14;
+    const requestCloseInset = placement
+        ? Math.max(
+              0,
+              placement.size * 0.2 -
+                  requestActionSize / 2 -
+                  (requestActionSize - requestCloseIconSize) / 2,
+          )
+        : 3;
+    const requestButtonGap = 6;
+    const twoTileRequestActionTop =
+        isTwoTileLayout && placement
+            ? placement.size -
+              (placement.size * 0.2 - requestActionSize / 2) -
+              requestActionSize * 2 -
+              requestButtonGap
+            : undefined;
+    const twoTileRequestUsernameGap = placement
+        ? Math.min(60, Math.max(45, placement.size * 0.23))
+        : 45;
+    const twoTileRequestUsernameTop =
+        twoTileRequestActionTop === undefined
+            ? undefined
+            : twoTileRequestActionTop - twoTileRequestUsernameGap;
 
     const hasMediaToLoad =
         isAvatarPending || Boolean(post && !postUnavailable && !imageUrl);
@@ -385,6 +450,19 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         window.setTimeout(() => {
             suppressClickRef.current = false;
         }, 0);
+    };
+
+    const updateFriendRequest = (
+        action: "accept" | "discard",
+        handler?: () => Promise<void>,
+    ) => {
+        if (isFriendRequestActionBusy || !handler) return;
+        setFriendRequestAction(action);
+        void handler()
+            .catch((error: unknown) =>
+                log.error("Failed to update friend request", error),
+            )
+            .finally(() => setFriendRequestAction(null));
     };
 
     const handlePointerDown: React.PointerEventHandler<HTMLButtonElement> = (
@@ -456,7 +534,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
             return;
         }
         if (isRequestPending) {
-            onOpenFriendRequest?.();
+            if (friendRequestDirection == "sent") onOpenFriendRequest?.();
             return;
         }
         if (!post || postUnavailable) {
@@ -494,7 +572,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         onOpenFriend?.(friend.id, friend.username);
     };
     const canOpenFriend = isRequestPending
-        ? Boolean(onOpenFriendRequest)
+        ? canOpenFriendRequest
         : Boolean(onOpenFriend);
 
     return (
@@ -524,15 +602,17 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 aria-label={
                     isLoading
                         ? `Loading ${firstName}'s latest post`
-                        : isRequestPending
-                          ? `Manage friend request sent to ${firstName}`
-                          : post && !postUnavailable
-                            ? posts.length > 1
-                                ? `Open ${posts.length} new posts from ${firstName}`
-                                : isRead
-                                  ? `Open ${firstName}'s latest post`
-                                  : `Open ${firstName}'s new post`
-                            : `Open ${firstName}'s profile`
+                        : friendRequestDirection == "received"
+                          ? `Review friend request from ${firstName}`
+                          : friendRequestDirection == "sent"
+                            ? `Manage friend request sent to ${firstName}`
+                            : post && !postUnavailable
+                              ? posts.length > 1
+                                  ? `Open ${posts.length} new posts from ${firstName}`
+                                  : isRead
+                                    ? `Open ${firstName}'s latest post`
+                                    : `Open ${firstName}'s new post`
+                              : `Open ${firstName}'s profile`
                 }
                 disabled={isTileDisabled}
                 onClick={openTile}
@@ -547,9 +627,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     alignItems: "center",
                     appearance: "none",
                     aspectRatio: "1",
-                    bgcolor: isRequestPending
-                        ? "rgba(8, 194, 37, 0.12)"
-                        : mediaPlaceholderColor,
+                    bgcolor: mediaPlaceholderColor,
                     border: 0,
                     borderRadius: "20%",
                     color: textBase,
@@ -642,15 +720,19 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         }}
                     />
                 )}
-                {!isLoading && !post && (
-                    <SpacePostBadge
-                        backgroundColor="rgba(255, 255, 255, 0.82)"
-                        color={textSecondary}
-                        placement="center"
-                    >
-                        {isRequestPending ? "Friend request sent" : "No posts"}
-                    </SpacePostBadge>
-                )}
+                {!isLoading &&
+                    !post &&
+                    friendRequestDirection != "received" && (
+                        <SpacePostBadge
+                            backgroundColor="rgba(255, 255, 255, 0.82)"
+                            color={textSecondary}
+                            placement="center"
+                        >
+                            {friendRequestDirection == "sent"
+                                ? "Pending"
+                                : "No posts"}
+                        </SpacePostBadge>
+                    )}
                 {!isLoading && postUnavailable && (
                     <SpacePostBadge
                         backgroundColor="rgba(255, 255, 255, 0.82)"
@@ -661,75 +743,321 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 )}
                 {!isRead && <SpacePostUnreadBadge count={posts.length} />}
             </Box>
-            <Box
-                component="button"
-                type="button"
-                aria-label={
-                    isRequestPending
-                        ? `Manage friend request sent to ${firstName}`
-                        : `Open ${firstName}'s profile`
-                }
-                disabled={!canOpenFriend}
-                onClick={openFriend}
-                onContextMenu={(event) => {
-                    if (onWave) event.preventDefault();
-                }}
-                onPointerCancel={handlePointerEnd}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerEnd}
-                sx={{
-                    appearance: "none",
-                    bgcolor: "transparent",
-                    border: displayAvatarUrl
-                        ? "2px solid rgba(255, 255, 255, 0.36)"
-                        : "2px solid rgba(255, 255, 255, 0.28)",
-                    borderRadius: "50%",
-                    bottom: "10%",
-                    boxSizing: "border-box",
-                    cursor: canOpenFriend ? "pointer" : "default",
-                    height: avatarSize,
-                    left: "10%",
-                    maxHeight: 36,
-                    maxWidth: 36,
-                    overflow: "hidden",
-                    p: 0,
-                    position: "absolute",
-                    width: avatarSize,
-                    zIndex: 2,
-                }}
-            >
-                {isAvatarPending ? (
-                    <Skeleton
-                        variant="circular"
-                        sx={{
-                            bgcolor: mediaPlaceholderColor,
-                            height: "100%",
-                            transform: "none",
-                            width: "100%",
-                        }}
-                    />
-                ) : displayAvatarUrl ? (
-                    <SpaceAvatarImage aria-hidden src={displayAvatarUrl} />
-                ) : (
+            {friendRequestDirection != "received" && (
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label={
+                        friendRequestDirection == "sent"
+                            ? `Manage friend request sent to ${firstName}`
+                            : `Open ${firstName}'s profile`
+                    }
+                    disabled={!canOpenFriend || isFriendRequestActionBusy}
+                    onClick={openFriend}
+                    onContextMenu={(event) => {
+                        if (onWave) event.preventDefault();
+                    }}
+                    onPointerCancel={handlePointerEnd}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerEnd}
+                    sx={{
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: displayAvatarUrl
+                            ? "2px solid rgba(255, 255, 255, 0.36)"
+                            : "2px solid rgba(255, 255, 255, 0.28)",
+                        borderRadius: "50%",
+                        bottom: "10%",
+                        boxSizing: "border-box",
+                        cursor: canOpenFriend ? "pointer" : "default",
+                        height: avatarSize,
+                        left: "10%",
+                        maxHeight: 36,
+                        maxWidth: 36,
+                        overflow: "hidden",
+                        p: 0,
+                        position: "absolute",
+                        width: avatarSize,
+                        zIndex: 2,
+                    }}
+                >
+                    {isAvatarPending ? (
+                        <Skeleton
+                            variant="circular"
+                            sx={{
+                                bgcolor: mediaPlaceholderColor,
+                                height: "100%",
+                                transform: "none",
+                                width: "100%",
+                            }}
+                        />
+                    ) : displayAvatarUrl ? (
+                        <SpaceAvatarImage aria-hidden src={displayAvatarUrl} />
+                    ) : (
+                        <Box
+                            aria-hidden
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: avatarFallbackColor,
+                                color: avatarFallbackTextColor,
+                                display: "flex",
+                                fontSize: 14,
+                                fontWeight: 700,
+                                height: "100%",
+                                justifyContent: "center",
+                                width: "100%",
+                            }}
+                        >
+                            {initial}
+                        </Box>
+                    )}
+                </Box>
+            )}
+            {friendRequestDirection == "received" && (
+                <Box
+                    sx={{
+                        height: "100%",
+                        inset: 0,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        width: "100%",
+                        zIndex: 2,
+                    }}
+                >
                     <Box
+                        component="span"
                         aria-hidden
+                        title={`@${friend.username}`}
                         sx={{
                             alignItems: "center",
-                            bgcolor: avatarFallbackColor,
-                            color: avatarFallbackTextColor,
-                            display: "flex",
-                            fontSize: 14,
-                            fontWeight: 700,
-                            height: "100%",
+                            bgcolor: "#FFFFFF",
+                            borderRadius: "999px",
+                            boxSizing: "border-box",
+                            color: textBase,
+                            display: "inline-flex",
+                            fontFamily: '"Nunito", sans-serif',
+                            fontSize: requestUsernameTextSize,
+                            fontWeight: 800,
+                            height: showFriendRequestDetails ? undefined : 24,
                             justifyContent: "center",
-                            width: "100%",
+                            left: "50%",
+                            lineHeight: 1,
+                            maxWidth: "84%",
+                            overflow: "hidden",
+                            position: "absolute",
+                            px: showFriendRequestDetails ? "11px" : "10px",
+                            py: showFriendRequestDetails ? "6px" : 0,
+                            textOverflow: "ellipsis",
+                            top: isTwoTileLayout
+                                ? twoTileRequestUsernameTop
+                                : showFriendRequestDetails
+                                  ? "30%"
+                                  : "50%",
+                            transform: "translate(-50%, -50%)",
+                            whiteSpace: "nowrap",
                         }}
                     >
-                        {initial}
+                        @{friend.username}
                     </Box>
-                )}
-            </Box>
+                    {showFriendRequestDetails && !isTwoTileLayout && (
+                        <Box
+                            component="span"
+                            aria-hidden
+                            sx={{
+                                color: textSecondary,
+                                fontSize: 13,
+                                fontWeight: 500,
+                                left: "50%",
+                                lineHeight: 1,
+                                position: "absolute",
+                                top: "40%",
+                                transform: "translate(-50%, -50%)",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            sent you a friend request
+                        </Box>
+                    )}
+                    <Box
+                        sx={{
+                            bottom: requestActionInset,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: `${requestButtonGap}px`,
+                            left: requestActionInset,
+                            pointerEvents: "auto",
+                            position: "absolute",
+                            right: requestActionInset,
+                        }}
+                    >
+                        <Box
+                            className="green-bg"
+                            component="button"
+                            type="button"
+                            aria-label={`Accept friend request from ${displayName}`}
+                            disabled={
+                                isFriendRequestActionBusy ||
+                                !onAcceptFriendRequest
+                            }
+                            onClick={() =>
+                                updateFriendRequest(
+                                    "accept",
+                                    onAcceptFriendRequest,
+                                )
+                            }
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: green,
+                                border: 0,
+                                borderRadius: `${requestActionSize / 2}px`,
+                                boxSizing: "border-box",
+                                color: "#FFFFFF",
+                                cursor: isFriendRequestActionBusy
+                                    ? "default"
+                                    : "pointer",
+                                display: "flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: requestActionTextSize,
+                                fontWeight: 700,
+                                height: requestActionSize,
+                                justifyContent: "center",
+                                p: 0,
+                                width: "100%",
+                                "&:disabled": { opacity: 0.55 },
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": isFriendRequestActionBusy
+                                    ? undefined
+                                    : { bgcolor: "#07A820" },
+                            }}
+                        >
+                            {friendRequestAction == "accept" ? (
+                                <SpaceActionFeedbackIcon
+                                    phase="busy"
+                                    size={17}
+                                />
+                            ) : (
+                                "Accept"
+                            )}
+                        </Box>
+                        {showFriendRequestDetails && (
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={`Ignore friend request from ${displayName}`}
+                                disabled={
+                                    isFriendRequestActionBusy ||
+                                    !onDiscardFriendRequest
+                                }
+                                onClick={() =>
+                                    updateFriendRequest(
+                                        "discard",
+                                        onDiscardFriendRequest,
+                                    )
+                                }
+                                sx={{
+                                    alignItems: "center",
+                                    bgcolor: "#DFE1E4",
+                                    border: 0,
+                                    borderRadius: `${requestActionSize / 2}px`,
+                                    boxSizing: "border-box",
+                                    color: "#5F6368",
+                                    cursor: isFriendRequestActionBusy
+                                        ? "default"
+                                        : "pointer",
+                                    display: "flex",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: requestActionTextSize,
+                                    fontWeight: 600,
+                                    height: requestActionSize,
+                                    justifyContent: "center",
+                                    p: 0,
+                                    width: "100%",
+                                    "&:disabled": { opacity: 0.55 },
+                                    "&:focus-visible": {
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                    "&:hover": isFriendRequestActionBusy
+                                        ? undefined
+                                        : { bgcolor: "#D7D9DC" },
+                                }}
+                            >
+                                {friendRequestAction == "discard" ? (
+                                    <SpaceActionFeedbackIcon
+                                        phase="busy"
+                                        size={17}
+                                    />
+                                ) : (
+                                    "Ignore"
+                                )}
+                            </Box>
+                        )}
+                    </Box>
+                    {!showFriendRequestDetails && (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={`Ignore friend request from ${displayName}`}
+                            disabled={
+                                isFriendRequestActionBusy ||
+                                !onDiscardFriendRequest
+                            }
+                            onClick={() =>
+                                updateFriendRequest(
+                                    "discard",
+                                    onDiscardFriendRequest,
+                                )
+                            }
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                borderRadius: "50%",
+                                color: textSecondary,
+                                cursor: isFriendRequestActionBusy
+                                    ? "default"
+                                    : "pointer",
+                                display: "flex",
+                                height: requestActionSize,
+                                justifyContent: "center",
+                                p: 0,
+                                pointerEvents: "auto",
+                                position: "absolute",
+                                right: requestCloseInset,
+                                top: requestCloseInset,
+                                width: requestActionSize,
+                                "&:disabled": { opacity: 0.55 },
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": isFriendRequestActionBusy
+                                    ? undefined
+                                    : { color: textBase },
+                            }}
+                        >
+                            {friendRequestAction == "discard" ? (
+                                <SpaceActionFeedbackIcon
+                                    phase="busy"
+                                    size={requestCloseIconSize}
+                                />
+                            ) : (
+                                <HugeiconsIcon
+                                    icon={Cancel01Icon}
+                                    size={requestCloseIconSize}
+                                    strokeWidth={2.2}
+                                />
+                            )}
+                        </Box>
+                    )}
+                </Box>
+            )}
             {waveAnimationID > 0 && (
                 <Box
                     key={waveAnimationID}
@@ -808,14 +1136,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     latestPosts,
     unreadPosts,
     friendRequestSentToastName,
+    friendRequests,
     friends,
-    sentFriendRequests,
     hasUnreadMessages,
     isLatestPostsLoading = false,
     isFriendsLoading = false,
     isFriendRequestsLoading = false,
     showInstallPrompt = false,
     onCreatePost,
+    onAcceptFriendRequest,
+    onDiscardFriendRequest,
     onLoadFriendAvatar,
     onLoadPostImage,
     onFriendRequestSentToastClose,
@@ -897,7 +1227,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 friend,
                 type: "friend" as const,
             })),
-            ...sentFriendRequests
+            ...friendRequests
                 .filter(
                     (request) =>
                         !friendIDs.has(
@@ -913,7 +1243,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 bFriend.spaceId ?? bFriend.id,
             );
         });
-    }, [friends, sentFriendRequests]);
+    }, [friendRequests, friends]);
     React.useEffect(() => setOpenedPostIds(new Set()), [viewerSpaceId]);
     React.useEffect(() => {
         const canvas = postTileCanvasRef.current;
@@ -1271,24 +1601,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         index: number,
     ) => {
         const friend = request.friend;
-        const avatarUrl = loadedFriendAvatarURLFor(friend);
+        const avatarUrl =
+            request.direction == "sent"
+                ? loadedFriendAvatarURLFor(friend)
+                : undefined;
         return (
             <FriendPostTile
                 key={`request:${request.requestId}`}
                 avatarUrl={avatarUrl}
                 friend={friend}
+                friendRequestDirection={request.direction}
                 isAvatarPending={Boolean(
-                    friend.avatarObjectID && avatarUrl === undefined,
+                    request.direction == "sent" &&
+                    friend.avatarObjectID &&
+                    avatarUrl === undefined,
                 )}
                 isLoading={isHomeItemsLoading}
                 isRead
-                isRequestPending
                 isUnavailable={false}
-                onLoadAvatar={() => loadFriendAvatar(friend)}
-                onOpenFriendRequest={onOpenFriendRequests}
+                onAcceptFriendRequest={
+                    request.direction == "received" && onAcceptFriendRequest
+                        ? () => onAcceptFriendRequest(request.requestId)
+                        : undefined
+                }
+                onDiscardFriendRequest={
+                    request.direction == "received" && onDiscardFriendRequest
+                        ? () => onDiscardFriendRequest(request.requestId)
+                        : undefined
+                }
+                onLoadAvatar={
+                    request.direction == "sent"
+                        ? () => loadFriendAvatar(friend)
+                        : undefined
+                }
+                onOpenFriendRequest={
+                    request.direction == "sent"
+                        ? onOpenFriendRequests
+                        : undefined
+                }
                 onOpenPosts={openPostPhotos}
+                isTwoTileLayout={orderedHomeItems.length == 2}
                 placement={usesPostGrid ? undefined : postTilePlacements[index]}
                 posts={[]}
+                showFriendRequestDetails={orderedHomeItems.length <= 2}
             />
         );
     };
@@ -1487,7 +1842,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         ) : orderedHomeItems.length > 0 ? (
                             <Box
                                 component="ul"
-                                aria-label="Friends and sent friend requests"
+                                aria-label="Friends and friend requests"
                                 sx={{
                                     display: usesPostGrid ? "grid" : "block",
                                     gap: postGridLayout
@@ -1599,9 +1954,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 component="p"
                                                 sx={{
                                                     color: "rgba(255, 255, 255, 0.84)",
-                                                    fontSize: 15,
+                                                    fontSize: 14,
                                                     fontWeight: 500,
-                                                    lineHeight: "21px",
+                                                    lineHeight: "20px",
                                                     m: 0,
                                                     mt: "10px",
                                                     maxWidth: 260,
