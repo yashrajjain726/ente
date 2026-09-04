@@ -22,7 +22,7 @@ void main() {
       const availableWidth = 400.0;
       const spacing = 2.0;
       final rows = JustifiedLayoutCalculator.computeRows(
-        aspectRatios: const [1, 1, 1, 1],
+        aspectRatios: const [1, 1, 1],
         availableWidth: availableWidth,
         targetRowHeight: 100,
         spacing: spacing,
@@ -30,49 +30,60 @@ void main() {
 
       expect(rows, hasLength(1));
       final row = rows.single;
-      final occupiedWidth =
-          row.itemWidths.fold<double>(0, (sum, width) => sum + width) +
-          spacing * (row.itemWidths.length - 1);
-      expect(occupiedWidth, closeTo(availableWidth, 1e-9));
-      expect(row.itemWidths, everyElement(closeTo(98.5, 1e-9)));
+      expect(row.itemWidths, hasLength(3));
+      expect(_occupiedWidth(row, spacing), closeTo(availableWidth, 1e-9));
     });
 
-    test("an already-tappable final row stays at the target height", () {
+    test("a two-item final row expands to the full available width", () {
       const availableWidth = 400.0;
-      const targetRowHeight = 100.0;
       const spacing = 2.0;
       final rows = JustifiedLayoutCalculator.computeRows(
         aspectRatios: const [1, 1],
         availableWidth: availableWidth,
-        targetRowHeight: targetRowHeight,
+        targetRowHeight: 100,
         spacing: spacing,
       );
 
       expect(rows, hasLength(1));
       final row = rows.single;
-      expect(row.height, targetRowHeight);
+      expect(row.itemWidths, hasLength(2));
       expect(row.itemWidths, everyElement(row.height));
-      final occupiedWidth =
-          row.itemWidths.fold<double>(0, (sum, width) => sum + width) + spacing;
-      expect(occupiedWidth, lessThanOrEqualTo(availableWidth));
+      expect(_occupiedWidth(row, spacing), closeTo(availableWidth, 1e-9));
     });
 
-    test("a sparse portrait final row remains ragged and tappable", () {
-      const availableWidth = 400.0;
-      const targetRowHeight = 100.0;
+    test("sizes final singletons by orientation and caps extremes", () {
+      const targetRowHeight = 200.0;
+      JustifiedRowLayout rowFor(double ratio) {
+        return JustifiedLayoutCalculator.computeRows(
+          aspectRatios: [ratio],
+          availableWidth: 402,
+          targetRowHeight: targetRowHeight,
+          spacing: 2,
+        ).single;
+      }
+
+      final portrait = rowFor(9 / 16);
+      final extremePortrait = rowFor(0.25);
+      final landscape = rowFor(3 / 2);
+
+      expect(portrait.itemWidths.single, targetRowHeight);
+      expect(extremePortrait.height, targetRowHeight * 2.4);
+      expect(
+        extremePortrait.itemWidths.single / extremePortrait.height,
+        closeTo(1 / 3, 1e-9),
+      );
+      expect(landscape.height, targetRowHeight);
+    });
+
+    test("rebalances a portrait orphan without disturbing earlier rows", () {
       final rows = JustifiedLayoutCalculator.computeRows(
-        aspectRatios: const [0.25],
-        availableWidth: availableWidth,
-        targetRowHeight: targetRowHeight,
+        aspectRatios: List.filled(7, 9 / 16),
+        availableWidth: 393,
+        targetRowHeight: (393 - 2) / 2,
         spacing: 2,
       );
 
-      expect(rows, hasLength(1));
-      final row = rows.single;
-      expect(row.height, 144);
-      expect(row.itemWidths.single / row.height, closeTo(1 / 3, 1e-9));
-      expect(row.itemWidths.single, closeTo(48, 1e-9));
-      expect(row.itemWidths.single, lessThan(availableWidth));
+      expect(rows.map((row) => row.lastIndex - row.firstIndex + 1), [3, 2, 2]);
     });
 
     test("keeps a tappable portrait with the following panorama", () {
@@ -92,9 +103,7 @@ void main() {
       expect(row.height, closeTo(391 / 4.85, 1e-9));
       expect(row.height, greaterThanOrEqualTo(48));
       expect(row.itemWidths, everyElement(greaterThanOrEqualTo(48)));
-      final occupiedWidth =
-          row.itemWidths.fold<double>(0, (sum, width) => sum + width) + spacing;
-      expect(occupiedWidth, closeTo(availableWidth, 1e-9));
+      expect(_occupiedWidth(row, spacing), closeTo(availableWidth, 1e-9));
     });
 
     test("does not squeeze an extreme item into a mixed row", () {
@@ -159,6 +168,56 @@ void main() {
       expect(rows.single.height, 48);
       expect(rows.single.itemWidths, [192]);
     });
+
+    test("caps rows at three items even when more would fit", () {
+      final rows = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [0.4, 0.4, 1.0, 0.4],
+        availableWidth: 393,
+        targetRowHeight: 195.5,
+        spacing: 2,
+      );
+
+      expect(rows.expand((row) => row.itemWidths), hasLength(4));
+      expect(
+        rows.map((row) => row.itemWidths.length),
+        everyElement(lessThanOrEqualTo(3)),
+      );
+    });
+
+    test("keeps typical landscapes to pairs", () {
+      final rows = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [4 / 3, 4 / 3, 4 / 3],
+        availableWidth: 393,
+        targetRowHeight: (393 - 4) / 3,
+        spacing: 2,
+      );
+
+      expect(rows.map((row) => row.itemWidths.length), [2, 1]);
+    });
+
+    test("merges a final portrait with a tappable two-item row", () {
+      final rows = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [1.0, 1.0, 0.5],
+        availableWidth: 393,
+        targetRowHeight: (393 - 2) / 2,
+        spacing: 2,
+      );
+
+      expect(rows, hasLength(1));
+      expect(rows.single.itemWidths, hasLength(3));
+    });
+
+    test("forced non-final singleton uses the target row height", () {
+      final rows = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [0.5, 4],
+        availableWidth: 393,
+        targetRowHeight: 130,
+        spacing: 2,
+      );
+
+      expect(rows, hasLength(2));
+      expect(rows.first.height, 130);
+    });
   });
 
   group("JustifiedSectionLayout", () {
@@ -215,4 +274,9 @@ void main() {
       expect(section.getMinChildIndexForScrollOffset(169), 13);
     });
   });
+}
+
+double _occupiedWidth(JustifiedRowLayout row, double spacing) {
+  return row.itemWidths.fold<double>(0, (sum, width) => sum + width) +
+      spacing * (row.itemWidths.length - 1);
 }

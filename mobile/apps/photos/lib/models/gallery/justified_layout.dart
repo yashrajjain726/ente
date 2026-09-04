@@ -96,6 +96,9 @@ class JustifiedLayoutCalculator {
   static const double _minimumAspectRatio = 1 / 3;
   static const double _maximumAspectRatio = 4.0;
   static const double _maximumRowHeightFactor = 2.4;
+  static const double _minimumLandscapeTrioHeightFactor = 0.88;
+  // Keep rows visually scannable even when more items would remain tappable.
+  static const int _maximumItemsPerRow = 3;
   // Logical pixels map to density-independent tap extents on both platforms.
   static const double _minimumTappableExtent = 48.0;
 
@@ -128,6 +131,7 @@ class JustifiedLayoutCalculator {
     final rows = <JustifiedRowLayout>[];
     final pendingRatios = <double>[];
     final maximumRowHeight = targetRowHeight * _maximumRowHeightFactor;
+    final lastCommittedRatios = <double>[];
     var pendingRatioSum = 0.0;
     var pendingMinimumRatio = double.infinity;
     var pendingFirstIndex = 0;
@@ -136,7 +140,10 @@ class JustifiedLayoutCalculator {
     double widthWithoutGaps(int itemCount) =>
         math.max(1, availableWidth - spacing * (itemCount - 1));
 
-    void addPendingRow({required bool fillWidth}) {
+    void addPendingRow({
+      required bool fillWidth,
+      double raggedHeightFactor = 1,
+    }) {
       if (pendingRatios.isEmpty) return;
       final contentWidth = widthWithoutGaps(pendingRatios.length);
       final fittedHeight = contentWidth / pendingRatioSum;
@@ -148,7 +155,10 @@ class JustifiedLayoutCalculator {
           ? fittedHeight
           : math.min(
               fittedHeight,
-              math.max(targetRowHeight, minimumTappableHeight),
+              math.max(
+                targetRowHeight * raggedHeightFactor,
+                minimumTappableHeight,
+              ),
             );
       final widths = pendingRatios
           .map((ratio) => ratio * height)
@@ -170,11 +180,54 @@ class JustifiedLayoutCalculator {
           itemWidths: UnmodifiableListView(widths),
         ),
       );
+      lastCommittedRatios
+        ..clear()
+        ..addAll(pendingRatios);
       rowOffset += height + spacing;
       pendingFirstIndex += pendingRatios.length;
       pendingRatios.clear();
       pendingRatioSum = 0;
       pendingMinimumRatio = double.infinity;
+    }
+
+    bool canFillWidth(
+      List<double> ratios, {
+      bool applyLandscapeDensityRule = false,
+    }) {
+      final ratioSum = ratios.fold<double>(0, (sum, ratio) => sum + ratio);
+      final height = widthWithoutGaps(ratios.length) / ratioSum;
+      final minimumWidth =
+          height * ratios.reduce((left, right) => math.min(left, right));
+      final isTappableAndBounded =
+          height >= _minimumTappableExtent &&
+          height <= maximumRowHeight &&
+          minimumWidth >= _minimumTappableExtent;
+      if (!isTappableAndBounded) return false;
+
+      return !applyLandscapeDensityRule ||
+          ratios.length != _maximumItemsPerRow ||
+          ratios.any((ratio) => ratio < 1) ||
+          height >= targetRowHeight * _minimumLandscapeTrioHeightFactor;
+    }
+
+    void replacePendingRatios(Iterable<double> ratios) {
+      pendingRatios
+        ..clear()
+        ..addAll(ratios);
+      pendingRatioSum = pendingRatios.fold<double>(
+        0,
+        (sum, ratio) => sum + ratio,
+      );
+      pendingMinimumRatio = pendingRatios.fold<double>(
+        double.infinity,
+        (minimum, ratio) => math.min(minimum, ratio),
+      );
+    }
+
+    void rewindLastRow() {
+      final removedRow = rows.removeLast();
+      rowOffset = removedRow.minOffset;
+      pendingFirstIndex = removedRow.firstIndex;
     }
 
     for (final rawRatio in aspectRatios) {
@@ -190,18 +243,36 @@ class JustifiedLayoutCalculator {
             candidateHeight * math.min(pendingMinimumRatio, ratio);
         final currentHeight =
             widthWithoutGaps(pendingRatios.length) / pendingRatioSum;
-        final wouldOverCompress =
+        final violatesTapTarget =
             candidateHeight < _minimumTappableExtent ||
             candidateMinimumWidth < _minimumTappableExtent;
+        final violatesLandscapeDensity =
+            candidateCount == _maximumItemsPerRow &&
+            pendingMinimumRatio >= 1 &&
+            ratio >= 1 &&
+            candidateHeight <
+                targetRowHeight * _minimumLandscapeTrioHeightFactor;
 
-        if (wouldOverCompress) {
-          addPendingRow(fillWidth: currentHeight <= maximumRowHeight);
+        if (violatesTapTarget || violatesLandscapeDensity) {
+          final leaveSingletonRagged = pendingRatios.length == 1;
+          addPendingRow(
+            fillWidth:
+                !leaveSingletonRagged && currentHeight <= maximumRowHeight,
+          );
         }
       }
 
       pendingRatios.add(ratio);
       pendingRatioSum += ratio;
       pendingMinimumRatio = math.min(pendingMinimumRatio, ratio);
+
+      if (pendingRatios.length == _maximumItemsPerRow) {
+        // With a hard item cap and gap-free non-final rows, very narrow items
+        // can require a row taller than the normal soft height bound. Prefer
+        // the two product constraints when all three cannot be satisfied.
+        addPendingRow(fillWidth: true);
+        continue;
+      }
 
       final naturalWidth =
           pendingRatioSum * targetRowHeight +
@@ -211,7 +282,44 @@ class JustifiedLayoutCalculator {
       }
     }
 
-    addPendingRow(fillWidth: false);
+    // Avoid leaving a single item at the end of a group when the last few
+    // items can instead form full-width rows without creating a cramped row.
+    if (pendingRatios.length == 1 && rows.isNotEmpty) {
+      final tailRatios = <double>[...lastCommittedRatios, pendingRatios.single];
+      if (lastCommittedRatios.length < _maximumItemsPerRow &&
+          canFillWidth(tailRatios, applyLandscapeDensityRule: true)) {
+        rewindLastRow();
+        replacePendingRatios(tailRatios);
+        addPendingRow(fillWidth: true);
+      } else if (lastCommittedRatios.length == _maximumItemsPerRow) {
+        final firstPair = tailRatios.sublist(0, 2);
+        final secondPair = tailRatios.sublist(2);
+        if (canFillWidth(firstPair) && canFillWidth(secondPair)) {
+          rewindLastRow();
+          replacePendingRatios(firstPair);
+          addPendingRow(fillWidth: true);
+          replacePendingRatios(secondPair);
+          addPendingRow(fillWidth: true);
+        }
+      }
+    }
+
+    if (pendingRatios.isNotEmpty) {
+      final canJustifyFinalRow = canFillWidth(
+        pendingRatios,
+        applyLandscapeDensityRule: true,
+      );
+      final singletonHeightFactor =
+          pendingRatios.length == 1 && pendingRatios.single < 1
+          ? math.min(_maximumRowHeightFactor, 1 / pendingRatios.single)
+          : 1.0;
+      addPendingRow(
+        fillWidth: pendingRatios.length > 1 && canJustifyFinalRow,
+        // Give a lone portrait roughly one target-width column without
+        // making landscape singletons or forced non-final rows taller.
+        raggedHeightFactor: singletonHeightFactor,
+      );
+    }
     return UnmodifiableListView(rows);
   }
 }
