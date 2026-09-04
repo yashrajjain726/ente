@@ -96,7 +96,11 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
             }
         >
             <SpaceShareIcon />
-            {copied ? "Copied" : canShare ? "Share invite" : "Copy invite"}
+            {copied
+                ? "Invite link copied"
+                : canShare
+                  ? "Share invite link"
+                  : "Copy invite link"}
         </Box>
     );
 };

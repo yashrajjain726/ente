@@ -157,10 +157,10 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                         disabled={!profileLink}
                         label={
                             copied
-                                ? "Copied"
+                                ? "Invite link copied"
                                 : useNativeShare
-                                  ? "Share invite"
-                                  : "Copy link"
+                                  ? "Share invite link"
+                                  : "Copy invite link"
                         }
                         onClick={share}
                     />
