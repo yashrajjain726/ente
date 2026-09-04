@@ -726,7 +726,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 )}
                 {!isLoading &&
                     !post &&
-                    friendRequestDirection != "received" && (
+                    friendRequestDirection != "received" &&
+                    !(
+                        friendRequestDirection == "sent" &&
+                        showFriendRequestDetails
+                    ) && (
                         <SpacePostBadge
                             backgroundColor="rgba(255, 255, 255, 0.82)"
                             color="#5A5A5A"
@@ -736,6 +740,51 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 ? "Pending"
                                 : "No posts"}
                         </SpacePostBadge>
+                    )}
+                {!isLoading &&
+                    friendRequestDirection == "sent" &&
+                    showFriendRequestDetails && (
+                        <Box
+                            aria-hidden
+                            component="span"
+                            title={`@${friend.username}’s posts will appear here`}
+                            sx={{
+                                bgcolor: "#FFFFFF",
+                                borderRadius: "999px",
+                                boxSizing: "border-box",
+                                color: textSecondary,
+                                display: "inline-flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                left: "50%",
+                                lineHeight: "17px",
+                                maxWidth: "calc(100% - 16px)",
+                                px: isTwoTileLayout ? "9px" : "14px",
+                                py: isTwoTileLayout ? "8px" : "7px",
+                                position: "absolute",
+                                textAlign: "center",
+                                top: "50%",
+                                transform: "translate(-50%, -50%)",
+                                whiteSpace: "nowrap",
+                                width: "fit-content",
+                            }}
+                        >
+                            <Box
+                                component="span"
+                                sx={{
+                                    minWidth: 0,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                }}
+                            >
+                                @{friend.username}
+                            </Box>
+                            <Box component="span" sx={{ flexShrink: 0 }}>
+                                ’s posts will appear here
+                            </Box>
+                        </Box>
                     )}
                 {!isLoading && postUnavailable && (
                     <SpacePostBadge

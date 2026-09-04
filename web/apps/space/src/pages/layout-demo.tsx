@@ -43,17 +43,13 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
             : index == 1
               ? ("received" as const)
               : undefined
-        : count >= 2 && index == 0
-          ? ("received" as const)
-          : undefined;
-    const seenPostIndex = showAllVariants ? 2 : count >= 3 ? 1 : undefined;
-    const unseenPostIndex = showAllVariants
-        ? 3
-        : count >= 3
-          ? 2
-          : count >= 2
-            ? 1
+        : count == 2 && index == 1
+          ? ("sent" as const)
+          : count >= 2 && index == 0
+            ? ("received" as const)
             : undefined;
+    const seenPostIndex = showAllVariants ? 2 : count >= 3 ? 1 : undefined;
+    const unseenPostIndex = showAllVariants ? 3 : count >= 3 ? 2 : undefined;
     const hasPlaceholderMedia = index == seenPostIndex;
     const isUnread = index == unseenPostIndex;
     const username = friendRequestDirection
