@@ -1422,7 +1422,7 @@ fn replay(log: &mut Log, dims: usize, mode: ReplayMode) -> Result<ReplayedState,
     {
         match mode {
             ReplayMode::Writer => {}
-            ReplayMode::ReadOnly => log.extend_end_offset_to_file_len()?,
+            ReplayMode::ReadOnly => log.extend_end_offset_to(loaded.covered_log_offset)?,
         }
         if loaded.covered_log_offset > log.current_end_offset() {
             return Err(VecDbError::Corrupt(format!(
@@ -2028,6 +2028,55 @@ mod tests {
             replay(&mut captured_for_writer, DIMS, ReplayMode::Writer),
             Err(VecDbError::Corrupt(_))
         ));
+    }
+
+    #[test]
+    fn read_only_replay_stops_at_the_snapshot_frontier_not_the_file_length() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 2, 700)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let mut captured_for_read_only = reopen_log(&path, DIMS).unwrap();
+        let stale_end = captured_for_read_only.current_end_offset();
+        let racer = open_writer(&path);
+        bulk_add(&racer, &bulk_entries(2, 2, 700)).unwrap();
+        racer.flush().unwrap();
+        let covered_end = fs::metadata(&path).unwrap().len();
+        bulk_add(&racer, &bulk_entries(4, 2, 700)).unwrap();
+        drop(racer);
+        let grown_end = fs::metadata(&path).unwrap().len();
+        assert!(covered_end > stale_end);
+        assert!(grown_end > covered_end);
+        assert_eq!(
+            load_snapshot(&path, generation_of(&path))
+                .unwrap()
+                .covered_log_offset,
+            covered_end
+        );
+        let replayed = replay(&mut captured_for_read_only, DIMS, ReplayMode::ReadOnly).unwrap();
+        assert_eq!(replayed.total_records, 4);
+        assert_eq!(replayed.arena.live_count(), 4);
+        assert_eq!(replayed.recoverable_end, covered_end);
+        assert_eq!(replayed.tail_records, 0);
+        assert!(replayed.graph.is_some());
+        for index in 0..4 {
+            assert!(
+                replayed
+                    .arena
+                    .slot_of_key(&format!("key-{index}"))
+                    .is_some()
+            );
+        }
+        for index in 4..6 {
+            assert!(
+                replayed
+                    .arena
+                    .slot_of_key(&format!("key-{index}"))
+                    .is_none()
+            );
+        }
     }
 
     #[test]

@@ -303,15 +303,13 @@ impl Log {
         self.end_offset
     }
 
-    pub(crate) fn extend_end_offset_to_file_len(&mut self) -> Result<(), VecDbError> {
+    pub(crate) fn extend_end_offset_to(&mut self, target: u64) -> Result<(), VecDbError> {
         let file_len = self
             .file
             .metadata()
             .map_err(|source| VecDbError::io(&self.path, source))?
             .len();
-        if file_len > self.end_offset {
-            self.end_offset = file_len;
-        }
+        self.end_offset = self.end_offset.max(target.min(file_len));
         Ok(())
     }
 
@@ -1409,7 +1407,7 @@ mod tests {
     }
 
     #[test]
-    fn extend_end_offset_adopts_growth_and_ignores_shrinkage() {
+    fn extend_end_offset_grows_to_target_clamps_to_file_and_never_shrinks() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         let mut log = Log::create(&path, 8).unwrap();
@@ -1422,21 +1420,28 @@ mod tests {
                 attrs: &[],
             }],
         );
-        log.extend_end_offset_to_file_len().unwrap();
+        log.extend_end_offset_to(captured_end).unwrap();
+        assert_eq!(log.current_end_offset(), captured_end);
+        log.extend_end_offset_to(captured_end + 1000).unwrap();
         assert_eq!(log.current_end_offset(), captured_end);
         let foreign = encoded_add("second", &vector);
         append_raw_bytes(&path, &foreign);
         assert_eq!(log.current_end_offset(), captured_end);
-        log.extend_end_offset_to_file_len().unwrap();
         let grown_end = captured_end + foreign.len() as u64;
+        let partial_end = captured_end + foreign.len() as u64 / 2;
+        log.extend_end_offset_to(partial_end).unwrap();
+        assert_eq!(log.current_end_offset(), partial_end);
+        log.extend_end_offset_to(grown_end).unwrap();
         assert_eq!(log.current_end_offset(), grown_end);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 2);
         assert_eq!(recoverable_end, grown_end);
+        log.extend_end_offset_to(captured_end).unwrap();
+        assert_eq!(log.current_end_offset(), grown_end);
         let file = File::options().read(true).write(true).open(&path).unwrap();
         file.set_len(captured_end).unwrap();
         drop(file);
-        log.extend_end_offset_to_file_len().unwrap();
+        log.extend_end_offset_to(grown_end).unwrap();
         assert_eq!(log.current_end_offset(), grown_end);
         assert_eq!(log.generation(), reopen(&path, 8).generation());
     }
