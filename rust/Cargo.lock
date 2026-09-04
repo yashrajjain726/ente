@@ -2479,17 +2479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ente-core-wasm"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-core",
- "ente-wasm-lib",
- "ente-wasm-log",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "ente-ensu"
 version = "0.0.0"
 dependencies = [
@@ -2757,6 +2746,14 @@ dependencies = [
 
 [[package]]
 name = "ente-photos-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-wasm-lib",
+ "ente-wasm-log",
+]
+
+[[package]]
+name = "ente-prelogin-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-wasm-lib",

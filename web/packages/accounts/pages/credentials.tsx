@@ -26,12 +26,12 @@ import {
     saveSRPAttributes,
     updateSavedLocalUser,
 } from "ente-accounts/services/accounts-db";
-import { masterKeyFromSession } from "ente-accounts/services/core-session";
 import { decryptBox } from "ente-accounts/services/crypto";
 import {
     openPasskeyVerificationURL,
     passkeyVerificationRedirectURL,
 } from "ente-accounts/services/passkey";
+import { masterKeyFromSession } from "ente-accounts/services/prelogin-session";
 import {
     appHomeRoute,
     stashRedirect,

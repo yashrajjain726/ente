@@ -6,7 +6,6 @@ import {
     saveKeyAttributes,
     updateSavedLocalUser,
 } from "ente-accounts/services/accounts-db";
-import { ensureMasterKeyFromSession } from "ente-accounts/services/core-session";
 import {
     boxSealOpenBytes,
     decryptBox,
@@ -17,6 +16,7 @@ import {
     generateKeyPair,
     toB64URLSafe,
 } from "ente-accounts/services/crypto";
+import { ensureMasterKeyFromSession } from "ente-accounts/services/prelogin-session";
 import {
     ensureMasterKeyFromSession as readMasterKeyFromSession,
     type DecryptBox,

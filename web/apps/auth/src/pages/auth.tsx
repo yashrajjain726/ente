@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { useColorScheme } from "@mui/material/styles";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
-import { masterKeyFromSession } from "ente-accounts/services/core-session";
+import { masterKeyFromSession } from "ente-accounts/services/prelogin-session";
 import { stashRedirect } from "ente-accounts/services/redirect";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { LoadingIndicator } from "ente-base/components/loaders";

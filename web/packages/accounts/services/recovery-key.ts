@@ -1,15 +1,15 @@
 import { savedKeyAttributes } from "ente-accounts/services/accounts-db";
-import { ensureMasterKeyFromSession } from "ente-accounts/services/core-session";
 import {
     decryptBox,
     encryptBox,
     generateKey,
     recoveryKeyFromMnemonicOrHex,
 } from "ente-accounts/services/crypto";
+import { ensureMasterKeyFromSession } from "ente-accounts/services/prelogin-session";
 import { saveKeyAttributes } from "./accounts-db";
 import { putUserRecoveryKeyAttributes, type KeyAttributes } from "./user";
 
-export { recoveryKeyToMnemonic } from "ente-core-wasm";
+export { recoveryKeyToMnemonic } from "ente-prelogin-wasm";
 
 // For legacy compatibility, the hex representation of the recovery key is
 // accepted in addition to the 24 word BIP-39 mnemonic.

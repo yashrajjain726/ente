@@ -4,5 +4,7 @@ pub mod accounts;
 pub mod contacts;
 #[cfg(feature = "crypto")]
 pub mod crypto;
+#[cfg(feature = "prelogin")]
+mod prelogin;
 #[cfg(feature = "session")]
 pub mod session;

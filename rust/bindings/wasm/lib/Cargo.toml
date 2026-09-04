@@ -15,6 +15,7 @@ contacts = [
 crypto = []
 crypto-file = ["crypto", "dep:md-5"]
 crypto-seal = ["crypto"]
+prelogin = ["accounts", "crypto"]
 session = []
 
 [dependencies]

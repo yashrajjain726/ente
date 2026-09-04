@@ -1,10 +1,10 @@
 import { readAndFree } from "ente-utils/wasm";
-import type { SrpSession } from "./pkg/ente_core_wasm";
+import type { SrpSession } from "./pkg/ente_prelogin_wasm";
 
 export type EncryptedBoxB64 = Awaited<ReturnType<typeof encryptBox>>;
 export type KeyPair = Awaited<ReturnType<typeof generateKeyPair>>;
 
-const wasm = () => import("./pkg/ente_core_wasm");
+const wasm = () => import("./pkg/ente_prelogin_wasm");
 
 type BytesOrB64 = Uint8Array | string;
 
@@ -31,13 +31,13 @@ export const deriveKey = async (
     saltB64: string,
     opsLimit: number,
     memLimit: number,
-) => (await wasm()).auth_derive_kek(password, saltB64, memLimit, opsLimit);
+) => (await wasm()).authDeriveKek(password, saltB64, memLimit, opsLimit);
 
 export const deriveSensitiveKey = async (
     password: string,
 ): Promise<DerivedKey> =>
     readAndFree(
-        (await wasm()).auth_generate_sensitive_kek(password),
+        (await wasm()).authGenerateSensitiveKek(password),
         derivedKeyValue,
     );
 
@@ -54,19 +54,19 @@ export const generateSRPSetup = async (
     srpUserID: string,
 ): Promise<SRPSetupAttributes> =>
     readAndFree(
-        (await wasm()).auth_generate_srp_setup(kekB64, srpUserID),
+        (await wasm()).authGenerateSrpSetup(kekB64, srpUserID),
         (setup) => ({
-            srpSalt: setup.srp_salt,
-            srpVerifier: setup.srp_verifier,
-            loginSubKey: setup.login_sub_key,
+            srpSalt: setup.srpSalt,
+            srpVerifier: setup.srpVerifier,
+            loginSubKey: setup.loginSubKey,
         }),
     );
 
 export const recoveryKeyFromMnemonicOrHex = async (value: string) =>
-    (await wasm()).auth_recovery_key_from_mnemonic_or_hex(value);
+    (await wasm()).authRecoveryKeyFromMnemonicOrHex(value);
 
 export const recoveryKeyToMnemonic = async (recoveryKeyB64: string) =>
-    (await wasm()).auth_recovery_key_to_mnemonic(recoveryKeyB64);
+    (await wasm()).authRecoveryKeyToMnemonic(recoveryKeyB64);
 
 export const createSRPSession = async (
     srpSaltB64: string,

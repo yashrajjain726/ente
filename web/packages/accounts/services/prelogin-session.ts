@@ -1,4 +1,4 @@
-import { decryptBox } from "ente-core-wasm";
+import { decryptBox } from "ente-prelogin-wasm";
 import {
     masterKeyFromSession as readMasterKeyFromSession,
     ensureMasterKeyFromSession as readRequiredMasterKeyFromSession,
