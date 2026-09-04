@@ -7,8 +7,7 @@ import {
     SecurityCheckIcon,
 } from "@hugeicons/core-free-icons";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import NorthEastIcon from "@mui/icons-material/NorthEast";
-import { Box, Stack, Typography, useTheme } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import { RecoveryKey } from "ente-accounts/components/RecoveryKey";
 import { openAccountsManagePasskeysPage } from "ente-accounts/services/passkey";
 import { useBaseContext } from "ente-base/context";
@@ -35,8 +34,6 @@ export const LockerAccountDrawer: React.FC<
 > = ({ open, onClose, onRootClose }) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
     const router = useRouter();
-    const theme = useTheme();
-
     const [isRecoveryKeyOpen, setIsRecoveryKeyOpen] = useState(false);
     const [isSessionsOpen, setIsSessionsOpen] = useState(false);
     const [isTwoFactorOpen, setIsTwoFactorOpen] = useState(false);
@@ -105,17 +102,7 @@ export const LockerAccountDrawer: React.FC<
                 title={t("account")}
                 hideRootCloseButton
             >
-                <Stack
-                    sx={{
-                        px: 2,
-                        pb: 2,
-                        gap: 2,
-                        backgroundColor: "background.default",
-                        ...theme.applyStyles("dark", {
-                            backgroundColor: "background.paper",
-                        }),
-                    }}
-                >
+                <Stack sx={{ px: 2, pb: 2, gap: 2 }}>
                     <LockerSidebarCardButton
                         icon={Key02Icon}
                         label={t("recovery_key")}
@@ -143,7 +130,7 @@ export const LockerAccountDrawer: React.FC<
                         <LockerSidebarCardButton
                             icon={Key01Icon}
                             label={t("passkeys")}
-                            endIcon={<NorthEastIcon />}
+                            endIcon={<ChevronRightIcon />}
                             onClick={handleOpenPasskeys}
                         />
                         <LockerSidebarCardButton
@@ -153,8 +140,6 @@ export const LockerAccountDrawer: React.FC<
                             onClick={() => authenticateBefore("activeSessions")}
                         />
                     </Stack>
-
-                    <Box sx={{ borderTop: 1, borderColor: "divider", mx: 1 }} />
 
                     <Stack sx={{ gap: 1 }}>
                         <LockerSidebarCardButton

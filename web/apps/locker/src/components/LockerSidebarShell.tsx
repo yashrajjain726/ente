@@ -33,13 +33,12 @@ export const LockerSidebarDrawer: React.FC<DrawerProps> = ({
                             maxWidth: "375px",
                             width: "100%",
                             scrollbarWidth: "thin",
-                            backgroundColor: "background.default",
+                            backgroundColor: "#f4f4f4",
                             "&&": { padding: 0 },
                         },
                         (theme) =>
                             theme.applyStyles("dark", {
-                                backgroundColor:
-                                    theme.vars.palette.background.paper,
+                                backgroundColor: "#161616",
                             }),
                         paperSlotProps?.sx as never,
                     ],
