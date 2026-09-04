@@ -36,6 +36,7 @@ let result = run(
             " */",
             "const values = {};",
         ].join("\n"),
+        "web/returns.js": "/** @returns {string} API documentation. */\nfunction value() {}\n",
         "rust/clap.rs": [
             "#[derive(clap::Parser)]",
             "struct Args {",
@@ -69,6 +70,7 @@ for (const path of [
     "web/type.ts:1",
     "web/param.js:1",
     "web/satisfies.js:1",
+    "web/returns.js:1",
     "rust/clap.rs:6",
     "native/Value.swift:1",
 ]) {
@@ -80,11 +82,17 @@ assert.doesNotMatch(result.stderr, /rust\/clap\.rs:3/);
 result = run({
     "rust/local.rs": "// Non-obvious implementation reason.\npub fn value() {}\n",
     "rust/args.rs": [
+        "/// Printed in top-level command help.",
         "#[derive(clap::Parser)]",
         "pub struct Args {",
         "    /// Printed in command help.",
         "    pub json: bool,",
         "}",
+    ].join("\n"),
+    "rust/block_args.rs": [
+        "/** Printed in top-level command help. */",
+        "#[derive(clap::Parser)]",
+        "pub struct Args {}",
     ].join("\n"),
     "web/env.d.ts": '/// <reference types="vite/client" />\n',
     "web/config.js": [
@@ -94,6 +102,19 @@ result = run({
         "const config = {};",
         "/** @satisfies {Record<string, string>} */",
         "const values = {};",
+        "/** @returns {string} */",
+        "function value() { return ''; }",
+        "/**",
+        " * @template T",
+        " * @param {T} value",
+        " * @returns {T}",
+        " */",
+        "function identity(value) { return value; }",
+        "/**",
+        " * @typedef {{ value: string }} Value",
+        " * @property {string} name",
+        " * @prop {number} count",
+        " */",
     ].join("\n"),
     "generated/value.dart": [
         "// Generated file. Do not edit.",

@@ -39,6 +39,7 @@ pub struct RustPlaneLayout {
 pub struct RustReprocessOptions {
     // Same space as `RustScanResult.quad`: the decoded source image.
     pub quad: RustQuad,
+    // Must be a multiple of 90.
     pub rotation_degrees: i32,
     pub color_mode: RustColorMode,
     pub max_pixels: Option<u32>,

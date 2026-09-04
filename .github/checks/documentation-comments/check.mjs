@@ -41,8 +41,9 @@ if (!paths.length) throw new Error(`${root}: found no source files`);
 for (const path of paths) {
     const source = readFileSync(resolve(root, path), "utf8");
     if (isGenerated(source)) continue;
-    const clap = path.endsWith(".rs") ? clapRanges(source) : [];
-    for (const comment of documentationComments(source)) {
+    const comments = documentationComments(source);
+    const clap = path.endsWith(".rs") ? clapRanges(source, comments) : [];
+    for (const comment of comments) {
         if (isToolInput(path, comment.text)) continue;
         if (clap.some(([start, end]) => comment.line >= start && comment.line <= end)) continue;
         console.error(
@@ -67,13 +68,13 @@ function documentationComments(source) {
         if (/^\s*(?:\/\/\/|\/\/!)/.test(lines[i])) {
             const start = i;
             while (i < lines.length - 1 && /^\s*(?:\/\/\/|\/\/!)/.test(lines[i + 1])) i++;
-            comments.push({ line: start + 1, text: lines.slice(start, i + 1).join("\n") });
+            comments.push({ line: start + 1, endLine: i + 1, text: lines.slice(start, i + 1).join("\n") });
             continue;
         }
         if (!/^\s*\/\*(?:\*|!)/.test(lines[i])) continue;
         const start = i;
         while (i < lines.length && !lines[i].includes("*/")) i++;
-        comments.push({ line: start + 1, text: lines.slice(start, i + 1).join("\n") });
+        comments.push({ line: start + 1, endLine: i + 1, text: lines.slice(start, i + 1).join("\n") });
     }
     return comments;
 }
@@ -93,9 +94,22 @@ function isToolInput(path, comment) {
         return true;
     }
     if ([".ts", ".tsx"].includes(extension)) return false;
+    const annotations = comment
+        .replace(/^\s*\/\*\*/, "")
+        .replace(/\*\/\s*$/, "")
+        .split("\n")
+        .map((line) => line.replace(/^\s*\*?\s?/, "").trim())
+        .filter(Boolean);
     return (
-        /^\s*\/\*\*\s*@param\s+\{[^\n]+\}\s+\S+\s*\*\/\s*$/.test(comment) ||
-        /^\s*\/\*\*\s*@(satisfies|type)\s+\{[^\n]+\}\s*\*\/\s*$/.test(comment)
+        annotations.length > 0 &&
+        annotations.every(
+            (annotation) =>
+                /^@(satisfies|type|returns?)\s+\{.+\}$/.test(annotation) ||
+                /^@param\s+\{.+\}\s+\S+$/.test(annotation) ||
+                /^@typedef\s+\{.+\}\s+\S+$/.test(annotation) ||
+                /^@prop(?:erty)?\s+\{.+\}\s+\S+$/.test(annotation) ||
+                /^@template(?:\s+\{.+\})?\s+\S+$/.test(annotation),
+        )
     );
 }
 
@@ -105,12 +119,14 @@ function isGenerated(source) {
     );
 }
 
-function clapRanges(source) {
+function clapRanges(source, comments) {
     const lines = source.split("\n");
     const ranges = [];
     for (let i = 0; i < lines.length; i++) {
         if (!/#\s*\[\s*derive\s*\(/.test(lines[i])) continue;
-        const start = i;
+        let start = i + 1;
+        const help = comments.find((comment) => comment.endLine === start - 1);
+        if (help) start = help.line;
         let derive = lines[i];
         while (i < lines.length - 1 && !derive.includes(")]")) derive += `\n${lines[++i]}`;
         if (!/\b(?:Args|Parser|Subcommand)\b/.test(derive)) continue;
@@ -126,7 +142,7 @@ function clapRanges(source) {
             if (depth) opened = true;
             depth -= (code.match(/}/g) ?? []).length;
             if (!opened || depth) continue;
-            ranges.push([start + 1, end + 1]);
+            ranges.push([start, end + 1]);
             i = end;
             break;
         }
