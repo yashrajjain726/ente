@@ -27,6 +27,8 @@ const SNAPSHOT_QUIET_GAP: Duration = Duration::from_secs(10);
 const COMPACTION_MIN_DEAD_RECORDS: u64 = 64;
 const COMPACTION_DEAD_RATIO: u64 = 10;
 const COMPACTION_BATCH_SIZE: usize = 1000;
+const HANDOFF_WAIT_ROUNDS: u32 = 750;
+const HANDOFF_WAIT_PARK: Duration = Duration::from_millis(2);
 const KEY_TABLE_COPIES: usize = 2;
 const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
 const GRAPH_NODE_OVERHEAD_BYTES: usize = 48;
@@ -38,7 +40,15 @@ static REGISTRY: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<PathSlot>>>>> =
 static PENDING_SEARCH_GRAPH: LazyLock<Graph> = LazyLock::new(Graph::new);
 
 struct PathSlot {
-    live: Weak<Shared>,
+    live: Option<Weak<Shared>>,
+}
+
+impl PathSlot {
+    fn holds_live(&self) -> bool {
+        self.live
+            .as_ref()
+            .is_some_and(|weak| weak.strong_count() > 0)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,10 +225,14 @@ impl Drop for Shared {
             return;
         };
         let mut guard = lock_slot(&slot);
-        if std::ptr::eq(guard.live.as_ptr(), self) {
-            guard.live = Weak::new();
+        if guard
+            .live
+            .as_ref()
+            .is_some_and(|weak| std::ptr::eq(weak.as_ptr(), self))
+        {
+            guard.live = None;
         }
-        let removable = guard.live.strong_count() == 0 && Arc::strong_count(&slot) == 2;
+        let removable = !guard.holds_live() && Arc::strong_count(&slot) == 2;
         drop(guard);
         if removable {
             registry.remove(key);
@@ -239,7 +253,7 @@ fn path_slot(key: &Path) -> Arc<Mutex<PathSlot>> {
     match registry.get(key) {
         Some(slot) => Arc::clone(slot),
         None => {
-            let slot = Arc::new(Mutex::new(PathSlot { live: Weak::new() }));
+            let slot = Arc::new(Mutex::new(PathSlot { live: None }));
             registry.insert(key.to_path_buf(), Arc::clone(&slot));
             slot
         }
@@ -255,7 +269,7 @@ fn remove_path_slot_if_unused(key: &Path) {
     let Some(slot) = registry.get(key).map(Arc::clone) else {
         return;
     };
-    let removable = lock_slot(&slot).live.strong_count() == 0 && Arc::strong_count(&slot) == 2;
+    let removable = !lock_slot(&slot).holds_live() && Arc::strong_count(&slot) == 2;
     if removable {
         registry.remove(key);
     }
@@ -290,14 +304,54 @@ fn join_live(shared: Arc<Shared>, dims: usize, read_only: bool) -> Result<VecDb,
     Ok(VecDb { shared, read_only })
 }
 
+enum SlotHandoff<'a> {
+    Join(Arc<Shared>),
+    Released(MutexGuard<'a, PathSlot>),
+    Expired(MutexGuard<'a, PathSlot>),
+}
+
+fn wait_for_teardown_handoff<'a>(slot: &'a Mutex<PathSlot>, path: &Path) -> SlotHandoff<'a> {
+    let mut rounds = HANDOFF_WAIT_ROUNDS;
+    loop {
+        let guard = lock_slot(slot);
+        match &guard.live {
+            None => return SlotHandoff::Released(guard),
+            Some(weak) => {
+                if let Some(shared) = weak.upgrade() {
+                    return SlotHandoff::Join(shared);
+                }
+            }
+        }
+        if rounds == 0 {
+            log::warn!(
+                "teardown handoff for {} did not complete within the wait cap; acquiring directly",
+                path.display()
+            );
+            return SlotHandoff::Expired(guard);
+        }
+        drop(guard);
+        rounds -= 1;
+        std::thread::sleep(HANDOFF_WAIT_PARK);
+    }
+}
+
 impl VecDb {
     pub fn open(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         let key = registry_key_for(path)?;
         let slot = path_slot(&key);
         let mut guard = lock_slot(&slot);
-        if let Some(shared) = guard.live.upgrade() {
+        if let Some(weak) = &guard.live {
+            if let Some(shared) = weak.upgrade() {
+                drop(guard);
+                return join_live(shared, dims, false);
+            }
             drop(guard);
-            return join_live(shared, dims, false);
+            match wait_for_teardown_handoff(&slot, &key) {
+                SlotHandoff::Join(shared) => return join_live(shared, dims, false),
+                SlotHandoff::Released(reacquired) | SlotHandoff::Expired(reacquired) => {
+                    guard = reacquired;
+                }
+            }
         }
         let built = match build_writer(&key, key.clone(), dims) {
             Ok(built) => built,
@@ -311,7 +365,7 @@ impl VecDb {
         match built {
             BuiltWriter::Complete(shared) => {
                 let shared = Arc::new(shared);
-                guard.live = Arc::downgrade(&shared);
+                guard.live = Some(Arc::downgrade(&shared));
                 drop(guard);
                 Ok(Self {
                     shared,
@@ -325,7 +379,7 @@ impl VecDb {
             } => {
                 let shared = Arc::new(shared);
                 let half = shared.writer_half();
-                guard.live = Arc::downgrade(&shared);
+                guard.live = Some(Arc::downgrade(&shared));
                 drop(guard);
                 finish_pending_open(&shared, half, snapshot_stale, pending_records);
                 Ok(Self {
@@ -347,7 +401,7 @@ impl VecDb {
     pub fn open_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         let resolved = registry_key_for(path).unwrap_or_else(|_| path.to_path_buf());
         if let Some(slot) = existing_path_slot(&resolved) {
-            let live = lock_slot(&slot).live.upgrade();
+            let live = lock_slot(&slot).live.as_ref().and_then(Weak::upgrade);
             if let Some(shared) = live {
                 return join_live(shared, dims, true);
             }
@@ -690,9 +744,19 @@ impl VecDb {
             Err(error) => return Err(error),
         };
         if let Some(slot) = existing_path_slot(&key) {
-            let live = lock_slot(&slot).live.upgrade();
-            if let Some(shared) = live {
-                return close_live_instance(&shared);
+            let guard = lock_slot(&slot);
+            if let Some(weak) = &guard.live {
+                if let Some(shared) = weak.upgrade() {
+                    drop(guard);
+                    return close_live_instance(&shared);
+                }
+                drop(guard);
+                match wait_for_teardown_handoff(&slot, &key) {
+                    SlotHandoff::Join(shared) => return close_live_instance(&shared),
+                    SlotHandoff::Released(reacquired) | SlotHandoff::Expired(reacquired) => {
+                        drop(reacquired);
+                    }
+                }
             }
         }
         let lock = WriterLock::acquire(&key)?;
@@ -801,8 +865,8 @@ fn registry_holds_live(key: &Path) -> bool {
         return false;
     };
     match slot.try_lock() {
-        Ok(guard) => guard.live.strong_count() > 0,
-        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner().live.strong_count() > 0,
+        Ok(guard) => guard.holds_live(),
+        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner().holds_live(),
         Err(TryLockError::WouldBlock) => false,
     }
 }
@@ -855,8 +919,12 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
         && let Some(slot) = existing_path_slot(key)
     {
         let mut guard = lock_slot(&slot);
-        if std::ptr::eq(guard.live.as_ptr(), Arc::as_ptr(shared)) {
-            guard.live = Weak::new();
+        if guard
+            .live
+            .as_ref()
+            .is_some_and(|weak| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(shared)))
+        {
+            guard.live = None;
         }
     }
     drop(st);
@@ -2242,6 +2310,66 @@ mod tests {
         }
         let reopened = open_writer(&path);
         assert!(reopened.contains("seed"));
+    }
+
+    #[test]
+    fn handoff_helper_joins_a_live_slot() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = existing_path_slot(&key).unwrap();
+        match wait_for_teardown_handoff(&slot, &key) {
+            SlotHandoff::Join(shared) => assert!(Arc::ptr_eq(&shared, &db.shared)),
+            SlotHandoff::Released(_) => panic!("expected a join, saw a released slot"),
+            SlotHandoff::Expired(_) => panic!("expected a join, saw an expired wait"),
+        }
+    }
+
+    #[test]
+    fn handoff_helper_proceeds_on_a_retired_slot() {
+        let slot = Arc::new(Mutex::new(PathSlot { live: None }));
+        match wait_for_teardown_handoff(&slot, Path::new("retired")) {
+            SlotHandoff::Released(guard) => assert!(guard.live.is_none()),
+            SlotHandoff::Join(_) => panic!("expected a release, saw a join"),
+            SlotHandoff::Expired(_) => panic!("expected a release, saw an expired wait"),
+        }
+    }
+
+    #[test]
+    fn handoff_helper_caps_out_on_a_leaked_dead_marker() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let weak = Arc::downgrade(&db.shared);
+        drop(db);
+        assert_eq!(weak.strong_count(), 0);
+        let slot = Arc::new(Mutex::new(PathSlot { live: Some(weak) }));
+        let started = Instant::now();
+        let outcome = wait_for_teardown_handoff(&slot, &path);
+        let waited = started.elapsed();
+        match outcome {
+            SlotHandoff::Expired(guard) => assert!(!guard.holds_live()),
+            SlotHandoff::Join(_) => panic!("expected an expired wait, saw a join"),
+            SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
+        }
+        assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS);
+    }
+
+    #[test]
+    fn dropping_the_last_handle_retires_the_marker_before_eviction() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = existing_path_slot(&key).unwrap();
+        assert!(lock_slot(&slot).holds_live());
+        drop(db);
+        assert!(lock_slot(&slot).live.is_none());
+        assert!(registry().contains_key(&key));
+        drop(slot);
+        remove_path_slot_if_unused(&key);
+        assert!(!registry().contains_key(&key));
     }
 
     #[test]
@@ -4103,8 +4231,8 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(60);
         let joined = loop {
             assert!(Instant::now() < deadline);
-            let registered = existing_path_slot(&key)
-                .is_some_and(|slot| lock_slot(&slot).live.strong_count() > 0);
+            let registered =
+                existing_path_slot(&key).is_some_and(|slot| lock_slot(&slot).holds_live());
             if registered {
                 break VecDb::open_read_only(&path, DIMS).unwrap();
             }
