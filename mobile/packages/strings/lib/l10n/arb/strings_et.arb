@@ -182,7 +182,7 @@
     "description": "Placeholder text for comment input field"
   },
   "comments": "Kommentaarid",
-  "commentsCount": "{count, plural, =0{Kommentare pole} one{{count} kommentar} other{{count} kommentari}}",
+  "commentsCount": "{count, plural, =0{Kommentaare pole} one{{count} kommentaar} other{{count} kommentari}}",
   "@commentsCount": {
     "description": "Number of comments with pluralization",
     "placeholders": {

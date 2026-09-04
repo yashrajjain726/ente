@@ -639,7 +639,7 @@
   "@deletedComment": {
     "description": "Label for deleted comments"
   },
-  "deletedFromEnte": "Radera från Ente",
+  "deletedFromEnte": "Raderad från Ente",
   "deletedItemsStayHereForThirtyDays": "Raderade objekt stannar här i 30 dagar",
   "deleteDuplicates": "Radera dubbletter",
   "deleteEmptyAlbums": "Ta bort tomma album",
