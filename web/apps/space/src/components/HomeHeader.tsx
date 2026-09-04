@@ -14,7 +14,7 @@ const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
 const headerChromeColor = "#F0F0F0";
-const headerIconSize = 22;
+const headerIconSize = 24;
 const headerSideWidth = 36;
 const mediaPlaceholderColor = "#E5E7EA";
 const avatarFadeSx = {
@@ -58,6 +58,18 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
             px: 2,
             width: "100%",
             zIndex: 4,
+            "&::after": {
+                bgcolor: headerChromeColor,
+                borderRadius: "999px",
+                content: '""',
+                height: 44,
+                left: "16px",
+                pointerEvents: "none",
+                position: "absolute",
+                right: "16px",
+                top: "12px",
+                zIndex: 0,
+            },
             "&::before": {
                 WebkitBackdropFilter: "blur(4px)",
                 WebkitMaskImage:
@@ -97,18 +109,18 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 height: headerActionSize,
                 justifyContent: "center",
                 lineHeight: 0,
-                ml: "-6px",
                 overflow: "hidden",
                 p: 0,
                 placeSelf: "center start",
+                position: "relative",
                 width: headerActionSize,
+                zIndex: 1,
             }}
         >
             <Box
                 sx={{
                     alignItems: "center",
                     bgcolor: "transparent",
-                    border: `2.5px solid ${headerChromeColor}`,
                     borderRadius: "50%",
                     boxSizing: "border-box",
                     display: "flex",
@@ -125,6 +137,9 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                         sx={{
                             ...avatarFadeSx,
                             borderRadius: "50%",
+                            filter: profile.avatarUrl
+                                ? undefined
+                                : "brightness(0.9)",
                             height: headerAvatarImageSize,
                             overflow: "hidden",
                             width: headerAvatarImageSize,
@@ -149,8 +164,6 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
             sx={{
                 alignItems: "center",
                 alignSelf: "center",
-                bgcolor: headerChromeColor,
-                borderRadius: "999px",
                 boxSizing: "border-box",
                 display: "flex",
                 height: 36,
@@ -160,7 +173,9 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 minWidth: 0,
                 overflow: "visible",
                 placeSelf: "center",
+                position: "relative",
                 px: "16px",
+                zIndex: 1,
             }}
         >
             <Box
@@ -198,10 +213,10 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 justifyContent: "center",
                 justifySelf: "end",
                 lineHeight: 0,
-                mr: "-6px",
                 p: 0,
                 position: "relative",
                 width: headerActionSize,
+                zIndex: 1,
                 "& svg": { display: "block" },
                 "&:focus-visible": {
                     borderRadius: "50%",
@@ -214,8 +229,6 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 aria-hidden
                 sx={{
                     alignItems: "center",
-                    bgcolor: headerChromeColor,
-                    borderRadius: "50%",
                     display: "flex",
                     height: headerChatCircleSize,
                     justifyContent: "center",
@@ -236,11 +249,11 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                             border: `2px solid ${headerChromeColor}`,
                             borderRadius: "50%",
                             boxSizing: "border-box",
-                            height: 11,
+                            height: 12,
                             position: "absolute",
-                            right: 5.5,
-                            top: 6,
-                            width: 11,
+                            right: 5,
+                            top: 5.5,
+                            width: 12,
                             zIndex: 1,
                         }}
                     />
