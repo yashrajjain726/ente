@@ -516,11 +516,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Desativar o bloqueio do ecrã do dispositivo quando o Ente estiver em primeiro plano e houver uma cópia de segurança em curso. Normalmente, isto não é necessário, mas pode ajudar a que os grandes carregamentos e as importações iniciais de grandes bibliotecas sejam concluídos mais rapidamente.",
   "deviceNotFound": "Dispositivo não encontrado",
   "didYouKnow": "Você sabia?",
   "digits": "Dígitos",
-  "disableAutoLock": "Desativar bloqueio automático",
   "disableDownloadWarningBody": "Visualizadores ainda podem fazer capturas de tela ou salvar uma cópia das suas fotos usando ferramentas externas",
   "disableDownloadWarningTitle": "Por favor, observe",
   "disableLinkMessage": "Isto removerá o link público para acessar \"{albumName}\".",
@@ -621,7 +619,6 @@
     }
   },
   "earned": "Recebido",
-  "earnFreeStorage": "Adquira armazenamento gratuito",
   "earnMoreSpace": "Ganhe mais espaço!",
   "edit": "Editar",
   "editAutoAddPeople": "Editar auto adição de pessoas",
@@ -1567,8 +1564,6 @@
   "referralCodeHint": "Pode personalizar este código até 3 vezes",
   "referrals": "Referências",
   "referralsAreCurrentlyPaused": "As referências estão atualmente em pausa",
-  "referralStep1": "1. Personalize e partilhe o seu código",
-  "referralStep2": "2. Criam uma conta Ente usando o seu código",
   "rejectRecovery": "Recusar recuperação",
   "rejectSuggestions": "Rejeitar sugestões",
   "remindToEmptyDeviceTrash": "Esvazie também a opção “Eliminados recentemente” em “Definições” -> “Armazenamento” para reclamar o espaço libertado",
@@ -1658,8 +1653,6 @@
   "saveCode": "Guardar código",
   "saveCollage": "Guardar colagem",
   "saveCopy": "Guardar cópia",
-  "saveDocumentDescription": "Envie documentos importantes.",
-  "saveDocumentTitle": "Documento",
   "saveOnlyDescription": "Deseja guardar isto no seu armazenamento (pasta de transferências por padrão)?",
   "@saveOnlyDescription": {
     "description": "Description text asking user if they want to save to storage (for platforms that don't support sharing)"
@@ -1853,7 +1846,6 @@
   "setupFirstAccount": "Configure a sua primeira conta",
   "share": "Partilhar",
   "shareALink": "Partilhar um link",
-  "shareCodeEarnStorage": "Partilhe o código, receba armazenamento",
   "shareCodes": "Partilhar códigos",
   "shareCodesDuration": "Selecione a duração que deseja partilhar os códigos.",
   "sharedAlbumSectionDescription": "Criar álbuns compartilhados e colaborativos com outros usuários da Ente, incluindo usuários em planos gratuitos.",
@@ -2100,7 +2092,6 @@
   },
   "unarchiveAlbum": "Desarquivar álbum",
   "unarchiving": "Desarquivar...",
-  "unavailableReferralCode": "Desculpe, este código não está disponível.",
   "uncategorized": "Sem categoria",
   "undo": " Desfazer ",
   "unhide": "Mostrar",
