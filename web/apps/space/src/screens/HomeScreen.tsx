@@ -13,7 +13,11 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
-import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
+import {
+    SpaceHomeHeader,
+    spaceHomeHeaderChromeColor,
+    spaceHomeHeaderHeight,
+} from "components/HomeHeader";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import {
     SpacePostBadge,
@@ -58,7 +62,7 @@ const textBase = spaceText;
 const textSecondary = spaceTextMuted;
 const avatarFallbackColor = "#888888";
 const avatarFallbackTextColor = "#FFFFFF";
-const mediaPlaceholderColor = "#E9EAEC";
+const mediaPlaceholderColor = spaceHomeHeaderChromeColor;
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 const waveAnimationDurationMs = 1100;
@@ -725,7 +729,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     friendRequestDirection != "received" && (
                         <SpacePostBadge
                             backgroundColor="rgba(255, 255, 255, 0.82)"
-                            color={textSecondary}
+                            color="#5A5A5A"
                             placement="center"
                         >
                             {friendRequestDirection == "sent"
@@ -961,11 +965,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 }
                                 sx={{
                                     alignItems: "center",
-                                    bgcolor: "#DFE1E4",
+                                    bgcolor: "#E8E8E8",
                                     border: 0,
                                     borderRadius: `${requestActionSize / 2}px`,
                                     boxSizing: "border-box",
-                                    color: "#5F6368",
+                                    color: "#5A5A5A",
                                     cursor: isFriendRequestActionBusy
                                         ? "default"
                                         : "pointer",
@@ -985,7 +989,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                     },
                                     "&:hover": isFriendRequestActionBusy
                                         ? undefined
-                                        : { bgcolor: "#D7D9DC" },
+                                        : { bgcolor: "#DEDEDE" },
                                 }}
                             >
                                 {friendRequestAction == "discard" ? (

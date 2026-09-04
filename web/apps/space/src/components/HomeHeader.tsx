@@ -13,7 +13,7 @@ const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
-const headerChromeColor = "#F0F0F0";
+export const spaceHomeHeaderChromeColor = "#F0F0F0";
 const headerIconSize = 24;
 const headerSideWidth = 36;
 const mediaPlaceholderColor = "#E5E7EA";
@@ -59,7 +59,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
             width: "100%",
             zIndex: 4,
             "&::after": {
-                bgcolor: headerChromeColor,
+                bgcolor: spaceHomeHeaderChromeColor,
                 borderRadius: "999px",
                 content: '""',
                 height: 44,
@@ -246,7 +246,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                     <Box
                         sx={{
                             bgcolor: dangerColor,
-                            border: `2px solid ${headerChromeColor}`,
+                            border: `2px solid ${spaceHomeHeaderChromeColor}`,
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             height: 12,

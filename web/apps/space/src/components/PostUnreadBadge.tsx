@@ -25,7 +25,7 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: placement == "center" ? 11 : 10,
             fontVariantNumeric: "tabular-nums",
-            fontWeight: placement == "center" ? 500 : 700,
+            fontWeight: placement == "center" ? 600 : 700,
             height: placement == "center" ? 24 : 20,
             justifyContent: "center",
             lineHeight: 1,
