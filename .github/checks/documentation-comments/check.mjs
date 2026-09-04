@@ -141,6 +141,11 @@ function clapRanges(source, comments) {
             depth += (code.match(/{/g) ?? []).length;
             if (depth) opened = true;
             depth -= (code.match(/}/g) ?? []).length;
+            if (!opened && /;\s*$/.test(code)) {
+                ranges.push([start, end + 1]);
+                i = end;
+                break;
+            }
             if (!opened || depth) continue;
             ranges.push([start, end + 1]);
             i = end;

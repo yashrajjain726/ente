@@ -46,6 +46,13 @@ let result = run(
             "/// API documentation.",
             "pub fn value() {}",
         ].join("\n"),
+        "rust/unit_clap.rs": [
+            "/// Printed in top-level command help.",
+            "#[derive(clap::Parser)]",
+            "struct Args;",
+            "/// API documentation.",
+            "pub fn value() {}",
+        ].join("\n"),
         "deleted.rs": "/// Deleted documentation.\n",
     },
     {
@@ -72,12 +79,14 @@ for (const path of [
     "web/satisfies.js:1",
     "web/returns.js:1",
     "rust/clap.rs:6",
+    "rust/unit_clap.rs:4",
     "native/Value.swift:1",
 ]) {
     assert.match(result.stderr, new RegExp(path.replace(".", "\\.")));
 }
 assert.doesNotMatch(result.stderr, /deleted/);
 assert.doesNotMatch(result.stderr, /rust\/clap\.rs:3/);
+assert.doesNotMatch(result.stderr, /rust\/unit_clap\.rs:1/);
 
 result = run({
     "rust/local.rs": "// Non-obvious implementation reason.\npub fn value() {}\n",
