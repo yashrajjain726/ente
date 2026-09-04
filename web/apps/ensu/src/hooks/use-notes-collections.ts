@@ -25,7 +25,7 @@ const NOTES_REMOVE_WAIT_ERROR =
 interface UseNotesCollectionsOptions {
     isTauriRuntime: boolean;
     isGenerating: boolean;
-    isGenerationStarting: () => boolean;
+    isGenerationActive: () => boolean;
     modelReady: boolean;
     ensureProvider: () => Promise<LlmProvider>;
     cancelIndexing: () => void;
@@ -35,7 +35,7 @@ interface UseNotesCollectionsOptions {
 export const useNotesCollections = ({
     isTauriRuntime,
     isGenerating,
-    isGenerationStarting,
+    isGenerationActive,
     modelReady,
     ensureProvider,
     cancelIndexing,
@@ -129,11 +129,19 @@ export const useNotesCollections = ({
     );
 
     const startIndex = useCallback(
-        (collectionId: string, force = false, automatic = false) => {
-            const blocked =
-                !modelReady || isGenerating || isGenerationStarting();
+        (
+            collectionId: string,
+            force = false,
+            automatic = false,
+            automaticRequestKey?: number,
+        ) => {
+            const blocked = !modelReady || isGenerationActive();
             const request = automatic
-                ? controller.ensureIndex(collectionId, blocked)
+                ? controller.ensureIndex(
+                      collectionId,
+                      blocked,
+                      automaticRequestKey,
+                  )
                 : controller.requestIndex(collectionId, force, blocked);
             if (request === "ignored") return;
             lifecycleChanged();
@@ -148,41 +156,43 @@ export const useNotesCollections = ({
                 force,
             });
 
+            const ownsIndex = () => controller.canContinueIndex(collectionId);
+            const canStartIndex = () => ownsIndex() && !isGenerationActive();
             void ensureProvider()
                 .then((provider) =>
-                    provider.withKnowledgeRetrieval(
-                        async (retrievalEpoch) => {
-                            let needsRerun = true;
-                            let bypassQuietPeriod = force;
-                            while (
-                                needsRerun &&
-                                controller.canContinueIndex(collectionId)
-                            ) {
-                                const result = await indexNotesCollection(
+                    provider.withKnowledgeRetrieval(async (retrievalEpoch) => {
+                        let needsRerun = true;
+                        let bypassQuietPeriod = force;
+                        while (needsRerun && ownsIndex()) {
+                            if (isGenerationActive()) {
+                                controller.queueIndex(
                                     collectionId,
                                     bypassQuietPeriod,
-                                    retrievalEpoch,
                                 );
-                                if (
-                                    !controller.canContinueIndex(collectionId)
-                                ) {
-                                    return;
-                                }
-                                bypassQuietPeriod = false;
-                                replaceCollection(result.collection);
-                                needsRerun = result.needsRerun;
-                                if (needsRerun) {
-                                    await new Promise<void>((resolve) =>
-                                        window.setTimeout(
-                                            resolve,
-                                            NOTES_INDEX_RERUN_YIELD_MS,
-                                        ),
-                                    );
-                                }
+                                lifecycleChanged();
+                                return;
                             }
-                        },
-                        () => controller.canContinueIndex(collectionId),
-                    ),
+                            const result = await indexNotesCollection(
+                                collectionId,
+                                bypassQuietPeriod,
+                                retrievalEpoch,
+                            );
+                            if (!ownsIndex()) {
+                                return;
+                            }
+                            bypassQuietPeriod = false;
+                            replaceCollection(result.collection);
+                            needsRerun = result.needsRerun;
+                            if (needsRerun) {
+                                await new Promise<void>((resolve) =>
+                                    window.setTimeout(
+                                        resolve,
+                                        NOTES_INDEX_RERUN_YIELD_MS,
+                                    ),
+                                );
+                            }
+                        }
+                    }, canStartIndex),
                 )
                 .catch((error: unknown) => {
                     if (controller.isRemoving(collectionId)) return;
@@ -215,8 +225,7 @@ export const useNotesCollections = ({
         [
             controller,
             ensureProvider,
-            isGenerating,
-            isGenerationStarting,
+            isGenerationActive,
             lifecycleChanged,
             modelReady,
             refresh,
@@ -231,7 +240,7 @@ export const useNotesCollections = ({
     );
 
     useEffect(() => {
-        const blocked = !modelReady || isGenerating || isGenerationStarting();
+        const blocked = !modelReady || isGenerationActive();
         const queued = controller.drainQueued(blocked);
         if (queued.length > 0) {
             lifecycleChanged();
@@ -242,7 +251,7 @@ export const useNotesCollections = ({
     }, [
         controller,
         isGenerating,
-        isGenerationStarting,
+        isGenerationActive,
         lifecycleChanged,
         lifecycleRevision,
         modelReady,
@@ -294,7 +303,13 @@ export const useNotesCollections = ({
             ) {
                 timeouts.push(
                     window.setTimeout(
-                        () => runIndex(collection.id),
+                        () =>
+                            startIndex(
+                                collection.id,
+                                false,
+                                true,
+                                collection.updateDueAtMs ?? undefined,
+                            ),
                         Math.max(0, collection.updateDueAtMs - now),
                     ),
                 );
@@ -303,7 +318,7 @@ export const useNotesCollections = ({
         return () => {
             for (const timeout of timeouts) window.clearTimeout(timeout);
         };
-    }, [collections, isTauriRuntime, modelReady, runIndex]);
+    }, [collections, isTauriRuntime, modelReady, startIndex]);
 
     useEffect(() => {
         if (!isTauriRuntime || !modelReady) return;
@@ -375,9 +390,6 @@ export const useNotesCollections = ({
     const collectionViews = useMemo<NotesCollectionView[]>(
         () =>
             collections.map((collection) => {
-                if (collection.status !== "pending") {
-                    return { ...collection, activity: null };
-                }
                 const lifecycleActivity = controller.indexActivity(
                     collection.id,
                 );
@@ -389,14 +401,20 @@ export const useNotesCollections = ({
                 } else if (lifecycleActivity === "queued") {
                     activity = !modelReady
                         ? "waitingForModel"
-                        : isGenerating || isGenerationStarting()
+                        : isGenerating || isGenerationActive()
                           ? "waitingForGeneration"
                           : "starting";
-                } else if (collection.updateDueAtMs != null) {
+                } else if (
+                    collection.updateDueAtMs != null &&
+                    (collection.status === "ready" ||
+                        collection.status === "pending")
+                ) {
                     activity = "scheduled";
+                } else if (collection.status !== "pending") {
+                    activity = null;
                 } else if (!modelReady) {
                     activity = "waitingForModel";
-                } else if (isGenerating || isGenerationStarting()) {
+                } else if (isGenerating || isGenerationActive()) {
                     activity = "waitingForGeneration";
                 } else {
                     activity = "starting";
@@ -407,7 +425,7 @@ export const useNotesCollections = ({
             collections,
             controller,
             isGenerating,
-            isGenerationStarting,
+            isGenerationActive,
             lifecycleRevision,
             modelReady,
         ],

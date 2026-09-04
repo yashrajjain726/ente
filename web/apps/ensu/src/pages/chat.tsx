@@ -572,6 +572,8 @@ const Page: React.FC = () => {
     >(undefined);
     const [chatNotificationOpen, setChatNotificationOpen] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSessionSummaryGenerating, setIsSessionSummaryGenerating] =
+        useState(false);
     const [isStreamingOutro, setIsStreamingOutro] = useState(false);
     const [loadingPhrase, setLoadingPhrase] = useState<string | null>(null);
     const [loadingDots, setLoadingDots] = useState(1);
@@ -620,6 +622,7 @@ const Page: React.FC = () => {
         KnowledgePack[]
     > | null>(null);
     const generationStartingRef = useRef(false);
+    const generationActiveRef = useRef(false);
     const generationStoppingRef = useRef(false);
     const pendingGenerationStopsRef = useRef(0);
     const modelGateRequestRef = useRef(0);
@@ -629,6 +632,7 @@ const Page: React.FC = () => {
         previousSelection?: string | null;
     } | null>(null);
     const sessionSummaryPromiseRef = useRef<Promise<void> | null>(null);
+    const sessionSummaryActiveRef = useRef(false);
     const sessionSummaryEpochRef = useRef(0);
     const manuallyRenamedSessionIdsRef = useRef(new Set<string>());
     const pendingSessionRenamesRef = useRef(new Set<string>());
@@ -1413,6 +1417,7 @@ const Page: React.FC = () => {
         const jobId = currentJobIdRef.current;
         currentJobIdRef.current = null;
         activeKnowledgeSourcesRef.current = [];
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         setIsDownloading(false);
@@ -1477,6 +1482,7 @@ const Page: React.FC = () => {
         streamingBufferRef.current = "";
         streamingChunksRef.current = [];
         streamingCreatedAtRef.current = null;
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         resetPendingImages();
@@ -1786,8 +1792,8 @@ const Page: React.FC = () => {
         return providerRef.current;
     }, []);
 
-    const isNotesGenerationStarting = useCallback(
-        () => generationStartingRef.current,
+    const isNotesGenerationActive = useCallback(
+        () => generationActiveRef.current || sessionSummaryActiveRef.current,
         [],
     );
     const cancelNotesIndexing = useCallback(() => {
@@ -1822,8 +1828,8 @@ const Page: React.FC = () => {
         runIndex: runNotesIndex,
     } = useNotesCollections({
         isTauriRuntime,
-        isGenerating,
-        isGenerationStarting: isNotesGenerationStarting,
+        isGenerating: isGenerating || isSessionSummaryGenerating,
+        isGenerationActive: isNotesGenerationActive,
         modelReady: modelGateStatus === "ready",
         ensureProvider,
         cancelIndexing: cancelNotesIndexing,
@@ -1915,41 +1921,48 @@ const Page: React.FC = () => {
 
     const generateSessionSummary = useCallback(
         async (input: string) => {
-            const provider = await ensureProvider();
-            const settings = getModelSettings();
-            const availability =
-                await provider.checkModelAvailability(settings);
-            const mmprojReady =
-                availability.mmprojAvailable === undefined ||
-                availability.mmprojAvailable;
+            sessionSummaryActiveRef.current = true;
+            setIsSessionSummaryGenerating(true);
+            try {
+                const provider = await ensureProvider();
+                const settings = getModelSettings();
+                const availability =
+                    await provider.checkModelAvailability(settings);
+                const mmprojReady =
+                    availability.mmprojAvailable === undefined ||
+                    availability.mmprojAvailable;
 
-            if (!availability.modelAvailable || !mmprojReady) {
-                return null;
+                if (!availability.modelAvailable || !mmprojReady) {
+                    return null;
+                }
+
+                await provider.ensureModelReady(settings);
+
+                let summary = "";
+
+                await provider.generateChatStream(
+                    {
+                        messages: [
+                            { role: "system", content: SESSION_TITLE_PROMPT },
+                            { role: "user", content: input },
+                        ],
+                        maxTokens: 64,
+                        temperature: 0.2,
+                        topP: 0.9,
+                        repeatPenalty: REPEAT_PENALTY,
+                    },
+                    (event) => {
+                        if (event.type === "text") {
+                            summary += event.text;
+                        }
+                    },
+                );
+
+                return summary;
+            } finally {
+                sessionSummaryActiveRef.current = false;
+                setIsSessionSummaryGenerating(false);
             }
-
-            await provider.ensureModelReady(settings);
-
-            let summary = "";
-
-            await provider.generateChatStream(
-                {
-                    messages: [
-                        { role: "system", content: SESSION_TITLE_PROMPT },
-                        { role: "user", content: input },
-                    ],
-                    maxTokens: 64,
-                    temperature: 0.2,
-                    topP: 0.9,
-                    repeatPenalty: REPEAT_PENALTY,
-                },
-                (event) => {
-                    if (event.type === "text") {
-                        summary += event.text;
-                    }
-                },
-            );
-
-            return summary;
         },
         [ensureProvider, getModelSettings],
     );
@@ -2427,6 +2440,7 @@ const Page: React.FC = () => {
         streamingBufferRef.current = "";
         streamingChunksRef.current = [];
         streamingCreatedAtRef.current = null;
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         setIsDraftSession(true);
@@ -2786,6 +2800,7 @@ const Page: React.FC = () => {
         const last = lastGenerationRef.current;
         lastGenerationRef.current = null;
 
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         setIsDownloading(false);
@@ -2921,6 +2936,7 @@ const Page: React.FC = () => {
                 return;
             }
             generationStartingRef.current = true;
+            generationActiveRef.current = true;
             setIsGenerating(true);
             currentJobIdRef.current = null;
             lastGenerationRef.current = null;
@@ -2984,6 +3000,7 @@ const Page: React.FC = () => {
             } finally {
                 generationStartingRef.current = false;
                 if (!startupCompleted && isActiveGeneration()) {
+                    generationActiveRef.current = false;
                     setIsGenerating(false);
                 }
             }
@@ -3282,6 +3299,7 @@ const Page: React.FC = () => {
             } finally {
                 if (isActiveGeneration()) {
                     activeKnowledgeSourcesRef.current = [];
+                    generationActiveRef.current = false;
                     setIsGenerating(false);
                     setIsStreamingOutro(false);
                     setIsDownloading(false);

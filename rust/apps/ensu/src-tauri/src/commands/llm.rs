@@ -19,6 +19,7 @@ pub struct State {
     context: Mutex<Option<llm::ContextRef>>,
     lifecycle: async_runtime::Mutex<()>,
     retrieval_epoch: Arc<AtomicU64>,
+    model_state_epoch: AtomicU64,
 }
 
 impl State {
@@ -33,11 +34,24 @@ impl State {
     fn cancel_retrieval(&self) {
         self.retrieval_epoch.fetch_add(1, Ordering::Relaxed);
     }
+
+    fn model_state_epoch(&self) -> u64 {
+        self.model_state_epoch.load(Ordering::SeqCst)
+    }
+
+    fn mark_model_state_changed(&self) {
+        self.model_state_epoch.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 #[tauri::command]
 pub fn llm_retrieval_epoch(state: TauriState<'_, State>) -> u64 {
     state.retrieval_epoch.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn llm_model_state_epoch(state: TauriState<'_, State>) -> u64 {
+    state.model_state_epoch()
 }
 
 pub struct ModelDownloadState {
@@ -143,6 +157,9 @@ pub(crate) fn replace_state(
 
     *model_guard = model;
     *context_guard = context;
+    drop(context_guard);
+    drop(model_guard);
+    state.mark_model_state_changed();
     Ok(())
 }
 
@@ -519,6 +536,8 @@ pub async fn llm_create_context(
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = Some(context);
+    drop(context_guard);
+    state.mark_model_state_changed();
 
     logging::log("LLM", "create context succeeded");
     Ok(())
@@ -532,6 +551,8 @@ pub async fn llm_free_context(state: TauriState<'_, State>) -> Result<(), ApiErr
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = None;
+    drop(context_guard);
+    state.mark_model_state_changed();
     Ok(())
 }
 
@@ -645,5 +666,20 @@ pub(crate) fn clear_for_exit(app: &AppHandle) {
         }
     } else {
         logging::log("App", "LLM state unavailable during exit");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{State, replace_state};
+
+    #[test]
+    fn replacing_model_state_advances_epoch() {
+        let state = State::default();
+        let before = state.model_state_epoch();
+
+        replace_state(&state, None, None).expect("replace empty model state");
+
+        assert_eq!(state.model_state_epoch(), before + 1);
     }
 }
