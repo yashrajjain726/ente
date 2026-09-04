@@ -185,6 +185,11 @@ impl Shared {
 
 impl Drop for Shared {
     fn drop(&mut self) {
+        let half = self
+            .writer
+            .get_mut()
+            .unwrap_or_else(PoisonError::into_inner);
+        half.mode = WriterMode::ReadOnly { log_bytes: 0 };
         let Some(key) = &self.registry_key else {
             return;
         };
@@ -2190,6 +2195,36 @@ mod tests {
         assert!(reopened.contains("still-open"));
         let again = VecDb::open(&path, DIMS).unwrap();
         assert!(Arc::ptr_eq(&reopened.shared, &again.shared));
+    }
+
+    #[test]
+    fn racing_open_and_drop_churn_never_reports_locked() {
+        const CYCLES: usize = 300;
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        open_writer(&path)
+            .add("seed", &seeded_unit_vector(1, DIMS))
+            .unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let churners: Vec<_> = (0..2)
+            .map(|_| {
+                let path = path.clone();
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    for _ in 0..CYCLES {
+                        let db = VecDb::open(&path, DIMS).unwrap();
+                        assert!(db.contains("seed"));
+                        drop(db);
+                    }
+                })
+            })
+            .collect();
+        for churner in churners {
+            churner.join().unwrap();
+        }
+        let reopened = open_writer(&path);
+        assert!(reopened.contains("seed"));
     }
 
     #[test]
