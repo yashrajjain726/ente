@@ -55,7 +55,7 @@ const addFriendOnboardingTitle = (username: string) => (
     <>
         {`See @${username}'s`}
         <br />
-        everyday moments
+        everyday photos
     </>
 );
 
@@ -227,7 +227,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     <Box component="span" sx={{ display: "block" }}>
                         {`See @${identity.username}’s`}
                     </Box>
-                    everyday moments
+                    everyday photos
                 </Box>
                 <Box
                     component="p"

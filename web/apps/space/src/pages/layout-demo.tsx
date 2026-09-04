@@ -4,15 +4,15 @@ import { Box } from "@mui/material";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import React from "react";
-import { FriendPostCircle } from "screens/HomeScreen";
+import { FriendPostTile } from "screens/HomeScreen";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
 import {
-    homeCircleGridLayout,
-    homeCirclePlacements,
-    usesHomeCircleGrid,
-    type HomeCirclePlacement,
-} from "utils/home-circle-layout";
+    homeTileGridLayout,
+    homeTilePlacements,
+    usesHomeTileGrid,
+    type HomeTilePlacement,
+} from "utils/home-tile-layout";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -26,14 +26,14 @@ interface CanvasSize {
 
 interface LayoutDemoPostProps {
     index: number;
-    placement?: HomeCirclePlacement;
+    placement?: HomeTilePlacement;
 }
 
 const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
     index,
     placement,
 }) => (
-    <FriendPostCircle
+    <FriendPostTile
         avatarUrl={null}
         friend={{
             friendsCount: 0,
@@ -89,13 +89,13 @@ const LayoutDemoPage: React.FC = () => {
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    const usesGrid = usesHomeCircleGrid(friendCount);
-    const placements = homeCirclePlacements(
+    const usesGrid = usesHomeTileGrid(friendCount);
+    const placements = homeTilePlacements(
         friendCount,
         canvasSize.width,
         canvasSize.height,
     );
-    const gridLayout = homeCircleGridLayout(
+    const gridLayout = homeTileGridLayout(
         friendCount,
         canvasSize.width,
         canvasSize.height,

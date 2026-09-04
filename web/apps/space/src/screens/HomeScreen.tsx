@@ -36,11 +36,11 @@ import {
 import { spaceAppBackground, spaceText, spaceTextMuted } from "styles/colors";
 import { firstNameFrom } from "utils/display";
 import {
-    homeCircleGridLayout,
-    homeCirclePlacements,
-    usesHomeCircleGrid,
-    type HomeCirclePlacement,
-} from "utils/home-circle-layout";
+    homeTileGridLayout,
+    homeTilePlacements,
+    usesHomeTileGrid,
+    type HomeTilePlacement,
+} from "utils/home-tile-layout";
 import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
 import {
     canPreviewSpaceImageFile,
@@ -58,7 +58,7 @@ const avatarFallbackColor = "#888888";
 const avatarFallbackTextColor = "#FFFFFF";
 const mediaPlaceholderColor = "#E5E7EA";
 const homeHorizontalPadding = "16px";
-const postCircleMediaLoadRootMargin = "640px 0px";
+const postTileMediaLoadRootMargin = "640px 0px";
 const waveAnimationDurationMs = 1100;
 const waveHoldDurationMs = 500;
 const waveHoldMovementTolerancePx = 12;
@@ -104,7 +104,7 @@ interface DecodedImageState {
     width?: number;
 }
 
-interface PostCircleCanvasSize {
+interface PostTileCanvasSize {
     height: number;
     width: number;
 }
@@ -231,7 +231,7 @@ const useDecodedImage = (
     return { ready: !src, src };
 };
 
-interface FriendPostCircleProps {
+interface FriendPostTileProps {
     avatarUrl?: string | null;
     friend: FriendProfile;
     imageUrl?: string;
@@ -250,11 +250,11 @@ interface FriendPostCircleProps {
         photo: SpaceViewerPhoto,
     ) => void;
     onWave?: () => Promise<void>;
-    placement?: HomeCirclePlacement;
+    placement?: HomeTilePlacement;
     posts: SpacePost[];
 }
 
-export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
+export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     avatarUrl,
     friend,
     imageUrl,
@@ -311,7 +311,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
               : avatarUrl) ?? null;
     const isPhotoReady = Boolean(displayImageUrl) && decodedPhoto.ready;
     const canOpenPost = Boolean(post) && !postUnavailable && isPhotoReady;
-    const isCircleDisabled =
+    const isTileDisabled =
         isLoading ||
         (isRequestPending && !onOpenFriendRequest) ||
         Boolean(post && !postUnavailable && !isPhotoReady);
@@ -339,7 +339,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     observer.disconnect();
                 }
             },
-            { rootMargin: postCircleMediaLoadRootMargin },
+            { rootMargin: postTileMediaLoadRootMargin },
         );
         observer.observe(element);
         return () => observer.disconnect();
@@ -449,7 +449,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
         if (suppressClickRef.current) suppressPendingClick();
     };
 
-    const openCircle = () => {
+    const openTile = () => {
         if (suppressClickRef.current) {
             suppressClickRef.current = false;
             return;
@@ -533,8 +533,8 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                                   : `Open ${firstName}'s new post`
                             : `Open ${firstName}'s profile`
                 }
-                disabled={isCircleDisabled}
-                onClick={openCircle}
+                disabled={isTileDisabled}
+                onClick={openTile}
                 onContextMenu={(event) => {
                     if (onWave) event.preventDefault();
                 }}
@@ -552,7 +552,7 @@ export const FriendPostCircle: React.FC<FriendPostCircleProps> = ({
                     border: 0,
                     borderRadius: "20%",
                     color: textBase,
-                    cursor: isCircleDisabled ? "default" : "pointer",
+                    cursor: isTileDisabled ? "default" : "pointer",
                     display: "flex",
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     height: "100%",
@@ -832,8 +832,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
     const [openedPostIds, setOpenedPostIds] = useState<Set<number>>(new Set());
-    const [postCircleCanvasSize, setPostCircleCanvasSize] =
-        useState<PostCircleCanvasSize>({ height: 0, width: 0 });
+    const [postTileCanvasSize, setPostTileCanvasSize] =
+        useState<PostTileCanvasSize>({ height: 0, width: 0 });
     const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
         useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
@@ -846,7 +846,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [unavailablePostsByKey, setUnavailablePostsByKey] = useState<
         Record<string, true>
     >({});
-    const postCircleCanvasRef = React.useRef<HTMLDivElement | null>(null);
+    const postTileCanvasRef = React.useRef<HTMLDivElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
@@ -910,32 +910,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, [friends, sentFriendRequests]);
     React.useEffect(() => setOpenedPostIds(new Set()), [viewerSpaceId]);
     React.useEffect(() => {
-        const canvas = postCircleCanvasRef.current;
+        const canvas = postTileCanvasRef.current;
         if (!canvas) return;
 
         const updateSize = () => {
             const { height, width } = canvas.getBoundingClientRect();
-            setPostCircleCanvasSize({ height, width });
+            setPostTileCanvasSize({ height, width });
         };
         const observer = new ResizeObserver(updateSize);
         observer.observe(canvas);
         updateSize();
         return () => observer.disconnect();
     }, []);
-    const postCirclePlacements = homeCirclePlacements(
+    const postTilePlacements = homeTilePlacements(
         orderedHomeItems.length,
-        postCircleCanvasSize.width,
-        postCircleCanvasSize.height,
+        postTileCanvasSize.width,
+        postTileCanvasSize.height,
     );
-    const usesPostGrid = usesHomeCircleGrid(orderedHomeItems.length);
-    const postGridLayout = homeCircleGridLayout(
+    const usesPostGrid = usesHomeTileGrid(orderedHomeItems.length);
+    const postGridLayout = homeTileGridLayout(
         orderedHomeItems.length,
-        postCircleCanvasSize.width,
-        postCircleCanvasSize.height,
+        postTileCanvasSize.width,
+        postTileCanvasSize.height,
     );
     const emptyFriendTileSize = Math.min(
-        postCircleCanvasSize.width,
-        Math.max(0, postCircleCanvasSize.height - 64),
+        postTileCanvasSize.width,
+        Math.max(0, postTileCanvasSize.height - 64),
     );
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
@@ -1207,10 +1207,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         selectedViewerPostIndex,
         selectedViewerPosts,
     ]);
-    const friendPostCircleFor = (friend: FriendProfile, index: number) => {
-        const placement = usesPostGrid
-            ? undefined
-            : postCirclePlacements[index];
+    const friendPostTileFor = (friend: FriendProfile, index: number) => {
+        const placement = usesPostGrid ? undefined : postTilePlacements[index];
         const friendID = friend.spaceId ?? friend.id;
         const unreadFriendPosts = (
             unreadPostsByFriendID.get(friendID) ?? []
@@ -1239,7 +1237,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         );
         const isRead = unreadFriendPosts.length == 0;
         return (
-            <FriendPostCircle
+            <FriendPostTile
                 key={`${friend.id}:${item?.postId ?? "empty"}`}
                 avatarUrl={avatarUrl}
                 friend={friend}
@@ -1262,14 +1260,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             />
         );
     };
-    const friendRequestCircleFor = (
+    const friendRequestTileFor = (
         request: SpaceFriendRequest,
         index: number,
     ) => {
         const friend = request.friend;
         const avatarUrl = loadedFriendAvatarURLFor(friend);
         return (
-            <FriendPostCircle
+            <FriendPostTile
                 key={`request:${request.requestId}`}
                 avatarUrl={avatarUrl}
                 friend={friend}
@@ -1283,9 +1281,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onLoadAvatar={() => loadFriendAvatar(friend)}
                 onOpenFriendRequest={onOpenFriendRequests}
                 onOpenPosts={openPostPhotos}
-                placement={
-                    usesPostGrid ? undefined : postCirclePlacements[index]
-                }
+                placement={usesPostGrid ? undefined : postTilePlacements[index]}
                 posts={[]}
             />
         );
@@ -1462,7 +1458,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     }}
                 >
                     <Box
-                        ref={postCircleCanvasRef}
+                        ref={postTileCanvasRef}
                         sx={{
                             flex: "1 1 auto",
                             minHeight: 0,
@@ -1510,15 +1506,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             >
                                 {((usesPostGrid && postGridLayout) ||
                                     (!usesPostGrid &&
-                                        postCirclePlacements.length ==
+                                        postTilePlacements.length ==
                                             orderedHomeItems.length)) &&
                                     orderedHomeItems.map((item, index) =>
                                         item.type == "friend"
-                                            ? friendPostCircleFor(
+                                            ? friendPostTileFor(
                                                   item.friend,
                                                   index,
                                               )
-                                            : friendRequestCircleFor(
+                                            : friendRequestTileFor(
                                                   item.request,
                                                   index,
                                               ),

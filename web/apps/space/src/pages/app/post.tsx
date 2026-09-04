@@ -158,7 +158,7 @@ const Page: React.FC = () => {
                                 maxWidth: 280,
                             }}
                         >
-                            Post a moment, big or small.
+                            Post a photo from your day.
                         </Box>
                         <Box
                             ref={inputRef}

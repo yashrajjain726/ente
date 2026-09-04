@@ -3,7 +3,7 @@ import { SpaceMobileBestToast } from "components/MobileBestToast";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
-export const onboardingTitle = "Share everyday moments";
+export const onboardingTitle = "Share everyday photos";
 export const onboardingDescription =
     "Keep up with close friends and family through everyday photos. No ads. No algorithms.";
 

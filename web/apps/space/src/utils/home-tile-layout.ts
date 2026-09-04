@@ -1,29 +1,29 @@
-interface CircleSlot {
+interface TileSlot {
     column: number;
     row: number;
 }
 
 const gridFriendCountStart = 9;
 const gridColumnCount = 3;
-const circleGapRatio = 0.1;
+const tileGapRatio = 0.1;
 const verticalInset = 16;
 
-export const usesHomeCircleGrid = (count: number) =>
+export const usesHomeTileGrid = (count: number) =>
     count >= gridFriendCountStart;
 
-export interface HomeCirclePlacement {
+export interface HomeTilePlacement {
     size: number;
     x: number;
     y: number;
 }
 
-export interface HomeCircleGridLayout {
+export interface HomeTileGridLayout {
     gap: number;
     rows: number;
     size: number;
 }
 
-const circleSlotsForCount = (count: number) => {
+const tileSlotsForCount = (count: number) => {
     if (count == 1) {
         return { columns: 1, rows: 1, slots: [{ column: 0, row: 0 }] };
     }
@@ -51,10 +51,10 @@ const circleSlotsForCount = (count: number) => {
 
     const columns = 2;
     const rows = Math.ceil(count / columns);
-    const singleCircleRow = count % columns ? rows - 1 : -1;
-    const slots: CircleSlot[] = [];
+    const singleTileRow = count % columns ? rows - 1 : -1;
+    const slots: TileSlot[] = [];
     for (let row = 0; row < rows; row++) {
-        if (row == singleCircleRow) {
+        if (row == singleTileRow) {
             slots.push({ column: 0.5, row });
         } else {
             slots.push({ column: 0, row }, { column: 1, row });
@@ -64,16 +64,16 @@ const circleSlotsForCount = (count: number) => {
 };
 
 const layoutDimensions = (columns: number, rows: number) => ({
-    height: rows + (rows - 1) * circleGapRatio,
-    width: columns + (columns - 1) * circleGapRatio,
+    height: rows + (rows - 1) * tileGapRatio,
+    width: columns + (columns - 1) * tileGapRatio,
 });
 
-export const homeCircleGridLayout = (
+export const homeTileGridLayout = (
     count: number,
     canvasWidth: number,
     canvasHeight: number,
-): HomeCircleGridLayout | undefined => {
-    if (!usesHomeCircleGrid(count) || canvasWidth <= 0 || canvasHeight <= 0) {
+): HomeTileGridLayout | undefined => {
+    if (!usesHomeTileGrid(count) || canvasWidth <= 0 || canvasHeight <= 0) {
         return undefined;
     }
 
@@ -84,24 +84,24 @@ export const homeCircleGridLayout = (
         canvasWidth / layout.width,
         availableHeight / layout.height,
     );
-    return { gap: size * circleGapRatio, rows, size };
+    return { gap: size * tileGapRatio, rows, size };
 };
 
-export const homeCirclePlacements = (
+export const homeTilePlacements = (
     count: number,
     canvasWidth: number,
     canvasHeight: number,
-): HomeCirclePlacement[] => {
+): HomeTilePlacement[] => {
     if (
         count < 1 ||
-        usesHomeCircleGrid(count) ||
+        usesHomeTileGrid(count) ||
         canvasWidth <= 0 ||
         canvasHeight <= 0
     ) {
         return [];
     }
 
-    const { columns, rows, slots } = circleSlotsForCount(count);
+    const { columns, rows, slots } = tileSlotsForCount(count);
     const rowOffsets = [0];
     for (let row = 1; row < rows; row++) {
         rowOffsets.push(rowOffsets[row - 1]! + 1.1);
@@ -112,7 +112,7 @@ export const homeCirclePlacements = (
         canvasWidth / layout.width,
         availableHeight / layout.height,
     );
-    const horizontalStep = size * (1 + circleGapRatio);
+    const horizontalStep = size * (1 + tileGapRatio);
     const renderedWidth = size + horizontalStep * (columns - 1);
     const renderedHeight = size * layout.height;
     const originX = (canvasWidth - renderedWidth) / 2;
