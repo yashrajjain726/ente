@@ -2341,6 +2341,7 @@ dependencies = [
  "keyring",
  "libc",
  "log",
+ "notify",
  "serde",
  "serde_json",
  "tauri",

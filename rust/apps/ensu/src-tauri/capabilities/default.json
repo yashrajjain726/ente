@@ -27,6 +27,12 @@
                 { "path": "$DOCUMENT" },
                 { "path": "$DOCUMENT/*" },
                 { "path": "$DOCUMENT/**" }
+            ],
+            "deny": [
+                { "path": "$APPDATA" },
+                { "path": "$APPDATA/notes" },
+                { "path": "$APPDATA/notes/*" },
+                { "path": "$APPDATA/notes/**" }
             ]
         },
         {
