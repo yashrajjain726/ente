@@ -1,9 +1,11 @@
 import { ArrowLeft02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import React from "react";
 import { FriendPostCircle } from "screens/HomeScreen";
+import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
 import {
     homeCircleGridLayout,
@@ -11,9 +13,10 @@ import {
     usesHomeCircleGrid,
     type HomeCirclePlacement,
 } from "utils/home-circle-layout";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
-const headerChromeColor = spaceSurface;
-const headerHeight = 64;
+const controlButtonColor = spaceSurface;
 const maximumFriendCount = 15;
 
 interface CanvasSize {
@@ -49,6 +52,8 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
 );
 
 const LayoutDemoPage: React.FC = () => {
+    const router = useSpaceRouter();
+    const { profile } = useSpaceAppState();
     const [friendCount, setFriendCount] = React.useState(1);
     const [canvasSize, setCanvasSize] = React.useState<CanvasSize>({
         height: 0,
@@ -122,118 +127,27 @@ const LayoutDemoPage: React.FC = () => {
                     "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
-                <Box
-                    component="header"
-                    sx={{
-                        alignItems: "center",
-                        display: "grid",
-                        gridTemplateColumns: "48px minmax(0, 1fr) 48px",
-                        height: headerHeight,
-                        px: "10px",
-                    }}
-                >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Show one fewer friend"
-                        disabled={friendCount == 1}
-                        onClick={() =>
-                            setFriendCount((count) => Math.max(1, count - 1))
-                        }
-                        sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: headerChromeColor,
-                            border: 0,
-                            borderRadius: "50%",
-                            color: spaceText,
-                            cursor: friendCount == 1 ? "default" : "pointer",
-                            display: "flex",
-                            height: 36,
-                            justifyContent: "center",
-                            opacity: friendCount == 1 ? 0.3 : 1,
-                            p: 0,
-                            width: 36,
-                        }}
-                    >
-                        <HugeiconsIcon
-                            icon={ArrowLeft02Icon}
-                            size={22}
-                            strokeWidth={2.2}
-                        />
-                    </Box>
-                    <Box
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: headerChromeColor,
-                            borderRadius: "999px",
-                            display: "flex",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            height: 36,
-                            justifySelf: "center",
-                            px: "15px",
-                        }}
-                    >
-                        <Box
-                            component="img"
-                            alt="Space"
-                            src="/images/space.svg"
-                            sx={{
-                                display: "block",
-                                filter: "invert(1)",
-                                height: 18,
-                                width: "auto",
-                            }}
-                        />
-                    </Box>
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Show one more friend"
-                        disabled={friendCount == maximumFriendCount}
-                        onClick={() =>
-                            setFriendCount((count) =>
-                                Math.min(maximumFriendCount, count + 1),
-                            )
-                        }
-                        sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: headerChromeColor,
-                            border: 0,
-                            borderRadius: "50%",
-                            color: spaceText,
-                            cursor:
-                                friendCount == maximumFriendCount
-                                    ? "default"
-                                    : "pointer",
-                            display: "flex",
-                            height: 36,
-                            justifyContent: "center",
-                            justifySelf: "end",
-                            opacity:
-                                friendCount == maximumFriendCount ? 0.3 : 1,
-                            p: 0,
-                            width: 36,
-                        }}
-                    >
-                        <HugeiconsIcon
-                            icon={ArrowRight01Icon}
-                            size={22}
-                            strokeWidth={2.2}
-                        />
-                    </Box>
-                </Box>
+                <SpaceHomeHeader
+                    profile={profile}
+                    onOpenMessages={() =>
+                        void router.push(spaceRoutes.messages)
+                    }
+                    onOpenProfile={
+                        profile
+                            ? () => void router.push(spaceRoutes.profile)
+                            : undefined
+                    }
+                />
                 <Box
                     sx={{
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        height: `calc(100svh - ${headerHeight}px)`,
+                        height: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 112px)",
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${headerHeight}px)`,
                         px: "16px",
+                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${spaceHomeHeaderHeight}px)`,
                         width: "100%",
                     }}
                 >
@@ -272,6 +186,83 @@ const LayoutDemoPage: React.FC = () => {
                                       placement={placement}
                                   />
                               ))}
+                    </Box>
+                </Box>
+                <Box
+                    sx={{
+                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
+                        display: "flex",
+                        gap: "8px",
+                        left: "max(20px, calc((100vw - 390px) / 2 + 20px))",
+                        position: "fixed",
+                        zIndex: 5,
+                    }}
+                >
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Show one fewer friend"
+                        disabled={friendCount == 1}
+                        onClick={() =>
+                            setFriendCount((count) => Math.max(1, count - 1))
+                        }
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: controlButtonColor,
+                            border: 0,
+                            borderRadius: "50%",
+                            color: spaceText,
+                            cursor: friendCount == 1 ? "default" : "pointer",
+                            display: "flex",
+                            height: 36,
+                            justifyContent: "center",
+                            opacity: friendCount == 1 ? 0.3 : 1,
+                            p: 0,
+                            width: 36,
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft02Icon}
+                            size={22}
+                            strokeWidth={2.2}
+                        />
+                    </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Show one more friend"
+                        disabled={friendCount == maximumFriendCount}
+                        onClick={() =>
+                            setFriendCount((count) =>
+                                Math.min(maximumFriendCount, count + 1),
+                            )
+                        }
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: controlButtonColor,
+                            border: 0,
+                            borderRadius: "50%",
+                            color: spaceText,
+                            cursor:
+                                friendCount == maximumFriendCount
+                                    ? "default"
+                                    : "pointer",
+                            display: "flex",
+                            height: 36,
+                            justifyContent: "center",
+                            opacity:
+                                friendCount == maximumFriendCount ? 0.3 : 1,
+                            p: 0,
+                            width: 36,
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            size={22}
+                            strokeWidth={2.2}
+                        />
                     </Box>
                 </Box>
                 <SpacePostFloatingActionButton />

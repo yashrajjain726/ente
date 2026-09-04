@@ -6,6 +6,7 @@ interface CircleSlot {
 const gridFriendCountStart = 9;
 const gridColumnCount = 3;
 const circleGapRatio = 0.1;
+const verticalInset = 16;
 
 export const usesHomeCircleGrid = (count: number) =>
     count >= gridFriendCountStart;
@@ -78,9 +79,10 @@ export const homeCircleGridLayout = (
 
     const rows = Math.ceil(count / gridColumnCount);
     const layout = layoutDimensions(gridColumnCount, rows);
+    const availableHeight = Math.max(0, canvasHeight - 2 * verticalInset);
     const size = Math.min(
         canvasWidth / layout.width,
-        canvasHeight / layout.height,
+        availableHeight / layout.height,
     );
     return { gap: size * circleGapRatio, rows, size };
 };
@@ -105,9 +107,10 @@ export const homeCirclePlacements = (
         rowOffsets.push(rowOffsets[row - 1]! + 1.1);
     }
     const layout = layoutDimensions(columns, rows);
+    const availableHeight = Math.max(0, canvasHeight - 2 * verticalInset);
     const size = Math.min(
         canvasWidth / layout.width,
-        canvasHeight / layout.height,
+        availableHeight / layout.height,
     );
     const horizontalStep = size * (1 + circleGapRatio);
     const renderedWidth = size + horizontalStep * (columns - 1);
