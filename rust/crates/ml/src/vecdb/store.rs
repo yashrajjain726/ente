@@ -114,6 +114,23 @@ impl AttrTable {
         self.0.as_ref()?.get(slot as usize)?.as_deref()
     }
 
+    fn repack(&mut self, live_slots: impl Iterator<Item = u32>) {
+        let Some(table) = &mut self.0 else {
+            return;
+        };
+        let mut dense = 0usize;
+        for slot in live_slots {
+            let moved = table.get_mut(slot as usize).and_then(Option::take);
+            match table.get_mut(dense) {
+                Some(entry) => *entry = moved,
+                None => debug_assert!(moved.is_none()),
+            }
+            dense += 1;
+        }
+        table.truncate(dense);
+        table.shrink_to_fit();
+    }
+
     fn reset(&mut self) {
         self.0 = None;
     }
@@ -941,11 +958,9 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
     active_state(half)?;
     let dims = shared.dims;
     let (mut temp_log, temp_path) = Log::create_temp_sibling(&shared.path, dims)?;
-    let mut compacted = VectorArena::new(dims)?;
-    let mut compacted_attrs = AttrTable::default();
     let staged = {
         let st = shared.state_read();
-        stage_live_entries(&st, &mut compacted, &mut compacted_attrs, &mut temp_log)
+        stage_live_entries(&st, &mut temp_log)
     };
     if let Err(error) = staged {
         drop(temp_log);
@@ -971,14 +986,26 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
         let _ = std::fs::remove_file(&temp_path);
         mutations_since_snapshot
     } else {
-        let graph = Graph::rebuild(&compacted);
-        let total_records = compacted.live_count() as u64;
-        let mut st = shared.state_write();
-        st.arena = compacted;
-        st.graph = Some(graph);
-        st.attrs = compacted_attrs;
-        st.total_records = total_records;
-        total_records as usize
+        let live_records = {
+            let mut st = shared.state_write();
+            let SearchState {
+                arena,
+                graph,
+                attrs,
+                total_records,
+            } = &mut *st;
+            attrs.repack(arena.live_slots());
+            arena.compact_in_place();
+            *graph = None;
+            *total_records = arena.live_count() as u64;
+            *total_records as usize
+        };
+        let graph = {
+            let st = shared.state_read();
+            Graph::rebuild(&st.arena)
+        };
+        shared.state_write().graph = Some(graph);
+        live_records
     };
     let restored = restore_writer_mode(shared, half, lock, last_write, pending);
     promoted?;
@@ -1456,12 +1483,7 @@ fn remove_data_files(path: &Path) -> Result<(), VecDbError> {
     sync_parent_dir(path)
 }
 
-fn stage_live_entries(
-    source: &SearchState,
-    target: &mut VectorArena,
-    target_attrs: &mut AttrTable,
-    log: &mut Log,
-) -> Result<(), VecDbError> {
+fn stage_live_entries(source: &SearchState, log: &mut Log) -> Result<(), VecDbError> {
     let mut batch: Vec<(String, Vec<f32>, Vec<Attribute>)> =
         Vec::with_capacity(COMPACTION_BATCH_SIZE);
     for slot in source.arena.live_slots() {
@@ -1478,16 +1500,14 @@ fn stage_live_entries(
                 .unwrap_or_default(),
         ));
         if batch.len() == COMPACTION_BATCH_SIZE {
-            flush_stage_batch(&mut batch, target, target_attrs, log)?;
+            flush_stage_batch(&mut batch, log)?;
         }
     }
-    flush_stage_batch(&mut batch, target, target_attrs, log)
+    flush_stage_batch(&mut batch, log)
 }
 
 fn flush_stage_batch(
     batch: &mut Vec<(String, Vec<f32>, Vec<Attribute>)>,
-    target: &mut VectorArena,
-    target_attrs: &mut AttrTable,
     log: &mut Log,
 ) -> Result<(), VecDbError> {
     if batch.is_empty() {
@@ -1498,10 +1518,7 @@ fn flush_stage_batch(
         .map(|(key, vector, attrs)| LogEntry::Add { key, vector, attrs })
         .collect();
     log.append_unsynced_for_staging(&records)?;
-    for (key, vector, attrs) in batch.drain(..) {
-        let outcome = target.upsert(&key, &vector)?;
-        target_attrs.set(slot_of_outcome(outcome), &attrs);
-    }
+    batch.clear();
     Ok(())
 }
 
@@ -2781,6 +2798,112 @@ mod tests {
     }
 
     #[test]
+    fn compaction_installs_the_graph_a_fresh_rebuild_of_the_compacted_log_builds() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let copy_path = dir.path().join("copy");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 300, 500)).unwrap();
+        let removals: Vec<String> = (0..40).map(|index| format!("key-{}", index * 7)).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 40);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
+        fs::copy(&path, &copy_path).unwrap();
+        let rebuilt = open_writer(&copy_path);
+        let st = db.shared.state_read();
+        let rebuilt_st = rebuilt.shared.state_read();
+        let installed = st.graph.as_ref().unwrap();
+        let from_scratch = rebuilt_st.graph.as_ref().unwrap();
+        assert_eq!(st.arena.live_count(), 260);
+        assert_eq!(st.arena.slot_count(), 260);
+        for slot in st.arena.live_slots() {
+            assert_eq!(
+                st.arena.key_of_slot(slot),
+                rebuilt_st.arena.key_of_slot(slot)
+            );
+        }
+        assert!(
+            installed
+                .slots()
+                .any(|slot| installed.level_of(slot).unwrap() > 0)
+        );
+        test_support::assert_identical_graphs(installed, from_scratch);
+    }
+
+    #[test]
+    fn a_repacked_state_with_no_graph_serves_exact_results_for_approx_searches() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let entries = bulk_entries(0, 200, 640);
+        let (keys, vectors): (Vec<String>, Vec<Vec<f32>>) = entries.iter().cloned().unzip();
+        let attrs: Vec<Option<Vec<Attribute>>> = (0..200)
+            .map(|index| (index % 3 == 0).then(|| sample_attrs(index)))
+            .collect();
+        db.bulk_add_with_attrs(&keys, &vectors, &attrs).unwrap();
+        let removals: Vec<String> = (0..20).map(|index| format!("key-{}", index * 9)).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 20);
+        let query = seeded_unit_vector(777, DIMS);
+        let approx = limit_params(10);
+        let exact = SearchParams {
+            limit: Some(10),
+            exact: true,
+            ..SearchParams::default()
+        };
+        let expected = db.search(&query, &exact).unwrap();
+        assert_eq!(expected.len(), 10);
+        let stored_keys = vec![
+            "key-1".to_string(),
+            "key-50".to_string(),
+            "key-100".to_string(),
+        ];
+        let expected_stored = db
+            .bulk_search_stored(&stored_keys, 5, None, true, false)
+            .unwrap();
+        {
+            let mut st = db.shared.state_write();
+            let SearchState {
+                arena,
+                graph,
+                attrs,
+                total_records,
+            } = &mut *st;
+            attrs.repack(arena.live_slots());
+            arena.compact_in_place();
+            *graph = None;
+            *total_records = arena.live_count() as u64;
+        }
+        {
+            let st = db.shared.state_read();
+            assert!(st.graph.is_none());
+            assert_eq!(st.arena.slot_count(), 180);
+        }
+        assert_eq!(db.len(), 180);
+        assert_eq!(db.search(&query, &approx).unwrap(), expected);
+        assert_eq!(db.search(&query, &exact).unwrap(), expected);
+        assert_eq!(
+            db.bulk_search(std::slice::from_ref(&query), &approx)
+                .unwrap(),
+            vec![expected.clone()]
+        );
+        assert_eq!(
+            db.bulk_search_stored(&stored_keys, 5, None, false, false)
+                .unwrap(),
+            expected_stored
+        );
+        for index in 0..200i64 {
+            let key = format!("key-{index}");
+            if index % 9 == 0 && index <= 171 {
+                assert!(!db.contains(&key));
+                assert_eq!(db.get_attrs(&key), None);
+            } else if index % 3 == 0 {
+                assert_eq!(db.get_attrs(&key).unwrap(), sample_attrs(index));
+            } else {
+                assert_eq!(db.get_attrs(&key), None);
+            }
+        }
+    }
+
+    #[test]
     fn stale_snapshot_left_by_interrupted_compaction_is_discarded_on_open() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -3351,11 +3474,18 @@ mod tests {
             let mut half = shared.writer_half();
             compact(&shared, &mut half)
         });
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while generation_of(&path) == generation_before {
+            assert!(Instant::now() < deadline);
+            thread::yield_now();
+        }
         let packed = held.arena.pack_query(&query).unwrap();
         for _ in 0..25 {
             let during = graph_search(held.search_graph(), &held.arena, &packed, &exact, None);
             assert_eq!(during, before);
         }
+        assert!(held.graph.is_some());
+        assert!(!compactor.is_finished());
         drop(held);
         compactor.join().unwrap().unwrap();
         assert_ne!(generation_of(&path), generation_before);

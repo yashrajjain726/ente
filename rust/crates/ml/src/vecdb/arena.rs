@@ -124,6 +124,54 @@ impl VectorArena {
         Some(slot)
     }
 
+    pub(crate) fn compact_in_place(&mut self) {
+        let mut dense: u32 = 0;
+        for slot in 0..self.slots_to_keys.len() as u32 {
+            if !self.is_alive(slot) {
+                continue;
+            }
+            if dense != slot {
+                self.move_vector(slot, dense);
+                let key = std::mem::take(&mut self.slots_to_keys[slot as usize]);
+                if let Some(mapped) = self.keys_to_slots.get_mut(&key) {
+                    *mapped = dense;
+                }
+                self.slots_to_keys[dense as usize] = key;
+            }
+            dense += 1;
+        }
+        let live = dense as usize;
+        debug_assert_eq!(live, self.live_count);
+        self.slots_to_keys.truncate(live);
+        self.slots_to_keys.shrink_to_fit();
+        self.chunks.truncate(live.div_ceil(VECTORS_PER_CHUNK));
+        self.chunks.shrink_to_fit();
+        self.alive.clear();
+        self.alive.resize(live.div_ceil(64), u64::MAX);
+        self.alive.shrink_to_fit();
+        if !live.is_multiple_of(64)
+            && let Some(word) = self.alive.last_mut()
+        {
+            *word = (1u64 << (live % 64)) - 1;
+        }
+        self.free_slots = Vec::new();
+    }
+
+    fn move_vector(&mut self, src: u32, dst: u32) {
+        let lanes = self.lanes_per_vector;
+        let src_chunk = src as usize / VECTORS_PER_CHUNK;
+        let dst_chunk = dst as usize / VECTORS_PER_CHUNK;
+        let src_start = (src as usize % VECTORS_PER_CHUNK) * lanes;
+        let dst_start = (dst as usize % VECTORS_PER_CHUNK) * lanes;
+        if src_chunk == dst_chunk {
+            self.chunks[src_chunk].copy_within(src_start..src_start + lanes, dst_start);
+        } else {
+            let (front, back) = self.chunks.split_at_mut(src_chunk);
+            front[dst_chunk][dst_start..dst_start + lanes]
+                .copy_from_slice(&back[0][src_start..src_start + lanes]);
+        }
+    }
+
     pub(crate) fn slot_of_key(&self, key: &str) -> Option<u32> {
         self.keys_to_slots.get(key).copied()
     }
@@ -437,6 +485,157 @@ mod tests {
             assert_eq!(first.key_of_slot(slot), second.key_of_slot(slot));
             assert_eq!(first.vector_values(slot), second.vector_values(slot));
         }
+    }
+
+    #[test]
+    fn compact_in_place_repacks_live_entries_densely_in_order() {
+        let mut arena = VectorArena::new(8).unwrap();
+        for index in 0..10u64 {
+            arena
+                .upsert(&format!("key-{index}"), &seeded_vector(index, 8))
+                .unwrap();
+        }
+        assert_eq!(arena.remove("key-0"), Some(0));
+        assert_eq!(arena.remove("key-4"), Some(4));
+        assert_eq!(arena.remove("key-9"), Some(9));
+        assert_eq!(
+            arena.upsert("key-5", &seeded_vector(50, 8)).unwrap(),
+            UpsertOutcome::ReplacedInPlace(5)
+        );
+        assert_eq!(
+            arena.upsert("extra", &seeded_vector(60, 8)).unwrap(),
+            UpsertOutcome::RecycledSlot(9)
+        );
+        assert_eq!(arena.remove("key-2"), Some(2));
+        let expected: Vec<(String, Vec<f32>)> = arena
+            .live_slots()
+            .map(|slot| {
+                (
+                    arena.key_of_slot(slot).unwrap().to_string(),
+                    arena.vector_values(slot),
+                )
+            })
+            .collect();
+        assert_eq!(expected.len(), 7);
+        assert_eq!(arena.dead_count(), 3);
+        arena.compact_in_place();
+        assert_eq!(arena.live_count(), 7);
+        assert_eq!(arena.slot_count(), 7);
+        assert_eq!(arena.dead_count(), 0);
+        assert!(arena.free_slots.is_empty());
+        for (index, (key, vector)) in expected.iter().enumerate() {
+            let slot = index as u32;
+            assert!(arena.is_alive(slot));
+            assert_eq!(arena.key_of_slot(slot), Some(key.as_str()));
+            assert_eq!(arena.slot_of_key(key), Some(slot));
+            assert_eq!(&arena.vector_values(slot), vector);
+        }
+        assert!(!arena.is_alive(7));
+        assert_eq!(
+            arena.live_slots().collect::<Vec<_>>(),
+            (0..7).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            arena.upsert("fresh", &seeded_vector(70, 8)).unwrap(),
+            UpsertOutcome::NewSlot(7)
+        );
+        let recycled = arena.slot_of_key("key-5").unwrap();
+        assert_eq!(arena.remove("key-5"), Some(recycled));
+        assert_eq!(arena.dead_count(), 1);
+        assert_eq!(
+            arena.upsert("reused", &seeded_vector(80, 8)).unwrap(),
+            UpsertOutcome::RecycledSlot(recycled)
+        );
+    }
+
+    #[test]
+    fn compact_in_place_moves_vectors_across_chunks_and_frees_the_tail() {
+        let mut arena = VectorArena::new(8).unwrap();
+        let count = VECTORS_PER_CHUNK + 300;
+        for index in 0..count as u64 {
+            arena
+                .upsert(&format!("key-{index}"), &seeded_vector(index, 8))
+                .unwrap();
+        }
+        assert_eq!(arena.chunks.len(), 2);
+        for index in (0..1000u64).step_by(2) {
+            assert!(arena.remove(&format!("key-{index}")).is_some());
+        }
+        let expected: Vec<(String, Vec<f32>)> = arena
+            .live_slots()
+            .map(|slot| {
+                (
+                    arena.key_of_slot(slot).unwrap().to_string(),
+                    arena.vector_values(slot),
+                )
+            })
+            .collect();
+        arena.compact_in_place();
+        let live = count - 500;
+        assert_eq!(arena.live_count(), live);
+        assert_eq!(arena.slot_count(), live);
+        assert_eq!(arena.chunks.len(), 1);
+        assert_eq!(arena.alive.len(), live.div_ceil(64));
+        assert!(arena.free_slots.is_empty());
+        for (index, (key, vector)) in expected.iter().enumerate() {
+            assert_eq!(arena.slot_of_key(key), Some(index as u32));
+            assert_eq!(&arena.vector_values(index as u32), vector);
+        }
+        for slot in arena.live_slots() {
+            assert_eq!(arena.vector_lanes(slot).as_ptr() as usize % 32, 0);
+        }
+    }
+
+    #[test]
+    fn compact_in_place_with_no_dead_slots_preserves_everything() {
+        let mut arena = arena_with_keys(8, &["a", "b", "c"]);
+        arena.compact_in_place();
+        assert_eq!(arena.live_count(), 3);
+        assert_eq!(arena.slot_count(), 3);
+        assert_eq!(arena.dead_count(), 0);
+        for (index, key) in ["a", "b", "c"].iter().enumerate() {
+            assert_eq!(arena.key_of_slot(index as u32), Some(*key));
+            assert_eq!(
+                arena.vector_values(index as u32),
+                seeded_vector(index as u64, 8)
+            );
+        }
+        assert_eq!(
+            arena.upsert("d", &seeded_vector(9, 8)).unwrap(),
+            UpsertOutcome::NewSlot(3)
+        );
+    }
+
+    #[test]
+    fn compact_in_place_empties_a_fully_dead_arena() {
+        let mut arena = arena_with_keys(8, &["a", "b", "c"]);
+        for key in ["a", "b", "c"] {
+            assert!(arena.remove(key).is_some());
+        }
+        arena.compact_in_place();
+        assert!(arena.is_empty());
+        assert_eq!(arena.live_count(), 0);
+        assert_eq!(arena.slot_count(), 0);
+        assert_eq!(arena.dead_count(), 0);
+        assert!(arena.chunks.is_empty());
+        assert!(arena.alive.is_empty());
+        assert_eq!(
+            arena.upsert("d", &seeded_vector(4, 8)).unwrap(),
+            UpsertOutcome::NewSlot(0)
+        );
+        assert_eq!(arena.vector_values(0), seeded_vector(4, 8));
+    }
+
+    #[test]
+    fn compact_in_place_on_an_empty_arena_is_a_noop() {
+        let mut arena = VectorArena::new(8).unwrap();
+        arena.compact_in_place();
+        assert!(arena.is_empty());
+        assert_eq!(arena.slot_count(), 0);
+        assert_eq!(
+            arena.upsert("a", &seeded_vector(0, 8)).unwrap(),
+            UpsertOutcome::NewSlot(0)
+        );
     }
 
     #[test]
