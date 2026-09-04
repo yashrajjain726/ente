@@ -282,8 +282,8 @@ class JustifiedLayoutCalculator {
       }
     }
 
-    // Avoid leaving a single item at the end of a group when the last few
-    // items can instead form full-width rows without creating a cramped row.
+    // Product decision: avoid one-item group tails by rebalancing the preceding
+    // row when the replacement rows meet tap-target, height, and density limits.
     if (pendingRatios.length == 1 && rows.isNotEmpty) {
       final tailRatios = <double>[...lastCommittedRatios, pendingRatios.single];
       if (lastCommittedRatios.length < _maximumItemsPerRow &&
