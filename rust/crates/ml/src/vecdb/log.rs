@@ -303,6 +303,18 @@ impl Log {
         self.end_offset
     }
 
+    pub(crate) fn extend_end_offset_to_file_len(&mut self) -> Result<(), VecDbError> {
+        let file_len = self
+            .file
+            .metadata()
+            .map_err(|source| VecDbError::io(&self.path, source))?
+            .len();
+        if file_len > self.end_offset {
+            self.end_offset = file_len;
+        }
+        Ok(())
+    }
+
     pub(crate) fn generation(&self) -> [u8; 16] {
         self.generation
     }
@@ -1394,6 +1406,39 @@ mod tests {
         assert_eq!(records[1].1, start);
         assert_eq!(recoverable_end, end);
         assert_eq!(std::fs::metadata(&path).unwrap().len(), end);
+    }
+
+    #[test]
+    fn extend_end_offset_adopts_growth_and_ignores_shrinkage() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        let mut log = Log::create(&path, 8).unwrap();
+        let vector = seeded_vector(1, 8);
+        let (_, captured_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "first",
+                vector: &vector,
+                attrs: &[],
+            }],
+        );
+        log.extend_end_offset_to_file_len().unwrap();
+        assert_eq!(log.current_end_offset(), captured_end);
+        let foreign = encoded_add("second", &vector);
+        append_raw_bytes(&path, &foreign);
+        assert_eq!(log.current_end_offset(), captured_end);
+        log.extend_end_offset_to_file_len().unwrap();
+        let grown_end = captured_end + foreign.len() as u64;
+        assert_eq!(log.current_end_offset(), grown_end);
+        let (records, recoverable_end) = scan_all(&mut log);
+        assert_eq!(records.len(), 2);
+        assert_eq!(recoverable_end, grown_end);
+        let file = File::options().read(true).write(true).open(&path).unwrap();
+        file.set_len(captured_end).unwrap();
+        drop(file);
+        log.extend_end_offset_to_file_len().unwrap();
+        assert_eq!(log.current_end_offset(), grown_end);
+        assert_eq!(log.generation(), reopen(&path, 8).generation());
     }
 
     #[test]

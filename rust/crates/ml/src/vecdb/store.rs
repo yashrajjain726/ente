@@ -915,6 +915,7 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
         st.attrs.reset();
         st.total_records = 0;
     }
+    drop(lock);
     if let Some(key) = &shared.registry_key
         && let Some(slot) = existing_path_slot(key)
     {
@@ -928,7 +929,6 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
         }
     }
     drop(st);
-    drop(lock);
     drop(half);
     removed
 }
@@ -1161,7 +1161,7 @@ fn build_writer(
     };
     remove_stale_temp_sibling(path)?;
     let snapshot_present = std::fs::metadata(snapshot_path(path)).is_ok();
-    let replayed = replay(&mut log, dims)?;
+    let replayed = replay(&mut log, dims, ReplayMode::Writer)?;
     if replayed.recoverable_end < log.current_end_offset() {
         log.truncate_to(replayed.recoverable_end)?;
     }
@@ -1310,7 +1310,7 @@ fn build_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
         return empty_read_only(path, dims);
     }
     let mut log = Log::open(file, path, dims)?;
-    let replayed = replay(&mut log, dims)?;
+    let replayed = replay(&mut log, dims, ReplayMode::ReadOnly)?;
     drop(log);
     let ReplayedState {
         arena,
@@ -1410,17 +1410,28 @@ struct ReplayedState {
     tail_records: u64,
 }
 
-fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
+enum ReplayMode {
+    Writer,
+    ReadOnly,
+}
+
+fn replay(log: &mut Log, dims: usize, mode: ReplayMode) -> Result<ReplayedState, VecDbError> {
     let mut snapshot = load_snapshot(log.path(), log.generation());
     if let Some(loaded) = &snapshot
         && loaded.covered_log_offset > log.current_end_offset()
     {
-        return Err(VecDbError::Corrupt(format!(
-            "{}: snapshot covers {} bytes but the log is only {} bytes; preserving the file",
-            log.path().display(),
-            loaded.covered_log_offset,
-            log.current_end_offset()
-        )));
+        match mode {
+            ReplayMode::Writer => {}
+            ReplayMode::ReadOnly => log.extend_end_offset_to_file_len()?,
+        }
+        if loaded.covered_log_offset > log.current_end_offset() {
+            return Err(VecDbError::Corrupt(format!(
+                "{}: snapshot covers {} bytes but the log is only {} bytes; preserving the file",
+                log.path().display(),
+                loaded.covered_log_offset,
+                log.current_end_offset()
+            )));
+        }
     }
     let snapshot_covered = snapshot.as_ref().map(|loaded| loaded.covered_log_offset);
     let covered = snapshot_covered.unwrap_or(u64::MAX);
@@ -1981,6 +1992,59 @@ mod tests {
         let recovered = open_writer(&path);
         assert_eq!(recovered.len(), 2);
         assert!(recovered.contains("second"));
+    }
+
+    #[test]
+    fn read_only_replay_adopts_records_a_foreign_writer_appended_after_capture() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 2, 500)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let mut captured_for_read_only = reopen_log(&path, DIMS).unwrap();
+        let mut captured_for_writer = reopen_log(&path, DIMS).unwrap();
+        let stale_end = captured_for_read_only.current_end_offset();
+        let racer = open_writer(&path);
+        bulk_add(&racer, &bulk_entries(2, 2, 500)).unwrap();
+        racer.flush().unwrap();
+        drop(racer);
+        let grown_end = fs::metadata(&path).unwrap().len();
+        assert!(grown_end > stale_end);
+        let replayed = replay(&mut captured_for_read_only, DIMS, ReplayMode::ReadOnly).unwrap();
+        assert_eq!(replayed.total_records, 4);
+        assert_eq!(replayed.arena.live_count(), 4);
+        assert_eq!(replayed.recoverable_end, grown_end);
+        assert!(replayed.graph.is_some());
+        for index in 0..4 {
+            assert!(
+                replayed
+                    .arena
+                    .slot_of_key(&format!("key-{index}"))
+                    .is_some()
+            );
+        }
+        assert!(matches!(
+            replay(&mut captured_for_writer, DIMS, ReplayMode::Writer),
+            Err(VecDbError::Corrupt(_))
+        ));
+    }
+
+    #[test]
+    fn shortened_log_copy_beside_a_newer_snapshot_is_corrupt_in_both_modes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("first", &seeded_unit_vector(1, DIMS)).unwrap();
+        let boundary = db.stats().unwrap().log_bytes;
+        db.add("second", &seeded_unit_vector(2, DIMS)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let stale = dir.path().join("stale");
+        let full = fs::read(&path).unwrap();
+        fs::write(&stale, &full[..boundary as usize]).unwrap();
+        fs::copy(snapshot_path(&path), snapshot_path(&stale)).unwrap();
+        assert_corrupt_open_preserves(&stale);
     }
 
     #[test]
@@ -3456,6 +3520,32 @@ mod tests {
         assert_eq!(third.len(), 1);
         assert!(third.contains("fresh"));
         assert!(lock_path(&path).exists());
+    }
+
+    #[test]
+    fn delete_releases_the_writer_lock_before_retiring_the_slot_marker() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("doomed", &seeded_unit_vector(5, DIMS)).unwrap();
+        let key = registry_key_for(&path).unwrap();
+        let slot = existing_path_slot(&key).unwrap();
+        let marker_blocked = lock_slot(&slot);
+        let deleter = thread::spawn(move || db.delete());
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while path.exists() {
+            assert!(Instant::now() < deadline);
+            thread::yield_now();
+        }
+        let mut reacquired = WriterLock::acquire(&path);
+        while reacquired.is_err() && Instant::now() < deadline {
+            reacquired = WriterLock::acquire(&path);
+        }
+        assert!(marker_blocked.holds_live());
+        drop(reacquired.unwrap());
+        drop(marker_blocked);
+        deleter.join().unwrap().unwrap();
+        assert!(lock_slot(&slot).live.is_none());
     }
 
     #[test]
