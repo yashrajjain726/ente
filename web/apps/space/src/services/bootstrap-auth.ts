@@ -7,7 +7,7 @@ import type { SRPSetupAttributes } from "ente-accounts/services/srp";
 import type { KeyAttributes } from "ente-accounts/services/user";
 import { ensureOk, publicRequestHeaders } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { createSRPSession } from "ente-core-wasm";
+import { createSRPSession } from "ente-prelogin-wasm";
 import { z } from "zod";
 
 export const spaceBootstrapAuthHeaders = (authToken: string) => ({
@@ -64,7 +64,7 @@ export const setupSpaceSignupSRP = async (
             srpUserID,
             srpSalt,
             srpVerifier,
-            srpA: session.public_a(),
+            srpA: session.publicA(),
         }),
     });
     ensureOk(setupRes);
@@ -73,10 +73,10 @@ export const setupSpaceSignupSRP = async (
     const completeRes = await fetch(await apiURL("/users/srp/complete"), {
         method: "POST",
         headers: spaceBootstrapAuthHeaders(authToken),
-        body: JSON.stringify({ setupID, srpM1: session.compute_m1(srpB) }),
+        body: JSON.stringify({ setupID, srpM1: session.computeM1(srpB) }),
     });
     ensureOk(completeRes);
     const { srpM2 } = CompleteSRPSetupResponse.parse(await completeRes.json());
 
-    session.verify_m2(srpM2);
+    session.verifyM2(srpM2);
 };

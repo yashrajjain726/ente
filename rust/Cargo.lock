@@ -2421,7 +2421,7 @@ version = "0.0.0"
 dependencies = [
  "ente-cast",
  "ente-core",
- "ente-wasm-log",
+ "ente-wasm-lib",
  "js-sys",
  "thiserror 2.0.18",
  "wasm-bindgen",
@@ -2476,17 +2476,6 @@ dependencies = [
  "x-wing",
  "x25519-dalek",
  "zeroize",
-]
-
-[[package]]
-name = "ente-core-wasm"
-version = "0.0.0"
-dependencies = [
- "ente-accounts",
- "ente-core",
- "ente-wasm-lib",
- "ente-wasm-log",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2546,7 +2535,7 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-ensu-crypto",
- "ente-wasm-log",
+ "ente-wasm-lib",
  "js-sys",
  "thiserror 2.0.18",
  "wasm-bindgen",
@@ -2605,7 +2594,6 @@ dependencies = [
  "ente-core",
  "ente-legacy",
  "ente-wasm-lib",
- "ente-wasm-log",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
@@ -2656,7 +2644,6 @@ name = "ente-locker-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-wasm-lib",
- "ente-wasm-log",
 ]
 
 [[package]]
@@ -2709,7 +2696,7 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-paste",
- "ente-wasm-log",
+ "ente-wasm-lib",
  "js-sys",
  "thiserror 2.0.18",
  "wasm-bindgen",
@@ -2760,7 +2747,13 @@ name = "ente-photos-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-wasm-lib",
- "ente-wasm-log",
+]
+
+[[package]]
+name = "ente-prelogin-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-wasm-lib",
 ]
 
 [[package]]
@@ -2822,7 +2815,7 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-space",
- "ente-wasm-log",
+ "ente-wasm-lib",
  "js-sys",
  "log",
  "serde",
@@ -2858,6 +2851,7 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "js-sys",
+ "log",
  "md-5 0.11.0",
  "serde",
  "serde-wasm-bindgen",
@@ -2865,15 +2859,6 @@ dependencies = [
  "tsify",
  "wasm-bindgen",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "ente-wasm-log"
-version = "0.0.0"
-dependencies = [
- "js-sys",
- "log",
- "wasm-bindgen",
  "web-sys",
 ]
 

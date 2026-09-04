@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
 import {
     authGenerateInteractiveKek,
-    auth_generate_srp_setup,
+    authGenerateSrpSetup,
     cryptoGenerateKey,
-} from "../pkg/ente_core_wasm.js";
+} from "../pkg/ente_prelogin_wasm.js";
 
 test("generates an interactive kek bundle", () => {
     const generated = authGenerateInteractiveKek(
@@ -18,11 +18,11 @@ test("generates an interactive kek bundle", () => {
 
 test("generates SRP setup attributes from a kek", () => {
     const kek = cryptoGenerateKey();
-    const generated = auth_generate_srp_setup(kek, "test-user-id");
+    const generated = authGenerateSrpSetup(kek, "test-user-id");
 
-    expect(Buffer.from(generated.srp_salt, "base64")).toHaveLength(16);
-    expect(Buffer.from(generated.login_sub_key, "base64")).toHaveLength(16);
-    expect(
-        Buffer.from(generated.srp_verifier, "base64").length,
-    ).toBeGreaterThan(0);
+    expect(Buffer.from(generated.srpSalt, "base64")).toHaveLength(16);
+    expect(Buffer.from(generated.loginSubKey, "base64")).toHaveLength(16);
+    expect(Buffer.from(generated.srpVerifier, "base64").length).toBeGreaterThan(
+        0,
+    );
 });

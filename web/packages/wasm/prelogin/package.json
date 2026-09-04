@@ -1,5 +1,5 @@
 {
-    "name": "ente-core-wasm",
+    "name": "ente-prelogin-wasm",
     "version": "0.0.0",
     "private": true,
     "exports": {
@@ -11,7 +11,7 @@
     "module": "./index.ts",
     "types": "./index.ts",
     "scripts": {
-        "build": "wasm-pack build ../../../../rust/bindings/wasm/core-wasm --target bundler --out-dir ../../../../web/packages/wasm/core/pkg --no-pack",
+        "build": "wasm-pack build ../../../../rust/bindings/wasm/prelogin --target bundler --out-dir ../../../../web/packages/wasm/prelogin/pkg --no-pack",
         "test": "vitest --run"
     },
     "dependencies": {

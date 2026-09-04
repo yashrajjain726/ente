@@ -105,7 +105,7 @@ const nextConfig = {
         "ente-base",
         "ente-utils",
         "ente-new",
-        "ente-core-wasm",
+        "ente-prelogin-wasm",
         "ente-paste-wasm",
     ],
 

@@ -32,6 +32,15 @@ for package in packages:
 
 failed = False
 
+members = tomllib.loads((root / "rust/Cargo.toml").read_text())["workspace"]["members"]
+for previous, member in zip(members, members[1:]):
+    if previous > member:
+        print(
+            f"rust/Cargo.toml: workspace.members {previous!r} precedes {member!r}; sort members",
+            file=sys.stderr,
+        )
+        failed = True
+
 for package in packages:
     manifest = Path(package["manifest_path"])
     path = manifest.relative_to(root).as_posix()

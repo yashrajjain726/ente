@@ -1,4 +1,4 @@
-use ente_wasm_log as _;
+use ente_wasm_lib as _;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
