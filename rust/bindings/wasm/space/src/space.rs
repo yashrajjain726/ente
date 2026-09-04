@@ -30,6 +30,7 @@ impl Error {
             Self::Space(ente_space::Error::SpaceSlugReserved) => Some("space_slug_reserved"),
             Self::Space(ente_space::Error::InvalidSpaceSlug) => Some("invalid_space_slug"),
             Self::Space(ente_space::Error::PostLimitReached) => Some("post_limit_reached"),
+            Self::Space(ente_space::Error::FriendLimitReached) => Some("friend_limit_reached"),
             Self::Space(ente_space::Error::SessionUnauthorized) => Some("session_unauthorized"),
             Self::Space(ente_space::Error::PermissionDenied) => Some("permission_denied"),
             _ => None,

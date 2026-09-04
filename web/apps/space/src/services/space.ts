@@ -378,6 +378,9 @@ interface SpaceConversationsContext {
 export const isSpaceContentError = (error: unknown) =>
     isNamedError(error, "content_unavailable");
 
+export const isSpaceFriendLimitError = (error: unknown) =>
+    isNamedError(error, "friend_limit_reached");
+
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
     if (!Number.isFinite(parsed)) {

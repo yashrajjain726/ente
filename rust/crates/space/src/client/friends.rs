@@ -7,6 +7,16 @@ use crate::transport::{
     SpaceFriendRequestResponse, SpaceFriendResponse, SpaceSentFriendRequestResponse,
 };
 use ente_core::b64;
+use ente_core::http;
+
+fn map_friend_mutation_error(error: http::Error) -> Error {
+    match &error {
+        http::Error::Api { code, .. } if code == "SPACE_FRIEND_LIMIT_REACHED" => {
+            Error::FriendLimitReached
+        }
+        _ => error.into(),
+    }
+}
 
 impl AccountSpaceCtx {
     async fn request_friend_with_target(
@@ -37,7 +47,9 @@ impl AccountSpaceCtx {
             .json(&payload)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_code()
+            .await
+            .map_err(map_friend_mutation_error)?
             .json()
             .await?;
         if response.status == "friend" {
@@ -123,7 +135,9 @@ impl AccountSpaceCtx {
             .json(&payload)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_code()
+            .await
+            .map_err(map_friend_mutation_error)?
             .json()
             .await?;
         self.clear_friend_share_cache()?;
@@ -238,5 +252,21 @@ impl AccountSpaceCtx {
             .error_for_status()?;
         self.clear_friend_share_cache()?;
         Ok(updated)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_friend_limit_error() {
+        let error = map_friend_mutation_error(http::Error::Api {
+            status: 409,
+            path: "/spaces/space/friends/add".into(),
+            code: "SPACE_FRIEND_LIMIT_REACHED".into(),
+        });
+
+        assert!(matches!(error, Error::FriendLimitReached));
     }
 }

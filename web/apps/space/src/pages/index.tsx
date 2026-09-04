@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { AuthenticatedFriendProfile } from "components/AuthenticatedFriendProfile";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
+import { SpaceFriendLimitToast } from "components/FriendLimitToast";
 import { SpaceMobileBestToast } from "components/MobileBestToast";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpacePublicProfileNotificationControl } from "components/PublicProfileNotificationControl";
@@ -25,6 +26,7 @@ import {
     type SpaceInviteRoute,
 } from "services/invite";
 import {
+    isSpaceFriendLimitError,
     loadCurrentSpaceRelationship,
     loadPublicSpaceIdentity,
     openPublicSpaceLink,
@@ -331,6 +333,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     const [pendingInviteIntent, setPendingInviteIntent] =
         useState<SpaceInviteIntent>();
     const [isAddingFriend, setIsAddingFriend] = useState(false);
+    const [showFriendLimitToast, setShowFriendLimitToast] = useState(false);
     const publicPostItems = useMemo(
         () => profilePostItemsFromPosts(publicPosts),
         [publicPosts],
@@ -617,6 +620,13 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                 void router.push(spaceRoutes.home);
             } catch (error) {
                 setIsAddingFriend(false);
+                if (isSpaceFriendLimitError(error)) {
+                    clearPendingSpaceInvite();
+                    clearPendingSpaceInviteFriend();
+                    clearPendingSpaceInviteIntent();
+                    setShowFriendLimitToast(true);
+                    return;
+                }
                 log.error("Failed to send friend request", error);
             }
         };
@@ -672,6 +682,11 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         showAddingFriendSpinner={
                             isAddingFriend && Boolean(profile)
                         }
+                    />
+                )}
+                {showFriendLimitToast && (
+                    <SpaceFriendLimitToast
+                        onClose={() => setShowFriendLimitToast(false)}
                     />
                 )}
             </>

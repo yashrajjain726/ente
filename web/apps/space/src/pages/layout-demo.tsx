@@ -10,6 +10,7 @@ import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
 import {
     homeTileGridLayout,
     homeTilePlacements,
+    maximumHomeTileCount,
     usesHomeTileGrid,
     type HomeTilePlacement,
 } from "utils/home-tile-layout";
@@ -17,7 +18,6 @@ import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
 const controlButtonColor = spaceSurface;
-const maximumFriendCount = 15;
 
 interface CanvasSize {
     height: number;
@@ -81,7 +81,7 @@ const LayoutDemoPage: React.FC = () => {
                 setFriendCount((count) => Math.max(1, count - 1));
             } else if (event.key == "ArrowRight") {
                 setFriendCount((count) =>
-                    Math.min(maximumFriendCount, count + 1),
+                    Math.min(maximumHomeTileCount, count + 1),
                 );
             }
         };
@@ -232,10 +232,10 @@ const LayoutDemoPage: React.FC = () => {
                         component="button"
                         type="button"
                         aria-label="Show one more friend"
-                        disabled={friendCount == maximumFriendCount}
+                        disabled={friendCount == maximumHomeTileCount}
                         onClick={() =>
                             setFriendCount((count) =>
-                                Math.min(maximumFriendCount, count + 1),
+                                Math.min(maximumHomeTileCount, count + 1),
                             )
                         }
                         sx={{
@@ -246,14 +246,14 @@ const LayoutDemoPage: React.FC = () => {
                             borderRadius: "50%",
                             color: spaceText,
                             cursor:
-                                friendCount == maximumFriendCount
+                                friendCount == maximumHomeTileCount
                                     ? "default"
                                     : "pointer",
                             display: "flex",
                             height: 36,
                             justifyContent: "center",
                             opacity:
-                                friendCount == maximumFriendCount ? 0.3 : 1,
+                                friendCount == maximumHomeTileCount ? 0.3 : 1,
                             p: 0,
                             width: 36,
                         }}

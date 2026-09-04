@@ -1,3 +1,5 @@
+import { maximumSpaceFriendCount } from "utils/friend-limits";
+
 interface TileSlot {
     column: number;
     row: number;
@@ -8,8 +10,10 @@ const gridColumnCount = 3;
 const tileGapRatio = 0.1;
 const verticalInset = 16;
 
+export const maximumHomeTileCount = maximumSpaceFriendCount;
+
 export const usesHomeTileGrid = (count: number) =>
-    count >= gridFriendCountStart;
+    count >= gridFriendCountStart && count <= maximumHomeTileCount;
 
 export interface HomeTilePlacement {
     size: number;
@@ -94,6 +98,7 @@ export const homeTilePlacements = (
 ): HomeTilePlacement[] => {
     if (
         count < 1 ||
+        count > maximumHomeTileCount ||
         usesHomeTileGrid(count) ||
         canvasWidth <= 0 ||
         canvasHeight <= 0

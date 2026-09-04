@@ -38,6 +38,7 @@ import { firstNameFrom } from "utils/display";
 import {
     homeTileGridLayout,
     homeTilePlacements,
+    maximumHomeTileCount,
     usesHomeTileGrid,
     type HomeTilePlacement,
 } from "utils/home-tile-layout";
@@ -887,11 +888,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         return postsByFriendID;
     }, [openedPostIds, unreadPosts]);
     const orderedHomeItems = React.useMemo(() => {
+        const displayedFriends = friends.slice(0, maximumHomeTileCount);
         const friendIDs = new Set(
             friends.map((friend) => friend.spaceId ?? friend.id),
         );
         return [
-            ...friends.map((friend) => ({ friend, type: "friend" as const })),
+            ...displayedFriends.map((friend) => ({
+                friend,
+                type: "friend" as const,
+            })),
             ...sentFriendRequests
                 .filter(
                     (request) =>
@@ -899,6 +904,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             request.friend.spaceId ?? request.friend.id,
                         ),
                 )
+                .slice(0, maximumHomeTileCount - displayedFriends.length)
                 .map((request) => ({ request, type: "request" as const })),
         ].sort((a, b) => {
             const aFriend = a.type == "friend" ? a.friend : a.request.friend;

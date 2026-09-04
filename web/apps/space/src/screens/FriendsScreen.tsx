@@ -32,7 +32,10 @@ import {
     normalizeSpaceUsername,
     spaceUsernameValidationError,
 } from "services/profile";
-import type { SpaceFriendRequest } from "services/space";
+import {
+    isSpaceFriendLimitError,
+    type SpaceFriendRequest,
+} from "services/space";
 import {
     spaceAppBackground,
     spaceDialogBackground,
@@ -42,6 +45,10 @@ import {
     spaceTextMuted,
 } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
+import {
+    maximumSpaceFriendCount,
+    spaceFriendLimitMessage,
+} from "utils/friend-limits";
 
 const green = "#08C225";
 const avatarSkeletonBackground = spaceSurface;
@@ -448,10 +455,11 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
     ) => {
         if (isBusy) return;
         setAction(nextAction);
-        void handler(request.requestId).catch((error: unknown) => {
-            log.error("Failed to update friend request", error);
-            setAction(null);
-        });
+        void handler(request.requestId)
+            .catch((error: unknown) =>
+                log.error("Failed to update friend request", error),
+            )
+            .finally(() => setAction(null));
     };
 
     return (
@@ -623,6 +631,7 @@ interface AddFriendSheetProps {
 }
 
 const friendRequestErrorMessage = (error: unknown, username: string) => {
+    if (isSpaceFriendLimitError(error)) return spaceFriendLimitMessage;
     if (!error || typeof error != "object") {
         return "Couldn't send the friend request. Please try again.";
     }
@@ -700,13 +709,22 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
             );
             return;
         }
+        const sentRequestCount = friendRequests.filter(
+            (request) => request.direction == "sent",
+        ).length;
+        if (friends.length + sentRequestCount >= maximumSpaceFriendCount) {
+            setErrorMessage(spaceFriendLimitMessage);
+            return;
+        }
 
         setErrorMessage(undefined);
         setIsSubmitting(true);
         void onAddFriend(normalizedUsername)
             .then(() => setIsSent(true))
             .catch((error: unknown) => {
-                log.error("Failed to send space friend request", error);
+                if (!isSpaceFriendLimitError(error)) {
+                    log.error("Failed to send space friend request", error);
+                }
                 setErrorMessage(
                     friendRequestErrorMessage(error, normalizedUsername),
                 );
