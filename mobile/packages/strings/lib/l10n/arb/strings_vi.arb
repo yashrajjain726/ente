@@ -2084,7 +2084,7 @@
   "librarySharingShareWith": "Chia sẻ với",
   "librarySharingSharingWith": "Đang chia sẻ với",
   "librarySharingStopSharing": "Ngừng chia sẻ",
-  "librarySharingStopSharingDescription": "{count, plural, other{Họ sẽ mất những album này và mọi ảnh họ đã thêm sẽ được giữ lại. Bạn có thể chia sẻ lại sau.}}",
+  "librarySharingStopSharingDescription": "{count, plural, other{Họ sẽ mất những album này và mọi ảnh họ đã thêm cũng sẽ bị xóa khỏi album. Bạn có thể chia sẻ lại sau.}}",
   "@librarySharingStopSharingDescription": {
     "placeholders": {
       "count": {
