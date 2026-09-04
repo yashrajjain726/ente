@@ -43,6 +43,8 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
     onClose,
     zIndex = 20,
 }) => {
+    const showCloseButton = autoDismissAfterMs === undefined;
+
     React.useEffect(() => {
         if (autoDismissAfterMs === undefined || !onClose) return;
 
@@ -90,7 +92,7 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
                     minHeight: 50,
                     pointerEvents: "auto",
                     pl: "10px",
-                    pr: "6px",
+                    pr: showCloseButton ? "6px" : "14px",
                     py: "3px",
                     width: "100%",
                 }}
@@ -129,37 +131,39 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
                     }}
                 >
                     {action}
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={closeLabel}
-                        onClick={onClose}
-                        sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: textBase,
-                            cursor: onClose ? "pointer" : "default",
-                            display: "flex",
-                            flexShrink: 0,
-                            height: spaceTouchTargetSize,
-                            justifyContent: "center",
-                            opacity: 0.9,
-                            p: 0,
-                            width: 36,
-                            "&:focus-visible": {
-                                outline: "2px solid rgba(0 0 0 / 0.72)",
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <HugeiconsIcon
-                            icon={MultiplicationSignIcon}
-                            size={16}
-                            strokeWidth={2}
-                        />
-                    </Box>
+                    {showCloseButton && (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={closeLabel}
+                            onClick={onClose}
+                            sx={{
+                                alignItems: "center",
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: textBase,
+                                cursor: onClose ? "pointer" : "default",
+                                display: "flex",
+                                flexShrink: 0,
+                                height: spaceTouchTargetSize,
+                                justifyContent: "center",
+                                opacity: 0.9,
+                                p: 0,
+                                width: 36,
+                                "&:focus-visible": {
+                                    outline: "2px solid rgba(0 0 0 / 0.72)",
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={MultiplicationSignIcon}
+                                size={16}
+                                strokeWidth={2}
+                            />
+                        </Box>
+                    )}
                 </Box>
             </Box>
         </Box>
