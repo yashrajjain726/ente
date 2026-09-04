@@ -12,7 +12,6 @@ export type NotesCollectionActivity =
     | "starting"
     | "waitingForGeneration"
     | "waitingForModel"
-    | "scheduled"
     | "failed"
     | null;
 

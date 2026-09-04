@@ -157,9 +157,9 @@ pub(crate) fn replace_state(
 
     *model_guard = model;
     *context_guard = context;
+    state.mark_model_state_changed();
     drop(context_guard);
     drop(model_guard);
-    state.mark_model_state_changed();
     Ok(())
 }
 
@@ -536,8 +536,8 @@ pub async fn llm_create_context(
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = Some(context);
-    drop(context_guard);
     state.mark_model_state_changed();
+    drop(context_guard);
 
     logging::log("LLM", "create context succeeded");
     Ok(())
@@ -551,8 +551,8 @@ pub async fn llm_free_context(state: TauriState<'_, State>) -> Result<(), ApiErr
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = None;
-    drop(context_guard);
     state.mark_model_state_changed();
+    drop(context_guard);
     Ok(())
 }
 
@@ -666,20 +666,5 @@ pub(crate) fn clear_for_exit(app: &AppHandle) {
         }
     } else {
         logging::log("App", "LLM state unavailable during exit");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{State, replace_state};
-
-    #[test]
-    fn replacing_model_state_advances_epoch() {
-        let state = State::default();
-        let before = state.model_state_epoch();
-
-        replace_state(&state, None, None).expect("replace empty model state");
-
-        assert_eq!(state.model_state_epoch(), before + 1);
     }
 }

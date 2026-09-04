@@ -394,7 +394,12 @@ export const useNotesCollections = ({
                     collection.id,
                 );
                 let activity: NotesCollectionActivity;
-                if (lifecycleActivity === "failed") {
+                if (
+                    collection.status === "indexing" ||
+                    collection.status === "updating"
+                ) {
+                    activity = null;
+                } else if (lifecycleActivity === "failed") {
                     activity = "failed";
                 } else if (lifecycleActivity === "starting") {
                     activity = "starting";
@@ -404,12 +409,8 @@ export const useNotesCollections = ({
                         : isGenerating || isGenerationActive()
                           ? "waitingForGeneration"
                           : "starting";
-                } else if (
-                    collection.updateDueAtMs != null &&
-                    (collection.status === "ready" ||
-                        collection.status === "pending")
-                ) {
-                    activity = "scheduled";
+                } else if (collection.updateDueAtMs != null) {
+                    activity = null;
                 } else if (collection.status !== "pending") {
                     activity = null;
                 } else if (!modelReady) {

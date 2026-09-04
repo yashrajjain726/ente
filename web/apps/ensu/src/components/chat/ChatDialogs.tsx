@@ -837,9 +837,7 @@ export const ChatDialogs = memo(
                                         : collection.activity ===
                                             "waitingForModel"
                                           ? "Indexing will start when the model is ready."
-                                          : collection.activity === "scheduled"
-                                            ? "Indexing is scheduled after recent changes settle."
-                                            : null;
+                                          : null;
                                 return (
                                     <Stack
                                         key={collection.id}
