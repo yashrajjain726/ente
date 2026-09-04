@@ -17,7 +17,7 @@ class DeviceTrashFile {
 
   final int localID;
 
-  /// The absolute deletion deadline in microseconds since the Unix epoch.
+  // The absolute deletion deadline in microseconds since the Unix epoch.
   final int deleteBy;
 
   final String deviceFolder;

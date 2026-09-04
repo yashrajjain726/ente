@@ -37,9 +37,8 @@ pub struct RustPlaneLayout {
 
 #[derive(Clone, Debug)]
 pub struct RustReprocessOptions {
-    /// Same space as `RustScanResult.quad`: the decoded source image.
+    // Same space as `RustScanResult.quad`: the decoded source image.
     pub quad: RustQuad,
-    /// Must be a multiple of 90.
     pub rotation_degrees: i32,
     pub color_mode: RustColorMode,
     pub max_pixels: Option<u32>,
@@ -47,15 +46,13 @@ pub struct RustReprocessOptions {
 
 #[derive(Clone, Debug)]
 pub struct RustScanResult {
-    /// Decoded-source coordinates (EXIF applied, before `rotation_degrees`); `None` when nothing was detected.
+    // Decoded-source coordinates (EXIF applied, before `rotation_degrees`); `None` when nothing was detected.
     pub quad: Option<RustQuad>,
     pub color_mode: RustColorMode,
     pub output_width: u32,
     pub output_height: u32,
-    /// The size `quad` is relative to.
     pub source_width: u32,
     pub source_height: u32,
-    /// JPEG-encoded.
     pub processed_image: Vec<u8>,
 }
 
@@ -80,7 +77,7 @@ impl ScannerSession {
         })
     }
 
-    /// The returned quad is in mask space (256x256), already rotated by `rotation_degrees`.
+    // The returned quad is in mask space (256x256), already rotated by `rotation_degrees`.
     pub fn live_detect_bgra(
         &self,
         bgra: Vec<u8>,
@@ -100,7 +97,6 @@ impl ScannerSession {
         })
     }
 
-    /// Quad semantics as in [`Self::live_detect_bgra`].
     pub fn live_detect_yuv420(
         &self,
         y: Vec<u8>,
