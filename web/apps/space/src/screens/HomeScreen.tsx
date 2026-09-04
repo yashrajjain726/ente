@@ -1527,8 +1527,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     display: "flex",
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    height: "100%",
+                                    height: "calc(100% + 32px)",
                                     justifyContent: "center",
+                                    mt: "-32px",
                                     width: "100%",
                                 }}
                             >
@@ -1562,12 +1563,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 alignItems: "center",
                                                 display: "flex",
                                                 flexDirection: "column",
-                                                mt: "64px",
+                                                mt: "40px",
                                                 position: "relative",
                                                 width: "100%",
                                                 zIndex: 1,
                                                 "@media (max-height: 720px)": {
-                                                    mt: "24px",
+                                                    mt: 0,
                                                 },
                                             }}
                                         >
@@ -1630,7 +1631,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 pointerEvents: "none",
                                                 position: "absolute",
                                                 transform:
-                                                    "translate(-50%, 4%)",
+                                                    "translate(-50%, -7%)",
                                                 width: "84%",
                                                 "@media (max-height: 720px)": {
                                                     maxWidth: 228,
