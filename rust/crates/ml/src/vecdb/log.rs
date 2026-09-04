@@ -63,6 +63,7 @@ pub(crate) struct Log {
     generation: [u8; 16],
     end_offset: u64,
     encode_buffer: Vec<u8>,
+    rollback_pending: bool,
 }
 
 impl Log {
@@ -107,6 +108,7 @@ impl Log {
             generation,
             end_offset: file_len,
             encode_buffer: Vec::new(),
+            rollback_pending: false,
         })
     }
 
@@ -126,6 +128,7 @@ impl Log {
             generation,
             end_offset: HEADER_LEN as u64,
             encode_buffer: Vec::new(),
+            rollback_pending: false,
         })
     }
 
@@ -172,13 +175,23 @@ impl Log {
         for entry in entries {
             validate_entry(entry, self.dims)?;
         }
+        if self.rollback_pending {
+            self.discard_unacked_tail()?;
+            self.rollback_pending = false;
+        }
         match self.write_records(entries, sync) {
             Ok(written) => {
                 self.end_offset += written;
                 Ok(())
             }
             Err(error) => {
-                self.discard_unacked_tail();
+                if let Err(rollback_error) = self.discard_unacked_tail() {
+                    log::warn!(
+                        "failed to discard the unacked tail of {} after a write failure, deferring the rollback: {rollback_error}",
+                        self.path.display()
+                    );
+                    self.rollback_pending = true;
+                }
                 Err(error)
             }
         }
@@ -205,9 +218,14 @@ impl Log {
         Ok(written)
     }
 
-    fn discard_unacked_tail(&mut self) {
-        let _ = self.file.set_len(self.end_offset);
-        let _ = self.file.sync_all();
+    fn discard_unacked_tail(&mut self) -> Result<(), VecDbError> {
+        self.file
+            .set_len(self.end_offset)
+            .map_err(|source| VecDbError::io(&self.path, source))?;
+        self.file
+            .sync_all()
+            .map_err(|source| VecDbError::io(&self.path, source))?;
+        Ok(())
     }
 
     fn drain_encode_buffer(&mut self) -> Result<u64, VecDbError> {
@@ -1398,7 +1416,7 @@ mod tests {
             std::fs::metadata(&path).unwrap().len(),
             acked_end + phantom.len() as u64
         );
-        log.discard_unacked_tail();
+        log.discard_unacked_tail().unwrap();
         assert_eq!(std::fs::metadata(&path).unwrap().len(), acked_end);
         drop(log);
         let mut reopened = reopen(&path, 8);
@@ -1406,6 +1424,51 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "acked"));
         assert_eq!(recoverable_end, acked_end);
+    }
+
+    #[test]
+    fn pending_rollback_truncates_stale_records_before_the_next_append() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("log");
+        let mut log = Log::create(&path, 8).unwrap();
+        let vector = seeded_vector(6, 8);
+        let (_, acked_end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "acked",
+                vector: &vector,
+                attrs: &[],
+            }],
+        );
+        let stale = encoded_add("stale-with-a-much-longer-key", &vector);
+        append_raw_bytes(&path, &stale);
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len(),
+            acked_end + stale.len() as u64
+        );
+        log.rollback_pending = true;
+        let fresh = seeded_vector(7, 8);
+        let (start, end) = append_bounds(
+            &mut log,
+            &[LogEntry::Add {
+                key: "fresh",
+                vector: &fresh,
+                attrs: &[],
+            }],
+        );
+        assert!(!log.rollback_pending);
+        assert_eq!(start, acked_end);
+        assert!(end < acked_end + stale.len() as u64);
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), end);
+        drop(log);
+        let mut reopened = reopen(&path, 8);
+        let (records, recoverable_end) = scan_all(&mut reopened);
+        assert_eq!(records.len(), 2);
+        assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "acked"));
+        assert!(matches!(&records[1].0, LogRecord::Add { key, vector, .. }
+            if key == "fresh" && vector == &fresh));
+        assert_eq!(records[1].1, acked_end);
+        assert_eq!(recoverable_end, end);
     }
 
     #[test]

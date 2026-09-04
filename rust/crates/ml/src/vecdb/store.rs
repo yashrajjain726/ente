@@ -516,6 +516,34 @@ impl VecDb {
             .collect()
     }
 
+    pub fn bulk_search_varied(
+        &self,
+        queries: &[Vec<f32>],
+        params: &[SearchParams],
+    ) -> Result<Vec<Vec<Match>>, VecDbError> {
+        if queries.len() != params.len() {
+            return Err(VecDbError::LengthMismatch {
+                keys: queries.len(),
+                vectors: params.len(),
+            });
+        }
+        self.shared.ensure_open()?;
+        let st = self.shared.state_read();
+        self.shared.ensure_open()?;
+        queries
+            .iter()
+            .zip(params)
+            .map(|(query, query_params)| {
+                if degenerate_distance_cut(query_params)? {
+                    return Ok(Vec::new());
+                }
+                let allowed_slots =
+                    resolve_allowed_slots(&st, query_params.allowed_keys.as_deref());
+                search_in_state(&st, query, query_params, allowed_slots.as_ref())
+            })
+            .collect()
+    }
+
     pub fn bulk_search_stored(
         &self,
         keys: &[String],
@@ -3386,6 +3414,89 @@ mod tests {
             assert!(db.search(query, &empty_allowed).unwrap().is_empty());
         }
         assert!(db.bulk_search(&[], &limit_params(3)).unwrap().is_empty());
+    }
+
+    #[test]
+    fn bulk_search_varied_matches_per_query_search() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 200, 640)).unwrap();
+        let queries: Vec<Vec<f32>> = (0..5)
+            .map(|index| seeded_unit_vector(9600 + index, DIMS))
+            .collect();
+        let params = vec![
+            SearchParams {
+                limit: Some(8),
+                max_distance: Some(2.0),
+                exact: true,
+                ..SearchParams::default()
+            },
+            SearchParams {
+                limit: Some(4),
+                max_distance: Some(0.9),
+                exact: true,
+                ..SearchParams::default()
+            },
+            SearchParams {
+                limit: None,
+                max_distance: Some(1.05),
+                exact: true,
+                ..SearchParams::default()
+            },
+            SearchParams {
+                limit: Some(6),
+                exact: true,
+                allowed_keys: Some(vec![
+                    "key-3".to_string(),
+                    "key-77".to_string(),
+                    "key-150".to_string(),
+                    "absent".to_string(),
+                ]),
+                ..SearchParams::default()
+            },
+            SearchParams {
+                limit: Some(3),
+                max_distance: Some(-0.25),
+                exact: true,
+                ..SearchParams::default()
+            },
+        ];
+        let varied = db.bulk_search_varied(&queries, &params).unwrap();
+        assert_eq!(varied.len(), queries.len());
+        for ((query, shape), matches) in queries.iter().zip(&params).zip(&varied) {
+            assert_eq!(matches, &db.search(query, shape).unwrap());
+        }
+        assert_eq!(varied[0].len(), 8);
+        assert!(varied[4].is_empty());
+        assert!(varied[..4].iter().all(|matches| !matches.is_empty()));
+        let approx: Vec<SearchParams> = params
+            .iter()
+            .cloned()
+            .map(|shape| SearchParams {
+                exact: false,
+                ..shape
+            })
+            .collect();
+        let approx_varied = db.bulk_search_varied(&queries, &approx).unwrap();
+        for ((query, shape), matches) in queries.iter().zip(&approx).zip(&approx_varied) {
+            assert_eq!(matches, &db.search(query, shape).unwrap());
+        }
+        assert!(approx_varied[4].is_empty());
+        let mut unbounded = params.clone();
+        unbounded[2] = SearchParams::default();
+        assert!(matches!(
+            db.bulk_search_varied(&queries, &unbounded),
+            Err(VecDbError::UnboundedSearch)
+        ));
+        assert!(matches!(
+            db.bulk_search_varied(&queries, &params[..3]),
+            Err(VecDbError::LengthMismatch {
+                keys: 5,
+                vectors: 3
+            })
+        ));
+        assert!(db.bulk_search_varied(&[], &[]).unwrap().is_empty());
     }
 
     #[test]

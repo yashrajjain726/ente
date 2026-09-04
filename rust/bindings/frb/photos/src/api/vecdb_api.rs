@@ -117,15 +117,6 @@ fn to_api_matches(matches: Vec<vecdb::Match>) -> Vec<VecDbMatch> {
     matches.into_iter().map(to_api_match).collect()
 }
 
-fn distance_cut(matches: &mut Vec<VecDbMatch>, max_distance: f32) {
-    let keep = matches.partition_point(|entry| entry.distance <= max_distance);
-    matches.truncate(keep);
-}
-
-fn valid_distance(distance: f32) -> bool {
-    distance.is_finite() && distance >= 0.0
-}
-
 pub fn delete_vec_db_files(file_path: String) -> Result<(), RustVecDbError> {
     Ok(vecdb::VecDb::purge(Path::new(&file_path))?)
 }
@@ -252,34 +243,17 @@ impl VecDb {
                 ),
             });
         }
-        let cuts: Vec<f32> = minimum_similarities
+        let params: Vec<vecdb::SearchParams> = minimum_similarities
             .iter()
-            .map(|similarity| 1.0 - similarity)
-            .collect();
-        let widest = cuts
-            .iter()
-            .copied()
-            .filter(|cut| valid_distance(*cut))
-            .fold(f32::NEG_INFINITY, f32::max);
-        let params = vecdb::SearchParams {
-            limit: limit.map(|value| value as usize),
-            max_distance: Some(widest),
-            exact,
-            allowed_keys: None,
-        };
-        let results = self.inner.bulk_search(&queries, &params)?;
-        Ok(results
-            .into_iter()
-            .zip(cuts)
-            .map(|(matches, cut)| {
-                if !valid_distance(cut) {
-                    return Vec::new();
-                }
-                let mut matches = to_api_matches(matches);
-                distance_cut(&mut matches, cut);
-                matches
+            .map(|similarity| vecdb::SearchParams {
+                limit: limit.map(|value| value as usize),
+                max_distance: Some(1.0 - similarity),
+                exact,
+                allowed_keys: None,
             })
-            .collect())
+            .collect();
+        let results = self.inner.bulk_search_varied(&queries, &params)?;
+        Ok(results.into_iter().map(to_api_matches).collect())
     }
 
     pub fn bulk_approx_filtered_search_vectors_within_distance(
