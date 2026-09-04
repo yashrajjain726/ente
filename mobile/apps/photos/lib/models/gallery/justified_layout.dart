@@ -97,7 +97,8 @@ class JustifiedLayoutCalculator {
   static const double _maximumAspectRatio = 4.0;
   static const double _maximumRowHeightFactor = 2.4;
   static const double _minimumLandscapeTrioHeightFactor = 0.88;
-  // Keep rows visually scannable even when more items would remain tappable.
+  // Product decision: cap visual density at three items per row,
+  // independently of tap-target sizing.
   static const int _maximumItemsPerRow = 3;
   // Logical pixels map to density-independent tap extents on both platforms.
   static const double _minimumTappableExtent = 48.0;
@@ -267,9 +268,8 @@ class JustifiedLayoutCalculator {
       pendingMinimumRatio = math.min(pendingMinimumRatio, ratio);
 
       if (pendingRatios.length == _maximumItemsPerRow) {
-        // With a hard item cap and gap-free non-final rows, very narrow items
-        // can require a row taller than the normal soft height bound. Prefer
-        // the two product constraints when all three cannot be satisfied.
+        // A three-item row may exceed maximumRowHeight: the three-item cap and
+        // fully justified non-final rows take precedence over that soft limit.
         addPendingRow(fillWidth: true);
         continue;
       }
