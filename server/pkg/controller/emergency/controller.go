@@ -19,7 +19,6 @@ type Controller struct {
 	UserRepo              *repo.UserRepository
 	UserLookup            controller.UserLookup
 	UserCtrl              *user.UserController
-	PasskeyController     *controller.PasskeyController
 	LockCtrl              *lock.LockController
 	isReminderCronRunning bool
 }

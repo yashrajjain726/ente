@@ -2,8 +2,10 @@ package repo
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/ente/museum/ente"
@@ -117,5 +119,78 @@ func TestUserAuthRepositoryRemoveOTTReturnsWhetherRowWasConsumed(t *testing.T) {
 	}
 	if removed {
 		t.Fatal("second remove should report that the ott was already consumed")
+	}
+}
+
+func TestAddTokenForPendingLoginConsumesPasskeyRecoverySession(t *testing.T) {
+	testutil.WithServerRoot(t)
+
+	db := testutil.RequireTestDB(t)
+	testutil.ResetTables(t, db)
+	t.Cleanup(func() { testutil.ResetTables(t, db) })
+
+	userID := testutil.InsertUser(t, db, testutil.UserFixture{
+		Email:        "passkey-recovery@example.com",
+		CreationTime: 1,
+	})
+	sessionID := "passkey-recovery-session"
+	if _, err := db.Exec(`INSERT INTO passkey_login_sessions(user_id, session_id, creation_time, expiration_time) VALUES($1, $2, $3, $4)`, userID, sessionID, 1, time.Microseconds()+1000000); err != nil {
+		t.Fatalf("failed to insert session: %v", err)
+	}
+
+	repo := &UserAuthRepository{DB: db}
+	if err := repo.AddTokenForPendingLogin(context.Background(), userID, sessionID, PasskeyPendingLogin, false, ente.Photos, "first-token", "", "", nil); err != nil {
+		t.Fatalf("first recovery failed: %v", err)
+	}
+	if err := repo.AddTokenForPendingLogin(context.Background(), userID, sessionID, PasskeyPendingLogin, false, ente.Photos, "second-token", "", "", nil); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("replayed recovery returned %v, want no rows", err)
+	}
+}
+
+func TestAddLoginResultRejectsStaleCredentials(t *testing.T) {
+	testutil.WithServerRoot(t)
+
+	db := testutil.RequireTestDB(t)
+	testutil.ResetTables(t, db)
+	t.Cleanup(func() { testutil.ResetTables(t, db) })
+
+	userID := testutil.InsertUser(t, db, testutil.UserFixture{Email: "stale-login@example.com", CreationTime: 1})
+	keyAttributes := ente.KeyAttributes{
+		KEKSalt: "old-salt", EncryptedKey: "old-key", KeyDecryptionNonce: "old-nonce",
+		PublicKey: "public-key", EncryptedSecretKey: "secret-key", SecretKeyDecryptionNonce: "secret-nonce",
+		MemLimit: 1, OpsLimit: 1,
+	}
+	if err := (&UserRepository{DB: db}).SetKeyAttributes(userID, keyAttributes); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO srp_auth(user_id, srp_user_id, salt, verifier) VALUES($1, '00000000-0000-0000-0000-000000000001', 'old-srp-salt', 'old-verifier')`, userID); err != nil {
+		t.Fatal(err)
+	}
+	repo := &UserAuthRepository{DB: db}
+	srpAuth, err := repo.GetSRPAuthEntity(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE key_attributes SET encrypted_key = 'new-key' WHERE user_id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.AddLoginResult(context.Background(), userID, srpAuth, &keyAttributes, ente.Photos, "token", "", "", "", "", 0)
+	if !errors.Is(err, ente.ErrAuthenticationRequired) {
+		t.Fatalf("stale key attributes returned %v", err)
+	}
+	if _, err = db.Exec(`UPDATE key_attributes SET encrypted_key = 'old-key' WHERE user_id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`UPDATE srp_auth SET verifier = 'new-verifier' WHERE user_id = $1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	err = repo.AddLoginResult(context.Background(), userID, srpAuth, &keyAttributes, ente.Photos, "token", "", "", "", "", 0)
+	if !errors.Is(err, ente.ErrInvalidPassword) {
+		t.Fatalf("stale SRP returned %v", err)
+	}
+	var tokenCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM tokens WHERE user_id = $1`, userID).Scan(&tokenCount); err != nil || tokenCount != 0 {
+		t.Fatalf("token count = %d, err = %v", tokenCount, err)
 	}
 }
