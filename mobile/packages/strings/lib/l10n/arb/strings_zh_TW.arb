@@ -812,11 +812,9 @@
   "@deviceLock": {
     "description": "Device lock option title"
   },
-  "deviceLockExplanation": "當 Ente 在前景且正在備份時，停用裝置螢幕鎖定。通常不需要這麼做，但可能有助於大型上傳與大量圖庫初次匯入更快完成。",
   "deviceNotFound": "找不到裝置",
   "didYouKnow": "你知道嗎？",
   "digits": "數位",
-  "disableAutoLock": "停用自動鎖定",
   "disableBackup": "停用備份",
   "disableDownloadWarningBody": "檢視者依然能透過外部工具擷取螢幕畫面，或是儲存您的照片副本",
   "disableDownloadWarningTitle": "請注意",
@@ -949,7 +947,6 @@
     }
   },
   "earned": "獎勵",
-  "earnFreeStorage": "領取免費空間",
   "earnMoreSpace": "獲得更多空間！",
   "edit": "編輯",
   "editAutoAddPeople": "編輯自動新增人物",
@@ -2292,14 +2289,6 @@
   "referrals": "推薦",
   "referralsAreCurrentlyPaused": "推薦獎勵活動目前暫停中",
   "referralStats": "推薦統計",
-  "referralStep1": "1. 自訂並分享您的推薦碼。",
-  "referralStep2": "2. 對方使用您的推薦碼登錄會員。",
-  "referralStep3": "3. 等他們登錄後，將獎勵 {storageInGB} GB 給他們 + {storageInGB} GB 給您自己。",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "等他們登錄後，將獎勵 {storageAmountInGB} GB 給他們 + {storageAmountInGB} GB 給您自己。",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2789,7 +2778,6 @@
   "share": "分享",
   "shareALink": "分享連結",
   "shareAnAlbum": "分享相簿",
-  "shareCodeEarnStorage": "分享推薦碼，取得更多空間。",
   "shareCodes": "分享驗證碼",
   "shareCodesDuration": "請選擇您想分享驗證碼的持續時間。",
   "shared": "已分享",
@@ -3222,7 +3210,6 @@
   },
   "unarchiveAlbum": "取消封存相簿",
   "unarchiving": "正在取消封存……",
-  "unavailableReferralCode": "抱歉，此推薦碼無法使用。",
   "uncategorized": "未分類",
   "uncategorizedItemsWillShowUpHere": "未分類的項目會出現在這裡",
   "undo": "復原",

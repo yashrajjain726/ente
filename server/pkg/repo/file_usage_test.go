@@ -12,14 +12,12 @@ func TestUpdateUsageForFileCreationMaintainsCounterState(t *testing.T) {
 	db := setupFileUsageTest(t)
 	repo := &FileRepository{DB: db}
 	tests := []struct {
-		name        string
-		app         ente.App
-		usageExists bool
-		ready       bool
+		name  string
+		app   ente.App
+		ready bool
 	}{
-		{name: "ready_photos", app: ente.Photos, usageExists: true, ready: true},
-		{name: "legacy_photos", app: ente.Photos, usageExists: true},
-		{name: "missing_locker", app: ente.Locker},
+		{name: "ready_photos", app: ente.Photos, ready: true},
+		{name: "legacy_photos", app: ente.Photos},
 	}
 
 	for i, tt := range tests {
@@ -35,7 +33,7 @@ func TestUpdateUsageForFileCreationMaintainsCounterState(t *testing.T) {
 					VALUES ($1, 10, 2, 3, 7)`, userID); err != nil {
 					t.Fatal(err)
 				}
-			} else if tt.usageExists {
+			} else {
 				testutil.InsertUsage(t, db, userID, 10)
 			}
 
@@ -58,9 +56,6 @@ func TestUpdateUsageForFileCreationMaintainsCounterState(t *testing.T) {
 				t.Fatal(err)
 			}
 			wantStorage := int64(15)
-			if !tt.usageExists {
-				wantStorage = 5
-			}
 			if usage != wantStorage || storage != wantStorage {
 				t.Fatalf("storage = (%d, %d), want %d", usage, storage, wantStorage)
 			}
@@ -72,6 +67,32 @@ func TestUpdateUsageForFileCreationMaintainsCounterState(t *testing.T) {
 				t.Fatalf("counter state = (%v, %v, %d), want (NULL, NULL, 1)", photos, locker, version)
 			}
 		})
+	}
+}
+
+func TestUpdateUsageRequiresUsageRow(t *testing.T) {
+	db := setupFileUsageTest(t)
+	userID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       1,
+		Email:        "missing-usage@example.com",
+		CreationTime: 1,
+	})
+	tx, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	if _, err := (&FileRepository{}).updateUsage(t.Context(), tx, userID, 5, 1, 0); err == nil {
+		t.Fatal("updateUsage() created a missing usage row")
+	}
+
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM usage WHERE user_id = $1`, userID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("usage row count = %d, want 0", count)
 	}
 }
 

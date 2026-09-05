@@ -611,11 +611,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Wyłącz blokadę ekranu urządzenia, gdy Ente jest na pierwszym planie i w trakcie tworzenia kopii zapasowej. Zwykle nie jest to potrzebne, ale może pomóc w szybszym przesyłaniu i początkowym imporcie dużych bibliotek.",
   "deviceNotFound": "Nie znaleziono urządzenia",
   "didYouKnow": "Czy wiedziałeś/aś?",
   "digits": "Cyfry",
-  "disableAutoLock": "Wyłącz automatyczną blokadę",
   "disableDownloadWarningBody": "Widzowie mogą nadal robić zrzuty ekranu lub zapisywać kopie zdjęć za pomocą programów trzecich",
   "disableDownloadWarningTitle": "Uwaga",
   "disableLinkMessage": "Spowoduje to usunięcie publicznego linku dostępu do \"{albumName}\".",
@@ -720,7 +718,6 @@
     }
   },
   "earned": "zdobyte",
-  "earnFreeStorage": "Zdobywaj bezpłatną przestrzeń dyskową",
   "earnMoreSpace": "Zdobądź więcej miejsca!",
   "edit": "Edytuj",
   "editAutoAddPeople": "Edytuj automatyczne dodawanie osób",
@@ -1924,14 +1921,6 @@
   "referrals": "Polecenia",
   "referralsAreCurrentlyPaused": "Wysyłanie poleceń jest obecnie wstrzymane",
   "referralStats": "Statystyki poleceń",
-  "referralStep1": "1. Dostosuj i udostępniaj swój kod.",
-  "referralStep2": "2. Oni rejestrują się do Ente, używając Twojego kodu.",
-  "referralStep3": "3. {storageInGB}GB za darmo dla nich + {storageInGB}GB za darmo dla Ciebie, gdy ulepszą swoje konto.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB dla nich + {storageAmountInGB} GB dla ciebie, gdy ulepszą swoje konto.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2058,8 +2047,6 @@
   "saveCode": "Zapisz kod",
   "saveCollage": "Zapisz kolaż",
   "saveCopy": "Zapisz kopię",
-  "saveDocumentDescription": "Prześlij ważne dokumenty.",
-  "saveDocumentTitle": "Dokument",
   "saveKey": "Zapisz klucz",
   "@saveKey": {
     "description": "Save key button label"
@@ -2277,7 +2264,6 @@
   "setupFirstAccount": "Skonfiguruj pierwsze\nkonto",
   "share": "Udostępnij",
   "shareALink": "Udostępnij link",
-  "shareCodeEarnStorage": "Udostępnij swój kod, zdobądź bezpłatną przestrzeń dyskową.",
   "shareCodes": "Udostępnij kody",
   "shareCodesDuration": "Wybierz okres, przez który chcesz udostępniać kody.",
   "sharedAlbumSectionDescription": "Twórz wspólne albumy i współpracuj z innymi użytkownikami Ente, w tym z użytkownikami korzystającymi z bezpłatnych planów.",
@@ -2612,7 +2598,6 @@
   },
   "unarchiveAlbum": "Przywróć album z archiwum",
   "unarchiving": "Usuwanie z archiwum...",
-  "unavailableReferralCode": "Przepraszamy, ten kod jest niedostępny.",
   "uncategorized": "Bez kategorii",
   "undo": "Cofnij",
   "unhide": "Odkryj",

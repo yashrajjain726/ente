@@ -96,6 +96,16 @@ pub(crate) fn knowledge_index_contract() -> KnowledgeIndexContract {
     }
 }
 
+pub(crate) fn format_knowledge_document_prompt(title: &str, text: &str) -> String {
+    let (prefix, remainder) = DOCUMENT_PROMPT
+        .split_once("{title}")
+        .expect("knowledge document prompt contains a title placeholder");
+    let (middle, suffix) = remainder
+        .split_once("{text}")
+        .expect("knowledge document prompt contains a text placeholder");
+    [prefix, title, middle, text, suffix].concat()
+}
+
 pub(crate) fn knowledge_embedding_config() -> KnowledgeEmbeddingConfig {
     KnowledgeEmbeddingConfig {
         model_url: EMBEDDING_MODEL_URL.to_owned(),

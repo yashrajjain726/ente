@@ -1,0 +1,9 @@
+[package]
+name = "ente-prelogin-wasm"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ente-wasm-lib = { workspace = true, features = ["prelogin"] }

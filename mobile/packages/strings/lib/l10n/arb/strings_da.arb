@@ -903,8 +903,6 @@
   "@save": {
     "description": "Label for save button"
   },
-  "saveDocumentDescription": "Upload vigtige dokumenter.",
-  "saveDocumentTitle": "Dokument",
   "saveKey": "Gem nøgle",
   "@saveKey": {
     "description": "Save key button label"
@@ -1117,7 +1115,6 @@
     "description": "Two-factor authentication title"
   },
   "twofactorSetup": "To-faktor opsætning",
-  "unavailableReferralCode": "Beklager, denne kode er ikke tilgængelig.",
   "uncategorized": "Ukategoriseret",
   "unimportant": "Ikke vigtig",
   "unlock": "Lås op",

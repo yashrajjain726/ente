@@ -692,11 +692,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Schakel de schermvergrendeling van het apparaat uit wanneer Ente op de voorgrond is en er een back-up aan de gang is. Dit is normaal gesproken niet nodig, maar kan grote uploads en initiële imports van grote mappen sneller laten verlopen.",
   "deviceNotFound": "Apparaat niet gevonden",
   "didYouKnow": "Wist u dat?",
   "digits": "Cijfers",
-  "disableAutoLock": "Automatisch vergrendelen uitschakelen",
   "disableDownloadWarningBody": "Kijkers kunnen nog steeds screenshots maken of een kopie van je foto's opslaan met behulp van externe tools",
   "disableDownloadWarningTitle": "Let op",
   "disableLinkMessage": "Dit verwijdert de openbare link voor toegang tot \"{albumName}\".",
@@ -837,7 +835,6 @@
     }
   },
   "earned": "verdiend",
-  "earnFreeStorage": "Gratis opslagruimte verdienen",
   "earnMoreSpace": "Verdien meer ruimte!",
   "edit": "Bewerken",
   "editAutoAddPeople": "Bewerk automatisch personen toevoegen",
@@ -2066,13 +2063,6 @@
   "referrals": "Referenties",
   "referralsAreCurrentlyPaused": "Verwijzingen zijn momenteel gepauzeerd",
   "referralStats": "Verwijzingsstatistieken",
-  "referralStep1": "1. Pas uw code aan en deel deze.",
-  "referralStep3": "3. {storageInGB}GB gratis voor hen + {storageInGB}GB gratis voor jou wanneer ze upgraden.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB voor hen + {storageAmountInGB} GB voor jou wanneer ze upgraden.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2278,7 +2268,6 @@
   "saveCollage": "Sla collage op",
   "saveContact": "Contact opslaan",
   "saveCopy": "Kopie opslaan",
-  "saveDocumentDescription": "Upload belangrijke documenten.",
   "saveOnlyDescription": "Wil je dit opslaan naar je opslagruimte (Downloads map)?",
   "@saveOnlyDescription": {
     "description": "Description text asking user if they want to save to storage (for platforms that don't support sharing)"
@@ -2505,7 +2494,6 @@
   "share": "Delen",
   "shareALink": "Deel een link",
   "shareAnAlbum": "Een album delen",
-  "shareCodeEarnStorage": "Deel je code, verdien opslagruimte.",
   "shareCodes": "Codes delen",
   "shareCodesDuration": "Selecteer de duur waarvoor je codes wilt delen.",
   "sharedAlbumSectionDescription": "Maak gedeelde en collaboratieve albums met andere Ente gebruikers, inclusief gebruikers met gratis abonnementen.",
@@ -2860,7 +2848,6 @@
   },
   "unarchiveAlbum": "Album uit archief halen",
   "unarchiving": "Uit het archief halen...",
-  "unavailableReferralCode": "Deze code is helaas niet beschikbaar.",
   "uncategorized": "Ongecategoriseerd",
   "undo": "Ongedaan maken",
   "unhide": "Zichtbaar maken",

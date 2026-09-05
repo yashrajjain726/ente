@@ -242,7 +242,7 @@ pub struct LegacyKitRecoverySession {
     #[serde(rename = "kitID")]
     kit_id: String,
     status: LegacyKitRecoveryStatus,
-    /// Remaining microseconds, not an epoch timestamp.
+    // Remaining microseconds, not an epoch timestamp.
     wait_till: i64,
     created_at: i64,
 }

@@ -1005,11 +1005,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Disabilita il blocco schermo del dispositivo quando Ente è in primo piano e c'è un backup in corso. Questo normalmente non è necessario ma può aiutare a completare più velocemente grossi caricamenti e l'importazione iniziale di grandi librerie.",
   "deviceNotFound": "Dispositivo non trovato",
   "didYouKnow": "Lo sapevi che?",
   "digits": "Cifre",
-  "disableAutoLock": "Disabilita blocco automatico",
   "disableBackup": "Disattiva i backup",
   "disableDownloadWarningBody": "I visualizzatori possono scattare screenshot o salvare una copia delle foto utilizzando strumenti esterni",
   "disableDownloadWarningTitle": "Nota bene",
@@ -1151,7 +1149,6 @@
     }
   },
   "earned": "ottenuti",
-  "earnFreeStorage": "Ottieni spazio gratis",
   "earnMoreSpace": "Ottieni più spazio!",
   "edit": "Modifica",
   "editAutoAddPeople": "Modifica auto-aggiungi persone",
@@ -2772,14 +2769,6 @@
   "referrals": "Inviti",
   "referralsAreCurrentlyPaused": "I codici invito sono attualmente sospesi",
   "referralStats": "Statistiche inviti",
-  "referralStep1": "1. Personalizza e condividi il tuo codice.",
-  "referralStep2": "2. Si iscrivono a Ente usando il tuo codice.",
-  "referralStep3": "3. {storageInGB} GB gratis per loro + {storageInGB} GB gratis per te quando si abbonano.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB per loro + {storageAmountInGB} GB per te quando si abbonano.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -3027,8 +3016,6 @@
   "saveCollage": "Salva il collage",
   "saveContact": "Salva il contatto",
   "saveCopy": "Salva una copia",
-  "saveDocumentDescription": "Carica documenti importanti.",
-  "saveDocumentTitle": "Documento",
   "saveKey": "Salva chiave",
   "@saveKey": {
     "description": "Save key button label"
@@ -3320,7 +3307,6 @@
   "share": "Condividi",
   "shareALink": "Condividi un link",
   "shareAnAlbum": "Condividi album",
-  "shareCodeEarnStorage": "Condividi il tuo codice, ottieni spazio.",
   "shareCodes": "Condividi codice",
   "shareCodesDuration": "Seleziona la durata per la quale vuoi condividere i codici.",
   "shareCollection": "Condividi la collezione",
@@ -3371,13 +3357,6 @@
   },
   "shareTextRecommendUsingEnteForFamily": "Scarica Ente così posso aggiungerti al mio piano famiglia\n\nhttps://ente.com",
   "shareTextRecommendUsingEnteForPhotos": "Scarica Ente così possiamo condividere foto e video in qualità originale\n\nhttps://ente.com",
-  "shareTextReferralCode": "Ente Photos è un luogo privato e sicuro per le tue foto\n* Scarica Ente Photos da https://ente.com/app\n* Crea un account\n* Applica il codice invito {referralCode} in Impostazioni -> Inviti\n* Ottieni {referralStorageInGB} GB gratis quando ti abboni a un piano a pagamento",
-  "@shareTextReferralCode": {
-    "placeholders": {
-      "referralCode": {},
-      "referralStorageInGB": {}
-    }
-  },
   "shareThisLink": "Questo link permette a chiunque lo riceva di accedere al tuo elemento. Puoi rimuovere l'accesso in qualsiasi momento eliminando il link.",
   "shareWithNonenteUsers": "Condividi con utenti che non hanno un account Ente",
   "shareWithPeopleSectionTitle": "{numberOfPeople, plural, =0{Condividi con persone specifiche} one{Condividi con {numberOfPeople} persona} other{Condividi con {numberOfPeople} persone}}",
@@ -3781,7 +3760,6 @@
   },
   "unarchiveAlbum": "Rimuovi album dall'archivio",
   "unarchiving": "Togliendo dall'archivio...",
-  "unavailableReferralCode": "Siamo spiacenti, questo codice non è disponibile.",
   "uncategorized": "Senza categoria",
   "uncategorizedItemsWillShowUpHere": "Gli elementi non categorizzati verranno visualizzati qui",
   "undo": "Annulla",

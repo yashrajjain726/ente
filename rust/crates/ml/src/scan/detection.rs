@@ -74,7 +74,7 @@ fn find_quad_from_orientation_with_adaptive_threshold(
     Ok(best_quad)
 }
 
-/// Deliberately no upper bound: edge-touching documents put corners past the mask edge.
+// Deliberately no upper bound: edge-touching documents put corners past the mask edge.
 pub(crate) fn is_valid_quad(quad: &[Point]) -> bool {
     quad.iter().all(|p| p.x >= 0.0 && p.y >= 0.0)
 }

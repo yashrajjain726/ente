@@ -796,17 +796,18 @@ func (repo *FileRepository) updateUsage(ctx context.Context, tx *sql.Tx, userID,
 		fileCountSourceVersionDiff = 1
 	}
 	var usage int64
-	err := tx.QueryRowContext(ctx, `INSERT INTO usage
-			(user_id, storage_consumed, file_count_source_version)
-			VALUES ($1, $2, $5)
-			ON CONFLICT (user_id) DO UPDATE SET
-				storage_consumed = usage.storage_consumed + EXCLUDED.storage_consumed,
-				photos_file_count = usage.photos_file_count + $3,
-				locker_file_count = usage.locker_file_count + $4,
-				file_count_source_version = usage.file_count_source_version + EXCLUDED.file_count_source_version
+	err := tx.QueryRowContext(ctx, `UPDATE usage SET
+			storage_consumed = storage_consumed + $2,
+			photos_file_count = photos_file_count + $3,
+			locker_file_count = locker_file_count + $4,
+			file_count_source_version = file_count_source_version + $5
+			WHERE user_id = $1
 			RETURNING storage_consumed`,
 		userID, storageDiff, photosFileCountDiff, lockerFileCountDiff, fileCountSourceVersionDiff).Scan(&usage)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return -1, stacktrace.Propagate(err, "missing usage row for user %d", userID)
+		}
 		return -1, stacktrace.Propagate(err, "")
 	}
 	return usage, nil

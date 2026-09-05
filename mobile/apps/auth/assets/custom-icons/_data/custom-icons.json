@@ -1236,6 +1236,13 @@
       "title": "Jottacloud"
     },
     {
+      "title": "Jotty Page",
+      "slug": "jotty",
+      "altNames": [
+        "Jotty"
+      ]
+    },
+    {
       "title": "JOYclub",
       "slug": "joyclub",
       "hex": "000000",
@@ -2138,6 +2145,13 @@
     {
       "title": "Seafile",
       "slug": "seafile"
+    },
+    {
+      "title": "Securo Finance",
+      "slug": "securo",
+      "altNames": [
+        "Securo"
+      ]
     },
     {
       "title": "SEI",

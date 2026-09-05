@@ -379,11 +379,11 @@ Contact [support@ente.com](mailto:support@ente.com) if you have questions about 
 
 Use our [referral program](/photos/features/account/referral-program/):
 
-Open `Settings > Referrals`, share your referral code with friends, and when they upgrade to a paid plan, both you and your friend get 10 GB free.
+Open `Settings > Referrals` and share your referral code with friends. New users get an extra 10 GB immediately after applying your code. You get an extra 10 GB when they upgrade to a paid plan.
 
 ### How much storage can I earn through referrals? {#referral-storage-limit}
 
-For each friend you refer who upgrades to a paid plan, both you and your friend receive **10 GB** of free storage.
+For each friend you refer who upgrades to a paid plan, you receive 10 GB of free storage.
 
 The amount of free storage you can earn is capped to your current plan. This means you can at most **double your storage**. For example, if you're on a 100 GB plan, you can earn another 100 GB (by referring 10 friends), taking your total available storage to 200 GB.
 
@@ -640,7 +640,7 @@ If support helps move your account back to the free plan, the [inactive free-acc
 
 ### How can I earn free storage? {#earn-free-storage}
 
-Use our [referral program](/photos/features/account/referral-program/). When friends sign up using your referral code and subscribe to a paid plan, both you and your friend earn additional free storage.
+Use our [referral program](/photos/features/account/referral-program/). New users get an extra 10 GB immediately after applying a referral code. The referrer gets an extra 10 GB when the new user upgrades to a paid plan.
 
 ## Inactive Account Email
 

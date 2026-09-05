@@ -1,13 +1,12 @@
-import {
-    boxSealOpen,
-    encryptBlob,
-    encryptBox,
-    generateKey,
-    generateKeyPair,
-} from "ente-core-wasm";
 import * as legacy from "ente-legacy-wasm/authenticated";
 import * as locker from "ente-locker-wasm";
 import * as photos from "ente-photos-wasm";
+import {
+    boxSealOpen,
+    encryptBox,
+    generateKey,
+    generateKeyPair,
+} from "ente-prelogin-wasm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -274,14 +273,14 @@ const encryptedContact = async () => {
     const contactKey = await generateKey();
     const wrappedRootKey = await encryptBox(rootKey, masterKey);
     const wrappedContactKey = await encryptBox(contactKey, rootKey);
-    const data = await encryptBlob(
+    const data = await locker.encryptBlob(
         Buffer.from(
             JSON.stringify({ contactUserId: 42, name: "Zoë 🦋" }),
         ).toString("base64"),
         contactKey,
     );
     const picture = Uint8Array.from({ length: 4096 }, (_, i) => i % 256);
-    const encryptedPicture = await encryptBlob(
+    const encryptedPicture = await locker.encryptBlob(
         Buffer.from(picture).toString("base64"),
         contactKey,
     );

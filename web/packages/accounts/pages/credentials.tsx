@@ -31,6 +31,7 @@ import {
     openPasskeyVerificationURL,
     passkeyVerificationRedirectURL,
 } from "ente-accounts/services/passkey";
+import { masterKeyFromSession } from "ente-accounts/services/prelogin-session";
 import {
     appHomeRoute,
     stashRedirect,
@@ -38,7 +39,6 @@ import {
 } from "ente-accounts/services/redirect";
 import { checkSessionValidity } from "ente-accounts/services/session";
 import {
-    masterKeyFromSession,
     saveMasterKeyInSessionAndSafeStore,
     stashKeyEncryptionKeyInSessionStore,
     unstashKeyEncryptionKeyFromSession,

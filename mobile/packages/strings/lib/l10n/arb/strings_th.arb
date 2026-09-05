@@ -155,7 +155,6 @@
     }
   },
   "earned": "ได้รับแล้ว",
-  "earnFreeStorage": "รับพื้นที่ฟรี",
   "earnMoreSpace": "เพิ่มพื้นที่ของคุณ!",
   "edit": "แก้ไข",
   "editLocation": "แก้ไขตำแหน่ง",
@@ -396,14 +395,6 @@
     "description": "Title for recreate password dialog"
   },
   "referralCodeHint": "คุณสามารถปรับแต่งโค้ดนี้ได้ถึง 3 ครั้ง",
-  "referralStep1": "1. ปรับแต่งและแชร์โค้ดของคุณ",
-  "referralStep2": "2. พวกเขาลงทะเบียน Ente โดยใช้โค้ดของคุณ",
-  "referralStep3": "3. ฟรี {storageInGB}GB สำหรับพวกเขา + ฟรี {storageInGB}GB สำหรับคุณเมื่อพวกเขาอัพเกรด",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "removeFromAlbum": "นำออกจากอัลบั้ม",
   "removeFromAlbumTitle": "นำออกจากอัลบั้ม?",
   "removeLink": "ลบลิ้งค์",
@@ -467,7 +458,6 @@
   "setupComplete": "ตั้งค่าเสร็จสมบูรณ์",
   "share": "แชร์",
   "shareALink": "แชร์​ลิงก์",
-  "shareCodeEarnStorage": "แชร์โค้ด, รับพื้นที่",
   "shareLink": "แชร์​ลิงก์",
   "sharing": "กำลังแชร์...",
   "showMemories": "แสดงความทรงจำ",

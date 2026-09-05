@@ -3,10 +3,7 @@ import type {
     LockerCollectionParticipant,
     LockerItem,
 } from "@/types";
-import {
-    ensureLocalUser,
-    ensureUserKeyPair,
-} from "ente-accounts/services/user";
+import { ensureLocalUser } from "ente-accounts/services/user";
 import { fetchFile } from "ente-base/file-download";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
@@ -19,8 +16,9 @@ import {
     decryptMetadataJSON,
     encryptBox,
     stringToB64,
-} from "ente-core-wasm";
+} from "ente-locker-wasm";
 import { z } from "zod";
+import { ensureUserKeyPair } from "./account-keys";
 import { fromInfoTypeWireValue } from "./info-type-wire";
 import {
     type StoredTrashFileRecord,
@@ -1095,13 +1093,9 @@ export const downloadLockerFile = async (
                     }
 
                     while (data.length >= streamDecryptor.decryptionChunkSize) {
-                        const decryptedChunk =
-                            await streamDecryptor.decryptChunk(
-                                data.slice(
-                                    0,
-                                    streamDecryptor.decryptionChunkSize,
-                                ),
-                            );
+                        const decryptedChunk = streamDecryptor.decryptChunk(
+                            data.slice(0, streamDecryptor.decryptionChunkSize),
+                        );
                         controller.enqueue(decryptedChunk);
                         didEnqueue = true;
                         data = data.slice(streamDecryptor.decryptionChunkSize);
@@ -1110,7 +1104,7 @@ export const downloadLockerFile = async (
                     if (done) {
                         if (data.length > 0) {
                             const decryptedChunk =
-                                await streamDecryptor.decryptChunk(data);
+                                streamDecryptor.decryptChunk(data);
                             controller.enqueue(decryptedChunk);
                         }
                         if (!streamDecryptor.isFinalized()) {
