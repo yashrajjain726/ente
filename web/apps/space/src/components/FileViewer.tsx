@@ -954,6 +954,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         const pswp = pswpRef.current;
         if (!pswp) return;
 
+        pswp.options.allowPanToNext = viewerPhotosRef.current.length > 1;
         const refreshIndex = (index: number) => {
             if (index >= 0 && index < viewerPhotosRef.current.length) {
                 pswp.refreshSlideContent(index);

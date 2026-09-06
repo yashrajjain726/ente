@@ -4,6 +4,7 @@ import {
     BubbleChatIcon,
     Menu01Icon,
     MoreHorizontalIcon,
+    Tick02Icon,
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -12,6 +13,10 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/ActionFeedback";
+import {
+    SpaceActionToast,
+    spaceToastAutoDismissDurationMs,
+} from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
@@ -555,6 +560,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
+    const [isInviteLinkCopied, setIsInviteLinkCopied] = useState(false);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
@@ -1012,10 +1018,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     const shareInvite = async () => {
-        if (!profileLink || typeof navigator.share != "function") return;
+        if (!profileLink) return;
 
         try {
-            await navigator.share({ url: profileLink });
+            if (typeof navigator.share == "function") {
+                await navigator.share({ url: profileLink });
+            } else {
+                await navigator.clipboard.writeText(profileLink);
+                setIsInviteLinkCopied(true);
+            }
         } catch (error) {
             if (
                 !(error instanceof DOMException && error.name == "AbortError")
@@ -2004,6 +2015,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     />
                 )}
             </Box>
+            {isInviteLinkCopied && (
+                <SpaceActionToast
+                    autoDismissAfterMs={spaceToastAutoDismissDurationMs}
+                    closeLabel="Dismiss invite link copied message"
+                    icon={
+                        <HugeiconsIcon
+                            icon={Tick02Icon}
+                            size={22}
+                            strokeWidth={1.8}
+                        />
+                    }
+                    message="Invite link copied"
+                    onClose={() => setIsInviteLinkCopied(false)}
+                />
+            )}
             <ConfirmationActionSheet
                 open={isUnfriendSheetOpen}
                 title="Are you sure you want to unfriend?"

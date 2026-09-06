@@ -22,6 +22,7 @@ import {
     loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
+    loadCurrentSpaceProfilePostsPage,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
     setCurrentPostLiked,
@@ -120,32 +121,47 @@ const Page: React.FC = () => {
                         log.error("Failed to load space unread status", error),
                     );
 
-                const [nextFriends, nextFriendRequests, savedHomePosts] =
-                    await Promise.all([
-                        loadCurrentSpaceFriends(nextSpaceId),
-                        loadCurrentFriendRequests(nextSpaceId).catch(
-                            (error: unknown) => {
-                                log.error(
-                                    "Failed to load Space friend requests",
-                                    error,
-                                );
-                                return [];
-                            },
-                        ),
-                        loadSpaceHomePosts(nextSpaceId),
-                    ]);
+                const [nextFriends, nextFriendRequests] = await Promise.all([
+                    loadCurrentSpaceFriends(nextSpaceId),
+                    loadCurrentFriendRequests(nextSpaceId).catch(
+                        (error: unknown) => {
+                            log.error(
+                                "Failed to load Space friend requests",
+                                error,
+                            );
+                            return [];
+                        },
+                    ),
+                    loadSpaceHomePosts(nextSpaceId).then((savedHomePosts) => {
+                        if (isCancelled() || !savedHomePosts) return;
+
+                        setLatestPosts(savedHomePosts.latestPosts);
+                        setUnreadPosts(savedHomePosts.unreadPosts);
+                        setFriends((currentFriends) =>
+                            currentFriends.length > 0
+                                ? currentFriends
+                                : savedHomePosts.latestPosts.map((post) => ({
+                                      avatarKeyVersion: post.avatarKeyVersion,
+                                      avatarObjectID: post.avatarObjectID,
+                                      avatarSize: post.avatarSize,
+                                      avatarUpdatedAt: post.avatarUpdatedAt,
+                                      friendsCount: 0,
+                                      fullName: post.name,
+                                      id: post.friendID,
+                                      spaceId: post.spaceId,
+                                      username: post.username ?? "",
+                                  })),
+                        );
+                        setIsLatestPostsLoading(false);
+                        setIsFriendsLoading(false);
+                    }),
+                ]);
                 if (isCancelled()) return;
 
                 setFriends(nextFriends);
                 setFriendRequests(nextFriendRequests);
                 setIsFriendsLoading(false);
                 setIsFriendRequestsLoading(false);
-                if (savedHomePosts) {
-                    setLatestPosts(savedHomePosts.latestPosts);
-                    setUnreadPosts(savedHomePosts.unreadPosts);
-                    setIsLatestPostsLoading(false);
-                }
-
                 const refreshedHomePosts = await refreshSpaceHomePosts(
                     nextSpaceId,
                     nextFriends,
@@ -308,6 +324,7 @@ const Page: React.FC = () => {
                     }
                 }}
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
+                onLoadFriendPosts={loadCurrentSpaceProfilePostsPage}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenFriendRequests={() =>

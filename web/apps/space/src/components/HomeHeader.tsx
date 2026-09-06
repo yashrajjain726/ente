@@ -14,7 +14,7 @@ const headerAvatarSize = 36;
 const headerAvatarImageSize = 26;
 const headerChatCircleSize = 36;
 export const spaceHomeHeaderChromeColor = "#F0F0F0";
-const headerIconSize = 24;
+const headerIconSize = 25;
 const headerSideWidth = 36;
 const mediaPlaceholderColor = "#E5E7EA";
 const avatarFadeSx = {
@@ -249,11 +249,11 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                             border: `2px solid ${spaceHomeHeaderChromeColor}`,
                             borderRadius: "50%",
                             boxSizing: "border-box",
-                            height: 12,
+                            height: 12.5,
                             position: "absolute",
-                            right: 5,
-                            top: 5.5,
-                            width: 12,
+                            right: 4.5,
+                            top: 5,
+                            width: 12.5,
                             zIndex: 1,
                         }}
                     />
