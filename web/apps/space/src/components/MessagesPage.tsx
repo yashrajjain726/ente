@@ -118,6 +118,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 }) => {
     const router = useSpaceRouter();
     const {
+        postPublishPhase,
         profile,
         profileLoadError,
         profileLoadStatus,
@@ -520,6 +521,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         if (!profile?.spaceId) return;
         void refreshConversations();
     }, [profile?.spaceId, refreshConversations]);
+
+    React.useEffect(() => {
+        if (postPublishPhase == "posted") void refreshConversations();
+    }, [postPublishPhase, refreshConversations]);
 
     React.useEffect(() => {
         const previousSelectedSpaceId = previousSelectedSpaceIdRef.current;

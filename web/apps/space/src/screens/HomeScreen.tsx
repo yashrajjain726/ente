@@ -76,6 +76,7 @@ interface HomeScreenProps {
     isLatestPostsLoading?: boolean;
     isFriendsLoading?: boolean;
     isFriendRequestsLoading?: boolean;
+    isHomeCacheLoading?: boolean;
     showInstallPrompt?: boolean;
     onCreatePost?: (
         image: SpaceDraftPostImage,
@@ -382,7 +383,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         isAvatarPending || Boolean(post && !postUnavailable && !imageUrl);
 
     React.useEffect(() => {
-        if (isLoading || !hasMediaToLoad || shouldLoadMedia) return;
+        if (!hasMediaToLoad || shouldLoadMedia) return;
         const element = rootRef.current;
         if (!element) return;
         if (
@@ -404,7 +405,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         );
         observer.observe(element);
         return () => observer.disconnect();
-    }, [hasMediaToLoad, isLoading, shouldLoadMedia]);
+    }, [hasMediaToLoad, shouldLoadMedia]);
 
     React.useEffect(() => {
         if (!shouldLoadMedia) return;
@@ -1009,6 +1010,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isLatestPostsLoading = false,
     isFriendsLoading = false,
     isFriendRequestsLoading = false,
+    isHomeCacheLoading = false,
     showInstallPrompt = false,
     onCreatePost,
     onAcceptFriendRequest,
@@ -1503,7 +1505,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 friend={friend}
                 imageUrl={imageUrl}
                 isAvatarPending={isAvatarPending}
-                isLoading={isFriendsLoading || isLatestPostsLoading}
+                isLoading={isFriendsLoading || (isLatestPostsLoading && !item)}
                 isRead={isRead}
                 isUnavailable={isUnavailable}
                 onLoadAvatar={() => loadFriendAvatar(friend)}
@@ -1762,7 +1764,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     width: "100%",
                                 }}
                             >
-                                <SpaceLoadingSpinner ariaLabel="Loading friends and requests" />
+                                {!isHomeCacheLoading && (
+                                    <SpaceLoadingSpinner ariaLabel="Loading friends and requests" />
+                                )}
                             </Box>
                         ) : orderedHomeItems.length > 0 ? (
                             <Box

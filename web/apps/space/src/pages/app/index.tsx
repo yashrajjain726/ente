@@ -61,6 +61,7 @@ const Page: React.FC = () => {
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
     const [isFriendRequestsLoading, setIsFriendRequestsLoading] =
         useState(true);
+    const [isHomeCacheLoading, setIsHomeCacheLoading] = useState(true);
     const [hasLoadedHomeItems, setHasLoadedHomeItems] = useState(false);
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         useState(false);
@@ -105,6 +106,7 @@ const Page: React.FC = () => {
         setIsLatestPostsLoading(true);
         setIsFriendsLoading(true);
         setIsFriendRequestsLoading(true);
+        setIsHomeCacheLoading(true);
         setHasLoadedHomeItems(false);
         void (async () => {
             try {
@@ -147,15 +149,19 @@ const Page: React.FC = () => {
                         if (savedHomePosts) {
                             setLatestPosts(savedHomePosts.latestPosts);
                             setUnreadPosts(savedHomePosts.unreadPosts);
-                            setIsLatestPostsLoading(false);
                         }
-                        if (savedHomeItems) {
+                        if (
+                            savedHomeItems &&
+                            (savedHomeItems.friends.length > 0 ||
+                                savedHomeItems.friendRequests.length > 0)
+                        ) {
                             setFriends(savedHomeItems.friends);
                             setFriendRequests(savedHomeItems.friendRequests);
                             setIsFriendsLoading(false);
                             setIsFriendRequestsLoading(false);
                             setHasLoadedHomeItems(true);
                         }
+                        setIsHomeCacheLoading(false);
                     }),
                 ]);
                 if (isCancelled()) return;
@@ -181,6 +187,7 @@ const Page: React.FC = () => {
                     setIsLatestPostsLoading(false);
                     setIsFriendsLoading(false);
                     setIsFriendRequestsLoading(false);
+                    setIsHomeCacheLoading(false);
                 }
             }
         })();
@@ -247,6 +254,7 @@ const Page: React.FC = () => {
                 isLatestPostsLoading={isLatestPostsLoading}
                 isFriendsLoading={isFriendsLoading}
                 isFriendRequestsLoading={isFriendRequestsLoading}
+                isHomeCacheLoading={isHomeCacheLoading}
                 profile={profile}
                 profileLink={
                     profile
@@ -297,19 +305,24 @@ const Page: React.FC = () => {
                     const loadedFriends = await loadCurrentSpaceFriends(
                         profile.spaceId,
                     );
+                    setIsLatestPostsLoading(true);
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
                             (request) => request.requestId != requestID,
                         ),
                     );
                     setFriends(loadedFriends);
-                    const refreshedHomePosts = await refreshSpaceHomePosts(
-                        profile.spaceId,
-                        loadedFriends,
-                    );
-                    if (refreshedHomePosts) {
-                        setLatestPosts(refreshedHomePosts.latestPosts);
-                        setUnreadPosts(refreshedHomePosts.unreadPosts);
+                    try {
+                        const refreshedHomePosts = await refreshSpaceHomePosts(
+                            profile.spaceId,
+                            loadedFriends,
+                        );
+                        if (refreshedHomePosts) {
+                            setLatestPosts(refreshedHomePosts.latestPosts);
+                            setUnreadPosts(refreshedHomePosts.unreadPosts);
+                        }
+                    } finally {
+                        setIsLatestPostsLoading(false);
                     }
                     await refreshUnreadStatus(profile.spaceId);
                 }}
