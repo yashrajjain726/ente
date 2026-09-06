@@ -2,6 +2,7 @@ import {
     ArrowLeft02Icon,
     Cancel01Icon,
     FavouriteIcon,
+    HandPointingRightIcon,
     ImageDelete02Icon,
     Navigation03Icon,
 } from "@hugeicons/core-free-icons";
@@ -39,10 +40,7 @@ import {
 } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
-import {
-    clampSpaceMessageText,
-    spaceWaveMessageText,
-} from "utils/message-limits";
+import { clampSpaceMessageText } from "utils/message-limits";
 import { spacePostImageInputAccept } from "utils/post-image";
 
 const green = "#08C225";
@@ -76,9 +74,6 @@ const messageLongPressMs = 520;
 const messageLongPressMoveTolerancePx = 10;
 const messageActionsTouchOpenMouseSuppressMs = 900;
 const dayMs = 24 * 60 * 60 * 1000;
-const isWaveMessageText = (text: string | undefined) =>
-    text?.trim() == spaceWaveMessageText;
-
 const shouldShowPostSomething = (
     conversation: SpaceMessageConversation,
     latestPostCreatedAtMs: number | null | undefined,
@@ -91,7 +86,7 @@ const shouldShowPostSomething = (
         (activity.type == "message" || activity.type == "post_reply") &&
         !activity.outgoing &&
         !activity.isUnavailable &&
-        isWaveMessageText(activity.text)
+        activity.kind == "poke"
     );
 };
 
@@ -127,6 +122,7 @@ interface MessagesScreenProps {
         messageId: string,
         text: string,
     ) => Promise<void>;
+    onSendPoke: (spaceId: string) => Promise<void>;
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
     profileLink?: string;
@@ -244,6 +240,9 @@ const conversationPreview = (conversation: SpaceMessageConversation) => {
             : activity.outgoing
               ? "You liked a message"
               : "Liked a message";
+    }
+    if (activity.kind == "poke") {
+        return activity.outgoing ? "You poked" : "Poked you";
     }
     if (text) {
         return activity.outgoing ? `You: ${text}` : text;
@@ -927,7 +926,11 @@ const bodyBubblesCanGroup = (
     if (!first || !second) return false;
     if (!sameMessageSender(first, second)) return false;
     if (first.kind == "post_like" || first.kind == "friend_added") return false;
-    if (second.kind != "regular" || second.replyMessageId) return false;
+    if (
+        (second.kind != "regular" && second.kind != "poke") ||
+        second.replyMessageId
+    )
+        return false;
     if (
         !isSameLocalDate(
             new Date(first.createdAtMs),
@@ -1394,7 +1397,8 @@ const MessageBubble: React.FC<{
 }) => {
     const isOwn = message.sender.spaceId == ownSpaceID;
     const isUnavailable = Boolean(message.isUnavailable);
-    const isWave = !isUnavailable && isWaveMessageText(message.text);
+    const isPoke = !isUnavailable && message.kind == "poke";
+    const pokeText = isOwn ? "You poked" : "Poked you";
     const bubbleBorderRadius = isOwn
         ? `20px ${groupsWithPrevious ? "6px" : "20px"} ${groupsWithNext ? "6px" : "20px"} 20px`
         : `${groupsWithPrevious ? "6px" : "20px"} 20px 20px ${groupsWithNext ? "6px" : "20px"}`;
@@ -1620,19 +1624,22 @@ const MessageBubble: React.FC<{
                                         : incomingMessageText,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    fontSize: isWave ? 40 : 14,
-                                    fontStyle: isUnavailable
-                                        ? "italic"
-                                        : "normal",
+                                    fontStyle:
+                                        isUnavailable || isPoke
+                                            ? "italic"
+                                            : "normal",
+                                    fontSize: 14,
                                     fontWeight: 600,
-                                    lineHeight: isWave ? "48px" : "21px",
+                                    lineHeight: "21px",
                                     overflowWrap: "anywhere",
                                     whiteSpace: "pre-wrap",
                                 }}
                             >
                                 {isUnavailable
                                     ? "Message unavailable"
-                                    : message.text}
+                                    : isPoke
+                                      ? pokeText
+                                      : message.text}
                             </Box>
                             {!isUnavailable && message.liked && (
                                 <Box
@@ -1686,6 +1693,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onPostPhotoSelect,
     onLoadActivityPost,
     onReplyToMessage,
+    onSendPoke,
     onSendMessage,
     onSetMessageLiked,
     profile,
@@ -1725,6 +1733,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         isThreadOpen && !isThreadReadOnly && !isThreadRecipientLoading;
     const canSend =
         canInteract && messageText.trim().length > 0 && sendPhase == "idle";
+    const canPoke = canInteract && sendPhase == "idle";
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
@@ -1794,10 +1803,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         messageContextMenu?.message &&
         isCurrentProfileMessage(messageContextMenu.message, profile),
     );
-    const isContextMessageWave = Boolean(
-        messageContextMenu?.message &&
-        isWaveMessageText(messageContextMenu.message.text),
-    );
+    const isContextMessagePoke = messageContextMenu?.message.kind == "poke";
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
@@ -1836,13 +1842,28 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             });
     };
 
+    const sendPoke = () => {
+        if (!selectedFriend || !canPoke) return;
+        const spaceId = selectedFriend.spaceId ?? selectedFriend.id;
+        stickToThreadBottomRef.current = true;
+        smoothNextMessageScrollRef.current = true;
+        setSendPhase("sending");
+        void onSendPoke(spaceId)
+            .then(() => setSendPhase("idle"))
+            .catch((error: unknown) => {
+                smoothNextMessageScrollRef.current = false;
+                log.error("Failed to send poke", error);
+                setSendPhase("idle");
+            });
+    };
+
     const openMessageActions = (
         message: SpaceMessage,
         anchorEl: HTMLElement,
         source: MessageActionsOpenSource,
     ) => {
         if (
-            isWaveMessageText(message.text) &&
+            message.kind == "poke" &&
             (!canInteract || !isCurrentProfileMessage(message, profile))
         ) {
             return;
@@ -2069,7 +2090,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
 
     const messageActionMenuItems = [
-        !isContextMessageWave && canInteract && !isContextMessageOwn ? (
+        !isContextMessagePoke && canInteract && !isContextMessageOwn ? (
             <MessageActionMenuItem
                 key="like"
                 icon={<HeartIcon small />}
@@ -2077,7 +2098,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 onClick={() => handleMessageAction("like")}
             />
         ) : null,
-        !isContextMessageWave && canInteract ? (
+        !isContextMessagePoke && canInteract ? (
             <MessageActionMenuItem
                 key="reply"
                 icon={<ReplyIcon />}
@@ -2085,7 +2106,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 onClick={() => handleMessageAction("reply")}
             />
         ) : null,
-        !isContextMessageWave ? (
+        !isContextMessagePoke ? (
             <MessageActionMenuItem
                 key="copy"
                 icon={<CopyIcon />}
@@ -2281,7 +2302,49 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 Messages
                             </Box>
                         )}
-                        <Box aria-hidden />
+                        {isThreadOpen && selectedFriend && canInteract ? (
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={
+                                    selectedName
+                                        ? `Poke ${selectedName}`
+                                        : "Send poke"
+                                }
+                                disabled={!canPoke}
+                                onClick={sendPoke}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: "inherit",
+                                    cursor: canPoke ? "pointer" : "default",
+                                    display: "flex",
+                                    height: spaceTouchTargetSize,
+                                    justifyContent: "center",
+                                    justifySelf: "end",
+                                    lineHeight: 1,
+                                    mr: "-8px",
+                                    opacity: canPoke ? 1 : 0.5,
+                                    p: 0,
+                                    width: spaceTouchTargetSize,
+                                    "&:focus-visible": {
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={HandPointingRightIcon}
+                                    size={24}
+                                    strokeWidth={1.8}
+                                />
+                            </Box>
+                        ) : (
+                            <Box aria-hidden />
+                        )}
                     </Box>
 
                     {isThreadOpen && selectedFriend ? (
@@ -2298,7 +2361,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     py: "12px",
                                 }}
                             >
-                                {isThreadLoading ? (
+                                {isThreadLoading || isThreadRecipientLoading ? (
                                     <Box
                                         sx={{
                                             alignItems: "center",

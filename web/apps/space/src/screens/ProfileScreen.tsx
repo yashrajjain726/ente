@@ -1389,7 +1389,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     <HugeiconsIcon
                                         icon={BubbleChatIcon}
                                         size={20}
-                                        strokeWidth={1.8}
+                                        strokeWidth={2}
                                     />
                                 </Box>
                             ) : (

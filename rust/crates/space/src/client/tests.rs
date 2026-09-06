@@ -1492,7 +1492,7 @@ async fn message_actions_use_message_endpoints() {
 }
 
 #[tokio::test]
-async fn wave_message_requests_special_notification() {
+async fn poke_message_requests_special_notification() {
     let mut server = Server::new_async().await;
     let space_root_key = generate_key();
     let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key);
@@ -1517,14 +1517,14 @@ async fn wave_message_requests_special_notification() {
         )
         .create_async()
         .await;
-    let wave = server
+    let poke = server
         .mock(
             "POST",
             "/spaces/space_owner_main/friends/space_friend/messages",
         )
         .match_header("x-space-session-token", "space-session-token")
         .match_body(Matcher::AllOf(vec![
-            Matcher::Regex("\"notificationKind\":\"wave\"".into()),
+            Matcher::Regex("\"notificationKind\":\"poke\"".into()),
             Matcher::Regex("\"messageCipher\":\"[^\"]+\"".into()),
             Matcher::Regex("\"senderEncryptedMessageKey\":\"[^\"]+\"".into()),
             Matcher::Regex("\"recipientEncryptedMessageKey\":\"[^\"]+\"".into()),
@@ -1532,7 +1532,7 @@ async fn wave_message_requests_special_notification() {
         .with_status(200)
         .with_body(
             json!({
-                "messageId": "wmsg_wave",
+                "messageId": "wmsg_poke",
                 "kind": "regular",
                 "senderSpaceId": "space_owner_main",
                 "recipientSpaceId": "space_friend",
@@ -1548,13 +1548,13 @@ async fn wave_message_requests_special_notification() {
         .await;
 
     let message = ctx
-        .send_message("space_owner_main", "space_friend", "👋")
+        .send_poke("space_owner_main", "space_friend")
         .await
-        .expect("wave should be sent");
+        .expect("poke should be sent");
 
-    assert_eq!(message.message_id, "wmsg_wave");
+    assert_eq!(message.message_id, "wmsg_poke");
     friends.assert_async().await;
-    wave.assert_async().await;
+    poke.assert_async().await;
 }
 
 #[test]

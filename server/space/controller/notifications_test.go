@@ -53,8 +53,8 @@ func (n *recordingSpaceActivityNotifier) OnSpaceMessageSent(actor SpaceActivityA
 	n.record(spaceActivityMessageSent, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpaceWaveSent(actor SpaceActivityActor, recipientUserID int64) {
-	n.record(spaceActivityWaveSent, actor, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpacePokeSent(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityPokeSent, actor, recipientUserID)
 }
 
 func (n *recordingSpaceActivityNotifier) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {
@@ -251,12 +251,12 @@ func TestMessageActivitiesAndLikeTransition(t *testing.T) {
 		recipientIDs: []int64{bobID},
 	}, requireSpaceActivity(t, notifier))
 
-	waveRequest := request
-	waveRequest.NotificationKind = spaceMessageNotificationKindWave
-	_, err = messages.Create(ctx, aliceSpace, bobSpace.SpaceID, waveRequest)
+	pokeRequest := request
+	pokeRequest.NotificationKind = spaceMessageNotificationKindPoke
+	_, err = messages.Create(ctx, aliceSpace, bobSpace.SpaceID, pokeRequest)
 	require.NoError(t, err)
 	require.Equal(t, recordedSpaceActivity{
-		event:        spaceActivityWaveSent,
+		event:        spaceActivityPokeSent,
 		actorUserID:  aliceID,
 		actorSpaceID: aliceSpace.SpaceID,
 		actorSlug:    aliceSpace.SpaceSlug,
@@ -339,7 +339,7 @@ func TestFriendActivitiesOnlyOnRelationshipTransitions(t *testing.T) {
 	}, requireSpaceActivity(t, notifier))
 }
 
-func TestSpaceWebPushSenderUsesWavePayloadAndPrunesDeadEndpoint(t *testing.T) {
+func TestSpaceWebPushSenderUsesPokePayloadAndPrunesDeadEndpoint(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	recipientID := insertSpaceControllerUser(t, repos, "space-push-recipient@example.com", "recipient-public")
 	sessionHash := []byte("space-push-session-hash")
@@ -363,10 +363,10 @@ func TestSpaceWebPushSenderUsesWavePayloadAndPrunesDeadEndpoint(t *testing.T) {
 	}
 
 	sender := NewSpaceWebPushSender(repos.WebPush, config)
-	sender.OnSpaceWaveSent(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
+	sender.OnSpacePokeSent(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
 	require.Equal(t, spaceWebPushPayload{
 		Title:  "Ente Space",
-		Body:   "@alice waved at you 👋",
+		Body:   "@alice poked you",
 		Action: "Post something",
 		URL:    "/app/post",
 	}, payload)

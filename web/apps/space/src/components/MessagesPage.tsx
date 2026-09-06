@@ -21,6 +21,7 @@ import {
     markCurrentMessagesRead,
     replyToCurrentMessage,
     sendCurrentMessage,
+    sendCurrentPoke,
     setCurrentMessageLiked,
     shouldAutoReadMessageActivities,
     type SpaceMessage,
@@ -84,11 +85,13 @@ const currentProfileMessageActor = (
 });
 
 const createLocalMessage = ({
+    kind,
     profile,
     recipient,
     replyMessageId,
     text,
 }: {
+    kind: SpaceMessage["kind"];
     profile: SetupProfile;
     recipient: SpaceMessageConversation["friend"];
     replyMessageId?: string;
@@ -99,7 +102,7 @@ const createLocalMessage = ({
         createdAtMs,
         id: createLocalMessageID(),
         isDeleted: false,
-        kind: "regular",
+        kind,
         liked: false,
         recipient,
         replyMessageId,
@@ -702,11 +705,44 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 onLoadActivityPost={(post) =>
                     loadCurrentMessageActivityPostPreview(post, actorSpaceId)
                 }
+                onSendPoke={async (spaceId) => {
+                    const sender = currentProfileMessageActor(profile);
+                    const recipient =
+                        selectedFriend ?? placeholderFriend(spaceId);
+                    const optimisticMessage = createLocalMessage({
+                        kind: "poke",
+                        profile,
+                        recipient,
+                        text: "Poked",
+                    });
+                    appendMessageIfThreadIsCurrent(spaceId, optimisticMessage);
+                    try {
+                        const message = await sendCurrentPoke(
+                            actorSpaceId,
+                            spaceId,
+                            sender,
+                            recipient,
+                        );
+                        replaceMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                            message,
+                        );
+                    } catch (error) {
+                        removeMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                        );
+                        throw error;
+                    }
+                    void refreshConversations();
+                }}
                 onSendMessage={async (spaceId, text) => {
                     const sender = currentProfileMessageActor(profile);
                     const recipient =
                         selectedFriend ?? placeholderFriend(spaceId);
                     const optimisticMessage = createLocalMessage({
+                        kind: "regular",
                         profile,
                         recipient,
                         text,
@@ -739,6 +775,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     const recipient =
                         selectedFriend ?? placeholderFriend(spaceId);
                     const optimisticMessage = createLocalMessage({
+                        kind: "regular",
                         profile,
                         recipient,
                         replyMessageId: messageId,

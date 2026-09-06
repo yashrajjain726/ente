@@ -43,6 +43,7 @@ use ente_core::{
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
+const MESSAGE_KIND_POKE: &str = "poke";
 const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
 const ONLY_PHOTOS_UPLOAD_MESSAGE: &str = "only photos can be uploaded";
 pub const MAX_SPACE_POST_UPLOAD_BYTES: usize = 5 * 1024 * 1024;

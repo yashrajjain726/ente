@@ -106,6 +106,7 @@ type SpaceMessageConversationActivityType =
 interface SpaceMessageConversationActivity {
     createdAt: string;
     id: string;
+    kind?: SpaceMessageKindResponse;
     messageId?: string;
     outgoing?: boolean;
     postId?: number;
@@ -123,6 +124,7 @@ interface SpaceFriend {
 
 type SpaceMessageKindResponse =
     | "friend_added"
+    | "poke"
     | "post_like"
     | "post_reply"
     | "regular";
@@ -307,6 +309,7 @@ export interface SpaceMessageActivityPost {
 export interface SpaceMessageActivity {
     createdAtMs: number;
     id: string;
+    kind?: SpaceMessageKind;
     messageId?: string;
     outgoing: boolean;
     post?: SpaceMessageActivityPost;
@@ -975,6 +978,7 @@ const messageActivityFromSpaceActivity = (
     return {
         createdAtMs: timestampMsFromSpaceDate(activity.createdAt),
         id: activity.id,
+        kind: activity.kind || undefined,
         messageId: activity.messageId,
         outgoing: Boolean(activity.outgoing),
         post,
@@ -984,21 +988,20 @@ const messageActivityFromSpaceActivity = (
     };
 };
 
-const isWaveMessageActivity = (activity: SpaceMessageActivity) =>
-    (activity.type == "message" || activity.type == "post_reply") &&
-    activity.text?.trim() == "👋";
+const isPokeMessageActivity = (activity: SpaceMessageActivity) =>
+    activity.kind == "poke";
 
 const isPassiveAutoReadMessageActivity = (activity: SpaceMessageActivity) =>
     activity.type == "friend_added" ||
     activity.type == "message_like" ||
     activity.type == "post_like" ||
-    isWaveMessageActivity(activity);
+    isPokeMessageActivity(activity);
 
 const messageConversationUnreadCount = (activities: SpaceMessageActivity[]) => {
     const onlyActivity = activities.length == 1 ? activities[0] : undefined;
     if (
         onlyActivity?.type == "post_like" ||
-        (onlyActivity && isWaveMessageActivity(onlyActivity))
+        (onlyActivity && isPokeMessageActivity(onlyActivity))
     ) {
         return 0;
     }
@@ -1420,6 +1423,29 @@ export const sendCurrentMessage = async (
     }
 };
 
+export const sendCurrentPoke = async (
+    senderSpaceId: string,
+    spaceId: string,
+    sender: FriendProfile,
+    recipient: FriendProfile,
+) => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        return await messageFromSpaceMessage(
+            ctx,
+            (await ctx.sendPoke(
+                senderSpaceId,
+                spaceId,
+            )) as SpaceMessageResponse,
+            true,
+            senderSpaceId,
+            { friend: recipient, viewer: sender },
+        );
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
 export const replyToCurrentMessage = async (
     senderSpaceId: string,
     spaceId: string,
@@ -1502,8 +1528,8 @@ export const loadCurrentMessageConversations = async (
                           .map(messageActivityFromSpaceActivity)
                           .map((activity) =>
                               activity.id == latestActivity?.id &&
-                              isWaveMessageActivity(latestActivity)
-                                  ? { ...activity, text: latestActivity.text }
+                              isPokeMessageActivity(latestActivity)
+                                  ? { ...activity, kind: "poke" as const }
                                   : activity,
                           )
                     : [];
