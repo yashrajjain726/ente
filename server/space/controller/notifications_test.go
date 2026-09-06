@@ -367,7 +367,7 @@ func TestSpaceWebPushSenderUsesPokePayloadAndPrunesDeadEndpoint(t *testing.T) {
 	require.Equal(t, spaceWebPushPayload{
 		Title:  "Ente Space",
 		Body:   "@alice poked you",
-		Action: "Post something",
+		Action: "Post a photo",
 		URL:    "/app/post",
 	}, payload)
 	var count int

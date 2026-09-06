@@ -41,6 +41,7 @@ export const SpacePostToast: React.FC = () => {
             }
             message={isPosting ? "Posting..." : isFailed ? "Failed" : "Posted"}
             onClose={dismissPostPublishToast}
+            showCloseButton={false}
             zIndex={1400}
         />
     );

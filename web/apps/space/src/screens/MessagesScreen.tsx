@@ -242,7 +242,9 @@ const conversationPreview = (conversation: SpaceMessageConversation) => {
               : "Liked a message";
     }
     if (activity.kind == "poke") {
-        return activity.outgoing ? "You poked" : "Poked you";
+        return activity.outgoing
+            ? `You poked ${firstNameFrom(conversation.friend.fullName.trim() || conversation.friend.username)}`
+            : "Poked you";
     }
     if (text) {
         return activity.outgoing ? `You: ${text}` : text;
@@ -779,7 +781,7 @@ const ConversationListItem: React.FC<{
                             "&:hover": { bgcolor: "#07A820" },
                         }}
                     >
-                        Post something
+                        Post a photo
                     </Box>
                 )}
                 {isFriendRequest && (
@@ -1368,6 +1370,7 @@ const isMessageLongPressIgnoredTarget = (target: EventTarget | null) =>
 
 const MessageBubble: React.FC<{
     activityPost?: SpaceMessageActivityPost;
+    friendName: string;
     groupsWithNext: boolean;
     groupsWithPrevious: boolean;
     isHighlighted: boolean;
@@ -1384,6 +1387,7 @@ const MessageBubble: React.FC<{
     profile: SetupProfile;
 }> = ({
     activityPost,
+    friendName,
     groupsWithNext,
     groupsWithPrevious,
     isHighlighted,
@@ -1398,7 +1402,8 @@ const MessageBubble: React.FC<{
     const isOwn = message.sender.spaceId == ownSpaceID;
     const isUnavailable = Boolean(message.isUnavailable);
     const isPoke = !isUnavailable && message.kind == "poke";
-    const pokeText = isOwn ? "You poked" : "Poked you";
+    const pokeName = firstNameFrom(friendName);
+    const pokeText = isOwn ? `You poked ${pokeName}` : `${pokeName} poked you`;
     const bubbleBorderRadius = isOwn
         ? `20px ${groupsWithPrevious ? "6px" : "20px"} ${groupsWithNext ? "6px" : "20px"} 20px`
         : `${groupsWithPrevious ? "6px" : "20px"} 20px 20px ${groupsWithNext ? "6px" : "20px"}`;
@@ -2467,6 +2472,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                                               )
                                                                           ]
                                                                         : undefined
+                                                                }
+                                                                friendName={
+                                                                    selectedName
                                                                 }
                                                                 groupsWithNext={
                                                                     groupsWithNext

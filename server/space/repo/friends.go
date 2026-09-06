@@ -56,8 +56,16 @@ func friendCapacityTx(ctx context.Context, tx *sql.Tx, spaceID string) (int, err
 	var count int
 	if err := tx.QueryRowContext(ctx, `
 		SELECT
-			(SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1) +
-			(SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1)
+			(SELECT COUNT(*)
+			 FROM space_friend_shares s
+			 JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
+			 JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
+			 WHERE s.space_id = $1) +
+			(SELECT COUNT(*)
+			 FROM space_friend_requests fr
+			 JOIN spaces target_space ON target_space.space_id = fr.target_space_id
+			 JOIN users target_owner ON target_owner.user_id = target_space.owner_id AND target_owner.encrypted_email IS NOT NULL
+			 WHERE fr.requester_space_id = $1)
 	`, spaceID).Scan(&count); err != nil {
 		return 0, stacktrace.Propagate(err, "")
 	}

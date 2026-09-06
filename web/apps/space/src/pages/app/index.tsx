@@ -137,21 +137,32 @@ const Page: React.FC = () => {
 
                         setLatestPosts(savedHomePosts.latestPosts);
                         setUnreadPosts(savedHomePosts.unreadPosts);
-                        setFriends((currentFriends) =>
-                            currentFriends.length > 0
-                                ? currentFriends
-                                : savedHomePosts.latestPosts.map((post) => ({
-                                      avatarKeyVersion: post.avatarKeyVersion,
-                                      avatarObjectID: post.avatarObjectID,
-                                      avatarSize: post.avatarSize,
-                                      avatarUpdatedAt: post.avatarUpdatedAt,
-                                      friendsCount: 0,
-                                      fullName: post.name,
-                                      id: post.friendID,
-                                      spaceId: post.spaceId,
-                                      username: post.username ?? "",
-                                  })),
-                        );
+                        setFriends((currentFriends) => {
+                            if (currentFriends.length > 0)
+                                return currentFriends;
+
+                            return savedHomePosts.friendSpaceIds.map(
+                                (friendSpaceId) => {
+                                    const post =
+                                        savedHomePosts.latestPosts.find(
+                                            (post) =>
+                                                post.spaceId == friendSpaceId,
+                                        );
+                                    return {
+                                        avatarKeyVersion:
+                                            post?.avatarKeyVersion,
+                                        avatarObjectID: post?.avatarObjectID,
+                                        avatarSize: post?.avatarSize,
+                                        avatarUpdatedAt: post?.avatarUpdatedAt,
+                                        friendsCount: 0,
+                                        fullName: post?.name ?? "",
+                                        id: friendSpaceId,
+                                        spaceId: friendSpaceId,
+                                        username: post?.username ?? "",
+                                    };
+                                },
+                            );
+                        });
                         setIsLatestPostsLoading(false);
                         setIsFriendsLoading(false);
                     }),

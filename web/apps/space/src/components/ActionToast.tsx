@@ -30,6 +30,7 @@ interface SpaceActionToastProps {
     icon: React.ReactNode;
     message: React.ReactNode;
     onClose?: () => void;
+    showCloseButton?: boolean;
     zIndex?: number;
 }
 
@@ -41,10 +42,9 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
     icon,
     message,
     onClose,
+    showCloseButton = autoDismissAfterMs === undefined,
     zIndex = 20,
 }) => {
-    const showCloseButton = autoDismissAfterMs === undefined;
-
     React.useEffect(() => {
         if (autoDismissAfterMs === undefined || !onClose) return;
 
