@@ -6,6 +6,10 @@ import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { HomeScreen } from "screens/HomeScreen";
 import {
+    cacheSpaceHomeItems,
+    loadCachedSpaceHomeItems,
+} from "services/home-items";
+import {
     loadSpaceHomePosts,
     patchCachedSpaceHomePost,
     refreshSpaceHomePosts,
@@ -57,6 +61,7 @@ const Page: React.FC = () => {
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
     const [isFriendRequestsLoading, setIsFriendRequestsLoading] =
         useState(true);
+    const [hasLoadedHomeItems, setHasLoadedHomeItems] = useState(false);
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         useState(false);
     const [showFriendLimitToast, setShowFriendLimitToast] = useState(false);
@@ -100,6 +105,7 @@ const Page: React.FC = () => {
         setIsLatestPostsLoading(true);
         setIsFriendsLoading(true);
         setIsFriendRequestsLoading(true);
+        setHasLoadedHomeItems(false);
         void (async () => {
             try {
                 const nextSpaceId = await loadExistingSpaceId();
@@ -129,48 +135,36 @@ const Page: React.FC = () => {
                                 "Failed to load Space friend requests",
                                 error,
                             );
-                            return [];
+                            return undefined;
                         },
                     ),
-                    loadSpaceHomePosts(nextSpaceId).then((savedHomePosts) => {
-                        if (isCancelled() || !savedHomePosts) return;
+                    Promise.all([
+                        loadSpaceHomePosts(nextSpaceId),
+                        loadCachedSpaceHomeItems(nextSpaceId),
+                    ]).then(([savedHomePosts, savedHomeItems]) => {
+                        if (isCancelled()) return;
 
-                        setLatestPosts(savedHomePosts.latestPosts);
-                        setUnreadPosts(savedHomePosts.unreadPosts);
-                        setFriends((currentFriends) => {
-                            if (currentFriends.length > 0)
-                                return currentFriends;
-
-                            return savedHomePosts.friendSpaceIds.map(
-                                (friendSpaceId) => {
-                                    const post =
-                                        savedHomePosts.latestPosts.find(
-                                            (post) =>
-                                                post.spaceId == friendSpaceId,
-                                        );
-                                    return {
-                                        avatarKeyVersion:
-                                            post?.avatarKeyVersion,
-                                        avatarObjectID: post?.avatarObjectID,
-                                        avatarSize: post?.avatarSize,
-                                        avatarUpdatedAt: post?.avatarUpdatedAt,
-                                        friendsCount: 0,
-                                        fullName: post?.name ?? "",
-                                        id: friendSpaceId,
-                                        spaceId: friendSpaceId,
-                                        username: post?.username ?? "",
-                                    };
-                                },
-                            );
-                        });
-                        setIsLatestPostsLoading(false);
-                        setIsFriendsLoading(false);
+                        if (savedHomePosts) {
+                            setLatestPosts(savedHomePosts.latestPosts);
+                            setUnreadPosts(savedHomePosts.unreadPosts);
+                            setIsLatestPostsLoading(false);
+                        }
+                        if (savedHomeItems) {
+                            setFriends(savedHomeItems.friends);
+                            setFriendRequests(savedHomeItems.friendRequests);
+                            setIsFriendsLoading(false);
+                            setIsFriendRequestsLoading(false);
+                            setHasLoadedHomeItems(true);
+                        }
                     }),
                 ]);
                 if (isCancelled()) return;
 
                 setFriends(nextFriends);
-                setFriendRequests(nextFriendRequests);
+                if (nextFriendRequests) {
+                    setFriendRequests(nextFriendRequests);
+                    setHasLoadedHomeItems(true);
+                }
                 setIsFriendsLoading(false);
                 setIsFriendRequestsLoading(false);
                 const refreshedHomePosts = await refreshSpaceHomePosts(
@@ -195,6 +189,12 @@ const Page: React.FC = () => {
             request.cancelled = true;
         };
     }, [setFriends]);
+
+    useEffect(() => {
+        if (spaceId && hasLoadedHomeItems) {
+            void cacheSpaceHomeItems(spaceId, friends, friendRequests);
+        }
+    }, [spaceId, hasLoadedHomeItems, friends, friendRequests]);
 
     const setLatestPostLiked = React.useCallback(
         async (postId: number, liked: boolean) => {

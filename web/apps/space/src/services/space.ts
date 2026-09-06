@@ -8,6 +8,7 @@ import {
     type SpaceAccountCtxHandle,
     type SpaceLinkCtxHandle,
 } from "ente-space-wasm";
+import { clearCachedSpaceHomeItems } from "services/home-items";
 import type { PendingSpaceInvite } from "services/invite";
 import {
     cachedSpaceMediaBlobURL,
@@ -1033,6 +1034,7 @@ export const requestFriendByUsername = async ({
         ).requestFriendByUsername(spaceId, spaceUsername)) as {
             status?: string;
         };
+        await clearCachedSpaceHomeItems(spaceId);
         return response.status == "friend" ? "friend" : "requested";
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1170,6 +1172,7 @@ export const removeCurrentSpaceFriend = async (
     const ctx = await ensureCurrentSpaceContext();
     try {
         await ctx.removeFriendBySpace(actorSpaceId, spaceId);
+        await clearCachedSpaceHomeItems(actorSpaceId);
         await clearSpaceMediaCache();
         clearSpaceFriendsCache();
     } finally {
@@ -1301,18 +1304,25 @@ export const loadCurrentFriendAvatarURL = async (
         return null;
     }
 
+    const avatar = {
+        keyVersion: friend.avatarKeyVersion,
+        objectID: friend.avatarObjectID,
+        size: friend.avatarSize,
+        updatedAt: friend.avatarUpdatedAt,
+    };
+    const cachedAvatarURL = await cachedAccountAvatarURLIfPresent(
+        friend.spaceId,
+        avatar,
+    );
+    if (cachedAvatarURL) return cachedAvatarURL;
+
     const profile = await loadExistingSpaceProfile();
     const ctx = await ensureCurrentSpaceContext();
     try {
         return await accountAvatarURL(
             ctx,
             friend.spaceId,
-            {
-                keyVersion: friend.avatarKeyVersion,
-                objectID: friend.avatarObjectID,
-                size: friend.avatarSize,
-                updatedAt: friend.avatarUpdatedAt,
-            },
+            avatar,
             profile?.spaceId,
         );
     } finally {
@@ -1621,6 +1631,12 @@ export const confirmCurrentFriendRequest = async (
             BigInt(requestId),
         );
         clearSpaceFriendsCache();
+        await clearCachedSpaceHomeItems(spaceId);
+    } catch (error) {
+        if (isFriendRequestCanceledError(error)) {
+            await clearCachedSpaceHomeItems(spaceId);
+        }
+        throw error;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1653,6 +1669,12 @@ export const deleteCurrentFriendRequest = async (
             spaceId,
             BigInt(requestId),
         );
+        await clearCachedSpaceHomeItems(spaceId);
+    } catch (error) {
+        if (isFriendRequestCanceledError(error)) {
+            await clearCachedSpaceHomeItems(spaceId);
+        }
+        throw error;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

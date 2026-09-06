@@ -320,11 +320,9 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
               ? decodedPhoto.src
               : imageUrl) ?? undefined;
     const displayAvatarUrl =
-        (decodedAvatar.failed
-            ? undefined
-            : decodedAvatar.ready
-              ? decodedAvatar.src
-              : avatarUrl) ?? null;
+        decodedAvatar.ready && !decodedAvatar.failed
+            ? (decodedAvatar.src ?? null)
+            : null;
     const isPhotoReady = Boolean(displayImageUrl) && decodedPhoto.ready;
     const canOpenPost = Boolean(post) && !postUnavailable && isPhotoReady;
     const isTileDisabled =
@@ -679,70 +677,65 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 )}
                 {!isRead && <SpacePostUnreadBadge count={posts.length} />}
             </Box>
-            {friendRequestDirection != "received" && (
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={
-                        friendRequestDirection == "sent"
-                            ? `Manage friend request sent to ${firstName}`
-                            : `Open ${firstName}'s profile`
-                    }
-                    disabled={!canOpenFriend || isFriendRequestActionBusy}
-                    onClick={openFriend}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: displayAvatarUrl
-                            ? "2px solid rgba(255, 255, 255, 0.36)"
-                            : "2px solid rgba(255, 255, 255, 0.28)",
-                        borderRadius: "50%",
-                        bottom: "10%",
-                        boxSizing: "border-box",
-                        cursor: canOpenFriend ? "pointer" : "default",
-                        height: avatarSize,
-                        left: "10%",
-                        maxHeight: 36,
-                        maxWidth: 36,
-                        overflow: "hidden",
-                        p: 0,
-                        position: "absolute",
-                        width: avatarSize,
-                        zIndex: 2,
-                    }}
-                >
-                    {isAvatarPending ? (
-                        <Skeleton
-                            variant="circular"
-                            sx={{
-                                bgcolor: mediaPlaceholderColor,
-                                height: "100%",
-                                transform: "none",
-                                width: "100%",
-                            }}
-                        />
-                    ) : displayAvatarUrl ? (
-                        <SpaceAvatarImage aria-hidden src={displayAvatarUrl} />
-                    ) : (
-                        <Box
-                            aria-hidden
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: avatarFallbackColor,
-                                color: avatarFallbackTextColor,
-                                display: "flex",
-                                fontSize: 14,
-                                fontWeight: 700,
-                                height: "100%",
-                                justifyContent: "center",
-                                width: "100%",
-                            }}
-                        >
-                            {initial}
-                        </Box>
-                    )}
-                </Box>
-            )}
+            {friendRequestDirection != "received" &&
+                !isAvatarPending &&
+                decodedAvatar.ready && (
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            friendRequestDirection == "sent"
+                                ? `Manage friend request sent to ${firstName}`
+                                : `Open ${firstName}'s profile`
+                        }
+                        disabled={!canOpenFriend || isFriendRequestActionBusy}
+                        onClick={openFriend}
+                        sx={{
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: displayAvatarUrl
+                                ? "2px solid rgba(255, 255, 255, 0.36)"
+                                : "2px solid rgba(255, 255, 255, 0.28)",
+                            borderRadius: "50%",
+                            bottom: "10%",
+                            boxSizing: "border-box",
+                            cursor: canOpenFriend ? "pointer" : "default",
+                            height: avatarSize,
+                            left: "10%",
+                            maxHeight: 36,
+                            maxWidth: 36,
+                            overflow: "hidden",
+                            p: 0,
+                            position: "absolute",
+                            width: avatarSize,
+                            zIndex: 2,
+                        }}
+                    >
+                        {displayAvatarUrl ? (
+                            <SpaceAvatarImage
+                                aria-hidden
+                                src={displayAvatarUrl}
+                            />
+                        ) : (
+                            <Box
+                                aria-hidden
+                                sx={{
+                                    alignItems: "center",
+                                    bgcolor: avatarFallbackColor,
+                                    color: avatarFallbackTextColor,
+                                    display: "flex",
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                    height: "100%",
+                                    justifyContent: "center",
+                                    width: "100%",
+                                }}
+                            >
+                                {initial}
+                            </Box>
+                        )}
+                    </Box>
+                )}
             {friendRequestDirection == "received" && (
                 <Box
                     sx={{
@@ -1759,7 +1752,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        {isHomeItemsLoading && orderedHomeItems.length == 0 ? (
+                        {isHomeItemsLoading ? (
                             <Box
                                 sx={{
                                     alignItems: "center",
