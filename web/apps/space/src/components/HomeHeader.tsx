@@ -11,7 +11,7 @@ const green = "#08C225";
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 36;
-const headerAvatarImageSize = 26;
+const headerAvatarImageSize = 28;
 const headerChatCircleSize = 36;
 export const spaceHomeHeaderChromeColor = "#F0F0F0";
 const headerIconSize = 25;
@@ -185,7 +185,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 sx={{
                     display: "block",
                     filter: "invert(1)",
-                    height: 18,
+                    height: 19,
                     width: "auto",
                 }}
             />
