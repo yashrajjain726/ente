@@ -201,6 +201,10 @@ impl Shared {
         self.state.write().unwrap_or_else(PoisonError::into_inner)
     }
 
+    fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::Acquire)
+    }
+
     fn ensure_open(&self) -> Result<(), VecDbError> {
         if self.closed.load(Ordering::Acquire) {
             Err(VecDbError::Closed)
@@ -314,25 +318,38 @@ fn wait_for_teardown_handoff<'a>(slot: &'a Mutex<PathSlot>, path: &Path) -> Slot
     let mut rounds = HANDOFF_WAIT_ROUNDS;
     loop {
         let guard = lock_slot(slot);
-        match &guard.live {
+        let observed = match &guard.live {
             None => return SlotHandoff::Released(guard),
-            Some(weak) => {
-                if let Some(shared) = weak.upgrade() {
-                    return SlotHandoff::Join(shared);
+            Some(weak) => weak.upgrade(),
+        };
+        match observed {
+            Some(shared) if !shared.is_closed() => return SlotHandoff::Join(shared),
+            Some(closing) => {
+                drop(guard);
+                drop(closing);
+                if rounds == 0 {
+                    warn_handoff_cap(path);
+                    return SlotHandoff::Expired(lock_slot(slot));
                 }
             }
+            None => {
+                if rounds == 0 {
+                    warn_handoff_cap(path);
+                    return SlotHandoff::Expired(guard);
+                }
+                drop(guard);
+            }
         }
-        if rounds == 0 {
-            log::warn!(
-                "teardown handoff for {} did not complete within the wait cap; acquiring directly",
-                path.display()
-            );
-            return SlotHandoff::Expired(guard);
-        }
-        drop(guard);
         rounds -= 1;
         std::thread::sleep(HANDOFF_WAIT_PARK);
     }
+}
+
+fn warn_handoff_cap(path: &Path) {
+    log::warn!(
+        "teardown handoff for {} did not complete within the wait cap; acquiring directly",
+        path.display()
+    );
 }
 
 impl VecDb {
@@ -340,12 +357,13 @@ impl VecDb {
         let key = registry_key_for(path)?;
         let slot = path_slot(&key);
         let mut guard = lock_slot(&slot);
-        if let Some(weak) = &guard.live {
-            if let Some(shared) = weak.upgrade() {
-                drop(guard);
-                return join_live(shared, dims, false);
-            }
+        if guard.live.is_some() {
+            let observed = guard.live.as_ref().and_then(Weak::upgrade);
             drop(guard);
+            match observed {
+                Some(shared) if !shared.is_closed() => return join_live(shared, dims, false),
+                observed => drop(observed),
+            }
             match wait_for_teardown_handoff(&slot, &key) {
                 SlotHandoff::Join(shared) => return join_live(shared, dims, false),
                 SlotHandoff::Released(reacquired) | SlotHandoff::Expired(reacquired) => {
@@ -401,9 +419,19 @@ impl VecDb {
     pub fn open_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         let resolved = registry_key_for(path).unwrap_or_else(|_| path.to_path_buf());
         if let Some(slot) = existing_path_slot(&resolved) {
-            let live = lock_slot(&slot).live.as_ref().and_then(Weak::upgrade);
-            if let Some(shared) = live {
-                return join_live(shared, dims, true);
+            let observed = lock_slot(&slot).live.as_ref().and_then(Weak::upgrade);
+            match observed {
+                Some(shared) if !shared.is_closed() => return join_live(shared, dims, true),
+                Some(closing) => {
+                    drop(closing);
+                    match wait_for_teardown_handoff(&slot, &resolved) {
+                        SlotHandoff::Join(shared) => return join_live(shared, dims, true),
+                        SlotHandoff::Released(released) | SlotHandoff::Expired(released) => {
+                            drop(released);
+                        }
+                    }
+                }
+                None => {}
             }
         }
         Ok(Self {
@@ -744,17 +772,29 @@ impl VecDb {
             Err(error) => return Err(error),
         };
         if let Some(slot) = existing_path_slot(&key) {
-            let guard = lock_slot(&slot);
-            if let Some(weak) = &guard.live {
-                if let Some(shared) = weak.upgrade() {
-                    drop(guard);
-                    return close_live_instance(&shared);
+            for _ in 0..3 {
+                let guard = lock_slot(&slot);
+                if guard.live.is_none() {
+                    break;
                 }
+                let observed = guard.live.as_ref().and_then(Weak::upgrade);
                 drop(guard);
-                match wait_for_teardown_handoff(&slot, &key) {
-                    SlotHandoff::Join(shared) => return close_live_instance(&shared),
-                    SlotHandoff::Released(reacquired) | SlotHandoff::Expired(reacquired) => {
-                        drop(reacquired);
+                match observed {
+                    Some(shared) if !shared.is_closed() => match close_live_instance(&shared) {
+                        Ok(()) => return Ok(()),
+                        Err(VecDbError::Closed) => {}
+                        Err(error) => return Err(error),
+                    },
+                    observed => {
+                        drop(observed);
+                        match wait_for_teardown_handoff(&slot, &key) {
+                            SlotHandoff::Join(joined) => drop(joined),
+                            SlotHandoff::Released(reacquired)
+                            | SlotHandoff::Expired(reacquired) => {
+                                drop(reacquired);
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -2467,6 +2507,104 @@ mod tests {
             SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
         }
         assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS);
+    }
+
+    fn closed_instance(path: &Path) -> Arc<Shared> {
+        let db = open_writer(path);
+        db.add("doomed", &seeded_unit_vector(77, DIMS)).unwrap();
+        let shared = Arc::clone(&db.shared);
+        db.delete().unwrap();
+        assert!(shared.is_closed());
+        shared
+    }
+
+    fn plant_closed_marker(key: &Path, closed: &Arc<Shared>) -> Arc<Mutex<PathSlot>> {
+        let slot = path_slot(key);
+        lock_slot(&slot).live = Some(Arc::downgrade(closed));
+        slot
+    }
+
+    #[test]
+    fn handoff_helper_keeps_waiting_on_a_closed_instance() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let closed = closed_instance(&path);
+        let slot = Arc::new(Mutex::new(PathSlot {
+            live: Some(Arc::downgrade(&closed)),
+        }));
+        let started = Instant::now();
+        let outcome = wait_for_teardown_handoff(&slot, &path);
+        let waited = started.elapsed();
+        match outcome {
+            SlotHandoff::Expired(guard) => assert!(guard.holds_live()),
+            SlotHandoff::Join(_) => panic!("expected an expired wait, saw a join"),
+            SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
+        }
+        assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS);
+    }
+
+    #[test]
+    fn open_waits_out_a_planted_closed_marker_and_builds_a_usable_handle() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let closed = closed_instance(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = plant_closed_marker(&key, &closed);
+        let reopened = VecDb::open(&path, DIMS).unwrap();
+        assert!(!Arc::ptr_eq(&reopened.shared, &closed));
+        reopened
+            .add("fresh", &seeded_unit_vector(78, DIMS))
+            .unwrap();
+        assert_eq!(reopened.len(), 1);
+        assert!(lock_slot(&slot).holds_live());
+    }
+
+    #[test]
+    fn purge_waits_out_a_planted_closed_marker_and_stays_ok() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let closed = closed_instance(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = plant_closed_marker(&key, &closed);
+        VecDb::purge(&path).unwrap();
+        assert!(!path.exists());
+        assert!(!snapshot_exists(&path));
+        drop(closed);
+        assert!(lock_slot(&slot).live.is_none());
+        let fresh = open_writer(&path);
+        fresh.add("anew", &seeded_unit_vector(79, DIMS)).unwrap();
+        assert_eq!(fresh.len(), 1);
+    }
+
+    #[test]
+    fn open_racing_a_parked_close_always_gets_a_usable_handle() {
+        for _ in 0..5 {
+            let dir = TempDir::new().unwrap();
+            let path = dir.path().join("db");
+            let db = open_writer(&path);
+            db.add("doomed", &seeded_unit_vector(80, DIMS)).unwrap();
+            let key = registry_key_for(&path).unwrap();
+            let slot = existing_path_slot(&key).unwrap();
+            let frozen = lock_slot(&slot);
+            let deleter = thread::spawn(move || db.delete());
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while path.exists() {
+                assert!(Instant::now() < deadline);
+                thread::yield_now();
+            }
+            let opener = {
+                let path = path.clone();
+                thread::spawn(move || VecDb::open(&path, DIMS))
+            };
+            thread::sleep(Duration::from_millis(5));
+            drop(frozen);
+            deleter.join().unwrap().unwrap();
+            let reopened = opener.join().unwrap().unwrap();
+            reopened
+                .add("fresh", &seeded_unit_vector(81, DIMS))
+                .unwrap();
+            assert_eq!(reopened.len(), 1);
+        }
     }
 
     #[test]
