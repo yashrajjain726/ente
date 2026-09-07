@@ -39,6 +39,8 @@ import { prepareSpacePostImageFromEdit } from "utils/post-image";
 export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     children,
 }) => {
+    const [cachedProfileAvatarUrl, setCachedProfileAvatarUrl] =
+        useState<string>();
     const [friends, setFriends] = useState(initialFriends);
     const [isLiveSignupVerification, setIsLiveSignupVerification] =
         useState(false);
@@ -113,6 +115,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     );
 
     const applyProfile = useCallback((nextProfile: SetupProfile | null) => {
+        setCachedProfileAvatarUrl(undefined);
         const previousAvatarURL = avatarURLRef.current;
         if (previousAvatarURL && previousAvatarURL != nextProfile?.avatarUrl) {
             URL.revokeObjectURL(previousAvatarURL);
@@ -220,7 +223,12 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             try {
                 const [nextProfile, cachedAvatar] = await Promise.all([
                     loadExistingSpaceProfile({ force: true }),
-                    loadCachedCurrentSpaceAvatar(),
+                    loadCachedCurrentSpaceAvatar().then((cachedAvatar) => {
+                        if (profileLoadGenerationRef.current == generation) {
+                            setCachedProfileAvatarUrl(cachedAvatar?.avatarUrl);
+                        }
+                        return cachedAvatar;
+                    }),
                 ]);
                 if (profileLoadGenerationRef.current == generation) {
                     const hydratedProfile =
@@ -287,6 +295,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
 
     const value = useMemo<SpaceAppState>(
         () => ({
+            cachedProfileAvatarUrl,
             friends,
             isLiveSignupVerification,
             onboardingEntrySource,
@@ -318,6 +327,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             signupEmail,
         }),
         [
+            cachedProfileAvatarUrl,
             friends,
             isLiveSignupVerification,
             onboardingEntrySource,

@@ -43,26 +43,26 @@ const tileSlotsForCount = (count: number) => {
     }
     if (count == 3) {
         return {
-            columns: 1,
-            rows: 3,
+            columns: 2,
+            rows: 2,
             slots: [
-                { column: 0, row: 0 },
+                { column: 0.5, row: 0 },
                 { column: 0, row: 1 },
-                { column: 0, row: 2 },
+                { column: 1, row: 1 },
             ],
         };
     }
 
     const columns = 2;
     const rows = Math.ceil(count / columns);
-    const singleTileRow = count % columns ? rows - 1 : -1;
+    const stagger = count % columns ? 0.5 : 0;
     const slots: TileSlot[] = [];
-    for (let row = 0; row < rows; row++) {
-        if (row == singleTileRow) {
-            slots.push({ column: 0.5, row });
-        } else {
-            slots.push({ column: 0, row }, { column: 1, row });
-        }
+    for (let index = 0; index < count; index++) {
+        const column = index % columns;
+        slots.push({
+            column,
+            row: Math.floor(index / columns) + column * stagger,
+        });
     }
     return { columns, rows, slots };
 };
@@ -107,24 +107,20 @@ export const homeTilePlacements = (
     }
 
     const { columns, rows, slots } = tileSlotsForCount(count);
-    const rowOffsets = [0];
-    for (let row = 1; row < rows; row++) {
-        rowOffsets.push(rowOffsets[row - 1]! + 1.1);
-    }
     const layout = layoutDimensions(columns, rows);
     const availableHeight = Math.max(0, canvasHeight - 2 * verticalInset);
     const size = Math.min(
         canvasWidth / layout.width,
         availableHeight / layout.height,
     );
-    const horizontalStep = size * (1 + tileGapRatio);
-    const renderedWidth = size + horizontalStep * (columns - 1);
+    const tileStep = size * (1 + tileGapRatio);
+    const renderedWidth = size + tileStep * (columns - 1);
     const renderedHeight = size * layout.height;
     const originX = (canvasWidth - renderedWidth) / 2;
     const originY = (canvasHeight - renderedHeight) / 2;
     return slots.map(({ column, row }) => ({
         size,
-        x: originX + column * horizontalStep,
-        y: originY + rowOffsets[row]! * size,
+        x: originX + column * tileStep,
+        y: originY + row * tileStep,
     }));
 };

@@ -4,6 +4,7 @@ import { Box, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor, spaceText } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
@@ -131,33 +132,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                     width: headerAvatarSize,
                 }}
             >
-                {profile && (profile.avatarUrl || !profile.avatarObjectID) ? (
-                    <Box
-                        key={profile.avatarUrl ?? "default-avatar"}
-                        sx={{
-                            ...avatarFadeSx,
-                            borderRadius: "50%",
-                            filter: profile.avatarUrl
-                                ? undefined
-                                : "brightness(0.9)",
-                            height: headerAvatarImageSize,
-                            overflow: "hidden",
-                            width: headerAvatarImageSize,
-                        }}
-                    >
-                        <SpaceAvatarImage src={profile.avatarUrl} />
-                    </Box>
-                ) : (
-                    <Skeleton
-                        variant="circular"
-                        sx={{
-                            bgcolor: mediaPlaceholderColor,
-                            height: headerAvatarImageSize,
-                            transform: "none",
-                            width: headerAvatarImageSize,
-                        }}
-                    />
-                )}
+                <SpaceHomeHeaderAvatar profile={profile} />
             </Box>
         </Box>
         <Box
@@ -262,3 +237,36 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
         </Box>
     </Box>
 );
+
+const SpaceHomeHeaderAvatar: React.FC<{ profile: SetupProfile | null }> = ({
+    profile,
+}) => {
+    const { cachedProfileAvatarUrl } = useSpaceAppState();
+    const avatarUrl = profile ? profile.avatarUrl : cachedProfileAvatarUrl;
+
+    return avatarUrl || (profile && !profile.avatarObjectID) ? (
+        <Box
+            key={avatarUrl ?? "default-avatar"}
+            sx={{
+                ...avatarFadeSx,
+                borderRadius: "50%",
+                filter: avatarUrl ? undefined : "brightness(0.9)",
+                height: headerAvatarImageSize,
+                overflow: "hidden",
+                width: headerAvatarImageSize,
+            }}
+        >
+            <SpaceAvatarImage src={avatarUrl} />
+        </Box>
+    ) : (
+        <Skeleton
+            variant="circular"
+            sx={{
+                bgcolor: mediaPlaceholderColor,
+                height: headerAvatarImageSize,
+                transform: "none",
+                width: headerAvatarImageSize,
+            }}
+        />
+    );
+};
