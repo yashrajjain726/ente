@@ -86,6 +86,9 @@ Future<AddEmailToCollectionResult?> _shareSelected({
   AddEmailToCollectionResult? firstFailure;
   for (final collection in collections) {
     for (final suggestion in selected) {
+      if (!_needsShare(collection, suggestion.email)) {
+        continue;
+      }
       final result = await actions.addEmailToCollection(
         collection,
         suggestion.email,
