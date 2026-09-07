@@ -428,6 +428,13 @@ class MemoryLaneService {
     }
     if (person.data.isIgnored) {
       await _invalidateTimeline(person.remoteID);
+      for (final cluster
+          in person.data.assigned
+              .map((c) => c.id)
+              .followedBy(event.newClusterIDs ?? [])) {
+        if (!_topNClusters.contains(cluster)) continue;
+        await _invalidateTimeline(cluster);
+      }
       return;
     }
     final logEntry = await _cacheService.getComputeLogEntry(person.remoteID);
