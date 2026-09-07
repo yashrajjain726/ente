@@ -1,0 +1,490 @@
+use super::common::*;
+use ente_exif::{Ifd, Location, Mode, Rational, Value, namespace};
+
+#[test]
+fn gps_hemispheres_zero_denominators_and_raw_dates() {
+    let rational = |n: u32, d: u32| [n.to_le_bytes(), d.to_le_bytes()].concat();
+    for (latitude, longitude, expected) in [
+        ("N", "E", Some((0.0, 0.0))),
+        ("S", "W", Some((-0.0, -0.0))),
+        ("X", "W", None),
+    ] {
+        let gps = tiff(
+            &[
+                (1, 2, 2, vec![latitude.as_bytes()[0], 0]),
+                (2, 5, 3, rational(0, 1).repeat(3)),
+                (3, 2, 2, vec![longitude.as_bytes()[0], 0]),
+                (4, 5, 3, rational(0, 1).repeat(3)),
+            ],
+            false,
+        );
+        let data = child_ifd(0x8825, gps);
+        assert_eq!(
+            read(&data, Mode::Summary).exif_location(),
+            expected.map(|(latitude, longitude)| Location {
+                latitude,
+                longitude
+            })
+        );
+    }
+    for (latitude, longitude, expected) in [
+        (b'N', b'E', (12.5, 20.25)),
+        (b'N', b'W', (12.5, -20.25)),
+        (b'S', b'E', (-12.5, 20.25)),
+        (b'S', b'W', (-12.5, -20.25)),
+    ] {
+        let gps = child_ifd(
+            0x8825,
+            tiff(
+                &[
+                    (1, 2, 2, vec![latitude, 0]),
+                    (3, 2, 2, vec![longitude, 0]),
+                    (
+                        2,
+                        5,
+                        3,
+                        [rational(12, 1), rational(30, 1), rational(0, 1)].concat(),
+                    ),
+                    (
+                        4,
+                        5,
+                        3,
+                        [rational(20, 1), rational(15, 1), rational(0, 1)].concat(),
+                    ),
+                ],
+                false,
+            ),
+        );
+        for mode in [Mode::Summary, Mode::Details] {
+            assert_eq!(
+                read(&gps, mode).exif_location(),
+                Some(Location {
+                    latitude: expected.0,
+                    longitude: expected.1
+                })
+            );
+        }
+    }
+    let broken = child_ifd(
+        0x8825,
+        tiff(
+            &[
+                (2, 5, 3, rational(0, 0).repeat(3)),
+                (4, 5, 3, rational(0, 1).repeat(3)),
+            ],
+            false,
+        ),
+    );
+    assert_eq!(read(&broken, Mode::Summary).exif_location(), None);
+    assert_eq!(
+        read(&broken, Mode::Summary)
+            .tag(Ifd::Gps(0), 2)
+            .unwrap()
+            .value
+            .number(0),
+        None
+    );
+
+    let exif = child_ifd(
+        0x8769,
+        tiff(
+            &[
+                (0x9003, 2, 20, b"2024:03:31 02:30:00\0".to_vec()),
+                (0x9011, 2, 7, b"+05:30\0".to_vec()),
+                (0x9291, 2, 7, b"123456\0".to_vec()),
+                (0x829a, 5, 1, rational(1, 125)),
+                (0xa401, 3, 1, vec![6, 0]),
+            ],
+            false,
+        ),
+    );
+    let metadata = read(&exif, Mode::Summary);
+    assert_eq!(
+        metadata.tag(Ifd::Exif(0), 0x9003).unwrap().value.text(),
+        Some("2024:03:31 02:30:00")
+    );
+    assert_eq!(
+        metadata.tag(Ifd::Exif(0), 0x9011).unwrap().value.text(),
+        Some("+05:30")
+    );
+    assert_eq!(
+        metadata.tag(Ifd::Exif(0), 0x9291).unwrap().value.text(),
+        Some("123456")
+    );
+    assert_eq!(
+        metadata.tag(Ifd::Exif(0), 0x829a).unwrap().value,
+        Value::Rational(vec![Rational {
+            numerator: 1,
+            denominator: 125
+        }])
+    );
+    assert!(metadata.is_panorama());
+}
+
+#[test]
+fn gps_rejects_malformed_references_and_components() {
+    let gps = |mut refs: Vec<(u16, u16, u32, Vec<u8>)>, minutes: i32, seconds: i32| {
+        let ratio = |n: i32| [n.to_le_bytes(), 1i32.to_le_bytes()].concat();
+        refs.extend([
+            (
+                2,
+                10,
+                3,
+                [ratio(-12), ratio(minutes), ratio(seconds)].concat(),
+            ),
+            (4, 10, 3, [ratio(-20), ratio(15), ratio(0)].concat()),
+        ]);
+        child_ifd(0x8825, tiff(&refs, false))
+    };
+    for (refs, expected) in [
+        (
+            vec![],
+            Some(Location {
+                latitude: -12.5,
+                longitude: -20.25,
+            }),
+        ),
+        (
+            vec![(1, 2, 2, b"N\0".to_vec()), (3, 2, 2, b"E\0".to_vec())],
+            Some(Location {
+                latitude: 12.5,
+                longitude: 20.25,
+            }),
+        ),
+        (vec![(1, 2, 2, b"N\0".to_vec())], None),
+        (vec![(1, 2, 2, vec![255, 0]), (3, 2, 2, vec![255, 0])], None),
+        (vec![(1, 2, 1, vec![0]), (3, 2, 1, vec![0])], None),
+        (
+            vec![(1, 4, 1, vec![1, 0, 0, 0]), (3, 4, 1, vec![1, 0, 0, 0])],
+            None,
+        ),
+    ] {
+        for mode in [Mode::Summary, Mode::Details] {
+            assert_eq!(
+                read(&gps(refs.clone(), 30, 0), mode).exif_location(),
+                expected
+            );
+        }
+    }
+    for (minutes, seconds) in [(60, 0), (-60, 0), (0, 60), (0, -60), (90, 0)] {
+        for mode in [Mode::Summary, Mode::Details] {
+            assert_eq!(
+                read(&gps(vec![], minutes, seconds), mode).exif_location(),
+                None
+            );
+        }
+    }
+}
+
+#[test]
+fn heif_contiguous_exif_skips_opaque_values_within_the_read_budget() {
+    let exif = child_ifd(
+        0x8769,
+        tiff(
+            &[
+                (0x927c, 7, 256 * 1024, vec![1; 256 * 1024]),
+                (0xa434, 2, 5, b"Lens\0".to_vec()),
+            ],
+            false,
+        ),
+    );
+    for method in [0, 1] {
+        for mode in [Mode::Summary, Mode::Details] {
+            let limits = ente_exif::Limits {
+                read_bytes: 1024,
+                ..ente_exif::Limits::default()
+            };
+            let direct = ente_exif::read(
+                &mut std::io::Cursor::new(heif(&exif, method, false)),
+                mode,
+                limits,
+            )
+            .unwrap();
+            let assembled = read(&heif(&exif, method, true), mode);
+            assert_eq!(direct.tags, assembled.tags);
+            assert_eq!(
+                direct.tag(Ifd::Exif(0), 0xa434).unwrap().value.text(),
+                Some("Lens")
+            );
+            assert!(direct.issues.is_empty());
+            assert!(direct.statistics.bytes_read < 1024);
+            assert!(assembled.statistics.bytes_read > 256 * 1024);
+        }
+    }
+}
+
+#[test]
+fn heif_exif_cannot_read_beyond_its_declared_extent() {
+    let exif = tiff(&[(0x112, 3, 1, vec![6, 0])], false);
+    for method in [0, 1] {
+        for size in [0u32, 3, 11, 12] {
+            let mut bytes = heif(&exif, method, false);
+            let iloc = bytes.windows(4).position(|b| b == b"iloc").unwrap() + 4;
+            bytes[iloc + 24..iloc + 28].copy_from_slice(&size.to_be_bytes());
+            for mode in [Mode::Summary, Mode::Details] {
+                let metadata = read(&bytes, mode);
+                assert_eq!(metadata.orientation(), None);
+                assert!(metadata.dimensions.is_some());
+                assert!(!metadata.issues.is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn png_keywords_use_latin1_and_text_obeys_its_chunk_encoding() {
+    for (kind, value) in [
+        (b"tEXt", b"Caf\xe9\0Andr\xe9".to_vec()),
+        (
+            b"zTXt",
+            [
+                b"Caf\xe9\0\0".to_vec(),
+                miniz_oxide::deflate::compress_to_vec_zlib(b"Andr\xe9", 6),
+            ]
+            .concat(),
+        ),
+        (
+            b"iTXt",
+            [b"Caf\xe9\0\0\0\0\0".to_vec(), "André".as_bytes().to_vec()].concat(),
+        ),
+    ] {
+        let bytes = [
+            b"\x89PNG\r\n\x1a\n".to_vec(),
+            png_chunk(b"IHDR", &[0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0]),
+            png_chunk(kind, &value),
+            png_chunk(b"IEND", &[]),
+        ]
+        .concat();
+        let details = read(&bytes, Mode::Details);
+        assert_eq!(details.property("urn:png:text", "Café"), Some("André"));
+        assert!(details.issues.is_empty());
+        let summary = read(&bytes, Mode::Summary);
+        assert!(summary.xmp.is_empty());
+        assert!(summary.issues.is_empty());
+    }
+}
+
+#[test]
+fn webp_padding_and_all_frame_headers() {
+    let packet = xmp("<p:ProjectionType>cylindrical</p:ProjectionType>");
+    let exif = tiff(&[(0x112, 3, 1, vec![8, 0])], false);
+    for (kind, data) in [
+        (b"VP8X", vec![0; 10]),
+        (b"VP8 ", vec![0, 0, 0, 0x9d, 1, 0x2a, 1, 0, 1, 0]),
+        (b"VP8L", vec![0x2f, 0, 0, 0, 0]),
+    ] {
+        let chunk = |kind: &[u8; 4], data: &[u8]| {
+            [
+                kind.to_vec(),
+                (data.len() as u32).to_le_bytes().to_vec(),
+                data.to_vec(),
+                vec![0; data.len() & 1],
+            ]
+            .concat()
+        };
+        let body = [
+            b"WEBP".to_vec(),
+            chunk(b"JUNK", &[1]),
+            chunk(kind, &data),
+            chunk(b"EXIF", &exif),
+            chunk(b"XMP ", packet.as_bytes()),
+        ]
+        .concat();
+        let bytes = [
+            b"RIFF".to_vec(),
+            (body.len() as u32).to_le_bytes().to_vec(),
+            body,
+        ]
+        .concat();
+        let metadata = read(&bytes, Mode::Summary);
+        assert_eq!(metadata.dimensions.unwrap().width, 1);
+        assert_eq!(metadata.orientation(), Some(8));
+        assert!(metadata.is_panorama());
+        assert!(metadata.issues.is_empty());
+    }
+}
+
+#[test]
+fn gif_xmp_after_image_subblocks() {
+    let mut bytes = b"GIF89a\x02\0\x03\0\0\0\0".to_vec();
+    bytes.extend([0x2c, 0, 0, 0, 0, 2, 0, 3, 0, 0, 2, 3, 0, 1, 2, 0]);
+    bytes.extend(b"\x21\xff\x0bXMP DataXMP");
+    bytes.extend(xmp("<p:ProjectionType>equirectangular</p:ProjectionType>").as_bytes());
+    bytes.push(1);
+    bytes.extend((0..=255).rev());
+    bytes.extend([0, 0x3b]);
+    let metadata = read(&bytes, Mode::Summary);
+    assert_eq!(metadata.dimensions.unwrap().height, 3);
+    assert!(metadata.is_panorama());
+    assert!(metadata.issues.is_empty());
+}
+
+#[test]
+fn photoshop_iptc_preserves_encoding_dates_and_caption() {
+    let dataset = |r, d, text: &[u8]| {
+        [
+            vec![0x1c, r, d],
+            (text.len() as u16).to_be_bytes().to_vec(),
+            text.to_vec(),
+        ]
+        .concat()
+    };
+    let iptc = [
+        dataset(1, 90, b"\x1b%G"),
+        dataset(2, 55, b"20250131"),
+        dataset(2, 60, b"101112+0530"),
+        dataset(2, 120, "Snow ☃".as_bytes()),
+    ]
+    .concat();
+    let resource = [
+        b"Photoshop 3.0\0".to_vec(),
+        b"8BIM\x04\x04\0\0".to_vec(),
+        (iptc.len() as u32).to_be_bytes().to_vec(),
+        iptc.clone(),
+        vec![0; iptc.len() & 1],
+    ]
+    .concat();
+    let bytes = [
+        vec![0xff, 0xd8],
+        segment(0xed, &resource),
+        jpeg(&[], "")[2..].to_vec(),
+    ]
+    .concat();
+    let metadata = read(&bytes, Mode::Summary);
+    assert_eq!(metadata.iptc.len(), 4);
+    assert_eq!(metadata.iptc[0].value, b"\x1b%G");
+    assert_eq!(metadata.iptc[3].value, "Snow ☃".as_bytes());
+    assert!(metadata.issues.is_empty());
+}
+
+#[test]
+fn iptc_zero_tail_and_malformed_tail_recovery() {
+    for tail in [b"".as_slice(), b"\0", b"\0\0", b"\0\0\0", b"\0\x01"] {
+        let payload = [b"\x1c\x02\x78\0\x03Sky".as_slice(), tail].concat();
+        let bytes = tiff(&[(0x83bb, 7, payload.len() as u32, payload)], false);
+        for mode in [Mode::Summary, Mode::Details] {
+            let metadata = read(&bytes, mode);
+            assert_eq!(metadata.iptc.len(), 1);
+            assert_eq!(metadata.iptc[0].value, b"Sky");
+            assert_eq!(metadata.issues.len(), usize::from(tail.contains(&1)));
+        }
+    }
+}
+
+#[test]
+fn extended_xmp_reorders_fragments_and_rejects_overlap() {
+    let id = "0123456789ABCDEF0123456789ABCDEF";
+    let base = xmp(&format!(
+        r#"<n:HasExtendedXMP xmlns:n="{}">{id}</n:HasExtendedXMP>"#,
+        namespace::NOTE
+    ));
+    let extension = xmp("<p:ProjectionType>equirectangular</p:ProjectionType>");
+    let split = extension.len() / 2;
+    let fragment = |offset: usize, bytes: &[u8]| {
+        segment(
+            0xe1,
+            &[
+                b"http://ns.adobe.com/xmp/extension/\0".as_slice(),
+                id.as_bytes(),
+                &(extension.len() as u32).to_be_bytes(),
+                &(offset as u32).to_be_bytes(),
+                bytes,
+            ]
+            .concat(),
+        )
+    };
+    for overlap in [false, true] {
+        let bytes = [
+            vec![0xff, 0xd8],
+            fragment(
+                if overlap { 0 } else { split },
+                &extension.as_bytes()[split..],
+            ),
+            fragment(0, &extension.as_bytes()[..split]),
+            jpeg(&[], &base)[2..].to_vec(),
+        ]
+        .concat();
+        let metadata = read(&bytes, Mode::Summary);
+        assert_eq!(metadata.is_panorama(), !overlap);
+        assert_eq!(metadata.issues.is_empty(), !overlap);
+    }
+}
+
+#[test]
+fn motion_requires_real_boxes_and_respects_explicit_disable() {
+    let video = [
+        box_bytes(b"ftyp", b"isom\0\0\0\0isom"),
+        box_bytes(b"moov", &[]),
+        box_bytes(b"mdat", &[0; 256]),
+    ]
+    .concat();
+    for flag in ["0", "1"] {
+        for valid in [false, true] {
+            let mut payload = video.clone();
+            if !valid {
+                payload[24..28].copy_from_slice(b"junk");
+            }
+            let packet = xmp(&format!(
+                r#"<c:MotionPhoto xmlns:c="{}">{flag}</c:MotionPhoto><c:MicroVideoOffset xmlns:c="{}">{}</c:MicroVideoOffset>"#,
+                namespace::CAMERA,
+                namespace::CAMERA,
+                payload.len()
+            ));
+            let mut bytes = jpeg(&[], &packet);
+            let start = bytes.len() as u64;
+            bytes.extend(payload);
+            let metadata = read(&bytes, Mode::Summary);
+            assert_eq!(metadata.motion_video.is_some(), valid && flag == "1");
+            if let Some(range) = metadata.motion_video {
+                assert_eq!(range.start, start);
+                assert_eq!(range.end, bytes.len() as u64);
+            }
+        }
+    }
+}
+
+#[test]
+fn motion_directory_accounts_for_primary_padding() {
+    let video = [
+        box_bytes(b"ftyp", b"isom\0\0\0\0isom"),
+        box_bytes(b"moov", &[]),
+        box_bytes(b"mdat", &[0; 256]),
+    ]
+    .concat();
+    let xml = xmp(&format!(
+        r#"<c:Directory xmlns:c="{}" xmlns:i="{}"><r:Seq><r:li><c:Item i:Mime="image/jpeg" i:Semantic="Primary" i:Padding="4"/></r:li><r:li><c:Item i:Mime="video/mp4" i:Semantic="MotionPhoto" i:Length="{}" i:Padding="0"/></r:li></r:Seq></c:Directory>"#,
+        namespace::CONTAINER,
+        namespace::ITEM,
+        video.len()
+    ));
+    let mut bytes = jpeg(&[], &xml);
+    bytes.extend([0; 4]);
+    let start = bytes.len() as u64;
+    bytes.extend(video);
+    assert_eq!(
+        read(&bytes, Mode::Summary).motion_video.unwrap().start,
+        start
+    );
+}
+
+#[test]
+fn png_text_encoding_and_bad_compressed_block_recovery() {
+    let ihdr = [vec![0, 0, 0, 1, 0, 0, 0, 1], vec![8, 2, 0, 0, 0]].concat();
+    let bytes = [
+        b"\x89PNG\r\n\x1a\n".to_vec(),
+        png_chunk(b"IHDR", &ihdr),
+        png_chunk(b"tEXt", b"Author\0Andr\xe9"),
+        png_chunk(b"iTXt", "Description\0\0\0\0\0Snow ☃".as_bytes()),
+        png_chunk(b"zTXt", b"Broken\0\0invalid zlib"),
+        png_chunk(b"IEND", &[]),
+    ]
+    .concat();
+    let metadata = read(&bytes, Mode::Details);
+    assert_eq!(metadata.property("urn:png:text", "Author"), Some("André"));
+    assert_eq!(
+        metadata.property("urn:png:text", "Description"),
+        Some("Snow ☃")
+    );
+    assert_eq!(metadata.issues.len(), 1);
+    assert_eq!(metadata.issues[0].message, "compressed PNG text");
+}
