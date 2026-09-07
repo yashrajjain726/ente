@@ -232,11 +232,10 @@ void main() {
           spacing: 2,
         );
 
-        expect(
-          rows.map((row) => row.itemWidths.length),
-          [testCase.maximumItems, testCase.maximumItems],
-          reason: "available width ${testCase.width}",
-        );
+        expect(rows.map((row) => row.itemWidths.length), [
+          testCase.maximumItems,
+          testCase.maximumItems,
+        ], reason: "available width ${testCase.width}");
         expect(
           rows.first.height,
           closeTo(3 * targetHeight, 1e-9),
