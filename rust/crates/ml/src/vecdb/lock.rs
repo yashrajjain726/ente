@@ -1,9 +1,12 @@
 use std::fs::{File, TryLockError};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use super::VecDbError;
 
 const ACQUIRE_ATTEMPTS: usize = 8;
+const CONTENTION_GRACE_STEPS: usize = 50;
+const CONTENTION_GRACE_STEP: Duration = Duration::from_millis(1);
 
 #[derive(Debug)]
 pub(crate) struct WriterLock {
@@ -12,18 +15,30 @@ pub(crate) struct WriterLock {
 
 impl WriterLock {
     pub(crate) fn acquire(log_path: &Path) -> Result<Self, VecDbError> {
+        let mut remaining_grace = CONTENTION_GRACE_STEPS;
+        loop {
+            if let Some(lock) = Self::acquire_once(log_path)? {
+                return Ok(lock);
+            }
+            if remaining_grace == 0 {
+                return Err(VecDbError::Locked(log_path.to_path_buf()));
+            }
+            remaining_grace -= 1;
+            std::thread::sleep(CONTENTION_GRACE_STEP);
+        }
+    }
+
+    fn acquire_once(log_path: &Path) -> Result<Option<Self>, VecDbError> {
         let sidecar = lock_path(log_path);
         for _ in 0..ACQUIRE_ATTEMPTS {
             let file = open_sidecar(&sidecar)?;
             match file.try_lock() {
                 Ok(()) => {
                     if lock_is_on_the_linked_sidecar(&file, &sidecar)? {
-                        return Ok(Self { _file: file });
+                        return Ok(Some(Self { _file: file }));
                     }
                 }
-                Err(TryLockError::WouldBlock) => {
-                    return Err(VecDbError::Locked(log_path.to_path_buf()));
-                }
+                Err(TryLockError::WouldBlock) => return Ok(None),
                 Err(TryLockError::Error(source)) => return Err(VecDbError::io(&sidecar, source)),
             }
         }

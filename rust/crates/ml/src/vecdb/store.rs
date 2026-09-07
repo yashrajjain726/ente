@@ -27,6 +27,9 @@ const SNAPSHOT_QUIET_GAP: Duration = Duration::from_secs(10);
 const COMPACTION_MIN_DEAD_RECORDS: u64 = 64;
 const COMPACTION_DEAD_RATIO: u64 = 10;
 const COMPACTION_BATCH_SIZE: usize = 1000;
+const HANDOFF_WAIT_ROUNDS: u32 = 750;
+const HANDOFF_CLOSE_WAIT_ROUNDS: u32 = 2500;
+const HANDOFF_WAIT_PARK: Duration = Duration::from_millis(2);
 const KEY_TABLE_COPIES: usize = 2;
 const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
 const GRAPH_NODE_OVERHEAD_BYTES: usize = 48;
@@ -38,7 +41,15 @@ static REGISTRY: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<PathSlot>>>>> =
 static PENDING_SEARCH_GRAPH: LazyLock<Graph> = LazyLock::new(Graph::new);
 
 struct PathSlot {
-    live: Weak<Shared>,
+    live: Option<Weak<Shared>>,
+}
+
+impl PathSlot {
+    fn holds_live(&self) -> bool {
+        self.live
+            .as_ref()
+            .is_some_and(|weak| weak.strong_count() > 0)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,6 +125,23 @@ impl AttrTable {
         self.0.as_ref()?.get(slot as usize)?.as_deref()
     }
 
+    fn repack(&mut self, live_slots: impl Iterator<Item = u32>) {
+        let Some(table) = &mut self.0 else {
+            return;
+        };
+        let mut dense = 0usize;
+        for slot in live_slots {
+            let moved = table.get_mut(slot as usize).and_then(Option::take);
+            match table.get_mut(dense) {
+                Some(entry) => *entry = moved,
+                None => debug_assert!(moved.is_none()),
+            }
+            dense += 1;
+        }
+        table.truncate(dense);
+        table.shrink_to_fit();
+    }
+
     fn reset(&mut self) {
         self.0 = None;
     }
@@ -174,6 +202,10 @@ impl Shared {
         self.state.write().unwrap_or_else(PoisonError::into_inner)
     }
 
+    fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::Acquire)
+    }
+
     fn ensure_open(&self) -> Result<(), VecDbError> {
         if self.closed.load(Ordering::Acquire) {
             Err(VecDbError::Closed)
@@ -185,6 +217,11 @@ impl Shared {
 
 impl Drop for Shared {
     fn drop(&mut self) {
+        let half = self
+            .writer
+            .get_mut()
+            .unwrap_or_else(PoisonError::into_inner);
+        half.mode = WriterMode::ReadOnly { log_bytes: 0 };
         let Some(key) = &self.registry_key else {
             return;
         };
@@ -193,10 +230,14 @@ impl Drop for Shared {
             return;
         };
         let mut guard = lock_slot(&slot);
-        if std::ptr::eq(guard.live.as_ptr(), self) {
-            guard.live = Weak::new();
+        if guard
+            .live
+            .as_ref()
+            .is_some_and(|weak| std::ptr::eq(weak.as_ptr(), self))
+        {
+            guard.live = None;
         }
-        let removable = guard.live.strong_count() == 0 && Arc::strong_count(&slot) == 2;
+        let removable = !guard.holds_live() && Arc::strong_count(&slot) == 2;
         drop(guard);
         if removable {
             registry.remove(key);
@@ -217,7 +258,7 @@ fn path_slot(key: &Path) -> Arc<Mutex<PathSlot>> {
     match registry.get(key) {
         Some(slot) => Arc::clone(slot),
         None => {
-            let slot = Arc::new(Mutex::new(PathSlot { live: Weak::new() }));
+            let slot = Arc::new(Mutex::new(PathSlot { live: None }));
             registry.insert(key.to_path_buf(), Arc::clone(&slot));
             slot
         }
@@ -233,7 +274,7 @@ fn remove_path_slot_if_unused(key: &Path) {
     let Some(slot) = registry.get(key).map(Arc::clone) else {
         return;
     };
-    let removable = lock_slot(&slot).live.strong_count() == 0 && Arc::strong_count(&slot) == 2;
+    let removable = !lock_slot(&slot).holds_live() && Arc::strong_count(&slot) == 2;
     if removable {
         registry.remove(key);
     }
@@ -268,14 +309,70 @@ fn join_live(shared: Arc<Shared>, dims: usize, read_only: bool) -> Result<VecDb,
     Ok(VecDb { shared, read_only })
 }
 
+enum SlotHandoff<'a> {
+    Join(Arc<Shared>),
+    Released(MutexGuard<'a, PathSlot>),
+    Expired(MutexGuard<'a, PathSlot>),
+}
+
+fn wait_for_teardown_handoff<'a>(slot: &'a Mutex<PathSlot>, path: &Path) -> SlotHandoff<'a> {
+    let mut dead_rounds = HANDOFF_WAIT_ROUNDS;
+    let mut close_rounds = HANDOFF_CLOSE_WAIT_ROUNDS;
+    loop {
+        let guard = lock_slot(slot);
+        let observed = match &guard.live {
+            None => return SlotHandoff::Released(guard),
+            Some(weak) => weak.upgrade(),
+        };
+        match observed {
+            Some(shared) if !shared.is_closed() => return SlotHandoff::Join(shared),
+            Some(closing) => {
+                drop(guard);
+                drop(closing);
+                if close_rounds == 0 {
+                    warn_handoff_cap(path);
+                    return SlotHandoff::Expired(lock_slot(slot));
+                }
+                close_rounds -= 1;
+            }
+            None => {
+                if dead_rounds == 0 {
+                    warn_handoff_cap(path);
+                    return SlotHandoff::Expired(guard);
+                }
+                drop(guard);
+                dead_rounds -= 1;
+            }
+        }
+        std::thread::sleep(HANDOFF_WAIT_PARK);
+    }
+}
+
+fn warn_handoff_cap(path: &Path) {
+    log::warn!(
+        "teardown handoff for {} did not complete within the wait cap; acquiring directly",
+        path.display()
+    );
+}
+
 impl VecDb {
     pub fn open(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         let key = registry_key_for(path)?;
         let slot = path_slot(&key);
         let mut guard = lock_slot(&slot);
-        if let Some(shared) = guard.live.upgrade() {
+        if guard.live.is_some() {
+            let observed = guard.live.as_ref().and_then(Weak::upgrade);
             drop(guard);
-            return join_live(shared, dims, false);
+            match observed {
+                Some(shared) if !shared.is_closed() => return join_live(shared, dims, false),
+                observed => drop(observed),
+            }
+            match wait_for_teardown_handoff(&slot, &key) {
+                SlotHandoff::Join(shared) => return join_live(shared, dims, false),
+                SlotHandoff::Released(reacquired) | SlotHandoff::Expired(reacquired) => {
+                    guard = reacquired;
+                }
+            }
         }
         let built = match build_writer(&key, key.clone(), dims) {
             Ok(built) => built,
@@ -289,7 +386,7 @@ impl VecDb {
         match built {
             BuiltWriter::Complete(shared) => {
                 let shared = Arc::new(shared);
-                guard.live = Arc::downgrade(&shared);
+                guard.live = Some(Arc::downgrade(&shared));
                 drop(guard);
                 Ok(Self {
                     shared,
@@ -303,7 +400,7 @@ impl VecDb {
             } => {
                 let shared = Arc::new(shared);
                 let half = shared.writer_half();
-                guard.live = Arc::downgrade(&shared);
+                guard.live = Some(Arc::downgrade(&shared));
                 drop(guard);
                 finish_pending_open(&shared, half, snapshot_stale, pending_records);
                 Ok(Self {
@@ -325,9 +422,19 @@ impl VecDb {
     pub fn open_read_only(path: &Path, dims: usize) -> Result<Self, VecDbError> {
         let resolved = registry_key_for(path).unwrap_or_else(|_| path.to_path_buf());
         if let Some(slot) = existing_path_slot(&resolved) {
-            let live = lock_slot(&slot).live.upgrade();
-            if let Some(shared) = live {
-                return join_live(shared, dims, true);
+            let observed = lock_slot(&slot).live.as_ref().and_then(Weak::upgrade);
+            match observed {
+                Some(shared) if !shared.is_closed() => return join_live(shared, dims, true),
+                Some(closing) => {
+                    drop(closing);
+                    match wait_for_teardown_handoff(&slot, &resolved) {
+                        SlotHandoff::Join(shared) => return join_live(shared, dims, true),
+                        SlotHandoff::Released(released) | SlotHandoff::Expired(released) => {
+                            drop(released);
+                        }
+                    }
+                }
+                None => {}
             }
         }
         Ok(Self {
@@ -668,9 +775,31 @@ impl VecDb {
             Err(error) => return Err(error),
         };
         if let Some(slot) = existing_path_slot(&key) {
-            let live = lock_slot(&slot).live.upgrade();
-            if let Some(shared) = live {
-                return close_live_instance(&shared);
+            for _ in 0..3 {
+                let guard = lock_slot(&slot);
+                if guard.live.is_none() {
+                    break;
+                }
+                let observed = guard.live.as_ref().and_then(Weak::upgrade);
+                drop(guard);
+                match observed {
+                    Some(shared) if !shared.is_closed() => match close_live_instance(&shared) {
+                        Ok(()) => return Ok(()),
+                        Err(VecDbError::Closed) => {}
+                        Err(error) => return Err(error),
+                    },
+                    observed => {
+                        drop(observed);
+                        match wait_for_teardown_handoff(&slot, &key) {
+                            SlotHandoff::Join(joined) => drop(joined),
+                            SlotHandoff::Released(reacquired)
+                            | SlotHandoff::Expired(reacquired) => {
+                                drop(reacquired);
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
         let lock = WriterLock::acquire(&key)?;
@@ -779,8 +908,8 @@ fn registry_holds_live(key: &Path) -> bool {
         return false;
     };
     match slot.try_lock() {
-        Ok(guard) => guard.live.strong_count() > 0,
-        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner().live.strong_count() > 0,
+        Ok(guard) => guard.holds_live(),
+        Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner().holds_live(),
         Err(TryLockError::WouldBlock) => false,
     }
 }
@@ -829,16 +958,20 @@ fn close_live_instance(shared: &Arc<Shared>) -> Result<(), VecDbError> {
         st.attrs.reset();
         st.total_records = 0;
     }
+    drop(lock);
     if let Some(key) = &shared.registry_key
         && let Some(slot) = existing_path_slot(key)
     {
         let mut guard = lock_slot(&slot);
-        if std::ptr::eq(guard.live.as_ptr(), Arc::as_ptr(shared)) {
-            guard.live = Weak::new();
+        if guard
+            .live
+            .as_ref()
+            .is_some_and(|weak| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(shared)))
+        {
+            guard.live = None;
         }
     }
     drop(st);
-    drop(lock);
     drop(half);
     removed
 }
@@ -936,11 +1069,9 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
     active_state(half)?;
     let dims = shared.dims;
     let (mut temp_log, temp_path) = Log::create_temp_sibling(&shared.path, dims)?;
-    let mut compacted = VectorArena::new(dims)?;
-    let mut compacted_attrs = AttrTable::default();
     let staged = {
         let st = shared.state_read();
-        stage_live_entries(&st, &mut compacted, &mut compacted_attrs, &mut temp_log)
+        stage_live_entries(&st, &mut temp_log)
     };
     if let Err(error) = staged {
         drop(temp_log);
@@ -966,14 +1097,26 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
         let _ = std::fs::remove_file(&temp_path);
         mutations_since_snapshot
     } else {
-        let graph = Graph::rebuild(&compacted);
-        let total_records = compacted.live_count() as u64;
-        let mut st = shared.state_write();
-        st.arena = compacted;
-        st.graph = Some(graph);
-        st.attrs = compacted_attrs;
-        st.total_records = total_records;
-        total_records as usize
+        let live_records = {
+            let mut st = shared.state_write();
+            let SearchState {
+                arena,
+                graph,
+                attrs,
+                total_records,
+            } = &mut *st;
+            attrs.repack(arena.live_slots());
+            arena.compact_in_place();
+            *graph = None;
+            *total_records = arena.live_count() as u64;
+            *total_records as usize
+        };
+        let graph = {
+            let st = shared.state_read();
+            Graph::rebuild(&st.arena)
+        };
+        shared.state_write().graph = Some(graph);
+        live_records
     };
     let restored = restore_writer_mode(shared, half, lock, last_write, pending);
     promoted?;
@@ -1061,7 +1204,7 @@ fn build_writer(
     };
     remove_stale_temp_sibling(path)?;
     let snapshot_present = std::fs::metadata(snapshot_path(path)).is_ok();
-    let replayed = replay(&mut log, dims)?;
+    let replayed = replay(&mut log, dims, ReplayMode::Writer)?;
     if replayed.recoverable_end < log.current_end_offset() {
         log.truncate_to(replayed.recoverable_end)?;
     }
@@ -1210,7 +1353,7 @@ fn build_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
         return empty_read_only(path, dims);
     }
     let mut log = Log::open(file, path, dims)?;
-    let replayed = replay(&mut log, dims)?;
+    let replayed = replay(&mut log, dims, ReplayMode::ReadOnly)?;
     drop(log);
     let ReplayedState {
         arena,
@@ -1310,17 +1453,28 @@ struct ReplayedState {
     tail_records: u64,
 }
 
-fn replay(log: &mut Log, dims: usize) -> Result<ReplayedState, VecDbError> {
+enum ReplayMode {
+    Writer,
+    ReadOnly,
+}
+
+fn replay(log: &mut Log, dims: usize, mode: ReplayMode) -> Result<ReplayedState, VecDbError> {
     let mut snapshot = load_snapshot(log.path(), log.generation());
     if let Some(loaded) = &snapshot
         && loaded.covered_log_offset > log.current_end_offset()
     {
-        return Err(VecDbError::Corrupt(format!(
-            "{}: snapshot covers {} bytes but the log is only {} bytes; preserving the file",
-            log.path().display(),
-            loaded.covered_log_offset,
-            log.current_end_offset()
-        )));
+        match mode {
+            ReplayMode::Writer => {}
+            ReplayMode::ReadOnly => log.extend_end_offset_to(loaded.covered_log_offset)?,
+        }
+        if loaded.covered_log_offset > log.current_end_offset() {
+            return Err(VecDbError::Corrupt(format!(
+                "{}: snapshot covers {} bytes but the log is only {} bytes; preserving the file",
+                log.path().display(),
+                loaded.covered_log_offset,
+                log.current_end_offset()
+            )));
+        }
     }
     let snapshot_covered = snapshot.as_ref().map(|loaded| loaded.covered_log_offset);
     let covered = snapshot_covered.unwrap_or(u64::MAX);
@@ -1451,12 +1605,7 @@ fn remove_data_files(path: &Path) -> Result<(), VecDbError> {
     sync_parent_dir(path)
 }
 
-fn stage_live_entries(
-    source: &SearchState,
-    target: &mut VectorArena,
-    target_attrs: &mut AttrTable,
-    log: &mut Log,
-) -> Result<(), VecDbError> {
+fn stage_live_entries(source: &SearchState, log: &mut Log) -> Result<(), VecDbError> {
     let mut batch: Vec<(String, Vec<f32>, Vec<Attribute>)> =
         Vec::with_capacity(COMPACTION_BATCH_SIZE);
     for slot in source.arena.live_slots() {
@@ -1473,16 +1622,14 @@ fn stage_live_entries(
                 .unwrap_or_default(),
         ));
         if batch.len() == COMPACTION_BATCH_SIZE {
-            flush_stage_batch(&mut batch, target, target_attrs, log)?;
+            flush_stage_batch(&mut batch, log)?;
         }
     }
-    flush_stage_batch(&mut batch, target, target_attrs, log)
+    flush_stage_batch(&mut batch, log)
 }
 
 fn flush_stage_batch(
     batch: &mut Vec<(String, Vec<f32>, Vec<Attribute>)>,
-    target: &mut VectorArena,
-    target_attrs: &mut AttrTable,
     log: &mut Log,
 ) -> Result<(), VecDbError> {
     if batch.is_empty() {
@@ -1493,10 +1640,7 @@ fn flush_stage_batch(
         .map(|(key, vector, attrs)| LogEntry::Add { key, vector, attrs })
         .collect();
     log.append_unsynced_for_staging(&records)?;
-    for (key, vector, attrs) in batch.drain(..) {
-        let outcome = target.upsert(&key, &vector)?;
-        target_attrs.set(slot_of_outcome(outcome), &attrs);
-    }
+    batch.clear();
     Ok(())
 }
 
@@ -1894,6 +2038,108 @@ mod tests {
     }
 
     #[test]
+    fn read_only_replay_adopts_records_a_foreign_writer_appended_after_capture() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 2, 500)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let mut captured_for_read_only = reopen_log(&path, DIMS).unwrap();
+        let mut captured_for_writer = reopen_log(&path, DIMS).unwrap();
+        let stale_end = captured_for_read_only.current_end_offset();
+        let racer = open_writer(&path);
+        bulk_add(&racer, &bulk_entries(2, 2, 500)).unwrap();
+        racer.flush().unwrap();
+        drop(racer);
+        let grown_end = fs::metadata(&path).unwrap().len();
+        assert!(grown_end > stale_end);
+        let replayed = replay(&mut captured_for_read_only, DIMS, ReplayMode::ReadOnly).unwrap();
+        assert_eq!(replayed.total_records, 4);
+        assert_eq!(replayed.arena.live_count(), 4);
+        assert_eq!(replayed.recoverable_end, grown_end);
+        assert!(replayed.graph.is_some());
+        for index in 0..4 {
+            assert!(
+                replayed
+                    .arena
+                    .slot_of_key(&format!("key-{index}"))
+                    .is_some()
+            );
+        }
+        assert!(matches!(
+            replay(&mut captured_for_writer, DIMS, ReplayMode::Writer),
+            Err(VecDbError::Corrupt(_))
+        ));
+    }
+
+    #[test]
+    fn read_only_replay_stops_at_the_snapshot_frontier_not_the_file_length() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 2, 700)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let mut captured_for_read_only = reopen_log(&path, DIMS).unwrap();
+        let stale_end = captured_for_read_only.current_end_offset();
+        let racer = open_writer(&path);
+        bulk_add(&racer, &bulk_entries(2, 2, 700)).unwrap();
+        racer.flush().unwrap();
+        let covered_end = fs::metadata(&path).unwrap().len();
+        bulk_add(&racer, &bulk_entries(4, 2, 700)).unwrap();
+        drop(racer);
+        let grown_end = fs::metadata(&path).unwrap().len();
+        assert!(covered_end > stale_end);
+        assert!(grown_end > covered_end);
+        assert_eq!(
+            load_snapshot(&path, generation_of(&path))
+                .unwrap()
+                .covered_log_offset,
+            covered_end
+        );
+        let replayed = replay(&mut captured_for_read_only, DIMS, ReplayMode::ReadOnly).unwrap();
+        assert_eq!(replayed.total_records, 4);
+        assert_eq!(replayed.arena.live_count(), 4);
+        assert_eq!(replayed.recoverable_end, covered_end);
+        assert_eq!(replayed.tail_records, 0);
+        assert!(replayed.graph.is_some());
+        for index in 0..4 {
+            assert!(
+                replayed
+                    .arena
+                    .slot_of_key(&format!("key-{index}"))
+                    .is_some()
+            );
+        }
+        for index in 4..6 {
+            assert!(
+                replayed
+                    .arena
+                    .slot_of_key(&format!("key-{index}"))
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn shortened_log_copy_beside_a_newer_snapshot_is_corrupt_in_both_modes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("first", &seeded_unit_vector(1, DIMS)).unwrap();
+        let boundary = db.stats().unwrap().log_bytes;
+        db.add("second", &seeded_unit_vector(2, DIMS)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let stale = dir.path().join("stale");
+        let full = fs::read(&path).unwrap();
+        fs::write(&stale, &full[..boundary as usize]).unwrap();
+        fs::copy(snapshot_path(&path), snapshot_path(&stale)).unwrap();
+        assert_corrupt_open_preserves(&stale);
+    }
+
+    #[test]
     fn mid_log_corruption_below_the_snapshot_frontier_is_preserved() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -2190,6 +2436,195 @@ mod tests {
         assert!(reopened.contains("still-open"));
         let again = VecDb::open(&path, DIMS).unwrap();
         assert!(Arc::ptr_eq(&reopened.shared, &again.shared));
+    }
+
+    #[test]
+    fn racing_open_and_drop_churn_never_reports_locked() {
+        const CYCLES: usize = 300;
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        open_writer(&path)
+            .add("seed", &seeded_unit_vector(1, DIMS))
+            .unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let churners: Vec<_> = (0..2)
+            .map(|_| {
+                let path = path.clone();
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    for _ in 0..CYCLES {
+                        let db = VecDb::open(&path, DIMS).unwrap();
+                        assert!(db.contains("seed"));
+                        drop(db);
+                    }
+                })
+            })
+            .collect();
+        for churner in churners {
+            churner.join().unwrap();
+        }
+        let reopened = open_writer(&path);
+        assert!(reopened.contains("seed"));
+    }
+
+    #[test]
+    fn handoff_helper_joins_a_live_slot() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = existing_path_slot(&key).unwrap();
+        match wait_for_teardown_handoff(&slot, &key) {
+            SlotHandoff::Join(shared) => assert!(Arc::ptr_eq(&shared, &db.shared)),
+            SlotHandoff::Released(_) => panic!("expected a join, saw a released slot"),
+            SlotHandoff::Expired(_) => panic!("expected a join, saw an expired wait"),
+        }
+    }
+
+    #[test]
+    fn handoff_helper_proceeds_on_a_retired_slot() {
+        let slot = Arc::new(Mutex::new(PathSlot { live: None }));
+        match wait_for_teardown_handoff(&slot, Path::new("retired")) {
+            SlotHandoff::Released(guard) => assert!(guard.live.is_none()),
+            SlotHandoff::Join(_) => panic!("expected a release, saw a join"),
+            SlotHandoff::Expired(_) => panic!("expected a release, saw an expired wait"),
+        }
+    }
+
+    #[test]
+    fn handoff_helper_caps_out_on_a_leaked_dead_marker() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let weak = Arc::downgrade(&db.shared);
+        drop(db);
+        assert_eq!(weak.strong_count(), 0);
+        let slot = Arc::new(Mutex::new(PathSlot { live: Some(weak) }));
+        let started = Instant::now();
+        let outcome = wait_for_teardown_handoff(&slot, &path);
+        let waited = started.elapsed();
+        match outcome {
+            SlotHandoff::Expired(guard) => assert!(!guard.holds_live()),
+            SlotHandoff::Join(_) => panic!("expected an expired wait, saw a join"),
+            SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
+        }
+        assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS);
+        assert!(waited < HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS * 2);
+    }
+
+    fn closed_instance(path: &Path) -> Arc<Shared> {
+        let db = open_writer(path);
+        db.add("doomed", &seeded_unit_vector(77, DIMS)).unwrap();
+        let shared = Arc::clone(&db.shared);
+        db.delete().unwrap();
+        assert!(shared.is_closed());
+        shared
+    }
+
+    fn plant_closed_marker(key: &Path, closed: &Arc<Shared>) -> Arc<Mutex<PathSlot>> {
+        let slot = path_slot(key);
+        lock_slot(&slot).live = Some(Arc::downgrade(closed));
+        slot
+    }
+
+    #[test]
+    fn handoff_helper_keeps_waiting_on_a_closed_instance() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let closed = closed_instance(&path);
+        let slot = Arc::new(Mutex::new(PathSlot {
+            live: Some(Arc::downgrade(&closed)),
+        }));
+        let started = Instant::now();
+        let outcome = wait_for_teardown_handoff(&slot, &path);
+        let waited = started.elapsed();
+        match outcome {
+            SlotHandoff::Expired(guard) => assert!(guard.holds_live()),
+            SlotHandoff::Join(_) => panic!("expected an expired wait, saw a join"),
+            SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
+        }
+        assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_CLOSE_WAIT_ROUNDS);
+    }
+
+    #[test]
+    fn open_waits_out_a_planted_closed_marker_and_builds_a_usable_handle() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let closed = closed_instance(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = plant_closed_marker(&key, &closed);
+        let reopened = VecDb::open(&path, DIMS).unwrap();
+        assert!(!Arc::ptr_eq(&reopened.shared, &closed));
+        reopened
+            .add("fresh", &seeded_unit_vector(78, DIMS))
+            .unwrap();
+        assert_eq!(reopened.len(), 1);
+        assert!(lock_slot(&slot).holds_live());
+    }
+
+    #[test]
+    fn purge_waits_out_a_planted_closed_marker_and_stays_ok() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let closed = closed_instance(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = plant_closed_marker(&key, &closed);
+        VecDb::purge(&path).unwrap();
+        assert!(!path.exists());
+        assert!(!snapshot_exists(&path));
+        drop(closed);
+        assert!(lock_slot(&slot).live.is_none());
+        let fresh = open_writer(&path);
+        fresh.add("anew", &seeded_unit_vector(79, DIMS)).unwrap();
+        assert_eq!(fresh.len(), 1);
+    }
+
+    #[test]
+    fn open_racing_a_parked_close_always_gets_a_usable_handle() {
+        for _ in 0..5 {
+            let dir = TempDir::new().unwrap();
+            let path = dir.path().join("db");
+            let db = open_writer(&path);
+            db.add("doomed", &seeded_unit_vector(80, DIMS)).unwrap();
+            let key = registry_key_for(&path).unwrap();
+            let slot = existing_path_slot(&key).unwrap();
+            let frozen = lock_slot(&slot);
+            let deleter = thread::spawn(move || db.delete());
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while path.exists() {
+                assert!(Instant::now() < deadline);
+                thread::yield_now();
+            }
+            let opener = {
+                let path = path.clone();
+                thread::spawn(move || VecDb::open(&path, DIMS))
+            };
+            thread::sleep(Duration::from_millis(5));
+            drop(frozen);
+            deleter.join().unwrap().unwrap();
+            let reopened = opener.join().unwrap().unwrap();
+            reopened
+                .add("fresh", &seeded_unit_vector(81, DIMS))
+                .unwrap();
+            assert_eq!(reopened.len(), 1);
+        }
+    }
+
+    #[test]
+    fn dropping_the_last_handle_retires_the_marker_before_eviction() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let key = registry_key_for(&path).unwrap();
+        let slot = existing_path_slot(&key).unwrap();
+        assert!(lock_slot(&slot).holds_live());
+        drop(db);
+        assert!(lock_slot(&slot).live.is_none());
+        assert!(registry().contains_key(&key));
+        drop(slot);
+        remove_path_slot_if_unused(&key);
+        assert!(!registry().contains_key(&key));
     }
 
     #[test]
@@ -2746,6 +3181,112 @@ mod tests {
     }
 
     #[test]
+    fn compaction_installs_the_graph_a_fresh_rebuild_of_the_compacted_log_builds() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let copy_path = dir.path().join("copy");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 300, 500)).unwrap();
+        let removals: Vec<String> = (0..40).map(|index| format!("key-{}", index * 7)).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 40);
+        assert_eq!(db.stats().unwrap().dead_count, 0);
+        fs::copy(&path, &copy_path).unwrap();
+        let rebuilt = open_writer(&copy_path);
+        let st = db.shared.state_read();
+        let rebuilt_st = rebuilt.shared.state_read();
+        let installed = st.graph.as_ref().unwrap();
+        let from_scratch = rebuilt_st.graph.as_ref().unwrap();
+        assert_eq!(st.arena.live_count(), 260);
+        assert_eq!(st.arena.slot_count(), 260);
+        for slot in st.arena.live_slots() {
+            assert_eq!(
+                st.arena.key_of_slot(slot),
+                rebuilt_st.arena.key_of_slot(slot)
+            );
+        }
+        assert!(
+            installed
+                .slots()
+                .any(|slot| installed.level_of(slot).unwrap() > 0)
+        );
+        test_support::assert_identical_graphs(installed, from_scratch);
+    }
+
+    #[test]
+    fn a_repacked_state_with_no_graph_serves_exact_results_for_approx_searches() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        let entries = bulk_entries(0, 200, 640);
+        let (keys, vectors): (Vec<String>, Vec<Vec<f32>>) = entries.iter().cloned().unzip();
+        let attrs: Vec<Option<Vec<Attribute>>> = (0..200)
+            .map(|index| (index % 3 == 0).then(|| sample_attrs(index)))
+            .collect();
+        db.bulk_add_with_attrs(&keys, &vectors, &attrs).unwrap();
+        let removals: Vec<String> = (0..20).map(|index| format!("key-{}", index * 9)).collect();
+        assert_eq!(db.bulk_remove(&removals).unwrap(), 20);
+        let query = seeded_unit_vector(777, DIMS);
+        let approx = limit_params(10);
+        let exact = SearchParams {
+            limit: Some(10),
+            exact: true,
+            ..SearchParams::default()
+        };
+        let expected = db.search(&query, &exact).unwrap();
+        assert_eq!(expected.len(), 10);
+        let stored_keys = vec![
+            "key-1".to_string(),
+            "key-50".to_string(),
+            "key-100".to_string(),
+        ];
+        let expected_stored = db
+            .bulk_search_stored(&stored_keys, 5, None, true, false)
+            .unwrap();
+        {
+            let mut st = db.shared.state_write();
+            let SearchState {
+                arena,
+                graph,
+                attrs,
+                total_records,
+            } = &mut *st;
+            attrs.repack(arena.live_slots());
+            arena.compact_in_place();
+            *graph = None;
+            *total_records = arena.live_count() as u64;
+        }
+        {
+            let st = db.shared.state_read();
+            assert!(st.graph.is_none());
+            assert_eq!(st.arena.slot_count(), 180);
+        }
+        assert_eq!(db.len(), 180);
+        assert_eq!(db.search(&query, &approx).unwrap(), expected);
+        assert_eq!(db.search(&query, &exact).unwrap(), expected);
+        assert_eq!(
+            db.bulk_search(std::slice::from_ref(&query), &approx)
+                .unwrap(),
+            vec![expected.clone()]
+        );
+        assert_eq!(
+            db.bulk_search_stored(&stored_keys, 5, None, false, false)
+                .unwrap(),
+            expected_stored
+        );
+        for index in 0..200i64 {
+            let key = format!("key-{index}");
+            if index % 9 == 0 && index <= 171 {
+                assert!(!db.contains(&key));
+                assert_eq!(db.get_attrs(&key), None);
+            } else if index % 3 == 0 {
+                assert_eq!(db.get_attrs(&key).unwrap(), sample_attrs(index));
+            } else {
+                assert_eq!(db.get_attrs(&key), None);
+            }
+        }
+    }
+
+    #[test]
     fn stale_snapshot_left_by_interrupted_compaction_is_discarded_on_open() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -3173,6 +3714,32 @@ mod tests {
     }
 
     #[test]
+    fn delete_releases_the_writer_lock_before_retiring_the_slot_marker() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("doomed", &seeded_unit_vector(5, DIMS)).unwrap();
+        let key = registry_key_for(&path).unwrap();
+        let slot = existing_path_slot(&key).unwrap();
+        let marker_blocked = lock_slot(&slot);
+        let deleter = thread::spawn(move || db.delete());
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while path.exists() {
+            assert!(Instant::now() < deadline);
+            thread::yield_now();
+        }
+        let mut reacquired = WriterLock::acquire(&path);
+        while reacquired.is_err() && Instant::now() < deadline {
+            reacquired = WriterLock::acquire(&path);
+        }
+        assert!(marker_blocked.holds_live());
+        drop(reacquired.unwrap());
+        drop(marker_blocked);
+        deleter.join().unwrap().unwrap();
+        assert!(lock_slot(&slot).live.is_none());
+    }
+
+    #[test]
     fn delete_leaves_surviving_handles_closed() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
@@ -3316,11 +3883,18 @@ mod tests {
             let mut half = shared.writer_half();
             compact(&shared, &mut half)
         });
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while generation_of(&path) == generation_before {
+            assert!(Instant::now() < deadline);
+            thread::yield_now();
+        }
         let packed = held.arena.pack_query(&query).unwrap();
         for _ in 0..25 {
             let during = graph_search(held.search_graph(), &held.arena, &packed, &exact, None);
             assert_eq!(during, before);
         }
+        assert!(held.graph.is_some());
+        assert!(!compactor.is_finished());
         drop(held);
         compactor.join().unwrap().unwrap();
         assert_ne!(generation_of(&path), generation_before);
@@ -3938,8 +4512,8 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(60);
         let joined = loop {
             assert!(Instant::now() < deadline);
-            let registered = existing_path_slot(&key)
-                .is_some_and(|slot| lock_slot(&slot).live.strong_count() > 0);
+            let registered =
+                existing_path_slot(&key).is_some_and(|slot| lock_slot(&slot).holds_live());
             if registered {
                 break VecDb::open_read_only(&path, DIMS).unwrap();
             }
