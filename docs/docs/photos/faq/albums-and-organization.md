@@ -76,6 +76,10 @@ This will reliably preserve the shared album name and contents.
 
 ## Slideshows {#album-slideshows-section}
 
+### What does Slideshow do? {#what-is-album-slideshow}
+
+Slideshow plays the photos in an album one after another, full screen, on your device. It is especially useful on large screen devices such as tablets and iPads, where you can leave an album playing like a photo frame.
+
 ### How do I start a slideshow from an album? {#start-album-slideshow}
 
 Album slideshows are available in Ente Photos on iOS and Android.
