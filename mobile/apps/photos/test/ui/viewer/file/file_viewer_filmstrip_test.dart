@@ -3,6 +3,7 @@ import "package:flutter/semantics.dart" show SemanticsAction;
 import "package:flutter/services.dart" show SystemChannels;
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip.dart";
+import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
 
 void main() {
   testWidgets("centers the selected item and exposes adjustable semantics", (
@@ -58,8 +59,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(key.currentState!.selections, [
-        (index: 8, source: FileViewerFilmstripSelectionSource.tap),
-        (index: 7, source: FileViewerFilmstripSelectionSource.tap),
+        (index: 8, type: FileViewerFilmstripEventType.tap),
+        (index: 7, type: FileViewerFilmstripEventType.tap),
       ]);
       _expectCentered(tester, 7);
     } finally {
@@ -83,7 +84,7 @@ void main() {
 
     expect(key.currentState!.selections.single, (
       index: 8,
-      source: FileViewerFilmstripSelectionSource.tap,
+      type: FileViewerFilmstripEventType.tap,
     ));
     await tester.pump();
     expect(_thumbnailSize(tester, 8), const Size(29, 35));
@@ -95,7 +96,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(key.currentState!.selections, [
-      (index: 8, source: FileViewerFilmstripSelectionSource.tap),
+      (index: 8, type: FileViewerFilmstripEventType.tap),
     ]);
     expect(haptics.count, 1);
     _expectCentered(tester, 8);
@@ -140,8 +141,8 @@ void main() {
     final incomingAt25 = _thumbnailSize(tester, 8);
     expect(outgoingAt25.width, inExclusiveRange(29, 34));
     expect(incomingAt25.width, inExclusiveRange(29, outgoingAt25.width));
-    expect(key.currentState!.selections.map((event) => event.source), [
-      FileViewerFilmstripSelectionSource.scrubStart,
+    expect(key.currentState!.selections.map((event) => event.type), [
+      FileViewerFilmstripEventType.scrubStart,
     ]);
     expect(haptics.count, 0);
 
@@ -161,7 +162,7 @@ void main() {
     expect((incomingAt55.width - incomingAt45.width).abs(), lessThan(2));
     expect(key.currentState!.selections.last, (
       index: 8,
-      source: FileViewerFilmstripSelectionSource.scrubPreview,
+      type: FileViewerFilmstripEventType.scrubPreview,
     ));
     expect(haptics.count, 1);
 
@@ -175,7 +176,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(key.currentState!.selections.last, (
       index: 8,
-      source: FileViewerFilmstripSelectionSource.scrubCommit,
+      type: FileViewerFilmstripEventType.scrubCommit,
     ));
     expect(haptics.count, 1);
     _expectCentered(tester, 8);
@@ -211,7 +212,7 @@ void main() {
 
     expect(key.currentState!.selections.last, (
       index: 8,
-      source: FileViewerFilmstripSelectionSource.scrubPreview,
+      type: FileViewerFilmstripEventType.scrubPreview,
     ));
     expect(buildCounts[7], initialBuilds[7]);
     expect(buildCounts[8], initialBuilds[8]);
@@ -244,16 +245,14 @@ void main() {
     expect(
       key.currentState!.selections
           .where(
-            (event) =>
-                event.source == FileViewerFilmstripSelectionSource.scrubStart,
+            (event) => event.type == FileViewerFilmstripEventType.scrubStart,
           )
           .length,
       1,
     );
     var previewsBeforeUp = key.currentState!.selections
         .where(
-          (event) =>
-              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+          (event) => event.type == FileViewerFilmstripEventType.scrubPreview,
         )
         .toList();
     expect(previewsBeforeUp.map((event) => event.index), [8]);
@@ -265,8 +264,7 @@ void main() {
 
     previewsBeforeUp = key.currentState!.selections
         .where(
-          (event) =>
-              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+          (event) => event.type == FileViewerFilmstripEventType.scrubPreview,
         )
         .toList();
     expect(previewsBeforeUp.map((event) => event.index), [8, 9]);
@@ -277,8 +275,7 @@ void main() {
 
     previewsBeforeUp = key.currentState!.selections
         .where(
-          (event) =>
-              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+          (event) => event.type == FileViewerFilmstripEventType.scrubPreview,
         )
         .toList();
     expect(previewsBeforeUp.map((event) => event.index), [8, 9, 8]);
@@ -293,13 +290,12 @@ void main() {
     expect(haptics.count, previewsBeforeUp.length);
     expect(key.currentState!.selections.last, (
       index: previewIndex,
-      source: FileViewerFilmstripSelectionSource.scrubCommit,
+      type: FileViewerFilmstripEventType.scrubCommit,
     ));
     expect(
       key.currentState!.selections
           .where(
-            (event) =>
-                event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+            (event) => event.type == FileViewerFilmstripEventType.scrubCommit,
           )
           .length,
       1,
@@ -408,15 +404,13 @@ void main() {
     final position = _filmstripPosition(tester);
     final previewsAtLaunch = key.currentState!.selections
         .where(
-          (event) =>
-              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+          (event) => event.type == FileViewerFilmstripEventType.scrubPreview,
         )
         .length;
     expect(position.isScrollingNotifier.value, isTrue);
     expect(
       key.currentState!.selections.where(
-        (event) =>
-            event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+        (event) => event.type == FileViewerFilmstripEventType.scrubCommit,
       ),
       isEmpty,
     );
@@ -426,16 +420,14 @@ void main() {
     expect(
       key.currentState!.selections
           .where(
-            (event) =>
-                event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+            (event) => event.type == FileViewerFilmstripEventType.scrubPreview,
           )
           .length,
       greaterThan(previewsAtLaunch),
     );
     expect(
       key.currentState!.selections.where(
-        (event) =>
-            event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+        (event) => event.type == FileViewerFilmstripEventType.scrubCommit,
       ),
       isEmpty,
     );
@@ -445,21 +437,18 @@ void main() {
     final selections = key.currentState!.selections;
     final previews = selections
         .where(
-          (event) =>
-              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+          (event) => event.type == FileViewerFilmstripEventType.scrubPreview,
         )
         .toList();
     final commits = selections
         .where(
-          (event) =>
-              event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+          (event) => event.type == FileViewerFilmstripEventType.scrubCommit,
         )
         .toList();
     expect(
       selections
           .where(
-            (event) =>
-                event.source == FileViewerFilmstripSelectionSource.scrubStart,
+            (event) => event.type == FileViewerFilmstripEventType.scrubStart,
           )
           .length,
       1,
@@ -522,8 +511,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(key.currentState!.selections, [
-      (index: 7, source: FileViewerFilmstripSelectionSource.scrubStart),
-      (index: 7, source: FileViewerFilmstripSelectionSource.scrubCommit),
+      (index: 7, type: FileViewerFilmstripEventType.scrubStart),
+      (index: 7, type: FileViewerFilmstripEventType.scrubCommit),
     ]);
     expect(haptics.count, 0);
     _expectCentered(tester, 7);
@@ -680,8 +669,7 @@ class _FilmstripHarness extends StatefulWidget {
 class _FilmstripHarnessState extends State<_FilmstripHarness> {
   late int itemCount = widget.itemCount;
   late int selectedIndex = widget.selectedIndex;
-  final selections =
-      <({int index, FileViewerFilmstripSelectionSource source})>[];
+  final selections = <FileViewerFilmstripEvent>[];
 
   void update({int? itemCount, int? selectedIndex}) {
     setState(() {
@@ -705,11 +693,11 @@ class _FilmstripHarnessState extends State<_FilmstripHarness> {
           color: Color(0xFF000000 + index),
         );
       },
-      onSelectionChanged: (index, source) {
-        selections.add((index: index, source: source));
-        if (source == FileViewerFilmstripSelectionSource.tap ||
-            source == FileViewerFilmstripSelectionSource.scrubCommit) {
-          setState(() => selectedIndex = index);
+      onEvent: (event) {
+        selections.add(event);
+        if (event.type == FileViewerFilmstripEventType.tap ||
+            event.type == FileViewerFilmstripEventType.scrubCommit) {
+          setState(() => selectedIndex = event.index);
         }
       },
     );

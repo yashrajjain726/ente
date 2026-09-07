@@ -12,7 +12,6 @@ import 'package:flutter/services.dart';
 import "package:flutter_svg/flutter_svg.dart";
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
-import "package:photos/core/constants.dart";
 import 'package:photos/core/errors.dart';
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/file_caption_updated_event.dart";
@@ -37,14 +36,13 @@ import "package:photos/ui/tools/editor/image_editor/image_editor_page.dart";
 import "package:photos/ui/tools/editor/video_editor_page.dart";
 import "package:photos/ui/viewer/file/file_app_bar.dart";
 import "package:photos/ui/viewer/file/file_bottom_bar.dart";
-import "package:photos/ui/viewer/file/file_viewer_filmstrip.dart";
-import "package:photos/ui/viewer/file/file_viewer_filmstrip_preview_handoff.dart";
+import "package:photos/ui/viewer/file/file_viewer_filmstrip_coordinator.dart";
 import 'package:photos/ui/viewer/file/file_widget.dart';
+import "package:photos/ui/viewer/file/gallery_file_viewer_filmstrip.dart";
 import "package:photos/ui/viewer/file/ocr/inline_text_detection.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/qr_code_highlight_overlay.dart";
-import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
@@ -133,8 +131,13 @@ class _DetailPageState extends State<DetailPage> {
   void initState() {
     super.initState();
     _bottomControlsAdditionalInsetNotifier.value =
-        widget.config.showGalleryFilmstrip && widget.config.files.length > 1
-        ? kFileViewerFilmstripAdditionalBottomInset
+        shouldShowGalleryFileViewerFilmstrip(
+          isEnabled: widget.config.showGalleryFilmstrip,
+          isMinimalistic: widget.config.mode == DetailPageMode.minimalistic,
+          isGuestView: false,
+          itemCount: widget.config.files.length,
+        )
+        ? GalleryFileViewerFilmstripLayout.additionalBottomInset
         : 0;
   }
 
@@ -181,7 +184,7 @@ class _BodyState extends State<_Body> {
   List<EnteFile>? _files;
   late PageController _pageController;
   final _selectedIndexNotifier = ValueNotifier(0);
-  final _filmstripPreviewHandoff = FileViewerFilmstripPreviewHandoff();
+  late final FileViewerFilmstripCoordinator _filmstripCoordinator;
   final _inlineTextDetectionController = InlineTextDetectionController();
   bool _isFirstOpened = true;
   bool isGuestView = false;
@@ -194,8 +197,6 @@ class _BodyState extends State<_Body> {
   final _playbackSpeed = ValueNotifier<double>(1.0);
   final Map<EnteFile, int> _fileIndexByIdentity = Map.identity();
   ValueNotifier<double>? _bottomControlsAdditionalInsetNotifier;
-  bool _isFilmstripScrubbing = false;
-  bool _didPauseVideoForFilmstripScrub = false;
 
   @override
   void initState() {
@@ -209,6 +210,21 @@ class _BodyState extends State<_Body> {
         : configuredIndex;
     _selectedIndexNotifier.value = selectedIndex;
     _pageController = PageController(initialPage: max(0, selectedIndex));
+    _filmstripCoordinator = FileViewerFilmstripCoordinator(
+      currentIndex: () => _selectedIndexNotifier.value,
+      identityAt: _fileAt,
+      jumpToPageImmediately: (index) {
+        if (!_pageController.hasClients) return false;
+        _pageController.jumpToPage(index);
+        return true;
+      },
+      requestPauseCurrentMedia: () {
+        final selectedFile = _selectedFile;
+        if (selectedFile?.fileType == FileType.video) {
+          Bus.instance.fire(PauseVideoEvent(fileTag: selectedFile!.tag));
+        }
+      },
+    );
     _guestViewEventSubscription = Bus.instance.on<GuestViewEvent>().listen((
       event,
     ) {
@@ -260,9 +276,9 @@ class _BodyState extends State<_Body> {
   void dispose() {
     _guestViewEventSubscription.cancel();
     _captionUpdatedSubscription.cancel();
+    _filmstripCoordinator.dispose();
     _pageController.dispose();
     _selectedIndexNotifier.dispose();
-    _filmstripPreviewHandoff.dispose();
     _qrHelper?.dispose();
     _playbackSpeed.dispose();
     super.dispose();
@@ -310,7 +326,7 @@ class _BodyState extends State<_Body> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: ValueListenableBuilder<int?>(
-            valueListenable: _filmstripPreviewHandoff,
+            valueListenable: _filmstripCoordinator.previewIndex,
             builder: (context, previewIndex, child) =>
                 AbsorbPointer(absorbing: previewIndex != null, child: child),
             child: ValueListenableBuilder(
@@ -455,32 +471,13 @@ class _BodyState extends State<_Body> {
                 },
               ),
               if (_shouldShowFilmstrip)
-                ValueListenableBuilder<int?>(
-                  valueListenable: _filmstripPreviewHandoff,
-                  builder: (context, previewIndex, _) {
-                    final previewFile = previewIndex == null
-                        ? null
-                        : _fileAt(previewIndex);
-                    if (previewFile == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return Positioned.fill(
-                      child: AbsorbPointer(
-                        child: ColoredBox(
-                          key: fileViewerFilmstripPreviewKey,
-                          color: Colors.black,
-                          child: _GalleryFilmstripThumbnail(
-                            file: previewFile,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                GalleryFileViewerFilmstripPreviewLayer(
+                  files: _files!,
+                  previewIndex: _filmstripCoordinator.previewIndex,
                 ),
               if (widget.config.mode != DetailPageMode.minimalistic)
                 ValueListenableBuilder<int?>(
-                  valueListenable: _filmstripPreviewHandoff,
+                  valueListenable: _filmstripCoordinator.previewIndex,
                   builder: (context, previewIndex, child) => AbsorbPointer(
                     // The toolbar stays visible, but must not act on the old
                     // committed file while another file is being previewed.
@@ -506,14 +503,15 @@ class _BodyState extends State<_Body> {
                 ValueListenableBuilder(
                   valueListenable: _selectedIndexNotifier,
                   builder: (BuildContext context, int selectedIndex, _) {
-                    return _GalleryFileViewerFilmstripOverlay(
+                    return GalleryFileViewerFilmstripOverlay(
                       files: _files!,
                       selectedIndex: selectedIndex,
+                      bottomControlsHeight: _galleryBottomBarHeight,
                       findChildIndexCallback: _findChildIndex,
                       enableFullScreenNotifier: InheritedDetailPageState.of(
                         context,
                       ).enableFullScreenNotifier,
-                      onSelectionChanged: _onFilmstripSelectionChanged,
+                      onEvent: _filmstripCoordinator.handleEvent,
                     );
                   },
                 ),
@@ -550,7 +548,7 @@ class _BodyState extends State<_Body> {
       clipBehavior: Clip.none,
       itemBuilder: (context, index) {
         final file = _files![index];
-        if (!_isFilmstripScrubbing) {
+        if (!_filmstripCoordinator.isUserScrollSessionActive) {
           _preloadFiles(index);
         }
         final Widget fileContent = FileWidget(
@@ -628,19 +626,8 @@ class _BodyState extends State<_Body> {
         } else {
           _selectedIndexNotifier.value = index;
         }
-        _filmstripPreviewHandoff.onPageChanged(
-          index: index,
-          fileIdentity: file,
-          onPagePainted: () {
-            if (!mounted ||
-                _selectedIndexNotifier.value != index ||
-                !identical(_fileAt(index), file)) {
-              return;
-            }
-            _clearFilmstripPreview();
-          },
-        );
-        if (!_isFilmstripScrubbing) {
+        _filmstripCoordinator.handlePageChanged(index, file);
+        if (!_filmstripCoordinator.isUserScrollSessionActive) {
           _runSelectedFileSideEffects(file);
         }
       },
@@ -678,71 +665,6 @@ class _BodyState extends State<_Body> {
     }
   }
 
-  void _onFilmstripSelectionChanged(
-    int index,
-    FileViewerFilmstripSelectionSource source,
-  ) {
-    final file = _fileAt(index);
-    if (file == null) return;
-
-    switch (source) {
-      case FileViewerFilmstripSelectionSource.tap:
-        _clearFilmstripPreview();
-        if (_pageController.hasClients &&
-            index != _selectedIndexNotifier.value) {
-          _pageController.jumpToPage(index);
-        }
-        break;
-      case FileViewerFilmstripSelectionSource.scrubStart:
-        _clearFilmstripPreview();
-        _isFilmstripScrubbing = true;
-        break;
-      case FileViewerFilmstripSelectionSource.scrubPreview:
-        _isFilmstripScrubbing = true;
-        if (index == _selectedIndexNotifier.value) {
-          _filmstripPreviewHandoff.clear();
-          break;
-        }
-        if (!_didPauseVideoForFilmstripScrub) {
-          _didPauseVideoForFilmstripScrub = true;
-          final selectedFile = _selectedFile;
-          if (selectedFile?.fileType == FileType.video) {
-            Bus.instance.fire(PauseVideoEvent(fileTag: selectedFile!.tag));
-          }
-        }
-        _filmstripPreviewHandoff.showPreview(index);
-        break;
-      case FileViewerFilmstripSelectionSource.scrubCommit:
-        _isFilmstripScrubbing = false;
-        _beginFilmstripHandoff(index, file);
-        break;
-    }
-  }
-
-  void _beginFilmstripHandoff(int index, EnteFile file) {
-    if (!_pageController.hasClients) {
-      _clearFilmstripPreview();
-      return;
-    }
-    if (index == _selectedIndexNotifier.value) {
-      if (!_filmstripPreviewHandoff.isPendingCommit(
-        index: index,
-        fileIdentity: file,
-      )) {
-        _clearFilmstripPreview();
-      }
-      return;
-    }
-    _filmstripPreviewHandoff.beginCommit(index: index, fileIdentity: file);
-    _pageController.jumpToPage(index);
-  }
-
-  void _clearFilmstripPreview() {
-    _isFilmstripScrubbing = false;
-    _didPauseVideoForFilmstripScrub = false;
-    _filmstripPreviewHandoff.clear();
-  }
-
   void _runSelectedFileSideEffects(EnteFile file) {
     Bus.instance.fire(GuestViewEvent(isGuestView, swipeLocked));
     _updateSharedCollectionState(file);
@@ -751,7 +673,7 @@ class _BodyState extends State<_Body> {
 
   Future<void> _onFileRemoved(EnteFile file) async {
     if (!mounted || _files == null) return;
-    _clearFilmstripPreview();
+    _filmstripCoordinator.reset();
     final files = _files!;
     final removedIndex = _indexOfFile(file);
     if (removedIndex < 0) {
@@ -920,18 +842,19 @@ class _BodyState extends State<_Body> {
 
   EnteFile? get _selectedFile => _fileAt(_selectedIndexNotifier.value);
 
-  bool get _shouldShowFilmstrip =>
-      widget.config.showGalleryFilmstrip &&
-      widget.config.mode != DetailPageMode.minimalistic &&
-      !isGuestView &&
-      (_files?.length ?? 0) > 1;
+  bool get _shouldShowFilmstrip => shouldShowGalleryFileViewerFilmstrip(
+    isEnabled: widget.config.showGalleryFilmstrip,
+    isMinimalistic: widget.config.mode == DetailPageMode.minimalistic,
+    isGuestView: isGuestView,
+    itemCount: _files?.length ?? 0,
+  );
 
   void _syncBottomControlsInset() {
     final notifier = _bottomControlsAdditionalInsetNotifier;
     if (notifier == null) return;
-    if (!_shouldShowFilmstrip) _clearFilmstripPreview();
+    if (!_shouldShowFilmstrip) _filmstripCoordinator.reset();
     final inset = _shouldShowFilmstrip
-        ? kFileViewerFilmstripAdditionalBottomInset
+        ? GalleryFileViewerFilmstripLayout.additionalBottomInset
         : 0.0;
     notifier.value = inset;
   }
@@ -1003,7 +926,7 @@ class _GalleryFileViewerBottomOverlay extends StatelessWidget {
       context,
     ).mini.copyWith(color: textBaseDark.withValues(alpha: 0.8));
     final filmstripInset = hasFilmstrip
-        ? kFileViewerFilmstripAdditionalBottomInset
+        ? GalleryFileViewerFilmstripLayout.additionalBottomInset
         : 0.0;
     return ValueListenableBuilder<bool>(
       valueListenable: enableFullScreenNotifier,
@@ -1093,100 +1016,6 @@ class _GalleryFileViewerBottomOverlay extends StatelessWidget {
 }
 
 // This widget returns Positioned, so its parent must be a Stack.
-class _GalleryFileViewerFilmstripOverlay extends StatelessWidget {
-  final List<EnteFile> files;
-  final int selectedIndex;
-  final int? Function(Key key) findChildIndexCallback;
-  final ValueListenable<bool> enableFullScreenNotifier;
-  final FileViewerFilmstripSelectionCallback onSelectionChanged;
-
-  const _GalleryFileViewerFilmstripOverlay({
-    required this.files,
-    required this.selectedIndex,
-    required this.findChildIndexCallback,
-    required this.enableFullScreenNotifier,
-    required this.onSelectionChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final safePadding = MediaQuery.paddingOf(context);
-    return Positioned(
-      left: safePadding.left,
-      right: safePadding.right,
-      bottom:
-          safePadding.bottom +
-          _galleryBottomBarHeight +
-          kFileViewerFilmstripGap,
-      height: kFileViewerFilmstripHeight,
-      child: ValueListenableBuilder<bool>(
-        valueListenable: enableFullScreenNotifier,
-        builder: (context, isFullScreen, child) => IgnorePointer(
-          ignoring: isFullScreen,
-          child: AnimatedOpacity(
-            opacity: isFullScreen ? 0 : 1,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            child: child,
-          ),
-        ),
-        child: FileViewerFilmstrip(
-          itemCount: files.length,
-          selectedIndex: selectedIndex,
-          semanticLabel: context.strings.photoViewerFilmstripLabel,
-          semanticValueBuilder: (current, total) => context.strings
-              .photoViewerFilmstripPosition(current: current, total: total),
-          itemKeyBuilder: (index) => ObjectKey(files[index]),
-          findChildIndexCallback: findChildIndexCallback,
-          itemBuilder: (context, index) {
-            final file = files[index];
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                _GalleryFilmstripThumbnail(file: file, fit: BoxFit.cover),
-                if (file.fileType == FileType.video)
-                  const Center(
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 14,
-                      shadows: [Shadow(color: Colors.black87, blurRadius: 3)],
-                    ),
-                  ),
-              ],
-            );
-          },
-          onSelectionChanged: onSelectionChanged,
-        ),
-      ),
-    );
-  }
-}
-
-class _GalleryFilmstripThumbnail extends StatelessWidget {
-  final EnteFile file;
-  final BoxFit fit;
-
-  const _GalleryFilmstripThumbnail({required this.file, required this.fit});
-
-  @override
-  Widget build(BuildContext context) {
-    return ThumbnailWidget(
-      file,
-      key: ObjectKey(file),
-      rawThumbnail: true,
-      diskLoadDeferDuration: galleryThumbnailDiskLoadDeferDuration,
-      serverLoadDeferDuration: galleryThumbnailServerLoadDeferDuration,
-      shouldShowSyncStatus: false,
-      shouldShowFavoriteIcon: false,
-      shouldShowVideoOverlayIcon: false,
-      shouldShowLivePhotoOverlay: false,
-      fit: fit,
-    );
-  }
-}
-
-// This widget returns Positioned, so its parent must be a Stack.
 class _GallerySocialOverlay extends StatelessWidget {
   final EnteFile file;
   final DetailPageMode mode;
@@ -1215,7 +1044,9 @@ class _GallerySocialOverlay extends StatelessWidget {
       bottom:
           padding.bottom +
           _socialBottomBarClearance +
-          (hasFilmstrip ? kFileViewerFilmstripAdditionalBottomInset : 0),
+          (hasFilmstrip
+              ? GalleryFileViewerFilmstripLayout.additionalBottomInset
+              : 0),
       child: ValueListenableBuilder<bool>(
         valueListenable: fullScreenNotifier,
         builder: (context, isFullScreen, child) => IgnorePointer(
