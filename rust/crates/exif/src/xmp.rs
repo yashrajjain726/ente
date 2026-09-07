@@ -27,14 +27,12 @@ pub struct Property {
     pub name: String,
     pub value: String,
     pub language: Option<String>,
-    /// Associates properties from the same RDF list item, preserving item order.
     pub item: Option<u32>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct XmpStructure {
     pub nodes: Vec<XmpNode>,
-    /// One parent-node index per entry in Metadata::xmp.
     pub parents: Vec<Option<u32>>,
 }
 

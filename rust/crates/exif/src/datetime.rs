@@ -1,7 +1,6 @@
 use crate::{Ifd, Metadata};
 use std::fmt;
 
-/// An EXIF date and its matching subsecond/UTC-offset tags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DateTimeKind {
     Original,
@@ -9,28 +8,17 @@ pub enum DateTimeKind {
     Modified,
 }
 
-/// The metadata field(s) containing one date/time value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DateTimeSource {
     Exif(DateTimeKind),
-    /// Namespace URI and local property name.
     Xmp(&'static str, &'static str),
-    /// Date and time dataset IDs in IPTC record 2.
     Iptc(u8, u8),
 }
-
-/// Parsed date components and the smallest calendar unit present in the source.
-/// Omitted components use the start of that period (month/day 1, clock 0).
-/// Precision keeps those defaults distinguishable from explicitly supplied values.
-/// No UTC offset is inferred and parsing allocates no strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DateTimeValue {
     pub date_time: DateTime,
     pub precision: DateTimePrecision,
 }
-
-/// Smallest supplied calendar unit. Fractional digits remain in the raw field;
-/// DateTime retains their value up to nanoseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DateTimePrecision {
     Year,
@@ -39,9 +27,6 @@ pub enum DateTimePrecision {
     Minute,
     Second,
 }
-
-/// A complete photo-local date/time. A missing UTC offset is unknown, not UTC.
-/// Original text and precision remain available through the raw metadata tags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DateTime {
     pub year: u16,
@@ -50,16 +35,11 @@ pub struct DateTime {
     pub hour: u8,
     pub minute: u8,
     pub second: u8,
-    /// Fractional seconds, truncated to nine digits.
     pub nanosecond: u32,
-    /// Signed minutes east of UTC, including negative sub-hour offsets.
     pub offset_minutes: Option<i16>,
 }
 
 impl Metadata {
-    /// Parse a specific EXIF, XMP or IPTC date without fallback or timezone policy.
-    /// Returns None when that field is absent or malformed. XMP fields must be
-    /// retained by the chosen read mode; arbitrary properties require Details.
     #[inline]
     pub fn date_time(&self, source: DateTimeSource) -> Option<DateTimeValue> {
         match source {
@@ -73,30 +53,6 @@ impl Metadata {
             }
         }
     }
-
-    /// Parse one EXIF date family without selecting a creation-time fallback.
-    /// Inline fractions/offsets take precedence over matching auxiliary tags.
-    /// Blank auxiliary fields mean unknown; malformed fields used for conversion are rejected.
-    ///
-    /// ```rust,no_run
-    /// # use ente_exif::{DateTime, DateTimeKind, DateTimeSource, Limits, Mode, namespace};
-    /// # let mut file = std::fs::File::open("photo.jpg")?;
-    /// # let metadata = ente_exif::read(&mut file, Mode::Summary, Limits::default())?;
-    /// let original = metadata.exif_date_time(DateTimeKind::Original);
-    /// let digitized = metadata.exif_date_time(DateTimeKind::Digitized);
-    /// let modified = metadata.exif_date_time(DateTimeKind::Modified);
-    /// // Choose the fallback order appropriate to the application.
-    /// let capture = original.or(modified);
-    /// if let Some(date) = capture {
-    ///     println!("local: {}-{}-{} {}:{}:{}", date.year, date.month, date.day,
-    ///              date.hour, date.minute, date.second);
-    ///     println!("offset minutes: {:?}; epoch µs: {:?}", date.offset_minutes, date.unix_micros());
-    /// }
-    /// let xmp_created = metadata.date_time(DateTimeSource::Xmp(namespace::XMP, "CreateDate"));
-    /// let iptc_created = metadata.date_time(DateTimeSource::Iptc(55, 60));
-    /// let strict = DateTime::parse("2024-02-29T12:34:56+05:30");
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
     pub fn exif_date_time(&self, kind: DateTimeKind) -> Option<DateTime> {
         let (ifd, date, subsecond, offset) = match kind {
             DateTimeKind::Original => (Ifd::Exif(0), 0x9003, 0x9291, 0x9011),
@@ -123,16 +79,9 @@ impl Metadata {
 }
 
 impl DateTime {
-    /// Parse a complete EXIF or ISO-style timestamp with optional fraction and offset.
-    /// Accepts YYYY:MM:DD HH:MM:SS and YYYY-MM-DD[T or space]HH:MM:SS,
-    /// dot/colon fractions, and Z or `±HH[:]?MM` offsets. Partial dates, leap seconds,
-    /// impossible calendar dates and named timezones return None.
     pub fn parse(value: &str) -> Option<Self> {
         parse(value.trim(), Some(""), Some(""))
     }
-
-    /// Epoch microseconds only when the offset and calendar components are valid.
-    /// No device timezone, DST rule, sentinel-date policy or fallback is applied.
     pub fn unix_micros(self) -> Option<i64> {
         if !self.valid() {
             return None;

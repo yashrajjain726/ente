@@ -10,16 +10,9 @@ pub struct Iptc {
 }
 
 impl Metadata {
-    /// IPTC caption (2:120), respecting its character-set announcement.
     pub fn iptc_caption(&self, fallback: TextEncoding) -> Option<Cow<'_, str>> {
         self.iptc_text(2, 120, fallback)
     }
-
-    /// Decode the first matching IPTC text dataset without trimming it.
-    /// Record 1 uses ASCII. Records 2–6 and 8 support the UTF-8 announcement
-    /// (ESC % G); other announcements return `None`. The caller's encoding is
-    /// used only when no announcement exists. Invalid UTF-8 is not repaired.
-    /// Raw datasets, including repeats and unsupported encodings, remain available.
     pub fn iptc_text(
         &self,
         record: u8,

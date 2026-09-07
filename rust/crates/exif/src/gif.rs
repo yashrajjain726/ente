@@ -39,7 +39,6 @@ pub(crate) fn read<R: Read + Seek>(
                     let app = reader.bytes(offset, size)?;
                     offset += size as u64;
                     if app == b"XMP DataXMP" {
-                        // https://github.com/adobe/XMP-Toolkit-SDK/blob/main/docs/XMPSpecificationPart3.pdf
                         let start = offset;
                         let mut packet = Vec::new();
                         loop {

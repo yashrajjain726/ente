@@ -2,13 +2,6 @@ use crate::boxes::box_at;
 use crate::read::{Error, Reader, State, be32, le32, range};
 use crate::{Format, namespace};
 use std::io::{Read, Seek};
-
-/// Half-open extraction range `[start, end)` for appended motion video.
-/// Selects the largest candidate, ending at the next recognized video or EOF;
-/// vendor trailers may be included. Checks `ftyp` and bounded `moov`/`mdat` boxes,
-/// not codec decodability. Detection uses XMP directories/MicroVideo offsets,
-/// HEIF `mpvd`, Samsung SEF or OnePlus JXRS. An explicit MotionPhoto value other
-/// than `1` disables detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VideoRange {
     pub start: u64,
@@ -81,7 +74,6 @@ fn xmp_starts(state: &State, len: u64, starts: &mut Vec<u64>) -> Result<(), Erro
                 .find(|p| p.namespace == namespace::ITEM && p.item == Some(item) && p.name == name)
                 .map(|p| p.value.as_str())
         };
-        // https://developer.android.com/media/platform/motion-photo-format
         if property("Semantic") == Some("Primary") {
             continue;
         }

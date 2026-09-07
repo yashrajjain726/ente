@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-
-/// Explicit decoding for metadata bytes. No character-set detection is performed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextEncoding {
     Ascii,
@@ -16,7 +14,6 @@ pub(crate) fn decode(bytes: &[u8], encoding: TextEncoding) -> Option<Cow<'_, str
     if encoding == TextEncoding::Ascii {
         return None;
     }
-    // https://encoding.spec.whatwg.org/index-windows-1252.txt
     const C1: [char; 32] = [
         '€', '\u{81}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{8d}', 'Ž',
         '\u{8f}', '\u{90}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{9d}',

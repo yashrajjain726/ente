@@ -6,9 +6,7 @@ use crate::{
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Metadata {
     pub format: Format,
-    /// Stored primary-image dimensions, before applying any transforms.
     pub dimensions: Option<Dimensions>,
-    /// Primary-image transforms in application order, independent of EXIF/XMP.
     pub transforms: Vec<Transform>,
     pub tags: Vec<Tag>,
     pub xmp: Vec<Property>,
@@ -31,30 +29,21 @@ pub struct Location {
 }
 
 impl Metadata {
-    /// Default capture-date selection. See [`photo::capture_date_time`].
     pub fn capture_date_time(&self) -> Option<CaptureDateTime> {
         photo::capture_date_time(self)
     }
-
-    /// Default date selection with caller resolution/rejection. See [`photo::capture_date_time_with`].
     pub fn capture_date_time_with(
         &self,
         accept: impl FnMut(&mut CaptureDateTime) -> bool,
     ) -> Option<CaptureDateTime> {
         photo::capture_date_time_with(self, accept)
     }
-
-    /// Default display-size selection. See [`photo::display_dimensions`].
     pub fn display_dimensions(&self) -> Option<Dimensions> {
         photo::display_dimensions(self)
     }
-
-    /// First matching tag. The raw collection preserves duplicates.
     pub fn tag(&self, ifd: Ifd, id: u16) -> Option<&Tag> {
         self.tags.iter().find(|tag| tag.ifd == ifd && tag.id == id)
     }
-
-    /// First matching namespace URI/local name. Raw properties preserve duplicates.
     pub fn property(&self, namespace: &str, name: &str) -> Option<&str> {
         self.xmp
             .iter()
@@ -71,14 +60,9 @@ impl Metadata {
             .iter()
             .filter(move |p| p.namespace == namespace && p.name == name)
     }
-
-    /// Raw EXIF orientation. Native container/codestream transforms are separate.
     pub fn orientation(&self) -> Option<u32> {
         self.tag(Ifd::Image(0), 0x112)?.value.unsigned()
     }
-
-    /// GPano cylindrical/equirectangular projection or EXIF CustomRendered = 6.
-    /// Does not infer panoramas from aspect ratio.
     pub fn is_panorama(&self) -> bool {
         matches!(
             self.property(namespace::GPANO, "ProjectionType"),
@@ -88,18 +72,12 @@ impl Metadata {
             .and_then(|t| t.value.unsigned())
             == Some(6)
     }
-
-    /// Stored primary-image width, before orientation or cropping.
     pub fn width(&self) -> Option<u32> {
         self.dimensions.map(|d| d.width)
     }
-
-    /// Stored primary-image height, before orientation or cropping.
     pub fn height(&self) -> Option<u32> {
         self.dimensions.map(|d| d.height)
     }
-
-    /// Dimensions from one XMP namespace/pair, without orientation or source fallback.
     pub fn xmp_dimensions(&self) -> Option<Dimensions> {
         [
             (namespace::TIFF, "ImageWidth", "ImageLength"),
@@ -113,23 +91,15 @@ impl Metadata {
             )
         })
     }
-
-    /// EXIF camera make; trimmed and borrowed. Empty values are absent.
     pub fn camera_make(&self) -> Option<&str> {
         self.text(Ifd::Image(0), 0x10f)
     }
-
-    /// EXIF camera model; trimmed and borrowed.
     pub fn camera_model(&self) -> Option<&str> {
         self.text(Ifd::Image(0), 0x110)
     }
-
-    /// EXIF lens model; trimmed and borrowed.
     pub fn lens_model(&self) -> Option<&str> {
         self.text(Ifd::Exif(0), 0xa434)
     }
-
-    /// Exact positive EXIF exposure time in seconds, without display rounding.
     pub fn exposure_time(&self) -> Option<Rational> {
         let Value::Rational(values) = &self.tag(Ifd::Exif(0), 0x829a)?.value else {
             return None;
@@ -139,35 +109,21 @@ impl Metadata {
         };
         (value.as_f64()? > 0.0).then_some(*value)
     }
-
-    /// Positive EXIF f-number (for example, 2.8).
     pub fn f_number(&self) -> Option<f64> {
         self.positive_number(0x829d)
     }
-
-    /// Positive EXIF focal length in millimetres.
     pub fn focal_length(&self) -> Option<f64> {
         self.positive_number(0x920a)
     }
-
-    /// Legacy EXIF sensitivity values (0x8827), including any 65535 sentinel.
-    /// Does not infer ISO speed from the newer sensitivity-type/extended tags.
     pub fn iso_speed_ratings(&self) -> Option<&[u32]> {
         match &self.tag(Ifd::Exif(0), 0x8827)?.value {
             Value::Unsigned(values) => Some(values),
             _ => None,
         }
     }
-
-    /// EXIF ImageDescription only; no XMP/IPTC precedence or character-set guess.
     pub fn exif_description(&self) -> Option<&str> {
         self.text(Ifd::Image(0), 0x10e)
     }
-
-    /// EXIF coordinates only. Preserves (0, 0); source precedence belongs to the caller.
-    /// Signed D/M/S components supply the sign only when both references are absent.
-    /// Rejects incomplete/out-of-range coordinates, malformed references, non-finite
-    /// values and minute/second magnitudes of 60 or more.
     pub fn exif_location(&self) -> Option<Location> {
         let latitude_ref = self.tag(Ifd::Gps(0), 1);
         let longitude_ref = self.tag(Ifd::Gps(0), 3);
@@ -204,22 +160,6 @@ impl Metadata {
             coordinate(4, longitude_ref, b'E', b'W')?,
         )
     }
-
-    /// XMP decimal or comma-separated degree/minute/second coordinates.
-    /// A suffix or separate hemisphere reference is required for each axis.
-    ///
-    /// ```rust,no_run
-    /// # use ente_exif::{Limits, Mode, namespace};
-    /// # let mut file = std::fs::File::open("photo.jpg")?;
-    /// let metadata = ente_exif::read(&mut file, Mode::Details, Limits::default())?;
-    /// let exif_location = metadata.exif_location();
-    /// let xmp_location = metadata.xmp_location();
-    /// let description = metadata.xmp_description(Some("en"));
-    /// for keyword in metadata.properties(namespace::DC, "subject") {
-    ///     println!("{}", keyword.value);
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
     pub fn xmp_location(&self) -> Option<Location> {
         location(
             xmp_coordinate(
@@ -236,9 +176,6 @@ impl Metadata {
             )?,
         )
     }
-
-    /// Preferred language, then x-default, then the first XMP description.
-    /// IPTC encoding and cross-source caption precedence remain explicit in the caller.
     pub fn xmp_description(&self, language: Option<&str>) -> Option<&str> {
         let descriptions = || self.properties(namespace::DC, "description");
         language

@@ -46,6 +46,50 @@ nested XMP annotations need parent/list relationships.
   vendor trailer bytes and does not establish playback support. Pairing separate
   live-photo files belongs to the caller.
 
+## API contracts
+
+Dates retain local components: offsets are minutes east of UTC, capture output
+normalizes them to `±HH:MM`, and epoch timestamps use microseconds. Local text
+retains nanoseconds. Unknown offsets stay unknown. Partial dates normalize to
+period-start midnight UTC without inventing an embedded offset; source-specific
+`date_time()` preserves precision without this normalization. Epoch zero is valid.
+
+Capture selection uses the first parseable candidate, in this order:
+
+| Family | Sources |
+| --- | --- |
+| Original | XMP `exif:DateTimeOriginal`, IPTC 2:55/60, EXIF Original, XMP `photoshop:DateCreated` |
+| Digitized | XMP `exif:DateTimeDigitized`, IPTC 2:62/63, EXIF Digitized, XMP `xmp:CreateDate` |
+| Metadata change | XMP `xmp:MetadataDate` |
+| Modified | XMP `tiff:DateTime`, EXIF Modified, XMP `xmp:ModifyDate` |
+
+EXIF families use their own subsecond/offset tags; inline values win. Blank
+auxiliary fields mean unknown; malformed values used for conversion fail.
+`capture_date_time_with()` can resolve the epoch using host timezone/DST rules or
+reject a candidate with `false`. An assumed offset must not replace `offset_time`.
+
+Display size prefers container/EXIF dimensions, then a complete XMP pair.
+Native transforms apply in order. Nonzero HEIF rotation or any mirror suppresses
+EXIF/XMP orientation; otherwise valid EXIF wins over XMP. XMP-only sizes use XMP
+orientation. JPEG XL orientation always wins. Crops must be positive, integral,
+pixel-aligned and in bounds; otherwise size is `None`. Display resampling and
+pixel aspect ratio are excluded. Rotations are counterclockwise quarter turns;
+mirror axes are 0 = vertical, 1 = horizontal; EXIF orientations 5–8 swap axes.
+
+GPS helpers preserve `(0, 0)` and reject invalid/incomplete coordinates. EXIF
+signed D/M/S values supply the sign only when both hemisphere references are
+absent; XMP requires a suffix or reference for each axis. Camera text is trimmed;
+exposure is exact rational seconds, focal length is millimetres, and legacy ISO
+ratings preserve the 65535 sentinel. Text decoding requires an explicit encoding;
+IPTC's declared UTF-8 overrides the fallback. Raw collections retain duplicates;
+`tag()`/`property()` return the first. XMP descriptions prefer the requested
+language, then `x-default`, then the first value. Structured XMP parent indices
+align with properties; node parents identify enclosing structures/list items.
+
+Motion extraction chooses the largest candidate, ending at the next video or
+EOF. Explicit `MotionPhoto` values other than `1` disable detection. Panorama
+means GPano cylindrical/equirectangular projection or EXIF `CustomRendered = 6`.
+
 ## Limits
 
 `Limits::default()` bounds logical reads to 8 MiB, individual values to 64 KiB,

@@ -1,4 +1,3 @@
-//! Photo metadata without reading or decoding image pixels.
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 
@@ -34,27 +33,9 @@ pub use text::TextEncoding;
 pub use xmp::{Property, XmpNode, XmpStructure, namespace};
 
 use std::io::{Read, Seek};
-
-/// Reads from byte zero, leaving the source positioned at the last accessed range.
-/// Metadata errors in a bounded block are reported in `issues`; I/O and resource
-/// limits stop the operation. No-metadata images return an empty successful result.
 pub fn read<R: Read + Seek>(source: &mut R, mode: Mode, limits: Limits) -> Result<Metadata, Error> {
     read_with_structure(source, mode, limits, None)
 }
-
-/// Details plus XMP ancestor/list relationships, for consumers of structured annotations.
-///
-/// ```rust,no_run
-/// # use ente_exif::Limits;
-/// # let mut file = std::fs::File::open("photo.xmp")?;
-/// let structured = ente_exif::read_structured(&mut file, Limits::default())?;
-/// // Includes Details metadata; parents[i] belongs to metadata.xmp[i].
-/// for (property, parent) in structured.metadata.xmp.iter().zip(&structured.xmp.parents) {
-///     println!("{}: {} (parent {parent:?})", property.name, property.value);
-/// }
-/// // Follow XmpNode::parent through structured.xmp.nodes to find region/list owners.
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 pub fn read_structured<R: Read + Seek>(
     source: &mut R,
     limits: Limits,
@@ -133,11 +114,7 @@ fn read_with_structure<R: Read + Seek>(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
-    /// Common capture, camera, location, description, panorama and motion fields.
     Summary,
-    /// Named standard TIFF tags, secondary IFDs, general XMP/IPTC and PNG text.
-    /// Unknown TIFF tags, MakerNotes and pixel/thumbnail references are omitted
-    /// with their byte counts. Opaque XMP HDRPlusMakernote is skipped in both modes.
     Details,
 }
 

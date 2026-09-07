@@ -366,8 +366,6 @@ fn header(
     }
     pack(&bits)
 }
-
-// https://www.rfc-editor.org/rfc/rfc7932.html#section-9
 fn stored_brotli(bytes: &[u8]) -> Vec<u8> {
     assert!(!bytes.is_empty() && bytes.len() <= 65536);
     let mut bits = Vec::new();

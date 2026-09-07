@@ -40,20 +40,12 @@ impl From<io::Error> for Error {
         Self::Io(e)
     }
 }
-
-/// Per-read resource budgets; not an exact heap/RSS cap. Retained accounting
-/// excludes allocator capacity, caller buffering and dependency internals.
-/// XML additionally allows at most 64 namespace declarations per element.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
-    /// Logical source reads; also sets a separate cumulative expanded-text budget
-    /// and the maximum Brotli window size.
     pub read_bytes: usize,
-    /// Maximum retained value or decompressed text chunk (raw profiles use read_bytes).
     pub value_bytes: usize,
     pub output_bytes: usize,
     pub entries: usize,
-    /// TIFF directories per block.
     pub directories: usize,
     pub depth: usize,
 }
@@ -73,7 +65,6 @@ impl Default for Limits {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Statistics {
-    /// Logical source bytes, excluding read-ahead inside a caller's BufReader.
     pub bytes_read: u64,
     pub reads: usize,
 }

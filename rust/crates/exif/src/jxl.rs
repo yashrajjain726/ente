@@ -74,7 +74,6 @@ fn codestream(bytes: &[u8], state: &mut State) -> Result<(), Error> {
     if bits.take(16)? != 0x0aff {
         return Err(Error::Malformed("JPEG XL signature"));
     }
-    // https://www.iso.org/standard/85066.html — Annex D.2–D.3.
     let div8 = bits.take(1)? != 0;
     let height = bits.dimension(div8)?;
     let ratio = bits.take(3)?;
@@ -125,7 +124,6 @@ fn compressed<R: Read + Seek>(
 }
 
 fn decompress(input: &[u8], state: &mut State) -> Result<Vec<u8>, Error> {
-    // https://www.rfc-editor.org/rfc/rfc7932.html#section-9.1
     let first = *input.first().ok_or(Error::Malformed("Brotli header"))?;
     let window_bits = if first & 1 == 0 {
         16

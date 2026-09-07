@@ -38,17 +38,12 @@ pub enum Value {
     Signed(Vec<i32>),
     Rational(Vec<Rational>),
     Float(Vec<f64>),
-    /// Original bytes, including any TIFF string terminator.
     Ascii(Vec<u8>),
     Bytes(Vec<u8>),
-    /// Opaque/unknown binary fields are described without retaining their payload.
-    Omitted {
-        bytes: u64,
-    },
+    Omitted { bytes: u64 },
 }
 
 impl Value {
-    /// Reads one finite number without allocating a converted vector.
     pub fn number(&self, index: usize) -> Option<f64> {
         match self {
             Self::Unsigned(v) => v.get(index).map(|n| f64::from(*n)),
@@ -73,19 +68,6 @@ impl Value {
         let end = bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len());
         std::str::from_utf8(&bytes[..end]).ok()
     }
-
-    /// Decode a TIFF ASCII field up to its first NUL. Legacy encodings are a
-    /// caller-selected compatibility policy; TIFF specifies ASCII.
-    /// ASCII and UTF-8 results borrow the original bytes.
-    ///
-    /// ```rust
-    /// use ente_exif::{Metadata, TextEncoding, Value};
-    ///
-    /// let value = Value::Ascii(b"Caf\xe9\0".to_vec());
-    /// assert_eq!(value.text_with(TextEncoding::Latin1).as_deref(), Some("Café"));
-    /// let metadata = Metadata::default();
-    /// let caption = metadata.iptc_caption(TextEncoding::Windows1252);
-    /// ```
     pub fn text_with(&self, encoding: TextEncoding) -> Option<Cow<'_, str>> {
         let Self::Ascii(bytes) = self else {
             return None;
