@@ -10,7 +10,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
-use super::graph::{Graph, search as graph_search, search_excluding};
+use super::graph::{Graph, search as graph_search, search_stored};
 use super::lock::WriterLock;
 use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, header_generation, remove_if_present,
@@ -685,13 +685,12 @@ impl VecDb {
                 });
                 continue;
             }
-            let mut matches = search_excluding(
+            let mut matches = search_stored(
                 st.search_graph(),
                 &st.arena,
-                st.arena.vector_lanes(slot),
+                slot,
                 &params,
                 allowed_slots.as_ref(),
-                Some(slot),
             );
             if let Some(cap) = max_distance {
                 let keep = matches.partition_point(|entry| entry.distance <= cap);
