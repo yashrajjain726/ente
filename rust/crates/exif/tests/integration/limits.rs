@@ -179,3 +179,49 @@ fn png_text_limits_apply_to_utf8_output_before_conversion() {
         assert!(ente_exif::read(&mut Cursor::new(&bytes), Mode::Summary, limits).is_ok());
     }
 }
+
+#[test]
+fn undersized_jxrs_is_recoverable() {
+    for length in 0u32..8 {
+        let bytes = [
+            jpeg(&[], ""),
+            b"jxrs".to_vec(),
+            length.to_le_bytes().to_vec(),
+        ]
+        .concat();
+        for mode in [Mode::Summary, Mode::Details] {
+            let metadata = read(&bytes, mode);
+            assert_eq!(metadata.width(), Some(30));
+            assert_eq!(metadata.issues.len(), 1);
+            assert_eq!(metadata.issues[0].message, "JXRS length");
+        }
+    }
+}
+
+#[test]
+fn png_language_obeys_value_and_retention_budgets() {
+    let bytes = [
+        b"\x89PNG\r\n\x1a\n".to_vec(),
+        png_chunk(b"iTXt", b"Note\0\0\0en-US\0\0x"),
+    ]
+    .concat();
+    for limits in [
+        Limits {
+            value_bytes: 4,
+            ..Limits::default()
+        },
+        Limits {
+            output_bytes: std::mem::size_of::<ente_exif::Property>()
+                + "urn:png:text".len()
+                + "Note".len()
+                + 1
+                + 4,
+            ..Limits::default()
+        },
+    ] {
+        assert!(matches!(
+            ente_exif::read(&mut Cursor::new(&bytes), Mode::Details, limits),
+            Err(Error::Limit(_))
+        ));
+    }
+}

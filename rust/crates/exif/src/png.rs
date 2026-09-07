@@ -48,6 +48,7 @@ fn text(data: &[u8], kind: &[u8], state: &mut State) -> Result<(), Error> {
         return Err(Error::Malformed("PNG keyword"));
     }
     let mut compressed = false;
+    let mut language = None;
     if kind == b"iTXt" {
         let flag = cursor.number(1)?;
         let method = cursor.number(1)?;
@@ -55,7 +56,7 @@ fn text(data: &[u8], kind: &[u8], state: &mut State) -> Result<(), Error> {
             return Err(Error::Unsupported("PNG text compression"));
         }
         compressed = flag == 1;
-        cursor.string()?;
+        language = Some(cursor.string()?).filter(|value| !value.is_empty());
         cursor.string()?;
     } else if kind == b"zTXt" {
         if cursor.number(1)? != 0 {
@@ -121,7 +122,10 @@ fn text(data: &[u8], kind: &[u8], state: &mut State) -> Result<(), Error> {
         Cow::Owned(text.iter().copied().map(char::from).collect::<String>())
     };
     let key: String = key.iter().copied().map(char::from).collect();
-    xmp::store(state, "urn:png:text", &key, &text, None, None)
+    if language.is_some_and(|value| value.len() > state.limits.value_bytes) {
+        return Err(Error::Limit("PNG language"));
+    }
+    xmp::store(state, "urn:png:text", &key, &text, language, None)
 }
 
 fn profile(key: &[u8], text: &[u8], state: &mut State) -> Result<(), Error> {

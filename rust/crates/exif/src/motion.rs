@@ -114,7 +114,10 @@ fn oplus<R: Read + Seek>(
         return Ok(());
     }
     let len = u64::from(le32(&footer[4..]));
-    if len < 8 || len > state.limits.value_bytes as u64 {
+    if len < 8 {
+        return Err(Error::Malformed("JXRS length"));
+    }
+    if len > state.limits.value_bytes as u64 {
         return Err(Error::Limit("JXRS index"));
     }
     let base = reader
@@ -278,24 +281,31 @@ fn video_starts<R: Read + Seek>(
                 {
                     videos.push(start);
                 }
-                if b.len < 8 {
+                if b.len < 8 || b.len % 4 != 0 {
                     return Err(Error::Malformed("video ftyp"));
                 }
-                let brand = reader.array::<4>(b.start)?;
-                if !matches!(
-                    &brand,
-                    b"isom"
-                        | b"iso2"
-                        | b"iso5"
-                        | b"iso6"
-                        | b"mp41"
-                        | b"mp42"
-                        | b"avc1"
-                        | b"qt  "
-                        | b"M4V "
-                        | b"3gp4"
-                        | b"3gp5"
-                ) {
+                let mut supported = false;
+                for position in std::iter::once(0).chain((8..b.len).step_by(4)) {
+                    let brand = reader.array::<4>(b.start + position)?;
+                    if matches!(
+                        &brand,
+                        b"isom"
+                            | b"iso2"
+                            | b"iso5"
+                            | b"iso6"
+                            | b"mp41"
+                            | b"mp42"
+                            | b"avc1"
+                            | b"qt  "
+                            | b"M4V "
+                            | b"3gp4"
+                            | b"3gp5"
+                    ) {
+                        supported = true;
+                        break;
+                    }
+                }
+                if !supported {
                     break;
                 }
                 current = Some(offset);

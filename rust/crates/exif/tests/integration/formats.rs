@@ -488,3 +488,74 @@ fn png_text_encoding_and_bad_compressed_block_recovery() {
     assert_eq!(metadata.issues.len(), 1);
     assert_eq!(metadata.issues[0].message, "compressed PNG text");
 }
+
+#[test]
+fn motion_accepts_compatible_brands_but_not_the_minor_version() {
+    for (brands, valid, malformed) in [
+        (b"newv\0\0\0\0junkisom".as_slice(), true, false),
+        (b"isom\0\0\0\0".as_slice(), true, false),
+        (b"newvisomjunk".as_slice(), false, false),
+        (b"newv\0\0\0\0iso".as_slice(), false, true),
+    ] {
+        let video = [
+            box_bytes(b"ftyp", brands),
+            box_bytes(b"moov", &[]),
+            box_bytes(b"mdat", &[0; 16]),
+        ]
+        .concat();
+        let packet = xmp(&format!(
+            r#"<c:MicroVideoOffset xmlns:c="{}">{}</c:MicroVideoOffset>"#,
+            namespace::CAMERA,
+            video.len()
+        ));
+        let mut bytes = jpeg(&[], &packet);
+        let start = bytes.len() as u64;
+        bytes.extend(video);
+        for mode in [Mode::Summary, Mode::Details] {
+            let metadata = read(&bytes, mode);
+            assert_eq!(
+                metadata.motion_video.map(|v| (v.start, v.end)),
+                valid.then_some((start, bytes.len() as u64))
+            );
+            assert_eq!(!metadata.issues.is_empty(), malformed);
+        }
+    }
+}
+
+#[test]
+fn png_itxt_preserves_languages_with_and_without_compression() {
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend(png_chunk(b"IHDR", &[0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0]));
+    for (language, text, compressed) in [
+        ("en", "Snow", false),
+        ("fr", "Neige", true),
+        ("", "Ice", false),
+    ] {
+        let mut data = b"Description\0".to_vec();
+        data.extend([u8::from(compressed), 0]);
+        data.extend(language.as_bytes());
+        data.extend([0, 0]);
+        data.extend(if compressed {
+            miniz_oxide::deflate::compress_to_vec_zlib(text.as_bytes(), 6)
+        } else {
+            text.as_bytes().to_vec()
+        });
+        bytes.extend(png_chunk(b"iTXt", &data));
+    }
+    bytes.extend(png_chunk(b"IEND", &[]));
+    let metadata = read(&bytes, Mode::Details);
+    let values: Vec<_> = metadata
+        .properties("urn:png:text", "Description")
+        .map(|p| (p.language.as_deref(), p.value.as_str()))
+        .collect();
+    assert_eq!(
+        values,
+        [(Some("en"), "Snow"), (Some("fr"), "Neige"), (None, "Ice")]
+    );
+    assert_eq!(
+        read(&bytes, Mode::Summary)
+            .properties("urn:png:text", "Description")
+            .count(),
+        0
+    );
+}
