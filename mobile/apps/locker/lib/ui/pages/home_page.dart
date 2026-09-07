@@ -864,7 +864,7 @@ class _HomePageState extends UploaderPageState<HomePage>
           button: true,
           label: context.strings.scanDocumentTitle,
           child: FABComponent(
-            variant: FABComponentVariant.secondary,
+            variant: FABComponentVariant.outlined,
             icon: HugeIcon(
               icon: HugeIcons.strokeRoundedCamera01,
               color: colors.primary,
