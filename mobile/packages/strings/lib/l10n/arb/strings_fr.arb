@@ -905,11 +905,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Désactiver le verrouillage de l'écran lorsque Ente est au premier plan et qu'une sauvegarde est en cours. Ce n'est normalement pas nécessaire mais cela peut faciliter les gros téléchargements et les premières importations de grandes bibliothèques.",
   "deviceNotFound": "Appareil non trouvé",
   "didYouKnow": "Le savais-tu ?",
   "digits": "Chiffres",
-  "disableAutoLock": "Désactiver le verrouillage automatique",
   "disableBackup": "Désactiver la sauvegarde",
   "disableDownloadWarningBody": "Les observateurs peuvent toujours prendre des captures d'écran ou enregistrer une copie de vos photos en utilisant des outils externes",
   "disableDownloadWarningTitle": "Veuillez remarquer",
@@ -1052,7 +1050,6 @@
     }
   },
   "earned": "gagné",
-  "earnFreeStorage": "Obtenez du stockage gratuit",
   "earnMoreSpace": "Gagnez de l'espace !",
   "edit": "Éditer",
   "editAutoAddPeople": "Modifier visages auto",
@@ -2485,14 +2482,6 @@
   "referrals": "Parrainages",
   "referralsAreCurrentlyPaused": "Les recommandations sont actuellement en pause",
   "referralStats": "Statistiques de parrainage",
-  "referralStep1": "1. Personnalisez et partagez votre code.",
-  "referralStep2": "2. Ils se sont inscrits à Ente en utilisant votre code.",
-  "referralStep3": "3. {storageInGB}Go gratuit pour eux + {storageInGB}Go gratuit pour vous lorsqu'ils passent sur un plan payant.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB pour eux + {storageAmountInGB} GB pour vous lorsqu'ils mettront à niveau leur compte.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2730,7 +2719,6 @@
   "saveCollage": "Enregistrer le collage",
   "saveContact": "Enregistrer le contact",
   "saveCopy": "Enregistrer une copie",
-  "saveDocumentDescription": "Charger des documents importants.",
   "saveKey": "Enregistrer la clé",
   "@saveKey": {
     "description": "Save key button label"
@@ -2996,7 +2984,6 @@
   "share": "Partager",
   "shareALink": "Partager le lien",
   "shareAnAlbum": "Partager un album",
-  "shareCodeEarnStorage": "Partagez votre code, gagnez du stockage.",
   "shareCodes": "Partager les codes",
   "shareCodesDuration": "Sélectionnez la durée pour laquelle vous souhaitez partager les codes.",
   "shared": "Partagé",
@@ -3421,7 +3408,6 @@
   },
   "unarchiveAlbum": "Désarchiver l'album",
   "unarchiving": "Désarchivage en cours...",
-  "unavailableReferralCode": "Désolé, ce code n'est pas disponible.",
   "uncategorized": "Aucune catégorie",
   "uncategorizedItemsWillShowUpHere": "Les éléments non catégorisés apparaîtront ici",
   "undo": "Annuler",

@@ -55,15 +55,6 @@ func (c *Controller) ChangePassword(ctx *gin.Context, userID int64, request ente
 	if err != nil {
 		return nil, err
 	}
-	if err := request.UpdateSrp.Validate(); err != nil {
-		return nil, stacktrace.Propagate(err, "invalid request")
-	}
-	if disableErr := c.UserCtrl.DisableTwoFactor(contact.UserID); disableErr != nil {
-		return nil, stacktrace.Propagate(disableErr, "failed to disable 2fa")
-	}
-	if disableErr := c.PasskeyController.RemovePasskey2FA(contact.UserID); disableErr != nil {
-		return nil, stacktrace.Propagate(disableErr, "failed to disable passkey")
-	}
 	logOutAllSessions := request.UpdateSrp.LogOutOtherDevices == nil || *request.UpdateSrp.LogOutOtherDevices
 	resp, err := c.UserCtrl.RecoverSrpAndKeyAttributes(ctx, contact.UserID, request.UpdateSrp, logOutAllSessions)
 	if err != nil {

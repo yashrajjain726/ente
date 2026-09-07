@@ -422,10 +422,8 @@
   "@deviceLock": {
     "description": "Device lock option title"
   },
-  "deviceLockExplanation": "Dezactivați blocarea ecranului dispozitivului atunci când Ente este în prim-plan și există o copie de rezervă în curs de desfășurare. În mod normal, acest lucru nu este necesar, dar poate ajuta la finalizarea mai rapidă a încărcărilor mari și a importurilor inițiale de biblioteci mari.",
   "deviceNotFound": "Dispozitivul nu a fost găsit",
   "didYouKnow": "Știați că?",
-  "disableAutoLock": "Dezactivare blocare automată",
   "disableDownloadWarningBody": "Observatorii pot să facă capturi de ecran sau să salveze o copie a fotografiilor dvs. folosind instrumente externe",
   "disableDownloadWarningTitle": "Rețineți",
   "disableLinkMessage": "Urmează să eliminați linkul public pentru accesarea „{albumName}”.",
@@ -1351,7 +1349,6 @@
   },
   "saveCollage": "Salvați colajul",
   "saveCopy": "Salvare copie",
-  "saveDocumentDescription": "Incarcati documente importante.",
   "savePerson": "Salvați persoana",
   "saveToLocker": "Salveaza in Locker",
   "saveYourRecoveryKeyIfYouHaventAlready": "Salvați cheia de recuperare, dacă nu ați făcut-o deja",
@@ -1687,7 +1684,6 @@
   },
   "unarchiveAlbum": "Dezarhivare album",
   "unarchiving": "Se dezarhivează...",
-  "unavailableReferralCode": "Ne pare rău, acest cod nu este disponibil.",
   "uncategorized": "Necategorisite",
   "unhide": "Reafişare",
   "unhideToAlbum": "Reafișare în album",

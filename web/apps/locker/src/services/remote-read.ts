@@ -3,10 +3,7 @@ import type {
     LockerCollectionParticipant,
     LockerItem,
 } from "@/types";
-import {
-    ensureLocalUser,
-    ensureUserKeyPair,
-} from "ente-accounts/services/user";
+import { ensureLocalUser } from "ente-accounts/services/user";
 import { fetchFile } from "ente-base/file-download";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
@@ -21,6 +18,7 @@ import {
     stringToB64,
 } from "ente-locker-wasm";
 import { z } from "zod";
+import { ensureUserKeyPair } from "./account-keys";
 import { fromInfoTypeWireValue } from "./info-type-wire";
 import {
     type StoredTrashFileRecord,

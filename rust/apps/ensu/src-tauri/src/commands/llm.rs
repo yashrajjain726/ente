@@ -1,5 +1,5 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -153,6 +153,25 @@ fn default_threads() -> i32 {
     let half = available / 2;
     let threads = if half == 0 { 1 } else { half };
     i32::try_from(threads).unwrap_or(1)
+}
+
+pub(crate) fn load_knowledge_embedding_context(
+    model_path: &Path,
+    check_cancelled: impl Fn() -> Result<(), ApiError>,
+) -> Result<llm::ContextRef, ApiError> {
+    let model = llm::Model::load(llm::ModelLoadParams {
+        model_path: model_path.display().to_string(),
+        n_gpu_layers: Some(0),
+        use_mmap: Some(true),
+        use_mlock: Some(false),
+    })
+    .map_err(llm_api_error)?;
+    check_cancelled()?;
+    let threads = std::thread::available_parallelism()
+        .map(|count| count.get().saturating_sub(1).max(1))
+        .unwrap_or(1);
+    llm::Context::new_knowledge_embedding(&model, Some(i32::try_from(threads).unwrap_or(1)))
+        .map_err(llm_api_error)
 }
 
 #[derive(Serialize, Clone)]

@@ -13,14 +13,13 @@ members = [
     "bindings/uniffi/ensu",
     "bindings/uniffi/log",
     "bindings/wasm/cast",
-    "bindings/wasm/core-wasm",
     "bindings/wasm/ensu",
     "bindings/wasm/legacy",
     "bindings/wasm/lib",
-    "bindings/wasm/log",
     "bindings/wasm/locker",
     "bindings/wasm/paste",
     "bindings/wasm/photos",
+    "bindings/wasm/prelogin",
     "bindings/wasm/space",
     "crates/accounts",
     "crates/assets",
@@ -61,7 +60,6 @@ ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
 ente-uniffi-log = { path = "bindings/uniffi/log" }
 ente-wasm-lib = { path = "bindings/wasm/lib" }
-ente-wasm-log = { path = "bindings/wasm/log" }
 fast_image_resize = { version = "5.5.0", features = ["image"] }
 flate2 = "1.1.9"
 flutter_rust_bridge = "=2.12.0"

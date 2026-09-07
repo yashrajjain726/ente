@@ -626,6 +626,7 @@ export const sidebar = [
                     { text: "FAQ", link: "/2of3/faq" },
                 ],
             },
+            { text: "QR", link: "/qr/" },
         ],
     },
     {

@@ -150,6 +150,10 @@
       "storageAmount": {}
     }
   },
+  "addPage": "Seite hinzufügen",
+  "@addPage": {
+    "description": "Button to capture another page in the document scanner"
+  },
   "addParticipants": "Teilnehmer hinzufügen",
   "addPeopleWidgetPrompt": "Füge ein Personen-Widget deinem Startbildschirm hinzu, um es hier anzupassen.",
   "addPerson": "Person hinzufügen",
@@ -180,6 +184,7 @@
   },
   "addYourPhotosNow": "Füge deine Foto jetzt hinzu",
   "adjust": "Anpassen",
+  "adjustCrop": "Zuschnitt anpassen",
   "admin": "Administrator",
   "admins": "Administratoren",
   "adminsAndCollaboratorsCanAddPhotosDescription": "Administratoren und Bearbeiter können Fotos hinzufügen. Administratoren können auch Fotos und Teilnehmer verwalten.",
@@ -207,7 +212,10 @@
   "after1Month": "Nach 1 Monat",
   "after1Week": "Nach 1 Woche",
   "after1Year": "Nach 1 Jahr",
+  "albumDescriptionHint": "Gib eine Beschreibung für dieses Album an",
+  "albumEditsWillNotBeSaved": "Deine Bearbeitungen an diesem Album werden nicht gespeichert.",
   "albumLayout": "Album-Layout",
+  "albumName": "Name des Albums",
   "albumOwner": "Besitzer",
   "@albumOwner": {
     "description": "Role of the album owner"
@@ -453,6 +461,33 @@
   "backupFile": "Datei sichern",
   "backupFolderLabel": "Sicherungsordner:",
   "backupLocationChoiceDescription": "Wo möchten sie ihre Backups speichern?",
+  "backupMode": "Sicherungsmodus",
+  "backupModeBackingUpItems": "{count, plural, one{Sichere ein Element} other{Sichere {formattedCount} Elemente}}",
+  "@backupModeBackingUpItems": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "12546"
+      },
+      "formattedCount": {
+        "type": "String",
+        "example": "12,546"
+      }
+    }
+  },
+  "backupModeCheckingForMoreItems": "Suche nach weiteren Elementen",
+  "backupModeFinishYourBackup": "Sicherung abschließen",
+  "backupModeKeepAppOpen": "Halte die App geöffnet",
+  "backupModeNoBackupInProgress": "Es läuft gerade keine Sicherung",
+  "backupModeNoBackupInProgressDescription": "Starte eine Sicherung, kehre dann zum Sicherungsmodus zurück.",
+  "backupModePlugInPhone": "Schließe dein Telefon an ein Ladegerät an. Sicherungen verkürzen die Akkulaufzeit.",
+  "backupModePreservingYourMemories": "Sicherung deiner Erinnerungsstücke",
+  "backupModeScreenDimmingDescription": "Der Bildschirm wird abgedunkelt, um den Akkuverbrauch zu reduzieren. Tippe ihn jederzeit an, um zurückzukommen.",
+  "backupModeScreenWillDim": "Bildschirm wird automatisch abgedunkelt, um den Akkuverbrauch zu reduzieren",
+  "backupModeSettingsDescription": "Halte die App geöffnet, um deine Sicherung abzuschließen",
+  "backupModeStart": "Sicherungsmodus starten",
+  "backupModeStayInEnte": "Bleib in Ente. Das Wechseln in andere Apps pausiert deine Sicherung.",
+  "backupModeTapToWakeScreen": "Tippen, um den Bildschirm aufzuwecken",
   "backupOnlyNewPhotos": "Nur neue Fotos sichern",
   "backupOnlyNewPhotosAllFoldersSelected": "Alle Ordner sind derzeit für die Sicherung ausgewählt. Du kannst jetzt fortfahren oder die ausgewählten Ordner aktualisieren.",
   "backupOnlyNewPhotosNoFoldersSelectedContinue": "Derzeit sind keine Ordner für die Sicherung ausgewählt. Du kannst jetzt fortfahren oder die ausgewählten Ordner aktualisieren.",
@@ -491,6 +526,7 @@
   "camera": "Kamera",
   "campingMoments": "Momente am Lagerfeuer",
   "cancel": "Abbrechen",
+  "back": "Zurück",
   "@cancel": {
     "description": "Cancel button label"
   },
@@ -1077,11 +1113,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Verhindern, dass der Bildschirm gesperrt wird, während die App im Vordergrund ist und eine Sicherung läuft. Das ist normalerweise nicht notwendig, kann aber dabei helfen, große Uploads wie einen Erstimport schneller abzuschließen.",
   "deviceNotFound": "Gerät nicht gefunden",
   "didYouKnow": "Schon gewusst?",
   "digits": "Ziffern",
-  "disableAutoLock": "Automatische Sperre deaktivieren",
   "disableBackup": "Sicherung deaktivieren",
   "disableDownloadWarningBody": "Zuschauer können weiterhin Screenshots oder mit anderen externen Programmen Kopien der Bilder machen.",
   "disableDownloadWarningTitle": "Bitte beachten Sie:",
@@ -1228,12 +1262,13 @@
     }
   },
   "earned": "verdient",
-  "earnFreeStorage": "Kostenlosen Speicherplatz verdienen",
+  "earnFreeStorage": "Erhalte kostenlosen Speicherplatz",
   "earnMoreSpace": "Verdiene mehr Speicherplatz!",
   "edit": "Bearbeiten",
   "editAutoAddPeople": "Automatisch hinzugefügte Personen bearbeiten",
   "editCodeAuthMessage": "Authentifizieren, um Code zu bearbeiten",
   "editContact": "Kontakt bearbeiten",
+  "editDetails": "Details bearbeiten",
   "editEmailAlreadyLinked": "Diese E-Mail ist bereits verknüpft mit {name}.",
   "@editEmailAlreadyLinked": {
     "placeholders": {
@@ -1611,6 +1646,16 @@
     }
   },
   "fileSavedToGallery": "Datei in Galerie gespeichert",
+  "filesCanBeRestoredFromTrash": "{count, plural, one{Element nicht gesichert. Es kann aus dem Papierkorb wiederhergestellt werden.} other{Elemente nicht gesichert. Sie können aus dem Papierkorb wiederhergestellt werden.}}",
+  "@filesCanBeRestoredFromTrash": {
+    "description": "Delete confirmation message for device-only items that will be moved to trash.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "filesDeleted": "Dateien gelöscht",
   "filesInAlbumSafelyOnEnte": "{count, plural, one {Dieses Element im Album ist bei Ente gesichert. Lösche die Kopie auf dem Gerät, um Speicherplatz freizugeben, ohne es zu verlieren.} other {Alle {formattedNumber} Elemente im Album sind bei Ente gesichert. Lösche die Kopien auf dem Gerät, um Speicherplatz freizugeben, ohne sie zu verlieren.}}",
   "@filesInAlbumSafelyOnEnte": {
@@ -1679,6 +1724,7 @@
       "count": {}
     }
   },
+  "freeUpDeviceSpaceDesc": "Gesicherte Elemente entfernen.",
   "freeUpSpace": "Speicherplatz freigeben",
   "gallery": "Galerie",
   "galleryMemoryLimitInfo": "Bis zu 1000 Erinnerungsstücke angezeigt in der Galerie",
@@ -1758,6 +1804,15 @@
   "ignore": "Ignorieren",
   "ignored": "ignoriert",
   "ignorePerson": "Person ignorieren",
+  "imageEditorBrightness": "Helligkeit",
+  "imageEditorContrast": "Kontrast",
+  "imageEditorExposure": "Belichtung",
+  "imageEditorFade": "Überblenden",
+  "imageEditorHue": "Farbton",
+  "imageEditorLuminance": "Leuchtdichte",
+  "imageEditorSaturation": "Sättigung",
+  "imageEditorSharpness": "Schärfe",
+  "imageEditorTemperature": "Temperatur",
   "imageNotAnalyzed": "Bild nicht analysiert",
   "immediately": "Sofort",
   "@immediately": {
@@ -1978,6 +2033,123 @@
       }
     }
   },
+  "librarySharingAllCurrentAlbumsShared": "Alle deine aktuellen Alben sind geteilt",
+  "librarySharingBannerDescription": "Teile alle deine Alben",
+  "librarySharingDisable": "Deaktivieren",
+  "librarySharingDisableDescription": "Alben, die du bereits geteilt hast, werden mit {recipient} geteilt bleiben, einschließlich aller neuen Fotos, die du ihnen hinzufügst. Neue Alben werden nicht automatisch geteilt.\n\nUm das Teilen eines Albums zu beenden, tippe es an und wähle '{stopSharingLabel}'.",
+  "@librarySharingDisableDescription": {
+    "placeholders": {
+      "recipient": {
+        "type": "String",
+        "example": "Alex"
+      },
+      "stopSharingLabel": {
+        "type": "String",
+        "example": "Stop sharing"
+      }
+    }
+  },
+  "librarySharingDisableTitle": "Teilen der Bibliothek deaktivieren?",
+  "librarySharingEnableDescription": "Deine vorhandenen Alben und Alben, die du in Zukunft erstellst, werden automatisch mit {recipient} geteilt.",
+  "@librarySharingEnableDescription": {
+    "placeholders": {
+      "recipient": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "librarySharingEnableTitle": "Teilen der Bibliothek aktivieren?",
+  "librarySharingFailedAlbumCount": "{count, plural, one{Konnte ein Album nicht aktualisieren.} other{Konnte {count} Alben nicht aktualisieren.}}",
+  "@librarySharingFailedAlbumCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingFailedDescription": "Ausgewählte Alben konnten nicht aktualisiert werden.",
+  "librarySharingFailedTitle": "Teilen fehlgeschlagen",
+  "librarySharingHiddenAlbumsDescription": "Versteckte Alben werden nicht geteilt. Du kannst jederzeit aufhören, alle Alben zu teilen.",
+  "librarySharingMemberSubtitle": "{count, plural, =0{Kein Album geteilt • {storageUsage}} one{Ein Album geteilt • {storageUsage}} other{{count} Alben geteilt • {storageUsage}}}",
+  "@librarySharingMemberSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      },
+      "storageUsage": {
+        "type": "String",
+        "example": "2 GB"
+      }
+    }
+  },
+  "librarySharingMixed": "Gemischt",
+  "librarySharingNoAlbumsToShare": "Noch keine Alben zum Teilen",
+  "librarySharingPreviouslyUnsharedDescription": "{count, plural, one{Das Teilen für dieses Album wurde zuvor gestoppt, daher wurde es nicht erneut geteilt.} other{Das Teilen für diese Alben wurde zuvor gestoppt, daher wurden sie nicht erneut geteilt.}}",
+  "@librarySharingPreviouslyUnsharedDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingPreviouslyUnsharedTitle": "{count, plural, one{Ein Album wurde nicht geteilt} other{{count} Alben wurden nicht geteilt}}",
+  "@librarySharingPreviouslyUnsharedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingRetryFailedAlbums": "Fehlgeschlagene Alben erneut versuchen",
+  "librarySharingRole": "Rolle",
+  "librarySharingRoles": "Rollen",
+  "librarySharingShareAlbumCount": "{count, plural, one{Ein Album teilen} other{{count} Alben teilen}}",
+  "@librarySharingShareAlbumCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingShareAlbums": "Alben teilen",
+  "librarySharingSharedAlbumCount": "{count, plural, =0{Keine Alben geteilt} one{Ein Album geteilt} other{{count} Alben geteilt}}",
+  "@librarySharingSharedAlbumCount": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingShareWith": "Teilen mit",
+  "librarySharingSharingWith": "Geteilt mit",
+  "librarySharingStopSharing": "Teilen beenden",
+  "librarySharingStopSharingDescription": "{count, plural, one{Die Person wird dieses Album verlieren und alle Fotos, die sie hinzugefügt hat, werden ebenfalls entfernt. Du kannst später erneut teilen.} other{Die Person wird diese Alben verlieren und alle Fotos, die sie hinzugefügt hat, werden ebenfalls entfernt. Du kannst später erneut teilen.}}",
+  "@librarySharingStopSharingDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingStopSharingTitle": "{count, plural, one{Das Teilen eines Albums beenden?} other{Das Teilen von {count} Alben beenden?}}",
+  "@librarySharingStopSharingTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "librarySharingTitle": "Bibliothek teilen",
+  "librarySharingUpdateRoles": "Rollen aktualisieren",
   "limit": "Begrenzung",
   "linkCopiedToClipboard": "Link in Zwischenablage kopiert",
   "linkDeletedSuccessfully": "Link erfolgreich gelöscht",
@@ -2186,6 +2358,7 @@
       }
     }
   },
+  "menubarMode": "Menüleisten-Modus",
   "message": "Nachricht",
   "minimizeAppOnCopy": "Beim Kopieren App minimieren",
   "minimizeToTrayOnClose": "Beim Schließen in die Taskleiste minimieren",
@@ -2604,6 +2777,8 @@
   },
   "pets": "Pelzige Begleiter",
   "photoGridSize": "Fotorastergröße",
+  "photoLibraryAddPermissionRequired": "Ente benötigt die Berechtigung, um Fotos und Videos in Apple Fotos zu speichern. Sie können den Zugriff in den Einstellungen erlauben.",
+  "photoLibraryAddPermissionRestricted": "Der Zugriff auf die Fotobibliothek ist auf diesem Gerät eingeschränkt.",
   "photos": "Fotos",
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Von dir hinzugefügte Fotos werden vom Album entfernt",
   "photosAndVideosCount": "{count, plural, one{{formattedCount} Foto & Video} other{{formattedCount} Fotos & Videos}}",
@@ -2676,6 +2851,7 @@
       }
     }
   },
+  "playbackSpeed": "Wiedergabegeschwindigkeit",
   "playfulKids": "Verspielte Kinder",
   "playOriginal": "Original abspielen",
   "playstoreSubscription": "PlayStore Abo",
@@ -2931,9 +3107,14 @@
   "referrals": "Weiterempfehlungen",
   "referralsAreCurrentlyPaused": "Einlösungen sind derzeit pausiert",
   "referralStats": "Empfehlungsstatistiken",
-  "referralStep1": "1. Personalisiere und teile deinen Code.",
-  "referralStep2": "2. Er oder sie meldet sich bei Ente mit deinem Code an.",
-  "referralStep3": "3. {storageInGB} GB kostenlos für sie oder ihn + {storageInGB} GB kostenlos für dich, wenn ein Upgrade durchgeführt wird.",
+  "referralStep1": "1. Teile deinen Code mit Freunden",
+  "referralStep2": "2. Sie erhalten {storageInGB} GB kostenlos bei der Anmeldung",
+  "@referralStep2": {
+    "placeholders": {
+      "storageInGB": {}
+    }
+  },
+  "referralStep3": "3. Du erhältst {storageInGB} GB kostenlos, wenn sie upgraden",
   "@referralStep3": {
     "placeholders": {
       "storageInGB": {}
@@ -3078,6 +3259,7 @@
     "description": "Reset password title"
   },
   "resetToDefault": "Standardwerte zurücksetzen",
+  "restartAppToApplyChanges": "Starte die App neu, um diese Änderung zu übernehmen",
   "@resetToDefault": {
     "description": "Button text to reset cover photo to default"
   },
@@ -3085,6 +3267,14 @@
   "@restore": {
     "description": "Display text for an action which triggers a restore of item from trash",
     "type": "text"
+  },
+  "restoredItems": "{count, plural, one{Element wiederhergestellt} other{{count} Elemente wiederhergestellt}}",
+  "@restoredItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "restoreToAlbum": "Album wiederherstellen",
   "restoringFiles": "Dateien werden wiederhergestellt...",
@@ -3174,6 +3364,8 @@
   "ritualSendReminderLabel": "Erinnerung senden",
   "ritualSetAlbumToLaunchCamera": "Lege ein Album für dieses Ritual fest, um die Kamera zu starten.",
   "ritualShareUnavailable": "Momentan kann nicht geteilt werden. Bitte versuche es erneut.",
+  "ritualStartNew": "Neues Ritual beginnen",
+  "ritualStartNewDescription": "Erstelle ein Ritual, baue Streaks und teile deinen Fortschritt.",
   "ritualsTitle": "Rituale",
   "ritualUntitled": "Unbenanntes Ritual",
   "ritualUpdate": "Ritual aktualisieren",
@@ -3191,13 +3383,14 @@
     "description": "Label for save button"
   },
   "saveAsAnotherPerson": "Als andere Person speichern",
+  "saveChanges": "Änderungen speichern",
   "saveChangesBeforeLeavingQuestion": "Änderungen vor dem Verlassen speichern?",
   "saveCode": "Code speichern",
   "saveCollage": "Collage speichern",
   "saveContact": "Kontakt speichern",
   "saveCopy": "Kopie speichern",
-  "saveDocumentDescription": "Lade wichtige Dokumente hoch.",
-  "saveDocumentTitle": "Dokument",
+  "saveFileDescription": "Wichtige Dateien hochladen.",
+  "saveFileTitle": "Datei",
   "saveKey": "Schlüssel speichern",
   "@saveKey": {
     "description": "Save key button label"
@@ -3211,6 +3404,7 @@
     "description": "Description text asking user if they want to save to storage or share with other apps"
   },
   "savePerson": "Person speichern",
+  "saveToEnte": "In Ente speichern",
   "saveToLocker": "Im Locker speichern",
   "saveYourRecoveryKeyIfYouHaventAlready": "Sichere deinen Wiederherstellungs-Schlüssel, falls noch nicht geschehen",
   "saving": "Speichern...",
@@ -3220,8 +3414,43 @@
   "scanACode": "Scan einen Code",
   "scanAQrCode": "QR-Code scannen",
   "scanCode": "Code scannen",
+  "scanDocumentDescription": "Scanne wichtige Dokumente.",
+  "scanDocumentTitle": "Dokument",
+  "scanFilenamePrefix": "Scannen",
+  "@scanFilenamePrefix": {
+    "description": "Prefix of the default filename for a scanned document PDF, e.g. 'Scan 13 Aug 2026, 14.30.pdf'"
+  },
+  "scannerAutoCaptureOff": "Automatische Aufnahme deaktivieren",
+  "scannerAutoCaptureOn": "Automatische Aufnahme aktivieren",
+  "scannerCaptureModeAuto": "Automatisch",
+  "@scannerCaptureModeAuto": {
+    "description": "Label on the scanner capture-mode toggle while automatic capture is on"
+  },
+  "scannerCaptureModeManual": "Manuell",
+  "@scannerCaptureModeManual": {
+    "description": "Label on the scanner capture-mode toggle while capture is manual (automatic capture off)"
+  },
+  "scannerNotSupportedOnDevice": "Scannen von Dokumenten wird auf diesem Gerät nicht unterstützt",
   "scannerTorchOff": "Taschenlampe ausschalten",
   "scannerTorchOn": "Taschenlampe einschalten",
+  "scannerCapture": "Aufnehmen",
+  "scannerPreparing": "Scanner wird vorbereitet...",
+  "scanProcessing": "Verarbeite deinen Scan...",
+  "scanPageOfTotal": "Seite {current} von {total}",
+  "@scanPageOfTotal": {
+    "description": "Page position indicator in the document scanner review screen",
+    "placeholders": {
+      "current": {
+        "type": "int",
+        "example": "1"
+      },
+      "total": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "scanSaved": "Scan gespeichert",
   "scanThisBarcodeWithnyourAuthenticatorApp": "Scanne diesen Code mit \ndeiner Authentifizierungs-App",
   "scheduleShare": "Teilen planen",
   "search": "Suche",
@@ -3490,7 +3719,7 @@
   "share": "Teilen",
   "shareALink": "Einen Link teilen",
   "shareAnAlbum": "Ein Album teilen",
-  "shareCodeEarnStorage": "Teile deinen Code, verdiene Speicherplatz.",
+  "shareCodeEarnStorage": "Verdopple deinen Speicherplatz auf Ente",
   "shareCodes": "Codes teilen",
   "shareCodesDuration": "Wählen Sie die Dauer aus, für die Sie die Codes teilen möchten.",
   "shareCollection": "Sammlung freigeben",
@@ -3543,11 +3772,10 @@
   "shareTextRecommendUsingEnte": "Laden Sie Ente herunter, damit wir problemlos Dateien in Originalqualität freigeben können https://ente.com",
   "shareTextRecommendUsingEnteForFamily": "Lade Ente herunter, damit ich dich zu meinem Familientarif hinzufügen kann\n\nhttps://ente.com",
   "shareTextRecommendUsingEnteForPhotos": "Hol dir Ente, damit wir ganz einfach Fotos und Videos in Originalqualität teilen können\n\nhttps://ente.com",
-  "shareTextReferralCode": "Ente Fotos ist ein privates und sicheres Zuhause für deine Fotos\n* Lade Ente Fotos von https://ente.com/app herunter\n* Erstelle ein Konto\n* Wende den Empfehlungscode {referralCode} an unter Einstellungen->Weiterempfehlungen\n* Erhalte zusätzliche {referralStorageInGB} GB kostenlos, wenn du auf einen kostenpflichtigen Tarif upgradest!",
-  "@shareTextReferralCode": {
+  "shareTextReferralInvite": "Erhalte 20 GB kostenlos mit Ente Photos! Lade die App unter https://ente.com/invite herunter und nutze den Code {referralCode}.",
+  "@shareTextReferralInvite": {
     "placeholders": {
-      "referralCode": {},
-      "referralStorageInGB": {}
+      "referralCode": {}
     }
   },
   "shareThisLink": "Mit diesem Link kann jeder, der ihn erhält, auf dein Element zugreifen. Du kannst den Zugriff jederzeit entfernen, indem du den Link löschst.",
@@ -3907,6 +4135,7 @@
   },
   "totalSize": "Gesamtgröße",
   "trash": "Papierkorb",
+  "restoreOrPermanentlyDeleteItems": "Elemente wiederherstellen oder dauerhaft löschen",
   "trashClearedSuccessfully": "Papierkorb erfolgreich geleert",
   "trashCode": "Code löschen?",
   "trashCodeMessage": "Sind Sie sicher, dass Sie den Code für {account} löschen wollen?",
@@ -3991,7 +4220,7 @@
   },
   "unarchiveAlbum": "Album dearchivieren",
   "unarchiving": "Dearchiviere …",
-  "unavailableReferralCode": "Entschuldigung, dieser Code ist nicht verfügbar.",
+  "unavailableReferralCode": "Dieser Code wurde bereits verwendet",
   "uncategorized": "Unkategorisiert",
   "uncategorizedItemsWillShowUpHere": "Unkategorisierte Elemente werden hier angezeigt",
   "undo": "Rückgängig",
@@ -4029,6 +4258,7 @@
   },
   "unpinPerson": "Person lösen",
   "unpinText": "Lösen",
+  "unsavedChangesDescription": "Du hast ungespeicherte Änderungen. Wenn du jetzt zurückgehst, gehen sie verloren.",
   "unsavedNoteChangesDescription": "Du hast ungespeicherte Änderungen in dieser Notiz. Wenn du jetzt zurückgehst, gehen sie verloren.",
   "unsavedNoteChangesTitle": "Änderungen verwerfen?",
   "unselectAll": "Alle demarkieren",
@@ -4109,6 +4339,7 @@
   "useAsCover": "Als Titelbild festlegen",
   "usedSpace": "Belegter Speicherplatz",
   "usedYourCode": "nutzte deinen Code",
+  "useMLToFindSimilarImages": "Entferne Elemente, die ähnlich aussehen",
   "useOffline": "Ohne Backup verwenden",
   "username": "Benutzername",
   "usernameHint": "Login-ID oder E-Mail",
@@ -4177,6 +4408,7 @@
     "description": "Number of viewers that were successfully added."
   },
   "viewLargeFiles": "Große Dateien",
+  "viewLargeFilesDesc": "Identifiziere Elemente, die den meisten Platz belegen",
   "viewLogs": "Protokolle anzeigen",
   "@viewLogs": {
     "description": "Button to view logs"
@@ -4291,6 +4523,7 @@
   "yourPlanWasSuccessfullyDowngraded": "Dein Tarif wurde erfolgreich heruntergestuft",
   "yourPlanWasSuccessfullyUpgraded": "Dein Abo wurde erfolgreich hochgestuft",
   "yourPurchaseWasSuccessful": "Dein Einkauf war erfolgreich",
+  "yourReferralCode": "Dein Empfehlungscode",
   "yourSubscriptionHasExpired": "Dein Abonnement ist abgelaufen",
   "yourSubscriptionWasUpdatedSuccessfully": "Dein Abonnement wurde erfolgreich aktualisiert.",
   "yourTrashIsEmpty": "Dein Papierkorb ist leer",

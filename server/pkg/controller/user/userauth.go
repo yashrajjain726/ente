@@ -306,7 +306,7 @@ func (c *UserController) VerifyEmail(context *gin.Context, request ente.EmailVer
 	if err != nil {
 		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
-	return c.onVerificationSuccess(context, email, request.Source)
+	return c.onVerificationSuccess(context, email, request.Source, nil)
 }
 
 func (c *UserController) ChangeEmail(ctx *gin.Context, request ente.EmailVerificationRequest) error {
@@ -493,7 +493,10 @@ func (c *UserController) AddTokenAndNotify(ctx *gin.Context, userID int64, app e
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to insert token")
 	}
+	return c.notifyLogin(ctx, userID, app, ip, userAgent)
+}
 
+func (c *UserController) notifyLogin(ctx *gin.Context, userID int64, app ente.App, ip string, userAgent string) error {
 	isEmailMFAEnabled, emailMFAErr := c.UserAuthRepo.IsEmailMFAEnabled(ctx, userID)
 	if emailMFAErr != nil {
 		log.WithError(emailMFAErr).WithField("user_id", userID).Warn("Failed to fetch email MFA status")
@@ -621,7 +624,7 @@ func emailOTT(app ente.App, to string, ott string, purpose string, mobile bool) 
 	return nil
 }
 
-func (c *UserController) onVerificationSuccess(context *gin.Context, email string, source *string) (ente.EmailAuthorizationResponse, error) {
+func (c *UserController) onVerificationSuccess(context *gin.Context, email string, source *string, srpAuth *ente.SRPAuthEntity) (ente.EmailAuthorizationResponse, error) {
 	isTwoFactorEnabled := false
 	app := auth.GetApp(context)
 
@@ -649,6 +652,20 @@ func (c *UserController) onVerificationSuccess(context *gin.Context, email strin
 	if err != nil {
 		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
+	if srpAuth == nil {
+		srpAuth, err = c.UserAuthRepo.GetSRPAuthEntity(context, userID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
+		}
+	}
+	keyAttributesValue, err := c.UserRepo.GetKeyAttributes(userID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
+	}
+	var keyAttributes *ente.KeyAttributes
+	if err == nil {
+		keyAttributes = &keyAttributesValue
+	}
 	var passKeySessionID, twoFactorSessionID, accountsUrl string
 
 	if hasPasskeys {
@@ -658,14 +675,12 @@ func (c *UserController) onVerificationSuccess(context *gin.Context, email strin
 		}
 
 		passKeySessionID = auth.GenerateURLSafeRandomString(PassKeySessionIDLength)
-		err = c.PasskeyRepo.AddPasskeyTwoFactorSession(userID, passKeySessionID, time.Microseconds()+TwoFactorValidityDurationInMicroSeconds)
-		if err != nil {
-			return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
-		}
 	}
 	if isTwoFactorEnabled {
 		twoFactorSessionID = auth.GenerateURLSafeRandomString(TwoFactorSessionIDLength)
-		err = c.TwoFactorRepo.AddTwoFactorSession(userID, twoFactorSessionID, time.Microseconds()+TwoFactorValidityDurationInMicroSeconds)
+	}
+	if hasPasskeys || isTwoFactorEnabled {
+		err = c.UserAuthRepo.AddLoginResult(context, userID, srpAuth, keyAttributes, app, "", "", "", passKeySessionID, twoFactorSessionID, time.Microseconds()+TwoFactorValidityDurationInMicroSeconds)
 		if err != nil {
 			return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 		}
@@ -679,37 +694,39 @@ func (c *UserController) onVerificationSuccess(context *gin.Context, email strin
 	}
 
 	token := auth.GenerateURLSafeRandomString(TokenLength)
-	keyAttributes, err := c.UserRepo.GetKeyAttributes(userID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// user creation is pending on key attributes set based on the password.
-			// No need to send login notification
-			if err := c.ensureStorageWarningDeletionLoginAllowed(userID, app); err != nil {
-				return ente.EmailAuthorizationResponse{}, err
-			}
-			err = c.UserAuthRepo.AddToken(userID, app, token,
-				network.GetClientIP(context), context.Request.UserAgent())
-			if err != nil {
-				return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
-			}
-			return ente.EmailAuthorizationResponse{ID: userID, Token: token}, nil
-		} else {
+	if keyAttributes == nil {
+		// user creation is pending on key attributes set based on the password.
+		// No need to send login notification
+		if err := c.ensureStorageWarningDeletionLoginAllowed(userID, app); err != nil {
+			return ente.EmailAuthorizationResponse{}, err
+		}
+		err = c.UserAuthRepo.AddLoginResult(context, userID, srpAuth, nil, app, token,
+			network.GetClientIP(context), context.Request.UserAgent(), "", "", 0)
+		if err != nil {
 			return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 		}
+		return ente.EmailAuthorizationResponse{ID: userID, Token: token}, nil
 	}
 	var encryptedToken string
 	encryptedToken, err = crypto.GetEncryptedToken(token, keyAttributes.PublicKey)
 	if err != nil {
 		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
-	err = c.AddTokenAndNotify(context, userID, app, token,
-		network.GetClientIP(context), context.Request.UserAgent())
+	ip := network.GetClientIP(context)
+	userAgent := context.Request.UserAgent()
+	if err = c.ensureStorageWarningDeletionLoginAllowed(userID, app); err != nil {
+		return ente.EmailAuthorizationResponse{}, err
+	}
+	err = c.UserAuthRepo.AddLoginResult(context, userID, srpAuth, keyAttributes, app, token, ip, userAgent, "", "", 0)
+	if err == nil {
+		err = c.notifyLogin(context, userID, app, ip, userAgent)
+	}
 	if err != nil {
 		return ente.EmailAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
 	return ente.EmailAuthorizationResponse{
 		ID:             userID,
-		KeyAttributes:  &keyAttributes,
+		KeyAttributes:  keyAttributes,
 		EncryptedToken: encryptedToken,
 	}, nil
 

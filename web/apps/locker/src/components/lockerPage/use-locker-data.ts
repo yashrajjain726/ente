@@ -1,3 +1,4 @@
+import { masterKeyFromSession } from "@/services/account-keys";
 import { openAuthenticatedSession } from "@/services/authenticated-session";
 import {
     LOCKER_FILE_LIMIT_FREE,
@@ -13,7 +14,6 @@ import {
     savedPartialLocalUser,
 } from "ente-accounts/services/accounts-db";
 import { stashRedirect } from "ente-accounts/services/redirect";
-import { masterKeyFromSession } from "ente-accounts/services/session-storage";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import {

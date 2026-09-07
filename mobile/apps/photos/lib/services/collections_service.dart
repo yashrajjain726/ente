@@ -41,7 +41,6 @@ import "package:photos/models/metadata/collection_magic.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/services/app_lifecycle_service.dart';
 import "package:photos/services/favorites_service.dart";
-import "package:photos/services/hidden_service.dart";
 import 'package:photos/services/memory_share_service.dart';
 import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
@@ -81,7 +80,6 @@ class CollectionsService {
   final _cachedUserIdToUser = <int, User>{};
   Collection? cachedDefaultHiddenCollection;
   Future<Map<int, int>>? _collectionIDToNewestFileTime;
-  Collection? cachedUncategorizedCollection;
   final Map<String, EnteFile> _coverCache = <String, EnteFile>{};
   final Map<int, int> _countCache = <int, int>{};
 
@@ -153,6 +151,7 @@ class CollectionsService {
     watch.log("remote fetch collections ${fetchedCollections.length}");
 
     if (fetchedCollections.isEmpty) {
+      await _ensureUncategorizedCollectionExists();
       return;
     }
     final updatedCollections = <Collection>[];
@@ -211,13 +210,14 @@ class CollectionsService {
         ),
       );
     }
+
+    await _ensureUncategorizedCollectionExists();
   }
 
   void clearCache() {
     _localPathToCollectionID.clear();
     _collectionIDToCollections.clear();
     cachedDefaultHiddenCollection = null;
-    cachedUncategorizedCollection = null;
     _cachedPublicAlbumToken.clear();
     _cachedPublicAlbumJWT.clear();
     _cachedPublicCollectionID.clear();
@@ -535,6 +535,34 @@ class CollectionsService {
         .toList()
         .where((element) => !element.isDeleted)
         .toList();
+  }
+
+  Future<Collection> getUncategorizedCollection() async {
+    final int? userID = _config.getUserID();
+    if (userID == null) {
+      throw StateError("Cannot get Uncategorized without a configured user");
+    }
+
+    final matchedCollection = _collectionIDToCollections.values
+        .firstWhereOrNull(
+          (collection) =>
+              !collection.isDeleted &&
+              collection.type == CollectionType.uncategorized &&
+              collection.isOwner(userID),
+        );
+    if (matchedCollection != null) {
+      return matchedCollection;
+    }
+
+    return _createUncategorizedCollection();
+  }
+
+  Future<void> _ensureUncategorizedCollectionExists() async {
+    try {
+      await getUncategorizedCollection();
+    } catch (e, s) {
+      _logger.warning("Failed to ensure Uncategorized collection exists", e, s);
+    }
   }
 
   Set<int> nonHiddenOwnedCollections() {
@@ -2558,6 +2586,28 @@ class CollectionsService {
       ),
     );
     return cachedCollection;
+  }
+
+  Future<Collection> _createUncategorizedCollection() async {
+    final uncategorizedCollectionKey = CryptoUtil.generateKey();
+    final encKey = CryptoUtil.encryptSync(
+      uncategorizedCollectionKey,
+      _config.getKey()!,
+    );
+    final encName = CryptoUtil.encryptSync(
+      utf8.encode("Uncategorized"),
+      uncategorizedCollectionKey,
+    );
+    return createAndCacheCollection(
+      CreateRequest(
+        encryptedKey: CryptoUtil.bin2base64(encKey.encryptedData!),
+        keyDecryptionNonce: CryptoUtil.bin2base64(encKey.nonce!),
+        encryptedName: CryptoUtil.bin2base64(encName.encryptedData!),
+        nameDecryptionNonce: CryptoUtil.bin2base64(encName.nonce!),
+        type: CollectionType.uncategorized,
+        attributes: CollectionAttributes(),
+      ),
+    );
   }
 
   @Deprecated("Use _cacheLocalPathAndCollection instead")

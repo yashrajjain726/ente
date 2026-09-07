@@ -22,11 +22,11 @@ edition = "2024"
 """
 
 
-def run(app_b):
+def run(app_b, members='"app-*"'):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         rust = root / "rust"
-        write(rust / "Cargo.toml", workspace)
+        write(rust / "Cargo.toml", workspace.replace('"app-*"', members))
         write(
             rust / "app-a/Cargo.toml",
             package.format("app-a")
@@ -90,3 +90,11 @@ dep = { package = "tokio", version = "1.0.0" }
 assert result.returncode == 1, result.stderr
 assert "target.cfg(unix).dependencies.dep duplicates shared dependency 'serde'" in result.stderr
 assert "target.cfg(windows)" not in result.stderr
+
+result = run("\n[dependencies]\nshared.workspace = true\n", '"app-b", "app-a"')
+assert result.returncode == 1, result.stderr
+assert "rust/Cargo.toml: workspace.members 'app-b' precedes 'app-a'; sort members" in result.stderr
+
+result = run("\n[dependencies]\nshared.workspace = true\n", '"app-a", "app-b"')
+assert result.returncode == 0, result.stderr
+assert not result.stderr

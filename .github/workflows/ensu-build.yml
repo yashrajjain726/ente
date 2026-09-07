@@ -151,10 +151,6 @@ jobs:
               working-directory: web
               run: npm ci
 
-            - name: Build WASM
-              working-directory: web
-              run: npm run build:core-wasm
-
             - name: Install Tauri dependencies
               run: npm ci --prefix rust/apps/ensu
 

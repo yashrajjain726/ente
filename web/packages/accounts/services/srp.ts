@@ -10,7 +10,7 @@ import {
     publicRequestHeaders,
 } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { createSRPSession } from "ente-core-wasm";
+import { createSRPSession } from "ente-prelogin-wasm";
 import { ensure } from "ente-utils/ensure";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
@@ -87,15 +87,15 @@ const srpSetupOrReconfigure = async (
         srpUserID,
         srpSalt,
         srpVerifier,
-        srpA: session.public_a(),
+        srpA: session.publicA(),
     });
 
     const { srpM2 } = await exchangeCB({
         setupID,
-        srpM1: session.compute_m1(srpB),
+        srpM1: session.computeM1(srpB),
     });
 
-    session.verify_m2(srpM2);
+    session.verifyM2(srpM2);
 };
 
 interface SetupSRPRequest {
@@ -200,16 +200,16 @@ export const verifySRP = async (
 
     const { srpB, sessionID } = await createSRPSessionOnRemote({
         srpUserID,
-        srpA: session.public_a(),
+        srpA: session.publicA(),
     });
 
     const { srpM2, ...rest } = await verifySRPSession({
         sessionID,
         srpUserID,
-        srpM1: session.compute_m1(srpB),
+        srpM1: session.computeM1(srpB),
     });
 
-    session.verify_m2(srpM2);
+    session.verifyM2(srpM2);
 
     return rest;
 };

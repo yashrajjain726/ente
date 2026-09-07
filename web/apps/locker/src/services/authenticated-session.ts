@@ -1,10 +1,10 @@
-import { masterKeyFromSession } from "ente-accounts/services/session-storage";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
 import { openSession as openLegacySession } from "ente-legacy-wasm/authenticated";
 import { openSession, type Session } from "ente-locker-wasm";
+import { masterKeyFromSession } from "./account-keys";
 
 const lockerSessions = sessionCache(openSession);
 const legacySessions = sessionCache(openLegacySession);

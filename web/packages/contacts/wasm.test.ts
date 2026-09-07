@@ -1,12 +1,12 @@
+import * as legacy from "ente-legacy-wasm/authenticated";
+import * as locker from "ente-locker-wasm";
+import * as photos from "ente-photos-wasm";
 import {
     boxSealOpen,
     encryptBox,
     generateKey,
     generateKeyPair,
-} from "ente-core-wasm";
-import * as legacy from "ente-legacy-wasm/authenticated";
-import * as locker from "ente-locker-wasm";
-import * as photos from "ente-photos-wasm";
+} from "ente-prelogin-wasm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 afterEach(() => vi.unstubAllGlobals());

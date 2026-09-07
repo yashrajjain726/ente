@@ -1,5 +1,5 @@
-//! L, a and b are all scaled onto 0..255 (a and b biased by 128); the
-//! pipeline's chroma and luminance thresholds are calibrated in these units.
+// L, a and b are all scaled onto 0..255 (a and b biased by 128); the
+// pipeline's chroma and luminance thresholds are calibrated in these units.
 
 use std::sync::OnceLock;
 

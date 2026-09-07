@@ -1,1 +1,1 @@
-- Document scanner (behind internal flag)
+- Document scanner enabled for all users

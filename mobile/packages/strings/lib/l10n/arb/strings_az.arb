@@ -572,10 +572,8 @@
   "@deviceLock": {
     "description": "Device lock option title"
   },
-  "deviceLockExplanation": "Ente ön planda olduqda və yedəkləmə davam etdikdə cihazın ekran kilidini söndürün. Bu normalda lazım deyil, lakin böyük yükləmələrin və böyük kitabxanaların ilkin idxalının daha sürətli tamamlanmasına kömək edə bilər.",
   "deviceNotFound": "Cihaz tapılmadı",
   "didYouKnow": "Bilirdinizmi?",
-  "disableAutoLock": "Avtomatik kilidi söndür",
   "disableDownloadWarningBody": "Nəzərə alın ki, izləyicilər hələ də kənar alətlər vasitəsilə fotoşəkillərinizin ekran görüntüsünü götürə və ya surətini yadda saxlaya bilərlər",
   "disableDownloadWarningTitle": "Qeyd edək ki",
   "disableLinkMessage": "Bu, \"{albumName}\" albomuna giriş üçün olan ictimai linki siləcək.",
@@ -700,7 +698,6 @@
     }
   },
   "earned": "qazanılıb",
-  "earnFreeStorage": "Pulsuz yaddaş qazanın",
   "earnMoreSpace": "Daha çox yer qazan!",
   "edit": "Redaktə et",
   "editAutoAddPeople": "İnsanların avtomatik əlavə edilməsini redaktə et",
@@ -1675,14 +1672,6 @@
   "referrals": "Tövsiyələr",
   "referralsAreCurrentlyPaused": "Referallar hazırda dayandırılıb",
   "referralStats": "Referal statistikası",
-  "referralStep1": "1. Kodunuzu fərdiləşdirin və paylaşın.",
-  "referralStep2": "2. Onlar sizin kodunuzdan istifadə edərək Ente-də qeydiyyatdan keçirlər.",
-  "referralStep3": "3. Onlar abunəliyi yüksəltdikdə onlar üçün {storageInGB} GB pulsuz + sizin üçün {storageInGB} GB pulsuz.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "Onlar üçün {storageAmountInGB} GB + onlar abunəliklərini yüksəltdikdə sizin üçün {storageAmountInGB} GB.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2066,7 +2055,6 @@
   "setupComplete": "Quraşdırma tamamlandı",
   "share": "Paylaş",
   "shareALink": "Link paylaş",
-  "shareCodeEarnStorage": "Kodunuzu paylaşın, yaddaş qazanın.",
   "sharedAlbumSectionDescription": "Digər Ente istifadəçiləri ilə pulsuz plan istifadəçiləri daxil olmaqla paylaşılan və birgə işlənilən albomlar yaradın.",
   "shareKey": "Açarı paylaş",
   "shareLink": "Linki paylaş",
@@ -2376,7 +2364,6 @@
   },
   "unarchiveAlbum": "Albomu arxivdən çıxar",
   "unarchiving": "Arxivdən çıxarılır...",
-  "unavailableReferralCode": "Təəssüf ki, bu kod artıq istifadə olunub əlçatmazdır.",
   "uncategorized": "Kateqoriyasız",
   "undo": "Geri al",
   "unhide": "Gizlilikdən çıxar",

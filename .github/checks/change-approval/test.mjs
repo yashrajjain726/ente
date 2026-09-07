@@ -114,7 +114,7 @@ test("CI preserves tabs and newlines in binary and large filenames", (t) => {
     const size = 1024 * 1024 + 1;
     const { output, summary } = scan(t, {}, { [binary]: Buffer.alloc(16), [large]: "a".repeat(size) }, { ci: true });
     assert.equal(output, 'categories=["binary files","large files"]\n');
-    assert.equal(summary, `## Binary files\n\n- \`${binary}\` (16 bytes)\n\n## Large files\n\n- \`${large}\` (${size} bytes)\n`);
+    assert.equal(summary, `1 binary file, 1 large file\n\n## Binary files\n\n- \`${binary}\` (16 bytes)\n\n## Large files\n\n- \`${large}\` (${size} bytes)\n`);
 });
 
 test("routine image, font, and xcassets binaries are ignored", (t) => {
@@ -331,7 +331,7 @@ test("go.sum new module", (t) => {
     assert.match(output, /- b\.org\/y\/v2 v2\.0\.1\n/);
 });
 
-test("guardrail paths modified or deleted, not added", (t) => {
+test("existing guardrails modified or deleted", (t) => {
     const output = scan(
         t,
         {
@@ -349,13 +349,26 @@ test("guardrail paths modified or deleted, not added", (t) => {
             "rust/checks/x/check.py": "\n",
             "web/apps/x/eslint.config.mjs": null,
             "web/checks/x/check.mjs": "\n",
-            ".github/CODEOWNERS": "",
+            "web/checks/new.mjs": "",
         },
     );
     assert.equal(
         output,
         "6 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
     );
+});
+
+test("new GitHub workflows, actions and policies need approval", (t) => {
+    const files = {
+        ".github/workflows/new.yml": "on: push\n",
+        ".github/actions/new/action.yml": "name: new\n",
+        ".github/checks/new/check.mjs": "export {};\n",
+    };
+    const { output, summary } = scan(t, {}, files, { ci: true });
+    assert.equal(output, 'categories=["guardrail files"]\n');
+    assert.match(summary, /3 guardrail files/);
+    for (const file of Object.keys(files)) assert.ok(summary.includes(`\`${file}\``));
+    assert.match(scan(t, {}, files, { commit: false }), /^3 guardrail files\n/);
 });
 
 test("toolchain and registry config added, modified, or deleted", (t) => {
@@ -390,7 +403,7 @@ test("Git attributes require config approval even when they hide binary changes"
         { ci: true },
     );
     assert.equal(output, 'categories=["config files"]\n');
-    assert.equal(summary, "## Toolchain and registry config\n\n- `.gitattributes`\n- `added/.gitattributes`\n- `deleted/.gitattributes`\n- `modified/.gitattributes`\n");
+    assert.equal(summary, "4 config files\n\n## Toolchain and registry config\n\n- `.gitattributes`\n- `added/.gitattributes`\n- `deleted/.gitattributes`\n- `modified/.gitattributes`\n");
 });
 
 test("uncommitted and untracked changes are scanned locally", (t) => {
@@ -408,9 +421,9 @@ test("uncommitted and untracked changes are scanned locally", (t) => {
 
 test("CI mode writes categories and the step summary, and tolerates gitlinks", (t) => {
     const { stdout, output, summary } = scan(t, { "a.txt": "a\n" }, { "a.bin": Buffer.alloc(16) }, { gitlink: "sub", ci: true });
-    assert.equal(stdout, "");
+    assert.equal(stdout, "::warning title=Change approval needed::1 binary file\n");
     assert.equal(output, 'categories=["binary files"]\n');
-    assert.equal(summary, "## Binary files\n\n- `a.bin` (16 bytes)\n");
+    assert.equal(summary, "1 binary file\n\n## Binary files\n\n- `a.bin` (16 bytes)\n");
 });
 
 test("untracked dangling symlink is skipped locally", (t) => {
@@ -422,7 +435,7 @@ test("CI mode with nothing flagged", (t) => {
     const { stdout, output, summary } = scan(t, { "a.txt": "a\n" }, { "a.txt": "b\n" }, { ci: true });
     assert.equal(stdout, "");
     assert.equal(output, "categories=[]\n");
-    assert.equal(summary, "");
+    assert.equal(summary, "No approval needed.\n");
 });
 
 test("ordinary change is silent", (t) => {

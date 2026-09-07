@@ -1,0 +1,1 @@
+- Chat with your local markdown notes on desktop
