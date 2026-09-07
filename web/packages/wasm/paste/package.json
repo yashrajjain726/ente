@@ -15,7 +15,8 @@
         "test": "vitest --run"
     },
     "dependencies": {
-        "comlink": "4.4.2"
+        "comlink": "4.4.2",
+        "ente-utils": "*"
     },
     "devDependencies": {
         "ente-build-config": "*",

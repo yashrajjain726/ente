@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ente-core.workspace = true
 ente-ensu-crypto.workspace = true
-ente-wasm-log.workspace = true
+ente-wasm-lib.workspace = true
 js-sys.workspace = true
 thiserror.workspace = true
 wasm-bindgen.workspace = true

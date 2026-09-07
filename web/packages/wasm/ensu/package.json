@@ -13,6 +13,9 @@
     "scripts": {
         "build": "wasm-pack build ../../../../rust/bindings/wasm/ensu --target bundler --out-dir ../../../../web/packages/wasm/ensu/pkg --no-pack"
     },
+    "dependencies": {
+        "ente-utils": "*"
+    },
     "devDependencies": {
         "ente-build-config": "*",
         "wasm-pack": "0.15.0"

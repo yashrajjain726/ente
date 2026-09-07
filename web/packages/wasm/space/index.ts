@@ -5,7 +5,7 @@ export type SpaceAccountCtxHandle =
 export type SpaceLinkCtxHandle =
     import("./pkg/ente_space_wasm").SpaceLinkCtxHandle;
 
-export interface OpenSpaceAccountContextInput {
+interface OpenSpaceAccountContextInput {
     baseUrl: string;
     clientPackage: string;
     clientVersion?: string;
@@ -14,7 +14,7 @@ export interface OpenSpaceAccountContextInput {
     spaceSessionToken: string;
 }
 
-export interface OpenSpaceLinkContextInput {
+interface OpenSpaceLinkContextInput {
     accessKey: string;
     baseUrl: string;
     clientPackage: string;

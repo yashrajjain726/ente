@@ -1,10 +1,10 @@
 import {
-    Github01Icon,
-    LicenseIcon,
+    File01Icon,
+    GithubIcon,
     Shield01Icon,
 } from "@hugeicons/core-free-icons";
-import NorthEastIcon from "@mui/icons-material/NorthEast";
-import { Stack, useTheme } from "@mui/material";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { Stack } from "@mui/material";
 import { t } from "i18next";
 import React from "react";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
@@ -18,8 +18,6 @@ const openExternal = (url: string) => window.open(url, "_blank", "noopener");
 export const LockerAboutDrawer: React.FC<
     LockerNestedSidebarDrawerVisibilityProps
 > = ({ open, onClose, onRootClose }) => {
-    const theme = useTheme();
-
     const handleRootClose = () => {
         onClose();
         onRootClose();
@@ -32,33 +30,23 @@ export const LockerAboutDrawer: React.FC<
             title={t("about")}
             hideRootCloseButton
         >
-            <Stack
-                sx={{
-                    px: 2,
-                    py: 1,
-                    gap: 1,
-                    backgroundColor: "background.default",
-                    ...theme.applyStyles("dark", {
-                        backgroundColor: "background.paper",
-                    }),
-                }}
-            >
+            <Stack sx={{ px: 2, py: 1, gap: 1 }}>
                 <LockerSidebarCardButton
-                    icon={Github01Icon}
+                    icon={GithubIcon}
                     label={t("we_are_open_source")}
-                    endIcon={<NorthEastIcon />}
+                    endIcon={<ChevronRightIcon />}
                     onClick={() => openExternal("https://github.com/ente/ente")}
                 />
                 <LockerSidebarCardButton
                     icon={Shield01Icon}
                     label={t("privacy")}
-                    endIcon={<NorthEastIcon />}
+                    endIcon={<ChevronRightIcon />}
                     onClick={() => openExternal("https://ente.com/privacy")}
                 />
                 <LockerSidebarCardButton
-                    icon={LicenseIcon}
+                    icon={File01Icon}
                     label={t("terms")}
-                    endIcon={<NorthEastIcon />}
+                    endIcon={<ChevronRightIcon />}
                     onClick={() => openExternal("https://ente.com/terms")}
                 />
             </Stack>

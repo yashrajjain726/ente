@@ -33,10 +33,10 @@ jobs:
                   submodules: recursive
 
             - name: Verify frozen mobile pubspecs
-              run: ruby mobile/scripts/check_frozen_pubspecs.rb mobile
+              run: ruby mobile/checks/frozen-pubspecs/check.rb mobile
 
             - name: Verify source ARB plurals
-              run: ruby mobile/scripts/check_source_arb_plurals.rb
+              run: ruby mobile/checks/source-arb-plurals/check.rb
 
             - name: Verify auth custom icons
               run: |

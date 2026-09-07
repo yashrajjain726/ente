@@ -13,7 +13,7 @@ import {
     encryptFileStreamWithKey,
     md5Base64,
     stringToB64,
-} from "ente-core-wasm";
+} from "ente-locker-wasm";
 import { z } from "zod";
 import {
     RemoteIDResponseSchema,
@@ -325,7 +325,7 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
                     await file.slice(chunkStart, chunkEnd).arrayBuffer(),
                 );
                 const isFinalChunk = chunkIndex === plaintextChunkCount - 1;
-                const encryptedChunk = await streamEncryptor.encryptChunk(
+                const encryptedChunk = streamEncryptor.encryptChunk(
                     plaintextChunk,
                     isFinalChunk,
                 );
@@ -400,10 +400,7 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
                 );
                 const isFinalChunk = chunkIndex === plaintextChunkCount - 1;
                 encryptedChunks.push(
-                    await streamEncryptor.encryptChunk(
-                        plaintextChunk,
-                        isFinalChunk,
-                    ),
+                    streamEncryptor.encryptChunk(plaintextChunk, isFinalChunk),
                 );
             }
 

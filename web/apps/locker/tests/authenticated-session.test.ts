@@ -25,9 +25,7 @@ vi.mock("ente-base/app", () => ({
 }));
 vi.mock("ente-base/origins", () => ({ apiOrigin }));
 vi.mock("ente-base/token", () => ({ savedAuthToken }));
-vi.mock("ente-accounts/services/session-storage", () => ({
-    masterKeyFromSession,
-}));
+vi.mock("../src/services/account-keys", () => ({ masterKeyFromSession }));
 vi.mock("ente-accounts/services/user", () => ({ ensureLocalUser: () => user }));
 vi.mock("ente-locker-wasm", () => ({ openSession: openLocker }));
 vi.mock("ente-legacy-wasm/authenticated", () => ({ openSession: openLegacy }));

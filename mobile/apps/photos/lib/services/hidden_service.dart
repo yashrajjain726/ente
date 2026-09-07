@@ -1,7 +1,6 @@
 import "dart:async";
 import 'dart:convert';
 
-import 'package:collection/collection.dart';
 import 'package:ente_crypto/ente_crypto.dart';
 import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
@@ -125,24 +124,6 @@ extension HiddenService on CollectionsService {
     }
 
     return defaultHidden;
-  }
-
-  Future<Collection> getUncategorizedCollection() async {
-    if (cachedUncategorizedCollection != null) {
-      return cachedUncategorizedCollection!;
-    }
-    final int userID = config.getUserID()!;
-    final Collection? matchedCollection = collectionIDToCollections.values
-        .firstWhereOrNull(
-          (element) =>
-              element.type == CollectionType.uncategorized &&
-              element.owner.id == userID,
-        );
-    if (matchedCollection != null) {
-      cachedUncategorizedCollection = matchedCollection;
-      return cachedUncategorizedCollection!;
-    }
-    return _createUncategorizedCollection();
   }
 
   Future<void> movePendingRemovalActionsToUncategorized() async {
@@ -318,30 +299,6 @@ extension HiddenService on CollectionsService {
     );
     _logger.info("Fetched Created Default Hidden Collection Successfully");
     return collectionFromServer;
-  }
-
-  Future<Collection> _createUncategorizedCollection() async {
-    final uncategorizedCollectionKey = CryptoUtil.generateKey();
-    final encKey = CryptoUtil.encryptSync(
-      uncategorizedCollectionKey,
-      config.getKey()!,
-    );
-    final encName = CryptoUtil.encryptSync(
-      utf8.encode("Uncategorized"),
-      uncategorizedCollectionKey,
-    );
-    final collection = await createAndCacheCollection(
-      CreateRequest(
-        encryptedKey: CryptoUtil.bin2base64(encKey.encryptedData!),
-        keyDecryptionNonce: CryptoUtil.bin2base64(encKey.nonce!),
-        encryptedName: CryptoUtil.bin2base64(encName.encryptedData!),
-        nameDecryptionNonce: CryptoUtil.bin2base64(encName.nonce!),
-        type: CollectionType.uncategorized,
-        attributes: CollectionAttributes(),
-      ),
-    );
-    cachedUncategorizedCollection = collection;
-    return cachedUncategorizedCollection!;
   }
 
   Future<CreateRequest> buildCollectionCreateRequest(

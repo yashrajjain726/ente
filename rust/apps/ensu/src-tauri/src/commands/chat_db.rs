@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::commands::chat_db_migration;
 use crate::commands::common::{ApiError, app_data_dir};
-use crate::commands::knowledge::SourceCitationDto;
+use crate::commands::knowledge::GroundedSourceDto;
 use crate::logging;
 
 #[derive(Default)]
@@ -158,8 +158,7 @@ pub struct ChatMessageDto {
     text: String,
     created_at: i64,
     attachments: Vec<ChatAttachmentDto>,
-    citations: Vec<SourceCitationDto>,
-    source_label: Option<String>,
+    sources: Vec<GroundedSourceDto>,
 }
 
 impl From<db::Message> for ChatMessageDto {
@@ -169,14 +168,13 @@ impl From<db::Message> for ChatMessageDto {
             db::Sender::Other => "assistant",
         };
         let parsed = if message.sender == db::Sender::Other {
-            ente_ensu::retrieval::parse_assistant_text(&message.text)
+            ente_ensu::retrieval::parse_grounded_assistant_text(&message.text)
         } else {
-            ente_ensu::retrieval::ParsedAssistantText {
+            ente_ensu::retrieval::ParsedGroundedAssistantText {
                 text: message.text,
-                citations: Vec::new(),
+                sources: Vec::new(),
             }
         };
-        let source_label = ente_ensu::retrieval::knowledge_source_chip_label(&parsed.citations);
         Self {
             message_uuid: message.uuid.to_string(),
             session_uuid: message.session_uuid.to_string(),
@@ -189,8 +187,7 @@ impl From<db::Message> for ChatMessageDto {
                 .into_iter()
                 .map(ChatAttachmentDto::from)
                 .collect(),
-            citations: parsed.citations.into_iter().map(Into::into).collect(),
-            source_label,
+            sources: parsed.sources.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -203,7 +200,7 @@ pub struct ChatMessageInsertInput {
     text: String,
     parent_message_uuid: Option<String>,
     attachments: Option<Vec<ChatAttachmentInput>>,
-    citations: Option<Vec<SourceCitationDto>>,
+    sources: Option<Vec<GroundedSourceDto>>,
 }
 
 #[derive(Deserialize)]
@@ -335,7 +332,18 @@ pub async fn chat_db_insert_message(
     let sender = normalize_sender(&input.sender)?;
     let attachments = convert_attachments(input.attachments)?;
     let text = if sender == "other" {
-        match finalize_assistant_text(&input.text, input.citations.unwrap_or_default()) {
+        let sources = input
+            .sources
+            .unwrap_or_default()
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
+        if sources.len() > ente_ensu::retrieval::MAX_GROUNDED_SOURCES {
+            return Err(ApiError::new("invalid_input", "Too many grounded sources"));
+        }
+        let result = ente_ensu::retrieval::finalize_grounded_assistant_text(&input.text, &sources)
+            .map_err(crate::commands::knowledge::retrieval_error);
+        match result {
             Ok(text) => text,
             Err(error) => {
                 logging::log(
@@ -345,7 +353,8 @@ pub async fn chat_db_insert_message(
                         error.message
                     ),
                 );
-                finalize_assistant_text(&input.text, Vec::new())?
+                ente_ensu::retrieval::finalize_grounded_assistant_text(&input.text, &[])
+                    .map_err(crate::commands::knowledge::retrieval_error)?
             }
         }
     } else {
@@ -520,15 +529,6 @@ fn normalize_sender(sender: &str) -> Result<&'static str, ApiError> {
             format!("Unsupported sender: {sender}"),
         )),
     }
-}
-
-fn finalize_assistant_text(
-    text: &str,
-    citations: Vec<SourceCitationDto>,
-) -> Result<String, ApiError> {
-    let citations = citations.into_iter().map(Into::into).collect::<Vec<_>>();
-    ente_ensu::retrieval::finalize_assistant_text(text, &citations)
-        .map_err(crate::commands::knowledge::retrieval_error)
 }
 
 fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {

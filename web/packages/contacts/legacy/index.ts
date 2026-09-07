@@ -7,10 +7,7 @@ export {
 export { mergeLegacySuggestedUsers } from "./suggestions";
 export type {
     LegacyContactRecord,
-    LegacyContactState,
     LegacyInfo,
     LegacyRecoverySession,
-    LegacyRecoveryStatus,
     LegacySuggestedUser,
-    LegacyUser,
 } from "./types";

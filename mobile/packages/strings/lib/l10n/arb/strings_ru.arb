@@ -150,6 +150,10 @@
       "storageAmount": {}
     }
   },
+  "addPage": "Добавить страницу",
+  "@addPage": {
+    "description": "Button to capture another page in the document scanner"
+  },
   "addParticipants": "Добавить участников",
   "addPeopleWidgetPrompt": "Добавьте виджет людей на главный экран, чтобы настроить его здесь.",
   "addPerson": "Добавить человека",
@@ -978,11 +982,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Отключить блокировку экрана устройства, когда Ente на экране, и выполняется резервное копирование. Обычно это не требуется, но это может ускорить завершение больших загрузок и первоначального импортирования крупных библиотек.",
   "deviceNotFound": "Устройство не найдено",
   "didYouKnow": "Знаете ли вы?",
   "digits": "Цифр",
-  "disableAutoLock": "Отключить автоблокировку",
   "disableBackup": "Отключить резервное копирование",
   "disableDownloadWarningBody": "Зрители всё ещё могут делать скриншоты или сохранять копии ваших фото с помощью внешних инструментов",
   "disableDownloadWarningTitle": "Обратите внимание",
@@ -1125,7 +1127,6 @@
     }
   },
   "earned": "получено",
-  "earnFreeStorage": "Заработайте бесплатное место в хранилище",
   "earnMoreSpace": "Получите больше места!",
   "edit": "Редактировать",
   "editAutoAddPeople": "Редактировать автоматическое добавление людей",
@@ -1178,6 +1179,10 @@
     "placeholders": {
       "email": {}
     }
+  },
+  "emailNotRegistered": "Электронная почта не зарегистрирована.",
+  "@emailNotRegistered": {
+    "description": "Error message when email is not registered"
   },
   "emailUsMessage": "Пожалуйста, напишите нам на {email}",
   "@emailUsMessage": {
@@ -2561,14 +2566,6 @@
   "referrals": "Рефералы",
   "referralsAreCurrentlyPaused": "Реферальная программа временно приостановлена",
   "referralStats": "Статистика рефералов",
-  "referralStep1": "1. Настройте код и поделитесь им.",
-  "referralStep2": "2. Они регистрируются в Ente, используя ваш код.",
-  "referralStep3": "3. {storageInGB} ГБ для них + {storageInGB} ГБ для вас при переходе на платный тариф.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} ГБ для них + {storageAmountInGB} ГБ для вас при переходе на платный тариф.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2821,8 +2818,6 @@
   "saveCollage": "Сохранить коллаж",
   "saveContact": "Сохранить контакт",
   "saveCopy": "Сохранить копию",
-  "saveDocumentDescription": "Загрузите важные документы.",
-  "saveDocumentTitle": "Документ",
   "saveKey": "Сохранить ключ",
   "@saveKey": {
     "description": "Save key button label"
@@ -3092,7 +3087,6 @@
   "share": "Поделиться",
   "shareALink": "Поделиться ссылкой",
   "shareAnAlbum": "Поделиться альбомом",
-  "shareCodeEarnStorage": "Поделитесь вашим кодом, получите место в хранилище.",
   "shareCodes": "Поделиться кодами",
   "shareCodesDuration": "Выберите продолжительность, на которую вы хотите поделиться кодами.",
   "shared": "Общий",
@@ -3506,7 +3500,6 @@
   },
   "unarchiveAlbum": "Извлечь альбом из архива",
   "unarchiving": "Извлечение...",
-  "unavailableReferralCode": "Извините, этот код недоступен.",
   "uncategorized": "Без категории",
   "uncategorizedItemsWillShowUpHere": "Элементы без категории будут отображаться здесь",
   "undo": "Отменить",

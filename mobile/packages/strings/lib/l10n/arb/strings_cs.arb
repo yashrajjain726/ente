@@ -780,11 +780,9 @@
   "@deviceLock": {
     "description": "Device lock option title"
   },
-  "deviceLockExplanation": "Deaktivujte zámek obrazovky zařízení, když je Ente v popředí a probíhá zálohování. Toto obvykle není nutné, ale může to pomoci urychlit velké nahrávání a počáteční import velkých knihoven.",
   "deviceNotFound": "Zařízení nebylo nalezeno",
   "didYouKnow": "Věděli jste?",
   "digits": "Číslice",
-  "disableAutoLock": "Vypnout automatické zamknutí",
   "disableDownloadWarningBody": "Diváci mohou stále pořizovat snímky obrazovky nebo ukládat kopii vašich fotografií pomocí externích nástrojů",
   "disableDownloadWarningTitle": "Upozornění",
   "disableLinkMessage": "Toto odstraní veřejný odkaz pro přístup k \"{albumName}\".",
@@ -928,7 +926,6 @@
     }
   },
   "earned": "získáno",
-  "earnFreeStorage": "Získat úložiště zdarma",
   "earnMoreSpace": "Získejte více prostoru!",
   "edit": "Upravit",
   "editAutoAddPeople": "Upravit automatické přidávání osob",
@@ -2340,14 +2337,6 @@
   "referrals": "Doporučení",
   "referralsAreCurrentlyPaused": "Doporučení jsou momentálně pozastavena",
   "referralStats": "Statistiky doporučení",
-  "referralStep1": "1. Upravte a sdílejte svůj kód.",
-  "referralStep2": "2. Zaregistrují se pomocí Vašeho kódu.",
-  "referralStep3": "3. {storageInGB}GB zdarma pro ně + {storageInGB}GB zdarma pro Vás když zvýší svůj tarif.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB pro ně + {storageAmountInGB} GB pro Vás když zvýší svůj tarif.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2597,8 +2586,6 @@
   "saveCollage": "Uložit koláž",
   "saveContact": "Uložit kontakt",
   "saveCopy": "Uložit kopii",
-  "saveDocumentDescription": "Nahrát důležité dokumenty.",
-  "saveDocumentTitle": "Dokument",
   "saveKey": "Uložit klíč",
   "@saveKey": {
     "description": "Save key button label"
@@ -2848,7 +2835,6 @@
   "setupFirstAccount": "Nastavte svůj první\núčet",
   "share": "Sdílet",
   "shareALink": "Sdílet odkaz",
-  "shareCodeEarnStorage": "Sdílejte svůj kód, získejte úložiště.",
   "shareCodes": "Sdílet kódy",
   "shareCodesDuration": "Vyberte dobu, po kterou chcete kódy sdílet.",
   "shareCollection": "Sdílet kolekci",
@@ -3218,7 +3204,6 @@
   },
   "unarchiveAlbum": "Odebrat album z archivu",
   "unarchiving": "Odebírání z archivu...",
-  "unavailableReferralCode": "Omlouváme se, tento kód je nedostupný.",
   "uncategorized": "Nezařazené",
   "undo": "Vrátit zpět",
   "unhide": "Odkrýt",

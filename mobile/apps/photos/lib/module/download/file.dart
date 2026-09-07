@@ -201,14 +201,10 @@ Future<File?> getFileFromServer(
     }
     return downloadFuture;
   }, onComplete: () => _progressCallbacks.remove(downloadID));
-  try {
-    return await download;
-  } on DownloadDecryptionError {
-    if (forGalleryDownload || throwOnDecryptionFailure) {
-      rethrow;
-    }
-    return null;
-  }
+  return handleDownloadDecryptionFailureForCaller(
+    download,
+    rethrowDecryptionFailure: forGalleryDownload || throwOnDecryptionFailure,
+  );
 }
 
 Future<bool> isFileCached(EnteFile file, {bool liveVideo = false}) async {
