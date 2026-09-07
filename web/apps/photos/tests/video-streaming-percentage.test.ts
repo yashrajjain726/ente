@@ -57,30 +57,20 @@ vi.mock("ente-base/kv", async (importOriginal) => ({
         return Promise.resolve();
     },
 }));
-vi.mock("ente-accounts/services/user", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("ente-accounts/services/user")>()),
+vi.mock("ente-accounts/services/user", () => ({
     ensureLocalUser: () => ({ id: 1 }),
 }));
-vi.mock("ente-new/photos/services/photos-fdb", async (importOriginal) => ({
-    ...(await importOriginal<
-        typeof import("ente-new/photos/services/photos-fdb")
-    >()),
+vi.mock("ente-new/photos/services/photos-fdb", () => ({
     savedCollectionFiles: async () => {
         mocks.collectionFilesReadCount++;
         await mocks.collectionFilesReadGate;
         return mocks.collectionFiles;
     },
 }));
-vi.mock("ente-new/photos/services/trash", async (importOriginal) => ({
-    ...(await importOriginal<
-        typeof import("ente-new/photos/services/trash")
-    >()),
+vi.mock("ente-new/photos/services/trash", () => ({
     savedTrashItemFileIDs: () => Promise.resolve(new Set<number>()),
 }));
-vi.mock("ente-gallery/services/file-data", async (importOriginal) => ({
-    ...(await importOriginal<
-        typeof import("ente-gallery/services/file-data")
-    >()),
+vi.mock("ente-gallery/services/file-data", () => ({
     syncUpdatedFileDataFileIDs: async (
         _type: string,
         _lastUpdatedAt: number,
@@ -96,18 +86,13 @@ vi.mock("ente-gallery/services/file-data", async (importOriginal) => ({
     },
     fetchFileData: () => mocks.fetchFileDataResult,
 }));
-vi.mock("ente-gallery/services/upload", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("ente-gallery/services/upload")>()),
+vi.mock("ente-gallery/services/upload", () => ({
     fileSystemUploadItemIfUnchanged: () => Promise.resolve({}),
 }));
-vi.mock("ente-gallery/utils/native-stream", async (importOriginal) => ({
-    ...(await importOriginal<
-        typeof import("ente-gallery/utils/native-stream")
-    >()),
+vi.mock("ente-gallery/utils/native-stream", () => ({
     initiateGenerateHLS: () => Promise.resolve(undefined),
 }));
-vi.mock("ente-new/photos/services/file", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("ente-new/photos/services/file")>()),
+vi.mock("ente-new/photos/services/file", () => ({
     updateFilePublicMagicMetadata: () => Promise.resolve(),
 }));
 vi.mock("ente-utils/promise", async (importOriginal) => ({
@@ -118,7 +103,6 @@ vi.mock("ente-utils/promise", async (importOriginal) => ({
 const {
     hlsGenerationStatusSnapshot,
     initVideoProcessing,
-    processedVideoFraction,
     processVideoNewUpload,
     resetVideoState,
     streamCandidateFiles,
@@ -130,11 +114,13 @@ const {
 const MiB = 1024 * 1024;
 
 const expectProcessedFraction = (processedFraction: number) =>
-    vi.waitFor(() =>
-        expect(hlsGenerationStatusSnapshot()).toMatchObject({
-            enabled: true,
-            processedFraction,
-        }),
+    vi.waitFor(
+        () =>
+            expect(hlsGenerationStatusSnapshot()).toMatchObject({
+                enabled: true,
+                processedFraction,
+            }),
+        { interval: 5 },
     );
 
 const file = (
@@ -175,25 +161,36 @@ describe("video streaming percentage", () => {
         mocks.fetchFileDataResult = new Promise<undefined>(() => undefined);
     });
 
-    test("calculates the processed fraction for all Desktop candidates", () => {
-        expect(processedVideoFraction(new Set(), [])).toBe(1);
-        expect(processedVideoFraction(new Set(), [file(1), file(2)])).toBe(0);
-        expect(
-            processedVideoFraction(new Set([1, 3]), [
+    test.each([
+        { ids: [], files: [], fraction: 1 },
+        { ids: [], files: [file(1), file(2)], fraction: 0 },
+        {
+            ids: [1, 3],
+            files: [file(1), file(2), file(3), file(4)],
+            fraction: 0.5,
+        },
+        {
+            ids: [1],
+            files: [
                 file(1),
-                file(2),
-                file(3),
-                file(4),
-            ]),
-        ).toBe(0.5);
-
-        const candidates = [
-            file(1),
-            file(2, { duration: 61 }),
-            file(3, { fileSize: 500 * MiB + 1 }),
-        ];
-        expect(processedVideoFraction(new Set([1]), candidates)).toBe(1 / 3);
-    });
+                file(2, { duration: 61 }),
+                file(3, { fileSize: 500 * MiB + 1 }),
+            ],
+            fraction: 1 / 3,
+        },
+        { ids: [1], files: [file(1), file(1), file(2)], fraction: 0.5 },
+        { ids: [3], files: [], fraction: 1 },
+        { ids: [1, 3], files: [file(1), file(2)], fraction: 0.5 },
+    ])(
+        "publishes the expected fraction: $fraction",
+        async ({ ids, files, fraction }) => {
+            mocks.kv.set("generateHLS", true);
+            mocks.kv.set("videoPreviewProcessedFileIDs", ids);
+            mocks.collectionFiles = files;
+            await initVideoProcessing();
+            await expectProcessedFraction(fraction);
+        },
+    );
 
     test("reuses Desktop's backfill population", () => {
         const candidates = streamCandidateFiles(
@@ -223,7 +220,9 @@ describe("video streaming percentage", () => {
         await videoProcessingSyncIfNeeded();
         const toggle = toggleHLSGeneration();
 
-        await vi.waitFor(() => expect(mocks.previewStatusPullCount).toBe(1));
+        await vi.waitFor(() => expect(mocks.previewStatusPullCount).toBe(1), {
+            interval: 5,
+        });
         expect(hlsGenerationStatusSnapshot()).toEqual({ enabled: true });
         expect(mocks.collectionFilesReadCount).toBe(0);
 
@@ -238,7 +237,9 @@ describe("video streaming percentage", () => {
         mocks.previewStatusPullGate = previewStatusPull.promise;
 
         const enable = toggleHLSGeneration();
-        await vi.waitFor(() => expect(mocks.previewStatusPullCount).toBe(1));
+        await vi.waitFor(() => expect(mocks.previewStatusPullCount).toBe(1), {
+            interval: 5,
+        });
         await toggleHLSGeneration();
         previewStatusPull.resolve(undefined);
         await enable;
@@ -318,12 +319,65 @@ describe("video streaming percentage", () => {
 
         collectionFilesRead.resolve(undefined);
 
-        await vi.waitFor(() => {
-            expect(mocks.collectionFilesReadCount).toBe(2);
-            expect(hlsGenerationStatusSnapshot()).toMatchObject({
-                enabled: true,
-                processedFraction: 0,
-            });
-        });
+        await vi.waitFor(
+            () => {
+                expect(mocks.collectionFilesReadCount).toBe(2);
+                expect(hlsGenerationStatusSnapshot()).toMatchObject({
+                    enabled: true,
+                    processedFraction: 0,
+                });
+            },
+            { interval: 5 },
+        );
+    });
+    test("discards a refresh after generation is disabled", async () => {
+        mocks.kv.set("generateHLS", true);
+        mocks.collectionFiles = [file(1)];
+        const gate = Promise.withResolvers<undefined>();
+        mocks.collectionFilesReadGate = gate.promise;
+        await initVideoProcessing();
+        await toggleHLSGeneration();
+        gate.resolve(undefined);
+        await new Promise<void>(setImmediate);
+        expect(hlsGenerationStatusSnapshot()).toEqual({ enabled: false });
+    });
+
+    test("does not publish an old account refresh after reset", async () => {
+        mocks.kv.set("generateHLS", true);
+        mocks.collectionFiles = [file(1)];
+        const gate = Promise.withResolvers<undefined>();
+        mocks.collectionFilesReadGate = gate.promise;
+        await initVideoProcessing();
+        resetVideoState();
+        gate.resolve(undefined);
+        await new Promise<void>(setImmediate);
+        expect(hlsGenerationStatusSnapshot()).toBeUndefined();
+    });
+
+    test("includes completion recorded during an overlapping refresh", async () => {
+        mocks.kv.set("generateHLS", true);
+        mocks.collectionFiles = [file(1), file(2)];
+        mocks.kv.set("videoPreviewProcessedFileIDs", [1]);
+        const gate = Promise.withResolvers<undefined>();
+        mocks.collectionFilesReadGate = gate.promise;
+        await initVideoProcessing();
+        mocks.kv.set("videoPreviewProcessedFileIDs", [1, 2]);
+        await initVideoProcessing();
+        gate.resolve(undefined);
+        await expectProcessedFraction(1);
+        expect(mocks.collectionFilesReadCount).toBe(2);
+    });
+
+    test("can refresh again after a storage failure", async () => {
+        mocks.kv.set("generateHLS", true);
+        mocks.collectionFiles = [file(1)];
+        const gate = Promise.withResolvers<undefined>();
+        mocks.collectionFilesReadGate = gate.promise;
+        await initVideoProcessing();
+        gate.reject(new Error("storage read failed"));
+        await new Promise<void>(setImmediate);
+        mocks.collectionFilesReadGate = undefined;
+        await initVideoProcessing();
+        await expectProcessedFraction(0);
     });
 });

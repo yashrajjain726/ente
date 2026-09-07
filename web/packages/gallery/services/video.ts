@@ -65,8 +65,7 @@ class VideoState {
     hlsGenerationStatusSnapshot: HLSGenerationStatus | undefined;
     lastEnabledStatus: HLSGenerationEnabledStatus | undefined;
     processedFraction: number | undefined;
-    processedFractionRefresh: Promise<void> | undefined;
-    processedFractionRefreshRequests = 0;
+    processedFractionRefresh: "running" | "pending" | undefined;
     candidateFileIDs: Set<number> | undefined;
     processedCandidateFileIDs: Set<number> | undefined;
     unsyncedUploadFiles = new Map<number, EnteFile>();
@@ -318,17 +317,6 @@ export const videoPrunePermanentlyDeletedFileIDsIfNeeded = async (
     }
 };
 
-export const processedVideoFraction = (
-    processedFileIDs: Set<number>,
-    candidateFiles: EnteFile[],
-) => {
-    const candidateFileIDs = new Set(candidateFiles.map((f) => f.id));
-    const previewFileIDs = processedFileIDs.intersection(candidateFileIDs);
-    return candidateFileIDs.size == 0
-        ? 1
-        : previewFileIDs.size / candidateFileIDs.size;
-};
-
 const publishProcessedFraction = (state: VideoState) => {
     const candidateCount = state.candidateFileIDs!.size;
     const fraction =
@@ -385,51 +373,36 @@ const refreshProcessedFractionIfNeeded = () => {
     if (!isHLSGenerationSupported || !isHLSGenerationEnabled()) return;
 
     const state = _state;
-    state.processedFractionRefreshRequests++;
-    if (state.processedFractionRefresh) return;
-
-    let handledRequests = 0;
-    state.processedFractionRefresh = (async () => {
-        while (handledRequests != state.processedFractionRefreshRequests) {
-            const request = state.processedFractionRefreshRequests;
-            try {
-                const [candidates, processedFileIDs] = await Promise.all([
-                    savedStreamCandidateFiles(
-                        ensureLocalUser().id,
-                        state.unsyncedUploadFiles,
-                        state.locallySkippedFileIDs,
-                    ),
-                    savedProcessedVideoFileIDs(),
-                ]);
-                const fraction = processedVideoFraction(
-                    processedFileIDs,
-                    candidates,
+    if (state.processedFractionRefresh) {
+        state.processedFractionRefresh = "pending";
+        return;
+    }
+    state.processedFractionRefresh = "running";
+    void (async () => {
+        try {
+            const [candidates, processedFileIDs] = await Promise.all([
+                savedStreamCandidateFiles(
+                    ensureLocalUser().id,
+                    state.unsyncedUploadFiles,
+                    state.locallySkippedFileIDs,
+                ),
+                savedProcessedVideoFileIDs(),
+            ]);
+            if (state != _state || !state.isHLSGenerationEnabled) return;
+            if (state.processedFractionRefresh != "pending") {
+                state.candidateFileIDs = new Set(candidates.map((f) => f.id));
+                state.processedCandidateFileIDs = processedFileIDs.intersection(
+                    state.candidateFileIDs,
                 );
-                if (state != _state || !state.isHLSGenerationEnabled) return;
-                if (request == state.processedFractionRefreshRequests) {
-                    state.candidateFileIDs = new Set(
-                        candidates.map((f) => f.id),
-                    );
-                    state.processedCandidateFileIDs =
-                        processedFileIDs.intersection(state.candidateFileIDs);
-                    if (fraction != state.processedFraction) {
-                        state.processedFraction = fraction;
-                        publishEnabledSnapshot();
-                    }
-                }
-            } catch (e) {
-                log.error("Failed to compute video processed fraction", e);
+                publishProcessedFraction(state);
             }
-            handledRequests = request;
+        } catch (e) {
+            log.error("Failed to compute video processed fraction", e);
         }
     })().finally(() => {
+        const pending = state.processedFractionRefresh == "pending";
         state.processedFractionRefresh = undefined;
-        if (
-            state == _state &&
-            handledRequests != state.processedFractionRefreshRequests
-        ) {
-            refreshProcessedFractionIfNeeded();
-        }
+        if (state == _state && pending) refreshProcessedFractionIfNeeded();
     });
 };
 
@@ -563,8 +536,7 @@ const savedStreamCandidateFiles = async (
         savedCollectionFiles(),
         savedTrashItemFileIDs(),
     ]);
-    const savedFileIDs = new Set(savedFiles.map((file) => file.id));
-    savedFileIDs.forEach((fileID) => unsyncedUploadFiles.delete(fileID));
+    savedFiles.forEach(({ id }) => unsyncedUploadFiles.delete(id));
     return streamCandidateFiles(
         [...savedFiles, ...unsyncedUploadFiles.values()],
         trashFileIDs,
