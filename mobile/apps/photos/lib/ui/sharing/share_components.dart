@@ -112,25 +112,33 @@ class ShareSectionDescription extends StatelessWidget {
 }
 
 class ShareMenuGroup extends StatelessWidget {
-  const ShareMenuGroup({
-    super.key,
-    required this.items,
-    this.showDividers = false,
-    this.dividerPadding = EdgeInsets.zero,
-  });
+  const ShareMenuGroup({super.key, required this.items});
 
   final List<Widget> items;
-  final bool showDividers;
-  final EdgeInsetsGeometry dividerPadding;
 
   @override
   Widget build(BuildContext context) {
+    final groupItems = items.length > 1
+        ? <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var index = 0; index < items.length; index++) ...[
+                    items[index],
+                    if (index < items.length - 1)
+                      const SizedBox(height: Spacing.xs),
+                  ],
+                ],
+              ),
+            ),
+          ]
+        : items;
     return MenuGroupComponent(
       backgroundColor: context.componentColors.fillLight,
       borderRadius: BorderRadius.circular(Radii.button),
-      showDividers: showDividers,
-      dividerPadding: dividerPadding,
-      items: items,
+      items: groupItems,
     );
   }
 }
