@@ -17,7 +17,7 @@ const kFileViewerFilmstripGap = 6.0;
 const kFileViewerFilmstripAdditionalBottomInset =
     kFileViewerFilmstripHeight + kFileViewerFilmstripGap + 6.0;
 
-const _itemExtent = 35.0;
+const _itemExtent = 33.0;
 const _selectedThumbnailWidth = 34.0;
 const _selectedThumbnailHeight = 43.0;
 const _thumbnailWidth = 29.0;
@@ -176,7 +176,11 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
       child: SizedBox(
         width: _itemExtent,
         height: kFileViewerFilmstripHeight,
-        child: Center(
+        child: OverflowBox(
+          minWidth: 0,
+          maxWidth: _selectedThumbnailWidth,
+          minHeight: 0,
+          maxHeight: _selectedThumbnailHeight,
           child: AnimatedContainer(
             duration: _selectionAnimationDuration,
             curve: Curves.easeOutCubic,

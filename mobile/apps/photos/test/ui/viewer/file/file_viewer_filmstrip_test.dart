@@ -25,7 +25,7 @@ void main() {
           tester
               .getCenter(find.byKey(const ValueKey("filmstrip-test-item-7")))
               .dx,
-      closeTo(35, 0.01),
+      closeTo(33, 0.01),
     );
     expect(
       tester.getSize(
