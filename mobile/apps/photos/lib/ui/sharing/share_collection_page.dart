@@ -30,24 +30,16 @@ class ShareCollectionPage extends StatefulWidget {
 
 class _ShareCollectionPageState extends State<ShareCollectionPage> {
   late Collection _collection;
-  late List<User> _sharees;
   final CollectionActions collectionActions = CollectionActions(
     CollectionsService.instance,
   );
   final GlobalKey sendLinkButtonKey = GlobalKey();
-  final ScrollController _rosterScrollController = ScrollController();
   bool _redirectedToParticipants = false;
 
   @override
   void initState() {
     super.initState();
     _collection = widget.collection;
-  }
-
-  @override
-  void dispose() {
-    _rosterScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _refreshCollection() async {
@@ -92,21 +84,12 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
       }
     }
 
-    _sharees = _collection.sharees;
     final bool hasUrl = _collection.hasLink;
     final bool isOwner = _collection.owner.id == userID;
     if (isOwner && _collection.owner.email.isEmpty) {
       _collection.owner.email = Configuration.instance.getEmail() ?? "";
     }
-    final sortedSharees = List<User>.from(_sharees)
-      ..sort((a, b) {
-        final rankComparison = sharingRoleRank(
-          _collection.getRole(a.id),
-        ).compareTo(sharingRoleRank(_collection.getRole(b.id)));
-        return rankComparison != 0
-            ? rankComparison
-            : a.email.toLowerCase().compareTo(b.email.toLowerCase());
-      });
+    final sortedSharees = sortedCollectionSharees(_collection);
     final children = <Widget>[ShareSectionTitle(context.strings.sharedWith)];
 
     if (isOwner) {
@@ -226,9 +209,6 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
           onCollectionChanged: () => setState(() {}),
         ),
     ];
-    return ScrollableParticipantRoster(
-      rows: rows,
-      scrollController: _rosterScrollController,
-    );
+    return ScrollableParticipantRoster(rows: rows);
   }
 }

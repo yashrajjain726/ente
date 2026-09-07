@@ -31,7 +31,6 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
   late final int currentUserID;
   late Collection _collection;
   final GlobalKey _sendLinkButtonKey = GlobalKey();
-  final ScrollController _rosterScrollController = ScrollController();
 
   @override
   void initState() {
@@ -39,12 +38,6 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
     currentUserID = Configuration.instance.getUserID()!;
     _collection = widget.collection;
     _refreshCollection();
-  }
-
-  @override
-  void dispose() {
-    _rosterScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _refreshCollection() async {
@@ -107,15 +100,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
     if (owner.id == currentUserID && owner.email.isEmpty) {
       owner.email = Configuration.instance.getEmail()!;
     }
-    final sortedSharees = List<User>.from(_collection.sharees)
-      ..sort((a, b) {
-        final rankComparison = sharingRoleRank(
-          _collection.getRole(a.id),
-        ).compareTo(sharingRoleRank(_collection.getRole(b.id)));
-        return rankComparison != 0
-            ? rankComparison
-            : a.email.toLowerCase().compareTo(b.email.toLowerCase());
-      });
+    final sortedSharees = sortedCollectionSharees(_collection);
     final participantRows = <Widget>[
       ParticipantRow(
         user: owner,
@@ -140,10 +125,7 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
     ];
     final children = <Widget>[
       ShareSectionTitle(context.strings.sharedWith),
-      ScrollableParticipantRoster(
-        rows: participantRows,
-        scrollController: _rosterScrollController,
-      ),
+      ScrollableParticipantRoster(rows: participantRows),
       if (isAdmin && _collection.type != CollectionType.uncategorized) ...[
         const SizedBox(height: Spacing.sm),
         ButtonComponent(

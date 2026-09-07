@@ -11,30 +11,40 @@ import "package:photos/ui/sharing/share_components.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/sharing/widgets/sharing_role.dart";
 
-class ScrollableParticipantRoster extends StatelessWidget {
-  const ScrollableParticipantRoster({
-    super.key,
-    required this.rows,
-    required this.scrollController,
-  });
+class ScrollableParticipantRoster extends StatefulWidget {
+  const ScrollableParticipantRoster({super.key, required this.rows});
 
   final List<Widget> rows;
-  final ScrollController scrollController;
+
+  @override
+  State<ScrollableParticipantRoster> createState() =>
+      _ScrollableParticipantRosterState();
+}
+
+class _ScrollableParticipantRosterState
+    extends State<ScrollableParticipantRoster> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     const maxVisibleRows = 3;
-    final visibleRows = math.min(rows.length, maxVisibleRows);
+    final visibleRows = math.min(widget.rows.length, maxVisibleRows);
     final viewportHeight = _groupHeight(context, visibleRows);
-    final showScrollbar = rows.length > maxVisibleRows;
+    final showScrollbar = widget.rows.length > maxVisibleRows;
     final roster = ClipRRect(
       key: const ValueKey("participant-roster-clip"),
       borderRadius: BorderRadius.circular(Radii.button),
       child: SingleChildScrollView(
         key: const ValueKey("participant-roster-scroll"),
-        controller: scrollController,
+        controller: _scrollController,
         primary: false,
-        child: ShareMenuGroup(items: rows),
+        child: ShareMenuGroup(items: widget.rows),
       ),
     );
     return SizedBox(
@@ -42,7 +52,7 @@ class ScrollableParticipantRoster extends StatelessWidget {
       child: showScrollbar
           ? RawScrollbar(
               key: const ValueKey("participant-roster-scrollbar"),
-              controller: scrollController,
+              controller: _scrollController,
               thumbVisibility: true,
               trackVisibility: true,
               interactive: true,
