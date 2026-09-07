@@ -7,7 +7,11 @@ description: Share your current and future albums with family members
 
 Library sharing lets you share the albums you own with a family member in one action. You can also automatically share new albums as you create them.
 
-Library sharing is available in Ente Photos on iOS and Android. The recipient must be an active member of your [family plan](/photos/features/account/family-plans).
+> [!NOTE]
+>
+> Library sharing is available on iOS and Android starting v1.3.63.
+
+The recipient must be an active member of your [family plan](/photos/features/account/family-plans).
 
 ## Share albums
 
