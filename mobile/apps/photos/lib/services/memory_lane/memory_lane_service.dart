@@ -420,11 +420,32 @@ class MemoryLaneService {
   }
 
   Future<void> _processPeopleChange(PeopleChangedEvent event) async {
+    final persons = event.persons;
+    if (persons != null) {
+      final hiddenTimelineIds = <String>{
+        for (final person in persons)
+          if (person.data.hideFromMemories) ...{
+            person.remoteID,
+            ...person.data.assigned.map((cluster) => cluster.id),
+          },
+      };
+      await _cacheService.updateMemoriesStripSchedule(hiddenTimelineIds, null);
+      return;
+    }
     final person = event.person;
     if (person == null) {
       _logger.warning("${event.type.name} event missing person");
       _scheduleStartupBackfill();
       return;
+    }
+    if (person.data.hideFromMemories) {
+      for (final id in {
+        person.remoteID,
+        ...person.data.assigned.map((cluster) => cluster.id),
+        ...?event.newClusterIDs,
+      }) {
+        await _cacheService.removeMemoriesStripSchedule(id);
+      }
     }
     if (person.data.isIgnored) {
       await _invalidateTimeline(person.remoteID);

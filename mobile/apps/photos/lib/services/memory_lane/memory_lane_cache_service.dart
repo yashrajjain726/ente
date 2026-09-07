@@ -113,6 +113,18 @@ class MemoryLaneCacheService {
     });
   }
 
+  Future<void> removeMemoriesStripSchedule(String personId) async {
+    await _ensureInitialized();
+    await _lock.synchronized(() async {
+      final currentCache = await _loadCacheUnsafe();
+      if (!currentCache.memoriesStripSchedule.containsKey(personId)) {
+        return;
+      }
+      _cache = currentCache.copyWithoutMemoriesStripScheduleEntries({personId});
+      await _writeCacheUnsafe();
+    });
+  }
+
   Future<void> upsertTimelineAndLog(
     MemoryLanePersonTimeline timeline,
     MemoryLaneComputeLogEntry log,
