@@ -32,8 +32,6 @@ const HANDOFF_CLOSE_WAIT_ROUNDS: u32 = 2500;
 const HANDOFF_WAIT_PARK: Duration = Duration::from_millis(2);
 const KEY_TABLE_COPIES: usize = 2;
 const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
-const GRAPH_NODE_OVERHEAD_BYTES: usize = 48;
-const NEIGHBOR_LIST_OVERHEAD_BYTES: usize = 24;
 
 static REGISTRY: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<PathSlot>>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -1425,21 +1423,7 @@ fn approximate_memory_bytes(state: &SearchState) -> usize {
         .map(|key| KEY_TABLE_COPIES * (key.len() + KEY_ENTRY_OVERHEAD_BYTES))
         .sum();
     let free_list_bytes = state.arena.dead_count() * size_of::<u32>();
-    let graph_bytes: usize = state.graph.as_ref().map_or(0, |graph| {
-        graph
-            .slots()
-            .map(|slot| {
-                let level = graph.level_of(slot).unwrap_or(0);
-                GRAPH_NODE_OVERHEAD_BYTES
-                    + (0..=level)
-                        .map(|layer| {
-                            NEIGHBOR_LIST_OVERHEAD_BYTES
-                                + size_of_val(graph.neighbors_of(slot, layer))
-                        })
-                        .sum::<usize>()
-            })
-            .sum()
-    });
+    let graph_bytes = state.graph.as_ref().map_or(0, Graph::memory_bytes);
     vector_bytes + key_bytes + free_list_bytes + graph_bytes + state.attrs.memory_bytes()
 }
 
