@@ -85,9 +85,25 @@ Trash is a special folder where deleted photos are held temporarily before perma
 1. Open the sidebar menu
 2. Click on "Trash"
 
+### Android device trash
+
+On Android 11 and newer, device photos deleted through Ente Photos move to Android's system trash instead of being permanently removed immediately. To review or recover them in Ente:
+
+1. Open the **Albums** tab
+2. Tap the down-arrow icon on the right
+3. Open **Trash**
+4. Select **On device** at the top
+5. Select the photos you want to restore, then tap **Restore**
+
+The **Ente** tab contains files deleted from your Ente account, while **On device** contains device copies in Android's system trash. Emptying either trash permanently deletes the items shown in that tab.
+
+> [!NOTE]
+>
+> The **On device** tab is available on Android 11 and newer.
+
 ### Storage considerations
 
-Items in Trash are included in your storage quota calculation. If you need to free up storage space immediately, you have two options:
+Items in Ente Trash are included in your storage quota calculation. If you need to free up storage space immediately, you have two options:
 
 1. **Empty trash completely** - Permanently deletes all items in trash
 2. **Delete specific items** - Permanently delete only selected items
