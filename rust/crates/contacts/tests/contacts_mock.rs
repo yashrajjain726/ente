@@ -5,7 +5,7 @@ use ente_contacts::{
 };
 use ente_core::{
     Session, b64,
-    crypto::{Key, SecretVec, blob, secretbox},
+    crypto::{Key, SecretKey, blob, secretbox},
     http::{Api, ApiConfig, Auth, Http},
 };
 use mockito::{Matcher, Server};
@@ -35,7 +35,9 @@ fn open(
     Ok(Client {
         session: Session {
             api,
-            master_key: SecretVec::new(master_key),
+            user_id: 0,
+            master_key: Key::try_from_slice(&master_key).unwrap(),
+            secret_key: SecretKey::generate(),
         },
         wrapped_root_contact_key: RwLock::new(cached_wrapped_root_contact_key),
     })

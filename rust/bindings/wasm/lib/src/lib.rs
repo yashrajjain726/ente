@@ -1,5 +1,7 @@
 #[cfg(feature = "accounts")]
 pub mod accounts;
+#[cfg(feature = "collections")]
+pub mod collections;
 #[cfg(feature = "contacts")]
 pub mod contacts;
 #[cfg(feature = "crypto")]

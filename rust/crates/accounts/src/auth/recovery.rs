@@ -1,12 +1,12 @@
 use bip39::{Language, Mnemonic};
 
 use ente_core::b64;
-use ente_core::crypto::{self, SecretVec, secretbox};
+use ente_core::crypto::{self, Key, SecretVec, secretbox};
 
 use super::KeyAttributes;
 use crate::error::{Error, Result};
 
-pub fn get_recovery_key(master_key: &[u8], attributes: &KeyAttributes) -> Result<String> {
+pub fn get_recovery_key(master_key: &Key, attributes: &KeyAttributes) -> Result<String> {
     let encrypted_recovery_key = attributes
         .recovery_key_encrypted_with_master_key
         .as_ref()
@@ -28,7 +28,7 @@ pub fn get_recovery_key(master_key: &[u8], attributes: &KeyAttributes) -> Result
         secretbox::decrypt(
             &encrypted_bytes,
             &crypto::Nonce::try_from_slice(&nonce_bytes)?,
-            &crypto::Key::try_from_slice(master_key)?,
+            master_key,
         )
         .map_err(|_| Error::InvalidKeyAttributes)?,
     );
@@ -90,7 +90,9 @@ mod tests {
     #[test]
     fn test_get_recovery_key() {
         let gen_result = generate_test_keys("password");
-        let master_key = b64::decode(&gen_result.private_key_attributes.key).unwrap();
+        let master_key =
+            Key::try_from_slice(&b64::decode(&gen_result.private_key_attributes.key).unwrap())
+                .unwrap();
 
         let recovered = get_recovery_key(&master_key, &gen_result.key_attributes).unwrap();
         assert_eq!(
@@ -102,7 +104,9 @@ mod tests {
     #[test]
     fn test_recovery_key_mnemonic_roundtrip() {
         let gen_result = generate_test_keys("password");
-        let master_key = b64::decode(&gen_result.private_key_attributes.key).unwrap();
+        let master_key =
+            Key::try_from_slice(&b64::decode(&gen_result.private_key_attributes.key).unwrap())
+                .unwrap();
         let recovery_key_hex = get_recovery_key(&master_key, &gen_result.key_attributes).unwrap();
         let recovery_key_b64 = b64::encode(&hex::decode(&recovery_key_hex).unwrap());
 

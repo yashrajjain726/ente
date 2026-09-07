@@ -5,6 +5,7 @@ const {
     apiOrigin,
     savedAuthToken,
     masterKeyFromSession,
+    keyAttributes,
     user,
     openLocker,
     openLegacy,
@@ -12,6 +13,11 @@ const {
     apiOrigin: vi.fn<() => Promise<string>>(),
     savedAuthToken: vi.fn<() => Promise<string>>(),
     masterKeyFromSession: vi.fn<() => Promise<string>>(),
+    keyAttributes: {
+        publicKey: "public-key",
+        encryptedSecretKey: "encrypted-secret-key",
+        secretKeyDecryptionNonce: "secret-key-nonce",
+    },
     user: { id: 1 },
     openLocker: vi.fn<typeof import("ente-locker-wasm").openSession>(),
     openLegacy:
@@ -26,7 +32,10 @@ vi.mock("ente-base/app", () => ({
 vi.mock("ente-base/origins", () => ({ apiOrigin }));
 vi.mock("ente-base/token", () => ({ savedAuthToken }));
 vi.mock("../src/services/account-keys", () => ({ masterKeyFromSession }));
-vi.mock("ente-accounts/services/user", () => ({ ensureLocalUser: () => user }));
+vi.mock("ente-accounts/services/user", () => ({
+    ensureLocalUser: () => user,
+    ensureSavedKeyAttributes: () => keyAttributes,
+}));
 vi.mock("ente-locker-wasm", () => ({ openSession: openLocker }));
 vi.mock("ente-legacy-wasm/authenticated", () => ({ openSession: openLegacy }));
 
@@ -128,7 +137,9 @@ test("failed opens can be retried and account changes replace the cached Legacy 
     expect(openLegacy).toHaveBeenLastCalledWith({
         baseUrl: "http://localhost:8080",
         authToken: "other-token",
+        userID: 2,
         masterKeyB64: "other-key",
+        keyAttributes,
         clientPackage: "io.ente.locker.web",
         clientVersion: undefined,
     });

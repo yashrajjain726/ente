@@ -27,6 +27,7 @@ pub struct TestAccount {
     pub user_id: i64,
     pub auth_token: String,
     pub master_key: Vec<u8>,
+    pub secret_key: Vec<u8>,
     pub key_attributes: KeyAttributes,
 }
 
@@ -229,6 +230,7 @@ pub async fn create_fixture_account(endpoint: &str, email_prefix: &str) -> TestA
         user_id: verification.id,
         auth_token,
         master_key: master_key.as_bytes().to_vec(),
+        secret_key: secret_key.as_bytes().to_vec(),
         key_attributes,
     }
 }
@@ -318,6 +320,7 @@ pub fn test_account_from_authenticated(
         user_id: authenticated.user_id,
         auth_token: auth_token_from_authenticated(&authenticated),
         master_key: authenticated.secrets.master_key.clone(),
+        secret_key: authenticated.secrets.secret_key.clone(),
         key_attributes: authenticated.key_attributes,
     }
 }

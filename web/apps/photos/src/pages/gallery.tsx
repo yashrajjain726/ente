@@ -133,7 +133,7 @@ import {
 } from "ente-new/photos/services/ml";
 import { contactsGetDiff, contactsGetProfilePicture } from "ente-photos-wasm";
 
-import { openAuthenticatedSession } from "@/services/authenticated-session";
+import { ensureAuthenticatedSession } from "@/services/authenticated-session";
 import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
@@ -515,24 +515,21 @@ const Page: React.FC = () => {
             setIsFirstLoad(getAndClearIsFirstLogin());
 
             const user = ensureLocalUser();
-            const masterKey = await masterKeyFromSession();
-            if (masterKey) {
-                void openAuthenticatedSession(user.id, authToken, masterKey)
-                    .then((session) =>
-                        ensureContactsReady(
-                            user.id,
-                            session,
-                            contactsGetDiff,
-                            contactsGetProfilePicture,
-                        ),
-                    )
-                    .catch((error: unknown) => {
-                        log.warn(
-                            "[gallery] Failed to warm contacts display cache",
-                            error,
-                        );
-                    });
-            }
+            void ensureAuthenticatedSession()
+                .then((session) =>
+                    ensureContactsReady(
+                        user.id,
+                        session,
+                        contactsGetDiff,
+                        contactsGetProfilePicture,
+                    ),
+                )
+                .catch((error: unknown) => {
+                    log.warn(
+                        "[gallery] Failed to warm contacts display cache",
+                        error,
+                    );
+                });
             const userDetails = await savedUserDetailsOrTriggerPull();
             dispatch({
                 type: "mount",

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ente_core::b64;
-use ente_core::crypto::{self, Salt, SecretVec, argon, kdf, sealed, secretbox};
+use ente_core::crypto::{self, Key, Salt, SecretKey, SecretVec, argon, kdf, sealed, secretbox};
 use sha2::Sha256;
 use srp::ClientG4096;
 
@@ -23,8 +23,8 @@ impl fmt::Debug for SrpCredentials {
 }
 
 pub struct DecryptedSecrets {
-    pub master_key: SecretVec,
-    pub secret_key: SecretVec,
+    pub master_key: Key,
+    pub secret_key: SecretKey,
     pub token: SecretVec,
 }
 
@@ -166,34 +166,36 @@ pub fn generate_srp_setup_with_login_key(
     })
 }
 
-pub fn decrypt_keys_only(kek: &[u8], key_attrs: &KeyAttributes) -> Result<(SecretVec, SecretVec)> {
+pub fn decrypt_keys_only(kek: &[u8], key_attrs: &KeyAttributes) -> Result<(Key, SecretKey)> {
     let encrypted_key = b64::decode(&key_attrs.encrypted_key)
         .map_err(|e| Error::Decode(format!("encrypted_key: {}", e)))?;
     let key_nonce = b64::decode(&key_attrs.key_decryption_nonce)
         .map_err(|e| Error::Decode(format!("key_decryption_nonce: {}", e)))?;
 
-    let master_key = SecretVec::new(
-        secretbox::decrypt(
-            &encrypted_key,
-            &crypto::Nonce::try_from_slice(&key_nonce)?,
-            &crypto::Key::try_from_slice(kek)?,
-        )
-        .map_err(|_| Error::IncorrectPassword)?,
-    );
+    let master_key = secretbox::decrypt(
+        &encrypted_key,
+        &crypto::Nonce::try_from_slice(&key_nonce)?,
+        &crypto::Key::try_from_slice(kek)?,
+    )
+    .map_err(|_| Error::IncorrectPassword)?;
+    let master_key = Key::try_from_slice(&master_key)?;
 
     let encrypted_secret_key = b64::decode(&key_attrs.encrypted_secret_key)
         .map_err(|e| Error::Decode(format!("encrypted_secret_key: {}", e)))?;
     let secret_key_nonce = b64::decode(&key_attrs.secret_key_decryption_nonce)
         .map_err(|e| Error::Decode(format!("secret_key_decryption_nonce: {}", e)))?;
-
-    let secret_key = SecretVec::new(
-        secretbox::decrypt(
-            &encrypted_secret_key,
-            &crypto::Nonce::try_from_slice(&secret_key_nonce)?,
-            &crypto::Key::try_from_slice(&master_key)?,
-        )
-        .map_err(|_| Error::InvalidKeyAttributes)?,
-    );
+    let public_key = b64::decode(&key_attrs.public_key)
+        .map_err(|e| Error::Decode(format!("public_key: {}", e)))?;
+    let public_key = crypto::PublicKey::try_from_slice(&public_key)?;
+    let secret_key = SecretKey::open(
+        &secretbox::EncryptedBox {
+            encrypted_data: encrypted_secret_key,
+            nonce: crypto::Nonce::try_from_slice(&secret_key_nonce)?,
+        },
+        &master_key,
+        &public_key,
+    )
+    .map_err(|_| Error::InvalidKeyAttributes)?;
 
     Ok((master_key, secret_key))
 }
@@ -205,17 +207,11 @@ pub fn decrypt_secrets(
 ) -> Result<DecryptedSecrets> {
     let (master_key, secret_key) = decrypt_keys_only(kek, key_attrs)?;
 
-    let public_key = b64::decode(&key_attrs.public_key)
-        .map_err(|e| Error::Decode(format!("public_key: {}", e)))?;
     let sealed_token = b64::decode(encrypted_token)
         .map_err(|e| Error::Decode(format!("encrypted_token: {}", e)))?;
 
-    let token = sealed::open(
-        &sealed_token,
-        &crypto::PublicKey::try_from_slice(&public_key)?,
-        &crypto::SecretKey::try_from_slice(&secret_key)?,
-    )
-    .map_err(|_| Error::InvalidKeyAttributes)?;
+    let token = sealed::open(&sealed_token, &secret_key.public_key(), &secret_key)
+        .map_err(|_| Error::InvalidKeyAttributes)?;
 
     Ok(DecryptedSecrets {
         master_key,
@@ -277,11 +273,17 @@ mod tests {
         let secrets = decrypt_secrets(&kek, &gen_result.key_attributes, &encrypted_token).unwrap();
 
         let original_master_key = b64::decode(&gen_result.private_key_attributes.key).unwrap();
-        assert_eq!(secrets.master_key.as_ref(), original_master_key.as_slice());
+        assert_eq!(
+            secrets.master_key.as_bytes(),
+            original_master_key.as_slice()
+        );
 
         let original_secret_key =
             b64::decode(&gen_result.private_key_attributes.secret_key).unwrap();
-        assert_eq!(secrets.secret_key.as_ref(), original_secret_key.as_slice());
+        assert_eq!(
+            secrets.secret_key.as_bytes(),
+            original_secret_key.as_slice()
+        );
 
         assert_eq!(secrets.token.as_ref(), token);
     }
@@ -310,6 +312,19 @@ mod tests {
 
         let result = decrypt_secrets(&kek, &gen_result.key_attributes, &encrypted_token);
         assert!(matches!(result, Err(Error::IncorrectPassword)));
+    }
+
+    #[test]
+    fn test_decrypt_keys_only_rejects_mismatched_public_key() {
+        let mut generated =
+            generate_keys_with_strength("password", KeyDerivationStrength::Interactive).unwrap();
+        generated.key_attributes.public_key =
+            b64::encode(crypto::SecretKey::generate().public_key().as_bytes());
+
+        assert!(matches!(
+            decrypt_keys_only(&generated.key_encryption_key, &generated.key_attributes),
+            Err(Error::InvalidKeyAttributes)
+        ));
     }
 
     #[test]

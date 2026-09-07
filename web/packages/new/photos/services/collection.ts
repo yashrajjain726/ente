@@ -1,12 +1,6 @@
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { blobCache } from "ente-base/blob-cache";
-import {
-    boxSeal,
-    boxSealOpen,
-    decryptBox,
-    encryptBox,
-    generateKey,
-} from "ente-base/crypto";
+import { boxSeal, encryptBox, generateKey } from "ente-base/crypto";
 import { haveWindow } from "ente-base/env";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
@@ -52,13 +46,29 @@ import {
     savedCollections,
     savedCollectionsUpdationTime,
 } from "./photos-fdb";
-import { ensureUserKeyPair, getPublicKey } from "./user";
+import { getPublicKey } from "./user";
 
 const uncategorizedCollectionName = "Uncategorized";
 const defaultHiddenCollectionName = ".hidden";
 export const defaultHiddenCollectionUserFacingName = "Hidden";
 const favoritesCollectionName = "Favorites";
 const copyRequestBatchSize = 100;
+
+export type OpenCollectionKey = (input: {
+    ownerID: number;
+    encryptedKey: string;
+    keyDecryptionNonce?: string;
+}) => Promise<string>;
+
+let collectionKeyOpener: OpenCollectionKey | undefined;
+
+export const bindCollectionKeyOpener = (opener: OpenCollectionKey) => {
+    collectionKeyOpener = opener;
+};
+
+export const unbindCollectionKeyOpener = () => {
+    collectionKeyOpener = undefined;
+};
 
 export const createAlbum = (albumName: string) =>
     createCollection(albumName, "album");
@@ -110,16 +120,14 @@ const decryptRemoteKeyAndCollection = async (collection: RemoteCollection) =>
 export const decryptCollectionKey = async (
     collection: RemoteCollection,
 ): Promise<string> => {
-    const { owner, encryptedKey, keyDecryptionNonce } = collection;
-    // Owned keys use the master key; shared keys use a sealed box.
-    if (owner.id == ensureLocalUser().id) {
-        return decryptBox(
-            { encryptedData: encryptedKey, nonce: keyDecryptionNonce! },
-            await ensureMasterKeyFromSession(),
-        );
-    } else {
-        return boxSealOpen(encryptedKey, await ensureUserKeyPair());
+    if (!collectionKeyOpener) {
+        throw new Error("Collection key opener is not bound");
     }
+    return collectionKeyOpener({
+        ownerID: collection.owner.id,
+        encryptedKey: collection.encryptedKey,
+        keyDecryptionNonce: collection.keyDecryptionNonce,
+    });
 };
 
 const CollectionResponse = z.object({ collection: RemoteCollection });

@@ -31,7 +31,7 @@ export const legacyChangePassword = (
     session: Session,
     recoveryID: string,
     newPassword: string,
-) => changePassword(session, recoveryID, currentKeyAttributes(), newPassword);
+) => changePassword(session, recoveryID, newPassword);
 
 const currentKeyAttributes = () => {
     const keyAttributes = savedKeyAttributes();

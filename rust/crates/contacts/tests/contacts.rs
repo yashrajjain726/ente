@@ -296,14 +296,9 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
 
     let previous_password = pair.owner.password.clone();
     let new_password = support::unique_password("LegacyRecovered");
-    ente_legacy::change_password(
-        &pair.trusted_session,
-        &recovery.id,
-        &pair.trusted.key_attributes,
-        &new_password,
-    )
-    .await
-    .unwrap();
+    ente_legacy::change_password(&pair.trusted_session, &recovery.id, &new_password)
+        .await
+        .unwrap();
 
     match auth::login_without_totp(endpoint, &pair.owner.email, &previous_password).await {
         Err(ente_accounts::Error::IncorrectPassword) => {}

@@ -44,6 +44,7 @@ for (const [name, api] of [
                 baseUrl: "http://localhost",
                 authToken: "test-token",
                 masterKeyB64: fixture.masterKey,
+                ...(await sessionKeyAttributes(fixture.masterKey)),
             });
             try {
                 const diff = await api.contactsGetDiff(
@@ -90,10 +91,12 @@ for (const [name, api] of [
             };
             mockFetch(() => Response.json({ diff: [contact] }));
 
+            const masterKey = await generateKey();
             const session = await api.openSession({
                 baseUrl: "http://localhost",
                 authToken: "test-token",
-                masterKeyB64: await generateKey(),
+                masterKeyB64: masterKey,
+                ...(await sessionKeyAttributes(masterKey)),
             });
             try {
                 expect(
@@ -173,10 +176,12 @@ describe("Legacy", () => {
                     throw new Error(`Unexpected request: ${request.url}`);
             }
         });
+        const masterKey = await generateKey();
         const session = await legacy.openSession({
             baseUrl: "http://localhost",
             authToken: "token",
-            masterKeyB64: await generateKey(),
+            masterKeyB64: masterKey,
+            ...(await sessionKeyAttributes(masterKey)),
         });
         try {
             expect(await legacy.getInfo(session)).toStrictEqual(info);
@@ -242,6 +247,7 @@ describe("Legacy", () => {
             baseUrl: "http://localhost",
             authToken: "token",
             masterKeyB64: masterKey,
+            ...(await sessionKeyAttributes(masterKey)),
         });
         try {
             await legacy.addContact(
@@ -266,6 +272,19 @@ const mockFetch = (
         Object.defineProperty(response, "url", { value: request.url });
         return response;
     });
+
+const sessionKeyAttributes = async (masterKey: string) => {
+    const { publicKey, privateKey } = await generateKeyPair();
+    const encryptedSecretKey = await encryptBox(privateKey, masterKey);
+    return {
+        userID: 42,
+        keyAttributes: {
+            publicKey,
+            encryptedSecretKey: encryptedSecretKey.encryptedData,
+            secretKeyDecryptionNonce: encryptedSecretKey.nonce,
+        },
+    };
+};
 
 const encryptedContact = async () => {
     const masterKey = await generateKey();

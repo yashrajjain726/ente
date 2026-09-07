@@ -4,22 +4,21 @@ edition = "2024"
 
 [features]
 accounts = ["dep:ente-accounts"]
+collections = ["session", "dep:ente-collections"]
 contacts = [
     "session",
     "dep:ente-contacts",
-    "dep:serde",
-    "dep:serde-wasm-bindgen",
-    "dep:tsify",
     "dep:wasm-bindgen-futures",
 ]
 crypto = []
 crypto-file = ["crypto", "dep:md-5"]
 crypto-seal = ["crypto"]
 prelogin = ["accounts", "crypto"]
-session = []
+session = ["dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
 
 [dependencies]
 ente-accounts = { workspace = true, optional = true }
+ente-collections = { workspace = true, optional = true }
 ente-contacts = { workspace = true, optional = true }
 ente-core.workspace = true
 js-sys.workspace = true

@@ -3,7 +3,7 @@ use std::sync::RwLock;
 use ente_contacts::{ContactData, ContactOutput, ContactRecord, WrappedRootContactKey};
 use ente_core::{
     Session,
-    crypto::SecretVec,
+    crypto::Key,
     http::{Api, ApiConfig, Auth, Http},
 };
 
@@ -79,7 +79,9 @@ pub fn open_client(endpoint: &str, account: &TestAccount) -> Client {
     Client {
         session: Session {
             api,
-            master_key: SecretVec::new(account.master_key.clone()),
+            user_id: account.user_id,
+            master_key: Key::try_from_slice(&account.master_key).unwrap(),
+            secret_key: ente_core::crypto::SecretKey::try_from_slice(&account.secret_key).unwrap(),
         },
         wrapped_root_contact_key: RwLock::new(None),
     }
