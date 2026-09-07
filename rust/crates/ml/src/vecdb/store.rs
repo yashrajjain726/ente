@@ -28,6 +28,7 @@ const COMPACTION_MIN_DEAD_RECORDS: u64 = 64;
 const COMPACTION_DEAD_RATIO: u64 = 10;
 const COMPACTION_BATCH_SIZE: usize = 1000;
 const HANDOFF_WAIT_ROUNDS: u32 = 750;
+const HANDOFF_CLOSE_WAIT_ROUNDS: u32 = 2500;
 const HANDOFF_WAIT_PARK: Duration = Duration::from_millis(2);
 const KEY_TABLE_COPIES: usize = 2;
 const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
@@ -315,7 +316,8 @@ enum SlotHandoff<'a> {
 }
 
 fn wait_for_teardown_handoff<'a>(slot: &'a Mutex<PathSlot>, path: &Path) -> SlotHandoff<'a> {
-    let mut rounds = HANDOFF_WAIT_ROUNDS;
+    let mut dead_rounds = HANDOFF_WAIT_ROUNDS;
+    let mut close_rounds = HANDOFF_CLOSE_WAIT_ROUNDS;
     loop {
         let guard = lock_slot(slot);
         let observed = match &guard.live {
@@ -327,20 +329,21 @@ fn wait_for_teardown_handoff<'a>(slot: &'a Mutex<PathSlot>, path: &Path) -> Slot
             Some(closing) => {
                 drop(guard);
                 drop(closing);
-                if rounds == 0 {
+                if close_rounds == 0 {
                     warn_handoff_cap(path);
                     return SlotHandoff::Expired(lock_slot(slot));
                 }
+                close_rounds -= 1;
             }
             None => {
-                if rounds == 0 {
+                if dead_rounds == 0 {
                     warn_handoff_cap(path);
                     return SlotHandoff::Expired(guard);
                 }
                 drop(guard);
+                dead_rounds -= 1;
             }
         }
-        rounds -= 1;
         std::thread::sleep(HANDOFF_WAIT_PARK);
     }
 }
@@ -2507,6 +2510,7 @@ mod tests {
             SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
         }
         assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS);
+        assert!(waited < HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS * 2);
     }
 
     fn closed_instance(path: &Path) -> Arc<Shared> {
@@ -2540,7 +2544,7 @@ mod tests {
             SlotHandoff::Join(_) => panic!("expected an expired wait, saw a join"),
             SlotHandoff::Released(_) => panic!("expected an expired wait, saw a release"),
         }
-        assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_WAIT_ROUNDS);
+        assert!(waited >= HANDOFF_WAIT_PARK * HANDOFF_CLOSE_WAIT_ROUNDS);
     }
 
     #[test]

@@ -144,6 +144,7 @@ impl VectorArena {
         debug_assert_eq!(live, self.live_count);
         self.slots_to_keys.truncate(live);
         self.slots_to_keys.shrink_to_fit();
+        self.keys_to_slots.shrink_to_fit();
         self.chunks.truncate(live.div_ceil(VECTORS_PER_CHUNK));
         self.chunks.shrink_to_fit();
         self.alive.clear();
@@ -624,6 +625,28 @@ mod tests {
             UpsertOutcome::NewSlot(0)
         );
         assert_eq!(arena.vector_values(0), seeded_vector(4, 8));
+    }
+
+    #[test]
+    fn compact_in_place_reclaims_key_map_capacity() {
+        let mut arena = VectorArena::new(8).unwrap();
+        for index in 0..5000u64 {
+            arena
+                .upsert(&format!("key-{index}"), &seeded_vector(index, 8))
+                .unwrap();
+        }
+        for index in 0..4900u64 {
+            assert!(arena.remove(&format!("key-{index}")).is_some());
+        }
+        let before = arena.keys_to_slots.capacity();
+        assert!(before > arena.live_count() * 4);
+        arena.compact_in_place();
+        let after = arena.keys_to_slots.capacity();
+        assert_eq!(arena.live_count(), 100);
+        assert!(after < before);
+        assert!(after >= arena.live_count());
+        assert!(after <= arena.live_count() * 4);
+        assert_eq!(arena.slot_of_key("key-4999"), Some(99));
     }
 
     #[test]
