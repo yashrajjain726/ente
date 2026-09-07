@@ -815,7 +815,10 @@ func (repo *CollectionRepository) RestoreFiles(ctx context.Context, userID int64
 		if !ok {
 			return stacktrace.Propagate(ente.ErrInvalidApp, "unsupported collection app %s", app)
 		}
-		if _, err := applyUsageDelta(ctx, tx, userID, 0, photosFileDelta, lockerFileDelta, false); err != nil {
+		if _, err := applyUsageChange(ctx, tx, userID, usageChange{
+			PhotosFileDelta: photosFileDelta,
+			LockerFileDelta: lockerFileDelta,
+		}); err != nil {
 			return stacktrace.Propagate(err, "failed to update file counts")
 		}
 	}

@@ -171,7 +171,11 @@ func (t *TrashRepository) TrashFiles(ctx context.Context, userID int64, trash en
 		return stacktrace.Propagate(err, "failed to disable file links for files being trashed")
 	}
 	if photosFileDelta != 0 || lockerFileDelta != 0 || ambiguousFileApp {
-		if _, err := applyUsageDelta(ctx, tx, userID, 0, photosFileDelta, lockerFileDelta, ambiguousFileApp); err != nil {
+		if _, err := applyUsageChange(ctx, tx, userID, usageChange{
+			PhotosFileDelta:      photosFileDelta,
+			LockerFileDelta:      lockerFileDelta,
+			InvalidateFileCounts: ambiguousFileApp,
+		}); err != nil {
 			return stacktrace.Propagate(err, "failed to update file counts")
 		}
 	}
@@ -219,7 +223,7 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 		return stacktrace.Propagate(err, "")
 	}
 	if removedOwnedMembership {
-		if _, err := applyUsageDelta(ctx, tx, userID, 0, 0, 0, true); err != nil {
+		if _, err := applyUsageChange(ctx, tx, userID, usageChange{InvalidateFileCounts: true}); err != nil {
 			return stacktrace.Propagate(err, "failed to invalidate file counts")
 		}
 	}

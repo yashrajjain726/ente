@@ -11,15 +11,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func applyUsageDelta(
-	ctx context.Context,
-	tx *sql.Tx,
-	userID int64,
-	storageDelta int64,
-	photosFileDelta int64,
-	lockerFileDelta int64,
-	invalidateFileCounts bool,
-) (int64, error) {
+type usageChange struct {
+	StorageDelta         int64
+	PhotosFileDelta      int64
+	LockerFileDelta      int64
+	InvalidateFileCounts bool
+}
+
+func applyUsageChange(ctx context.Context, tx *sql.Tx, userID int64, change usageChange) (int64, error) {
 	row := tx.QueryRowContext(ctx, `WITH current_usage AS (
 			SELECT user_id, storage_consumed, photos_file_count, locker_file_count, file_count_source_version
 			FROM usage
@@ -55,10 +54,10 @@ func applyUsageDelta(
 			AND current_usage.locker_file_count IS NOT NULL
 			AND ($5 OR current_usage.photos_file_count + $3 < 0 OR current_usage.locker_file_count + $4 < 0)`,
 		userID,
-		storageDelta,
-		photosFileDelta,
-		lockerFileDelta,
-		invalidateFileCounts,
+		change.StorageDelta,
+		change.PhotosFileDelta,
+		change.LockerFileDelta,
+		change.InvalidateFileCounts,
 	)
 	var storageConsumed int64
 	var fileCountsInvalidated bool
@@ -71,8 +70,8 @@ func applyUsageDelta(
 	if fileCountsInvalidated {
 		logrus.WithFields(logrus.Fields{
 			"user_id":           userID,
-			"photos_file_delta": photosFileDelta,
-			"locker_file_delta": lockerFileDelta,
+			"photos_file_delta": change.PhotosFileDelta,
+			"locker_file_delta": change.LockerFileDelta,
 		}).Error("invalidated file counts")
 	}
 	return storageConsumed, nil
