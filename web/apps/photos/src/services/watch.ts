@@ -550,6 +550,10 @@ const ignoredExtensions = new Set([
     "htm",
     "xmp",
     "db",
+    "clpi",
+    "mpls",
+    "bdmv",
+    "cmap",
 ]);
 
 const shouldIgnoreForUpload = (path: string): boolean => {
