@@ -1,5 +1,7 @@
+import "dart:async";
 import "dart:io";
 
+import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/widgets.dart" show AppLifecycleState, WidgetsBinding;
@@ -21,25 +23,45 @@ void callbackDispatcher() {
     // listener surfaces as an unhandled exception even on success.
     String? failure = "Task didn't run";
     bool timedOut = false;
+    bool ownsPipeline = !Platform.isIOS;
+    final isIOSProcessingTask =
+        Platform.isIOS && taskName == BgTaskUtils.iOSBackgroundProcessingTask;
     final prefs = await SharedPreferences.getInstance();
 
     await runWithLogs(
       () async {
         try {
           BgTaskUtils.$.info('Task started $tlog');
-          if (Platform.isIOS &&
-              taskName == BgTaskUtils.iOSBackgroundProcessingTask) {
+          if (isIOSProcessingTask) {
             await BgTaskUtils.scheduleIOSBackgroundProcessingTask();
+          }
+          if (Platform.isIOS) {
+            ownsPipeline = await BgTaskUtils.acquireIOSBackgroundPipeline(
+              taskName,
+              taskStopwatch,
+            );
+            if (!ownsPipeline) {
+              BgTaskUtils.$.info(
+                'Skipping $taskName, background pipeline busy',
+              );
+              failure = null;
+              return;
+            }
+          }
+          if (isIOSProcessingTask) {
             await BgTaskUtils.markProcessingTaskStart(prefs);
           }
           final Duration taskBudget = BgTaskUtils.taskTimeoutFor(taskName);
           final Duration remainingBudget = Platform.isIOS
               ? taskBudget - taskStopwatch.elapsed
               : taskBudget;
+          final mlSelfStop = BgTaskUtils.mlSelfStopFor(taskName);
           await runBackgroundTask(
             taskName,
             tlog,
-            mlSelfStop: BgTaskUtils.mlSelfStopFor(taskName),
+            mlSelfStop: Platform.isIOS
+                ? mlSelfStop - taskStopwatch.elapsed
+                : mlSelfStop,
             mlLockWait: BgTaskUtils.mlLockWaitFor(taskName),
           ).timeout(
             remainingBudget.isNegative ? Duration.zero : remainingBudget,
@@ -59,13 +81,13 @@ void callbackDispatcher() {
           }
         } catch (e) {
           BgTaskUtils.$.warning('Task error: $e');
-          await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+          if (ownsPipeline) {
+            await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+          }
           failure = e.toString();
         } finally {
           // A timed-out run may still be draining, so its marker stays set.
-          if (!timedOut &&
-              Platform.isIOS &&
-              taskName == BgTaskUtils.iOSBackgroundProcessingTask) {
+          if (ownsPipeline && !timedOut && isIOSProcessingTask) {
             await BgTaskUtils.clearProcessingTaskStart(prefs);
           }
         }
@@ -93,6 +115,38 @@ class BgTaskUtils {
   static const iOSBackgroundProcessingTask =
       "io.ente.frame.iOSBackgroundProcessing";
   static const androidPeriodicTask = "io.ente.photos.androidPeriodicTask";
+
+  static Future<bool> acquireIOSBackgroundPipeline(
+    String taskName,
+    Stopwatch taskStopwatch,
+  ) async {
+    final waitDeadline =
+        taskStopwatch.elapsed +
+        (taskName == iOSBackgroundProcessingTask
+            ? const Duration(seconds: 30)
+            : Duration.zero);
+    final taskBudget = taskTimeoutFor(taskName);
+    const pollInterval = Duration(milliseconds: 500);
+    do {
+      if (taskStopwatch.elapsed >= taskBudget) return false;
+      if (await ProcessLockClient.instance.tryAcquire(
+        name: "background_process",
+        origin: "bg",
+        operation: taskName,
+      )) {
+        $.info(
+          'Acquired background pipeline for $taskName until engine detach',
+        );
+        return true;
+      }
+      final remainingWait = waitDeadline - taskStopwatch.elapsed;
+      if (remainingWait <= Duration.zero) return false;
+      await Future<void>.delayed(
+        remainingWait < pollInterval ? remainingWait : pollInterval,
+      );
+    } while (taskStopwatch.elapsed < waitDeadline);
+    return false;
+  }
 
   static Duration taskTimeoutFor(String taskName) {
     if (!Platform.isIOS) return const Duration(hours: 1);
