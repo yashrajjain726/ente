@@ -9,6 +9,7 @@ const M: usize = 16;
 const LEVEL_ZERO_NEIGHBOR_CAP: usize = 2 * M;
 const UPPER_LEVEL_NEIGHBOR_CAP: usize = M;
 const EF_CONSTRUCTION: usize = 128;
+const EF_SEARCH_UPPER: usize = 2;
 const EF_SEARCH_FLOOR: usize = 64;
 const EF_SEARCH_LIMIT_FACTOR: usize = 4;
 const SMALL_FILTER_FLOOR: usize = 1024;
@@ -457,7 +458,7 @@ impl QueryContext<'_> {
         let top = self.graph.level_of(entry).map_or(0, usize::from);
         let mut entries = vec![self.scored(entry)];
         for level in (1..=top).rev() {
-            entries = self.search_layer(&entries, level, ef, None, &|_| true);
+            entries = self.search_layer(&entries, level, EF_SEARCH_UPPER, None, &|_| true);
         }
         self.search_layer(&entries, 0, ef, None, admit)
     }
