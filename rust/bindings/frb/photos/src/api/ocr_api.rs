@@ -1,16 +1,9 @@
 use std::path::Path;
 
+use ente_assets::AssetStore;
 use ente_ml::error::MlError;
 use ente_ml::ocr;
 use flutter_rust_bridge::frb;
-
-#[derive(Clone, Debug)]
-pub struct RustOcrModelPaths {
-    pub detection: String,
-    pub classification: String,
-    pub recognition: String,
-    pub dictionary: String,
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct RustOcrPoint {
@@ -68,18 +61,29 @@ pub struct OcrEngine {
 }
 
 impl OcrEngine {
-    pub fn create(paths: RustOcrModelPaths) -> Result<OcrEngine, RustOcrError> {
-        ocr::OcrEngine::new(to_model_paths(paths))
-            .map(|inner| OcrEngine { inner })
-            .map_err(|error| {
-                let error = RustOcrError::from(ocr::OcrError::Ml(error));
-                log::log!(
-                    error.log_level(),
-                    "Rust OCR create failed: {}",
-                    error.description()
-                );
-                error
-            })
+    pub async fn create(
+        assets_dir: String,
+        include_recognizer: bool,
+    ) -> Result<OcrEngine, RustOcrError> {
+        let store = AssetStore::new(assets_dir);
+        let result = async {
+            let paths = ocr::assets::ensure_models(&store, include_recognizer).await?;
+            ocr::OcrEngine::new(paths)
+        }
+        .await;
+        result.map(|inner| OcrEngine { inner }).map_err(|error| {
+            let error = RustOcrError::from(ocr::OcrError::Ml(error));
+            log::log!(
+                error.log_level(),
+                "Rust OCR create failed: {}",
+                error.description()
+            );
+            error
+        })
+    }
+
+    pub fn is_detector_downloaded(assets_dir: String) -> bool {
+        ocr::assets::is_detector_downloaded(&AssetStore::new(assets_dir))
     }
 
     pub fn detect_text(
@@ -181,15 +185,6 @@ fn image_file_name(image_path: &str) -> String {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default()
-}
-
-fn to_model_paths(paths: RustOcrModelPaths) -> ocr::OcrModelPaths {
-    ocr::OcrModelPaths {
-        detection: paths.detection,
-        classification: paths.classification,
-        recognition: paths.recognition,
-        dictionary: paths.dictionary,
-    }
 }
 
 fn to_api_points(points: &[ocr::Point; 4]) -> Vec<RustOcrPoint> {

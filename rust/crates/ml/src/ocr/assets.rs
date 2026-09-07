@@ -77,8 +77,20 @@ pub fn model_assets() -> Vec<Asset> {
     CATALOG.iter().map(|file| file.asset()).collect()
 }
 
-pub async fn ensure_models(store: &AssetStore) -> MlResult<OcrModelPaths> {
-    let missing: Vec<(&OcrModelFile, Asset)> = CATALOG
+pub fn is_detector_downloaded(store: &AssetStore) -> bool {
+    store.is_downloaded(&DETECTION.asset())
+}
+
+pub async fn ensure_models(
+    store: &AssetStore,
+    include_recognizer: bool,
+) -> MlResult<OcrModelPaths> {
+    let files = if include_recognizer {
+        &CATALOG[..]
+    } else {
+        &CATALOG[..1]
+    };
+    let missing: Vec<(&OcrModelFile, Asset)> = files
         .iter()
         .map(|file| (*file, file.asset()))
         .filter(|(_, asset)| !store.is_downloaded(asset))
@@ -108,17 +120,90 @@ pub async fn ensure_models(store: &AssetStore) -> MlResult<OcrModelPaths> {
     }
     Ok(OcrModelPaths {
         detection: DETECTION.path(store),
-        classification: CLASSIFICATION.path(store),
-        recognition: RECOGNITION.path(store),
-        dictionary: DICTIONARY.path(store),
+        classification: if include_recognizer {
+            CLASSIFICATION.path(store)
+        } else {
+            String::new()
+        },
+        recognition: if include_recognizer {
+            RECOGNITION.path(store)
+        } else {
+            String::new()
+        },
+        dictionary: if include_recognizer {
+            DICTIONARY.path(store)
+        } else {
+            String::new()
+        },
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::Path;
 
     use super::*;
+
+    fn cache_model(store: &AssetStore, model: &OcrModelFile) {
+        let asset = model.asset();
+        fs::create_dir_all(store.asset_dir(&asset)).unwrap();
+        fs::write(model.path(store), b"cached model").unwrap();
+    }
+
+    #[test]
+    fn detector_availability_requires_the_published_file() {
+        let root = tempfile::tempdir().unwrap();
+        let store = AssetStore::new(root.path());
+        assert!(!is_detector_downloaded(&store));
+
+        fs::create_dir_all(store.asset_dir(&DETECTION.asset())).unwrap();
+        assert!(!is_detector_downloaded(&store));
+
+        cache_model(&store, &RECOGNITION);
+        assert!(!is_detector_downloaded(&store));
+
+        cache_model(&store, &DETECTION);
+        assert!(is_detector_downloaded(&store));
+
+        store.remove(&DETECTION.asset()).unwrap();
+        assert!(!is_detector_downloaded(&store));
+    }
+
+    #[tokio::test]
+    async fn cached_detector_can_be_prepared_without_recognition_models() {
+        let root = tempfile::tempdir().unwrap();
+        let store = AssetStore::new(root.path());
+        cache_model(&store, &DETECTION);
+
+        let paths = ensure_models(&store, false).await.unwrap();
+
+        assert_eq!(paths.detection, DETECTION.path(&store));
+        assert!(paths.classification.is_empty());
+        assert!(paths.recognition.is_empty());
+        assert!(paths.dictionary.is_empty());
+        for model in [&CLASSIFICATION, &RECOGNITION, &DICTIONARY] {
+            assert!(!store.is_downloaded(&model.asset()));
+        }
+    }
+
+    #[tokio::test]
+    async fn cached_full_models_can_be_prepared_after_detector_only() {
+        let root = tempfile::tempdir().unwrap();
+        let store = AssetStore::new(root.path());
+        for model in CATALOG {
+            cache_model(&store, model);
+        }
+
+        let detector_paths = ensure_models(&store, false).await.unwrap();
+        let paths = ensure_models(&store, true).await.unwrap();
+
+        assert_eq!(paths.detection, detector_paths.detection);
+        assert_eq!(paths.classification, CLASSIFICATION.path(&store));
+        assert_eq!(paths.recognition, RECOGNITION.path(&store));
+        assert_eq!(paths.dictionary, DICTIONARY.path(&store));
+        assert_eq!(fs::read(&paths.detection).unwrap(), b"cached model");
+    }
 
     #[test]
     fn catalog_directories_do_not_collide_with_the_indexing_catalog() {

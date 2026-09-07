@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     install_logger();
     load_onnx_runtime().await?;
     let store = AssetStore::new(asset_cache_dir()?);
-    let paths = assets::ensure_models(&store).await?;
+    let paths = assets::ensure_models(&store, !options.regions).await?;
     run_with_large_stack("ocr", move || run(options, paths))
 }
 

@@ -1,81 +1,63 @@
-import "dart:io";
 import "dart:ui";
 
 import "package:logging/logging.dart";
-import "package:photos/services/machine_learning/ml_model_assets.dart";
+import "package:path/path.dart" as p;
+import "package:path_provider/path_provider.dart";
 import "package:photos/services/machine_learning/ocr/ocr_backend.dart";
 import "package:photos/services/machine_learning/ocr/ocr_models.dart";
-import "package:photos/services/remote_assets_service.dart";
 import "package:photos/src/rust/api/ocr_api.dart";
 import "package:synchronized/synchronized.dart";
 
 class RustOcrBackend implements OcrBackend {
   static final _logger = Logger("RustOcrBackend");
   static const _modelVersion = "pp-ocrv5";
-  static const _noModelPaths = RustOcrModelPaths(
-    detection: "",
-    classification: "",
-    recognition: "",
-    dictionary: "",
-  );
 
   final _engineLock = Lock();
   OcrEngine? _engine;
-  RustOcrModelPaths _enginePaths = _noModelPaths;
+  String? _assetsDir;
+  bool _includesRecognizer = false;
 
   @override
   Future<ModelPreparationStatus> prepareModels(
     Set<OcrModelComponent> components,
   ) {
     return _engineLock.synchronized(() async {
-      final paths = await _downloadModels(
+      final assetsDir = await _getAssetsDirectory();
+      await _ensureEngine(
+        assetsDir,
         includeRecognizer: components.contains(OcrModelComponent.recognizer),
       );
-      await _ensureEngine(paths);
       return ModelPreparationStatus(
         isReady: true,
         version: _modelVersion,
-        modelPath: File(paths.detection).parent.path,
+        modelPath: assetsDir,
       );
     });
   }
 
-  Future<RustOcrModelPaths> _downloadModels({
-    required bool includeRecognizer,
-  }) async {
-    if (!includeRecognizer) {
-      final detection = await OcrDetectionModel.instance.downloadModel();
-      return RustOcrModelPaths(
-        detection: detection,
-        classification: _enginePaths.classification,
-        recognition: _enginePaths.recognition,
-        dictionary: _enginePaths.dictionary,
-      );
-    }
-    final paths = await Future.wait([
-      OcrDetectionModel.instance.downloadModel(),
-      OcrClassificationModel.instance.downloadModel(),
-      OcrRecognitionModel.instance.downloadModel(),
-      OcrDictionaryAsset.instance.downloadModel(),
-    ]);
-    return RustOcrModelPaths(
-      detection: paths[0],
-      classification: paths[1],
-      recognition: paths[2],
-      dictionary: paths[3],
+  Future<String> _getAssetsDirectory() async {
+    return _assetsDir ??= p.join(
+      (await getApplicationSupportDirectory()).path,
+      "assets",
     );
   }
 
-  Future<void> _ensureEngine(RustOcrModelPaths paths) async {
-    if (_engine != null && paths == _enginePaths) {
+  Future<void> _ensureEngine(
+    String assetsDir, {
+    required bool includeRecognizer,
+  }) async {
+    if (_engine != null && (!includeRecognizer || _includesRecognizer)) {
       return;
     }
     try {
-      _engine = await OcrEngine.create(paths: paths);
-      _enginePaths = paths;
-      final loadedModels = paths.recognition.isEmpty
-          ? "detector only"
-          : "detector, classifier and recognizer";
+      _engine = await OcrEngine.create(
+        assetsDir: assetsDir,
+        includeRecognizer: includeRecognizer,
+      );
+      _includesRecognizer = includeRecognizer;
+      final loadedModels = includeRecognizer
+          ? "detector, classifier and recognizer"
+          : "detector only";
       _logger.info("Created Rust OCR engine ($loadedModels)");
     } on RustOcrError catch (error) {
       _logger.severe("Could not create the Rust OCR engine: $error");
@@ -139,29 +121,32 @@ class RustOcrBackend implements OcrBackend {
 
   Future<OcrEngine> _recognitionEngine() async {
     final engine = _engine;
-    if (engine != null && _enginePaths.recognition.isNotEmpty) {
+    if (engine != null && _includesRecognizer) {
       return engine;
     }
     await prepareModels(OcrModelComponent.values.toSet());
     return _requireEngine();
   }
 
-  Future<OcrEngine> _detectionEngine() async {
-    final engine = _engine;
-    if (engine != null) {
-      return engine;
-    }
-    final detectorAvailable = await RemoteAssetsService.instance.hasAsset(
-      OcrDetectionModel.instance.modelRemotePath,
-    );
-    if (!detectorAvailable) {
-      throw const OcrException(
-        code: "MODEL_NOT_READY",
-        message: "The OCR detector model is not available locally",
+  Future<OcrEngine> _detectionEngine() {
+    return _engineLock.synchronized(() async {
+      final engine = _engine;
+      if (engine != null) {
+        return engine;
+      }
+      final assetsDir = await _getAssetsDirectory();
+      final detectorAvailable = await OcrEngine.isDetectorDownloaded(
+        assetsDir: assetsDir,
       );
-    }
-    await prepareModels({OcrModelComponent.detector});
-    return _requireEngine();
+      if (!detectorAvailable) {
+        throw const OcrException(
+          code: "MODEL_NOT_READY",
+          message: "The OCR detector model is not available locally",
+        );
+      }
+      await _ensureEngine(assetsDir, includeRecognizer: false);
+      return _requireEngine();
+    });
   }
 
   OcrEngine _requireEngine() {
