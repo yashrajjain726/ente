@@ -29,6 +29,7 @@ import {
     loadCurrentSpaceProfilePostsPage,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
+    sendCurrentPoke,
     setCurrentPostLiked,
     type SpaceFriendRequest,
     type SpacePost,
@@ -351,6 +352,27 @@ const Page: React.FC = () => {
                 onLoadFriendPosts={loadCurrentSpaceProfilePostsPage}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
+                onMessageFriend={(friend) =>
+                    void router.push(
+                        spaceRoutes.message(friend.spaceId ?? friend.id),
+                    )
+                }
+                onPokeFriend={async (friend) => {
+                    if (!profile?.spaceId) throw new Error("Missing space.");
+                    await sendCurrentPoke(
+                        profile.spaceId,
+                        friend.spaceId ?? friend.id,
+                        {
+                            id: profile.spaceId,
+                            spaceId: profile.spaceId,
+                            fullName: profile.fullName,
+                            username: profile.username,
+                            avatarUrl: profile.avatarUrl,
+                            friendsCount: 0,
+                        },
+                        friend,
+                    );
+                }}
                 onOpenFriendRequests={() =>
                     void router.push(spaceRoutes.friends)
                 }

@@ -13,6 +13,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
+import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
 import {
     SpaceHomeHeader,
     spaceHomeHeaderChromeColor,
@@ -95,6 +96,8 @@ interface HomeScreenProps {
     onOpenFriend?: (friendID: string, username?: string) => void;
     onOpenFriendRequests?: () => void;
     onOpenMessages?: () => void;
+    onMessageFriend: (friend: FriendProfile) => void;
+    onPokeFriend: (friend: FriendProfile) => Promise<void>;
     onOpenProfile?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
@@ -258,6 +261,7 @@ interface FriendPostTileProps {
     onAcceptFriendRequest?: () => Promise<void>;
     onDiscardFriendRequest?: () => Promise<void>;
     onOpenFriend?: (friendID: string, username?: string) => void;
+    onOpenAvatar?: (anchorRect: DOMRect) => void;
     onOpenFriendRequest?: () => void;
     onOpenPosts: (
         friend: FriendProfile,
@@ -284,6 +288,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     onLoadAvatar,
     onLoadImage,
     onOpenFriend,
+    onOpenAvatar,
     onOpenFriendRequest,
     onOpenPosts,
     isTwoTileLayout = false,
@@ -461,16 +466,16 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         });
     };
 
-    const openFriend = () => {
+    const openAvatar = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (isRequestPending) {
             onOpenFriendRequest?.();
             return;
         }
-        onOpenFriend?.(friend.id, friend.username);
+        onOpenAvatar?.(event.currentTarget.getBoundingClientRect());
     };
-    const canOpenFriend = isRequestPending
+    const canOpenAvatar = isRequestPending
         ? canOpenFriendRequest
-        : Boolean(onOpenFriend);
+        : Boolean(onOpenAvatar);
 
     return (
         <Box
@@ -687,10 +692,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         aria-label={
                             friendRequestDirection == "sent"
                                 ? `Manage friend request sent to ${firstName}`
-                                : `Open ${firstName}'s profile`
+                                : `Open actions for ${displayName}`
                         }
-                        disabled={!canOpenFriend || isFriendRequestActionBusy}
-                        onClick={openFriend}
+                        aria-haspopup={isRequestPending ? undefined : "dialog"}
+                        disabled={!canOpenAvatar || isFriendRequestActionBusy}
+                        onClick={openAvatar}
                         sx={{
                             appearance: "none",
                             bgcolor: "transparent",
@@ -700,7 +706,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                             borderRadius: "50%",
                             bottom: "10%",
                             boxSizing: "border-box",
-                            cursor: canOpenFriend ? "pointer" : "default",
+                            cursor: canOpenAvatar ? "pointer" : "default",
                             height: avatarSize,
                             left: "10%",
                             maxHeight: 36,
@@ -1022,6 +1028,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenFriend,
     onOpenFriendRequests,
     onOpenMessages,
+    onMessageFriend,
+    onPokeFriend,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -1031,6 +1039,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [selectedContact, setSelectedContact] = useState<{
+        anchorRect: DOMRect;
+        friend: FriendProfile;
+        avatarUrl?: string | null;
+    } | null>(null);
     const [openedPostIds, setOpenedPostIds] = useState<Set<number>>(new Set());
     const [postTileCanvasSize, setPostTileCanvasSize] =
         useState<PostTileCanvasSize>({ height: 0, width: 0 });
@@ -1515,6 +1528,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         : undefined
                 }
                 onOpenFriend={onOpenFriend}
+                onOpenAvatar={(anchorRect) =>
+                    setSelectedContact({ anchorRect, friend, avatarUrl })
+                }
                 onOpenPosts={(friend, posts, photo) =>
                     openPostPhotos(friend, posts, photo, isRead)
                 }
@@ -1939,6 +1955,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     disabled={isPostPhotoButtonDisabled}
                     onClick={openPostPhotoPicker}
                 />
+                {selectedContact && (
+                    <FriendQuickActionsDialog
+                        {...selectedContact}
+                        onClose={() => setSelectedContact(null)}
+                        onMessage={() =>
+                            onMessageFriend(selectedContact.friend)
+                        }
+                        onPoke={() => onPokeFriend(selectedContact.friend)}
+                        onProfile={() =>
+                            onOpenFriend?.(
+                                selectedContact.friend.id,
+                                selectedContact.friend.username,
+                            )
+                        }
+                    />
+                )}
                 {selectedViewer && (
                     <SpaceFileViewer
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
