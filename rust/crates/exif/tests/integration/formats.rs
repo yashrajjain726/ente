@@ -294,6 +294,91 @@ fn heif_protected_metadata_preserves_image_dimensions() {
 }
 
 #[test]
+fn heif_metadata_prefers_primary_references() {
+    for mime in [
+        None,
+        Some("application/rdf+xml"),
+        Some("application/xml"),
+        Some("text/xml"),
+    ] {
+        for (targets, expected, ambiguous) in [
+            ([Some(1u16), None], Some(6), false),
+            ([None, Some(1)], Some(3), false),
+            ([Some(1), Some(1)], None, true),
+            ([None, None], None, true),
+            ([Some(4), Some(1)], Some(3), false),
+            ([Some(1), Some(4)], Some(6), false),
+            ([None, Some(4)], Some(6), false),
+            ([Some(4), None], Some(3), false),
+            ([Some(4), Some(4)], None, false),
+        ] {
+            let mut info = vec![0, 0, 0, 0, 0, 2];
+            let mut locations = vec![1, 0, 0, 0, 0x44, 0, 0, 2];
+            let mut references = vec![0; 4];
+            let mut data = Vec::new();
+            for (index, target) in targets.into_iter().enumerate() {
+                let id = index as u16 + 2;
+                let orientation = if index == 0 { 6 } else { 3 };
+                let value = if mime.is_some() {
+                    xmp(&format!("<t:Orientation>{orientation}</t:Orientation>")).into_bytes()
+                } else {
+                    [
+                        vec![0; 4],
+                        tiff(&[(0x112, 3, 1, vec![orientation, 0])], false),
+                    ]
+                    .concat()
+                };
+                let mut entry = vec![2, 0, 0, 0];
+                entry.extend(id.to_be_bytes());
+                entry.extend([0, 0]);
+                entry.extend(if mime.is_some() { b"mime\0" } else { b"Exif\0" });
+                if let Some(mime) = mime {
+                    entry.extend(mime.as_bytes());
+                    entry.extend([0, 0]);
+                }
+                info.extend(box_bytes(b"infe", &entry));
+                locations.extend([id, 1, 0, 1].map(u16::to_be_bytes).concat());
+                locations.extend((data.len() as u32).to_be_bytes());
+                locations.extend((value.len() as u32).to_be_bytes());
+                data.extend(value);
+                if let Some(target) = target {
+                    references.extend(box_bytes(
+                        b"cdsc",
+                        &[id, 1, target].map(u16::to_be_bytes).concat(),
+                    ));
+                }
+            }
+            let mut meta = vec![0; 4];
+            meta.extend(box_bytes(b"pitm", &[0, 0, 0, 0, 0, 1]));
+            meta.extend(box_bytes(b"iinf", &info));
+            meta.extend(box_bytes(b"iloc", &locations));
+            meta.extend(box_bytes(b"iref", &references));
+            meta.extend(box_bytes(b"idat", &data));
+            let bytes = [
+                box_bytes(b"ftyp", b"heic\0\0\0\0mif1"),
+                box_bytes(b"meta", &meta),
+            ]
+            .concat();
+            for mode in [Mode::Summary, Mode::Details] {
+                let metadata = read(&bytes, mode);
+                let orientation = if mime.is_some() {
+                    metadata
+                        .property(namespace::TIFF, "Orientation")
+                        .map(|value| value.parse::<u32>().unwrap())
+                } else {
+                    metadata.orientation()
+                };
+                assert_eq!(orientation, expected, "{mime:?} {targets:?} {mode:?}");
+                assert_eq!(metadata.issues.len(), usize::from(ambiguous));
+                if ambiguous {
+                    assert_eq!(metadata.issues[0].message, "ambiguous primary metadata");
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn png_keywords_use_latin1_and_text_obeys_its_chunk_encoding() {
     for (kind, value) in [
         (b"tEXt", b"Caf\xe9\0Andr\xe9".to_vec()),

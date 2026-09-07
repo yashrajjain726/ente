@@ -157,17 +157,26 @@ fn metadata<R: Read + Seek>(
         }
     }
     for is_exif in [true, false] {
-        let mut candidates = meta.items.values().filter(|item| {
-            (item.describes.is_empty() || item.describes.contains(&primary))
-                && if is_exif {
-                    &item.kind == b"Exif"
-                } else {
-                    &item.kind == b"mime"
-                        && matches!(
-                            item.mime.as_str(),
-                            "application/rdf+xml" | "application/xml" | "text/xml"
-                        )
-                }
+        let candidates = meta.items.values().filter(|item| {
+            if is_exif {
+                &item.kind == b"Exif"
+            } else {
+                &item.kind == b"mime"
+                    && matches!(
+                        item.mime.as_str(),
+                        "application/rdf+xml" | "application/xml" | "text/xml"
+                    )
+            }
+        });
+        let has_primary = candidates
+            .clone()
+            .any(|item| item.describes.contains(&primary));
+        let mut candidates = candidates.filter(|item| {
+            if has_primary {
+                item.describes.contains(&primary)
+            } else {
+                item.describes.is_empty()
+            }
         });
         let Some(item) = candidates.next() else {
             continue;
