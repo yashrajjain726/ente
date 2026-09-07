@@ -24,6 +24,7 @@ members = [
     "crates/accounts",
     "crates/assets",
     "crates/cast",
+    "crates/collections",
     "crates/contacts",
     "crates/core",
     "crates/ensu",
@@ -45,6 +46,7 @@ dirs = "5.0.1"
 ente-accounts = { path = "crates/accounts" }
 ente-assets = { path = "crates/assets" }
 ente-cast = { path = "crates/cast" }
+ente-collections = { path = "crates/collections" }
 ente-contacts = { path = "crates/contacts" }
 ente-core = { path = "crates/core" }
 ente-ensu = { path = "crates/ensu" }

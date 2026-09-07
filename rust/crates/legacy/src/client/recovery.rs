@@ -1,5 +1,5 @@
 use ente_accounts::auth::{self, KeyAttributes, SrpSession};
-use ente_core::crypto::{self, SecretVec, sealed, secretbox};
+use ente_core::crypto::{self, Key, sealed, secretbox};
 use ente_core::{Session, b64};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -8,7 +8,7 @@ use crate::{Error, Result};
 
 #[derive(Debug)]
 pub struct LegacyRecoveryBundle {
-    pub recovery_key: SecretVec,
+    pub recovery_key: Key,
     pub user_key_attributes: KeyAttributes,
 }
 
@@ -74,14 +74,9 @@ pub async fn approve_recovery(
     .await
 }
 
-pub async fn recovery_bundle(
-    session: &Session,
-    recovery_id: &str,
-    current_user_key_attrs: &KeyAttributes,
-) -> Result<LegacyRecoveryBundle> {
+pub async fn recovery_bundle(session: &Session, recovery_id: &str) -> Result<LegacyRecoveryBundle> {
     let response = recovery_info(session, recovery_id).await?;
-    let recovery_key =
-        decrypt_recovery_key(session, &response.encrypted_key, current_user_key_attrs)?;
+    let recovery_key = decrypt_recovery_key(session, &response.encrypted_key)?;
 
     Ok(LegacyRecoveryBundle {
         recovery_key,
@@ -92,14 +87,13 @@ pub async fn recovery_bundle(
 pub async fn change_password(
     session: &Session,
     recovery_id: &str,
-    current_user_key_attrs: &KeyAttributes,
     new_password: &str,
 ) -> Result<()> {
-    let bundle = recovery_bundle(session, recovery_id, current_user_key_attrs).await?;
+    let bundle = recovery_bundle(session, recovery_id).await?;
     let target_master_key =
         decrypt_master_key_with_recovery_key(&bundle.user_key_attributes, &bundle.recovery_key)?;
     let (updated_key_attrs, login_key) = auth::generate_key_attributes_for_new_password(
-        &target_master_key,
+        target_master_key.as_bytes(),
         &bundle.user_key_attributes,
         new_password,
     )?;
@@ -199,40 +193,20 @@ async fn recovery_info(session: &Session, recovery_id: &str) -> Result<LegacyRec
         .await?)
 }
 
-fn decrypt_recovery_key(
-    session: &Session,
-    encrypted_key_b64: &str,
-    current_user_key_attrs: &KeyAttributes,
-) -> Result<SecretVec> {
-    let public_key = b64::decode(&current_user_key_attrs.public_key)?;
+fn decrypt_recovery_key(session: &Session, encrypted_key_b64: &str) -> Result<Key> {
     let encrypted_key = b64::decode(encrypted_key_b64)?;
-    let secret_key = current_secret_key(session, current_user_key_attrs)?;
     let decrypted = sealed::open(
         &encrypted_key,
-        &crypto::PublicKey::try_from_slice(&public_key)?,
-        &crypto::SecretKey::try_from_slice(&secret_key)?,
+        &session.secret_key.public_key(),
+        &session.secret_key,
     )?;
-    Ok(SecretVec::new(decrypted))
-}
-
-fn current_secret_key(
-    session: &Session,
-    current_user_key_attrs: &KeyAttributes,
-) -> Result<SecretVec> {
-    let encrypted_secret_key = b64::decode(&current_user_key_attrs.encrypted_secret_key)?;
-    let secret_key_nonce = b64::decode(&current_user_key_attrs.secret_key_decryption_nonce)?;
-    let secret_key = secretbox::decrypt(
-        &encrypted_secret_key,
-        &crypto::Nonce::try_from_slice(&secret_key_nonce)?,
-        &crypto::Key::try_from_slice(&session.master_key)?,
-    )?;
-    Ok(SecretVec::new(secret_key))
+    Ok(Key::try_from_slice(&decrypted)?)
 }
 
 fn decrypt_master_key_with_recovery_key(
     key_attributes: &KeyAttributes,
-    recovery_key: &[u8],
-) -> Result<SecretVec> {
+    recovery_key: &Key,
+) -> Result<Key> {
     let encrypted_master_key = key_attributes
         .master_key_encrypted_with_recovery_key
         .as_ref()
@@ -249,13 +223,13 @@ fn decrypt_master_key_with_recovery_key(
         })?;
     let encrypted_master_key = b64::decode(encrypted_master_key)?;
     let master_key_nonce = b64::decode(master_key_nonce)?;
-    secretbox::decrypt(
+    let master_key = secretbox::decrypt(
         &encrypted_master_key,
         &crypto::Nonce::try_from_slice(&master_key_nonce)?,
-        &crypto::Key::try_from_slice(recovery_key)?,
+        recovery_key,
     )
-    .map(SecretVec::new)
-    .map_err(Into::into)
+    .map_err(Error::from)?;
+    Ok(Key::try_from_slice(&master_key)?)
 }
 
 fn password_reset_setup_request(

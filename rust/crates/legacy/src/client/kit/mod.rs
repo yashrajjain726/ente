@@ -1,7 +1,7 @@
 mod owner_blob;
 
 use ente_accounts::auth::KeyAttributes;
-use ente_core::crypto::{self, SecretVec, secretbox};
+use ente_core::crypto::{self, Key, SecretVec, secretbox};
 use ente_core::http;
 use ente_core::{Session, b64};
 use serde::{Deserialize, Serialize};
@@ -148,7 +148,7 @@ pub async fn delete_kit(session: &Session, kit_id: &str) -> Result<()> {
 
 fn create_kit_request(
     recovery_key: &[u8],
-    master_key: &[u8],
+    master_key: &Key,
     part_names: [String; 3],
     notice_period_in_hours: i32,
 ) -> Result<(CreateLegacyKitRequest, Vec<LegacyKitShare>)> {
@@ -198,7 +198,7 @@ fn create_kit_request(
     ))
 }
 
-fn decode_kit_record(response: LegacyKitRecordResponse, master_key: &[u8]) -> Result<LegacyKit> {
+fn decode_kit_record(response: LegacyKitRecordResponse, master_key: &Key) -> Result<LegacyKit> {
     let owner_blob = decrypt_owner_blob(&response.encrypted_owner_blob, master_key)?;
     Ok(LegacyKit {
         id: response.id,
@@ -214,7 +214,7 @@ fn decode_kit_record(response: LegacyKitRecordResponse, master_key: &[u8]) -> Re
 
 fn decode_download_content(
     response: LegacyKitDownloadContentResponse,
-    master_key: &[u8],
+    master_key: &Key,
 ) -> Result<Vec<LegacyKitShare>> {
     let owner_blob = decrypt_owner_blob(&response.encrypted_owner_blob, master_key)?;
     Ok(owner_blob

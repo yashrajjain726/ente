@@ -299,7 +299,8 @@ where
                 .ok_or(Error::MissingKeyAttributes)?
         };
 
-        let recovery_key = get_recovery_key(&params.master_key, &key_attributes)?;
+        let master_key = crypto::Key::try_from_slice(&params.master_key)?;
+        let recovery_key = get_recovery_key(&master_key, &key_attributes)?;
 
         let secret = self.client.setup_two_factor().await?;
         self.ui
@@ -548,8 +549,8 @@ where
             key_attributes,
             secrets: AccountSecrets {
                 token: secrets.token.into_vec(),
-                master_key: secrets.master_key.into_vec(),
-                secret_key: secrets.secret_key.into_vec(),
+                master_key: secrets.master_key.as_bytes().to_vec(),
+                secret_key: secrets.secret_key.as_bytes().to_vec(),
                 public_key,
             },
             recovery_key,

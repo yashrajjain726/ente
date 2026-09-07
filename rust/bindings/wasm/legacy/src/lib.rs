@@ -151,18 +151,11 @@ pub async fn legacy_reject_recovery(
 pub async fn legacy_change_password(
     session: &Session,
     recovery_id: String,
-    current_user_key_attrs: <KeyAttributes as Tsify>::JsType,
     new_password: String,
 ) -> Result<(), Error> {
-    let current_user_key_attrs = KeyAttributes::from_js(current_user_key_attrs)?;
-    ente_legacy::change_password(
-        session.inner(),
-        &recovery_id,
-        &current_user_key_attrs.into(),
-        &new_password,
-    )
-    .await
-    .map_err(Into::into)
+    ente_legacy::change_password(session.inner(), &recovery_id, &new_password)
+        .await
+        .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = openKitRecovery)]

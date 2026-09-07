@@ -1,6 +1,6 @@
 use ente_core::{
     Session,
-    crypto::SecretVec,
+    crypto::{Key, SecretKey},
     http::{ApiConfig, Auth},
 };
 use ente_legacy::{LegacyContactRecord, LegacyContactState, LegacyInfo, LegacyRecoverySession};
@@ -29,7 +29,9 @@ pub fn open_session(endpoint: &str, account: &TestAccount) -> Session {
             user_agent: Some("ente-legacy-e2e".to_string()),
             auth: Some(Auth::User(account.auth_token.clone())),
         },
-        SecretVec::new(account.master_key.clone()),
+        account.user_id,
+        Key::try_from_slice(&account.master_key).unwrap(),
+        SecretKey::try_from_slice(&account.secret_key).unwrap(),
     )
     .unwrap()
 }

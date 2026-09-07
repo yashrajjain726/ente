@@ -2,19 +2,58 @@ use std::sync::Arc;
 
 use ente_core::{
     Session as InnerSession, b64,
-    crypto::SecretVec,
+    crypto::{self, Key, Nonce, PublicKey, SecretKey, secretbox::EncryptedBox},
     http::{ApiConfig, Auth},
 };
+use serde::Deserialize;
+use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(js_name = openSession)]
-pub fn open_session(
+#[derive(Deserialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionKeyAttributes {
+    public_key: String,
+    encrypted_secret_key: String,
+    secret_key_decryption_nonce: String,
+}
+
+#[derive(Deserialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenSessionInput {
     base_url: String,
     auth_token: String,
+    #[serde(rename = "userID")]
+    user_id: i64,
     master_key_b64: String,
+    key_attributes: SessionKeyAttributes,
+    #[tsify(optional)]
     client_package: Option<String>,
+    #[tsify(optional)]
     client_version: Option<String>,
-) -> Result<Session, Error> {
+}
+
+#[wasm_bindgen(js_name = openSession)]
+pub fn open_session(input: Ts<OpenSessionInput>) -> Result<Session, Error> {
+    let OpenSessionInput {
+        base_url,
+        auth_token,
+        user_id,
+        master_key_b64,
+        key_attributes,
+        client_package,
+        client_version,
+    } = input.to_rust()?;
+    let master_key = Key::try_from_slice(&b64::decode(&master_key_b64)?)?;
+    let secret_key = SecretKey::open(
+        &EncryptedBox {
+            encrypted_data: b64::decode(&key_attributes.encrypted_secret_key)?,
+            nonce: Nonce::try_from_slice(&b64::decode(
+                &key_attributes.secret_key_decryption_nonce,
+            )?)?,
+        },
+        &master_key,
+        &PublicKey::try_from_slice(&b64::decode(&key_attributes.public_key)?)?,
+    )?;
     Ok(Session(Arc::new(InnerSession::new(
         ApiConfig {
             origin: base_url,
@@ -23,7 +62,9 @@ pub fn open_session(
             user_agent: None,
             auth: Some(Auth::User(auth_token)),
         },
-        SecretVec::new(b64::decode(&master_key_b64)?),
+        user_id,
+        master_key,
+        secret_key,
     )?)))
 }
 
@@ -47,9 +88,13 @@ impl Session {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
+    Input(#[from] tsify::Error),
+    #[error(transparent)]
     Http(#[from] ente_core::http::Error),
     #[error(transparent)]
     Decode(#[from] b64::DecodeError),
+    #[error(transparent)]
+    Crypto(#[from] crypto::Error),
 }
 
 impl Error {

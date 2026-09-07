@@ -1,4 +1,7 @@
-import { ensureLocalUser } from "ente-accounts/services/user";
+import {
+    ensureLocalUser,
+    ensureSavedKeyAttributes,
+} from "ente-accounts/services/user";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
@@ -51,10 +54,13 @@ function sessionCache<T extends Pick<Session, "free" | "updateAuthToken">>(
             }
             const key = `${baseUrl}:${userID}`;
             if (current?.key !== key) {
+                const keyAttributes = ensureSavedKeyAttributes();
                 const opening = open({
                     baseUrl,
                     authToken,
+                    userID,
                     masterKeyB64,
+                    keyAttributes,
                     clientPackage: clientPackageName,
                     clientVersion: isDesktop ? desktopAppVersion : undefined,
                 })
