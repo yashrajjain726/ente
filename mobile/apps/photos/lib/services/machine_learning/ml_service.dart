@@ -340,6 +340,7 @@ class MLService {
 
   Future<MlRunDisposition> runAllML({
     bool force = false,
+    bool allowImageIndexing = true,
     MlRunControl? control,
     Duration? lockWait,
   }) async {
@@ -391,6 +392,7 @@ class MLService {
           disposition = await _runAllMLProtected(
             mode: mode,
             force: force,
+            allowImageIndexing: allowImageIndexing,
             control: runControl,
           );
         },
@@ -431,6 +433,7 @@ class MLService {
   Future<MlRunDisposition> _runAllMLProtected({
     required MLMode mode,
     required bool force,
+    required bool allowImageIndexing,
     required MlRunControl control,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
@@ -463,7 +466,11 @@ class MLService {
         return MlRunDisposition.stopped;
       }
       if (canFetch()) {
-        await _fetchAndIndexAllImages(mode: mode, control: control);
+        await _fetchAndIndexAllImages(
+          mode: mode,
+          control: control,
+          allowImageIndexing: allowImageIndexing,
+        );
       }
       if (control.stopRequested) {
         _logRunStopped(control, "before final clustering");
@@ -580,6 +587,7 @@ class MLService {
   Future<void> _fetchAndIndexAllImages({
     required MLMode mode,
     required MlRunControl control,
+    bool allowImageIndexing = true,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
     if (control.stopRequested) {
@@ -591,7 +599,7 @@ class MLService {
     bool rustRuntimePrepared = false;
     try {
       _logger.info('starting image indexing');
-      if (localSettings.isMLLocalIndexingEnabled) {
+      if (allowImageIndexing && localSettings.isMLLocalIndexingEnabled) {
         await MLModelDownloadService.instance.ensureModelsDownloaded(
           onlyIndexingModels: true,
         );
@@ -608,7 +616,7 @@ class MLService {
           _logRunStopped(control, "between indexing chunks");
           break;
         }
-        if (!localSettings.isMLLocalIndexingEnabled) {
+        if (!allowImageIndexing || !localSettings.isMLLocalIndexingEnabled) {
           if (rustRuntimePrepared) {
             await MLIndexingIsolate.instance.releaseRustRuntime();
             rustRuntimePrepared = false;
