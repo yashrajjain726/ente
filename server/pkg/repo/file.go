@@ -313,7 +313,7 @@ func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	_, err = repo.updateUsage(ctx, tx, file.OwnerID, usageDiff, 0, 0)
+	_, err = applyUsageChange(ctx, tx, file.OwnerID, usageChange{StorageDelta: usageDiff})
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -450,7 +450,7 @@ func (repo *FileRepository) UpdateThumbnail(ctx context.Context, fileID int64, u
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	_, err = repo.updateUsage(ctx, tx, userID, usageDiff, 0, 0)
+	_, err = applyUsageChange(ctx, tx, userID, usageChange{StorageDelta: usageDiff})
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -775,7 +775,7 @@ func (repo *FileRepository) scheduleDeletion(ctx context.Context, tx *sql.Tx, fi
 		totalObjectSize += object.FileSize
 	}
 	diff = diff - (totalObjectSize)
-	_, err = repo.updateUsage(ctx, tx, userID, diff, 0, 0)
+	_, err = applyUsageChange(ctx, tx, userID, usageChange{StorageDelta: diff})
 	return stacktrace.Propagate(err, "")
 }
 
@@ -784,9 +784,9 @@ func (repo *FileRepository) updateUsageForFileCreation(ctx context.Context, tx *
 	if !ok {
 		return -1, stacktrace.Propagate(ente.ErrInvalidApp, "")
 	}
-	return repo.updateUsage(ctx, tx, userID, storageDiff, photosFileCountDiff, lockerFileCountDiff)
-}
-
-func (repo *FileRepository) updateUsage(ctx context.Context, tx *sql.Tx, userID, storageDiff, photosFileCountDiff, lockerFileCountDiff int64) (int64, error) {
-	return applyUsageDelta(ctx, tx, userID, storageDiff, photosFileCountDiff, lockerFileCountDiff, false)
+	return applyUsageChange(ctx, tx, userID, usageChange{
+		StorageDelta:    storageDiff,
+		PhotosFileDelta: photosFileCountDiff,
+		LockerFileDelta: lockerFileCountDiff,
+	})
 }

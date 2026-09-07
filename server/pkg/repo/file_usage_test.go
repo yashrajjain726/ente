@@ -71,7 +71,7 @@ func TestUpdateUsageForFileCreationMaintainsCounterState(t *testing.T) {
 	}
 }
 
-func TestUpdateUsageRequiresUsageRow(t *testing.T) {
+func TestApplyUsageChangeRequiresUsageRow(t *testing.T) {
 	db := setupFileUsageTest(t)
 	userID := testutil.InsertUser(t, db, testutil.UserFixture{
 		UserID:       1,
@@ -84,12 +84,12 @@ func TestUpdateUsageRequiresUsageRow(t *testing.T) {
 	}
 	defer tx.Rollback()
 
-	_, err = (&FileRepository{}).updateUsage(t.Context(), tx, userID, 5, 1, 0)
+	_, err = applyUsageChange(t.Context(), tx, userID, usageChange{StorageDelta: 5, PhotosFileDelta: 1})
 	if err == nil {
-		t.Fatal("updateUsage() created a missing usage row")
+		t.Fatal("applyUsageChange() created a missing usage row")
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		t.Fatal("updateUsage() exposed missing usage row as not found")
+		t.Fatal("applyUsageChange() exposed missing usage row as not found")
 	}
 
 	var count int
