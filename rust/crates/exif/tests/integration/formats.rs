@@ -232,6 +232,68 @@ fn heif_exif_cannot_read_beyond_its_declared_extent() {
 }
 
 #[test]
+fn heif_protected_metadata_preserves_image_dimensions() {
+    let exif = [vec![0; 4], tiff(&[(0x112, 3, 1, vec![6, 0])], false)].concat();
+    let packet = xmp("<p:ProjectionType>equirectangular</p:ProjectionType>");
+    for mime in [
+        None,
+        Some("application/rdf+xml"),
+        Some("application/xml"),
+        Some("text/xml"),
+    ] {
+        for protected in [false, true] {
+            let data = if mime.is_some() {
+                packet.as_bytes()
+            } else {
+                &exif
+            };
+            let mut info = vec![2, 0, 0, 0, 0, 2, 0, u8::from(protected)];
+            info.extend(if mime.is_some() { b"mime\0" } else { b"Exif\0" });
+            if let Some(mime) = mime {
+                info.extend(mime.as_bytes());
+                info.extend([0, 0]);
+            }
+            let mut location = vec![1, 0, 0, 0, 0x44, 0, 0, 1, 0, 2, 0, 1, 0, 0, 0, 1];
+            location.extend(0u32.to_be_bytes());
+            location.extend((data.len() as u32).to_be_bytes());
+            let image_size = box_bytes(b"ispe", &[0u32, 640, 480].map(u32::to_be_bytes).concat());
+            let mut properties = box_bytes(b"ipco", &image_size);
+            properties.extend(box_bytes(b"ipma", &[0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1]));
+            let mut meta = vec![0; 4];
+            meta.extend(box_bytes(b"pitm", &[0, 0, 0, 0, 0, 1]));
+            meta.extend(box_bytes(
+                b"iinf",
+                &[vec![0, 0, 0, 0, 0, 1], box_bytes(b"infe", &info)].concat(),
+            ));
+            meta.extend(box_bytes(b"iloc", &location));
+            meta.extend(box_bytes(b"iprp", &properties));
+            meta.extend(box_bytes(b"idat", data));
+            let bytes = [
+                box_bytes(b"ftyp", b"heic\0\0\0\0mif1"),
+                box_bytes(b"meta", &meta),
+            ]
+            .concat();
+            for mode in [Mode::Summary, Mode::Details] {
+                let metadata = read(&bytes, mode);
+                assert_eq!(
+                    (metadata.width(), metadata.height()),
+                    (Some(640), Some(480))
+                );
+                assert_eq!(
+                    metadata.orientation(),
+                    (!protected && mime.is_none()).then_some(6)
+                );
+                assert_eq!(metadata.is_panorama(), !protected && mime.is_some());
+                assert_eq!(metadata.issues.len(), usize::from(protected));
+                if protected {
+                    assert_eq!(metadata.issues[0].message, "protected metadata");
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn png_keywords_use_latin1_and_text_obeys_its_chunk_encoding() {
     for (kind, value) in [
         (b"tEXt", b"Caf\xe9\0Andr\xe9".to_vec()),
@@ -305,6 +367,50 @@ fn webp_padding_and_all_frame_headers() {
 }
 
 #[test]
+fn png_summary_skips_text_within_a_small_read_budget() {
+    for (kind, fields, compressed) in [
+        (b"tEXt", b"".as_slice(), false),
+        (b"zTXt", b"\0".as_slice(), true),
+        (b"iTXt", b"\0\0en\0Comment\0".as_slice(), false),
+        (b"iTXt", b"\x01\0en\0Comment\0".as_slice(), true),
+    ] {
+        for size in [1024, 4096] {
+            let text = vec![b'a'; size];
+            let text = if compressed {
+                miniz_oxide::deflate::compress_to_vec_zlib(&text, 0)
+            } else {
+                text
+            };
+            let bytes = [
+                b"\x89PNG\r\n\x1a\n".to_vec(),
+                png_chunk(b"IHDR", &[0, 0, 0, 1, 0, 0, 0, 2, 8, 2, 0, 0, 0]),
+                png_chunk(
+                    kind,
+                    &[vec![b'C'; 79], vec![0], fields.to_vec(), text].concat(),
+                ),
+                png_chunk(b"eXIf", &tiff(&[(0x112, 3, 1, vec![6, 0])], false)),
+                png_chunk(b"IEND", &[]),
+            ]
+            .concat();
+            let limits = ente_exif::Limits {
+                read_bytes: 256,
+                ..ente_exif::Limits::default()
+            };
+            let metadata =
+                ente_exif::read(&mut std::io::Cursor::new(&bytes), Mode::Summary, limits).unwrap();
+            assert_eq!((metadata.width(), metadata.height()), (Some(1), Some(2)));
+            assert_eq!(metadata.orientation(), Some(6));
+            assert!(metadata.issues.is_empty());
+            assert!(metadata.xmp.is_empty());
+            assert!(matches!(
+                ente_exif::read(&mut std::io::Cursor::new(&bytes), Mode::Details, limits),
+                Err(ente_exif::Error::Limit("read bytes"))
+            ));
+        }
+    }
+}
+
+#[test]
 fn gif_xmp_after_image_subblocks() {
     let mut bytes = b"GIF89a\x02\0\x03\0\0\0\0".to_vec();
     bytes.extend([0x2c, 0, 0, 0, 0, 2, 0, 3, 0, 0, 2, 3, 0, 1, 2, 0]);
@@ -355,6 +461,45 @@ fn photoshop_iptc_preserves_encoding_dates_and_caption() {
     assert_eq!(metadata.iptc[0].value, b"\x1b%G");
     assert_eq!(metadata.iptc[3].value, "Snow ☃".as_bytes());
     assert!(metadata.issues.is_empty());
+}
+
+#[test]
+fn photoshop_recovers_each_metadata_resource() {
+    let resource = |id: u16, value: &[u8]| {
+        let mut bytes = b"8BIM".to_vec();
+        bytes.extend(id.to_be_bytes());
+        bytes.extend([0, 0]);
+        bytes.extend((value.len() as u32).to_be_bytes());
+        bytes.extend(value);
+        bytes.resize(bytes.len() + (value.len() & 1), 0);
+        bytes
+    };
+    let packet = xmp("<p:ProjectionType>equirectangular</p:ProjectionType>");
+    for (id, malformed) in [
+        (0x404, b"\x1c\x02\x78\0\x05x".as_slice()),
+        (0x424, b"<".as_slice()),
+    ] {
+        let resources = [
+            b"Photoshop 3.0\0".to_vec(),
+            resource(id, malformed),
+            resource(0x424, packet.as_bytes()),
+        ]
+        .concat();
+        let jpeg = [
+            vec![0xff, 0xd8],
+            segment(0xed, &resources),
+            jpeg(&[], "")[2..].to_vec(),
+        ]
+        .concat();
+        let tiff = tiff(&[(0x8649, 7, resources.len() as u32, resources)], false);
+        for bytes in [&jpeg, &tiff] {
+            for mode in [Mode::Summary, Mode::Details] {
+                let metadata = read(bytes, mode);
+                assert!(metadata.is_panorama());
+                assert_eq!(metadata.issues.len(), 1);
+            }
+        }
+    }
 }
 
 #[test]

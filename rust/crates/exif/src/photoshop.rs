@@ -16,14 +16,15 @@ pub(crate) fn read(data: &[u8], state: &mut State) -> Result<(), Error> {
         let name_length = cursor.number(1)? as usize;
         cursor.take(name_length + ((name_length + 1) & 1))?;
         let size = cursor.number(4)? as usize;
+        let offset = cursor.pos as u64;
         let value = cursor.take(size)?;
         cursor.take(size & 1)?;
-        if id == 0x404 {
-            iptc::read(value, state)?;
-        }
-        if id == 0x424 {
-            xmp::read(value, state)?;
-        }
+        let result = match id {
+            0x404 => iptc::read(value, state),
+            0x424 => xmp::read(value, state),
+            _ => Ok(()),
+        };
+        state.recover(offset, result)?;
     }
     Ok(())
 }

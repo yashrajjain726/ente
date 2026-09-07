@@ -3,6 +3,8 @@ use crate::{Dimensions, Mode, iptc, photoshop, tiff, xmp};
 use std::borrow::Cow;
 use std::io::{Read, Seek};
 
+const MAX_KEYWORD_LEN: usize = 79;
+
 pub(crate) fn read<R: Read + Seek>(
     reader: &mut Reader<'_, R>,
     state: &mut State,
@@ -24,9 +26,7 @@ pub(crate) fn read<R: Read + Seek>(
                 Ok(())
             }
             b"eXIf" => tiff::read(reader, state, start, len),
-            b"iTXt" | b"zTXt" | b"tEXt" => {
-                text(&reader.bytes(start, len as usize)?, &header[4..], state)
-            }
+            b"iTXt" | b"zTXt" | b"tEXt" => text(reader, start, len as usize, &header[4..], state),
             b"IEND" => {
                 if len != 0 || state.metadata.dimensions.is_none() {
                     return Err(Error::Malformed("PNG IEND"));
@@ -41,12 +41,45 @@ pub(crate) fn read<R: Read + Seek>(
     Err(Error::Malformed("missing PNG IEND"))
 }
 
-fn text(data: &[u8], kind: &[u8], state: &mut State) -> Result<(), Error> {
-    let mut cursor = Cursor::new(data);
+fn text<R: Read + Seek>(
+    reader: &mut Reader<'_, R>,
+    start: u64,
+    len: usize,
+    kind: &[u8],
+    state: &mut State,
+) -> Result<(), Error> {
+    let mut header = [0; MAX_KEYWORD_LEN + 1];
+    let header = &mut header[..len.min(MAX_KEYWORD_LEN + 1)];
+    reader.fill(start, header)?;
+    let mut cursor = Cursor::new(header);
     let key = cursor.terminated_bytes()?;
-    if !(1..=79).contains(&key.len()) {
+    if !(1..=MAX_KEYWORD_LEN).contains(&key.len()) {
         return Err(Error::Malformed("PNG keyword"));
     }
+    let is_profile = matches!(
+        key,
+        b"Raw profile type exif"
+            | b"Raw profile type APP1"
+            | b"Raw profile type iptc"
+            | b"Raw profile type 8bim"
+            | b"Raw profile type xmp"
+    );
+    if key != b"XML:com.adobe.xmp" && !is_profile && state.mode == Mode::Summary {
+        return Ok(());
+    }
+    let prefix = &header[cursor.pos..];
+    let data = if len == header.len() {
+        Cow::Borrowed(prefix)
+    } else {
+        let remaining = len - header.len();
+        let offset = start + header.len() as u64;
+        reader.check(offset, remaining)?;
+        let mut data = vec![0; prefix.len() + remaining];
+        data[..prefix.len()].copy_from_slice(prefix);
+        reader.fill(offset, &mut data[prefix.len()..])?;
+        Cow::Owned(data)
+    };
+    let mut cursor = Cursor::new(&data);
     let mut compressed = false;
     let mut language = None;
     if kind == b"iTXt" {
@@ -63,17 +96,6 @@ fn text(data: &[u8], kind: &[u8], state: &mut State) -> Result<(), Error> {
             return Err(Error::Unsupported("PNG text compression"));
         }
         compressed = true;
-    }
-    let is_profile = matches!(
-        key,
-        b"Raw profile type exif"
-            | b"Raw profile type APP1"
-            | b"Raw profile type iptc"
-            | b"Raw profile type 8bim"
-            | b"Raw profile type xmp"
-    );
-    if key != b"XML:com.adobe.xmp" && !is_profile && state.mode == Mode::Summary {
-        return Ok(());
     }
     let bytes = &data[cursor.pos..];
     let decoded;

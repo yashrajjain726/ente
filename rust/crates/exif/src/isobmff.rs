@@ -40,6 +40,7 @@ pub(crate) fn read<R: Read + Seek>(
 struct Item {
     kind: [u8; 4],
     mime: String,
+    protected: bool,
     location: Option<Location>,
     describes: Vec<u32>,
 }
@@ -191,6 +192,9 @@ fn read_item<R: Read + Seek>(
     idat: Option<&BoxRange>,
     is_exif: bool,
 ) -> Result<(), Error> {
+    if item.protected {
+        return Err(Error::Unsupported("protected metadata"));
+    }
     let location = item
         .location
         .as_ref()
@@ -283,15 +287,13 @@ fn item_info<R: Read + Seek>(
         } else {
             String::new()
         };
-        if protection != 0 && (&kind == b"Exif" || mime == "application/rdf+xml") {
-            return Err(Error::Unsupported("protected metadata"));
-        }
         let item = meta.items.entry(id).or_default();
         if item.kind != [0; 4] {
             return Err(Error::Malformed("duplicate item info"));
         }
         item.kind = kind;
         item.mime = mime;
+        item.protected = protection != 0;
     }
     Ok(())
 }

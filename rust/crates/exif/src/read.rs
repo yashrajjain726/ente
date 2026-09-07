@@ -119,7 +119,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         Ok(())
     }
 
-    fn check(&self, offset: u64, count: usize) -> Result<(), Error> {
+    pub fn check(&self, offset: u64, count: usize) -> Result<(), Error> {
         if offset > self.len || count as u64 > self.len - offset {
             return Err(Error::Malformed("range"));
         }
