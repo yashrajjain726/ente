@@ -23,9 +23,11 @@ const _selectedThumbnailHeight = 43.0;
 const _thumbnailWidth = 29.0;
 const _thumbnailHeight = 35.0;
 const _cacheExtentInItems = 4;
-const _selectionAnimationDuration = Duration(milliseconds: 120);
 const _scrollAnimationDuration = Duration(milliseconds: 180);
-const _scrubThrottleDuration = Duration(milliseconds: 50);
+const _maxFlingVelocity = 800.0;
+// Evaluating a slightly faster platform simulation on a slower clock keeps the
+// launch velocity unchanged while extending its distance and settling time.
+const _ballisticTimeScale = 0.7;
 
 enum FileViewerFilmstripSelectionSource {
   tap,
@@ -70,8 +72,6 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
   late int _visualSelectedIndex;
   bool _isUserScrollSession = false;
   bool _alignmentScheduled = false;
-  Timer? _scrubThrottleTimer;
-  int? _pendingScrubIndex;
 
   @override
   void initState() {
@@ -80,6 +80,7 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     _scrollController = ScrollController(
       initialScrollOffset: _offsetForIndex(_visualSelectedIndex),
     );
+    _scrollController.addListener(_onScrollOffsetChanged);
   }
 
   @override
@@ -87,7 +88,9 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     super.didUpdateWidget(oldWidget);
     final selectedIndex = _clampIndex(widget.selectedIndex);
     if (!_isUserScrollSession) {
-      _visualSelectedIndex = selectedIndex;
+      if (_visualSelectedIndex != selectedIndex) {
+        _visualSelectedIndex = selectedIndex;
+      }
     } else if (_visualSelectedIndex >= widget.itemCount) {
       _visualSelectedIndex = selectedIndex;
     }
@@ -101,7 +104,7 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
 
   @override
   void dispose() {
-    _scrubThrottleTimer?.cancel();
+    _scrollController.removeListener(_onScrollOffsetChanged);
     _scrollController.dispose();
     super.dispose();
   }
@@ -151,6 +154,7 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
                   controller: _scrollController,
                   clipBehavior: Clip.none,
                   scrollDirection: Axis.horizontal,
+                  physics: const _FilmstripScrollPhysics(),
                   itemCount: widget.itemCount,
                   itemExtent: _itemExtent,
                   findChildIndexCallback: widget.findChildIndexCallback,
@@ -169,7 +173,6 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
   }
 
   Widget _buildItem(BuildContext context, int index) {
-    final isSelected = index == _visualSelectedIndex;
     final item = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _select(index, FileViewerFilmstripSelectionSource.tap),
@@ -181,36 +184,54 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
           maxWidth: _selectedThumbnailWidth,
           minHeight: 0,
           maxHeight: _selectedThumbnailHeight,
-          child: AnimatedContainer(
-            duration: _selectionAnimationDuration,
-            curve: Curves.easeOutCubic,
-            width: isSelected ? _selectedThumbnailWidth : _thumbnailWidth,
-            height: isSelected ? _selectedThumbnailHeight : _thumbnailHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: isSelected
-                      ? const Color(0x33000000)
-                      : const Color(0x24000000),
-                  blurRadius: isSelected ? 3 : 2,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2.5),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  widget.itemBuilder(context, index),
-                  AnimatedContainer(
-                    duration: _selectionAnimationDuration,
-                    color: isSelected ? Colors.transparent : Colors.black26,
+          child: AnimatedBuilder(
+            animation: _scrollController,
+            child: widget.itemBuilder(context, index),
+            builder: (context, thumbnail) {
+              final proximity = _centerProximity(index);
+              final width =
+                  _thumbnailWidth +
+                  ((_selectedThumbnailWidth - _thumbnailWidth) * proximity);
+              final height =
+                  _thumbnailHeight +
+                  ((_selectedThumbnailHeight - _thumbnailHeight) * proximity);
+              return SizedBox(
+                width: width,
+                height: height,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color.lerp(
+                          const Color(0x24000000),
+                          const Color(0x33000000),
+                          proximity,
+                        )!,
+                        blurRadius: 2 + proximity,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2.5),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        thumbnail!,
+                        ColoredBox(
+                          color: Color.lerp(
+                            Colors.black26,
+                            Colors.transparent,
+                            proximity,
+                          )!,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -223,32 +244,19 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
       _isUserScrollSession = true;
-      _pendingScrubIndex = null;
       widget.onSelectionChanged(
         _visualSelectedIndex,
         FileViewerFilmstripSelectionSource.scrubStart,
       );
     }
 
-    if (_isUserScrollSession &&
-        (notification is ScrollUpdateNotification ||
-            notification is OverscrollNotification)) {
-      _queueNearestScrolledItem();
-    }
-
     if (notification is ScrollEndNotification && _isUserScrollSession) {
-      _scrubThrottleTimer?.cancel();
-      _scrubThrottleTimer = null;
-      _pendingScrubIndex = null;
       final finalIndex = _nearestScrolledIndex();
       if (finalIndex != _visualSelectedIndex) {
-        unawaited(HapticFeedback.selectionClick());
         _select(
           finalIndex,
           FileViewerFilmstripSelectionSource.scrubPreview,
           align: false,
-          notifySelection: false,
-          triggerHaptic: false,
         );
       }
       _isUserScrollSession = false;
@@ -261,37 +269,18 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     return false;
   }
 
-  void _queueNearestScrolledItem() {
+  void _selectNearestScrolledItem() {
     final index = _nearestScrolledIndex();
-    if (index == _visualSelectedIndex) {
-      _pendingScrubIndex = null;
-      return;
-    }
-    if (index == _pendingScrubIndex) return;
-    _pendingScrubIndex = index;
-    if (_scrubThrottleTimer != null) return;
-    _flushPendingScrubSelection();
-    _startScrubThrottleWindow();
-  }
-
-  void _startScrubThrottleWindow() {
-    _scrubThrottleTimer = Timer(_scrubThrottleDuration, () {
-      _scrubThrottleTimer = null;
-      if (!mounted || _pendingScrubIndex == null) return;
-      _flushPendingScrubSelection();
-      if (_isUserScrollSession) _startScrubThrottleWindow();
-    });
-  }
-
-  void _flushPendingScrubSelection() {
-    final index = _pendingScrubIndex;
-    _pendingScrubIndex = null;
-    if (index == null) return;
+    if (index == _visualSelectedIndex) return;
     _select(
       index,
       FileViewerFilmstripSelectionSource.scrubPreview,
       align: false,
     );
+  }
+
+  void _onScrollOffsetChanged() {
+    if (_isUserScrollSession) _selectNearestScrolledItem();
   }
 
   int _nearestScrolledIndex() {
@@ -303,25 +292,37 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     int index,
     FileViewerFilmstripSelectionSource source, {
     bool align = true,
-    bool notifySelection = true,
-    bool triggerHaptic = true,
   }) {
     final clampedIndex = _clampIndex(index);
     if (clampedIndex == _visualSelectedIndex) {
-      if (notifySelection &&
-          clampedIndex != _clampIndex(widget.selectedIndex)) {
-        if (triggerHaptic) unawaited(HapticFeedback.selectionClick());
+      if (clampedIndex != _clampIndex(widget.selectedIndex)) {
+        unawaited(HapticFeedback.selectionClick());
         widget.onSelectionChanged(clampedIndex, source);
       }
       if (align) _alignToIndex(clampedIndex, animate: true);
       return;
     }
     setState(() => _visualSelectedIndex = clampedIndex);
-    if (notifySelection) {
-      if (triggerHaptic) unawaited(HapticFeedback.selectionClick());
-      widget.onSelectionChanged(clampedIndex, source);
-    }
+    unawaited(HapticFeedback.selectionClick());
+    widget.onSelectionChanged(clampedIndex, source);
     if (align) _alignToIndex(clampedIndex, animate: true);
+  }
+
+  double _centerProximity(int index) {
+    var scrollOffset = _offsetForIndex(_visualSelectedIndex);
+    if (_scrollController.hasClients) {
+      final position = _scrollController.position;
+      scrollOffset = position.hasContentDimensions
+          ? position.pixels
+                .clamp(position.minScrollExtent, position.maxScrollExtent)
+                .toDouble()
+          : position.pixels;
+    }
+    final linearProximity =
+        (1 - ((scrollOffset - _offsetForIndex(index)).abs() / _itemExtent))
+            .clamp(0.0, 1.0)
+            .toDouble();
+    return linearProximity * linearProximity * (3 - (2 * linearProximity));
   }
 
   void _scheduleAlignment(int index, {required bool animate}) {
@@ -359,4 +360,59 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
   }
 
   double _offsetForIndex(int index) => index * _itemExtent;
+}
+
+class _FilmstripScrollPhysics extends ScrollPhysics {
+  const _FilmstripScrollPhysics({super.parent});
+
+  @override
+  _FilmstripScrollPhysics applyTo(ScrollPhysics? ancestor) =>
+      _FilmstripScrollPhysics(parent: buildParent(ancestor));
+
+  @override
+  double get maxFlingVelocity => _maxFlingVelocity;
+
+  @override
+  double carriedMomentum(double existingVelocity) => 0;
+
+  @override
+  Simulation? createBallisticSimulation(
+    ScrollMetrics position,
+    double velocity,
+  ) {
+    final cappedVelocity = velocity
+        .clamp(-_maxFlingVelocity, _maxFlingVelocity)
+        .toDouble();
+    if (position.outOfRange ||
+        cappedVelocity.abs() < toleranceFor(position).velocity) {
+      return super.createBallisticSimulation(position, cappedVelocity);
+    }
+    final simulation = super.createBallisticSimulation(
+      position,
+      cappedVelocity / _ballisticTimeScale,
+    );
+    return simulation == null
+        ? null
+        : _FilmstripBallisticSimulation(
+            simulation,
+            timeScale: _ballisticTimeScale,
+          );
+  }
+}
+
+class _FilmstripBallisticSimulation extends Simulation {
+  final Simulation _simulation;
+  final double timeScale;
+
+  _FilmstripBallisticSimulation(this._simulation, {required this.timeScale})
+    : super(tolerance: _simulation.tolerance);
+
+  @override
+  double x(double time) => _simulation.x(time * timeScale);
+
+  @override
+  double dx(double time) => _simulation.dx(time * timeScale) * timeScale;
+
+  @override
+  bool isDone(double time) => _simulation.isDone(time * timeScale);
 }

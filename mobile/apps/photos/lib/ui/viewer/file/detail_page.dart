@@ -473,6 +473,10 @@ class _BodyState extends State<_Body> {
                             previewFile,
                             key: ObjectKey(previewFile),
                             rawThumbnail: true,
+                            diskLoadDeferDuration:
+                                galleryThumbnailDiskLoadDeferDuration,
+                            serverLoadDeferDuration:
+                                galleryThumbnailServerLoadDeferDuration,
                             shouldShowSyncStatus: false,
                             shouldShowFavoriteIcon: false,
                             shouldShowVideoOverlayIcon: false,
