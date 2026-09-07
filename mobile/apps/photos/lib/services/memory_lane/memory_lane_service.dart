@@ -122,7 +122,11 @@ class MemoryLaneService {
         _logger.severe("getClustersForMemoryLane failed:", e, s);
         final cache = await _cacheService.getCache();
         _topNClusters = cache.timelines.entries
-            .where((entry) => entry.value.isCluster)
+            .where(
+              (entry) =>
+                  entry.value.isCluster &&
+                  !assigned.contains(entry.value.personId),
+            )
             .map((entry) => entry.key)
             .toSet();
       }
