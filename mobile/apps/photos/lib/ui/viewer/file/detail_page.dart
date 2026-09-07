@@ -38,6 +38,7 @@ import "package:photos/ui/tools/editor/video_editor_page.dart";
 import "package:photos/ui/viewer/file/file_app_bar.dart";
 import "package:photos/ui/viewer/file/file_bottom_bar.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip.dart";
+import "package:photos/ui/viewer/file/file_viewer_filmstrip_preview_handoff.dart";
 import 'package:photos/ui/viewer/file/file_widget.dart';
 import "package:photos/ui/viewer/file/ocr/inline_text_detection.dart";
 import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
@@ -180,7 +181,7 @@ class _BodyState extends State<_Body> {
   List<EnteFile>? _files;
   late PageController _pageController;
   final _selectedIndexNotifier = ValueNotifier(0);
-  final _filmstripPreviewIndexNotifier = ValueNotifier<int?>(null);
+  final _filmstripPreviewHandoff = FileViewerFilmstripPreviewHandoff();
   final _inlineTextDetectionController = InlineTextDetectionController();
   bool _isFirstOpened = true;
   bool isGuestView = false;
@@ -195,7 +196,6 @@ class _BodyState extends State<_Body> {
   ValueNotifier<double>? _bottomControlsAdditionalInsetNotifier;
   bool _isFilmstripScrubbing = false;
   bool _didPauseVideoForFilmstripScrub = false;
-  int? _pendingFilmstripCommitIndex;
 
   @override
   void initState() {
@@ -262,7 +262,7 @@ class _BodyState extends State<_Body> {
     _captionUpdatedSubscription.cancel();
     _pageController.dispose();
     _selectedIndexNotifier.dispose();
-    _filmstripPreviewIndexNotifier.dispose();
+    _filmstripPreviewHandoff.dispose();
     _qrHelper?.dispose();
     _playbackSpeed.dispose();
     super.dispose();
@@ -310,7 +310,7 @@ class _BodyState extends State<_Body> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: ValueListenableBuilder<int?>(
-            valueListenable: _filmstripPreviewIndexNotifier,
+            valueListenable: _filmstripPreviewHandoff,
             builder: (context, previewIndex, child) =>
                 AbsorbPointer(absorbing: previewIndex != null, child: child),
             child: ValueListenableBuilder(
@@ -456,7 +456,7 @@ class _BodyState extends State<_Body> {
               ),
               if (_shouldShowFilmstrip)
                 ValueListenableBuilder<int?>(
-                  valueListenable: _filmstripPreviewIndexNotifier,
+                  valueListenable: _filmstripPreviewHandoff,
                   builder: (context, previewIndex, _) {
                     final previewFile = previewIndex == null
                         ? null
@@ -469,18 +469,8 @@ class _BodyState extends State<_Body> {
                         child: ColoredBox(
                           key: fileViewerFilmstripPreviewKey,
                           color: Colors.black,
-                          child: ThumbnailWidget(
-                            previewFile,
-                            key: ObjectKey(previewFile),
-                            rawThumbnail: true,
-                            diskLoadDeferDuration:
-                                galleryThumbnailDiskLoadDeferDuration,
-                            serverLoadDeferDuration:
-                                galleryThumbnailServerLoadDeferDuration,
-                            shouldShowSyncStatus: false,
-                            shouldShowFavoriteIcon: false,
-                            shouldShowVideoOverlayIcon: false,
-                            shouldShowLivePhotoOverlay: false,
+                          child: _GalleryFilmstripThumbnail(
+                            file: previewFile,
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -490,7 +480,7 @@ class _BodyState extends State<_Body> {
                 ),
               if (widget.config.mode != DetailPageMode.minimalistic)
                 ValueListenableBuilder<int?>(
-                  valueListenable: _filmstripPreviewIndexNotifier,
+                  valueListenable: _filmstripPreviewHandoff,
                   builder: (context, previewIndex, child) => AbsorbPointer(
                     // The toolbar stays visible, but must not act on the old
                     // committed file while another file is being previewed.
@@ -638,9 +628,18 @@ class _BodyState extends State<_Body> {
         } else {
           _selectedIndexNotifier.value = index;
         }
-        if (_pendingFilmstripCommitIndex == index) {
-          _clearFilmstripPreview();
-        }
+        _filmstripPreviewHandoff.onPageChanged(
+          index: index,
+          fileIdentity: file,
+          onPagePainted: () {
+            if (!mounted ||
+                _selectedIndexNotifier.value != index ||
+                !identical(_fileAt(index), file)) {
+              return;
+            }
+            _clearFilmstripPreview();
+          },
+        );
         if (!_isFilmstripScrubbing) {
           _runSelectedFileSideEffects(file);
         }
@@ -701,7 +700,7 @@ class _BodyState extends State<_Body> {
       case FileViewerFilmstripSelectionSource.scrubPreview:
         _isFilmstripScrubbing = true;
         if (index == _selectedIndexNotifier.value) {
-          _filmstripPreviewIndexNotifier.value = null;
+          _filmstripPreviewHandoff.clear();
           break;
         }
         if (!_didPauseVideoForFilmstripScrub) {
@@ -711,36 +710,37 @@ class _BodyState extends State<_Body> {
             Bus.instance.fire(PauseVideoEvent(fileTag: selectedFile!.tag));
           }
         }
-        if (_filmstripPreviewIndexNotifier.value != index) {
-          _filmstripPreviewIndexNotifier.value = index;
-        }
+        _filmstripPreviewHandoff.showPreview(index);
         break;
       case FileViewerFilmstripSelectionSource.scrubCommit:
         _isFilmstripScrubbing = false;
-        if (!_pageController.hasClients) {
-          _clearFilmstripPreview();
-          return;
-        }
-        if (index == _selectedIndexNotifier.value) {
-          _clearFilmstripPreview();
-          return;
-        }
-        _pendingFilmstripCommitIndex = index;
-        if (_filmstripPreviewIndexNotifier.value != index) {
-          _filmstripPreviewIndexNotifier.value = index;
-        }
-        _pageController.jumpToPage(index);
+        _beginFilmstripHandoff(index, file);
         break;
     }
+  }
+
+  void _beginFilmstripHandoff(int index, EnteFile file) {
+    if (!_pageController.hasClients) {
+      _clearFilmstripPreview();
+      return;
+    }
+    if (index == _selectedIndexNotifier.value) {
+      if (!_filmstripPreviewHandoff.isPendingCommit(
+        index: index,
+        fileIdentity: file,
+      )) {
+        _clearFilmstripPreview();
+      }
+      return;
+    }
+    _filmstripPreviewHandoff.beginCommit(index: index, fileIdentity: file);
+    _pageController.jumpToPage(index);
   }
 
   void _clearFilmstripPreview() {
     _isFilmstripScrubbing = false;
     _didPauseVideoForFilmstripScrub = false;
-    _pendingFilmstripCommitIndex = null;
-    if (_filmstripPreviewIndexNotifier.value != null) {
-      _filmstripPreviewIndexNotifier.value = null;
-    }
+    _filmstripPreviewHandoff.clear();
   }
 
   void _runSelectedFileSideEffects(EnteFile file) {
@@ -933,7 +933,7 @@ class _BodyState extends State<_Body> {
     final inset = _shouldShowFilmstrip
         ? kFileViewerFilmstripAdditionalBottomInset
         : 0.0;
-    if (notifier.value != inset) notifier.value = inset;
+    notifier.value = inset;
   }
 
   EnteFile? _fileAt(int index) {
@@ -1143,19 +1143,7 @@ class _GalleryFileViewerFilmstripOverlay extends StatelessWidget {
             return Stack(
               fit: StackFit.expand,
               children: [
-                ThumbnailWidget(
-                  file,
-                  key: ObjectKey(file),
-                  rawThumbnail: true,
-                  diskLoadDeferDuration: galleryThumbnailDiskLoadDeferDuration,
-                  serverLoadDeferDuration:
-                      galleryThumbnailServerLoadDeferDuration,
-                  shouldShowSyncStatus: false,
-                  shouldShowFavoriteIcon: false,
-                  shouldShowVideoOverlayIcon: false,
-                  shouldShowLivePhotoOverlay: false,
-                  fit: BoxFit.cover,
-                ),
+                _GalleryFilmstripThumbnail(file: file, fit: BoxFit.cover),
                 if (file.fileType == FileType.video)
                   const Center(
                     child: Icon(
@@ -1171,6 +1159,29 @@ class _GalleryFileViewerFilmstripOverlay extends StatelessWidget {
           onSelectionChanged: onSelectionChanged,
         ),
       ),
+    );
+  }
+}
+
+class _GalleryFilmstripThumbnail extends StatelessWidget {
+  final EnteFile file;
+  final BoxFit fit;
+
+  const _GalleryFilmstripThumbnail({required this.file, required this.fit});
+
+  @override
+  Widget build(BuildContext context) {
+    return ThumbnailWidget(
+      file,
+      key: ObjectKey(file),
+      rawThumbnail: true,
+      diskLoadDeferDuration: galleryThumbnailDiskLoadDeferDuration,
+      serverLoadDeferDuration: galleryThumbnailServerLoadDeferDuration,
+      shouldShowSyncStatus: false,
+      shouldShowFavoriteIcon: false,
+      shouldShowVideoOverlayIcon: false,
+      shouldShowLivePhotoOverlay: false,
+      fit: fit,
     );
   }
 }

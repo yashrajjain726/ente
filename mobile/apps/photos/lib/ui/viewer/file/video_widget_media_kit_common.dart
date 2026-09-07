@@ -208,20 +208,8 @@ class _VideoWidgetState extends State<VideoWidget> {
                         ),
                   widget.isFromMemories
                       ? const SizedBox.shrink()
-                      : ValueListenableBuilder<double>(
-                          valueListenable:
-                              galleryBottomControlsAdditionalInsetListenable(
-                                context,
-                              ),
-                          builder: (context, additionalBottomInset, child) =>
-                              Positioned(
-                                bottom:
-                                    kVideoProgressRowBottomInset +
-                                    additionalBottomInset,
-                                right: 0,
-                                left: 0,
-                                child: child!,
-                              ),
+                      : GalleryBottomControlsPositioned(
+                          bottom: kVideoProgressRowBottomInset,
                           child: IgnorePointer(
                             ignoring: !value,
                             child: SafeArea(
@@ -237,21 +225,10 @@ class _VideoWidgetState extends State<VideoWidget> {
                         ),
                   widget.isFromMemories
                       ? const SizedBox.shrink()
-                      : ValueListenableBuilder<double>(
-                          valueListenable:
-                              galleryBottomControlsAdditionalInsetListenable(
-                                context,
-                              ),
-                          builder: (context, additionalBottomInset, child) =>
-                              Positioned(
-                                bottom: videoStreamControlBottomInset(
-                                  widget.file.caption?.isNotEmpty ?? false,
-                                  additionalBottomInset: additionalBottomInset,
-                                ),
-                                right: 0,
-                                left: 0,
-                                child: child!,
-                              ),
+                      : GalleryBottomControlsPositioned(
+                          bottom: videoStreamControlBottomInset(
+                            widget.file.caption?.isNotEmpty ?? false,
+                          ),
                           child: SafeArea(
                             top: false,
                             left: false,

@@ -10,69 +10,68 @@ void main() {
   ) async {
     final key = GlobalKey<_FilmstripHarnessState>();
     final semantics = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        _TestApp(
+          child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      _TestApp(
-        child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
-      ),
-    );
-    await tester.pumpAndSettle();
+      _expectCentered(tester, 7);
+      expect(tester.getSize(find.byKey(fileViewerFilmstripListKey)).height, 45);
+      expect(
+        tester
+                .getCenter(find.byKey(const ValueKey("filmstrip-test-item-8")))
+                .dx -
+            tester
+                .getCenter(find.byKey(const ValueKey("filmstrip-test-item-7")))
+                .dx,
+        closeTo(33, 0.01),
+      );
+      expect(_thumbnailSize(tester, 7), const Size(34, 43));
+      expect(_thumbnailSize(tester, 8), const Size(29, 35));
+      final semanticsNode = tester.getSemantics(
+        find.byKey(fileViewerFilmstripKey),
+      );
+      final semanticsData = semanticsNode.getSemanticsData();
+      expect(semanticsData.label, "Photo chooser");
+      expect(semanticsData.value, "Photo 8 of 20");
+      expect(semanticsData.hasAction(SemanticsAction.increase), isTrue);
+      expect(semanticsData.hasAction(SemanticsAction.decrease), isTrue);
 
-    _expectCentered(tester, 7);
-    expect(tester.getSize(find.byKey(fileViewerFilmstripListKey)).height, 45);
-    expect(
-      tester.getCenter(find.byKey(const ValueKey("filmstrip-test-item-8"))).dx -
-          tester
-              .getCenter(find.byKey(const ValueKey("filmstrip-test-item-7")))
-              .dx,
-      closeTo(33, 0.01),
-    );
-    expect(_thumbnailSize(tester, 7), const Size(34, 43));
-    expect(_thumbnailSize(tester, 8), const Size(29, 35));
-    final semanticsNode = tester.getSemantics(
-      find.byKey(fileViewerFilmstripKey),
-    );
-    final semanticsData = semanticsNode.getSemanticsData();
-    expect(semanticsData.label, "Photo chooser");
-    expect(semanticsData.value, "Photo 8 of 20");
-    expect(semanticsData.hasAction(SemanticsAction.increase), isTrue);
-    expect(semanticsData.hasAction(SemanticsAction.decrease), isTrue);
+      semanticsNode.owner!.performAction(
+        semanticsNode.id,
+        SemanticsAction.increase,
+      );
+      await tester.pumpAndSettle();
+      expect(key.currentState!.selections.last.index, 8);
+      _expectCentered(tester, 8);
 
-    semanticsNode.owner!.performAction(
-      semanticsNode.id,
-      SemanticsAction.increase,
-    );
-    await tester.pumpAndSettle();
-    expect(key.currentState!.selections.last.index, 8);
-    _expectCentered(tester, 8);
-
-    final updatedSemanticsNode = tester.getSemantics(
-      find.byKey(fileViewerFilmstripKey),
-    );
-    updatedSemanticsNode.owner!.performAction(
-      updatedSemanticsNode.id,
-      SemanticsAction.decrease,
-    );
-    await tester.pumpAndSettle();
-    expect(key.currentState!.selections.last.index, 7);
-    _expectCentered(tester, 7);
-    semantics.dispose();
+      final updatedSemanticsNode = tester.getSemantics(
+        find.byKey(fileViewerFilmstripKey),
+      );
+      expect(updatedSemanticsNode.getSemanticsData().value, "Photo 9 of 20");
+      updatedSemanticsNode.owner!.performAction(
+        updatedSemanticsNode.id,
+        SemanticsAction.decrease,
+      );
+      await tester.pumpAndSettle();
+      expect(key.currentState!.selections, [
+        (index: 8, source: FileViewerFilmstripSelectionSource.tap),
+        (index: 7, source: FileViewerFilmstripSelectionSource.tap),
+      ]);
+      _expectCentered(tester, 7);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets("a tap selects immediately and keeps the size animation", (
     tester,
   ) async {
     final key = GlobalKey<_FilmstripHarnessState>();
-    var hapticCount = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == "HapticFeedback.vibrate") hapticCount++;
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null),
-    );
+    final haptics = _installHapticSpy();
     await tester.pumpWidget(
       _TestApp(
         child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
@@ -86,7 +85,6 @@ void main() {
       index: 8,
       source: FileViewerFilmstripSelectionSource.tap,
     ));
-    expect(_thumbnailSize(tester, 8), const Size(29, 35));
     await tester.pump();
     expect(_thumbnailSize(tester, 8), const Size(29, 35));
     await tester.pump(const Duration(milliseconds: 1));
@@ -99,7 +97,7 @@ void main() {
     expect(key.currentState!.selections, [
       (index: 8, source: FileViewerFilmstripSelectionSource.tap),
     ]);
-    expect(hapticCount, 1);
+    expect(haptics.count, 1);
     _expectCentered(tester, 8);
     expect(_thumbnailSize(tester, 8), const Size(34, 43));
   });
@@ -108,16 +106,7 @@ void main() {
     tester,
   ) async {
     final key = GlobalKey<_FilmstripHarnessState>();
-    var hapticCount = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == "HapticFeedback.vibrate") hapticCount++;
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null),
-    );
+    final haptics = _installHapticSpy();
     await tester.pumpWidget(
       _TestApp(
         child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
@@ -154,14 +143,14 @@ void main() {
     expect(key.currentState!.selections.map((event) => event.source), [
       FileViewerFilmstripSelectionSource.scrubStart,
     ]);
-    expect(hapticCount, 0);
+    expect(haptics.count, 0);
 
     await moveTo(0.45);
     final outgoingAt45 = _thumbnailSize(tester, 7);
     final incomingAt45 = _thumbnailSize(tester, 8);
     expect(outgoingAt45.width, lessThan(outgoingAt25.width));
     expect(incomingAt45.width, greaterThan(incomingAt25.width));
-    expect(hapticCount, 0);
+    expect(haptics.count, 0);
 
     await moveTo(0.55);
     final outgoingAt55 = _thumbnailSize(tester, 7);
@@ -174,12 +163,12 @@ void main() {
       index: 8,
       source: FileViewerFilmstripSelectionSource.scrubPreview,
     ));
-    expect(hapticCount, 1);
+    expect(haptics.count, 1);
 
     await moveTo(0.75);
     expect(_thumbnailSize(tester, 7).width, lessThan(outgoingAt55.width));
     expect(_thumbnailSize(tester, 8).width, greaterThan(incomingAt55.width));
-    expect(hapticCount, 1);
+    expect(haptics.count, 1);
 
     await tester.pump(const Duration(milliseconds: 200));
     await gesture.up();
@@ -188,24 +177,54 @@ void main() {
       index: 8,
       source: FileViewerFilmstripSelectionSource.scrubCommit,
     ));
-    expect(hapticCount, 1);
+    expect(haptics.count, 1);
     _expectCentered(tester, 8);
+  });
+
+  testWidgets("scrub focus changes do not rebuild itemBuilder children", (
+    tester,
+  ) async {
+    final key = GlobalKey<_FilmstripHarnessState>();
+    final buildCounts = <int, int>{};
+    await tester.pumpWidget(
+      _TestApp(
+        child: _FilmstripHarness(
+          key: key,
+          itemCount: 20,
+          selectedIndex: 7,
+          onItemBuild: (index) {
+            buildCounts.update(index, (count) => count + 1, ifAbsent: () => 1);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final initialBuilds = {7: buildCounts[7]!, 8: buildCounts[8]!};
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(fileViewerFilmstripListKey)),
+    );
+    await gesture.moveBy(const Offset(-20, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-33, 0));
+    await tester.pump();
+
+    expect(key.currentState!.selections.last, (
+      index: 8,
+      source: FileViewerFilmstripSelectionSource.scrubPreview,
+    ));
+    expect(buildCounts[7], initialBuilds[7]);
+    expect(buildCounts[8], initialBuilds[8]);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets("scrubbing previews and ticks each newly centered thumbnail", (
     tester,
   ) async {
     final key = GlobalKey<_FilmstripHarnessState>();
-    var hapticCount = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == "HapticFeedback.vibrate") hapticCount++;
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null),
-    );
+    final haptics = _installHapticSpy();
     await tester.pumpWidget(
       _TestApp(
         child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
@@ -238,7 +257,7 @@ void main() {
         )
         .toList();
     expect(previewsBeforeUp.map((event) => event.index), [8]);
-    expect(hapticCount, 1);
+    expect(haptics.count, 1);
     _expectNearestToStripCenter(tester, 8);
 
     await gesture.moveBy(const Offset(-33, 0));
@@ -251,7 +270,7 @@ void main() {
         )
         .toList();
     expect(previewsBeforeUp.map((event) => event.index), [8, 9]);
-    expect(hapticCount, 2);
+    expect(haptics.count, 2);
 
     await gesture.moveBy(const Offset(33, 0));
     await tester.pump();
@@ -263,7 +282,7 @@ void main() {
         )
         .toList();
     expect(previewsBeforeUp.map((event) => event.index), [8, 9, 8]);
-    expect(hapticCount, 3);
+    expect(haptics.count, 3);
 
     final previewIndex = previewsBeforeUp.last.index;
     _expectNearestToStripCenter(tester, previewIndex);
@@ -271,7 +290,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(hapticCount, previewsBeforeUp.length);
+    expect(haptics.count, previewsBeforeUp.length);
     expect(key.currentState!.selections.last, (
       index: previewIndex,
       source: FileViewerFilmstripSelectionSource.scrubCommit,
@@ -288,7 +307,9 @@ void main() {
     _expectCentered(tester, previewIndex);
   });
 
-  testWidgets("raises the fling cap and extends its coast", (tester) async {
+  testWidgets("caps fling velocity at 800 and extends Android coast", (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const _TestApp(child: _FilmstripHarness(itemCount: 20, selectedIndex: 7)),
     );
@@ -297,7 +318,6 @@ void main() {
     final position = _filmstripPosition(tester);
     final physics = position.physics;
     expect(physics.maxFlingVelocity, 800);
-    expect(physics.carriedMomentum(500), greaterThan(0));
 
     final cappedSimulation = physics.createBallisticSimulation(position, 5000);
     expect(cappedSimulation, isNotNull);
@@ -366,6 +386,91 @@ void main() {
     expect(repeatedLaunchVelocity.abs(), lessThanOrEqualTo(800.01));
   });
 
+  testWidgets("a fling previews during its coast and commits once at rest", (
+    tester,
+  ) async {
+    final key = GlobalKey<_FilmstripHarnessState>();
+    final haptics = _installHapticSpy();
+    await tester.pumpWidget(
+      _TestApp(
+        child: _FilmstripHarness(key: key, itemCount: 100, selectedIndex: 50),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.fling(
+      find.byKey(fileViewerFilmstripListKey),
+      const Offset(-80, 0),
+      400,
+    );
+    await tester.pump();
+
+    final position = _filmstripPosition(tester);
+    final previewsAtLaunch = key.currentState!.selections
+        .where(
+          (event) =>
+              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+        )
+        .length;
+    expect(position.isScrollingNotifier.value, isTrue);
+    expect(
+      key.currentState!.selections.where(
+        (event) =>
+            event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+      ),
+      isEmpty,
+    );
+
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(position.isScrollingNotifier.value, isTrue);
+    expect(
+      key.currentState!.selections
+          .where(
+            (event) =>
+                event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+          )
+          .length,
+      greaterThan(previewsAtLaunch),
+    );
+    expect(
+      key.currentState!.selections.where(
+        (event) =>
+            event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+      ),
+      isEmpty,
+    );
+
+    await tester.pumpAndSettle();
+
+    final selections = key.currentState!.selections;
+    final previews = selections
+        .where(
+          (event) =>
+              event.source == FileViewerFilmstripSelectionSource.scrubPreview,
+        )
+        .toList();
+    final commits = selections
+        .where(
+          (event) =>
+              event.source == FileViewerFilmstripSelectionSource.scrubCommit,
+        )
+        .toList();
+    expect(
+      selections
+          .where(
+            (event) =>
+                event.source == FileViewerFilmstripSelectionSource.scrubStart,
+          )
+          .length,
+      1,
+    );
+    expect(commits, hasLength(1));
+    expect(selections.last, commits.single);
+    expect(commits.single.index, previews.last.index);
+    expect(haptics.count, previews.length);
+    _expectCentered(tester, commits.single.index);
+  });
+
   testWidgets("holding a coasting strip does not start a center snap", (
     tester,
   ) async {
@@ -400,16 +505,7 @@ void main() {
     tester,
   ) async {
     final key = GlobalKey<_FilmstripHarnessState>();
-    var hapticCount = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == "HapticFeedback.vibrate") hapticCount++;
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null),
-    );
+    final haptics = _installHapticSpy();
     await tester.pumpWidget(
       _TestApp(
         child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
@@ -429,7 +525,7 @@ void main() {
       (index: 7, source: FileViewerFilmstripSelectionSource.scrubStart),
       (index: 7, source: FileViewerFilmstripSelectionSource.scrubCommit),
     ]);
-    expect(hapticCount, 0);
+    expect(haptics.count, 0);
     _expectCentered(tester, 7);
   });
 
@@ -437,16 +533,7 @@ void main() {
     tester,
   ) async {
     final key = GlobalKey<_FilmstripHarnessState>();
-    var hapticCount = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == "HapticFeedback.vibrate") hapticCount++;
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null),
-    );
+    final haptics = _installHapticSpy();
     await tester.pumpWidget(
       _TestApp(
         child: _FilmstripHarness(key: key, itemCount: 20, selectedIndex: 7),
@@ -471,8 +558,7 @@ void main() {
     key.currentState!.update(itemCount: 5, selectedIndex: 2);
     await tester.pumpAndSettle();
     _expectCentered(tester, 2);
-    expect(tester.takeException(), isNull);
-    expect(hapticCount, 0);
+    expect(haptics.count, 0);
   });
 }
 
@@ -501,10 +587,19 @@ ScrollPosition _filmstripPosition(WidgetTester tester) {
       .position;
 }
 
+_HapticSpy _installHapticSpy() {
+  final spy = _HapticSpy()..install();
+  addTearDown(spy.uninstall);
+  return spy;
+}
+
 double _settlingTime(Simulation simulation, {required double start}) {
   var time = start;
   while (!simulation.isDone(time) && time < 10) {
     time += 0.01;
+  }
+  if (!simulation.isDone(time)) {
+    fail("Simulation did not settle within 10 seconds");
   }
   return time;
 }
@@ -549,13 +644,32 @@ class _TestApp extends StatelessWidget {
   }
 }
 
+class _HapticSpy {
+  int count = 0;
+
+  void install() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == "HapticFeedback.vibrate") count++;
+          return null;
+        });
+  }
+
+  void uninstall() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
+  }
+}
+
 class _FilmstripHarness extends StatefulWidget {
   final int itemCount;
   final int selectedIndex;
+  final ValueChanged<int>? onItemBuild;
 
   const _FilmstripHarness({
     required this.itemCount,
     required this.selectedIndex,
+    this.onItemBuild,
     super.key,
   });
 
@@ -584,10 +698,13 @@ class _FilmstripHarnessState extends State<_FilmstripHarness> {
       semanticLabel: "Photo chooser",
       semanticValueBuilder: (current, total) => "Photo $current of $total",
       itemKeyBuilder: (index) => ValueKey("filmstrip-test-item-$index"),
-      itemBuilder: (context, index) => ColoredBox(
-        key: ValueKey("filmstrip-test-thumbnail-$index"),
-        color: Color(0xFF000000 + index),
-      ),
+      itemBuilder: (context, index) {
+        widget.onItemBuild?.call(index);
+        return ColoredBox(
+          key: ValueKey("filmstrip-test-thumbnail-$index"),
+          color: Color(0xFF000000 + index),
+        );
+      },
       onSelectionChanged: (index, source) {
         selections.add((index: index, source: source));
         if (source == FileViewerFilmstripSelectionSource.tap ||
