@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     kv: new Map<string, unknown>(),
+    generateHLSSaveGate: undefined as Promise<void> | undefined,
     collectionFiles: [] as EnteFile[],
     collectionFilesReadCount: 0,
     collectionFilesReadGate: undefined as Promise<void> | undefined,
@@ -52,9 +53,9 @@ vi.mock("ente-base/kv", async (importOriginal) => ({
     getKV: (key: string) => Promise.resolve(mocks.kv.get(key)),
     getKVB: (key: string) => Promise.resolve(mocks.kv.get(key)),
     getKVN: (key: string) => Promise.resolve(mocks.kv.get(key)),
-    setKV: (key: string, value: unknown) => {
+    setKV: async (key: string, value: unknown) => {
+        if (key == "generateHLS") await mocks.generateHLSSaveGate;
         mocks.kv.set(key, value);
-        return Promise.resolve();
     },
 }));
 vi.mock("ente-accounts/services/user", () => ({
@@ -150,6 +151,7 @@ describe("video streaming percentage", () => {
     afterEach(() => {
         resetVideoState();
         mocks.kv.clear();
+        mocks.generateHLSSaveGate = undefined;
         mocks.collectionFiles = [];
         mocks.collectionFilesReadCount = 0;
         mocks.collectionFilesReadGate = undefined;
@@ -257,6 +259,33 @@ describe("video streaming percentage", () => {
         await expectProcessedFraction(0);
     });
 
+    test("refreshes newly synced files when the preview sync fails", async () => {
+        await toggleHLSGeneration();
+        await expectProcessedFraction(1);
+        mocks.collectionFiles = [file(1)];
+        mocks.previewStatusPullError = new Error("offline");
+
+        await videoProcessingSyncIfNeeded();
+
+        await expectProcessedFraction(0);
+    });
+
+    test("does not start a stale sync operation after disabling", async () => {
+        mocks.kv.set("generateHLS", true);
+        await initVideoProcessing();
+        await expectProcessedFraction(1);
+        const previewStatusPull = Promise.withResolvers<undefined>();
+        mocks.previewStatusPullGate = previewStatusPull.promise;
+        const sync = videoProcessingSyncIfNeeded();
+        await toggleHLSGeneration();
+
+        previewStatusPull.resolve(undefined);
+        await sync;
+
+        expect(hlsGenerationStatusSnapshot()).toEqual({ enabled: false });
+        expect(mocks.assertionFailedCount).toBe(0);
+    });
+
     test("includes unsynced uploads in the fraction", async () => {
         await toggleHLSGeneration();
 
@@ -284,14 +313,36 @@ describe("video streaming percentage", () => {
 
         mocks.collectionFiles = [file(1), file(2), file(3)];
         mocks.kv.set("videoPreviewProcessedFileIDs", [1, 2]);
-        await initVideoProcessing();
+        await videoProcessingSyncIfNeeded();
         await expectProcessedFraction(2 / 3);
 
         mocks.collectionFiles = [file(2), file(3)];
         await videoPrunePermanentlyDeletedFileIDsIfNeeded(new Set([1]));
-        await initVideoProcessing();
+        await videoProcessingSyncIfNeeded();
         await expectProcessedFraction(1 / 2);
     });
+
+    test.each([false, true])(
+        "prunes uploads deleted before entering the saved index (processed: %s)",
+        async (processed) => {
+            await toggleHLSGeneration();
+            processVideoNewUpload(file(1), {} as never);
+            await expectProcessedFraction(0);
+            if (processed) {
+                mocks.kv.set("videoPreviewProcessedFileIDs", [1]);
+            }
+
+            await videoPrunePermanentlyDeletedFileIDsIfNeeded(new Set([1]));
+
+            await expectProcessedFraction(1);
+            expect(mocks.kv.get("videoPreviewProcessedFileIDs") ?? []).toEqual(
+                [],
+            );
+            await videoProcessingSyncIfNeeded();
+            await new Promise<void>(setImmediate);
+            await expectProcessedFraction(1);
+        },
+    );
 
     test("excludes files locally marked as not requiring a stream", async () => {
         mocks.collectionFiles = [file(1), file(2), file(3)];
@@ -339,6 +390,37 @@ describe("video streaming percentage", () => {
         await toggleHLSGeneration();
         gate.resolve(undefined);
         await new Promise<void>(setImmediate);
+        expect(hlsGenerationStatusSnapshot()).toEqual({ enabled: false });
+    });
+
+    test("keeps the snapshot disabled when processing finishes after disabling", async () => {
+        const processing = Promise.withResolvers<undefined>();
+        mocks.fetchFileDataResult = processing.promise;
+        await toggleHLSGeneration();
+        processVideoNewUpload(file(1), {} as never);
+        await expectProcessedFraction(0);
+
+        const collectionRead = Promise.withResolvers<undefined>();
+        mocks.collectionFilesReadGate = collectionRead.promise;
+        await initVideoProcessing();
+        const save = Promise.withResolvers<undefined>();
+        mocks.generateHLSSaveGate = save.promise;
+        const disable = toggleHLSGeneration();
+
+        collectionRead.resolve(undefined);
+        await expectProcessedFraction(0);
+        save.resolve(undefined);
+        await disable;
+        expect(hlsGenerationStatusSnapshot()).toEqual({ enabled: false });
+
+        processing.resolve({} as never);
+        await vi.waitFor(
+            () =>
+                expect(mocks.kv.get("videoPreviewProcessedFileIDs")).toEqual([
+                    1,
+                ]),
+            { interval: 5 },
+        );
         expect(hlsGenerationStatusSnapshot()).toEqual({ enabled: false });
     });
 

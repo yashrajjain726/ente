@@ -103,12 +103,15 @@ const setHLSGenerationStatusSnapshot = (snapshot: HLSGenerationStatus) => {
     _state.hlsGenerationStatusListeners.forEach((l) => l());
 };
 
-const publishEnabledSnapshot = () =>
+const publishEnabledSnapshot = () => {
+    if (!_state.isHLSGenerationEnabled) return;
+
     setHLSGenerationStatusSnapshot({
         enabled: true,
         status: _state.lastEnabledStatus,
         processedFraction: _state.processedFraction,
     });
+};
 
 const updateSnapshotIfNeeded = (
     status: HLSGenerationEnabledStatus | undefined,
@@ -308,6 +311,14 @@ export const videoPrunePermanentlyDeletedFileIDsIfNeeded = async (
 ) => {
     if (!isHLSGenerationSupported) return;
 
+    for (const id of deletedFileIDs) {
+        _state.unsyncedUploadFiles.delete(id);
+        _state.locallySkippedFileIDs.delete(id);
+        _state.candidateFileIDs?.delete(id);
+        _state.processedCandidateFileIDs?.delete(id);
+    }
+    refreshProcessedFractionIfNeeded();
+
     const existing = await savedProcessedVideoFileIDs();
     if (existing.size > 0) {
         const updated = existing.difference(deletedFileIDs);
@@ -414,10 +425,14 @@ export const videoProcessingSyncIfNeeded = async () => {
 
     if (!isHLSGenerationEnabled()) return;
 
-    await pullProcessedFileIDs();
+    try {
+        await pullProcessedFileIDs();
+    } catch (e) {
+        log.error("Failed to sync video preview status", e);
+    }
     refreshProcessedFractionIfNeeded();
 
-    tickNow();
+    if (isHLSGenerationEnabled()) tickNow();
 };
 
 export const processVideoNewUpload = (
