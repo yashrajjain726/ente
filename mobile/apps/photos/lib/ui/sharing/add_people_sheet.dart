@@ -292,7 +292,11 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
       }
       if (publicKey == null || publicKey.isEmpty) {
         setState(() => _emailHasNoAccount = true);
-        if (widget.collections.length > 1) {
+        if (widget.collections.length != 1 ||
+            !_canUseNonEnteFallback(
+              widget.collections.first,
+              Configuration.instance.getUserID()!,
+            )) {
           await CollectionActions(
             CollectionsService.instance,
           ).showAddEmailToCollectionFailure(
