@@ -70,8 +70,10 @@ class FileViewerFilmstrip extends StatefulWidget {
 class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
   late final ScrollController _scrollController;
   late int _visualSelectedIndex;
+  final Set<int> _activePointers = {};
   bool _isUserScrollSession = false;
   bool _alignmentScheduled = false;
+  bool _alignmentDeferred = false;
 
   @override
   void initState() {
@@ -98,7 +100,7 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     if (!_isUserScrollSession &&
         (selectedIndex != _clampIndex(oldWidget.selectedIndex) ||
             widget.itemCount != oldWidget.itemCount)) {
-      _scheduleAlignment(selectedIndex, animate: true);
+      _scheduleAlignment(animate: true);
     }
   }
 
@@ -145,24 +147,31 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
               0.0,
               (constraints.maxWidth - _itemExtent) / 2,
             );
-            return NotificationListener<ScrollNotification>(
-              onNotification: _onScrollNotification,
-              child: SizedBox(
-                height: kFileViewerFilmstripHeight,
-                child: ListView.builder(
-                  key: fileViewerFilmstripListKey,
-                  controller: _scrollController,
-                  clipBehavior: Clip.none,
-                  scrollDirection: Axis.horizontal,
-                  physics: const _FilmstripScrollPhysics(),
-                  itemCount: widget.itemCount,
-                  itemExtent: _itemExtent,
-                  findChildIndexCallback: widget.findChildIndexCallback,
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  cacheExtent: _itemExtent * _cacheExtentInItems,
-                  addAutomaticKeepAlives: false,
-                  addSemanticIndexes: false,
-                  itemBuilder: (context, index) => _buildItem(context, index),
+            return Listener(
+              onPointerDown: (event) => _activePointers.add(event.pointer),
+              onPointerUp: _onPointerReleased,
+              onPointerCancel: _onPointerReleased,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScrollNotification,
+                child: SizedBox(
+                  height: kFileViewerFilmstripHeight,
+                  child: ListView.builder(
+                    key: fileViewerFilmstripListKey,
+                    controller: _scrollController,
+                    clipBehavior: Clip.none,
+                    scrollDirection: Axis.horizontal,
+                    physics: const _FilmstripScrollPhysics(),
+                    itemCount: widget.itemCount,
+                    itemExtent: _itemExtent,
+                    findChildIndexCallback: widget.findChildIndexCallback,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                    ),
+                    cacheExtent: _itemExtent * _cacheExtentInItems,
+                    addAutomaticKeepAlives: false,
+                    addSemanticIndexes: false,
+                    itemBuilder: (context, index) => _buildItem(context, index),
+                  ),
                 ),
               ),
             );
@@ -264,7 +273,7 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
         finalIndex,
         FileViewerFilmstripSelectionSource.scrubCommit,
       );
-      _scheduleAlignment(_visualSelectedIndex, animate: true);
+      _scheduleAlignment(animate: true);
     }
     return false;
   }
@@ -281,6 +290,16 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
 
   void _onScrollOffsetChanged() {
     if (_isUserScrollSession) _selectNearestScrolledItem();
+  }
+
+  void _onPointerReleased(PointerEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.isEmpty &&
+        !_isUserScrollSession &&
+        _alignmentDeferred) {
+      _alignmentDeferred = false;
+      _scheduleAlignment(animate: true);
+    }
   }
 
   int _nearestScrolledIndex() {
@@ -325,12 +344,18 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
     return linearProximity * linearProximity * (3 - (2 * linearProximity));
   }
 
-  void _scheduleAlignment(int index, {required bool animate}) {
+  void _scheduleAlignment({required bool animate}) {
     if (widget.itemCount == 0 || _alignmentScheduled) return;
     _alignmentScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _alignmentScheduled = false;
-      if (mounted) _alignToIndex(index, animate: animate);
+      if (!mounted) return;
+      if (_activePointers.isNotEmpty || _isUserScrollSession) {
+        _alignmentDeferred = true;
+        return;
+      }
+      _alignmentDeferred = false;
+      _alignToIndex(_visualSelectedIndex, animate: animate);
     });
   }
 
@@ -373,7 +398,12 @@ class _FilmstripScrollPhysics extends ScrollPhysics {
   double get maxFlingVelocity => _maxFlingVelocity;
 
   @override
-  double carriedMomentum(double existingVelocity) => 0;
+  double carriedMomentum(double existingVelocity) {
+    final momentum = const BouncingScrollPhysics().carriedMomentum(
+      existingVelocity,
+    );
+    return momentum.clamp(-_maxFlingVelocity, _maxFlingVelocity).toDouble();
+  }
 
   @override
   Simulation? createBallisticSimulation(

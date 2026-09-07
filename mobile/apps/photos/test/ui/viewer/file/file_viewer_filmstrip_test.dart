@@ -297,7 +297,7 @@ void main() {
     final position = _filmstripPosition(tester);
     final physics = position.physics;
     expect(physics.maxFlingVelocity, 800);
-    expect(physics.carriedMomentum(5000), 0);
+    expect(physics.carriedMomentum(500), greaterThan(0));
 
     final cappedSimulation = physics.createBallisticSimulation(position, 5000);
     expect(cappedSimulation, isNotNull);
@@ -319,6 +319,81 @@ void main() {
       tunedSettlingTime / baselineSettlingTime,
       inInclusiveRange(1.7, 2.0),
     );
+  });
+
+  testWidgets("a second fling keeps moving while the strip is coasting", (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const _TestApp(
+        child: _FilmstripHarness(itemCount: 100, selectedIndex: 50),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = find.byKey(fileViewerFilmstripListKey);
+    final position = _filmstripPosition(tester);
+    const motion = Offset(-60, 0);
+    const speed = 400.0;
+    await tester.fling(list, motion, speed);
+    await tester.pump();
+    final firstLaunchVelocity = position.activity!.velocity;
+    await tester.pump(const Duration(milliseconds: 10));
+    final coastingVelocity = position.activity!.velocity;
+    expect(position.isScrollingNotifier.value, isTrue);
+    expect(coastingVelocity.sign, firstLaunchVelocity.sign);
+    expect(
+      coastingVelocity.abs(),
+      inExclusiveRange(0, firstLaunchVelocity.abs()),
+    );
+
+    await tester.fling(
+      list,
+      motion,
+      speed,
+      // Run the replacement gesture without an intermediate frame so the
+      // interrupted fling's queued alignment races with its new ballistic.
+      frameInterval: const Duration(seconds: 1),
+    );
+    await tester.pump();
+
+    final repeatedLaunchVelocity = position.activity!.velocity;
+    expect(repeatedLaunchVelocity.sign, firstLaunchVelocity.sign);
+    expect(
+      repeatedLaunchVelocity.abs(),
+      greaterThan(firstLaunchVelocity.abs() * 1.05),
+    );
+    expect(repeatedLaunchVelocity.abs(), lessThanOrEqualTo(800.01));
+  });
+
+  testWidgets("holding a coasting strip does not start a center snap", (
+    tester,
+  ) async {
+    final key = GlobalKey<_FilmstripHarnessState>();
+    await tester.pumpWidget(
+      _TestApp(
+        child: _FilmstripHarness(key: key, itemCount: 100, selectedIndex: 50),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = find.byKey(fileViewerFilmstripListKey);
+    final position = _filmstripPosition(tester);
+    await tester.fling(list, const Offset(-50, 0), 400);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(position.isScrollingNotifier.value, isTrue);
+
+    final gesture = await tester.startGesture(tester.getCenter(list));
+    final heldOffset = position.pixels;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 30));
+
+    expect(position.pixels, closeTo(heldOffset, 0.01));
+
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    _expectCentered(tester, key.currentState!.selectedIndex);
   });
 
   testWidgets("a drag that stays centered still ends its scrub session", (
