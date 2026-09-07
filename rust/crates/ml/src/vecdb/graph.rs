@@ -14,7 +14,8 @@ const EF_SEARCH_FLOOR: usize = 64;
 const EF_SEARCH_LIMIT_FACTOR: usize = 4;
 const SMALL_FILTER_FLOOR: usize = 1024;
 const SMALL_FILTER_LIMIT_FACTOR: usize = 4;
-const THRESHOLD_STEP_COUNTS: [usize; 5] = [200, 500, 2000, 5000, 10000];
+const RANGE_SEARCH_FLOOR: usize = 200;
+const RANGE_EXPANSION_SLACK: f32 = 0.10;
 const LEVEL_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
 
 fn neighbor_cap(level: usize) -> usize {
@@ -451,7 +452,7 @@ impl QueryContext<'_> {
         results.into_sorted_vec()
     }
 
-    fn top_scored(&self, ef: usize, admit: &impl Fn(u32) -> bool) -> Vec<Scored> {
+    fn level_zero_entries(&self) -> Vec<Scored> {
         let Some(entry) = self.graph.entry_point else {
             return Vec::new();
         };
@@ -460,7 +461,67 @@ impl QueryContext<'_> {
         for level in (1..=top).rev() {
             entries = self.search_layer(&entries, level, EF_SEARCH_UPPER, None, &|_| true);
         }
+        entries
+    }
+
+    fn top_scored(&self, ef: usize, admit: &impl Fn(u32) -> bool) -> Vec<Scored> {
+        let entries = self.level_zero_entries();
+        if entries.is_empty() {
+            return Vec::new();
+        }
         self.search_layer(&entries, 0, ef, None, admit)
+    }
+
+    fn range_scored(&self, max_distance: f32, admit: &impl Fn(u32) -> bool) -> Vec<Scored> {
+        let expansion_bound = max_distance * (1.0 + RANGE_EXPANSION_SLACK);
+        let mut visited = VisitedSet::with_capacity(self.graph.nodes.len());
+        let mut candidates: BinaryHeap<Reverse<Scored>> = BinaryHeap::new();
+        let mut frontier: BinaryHeap<Scored> = BinaryHeap::new();
+        let mut results: Vec<Scored> = Vec::new();
+        for entry in self.level_zero_entries() {
+            if !visited.insert(entry.slot) {
+                continue;
+            }
+            if entry.distance <= max_distance && admit(entry.slot) {
+                results.push(entry);
+            }
+            candidates.push(Reverse(entry));
+            keep_frontier(&mut frontier, entry);
+        }
+        while let Some(Reverse(current)) = candidates.pop() {
+            if current.distance > expansion_bound && trails_frontier(&frontier, current) {
+                break;
+            }
+            for &neighbor in self.graph.level_neighbors(current.slot, 0) {
+                if !visited.insert(neighbor) {
+                    continue;
+                }
+                let scored = self.scored(neighbor);
+                if scored.distance <= max_distance && admit(neighbor) {
+                    results.push(scored);
+                }
+                let trails = trails_frontier(&frontier, scored);
+                if !trails || scored.distance <= expansion_bound {
+                    candidates.push(Reverse(scored));
+                }
+                if !trails {
+                    keep_frontier(&mut frontier, scored);
+                }
+            }
+        }
+        results.sort_unstable();
+        results
+    }
+}
+
+fn trails_frontier(frontier: &BinaryHeap<Scored>, scored: Scored) -> bool {
+    frontier.len() >= RANGE_SEARCH_FLOOR && frontier.peek().is_some_and(|worst| scored > *worst)
+}
+
+fn keep_frontier(frontier: &mut BinaryHeap<Scored>, scored: Scored) {
+    frontier.push(scored);
+    if frontier.len() > RANGE_SEARCH_FLOOR {
+        frontier.pop();
     }
 }
 
@@ -580,29 +641,9 @@ fn approx_threshold(
     allowed: Option<&HashSet<u32>>,
     banned: Option<u32>,
 ) -> Vec<Match> {
-    let bound = result_bound(context.arena, allowed);
     let admit = admission(context.arena, allowed, banned);
-    let mut previous = 0usize;
-    for step in THRESHOLD_STEP_COUNTS
-        .into_iter()
-        .chain(std::iter::once(bound))
-    {
-        let count = step.min(bound);
-        if count <= previous {
-            continue;
-        }
-        previous = count;
-        let scored = context.top_scored(count, &admit);
-        let full_step = scored.len() == count;
-        let tail_within = scored
-            .last()
-            .is_some_and(|last| last.distance <= max_distance);
-        if count < bound && full_step && tail_within {
-            continue;
-        }
-        return to_matches(context.arena, scored, None, Some(max_distance));
-    }
-    Vec::new()
+    let scored = context.range_scored(max_distance, &admit);
+    to_matches(context.arena, scored, None, Some(max_distance))
 }
 
 fn brute_force(
