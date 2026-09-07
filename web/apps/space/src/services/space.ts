@@ -28,6 +28,7 @@ import {
     parseSpaceProfilePayload,
     spaceProfileTextField,
 } from "services/profile-payload";
+import { isFriendRequestCanceledError } from "utils/friend-errors";
 import { normalizeSpaceMessageText } from "utils/message-limits";
 
 export { clearSpaceMediaURLCache } from "services/media-cache";
@@ -381,9 +382,6 @@ interface SpaceConversationsContext {
 
 export const isSpaceContentError = (error: unknown) =>
     isNamedError(error, "content_unavailable");
-
-export const isSpaceFriendLimitError = (error: unknown) =>
-    isNamedError(error, "friend_limit_reached");
 
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
@@ -1640,23 +1638,6 @@ export const confirmCurrentFriendRequest = async (
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
-};
-
-export const isFriendRequestCanceledError = (error: unknown) => {
-    if (!error || typeof error != "object") return false;
-
-    const { code, message, status } = error as {
-        code?: unknown;
-        message?: unknown;
-        status?: unknown;
-    };
-    return (
-        status == 400 ||
-        status == 404 ||
-        (code == "invalid_input" &&
-            typeof message == "string" &&
-            message.includes("friend request is not available"))
-    );
 };
 
 export const deleteCurrentFriendRequest = async (

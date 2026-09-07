@@ -27,6 +27,14 @@ func newSpaceFriendLimitReachedError() *ente.ApiError {
 	}
 }
 
+func newSpaceFriendRequestUnavailableError(status int) *ente.ApiError {
+	return &ente.ApiError{
+		Code:           ente.ErrorCode("SPACE_FRIEND_REQUEST_UNAVAILABLE"),
+		Message:        "friend request is no longer available",
+		HttpStatusCode: status,
+	}
+}
+
 func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceRecord, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {
 	if (strings.TrimSpace(req.TargetSpaceID) == "" && strings.TrimSpace(req.TargetUsername) == "") ||
 		strings.TrimSpace(req.RequesterFriendSealedSpaceKey) == "" ||
@@ -57,7 +65,11 @@ func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceR
 	)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), repo.ErrSelfFriendship) {
-			return nil, ente.NewBadRequestWithMessage("cannot add yourself as a friend")
+			return nil, &ente.ApiError{
+				Code:           ente.ErrorCode("SPACE_SELF_FRIENDSHIP"),
+				Message:        "cannot add yourself as a friend",
+				HttpStatusCode: http.StatusBadRequest,
+			}
 		}
 		if errors.Is(stacktrace.RootCause(err), repo.ErrAlreadyFriends) {
 			return &models.FriendStatusResponse{Status: "friend"}, nil
@@ -69,7 +81,11 @@ func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceR
 			return nil, ente.NewBadRequestWithMessage("space key version is stale")
 		}
 		if errors.Is(stacktrace.RootCause(err), repo.ErrSpaceFriendRequestLimitReached) {
-			return nil, ente.NewConflictError("space friend request limit reached")
+			return nil, &ente.ApiError{
+				Code:           ente.ErrorCode("SPACE_FRIEND_REQUEST_LIMIT_REACHED"),
+				Message:        "space friend request limit reached",
+				HttpStatusCode: http.StatusConflict,
+			}
 		}
 		return nil, err
 	}
@@ -135,7 +151,10 @@ func (c *FriendsController) ConfirmRequest(ctx context.Context, targetSpace *rep
 			return nil, newSpaceFriendLimitReachedError()
 		}
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-			return nil, ente.NewBadRequestWithMessage("friend request is stale or no longer available")
+			return nil, newSpaceFriendRequestUnavailableError(http.StatusBadRequest)
+		}
+		if errors.Is(stacktrace.RootCause(err), repo.ErrSpaceFriendRequestStale) {
+			return nil, ente.NewBadRequestWithMessage("space key version is stale")
 		}
 		return nil, err
 	}
@@ -148,7 +167,7 @@ func (c *FriendsController) ConfirmRequest(ctx context.Context, targetSpace *rep
 func (c *FriendsController) DeleteRequest(ctx context.Context, space *repo.SpaceRecord, requestID int64) error {
 	if err := c.FriendsRepo.DeleteFriendRequest(ctx, space.SpaceID, requestID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-			return ente.ErrNotFound
+			return newSpaceFriendRequestUnavailableError(http.StatusNotFound)
 		}
 		return err
 	}

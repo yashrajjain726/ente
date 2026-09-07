@@ -2060,7 +2060,7 @@ func TestAddFriendRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
-	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.ErrorIs(t, err, ErrSpaceFriendRequestStale)
 
 	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.ErrorIs(t, err, sql.ErrNoRows)

@@ -373,7 +373,11 @@ impl AccountSpaceCtx {
             .get(&path)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_status()
+            .map_err(|error| match error.status_code() {
+                Some(404) => Error::ProfileNotFound,
+                _ => error.into(),
+            })?
             .json()
             .await?)
     }

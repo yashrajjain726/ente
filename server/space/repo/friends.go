@@ -16,6 +16,7 @@ var (
 	ErrSelfFriendship                 = errors.New("space users cannot friend themselves")
 	ErrSpaceFriendLimitReached        = errors.New("space friend limit reached")
 	ErrSpaceFriendRequestLimitReached = errors.New("space friend request limit reached")
+	ErrSpaceFriendRequestStale        = errors.New("space friend request keys are stale")
 )
 
 const (
@@ -383,7 +384,7 @@ func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetSpac
 		return 0, false, stacktrace.Propagate(err, "")
 	}
 	if targetCurrentVersion != targetKeyVersion || requesterCurrentVersion != requesterKeyVersion {
-		return 0, false, sql.ErrNoRows
+		return 0, false, ErrSpaceFriendRequestStale
 	}
 
 	alreadyFriends, err := areMutualFriendsTx(ctx, tx, requesterSpaceID, targetSpaceID)
