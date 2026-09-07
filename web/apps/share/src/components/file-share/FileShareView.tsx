@@ -31,7 +31,7 @@ export const FileShareView: React.FC = () => {
             </Head>
             <Box
                 sx={{
-                    minHeight: "100dvh",
+                    height: "100dvh",
                     width: "100%",
                     maxWidth: "100%",
                     bgcolor: "accent.main",
@@ -40,7 +40,7 @@ export const FileShareView: React.FC = () => {
                     alignItems: "center",
                     p: { xs: 1.25, md: 2 },
                     boxSizing: "border-box",
-                    overflowX: "hidden",
+                    overflow: "hidden",
                 }}
             >
                 <Box
@@ -55,7 +55,23 @@ export const FileShareView: React.FC = () => {
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        overflow: "hidden",
+                        overflowX: "hidden",
+                        overflowY: "auto",
+                        "& > *": { flexShrink: 0 },
+                        scrollbarWidth: "thin",
+                        scrollbarColor: "rgba(128, 128, 128, 0.35) transparent",
+                        "&::-webkit-scrollbar": { width: 6 },
+                        "&::-webkit-scrollbar-track": {
+                            background: "transparent",
+                            marginBlock: "34px",
+                        },
+                        "&::-webkit-scrollbar-thumb": {
+                            backgroundColor: "rgba(128, 128, 128, 0.35)",
+                            borderRadius: "999px",
+                            "&:hover": {
+                                backgroundColor: "rgba(128, 128, 128, 0.55)",
+                            },
+                        },
                         "& ::selection": {
                             backgroundColor: "accent.main",
                             color: "fixed.white",
@@ -68,13 +84,15 @@ export const FileShareView: React.FC = () => {
                 >
                     <Box
                         sx={{
-                            width: "100%",
+                            position: "sticky",
+                            top: { xs: 16, md: 24 },
+                            zIndex: 1,
+                            alignSelf: "flex-end",
+                            height: 0,
                             display: "flex",
-                            alignItems: "center",
-                            justifyContent: { xs: "center", md: "flex-end" },
-                            minHeight: { xs: 88, md: 104 },
+                            alignItems: "flex-start",
+                            justifyContent: "flex-end",
                             px: { xs: 3, md: 4.5 },
-                            mb: fileInfo?.lockerType ? { xs: 16, md: 0 } : 0,
                         }}
                     >
                         <a
@@ -103,17 +121,14 @@ export const FileShareView: React.FC = () => {
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            justifyContent: fileInfo?.lockerType
-                                ? "flex-start"
-                                : "center",
+                            justifyContent: "center",
                             width: "100%",
-                            maxWidth: 400,
+                            maxWidth: fileInfo?.lockerType
+                                ? { xs: 400, md: 640, lg: 720 }
+                                : 400,
                             flex: 1,
                             px: 3,
-                            pb: 8,
-                            mt: fileInfo?.lockerType
-                                ? { xs: 0, md: "20dvh" }
-                                : 0,
+                            py: { xs: "88px", md: 3 },
                         }}
                     >
                         {loading && (
@@ -162,7 +177,9 @@ export const FileShareView: React.FC = () => {
                                         justifyContent: "center",
                                         gap: 3,
                                         width: "100%",
-                                        marginBottom: 4,
+                                        marginBottom: fileInfo.lockerType
+                                            ? 0
+                                            : 4,
                                     }}
                                 >
                                     <Box
