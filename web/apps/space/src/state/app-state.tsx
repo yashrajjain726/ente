@@ -22,6 +22,7 @@ export interface RefreshSpaceProfileOptions {
 }
 
 export interface SpaceAppState {
+    cachedProfileAvatarUrl?: string;
     friends: FriendProfile[];
     isLiveSignupVerification: boolean;
     onboardingEntrySource: OnboardingEntrySource;

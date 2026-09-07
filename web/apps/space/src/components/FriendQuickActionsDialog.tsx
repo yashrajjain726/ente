@@ -58,7 +58,7 @@ export const FriendQuickActionsDialog: React.FC<
 
     React.useEffect(() => {
         if (pokePhase != "done") return;
-        const timeout = window.setTimeout(() => setPokePhase(null), 650);
+        const timeout = window.setTimeout(() => setPokePhase(null), 2100);
         return () => window.clearTimeout(timeout);
     }, [pokePhase]);
 
@@ -291,16 +291,20 @@ export const FriendQuickActionsDialog: React.FC<
                                 justifyContent: "center",
                                 width: 24,
                                 animation: action.active
-                                    ? "spacePokeJab 550ms ease-in-out"
+                                    ? "spacePokeJab 2000ms ease-in-out"
                                     : "none",
                                 "@keyframes spacePokeJab": {
                                     "0%, 100%": {
                                         transform:
                                             "translate(0, 0) rotate(0deg) scale(1)",
                                     },
-                                    "50%": {
+                                    "27.5%, 52%, 73.75%": {
                                         transform:
-                                            "translate(28px, -36px) rotate(-40deg) scale(2.25)",
+                                            "translate(20px, -80px) rotate(-40deg) scale(3)",
+                                    },
+                                    "41%, 63%": {
+                                        transform:
+                                            "translate(36px, -94px) rotate(-40deg) scale(3)",
                                     },
                                 },
                                 "@media (prefers-reduced-motion: reduce)": {
