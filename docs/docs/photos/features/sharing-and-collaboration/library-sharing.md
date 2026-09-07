@@ -17,6 +17,8 @@ Library sharing is available in Ente Photos on iOS and Android. The recipient mu
 4. Choose Viewer, Collaborator, or Admin for the selection. You can also assign roles per album.
 5. Tap the **Share** button.
 
+Uncategorized is always shared as Viewer, even if you choose a different role for the selection.
+
 The albums appear among the recipient's shared albums. New photos added to them remain available to the recipient as they are backed up.
 
 See [Collaboration](/photos/features/sharing-and-collaboration/collaboration#permissions-explained) for the permissions granted by each role.
@@ -30,8 +32,13 @@ Ente shares your current albums and automatically shares new albums you create. 
 - Hidden albums
 - Albums you stopped sharing or that the family member left
 - Albums shared with you by someone else
+- Quick Link albums
 
 You can select a previously unshared album manually. Unhide a hidden album before sharing it.
+
+Quick Link albums must be [converted to regular albums](/photos/features/sharing-and-collaboration/public-links#convert-quick-link-to-regular-album) before they appear on the **Share albums** page.
+
+Automatic sharing runs in the mobile app. If you create albums on web or desktop, open Ente Photos on your phone and let it sync to share them automatically.
 
 ## Manage library sharing
 
