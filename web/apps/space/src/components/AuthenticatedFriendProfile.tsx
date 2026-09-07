@@ -4,16 +4,16 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
-import { friendsBackground } from "screens/FriendsScreen";
 import {
     FriendProfileImageViewerScreen,
     friendProfileImageViewerBackground,
 } from "screens/ProfileImageViewerScreen";
 import { ProfileScreen } from "screens/ProfileScreen";
 import {
-    patchCachedSpaceFeedPost,
-    removeCachedSpaceFeedPostsBySpace,
-} from "services/feed-cache";
+    markSpaceHomePostRead,
+    patchCachedSpaceHomePost,
+    removeCachedSpaceHomePostsBySpace,
+} from "services/home-posts";
 import {
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfile,
@@ -24,6 +24,7 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
@@ -139,13 +140,13 @@ export const AuthenticatedFriendProfile: React.FC<
         if (!actorSpaceId) return;
 
         await removeCurrentSpaceFriend(actorSpaceId, friendSpaceId);
-        await removeCachedSpaceFeedPostsBySpace(actorSpaceId, friendSpaceId);
+        await removeCachedSpaceHomePostsBySpace(actorSpaceId, friendSpaceId);
     }, [friendSpaceId, profile?.spaceId]);
 
     if (profileLoadStatus != "ready" || !profile?.spaceId) {
         return (
             <SpaceRouteFallback
-                background={friendsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -154,13 +155,13 @@ export const AuthenticatedFriendProfile: React.FC<
         !hadCachedFriendProfileOnMount.current &&
         (isProfileLoading || isPostsLoading)
     ) {
-        return <SpaceRouteFallback background={friendsBackground} />;
+        return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
     }
     const actorSpaceId = profile.spaceId;
 
     return (
         <>
-            <SpacePageMeta themeColor={friendsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileScreen
                 friendsCount={displayedProfile.friendsCount}
                 headerVariant="friend"
@@ -175,12 +176,21 @@ export const AuthenticatedFriendProfile: React.FC<
                 }
                 onOpenProfileCover={() => setOpenProfileImage("cover")}
                 onOpenProfilePhoto={() => setOpenProfileImage("avatar")}
+                onOpenPost={(post) => {
+                    if (!post.postId) return;
+                    void markSpaceHomePostRead(actorSpaceId, {
+                        postId: post.postId,
+                        timestampMs: post.timestampMs,
+                    }).catch((error: unknown) =>
+                        log.warn("Failed to mark Space post as read", error),
+                    );
+                }}
                 onReplyToPost={(postSpaceId, postId, text) =>
                     replyToCurrentPost(actorSpaceId, postSpaceId, postId, text)
                 }
                 onSetPostLiked={async (postId, liked) => {
                     await setCurrentPostLiked(actorSpaceId, postId, liked);
-                    void patchCachedSpaceFeedPost(actorSpaceId, postId, {
+                    void patchCachedSpaceHomePost(actorSpaceId, postId, {
                         viewerLiked: liked,
                     });
                 }}

@@ -39,6 +39,9 @@ pub enum Error {
     #[error("space post limit reached")]
     PostLimitReached,
 
+    #[error("space friend limit reached")]
+    FriendLimitReached,
+
     #[error("space session is unauthorized")]
     SessionUnauthorized,
 

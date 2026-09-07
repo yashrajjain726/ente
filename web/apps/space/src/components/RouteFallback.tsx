@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { SpacePageMeta } from "components/PageMeta";
 import React from "react";
+import { spaceAppBackground, spaceText } from "styles/colors";
 
 interface SpaceRouteFallbackProps {
     background: string;
@@ -49,7 +50,7 @@ export const SpaceRouteFallback: React.FC<SpaceRouteFallbackProps> = ({
         <Box
             sx={{
                 alignItems: "center",
-                bgcolor: background,
+                background: spaceAppBackground,
                 display: "grid",
                 minHeight: "100svh",
                 placeItems: "center",
@@ -62,7 +63,7 @@ export const SpaceRouteFallback: React.FC<SpaceRouteFallbackProps> = ({
                     <Box
                         role="alert"
                         sx={{
-                            color: "#111111",
+                            color: spaceText,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
                             fontWeight: 600,

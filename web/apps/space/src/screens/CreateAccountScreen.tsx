@@ -6,13 +6,17 @@ import {
     type PasswordStrength,
 } from "ente-accounts/utils/password";
 import React, { useId, useMemo, useState } from "react";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
-export const createAccountBackground = "#FAFAFA";
-
 const green = "#08C225";
-const textBase = "#000";
-const textLight = "#969696";
+const textBase = spaceText;
+const textLight = spaceTextMuted;
 const warning = "#F63A3A";
 const caution = "#B65F00";
 const createAccountFormID = "space-create-account-form";
@@ -203,7 +207,7 @@ const TextInput: React.FC<TextInputProps> = ({
             <Box
                 sx={{
                     alignItems: "center",
-                    bgcolor: "white",
+                    bgcolor: spaceSurface,
                     borderRadius: "16px",
                     display: "flex",
                     height: 52,
@@ -333,7 +337,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: createAccountBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -343,7 +347,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: createAccountBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -592,7 +596,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
                 <Box
                     sx={{
-                        bgcolor: createAccountBackground,
+                        bgcolor: "transparent",
                         bottom: 0,
                         boxSizing: "border-box",
                         display: "flex",
@@ -622,7 +626,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                             alignItems: "center",
                             bgcolor: isCreateAccountButtonActive
                                 ? green
-                                : "#F5F5F5",
+                                : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
                             color: isCreateAccountButtonActive

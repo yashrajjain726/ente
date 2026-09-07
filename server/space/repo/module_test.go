@@ -180,6 +180,18 @@ func testConfirmFriendRequest(ctx context.Context, module *Module, _ int64, targ
 	return module.Friends.ConfirmFriendRequest(ctx, targetSpaceID, requestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 }
 
+func fillSpaceFriendLimit(t *testing.T, ctx context.Context, module *Module, space *SpaceRecord, prefix string, count int) {
+	t.Helper()
+	for i := 0; i < count; i++ {
+		suffix := strconv.Itoa(i)
+		friendID := insertSpaceUser(t, module, prefix+"-"+suffix+"@example.com", prefix+"-public-"+suffix)
+		friendSpace, err := testCreateSpace(ctx, module, friendID, prefix+"_"+suffix, "root", "public", "secret", "nonce", "profile")
+		require.NoError(t, err)
+		require.NoError(t, testUpsertShare(ctx, module, space.SpaceID, friendSpace.SpaceID, "friend-share", space.CurrentVersion))
+		require.NoError(t, testUpsertShare(ctx, module, friendSpace.SpaceID, space.SpaceID, "space-share", friendSpace.CurrentVersion))
+	}
+}
+
 func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
 	return upsertFriendShare(ctx, module.Friends.DB, friendShareMutation{
 		SpaceID:              spaceID,
@@ -363,6 +375,123 @@ func TestCreateFriendRequestEnforcesTargetLimit(t *testing.T) {
 	_, created, err := testCreateFriendRequest(ctx, module, extraID, extraSpace.SpaceID, targetSpace.SpaceID, "share-key", extraSpace.CurrentVersion)
 	require.NoError(t, err)
 	require.True(t, created)
+}
+
+func TestCreateFriendRequestEnforcesFriendLimit(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "friend-limit-requester@example.com", "friend-limit-requester-public")
+	targetID := insertSpaceUser(t, module, "friend-limit-target@example.com", "friend-limit-target-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "friend_limit_requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	targetSpace, err := testCreateSpace(ctx, module, targetID, "friend_limit_target", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	fillSpaceFriendLimit(t, ctx, module, requesterSpace, "friend_limit_member", MaxFriendsPerSpace)
+
+	_, _, err = testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
+	require.ErrorIs(t, err, ErrSpaceFriendLimitReached)
+}
+
+func TestCreateFriendRequestCountsSentRequestsTowardFriendLimit(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "pending-limit-requester@example.com", "pending-limit-requester-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "pending_limit_requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+
+	for i := 0; i < MaxFriendsPerSpace+1; i++ {
+		suffix := strconv.Itoa(i)
+		targetID := insertSpaceUser(t, module, "pending-limit-target-"+suffix+"@example.com", "pending-limit-target-public-"+suffix)
+		targetSpace, err := testCreateSpace(ctx, module, targetID, "pending_limit_target_"+suffix, "root", "public", "secret", "nonce", "profile")
+		require.NoError(t, err)
+		_, created, err := testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
+		if i == MaxFriendsPerSpace {
+			require.ErrorIs(t, err, ErrSpaceFriendLimitReached)
+			require.False(t, created)
+		} else {
+			require.NoError(t, err)
+			require.True(t, created)
+		}
+	}
+}
+
+func TestCreateFriendRequestIgnoresTargetFriendLimit(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "full-target-requester@example.com", "full-target-requester-public")
+	targetID := insertSpaceUser(t, module, "full-target@example.com", "full-target-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "full_target_requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	targetSpace, err := testCreateSpace(ctx, module, targetID, "full_target", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	fillSpaceFriendLimit(t, ctx, module, targetSpace, "full_target_member", MaxFriendsPerSpace)
+
+	_, created, err := testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+}
+
+func TestConfirmFriendRequestEnforcesFriendLimit(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "confirm-limit-requester@example.com", "confirm-limit-requester-public")
+	targetID := insertSpaceUser(t, module, "confirm-limit-target@example.com", "confirm-limit-target-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "confirm_limit_requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	targetSpace, err := testCreateSpace(ctx, module, targetID, "confirm_limit_target", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	request, created, err := testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	fillSpaceFriendLimit(t, ctx, module, targetSpace, "confirm_limit_member", MaxFriendsPerSpace)
+
+	_, _, err = testConfirmFriendRequest(ctx, module, targetID, targetSpace.SpaceID, request.RequestID, "target-share-key", targetSpace.CurrentVersion)
+	require.ErrorIs(t, err, ErrSpaceFriendLimitReached)
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE request_id = $1`, request.RequestID))
+}
+
+func TestConfirmFriendRequestCountsSentRequestsTowardFriendLimit(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "confirm-pending-requester@example.com", "confirm-pending-requester-public")
+	targetID := insertSpaceUser(t, module, "confirm-pending-target@example.com", "confirm-pending-target-public")
+	pendingTargetID := insertSpaceUser(t, module, "confirm-pending-other@example.com", "confirm-pending-other-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "confirm_pending_requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	targetSpace, err := testCreateSpace(ctx, module, targetID, "confirm_pending_target", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	pendingTargetSpace, err := testCreateSpace(ctx, module, pendingTargetID, "confirm_pending_other", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	fillSpaceFriendLimit(t, ctx, module, targetSpace, "confirm_pending_member", MaxFriendsPerSpace-1)
+	_, created, err := testCreateFriendRequest(ctx, module, targetID, targetSpace.SpaceID, pendingTargetSpace.SpaceID, "target-share-key", targetSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	request, created, err := testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+
+	_, _, err = testConfirmFriendRequest(ctx, module, targetID, targetSpace.SpaceID, request.RequestID, "target-share-key", targetSpace.CurrentVersion)
+	require.ErrorIs(t, err, ErrSpaceFriendLimitReached)
+}
+
+func TestConfirmFriendRequestAllowsTwelfthFriend(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "twelfth-friend-requester@example.com", "twelfth-friend-requester-public")
+	targetID := insertSpaceUser(t, module, "twelfth-friend-target@example.com", "twelfth-friend-target-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "twelfth_friend_requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	targetSpace, err := testCreateSpace(ctx, module, targetID, "twelfth_friend_target", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	fillSpaceFriendLimit(t, ctx, module, targetSpace, "twelfth_friend_member", MaxFriendsPerSpace-1)
+	request, created, err := testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+
+	_, created, err = testConfirmFriendRequest(ctx, module, targetID, targetSpace.SpaceID, request.RequestID, "target-share-key", targetSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	require.Equal(t, int64(MaxFriendsPerSpace), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1`, targetSpace.SpaceID))
 }
 
 func testUpdateCaption(ctx context.Context, module *Module, postID int64, _ int64, spaceID string, captionCipher *string) error {
@@ -2044,7 +2173,7 @@ func TestListPostsBySpaceCursorUsesCreatedAtSortOrder(t *testing.T) {
 	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
 }
 
-func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
+func TestListHomePostsReturnsFriendLatestAndPostsAfterCursor(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -2076,30 +2205,52 @@ func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
 	setPostCreatedAt(t, module, 2000, second)
 	setPostCreatedAt(t, module, 1000, third)
 
-	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceSpace.SpaceID, "", 1)
+	page, nextCursor, err := module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "", "", 10)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, ownPost, page[0].PostID)
-	require.Equal(t, aliceSpace.SpaceID, page[0].SpaceID)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, bobSpace.SpaceID, page[0].SpaceID)
 	require.False(t, page[0].ViewerLiked)
-	require.Equal(t, "5000:"+strconv.FormatInt(ownPost, 10), nextCursor)
+	require.Empty(t, nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceSpace.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, second, page[1].PostID)
+	require.Empty(t, nextCursor)
+
+	after := "1000:" + strconv.FormatInt(third, 10)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, after, "", 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceSpace.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, after, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, second, page[0].PostID)
-	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
+	require.Empty(t, nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceSpace.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "3000:"+strconv.FormatInt(first, 10), "", 10)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, third, page[0].PostID)
+	require.Equal(t, first, page[0].PostID)
+	require.Empty(t, nextCursor)
+
+	require.NoError(t, module.Posts.UpdateCaption(ctx, second, bobSpace.SpaceID, testSpaceBytes("updated-caption")))
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, testSpaceBytes("updated-caption"), page[1].CaptionCipher)
+	require.Empty(t, nextCursor)
+
+	require.NoError(t, module.Posts.DeletePost(ctx, second, bobSpace.SpaceID))
+	page, nextCursor, err = module.Posts.ListHomePosts(ctx, aliceSpace.SpaceID, "1500:0", "", 10)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, first, page[0].PostID)
 	require.Empty(t, nextCursor)
 }
 

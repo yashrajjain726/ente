@@ -16,11 +16,16 @@ import { SpaceNotificationPermissionInstructions } from "components/Notification
 import { useSpacePWAInstallPrompt } from "hooks/use-pwa-install-prompt";
 import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
+import {
+    spaceDialogBackground,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
-const textBase = "#000";
-const textSoft = "#777777";
+const textBase = spaceText;
+const textSoft = spaceTextMuted;
 const authenticatedSessionSeenKey = "space.prompts.authenticatedSessionSeen";
 const automaticPromptClaimedKey = "space.prompts.automaticClaimed";
 
@@ -200,7 +205,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                     : undefined,
             boxSizing: "border-box",
             left: "50%",
-            px: "16px",
+            px: "12px",
             pointerEvents: "none",
             position: "fixed",
             top:
@@ -224,7 +229,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: "#FFFFFF",
+                bgcolor: spaceDialogBackground,
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 color: textBase,
@@ -476,7 +481,6 @@ export const SpacePWAInstallInstructions: React.FC<
             aria-describedby={
                 purpose == "notifications" ? descriptionID : undefined
             }
-            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.56)" }}
             slots={
                 isBottomSheet
                     ? { transition: SpaceBottomSheetTransition }
@@ -485,7 +489,6 @@ export const SpacePWAInstallInstructions: React.FC<
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: "#FFFFFF",
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "0 -18px 44px rgba(0, 0, 0, 0.18)",
@@ -619,7 +622,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
         <Box
             sx={{
                 alignItems: "center",
-                bgcolor: "#E7F6E9",
+                bgcolor: "rgba(8, 194, 37, 0.14)",
                 borderRadius: "14px",
                 color: green,
                 display: "flex",

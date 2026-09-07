@@ -2,12 +2,10 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
-import {
-    ChangeNameSettingsScreen,
-    settingsBackground,
-} from "screens/SettingsScreen";
+import { ChangeNameSettingsScreen } from "screens/SettingsScreen";
 import { saveSpaceProfile, spaceProfileErrorMessage } from "services/profile";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -27,7 +25,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={settingsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -35,7 +33,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={settingsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ChangeNameSettingsScreen
                 errorMessage={errorMessage}
                 initialName={profile.fullName}

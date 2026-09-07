@@ -1,5 +1,6 @@
 use super::{
-    AccountSpaceCtx, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR, validate_message_payload,
+    AccountSpaceCtx, MESSAGE_KIND_POKE, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR,
+    validate_message_payload,
 };
 use crate::crypto::{
     decrypt_secretbox_payload, encrypt_secretbox_payload, generate_key, open_with_keypair,
@@ -13,8 +14,8 @@ use crate::transport::{
 };
 use ente_core::b64;
 
-const MESSAGE_NOTIFICATION_KIND_WAVE: &str = "wave";
-const WAVE_MESSAGE_TEXT: &str = "👋";
+const MESSAGE_NOTIFICATION_KIND_POKE: &str = "poke";
+const POKE_MESSAGE_TEXT: &str = "Poked";
 
 impl AccountSpaceCtx {
     pub async fn list_conversations(&self, space_id: &str) -> Result<ConversationsResponse> {
@@ -61,21 +62,54 @@ impl AccountSpaceCtx {
         space_id: &str,
         text: &str,
     ) -> Result<MessageResponse> {
+        self.send_direct_message(
+            sender_space_id,
+            space_id,
+            MessagePayload {
+                version: 1,
+                kind: MESSAGE_KIND_REGULAR.to_owned(),
+                text: text.to_owned(),
+            },
+            None,
+        )
+        .await
+    }
+
+    pub async fn send_poke(
+        &self,
+        sender_space_id: &str,
+        space_id: &str,
+    ) -> Result<MessageResponse> {
+        self.send_direct_message(
+            sender_space_id,
+            space_id,
+            MessagePayload {
+                version: 1,
+                kind: MESSAGE_KIND_POKE.to_owned(),
+                text: POKE_MESSAGE_TEXT.to_owned(),
+            },
+            Some(MESSAGE_NOTIFICATION_KIND_POKE),
+        )
+        .await
+    }
+
+    async fn send_direct_message(
+        &self,
+        sender_space_id: &str,
+        space_id: &str,
+        payload: MessagePayload,
+        notification_kind: Option<&str>,
+    ) -> Result<MessageResponse> {
         let friend = self
             .friend_actor_for_space(sender_space_id, space_id)
             .await?;
-        let payload = MessagePayload {
-            version: 1,
-            kind: MESSAGE_KIND_REGULAR.to_owned(),
-            text: text.to_owned(),
-        };
         let request = self
             .message_request_for_payload(
                 sender_space_id,
                 &friend.public_key,
                 &payload,
                 None,
-                (text == WAVE_MESSAGE_TEXT).then(|| MESSAGE_NOTIFICATION_KIND_WAVE.to_owned()),
+                notification_kind.map(str::to_owned),
             )
             .await?;
         let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");

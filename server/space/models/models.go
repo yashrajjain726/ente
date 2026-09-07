@@ -55,7 +55,8 @@ type ListPostsRequest struct {
 	Limit         int    `form:"limit"`
 }
 
-type ListFeedRequest struct {
+type ListHomePostsRequest struct {
+	After  string `form:"after"`
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
 }
@@ -401,7 +402,8 @@ type PostPage struct {
 	NextCursor string         `json:"nextCursor,omitempty"`
 }
 
-type FeedPage struct {
+type HomePostPage struct {
 	Items      []PostResponse `json:"items"`
 	NextCursor string         `json:"nextCursor,omitempty"`
+	SyncCursor string         `json:"syncCursor"`
 }

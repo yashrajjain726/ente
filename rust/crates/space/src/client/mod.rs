@@ -28,11 +28,11 @@ use crate::crypto::{
 };
 use crate::error::{Error, Result};
 use crate::models::{
-    CreatedSpace, DecryptedFriendShare, DecryptedSpaceProfile, FeedItem, MessagePayload,
+    CreatedSpace, DecryptedFriendShare, DecryptedSpaceProfile, MessagePayload,
     OpenAccountSpaceCtxInput, PostObjectMetadata,
 };
 use crate::transport::{
-    CreateSpaceRequest, FriendShareResponse, PostObjectPayload, PostResponse, SpaceKeyResponse,
+    CreateSpaceRequest, FriendShareResponse, PostObjectPayload, SpaceKeyResponse,
     SpaceKeyVersionResponse, SpaceLookupResponse, SpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::{
@@ -43,6 +43,7 @@ use ente_core::{
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
+const MESSAGE_KIND_POKE: &str = "poke";
 const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
 const ONLY_PHOTOS_UPLOAD_MESSAGE: &str = "only photos can be uploaded";
 pub const MAX_SPACE_POST_UPLOAD_BYTES: usize = 5 * 1024 * 1024;
@@ -706,21 +707,6 @@ fn validate_message_payload(payload: &MessagePayload, plaintext_len: usize) -> R
         )));
     }
     Ok(())
-}
-
-fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
-    PostResponse {
-        post_id: item.post_id,
-        space_id: item.space_id.clone(),
-        space_slug: item.space_slug.clone(),
-        author: item.author.clone(),
-        encrypted_post_key: item.encrypted_post_key.clone(),
-        caption_cipher: item.caption_cipher.clone(),
-        key_version: item.key_version,
-        objects: item.objects.clone(),
-        created_at: item.created_at.clone(),
-        viewer_liked: item.viewer_liked,
-    }
 }
 
 pub(super) fn build_api(

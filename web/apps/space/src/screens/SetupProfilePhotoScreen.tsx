@@ -10,7 +10,13 @@ import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import log from "ente-base/log";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
-import { setupProfileBackground } from "screens/SetupProfileScreen";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import {
     prepareSpaceAvatarImageFromCrop,
@@ -20,9 +26,9 @@ import {
 } from "utils/post-image";
 
 const green = "#08C225";
-const textBase = "#000";
-const textLight = "#969696";
-const textMuted = "#666";
+const textBase = spaceText;
+const textLight = spaceTextMuted;
+const textMuted = spaceTextMuted;
 const warning = "#F63A3A";
 
 interface AvatarCropImage {
@@ -38,7 +44,11 @@ interface SetupProfilePhotoScreenProps {
 }
 
 const AvatarPlaceholder: React.FC = () => (
-    <SpaceAvatarImage aria-hidden border="4px solid white" borderRadius="50%" />
+    <SpaceAvatarImage
+        aria-hidden
+        border={`4px solid ${spaceSurface}`}
+        borderRadius="50%"
+    />
 );
 
 export const SetupProfilePhotoScreen: React.FC<
@@ -170,7 +180,6 @@ export const SetupProfilePhotoScreen: React.FC<
             <>
                 {avatarFileInput}
                 <SpaceAvatarCropPage
-                    background={setupProfileBackground}
                     crop={avatarCrop}
                     errorMessage={errorMessage ?? avatarError}
                     imageURL={avatarCropImage.url}
@@ -196,7 +205,7 @@ export const SetupProfilePhotoScreen: React.FC<
         <Box
             component="main"
             sx={{
-                bgcolor: setupProfileBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 height: "100dvh",
@@ -209,7 +218,7 @@ export const SetupProfilePhotoScreen: React.FC<
         >
             <Box
                 sx={{
-                    bgcolor: setupProfileBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "grid",
                     gridTemplateRows: `42px minmax(0, 1fr) auto ${spaceSetupAvatarCropFooterHeight}`,
@@ -344,7 +353,7 @@ export const SetupProfilePhotoScreen: React.FC<
 
                 <Box
                     sx={{
-                        bgcolor: setupProfileBackground,
+                        bgcolor: "transparent",
                         bottom: 0,
                         boxSizing: "border-box",
                         display: "flex",
@@ -406,7 +415,7 @@ export const SetupProfilePhotoScreen: React.FC<
                         onClick={() => void skipProfilePicture()}
                         sx={{
                             alignItems: "center",
-                            bgcolor: "#F2F2F2",
+                            bgcolor: spaceSurface,
                             border: 0,
                             borderRadius: "20px",
                             color: textMuted,
@@ -426,7 +435,7 @@ export const SetupProfilePhotoScreen: React.FC<
                                 outlineOffset: 2,
                             },
                             "&:hover": canSkip
-                                ? { bgcolor: "#ECECEC" }
+                                ? { bgcolor: spaceSurfaceHover }
                                 : undefined,
                         }}
                     >

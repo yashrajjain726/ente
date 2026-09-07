@@ -14,10 +14,14 @@ import (
 var (
 	ErrAlreadyFriends                 = errors.New("space users are already friends")
 	ErrSelfFriendship                 = errors.New("space users cannot friend themselves")
+	ErrSpaceFriendLimitReached        = errors.New("space friend limit reached")
 	ErrSpaceFriendRequestLimitReached = errors.New("space friend request limit reached")
 )
 
-const MaxPendingFriendRequestsPerSpace = 100
+const (
+	MaxFriendsPerSpace               = 12
+	MaxPendingFriendRequestsPerSpace = 100
+)
 
 type friendShareMutation struct {
 	SpaceID              string
@@ -46,6 +50,26 @@ func areMutualFriendsTx(ctx context.Context, tx *sql.Tx, firstSpaceID string, se
 		return false, stacktrace.Propagate(err, "")
 	}
 	return alreadyFriends, nil
+}
+
+func friendCapacityTx(ctx context.Context, tx *sql.Tx, spaceID string) (int, error) {
+	var count int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT
+			(SELECT COUNT(*)
+			 FROM space_friend_shares s
+			 JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
+			 JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
+			 WHERE s.space_id = $1) +
+			(SELECT COUNT(*)
+			 FROM space_friend_requests fr
+			 JOIN spaces target_space ON target_space.space_id = fr.target_space_id
+			 JOIN users target_owner ON target_owner.user_id = target_space.owner_id AND target_owner.encrypted_email IS NOT NULL
+			 WHERE fr.requester_space_id = $1)
+	`, spaceID).Scan(&count); err != nil {
+		return 0, stacktrace.Propagate(err, "")
+	}
+	return count, nil
 }
 
 func upsertMutualFriendSharesTx(ctx context.Context, tx *sql.Tx, first friendShareMutation, second friendShareMutation) error {
@@ -158,6 +182,13 @@ func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID
 	case !errors.Is(err, sql.ErrNoRows):
 		return nil, false, false, stacktrace.Propagate(err, "")
 	}
+	requesterFriendCapacity, err := friendCapacityTx(ctx, tx, requesterSpaceID)
+	if err != nil {
+		return nil, false, false, err
+	}
+	if requesterFriendCapacity >= MaxFriendsPerSpace {
+		return nil, false, false, ErrSpaceFriendLimitReached
+	}
 
 	var reverse SpaceFriendRequestRecord
 	err = tx.QueryRowContext(ctx, `
@@ -176,6 +207,13 @@ func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID
 	case err == nil:
 		if targetCurrentVersion != reverse.RequesterKeyVersion {
 			return nil, false, false, sql.ErrNoRows
+		}
+		targetFriendCapacity, err := friendCapacityTx(ctx, tx, targetSpaceID)
+		if err != nil {
+			return nil, false, false, err
+		}
+		if targetFriendCapacity > MaxFriendsPerSpace {
+			return nil, false, false, ErrSpaceFriendLimitReached
 		}
 		if err := upsertMutualFriendSharesTx(ctx, tx,
 			friendShareMutation{
@@ -351,6 +389,22 @@ func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetSpac
 	alreadyFriends, err := areMutualFriendsTx(ctx, tx, requesterSpaceID, targetSpaceID)
 	if err != nil {
 		return 0, false, err
+	}
+	if !alreadyFriends {
+		targetFriendCapacity, err := friendCapacityTx(ctx, tx, targetSpaceID)
+		if err != nil {
+			return 0, false, err
+		}
+		if targetFriendCapacity >= MaxFriendsPerSpace {
+			return 0, false, ErrSpaceFriendLimitReached
+		}
+		requesterFriendCapacity, err := friendCapacityTx(ctx, tx, requesterSpaceID)
+		if err != nil {
+			return 0, false, err
+		}
+		if requesterFriendCapacity > MaxFriendsPerSpace {
+			return 0, false, ErrSpaceFriendLimitReached
+		}
 	}
 	if err := upsertMutualFriendSharesTx(ctx, tx,
 		friendShareMutation{
