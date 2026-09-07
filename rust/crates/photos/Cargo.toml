@@ -5,7 +5,7 @@ edition = "2024"
 [dependencies]
 ente-assets.workspace = true
 ente-location.workspace = true
-quick-xml = "0.41.0"
+quick-xml.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

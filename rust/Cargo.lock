@@ -2542,6 +2542,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-exif"
+version = "0.0.0"
+dependencies = [
+ "brotli-decompressor",
+ "miniz_oxide",
+ "quick-xml",
+ "serde_json",
+]
+
+[[package]]
 name = "ente-frb-lib"
 version = "0.0.0"
 dependencies = [
