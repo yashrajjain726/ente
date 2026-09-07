@@ -5064,5 +5064,88 @@
   "personShareFailedTitle": "Could not share photos",
   "personShareFailedBody": "The shared album could not be created. Your photos and selection are unchanged. Please try again.",
   "personShareRollbackFailed": "The share did not finish, and the album “{name}” could not be removed. It remains in Albums and may have an active public link. Review or delete it there before trying again. Your original photos are safe.",
-  "@personShareRollbackFailed": {"placeholders": {"name": {"type": "String"}}}
+  "@personShareRollbackFailed": {"placeholders": {"name": {"type": "String"}}},
+  "sharedByYou": "Shared by you",
+  "sharedByOwner": "Shared by {owner}",
+  "@sharedByOwner": {
+    "placeholders": {
+      "owner": {
+        "type": "String"
+      }
+    }
+  },
+  "youAreViewer": "You are a viewer",
+  "youAreCollaborator": "You are a collaborator",
+  "youAreAdmin": "You are an admin",
+  "emptyAlbumShareMessage": "You have not shared this album with anyone yet.",
+  "addPeople": "Add people",
+  "fromYourContacts": "From your contacts",
+  "chooseAccess": "Choose access",
+  "permissions": "Permissions",
+  "viewerRoleDescription": "View and download photos",
+  "collaboratorRoleDescription": "Plus add their own photos",
+  "adminRoleDescription": "Plus add and remove people",
+  "addAsViewers": "{count, plural, one{Add as viewer} other{Add as viewers}}",
+  "@addAsViewers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addAsCollaborators": "{count, plural, one{Add as collaborator} other{Add as collaborators}}",
+  "@addAsCollaborators": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addAsAdmins": "{count, plural, one{Add as admin} other{Add as admins}}",
+  "@addAsAdmins": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noEnteAccountWithThisEmail": "No Ente account with this email",
+  "personAlreadyHasAccess": "This person already has access.",
+  "shareWithPeopleNotOnEnte": "Share with people not on Ente",
+  "shareYourAlbumLink": "Share your album link",
+  "albumAlreadyHasPublicLink": "This album already has a public link",
+  "removePersonTitle": "Remove {name}?",
+  "@removePersonTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removePersonBody": "{count, plural, =0{They lose access to this album straight away.} one{They lose access to this album straight away. The {count} photo they added will be removed.} other{They lose access to this album straight away. The {count} photos they added will be removed.}}",
+  "@removePersonBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "leaveAlbumTitle": "Leave {album}?",
+  "@leaveAlbumTitle": {
+    "placeholders": {
+      "album": {
+        "type": "String"
+      }
+    }
+  },
+  "leaveAlbumBody": "{count, plural, =0{You will lose access to this album straight away.} one{They will lose access to the {count} photo you added.} other{They will lose access to the {count} photos you added.}}",
+  "@leaveAlbumBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notEnoughStorageTitle": "Not enough storage",
+  "notEnoughStorageBody": "You do not have enough free space on Ente to add new photos. Free up space or upgrade to keep adding."
 }
