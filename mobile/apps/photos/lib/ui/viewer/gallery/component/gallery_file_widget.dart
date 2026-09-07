@@ -317,6 +317,7 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
         selectedIndex,
         widget.tag,
         isLocalOnlyContext: isLocalOnlyContext,
+        showGalleryFilmstrip: true,
         galleryType: galleryType,
       ),
     );

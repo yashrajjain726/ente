@@ -2980,6 +2980,22 @@
   "photoLibraryAddPermissionRequired": "Ente needs permission to save photos and videos to Apple Photos. You can allow access in Settings.",
   "photoLibraryAddPermissionRestricted": "Photo Library access is restricted on this device.",
   "photoOrder": "Photo order",
+  "photoViewerFilmstripLabel": "Photo chooser",
+  "@photoViewerFilmstripLabel": {
+    "description": "Accessibility label for the thumbnail filmstrip in the photo viewer"
+  },
+  "photoViewerFilmstripPosition": "Photo {current} of {total}",
+  "@photoViewerFilmstripPosition": {
+    "description": "Accessibility position within the thumbnail filmstrip in the photo viewer",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "photos": "Photos",
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Photos added by you will be removed from the album",
   "photosAndVideosCount": "{count, plural, one{{formattedCount} photo & video} other{{formattedCount} photos & videos}}",

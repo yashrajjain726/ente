@@ -97,6 +97,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     }
 
     pauseVideoSubscription = Bus.instance.on<PauseVideoEvent>().listen((event) {
+      if (event.fileTag != null && event.fileTag != widget.file.tag) return;
       player.pause();
     });
     resumeVideoSubscription = Bus.instance.on<ResumeVideoEvent>().listen((

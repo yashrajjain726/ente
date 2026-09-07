@@ -137,6 +137,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     }
 
     pauseVideoSubscription = Bus.instance.on<PauseVideoEvent>().listen((event) {
+      if (event.fileTag != null && event.fileTag != widget.file.tag) return;
       _controller?.pause();
     });
     resumeVideoSubscription = Bus.instance.on<ResumeVideoEvent>().listen((
@@ -469,10 +470,21 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                             Positioned.fill(child: _getLoadingWidget()),
                           widget.isFromMemories
                               ? const SizedBox.shrink()
-                              : Positioned(
-                                  bottom: kVideoProgressRowBottomInset,
-                                  right: 0,
-                                  left: 0,
+                              : ValueListenableBuilder<double>(
+                                  valueListenable:
+                                      galleryBottomControlsAdditionalInsetListenable(
+                                        context,
+                                      ),
+                                  builder:
+                                      (context, additionalBottomInset, child) =>
+                                          Positioned(
+                                            bottom:
+                                                kVideoProgressRowBottomInset +
+                                                additionalBottomInset,
+                                            right: 0,
+                                            left: 0,
+                                            child: child!,
+                                          ),
                                   child: SafeArea(
                                     top: false,
                                     left: false,
@@ -489,12 +501,27 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                 ),
                           widget.isFromMemories
                               ? const SizedBox.shrink()
-                              : Positioned(
-                                  bottom: videoStreamControlBottomInset(
-                                    widget.file.caption?.isNotEmpty ?? false,
-                                  ),
-                                  right: 0,
-                                  left: 0,
+                              : ValueListenableBuilder<double>(
+                                  valueListenable:
+                                      galleryBottomControlsAdditionalInsetListenable(
+                                        context,
+                                      ),
+                                  builder:
+                                      (
+                                        context,
+                                        additionalBottomInset,
+                                        child,
+                                      ) => Positioned(
+                                        bottom: videoStreamControlBottomInset(
+                                          widget.file.caption?.isNotEmpty ??
+                                              false,
+                                          additionalBottomInset:
+                                              additionalBottomInset,
+                                        ),
+                                        right: 0,
+                                        left: 0,
+                                        child: child!,
+                                      ),
                                   child: SafeArea(
                                     top: false,
                                     left: false,
