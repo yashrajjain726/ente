@@ -1329,6 +1329,7 @@ const Preferences: React.FC<PreferencesProps> = ({
                                                             ? 0
                                                             : 2,
                                                     maximumFractionDigits: 2,
+                                                    roundingMode: "trunc",
                                                 },
                                             },
                                         })}
