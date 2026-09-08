@@ -26,6 +26,7 @@ import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -35,8 +36,8 @@ import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
 const textBase = spaceText;
-const rowBackground = "#F7F7F7";
-const rowHover = "#F0F0F0";
+const rowBackground = spaceSurface;
+const rowHover = spaceSurfaceHover;
 const dangerColor = "#F63A3A";
 const iconMuted = spaceTextMuted;
 const textLight = spaceTextMuted;
@@ -256,7 +257,7 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
                     <Box
                         aria-hidden
                         sx={{
-                            bgcolor: toggleState ? green : "#D6D6D6",
+                            bgcolor: toggleState ? green : spaceSurfaceHover,
                             borderRadius: "999px",
                             height: 24,
                             p: "2px",
@@ -829,7 +830,7 @@ export const ChangeNameSettingsScreen: React.FC<
                                 bgcolor: green,
                                 border: 0,
                                 borderRadius: "20px",
-                                color: "white",
+                                color: spaceOnAccent,
                                 cursor: canSave ? "pointer" : "default",
                                 display: "flex",
                                 fontFamily:

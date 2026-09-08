@@ -14,11 +14,7 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
-import {
-    SpaceHomeHeader,
-    spaceHomeHeaderChromeColor,
-    spaceHomeHeaderHeight,
-} from "components/HomeHeader";
+import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
 import {
     SpacePostBadge,
@@ -40,7 +36,14 @@ import {
     type SpacePostAssetURLLoader,
     type SpaceProfilePostPage,
 } from "services/space";
-import { spaceAppBackground, spaceText, spaceTextMuted } from "styles/colors";
+import {
+    spaceAppBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { firstNameFrom } from "utils/display";
 import {
     homeTileGridLayout,
@@ -62,9 +65,10 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 const green = "#08C225";
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
-const avatarFallbackColor = "#888888";
+const avatarFallbackColor = spaceSurfaceHover;
 const avatarFallbackTextColor = "#FFFFFF";
-const mediaPlaceholderColor = spaceHomeHeaderChromeColor;
+const mediaPlaceholderColor = spaceSurface;
+const tileBadgeBackground = "#343438";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
@@ -382,7 +386,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     const twoTileRequestUsernameTop =
         twoTileRequestActionTop === undefined
             ? undefined
-            : twoTileRequestActionTop - twoTileRequestUsernameGap;
+            : Math.max(28, twoTileRequestActionTop - twoTileRequestUsernameGap);
 
     const hasMediaToLoad =
         isAvatarPending || Boolean(post && !postUnavailable && !imageUrl);
@@ -619,8 +623,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         showFriendRequestDetails
                     ) && (
                         <SpacePostBadge
-                            backgroundColor="rgba(255, 255, 255, 0.82)"
-                            color="#5A5A5A"
+                            backgroundColor={tileBadgeBackground}
+                            color={textBase}
                             placement="center"
                         >
                             {friendRequestDirection == "sent"
@@ -636,7 +640,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                             component="span"
                             title={`@${friend.username}’s posts will appear here`}
                             sx={{
-                                bgcolor: "#FFFFFF",
+                                bgcolor: tileBadgeBackground,
                                 borderRadius: "999px",
                                 boxSizing: "border-box",
                                 color: textSecondary,
@@ -675,8 +679,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     )}
                 {!isLoading && postUnavailable && (
                     <SpacePostBadge
-                        backgroundColor="rgba(255, 255, 255, 0.82)"
-                        color={textSecondary}
+                        backgroundColor={tileBadgeBackground}
+                        color={textBase}
                     >
                         Unavailable
                     </SpacePostBadge>
@@ -759,25 +763,26 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         aria-hidden
                         title={`@${friend.username}`}
                         sx={{
-                            alignItems: "center",
-                            bgcolor: "#FFFFFF",
+                            bgcolor: tileBadgeBackground,
                             borderRadius: "999px",
                             boxSizing: "border-box",
                             color: textBase,
-                            display: "inline-flex",
+                            display: "block",
                             fontFamily: '"Nunito", sans-serif',
                             fontSize: requestUsernameTextSize,
                             fontWeight: 800,
                             height: showFriendRequestDetails ? undefined : 24,
-                            justifyContent: "center",
                             left: "50%",
-                            lineHeight: 1,
-                            maxWidth: "84%",
+                            lineHeight: showFriendRequestDetails
+                                ? "20px"
+                                : "24px",
+                            maxWidth: "88%",
                             overflow: "hidden",
                             position: "absolute",
-                            px: showFriendRequestDetails ? "11px" : "10px",
+                            px: showFriendRequestDetails ? "11px" : "6px",
                             py: showFriendRequestDetails ? "6px" : 0,
                             textOverflow: "ellipsis",
+                            textAlign: "center",
                             top: isTwoTileLayout
                                 ? twoTileRequestUsernameTop
                                 : showFriendRequestDetails
@@ -841,7 +846,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 border: 0,
                                 borderRadius: `${requestActionSize / 2}px`,
                                 boxSizing: "border-box",
-                                color: "#FFFFFF",
+                                color: spaceOnAccent,
                                 cursor: isFriendRequestActionBusy
                                     ? "default"
                                     : "pointer",
@@ -890,11 +895,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 }
                                 sx={{
                                     alignItems: "center",
-                                    bgcolor: "#E8E8E8",
+                                    bgcolor: spaceSurfaceHover,
                                     border: 0,
                                     borderRadius: `${requestActionSize / 2}px`,
                                     boxSizing: "border-box",
-                                    color: "#5A5A5A",
+                                    color: textBase,
                                     cursor: isFriendRequestActionBusy
                                         ? "default"
                                         : "pointer",
@@ -914,7 +919,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                     },
                                     "&:hover": isFriendRequestActionBusy
                                         ? undefined
-                                        : { bgcolor: "#DEDEDE" },
+                                        : { bgcolor: "#48484E" },
                                 }}
                             >
                                 {friendRequestAction == "discard" ? (
@@ -1841,10 +1846,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             >
                                 {emptyFriendTileSize > 0 && (
                                     <Box
-                                        className="green-bg"
                                         sx={{
                                             alignItems: "flex-start",
-                                            bgcolor: green,
+                                            bgcolor: spaceSurface,
                                             border: 0,
                                             borderRadius: "24px",
                                             boxSizing: "border-box",
@@ -1914,7 +1918,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             <Box sx={{ mt: "24px" }}>
                                                 <SpaceShareInviteButton
                                                     profileLink={profileLink}
-                                                    variant="white"
+                                                    variant="secondary"
                                                     onShareError={(error) =>
                                                         log.error(
                                                             "Failed to share Space invite link",

@@ -18,6 +18,8 @@ import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
 import {
     spaceDialogBackground,
+    spaceOnAccent,
+    spaceSurface,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -286,7 +288,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                             bgcolor: green,
                             border: 0,
                             borderRadius: "14px",
-                            color: "#FFFFFF",
+                            color: spaceOnAccent,
                             cursor: actionDisabled ? "default" : "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -577,7 +579,7 @@ export const SpacePWAInstallInstructions: React.FC<
                         bgcolor: green,
                         border: 0,
                         borderRadius: "20px",
-                        color: "#FFFFFF",
+                        color: spaceOnAccent,
                         cursor: "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -592,7 +594,7 @@ export const SpacePWAInstallInstructions: React.FC<
                         width: "100%",
                         "&:active": { filter: "brightness(0.96)" },
                         "&:focus-visible": {
-                            outline: "2px solid rgba(0 0 0 / 0.72)",
+                            outline: `2px solid ${spaceText}`,
                             outlineOffset: 2,
                         },
                         "&:hover": { filter: "brightness(0.98)" },
@@ -609,7 +611,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: "#FAFAFA",
+            bgcolor: spaceSurface,
             borderRadius: "18px",
             color: textSoft,
             display: "flex",

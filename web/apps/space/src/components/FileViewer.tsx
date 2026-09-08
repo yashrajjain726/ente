@@ -1812,6 +1812,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             }}
                         />
                         <Box
+                            className="green-bg"
                             component="button"
                             type="button"
                             aria-label={
@@ -1826,12 +1827,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             onPointerDown={handleInputActionPointerDown}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#FFFFFF",
+                                bgcolor: green,
                                 border: 0,
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color: "#111111",
+                                color: "#FFFFFF",
                                 cursor: isDraftPostPublishDisabled
                                     ? "default"
                                     : "pointer",
@@ -1853,9 +1854,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     outlineOffset: 2,
                                 },
                                 "&:hover": {
-                                    bgcolor: isDraftPostPublishDisabled
-                                        ? "#FFFFFF"
-                                        : "#F0F0F0",
+                                    filter: isDraftPostPublishDisabled
+                                        ? undefined
+                                        : "brightness(0.96)",
                                 },
                             }}
                         >
@@ -1965,12 +1966,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             onClick={updateCaption}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#FFFFFF",
+                                bgcolor: controlBackground,
                                 border: 0,
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color: "#111111",
+                                color: textBase,
                                 cursor: isCaptionUpdateDisabled
                                     ? "default"
                                     : "pointer",
@@ -1997,8 +1998,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 },
                                 "&:hover": {
                                     bgcolor: isCaptionUpdateDisabled
-                                        ? "#FFFFFF"
-                                        : "#F0F0F0",
+                                        ? controlBackground
+                                        : controlBackgroundHover,
                                 },
                             }}
                         >
@@ -2192,13 +2193,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     animation: isPhotoLikePopping
                                         ? `${spacePostLikeButtonPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
                                         : undefined,
-                                    bgcolor:
-                                        isReplyMode && canSendReply
-                                            ? "#FFFFFF"
-                                            : controlBackground,
+                                    bgcolor: controlBackground,
                                     color:
                                         isReplyMode && canSendReply
-                                            ? "#111111"
+                                            ? textBase
                                             : controlIcon,
                                     cursor:
                                         isReplyMode && !canSendReply
@@ -2211,7 +2209,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     "&:hover": {
                                         bgcolor: isReplyMode
                                             ? canSendReply
-                                                ? "#F0F0F0"
+                                                ? controlBackgroundHover
                                                 : controlBackground
                                             : controlBackgroundHover,
                                     },
@@ -2291,7 +2289,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             )}
             {canDeletePost && (
                 <ConfirmationActionSheet
-                    appearance="dark"
                     open={deleteSheetOpen}
                     title="Are you sure you want to delete this?"
                     confirmLabel="Yes, delete"
@@ -2305,7 +2302,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             )}
             {canAddFriendForPostAction && (
                 <ConfirmationActionSheet
-                    appearance="dark"
                     open={addFriendSheetOpen}
                     title={
                         addFriendIntent == "like"

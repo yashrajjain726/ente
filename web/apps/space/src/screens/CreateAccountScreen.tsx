@@ -8,6 +8,7 @@ import {
 import React, { useId, useMemo, useState } from "react";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -18,7 +19,7 @@ const green = "#08C225";
 const textBase = spaceText;
 const textLight = spaceTextMuted;
 const warning = "#F63A3A";
-const caution = "#B65F00";
+const caution = "#E9A64D";
 const createAccountFormID = "space-create-account-form";
 
 const passwordStrengthLabels: Record<PasswordStrength, string> = {
@@ -528,7 +529,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                                     acceptedTerms ? green : textLight
                                 }`,
                                 borderRadius: "4px",
-                                color: "white",
+                                color: spaceOnAccent,
                                 display: "flex",
                                 flexShrink: 0,
                                 height: 16,
@@ -630,7 +631,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                             border: 0,
                             borderRadius: "20px",
                             color: isCreateAccountButtonActive
-                                ? "white"
+                                ? spaceOnAccent
                                 : textLight,
                             cursor: canCreateAccount ? "pointer" : "default",
                             display: "flex",

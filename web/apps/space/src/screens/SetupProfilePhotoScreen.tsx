@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -380,7 +381,7 @@ export const SetupProfilePhotoScreen: React.FC<
                             bgcolor: green,
                             border: 0,
                             borderRadius: "20px",
-                            color: "white",
+                            color: spaceOnAccent,
                             cursor: canAddPicture ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

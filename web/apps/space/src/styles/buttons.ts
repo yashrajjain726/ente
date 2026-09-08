@@ -1,3 +1,4 @@
+import { spaceOnAccent } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
@@ -9,7 +10,7 @@ export const spaceEmptyStateButtonSx = {
     border: 0,
     borderRadius: "18px",
     boxSizing: "border-box",
-    color: "#FFF",
+    color: spaceOnAccent,
     cursor: "pointer",
     display: "inline-flex",
     fontFamily: '"Inter Variable", Inter, sans-serif',

@@ -33,6 +33,7 @@ import {
     spaceAppBackground,
     spaceAppBackgroundColor,
     spaceDialogBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -47,18 +48,16 @@ const green = "#08C225";
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
 const conversationPrimaryText = spaceText;
-const lightSurface = spaceSurface;
-const lightSurfaceHover = spaceSurfaceHover;
-const composerSurface = lightSurface;
-const outgoingBubble = "#0DAF35";
-const incomingBubble = lightSurface;
+const composerSurface = spaceSurface;
+const outgoingBubble = "#176B2A";
+const incomingBubble = spaceSurface;
 const outgoingMessageText = "#FFFFFF";
 const incomingMessageText = spaceText;
-const outgoingQuoteBubble = "#9EDFAE";
+const outgoingQuoteBubble = "#124F21";
 const incomingQuoteBubble = spaceSurfaceHover;
 const incomingQuoteText = spaceTextMuted;
-const outgoingQuoteText = "#176B2A";
-const quoteRule = "#D6D6D6";
+const outgoingQuoteText = "#C7E8CE";
+const quoteRule = "#666666";
 const dangerColor = "#F63A3A";
 const composerHeight = 48;
 const composerMaxHeight = 112;
@@ -584,7 +583,7 @@ const ConversationListItem: React.FC<{
                                 bgcolor: dangerColor,
                                 borderRadius: "8px",
                                 boxShadow: `0 0 0 2px ${spaceAppBackgroundColor}`,
-                                color: "#FFFFFF",
+                                color: spaceOnAccent,
                                 display: "inline-flex",
                                 flexShrink: 0,
                                 fontFamily:
@@ -766,7 +765,7 @@ const ConversationListItem: React.FC<{
                             bgcolor: green,
                             border: 0,
                             borderRadius: "16px",
-                            color: "#FFFFFF",
+                            color: spaceOnAccent,
                             cursor: "pointer",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
@@ -798,7 +797,7 @@ const ConversationListItem: React.FC<{
                                 bgcolor: green,
                                 border: 0,
                                 borderRadius: "12px",
-                                color: "white",
+                                color: spaceOnAccent,
                                 cursor: "pointer",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
@@ -828,7 +827,7 @@ const ConversationListItem: React.FC<{
                                 justifyContent: "center",
                                 p: 0,
                                 width: 34,
-                                "&:hover": { bgcolor: "#F1F1F1" },
+                                "&:hover": { bgcolor: spaceSurfaceHover },
                             }}
                         >
                             <HugeiconsIcon
@@ -1072,14 +1071,14 @@ const MessageActionMenuItem: React.FC<{
             py: "7px",
             "&.Mui-focusVisible": {
                 bgcolor:
-                    tone == "danger" ? "rgba(246, 58, 58, 0.14)" : lightSurface,
+                    tone == "danger" ? "rgba(246, 58, 58, 0.14)" : spaceSurface,
                 outline: 0,
             },
             "&:focus": { outline: 0 },
             "&:focus-visible": { outline: 0 },
             "&:hover": {
                 bgcolor:
-                    tone == "danger" ? "rgba(246, 58, 58, 0.14)" : lightSurface,
+                    tone == "danger" ? "rgba(246, 58, 58, 0.14)" : spaceSurface,
             },
         }}
     >
@@ -1162,7 +1161,7 @@ const FriendAddedSystemMessage: React.FC = () => (
     <Box
         sx={{
             alignSelf: "center",
-            bgcolor: lightSurface,
+            bgcolor: spaceSurface,
             borderRadius: "999px",
             color: textSecondary,
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1618,7 +1617,7 @@ const MessageBubble: React.FC<{
                                 "&:hover": {
                                     bgcolor: isOwn
                                         ? outgoingBubble
-                                        : lightSurfaceHover,
+                                        : spaceSurfaceHover,
                                 },
                             }}
                         >
@@ -2790,11 +2789,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 alignItems: "center",
                                                 bgcolor: canSend
                                                     ? green
-                                                    : lightSurface,
+                                                    : spaceSurface,
                                                 border: 0,
                                                 borderRadius: "50%",
                                                 color: canSend
-                                                    ? "#FFFFFF"
+                                                    ? spaceOnAccent
                                                     : "#BDBDBD",
                                                 cursor: canSend
                                                     ? "pointer"
@@ -2819,7 +2818,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 "&:hover": {
                                                     bgcolor: canSend
                                                         ? "#07AE22"
-                                                        : lightSurface,
+                                                        : spaceSurface,
                                                 },
                                             }}
                                         >

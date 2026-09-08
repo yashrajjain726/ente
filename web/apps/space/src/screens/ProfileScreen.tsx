@@ -41,6 +41,7 @@ import {
     spaceAppBackgroundColor,
     spaceDialogBackground,
     spaceSurface,
+    spaceSurfaceHover,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -62,7 +63,7 @@ const dangerColor = "#F63A3A";
 const textBase = spaceText;
 const textSoft = spaceTextMuted;
 const coverForeground = "#FFFFFF";
-const profileIdentityColor = "#303030";
+const profileIdentityColor = spaceText;
 const profileStatsColor = spaceTextMuted;
 const profileStatsValueColor = spaceText;
 const profileCoverBackground = "#1F1F1F";
@@ -283,10 +284,10 @@ const PublicProfileActionButton: React.FC<PublicProfileActionButtonProps> = ({
         sx={{
             alignItems: "center",
             appearance: "none",
-            bgcolor: "#FFF",
+            bgcolor: spaceSurface,
             border: 0,
             borderRadius: "14px",
-            color: "#000",
+            color: spaceText,
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             flexShrink: 0,
@@ -298,7 +299,7 @@ const PublicProfileActionButton: React.FC<PublicProfileActionButtonProps> = ({
             lineHeight: "18px",
             px: "14px",
             py: "8px",
-            "&:hover": { bgcolor: disabled ? "#FFF" : "#F4F4F4" },
+            "&:hover": { bgcolor: disabled ? spaceSurface : spaceSurfaceHover },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
@@ -1722,15 +1723,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 whiteSpace: "nowrap",
                                                 "&.Mui-focusVisible": {
                                                     bgcolor:
-                                                        "rgba(246, 58, 58, 0.06)",
+                                                        "rgba(246, 58, 58, 0.14)",
                                                 },
                                                 "&:active": {
                                                     bgcolor:
-                                                        "rgba(246, 58, 58, 0.06)",
+                                                        "rgba(246, 58, 58, 0.14)",
                                                 },
                                                 "&:hover": {
                                                     bgcolor:
-                                                        "rgba(246, 58, 58, 0.06)",
+                                                        "rgba(246, 58, 58, 0.14)",
                                                 },
                                             }}
                                         >
