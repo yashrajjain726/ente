@@ -32,10 +32,7 @@ import {
     normalizeSpaceUsername,
     spaceUsernameValidationError,
 } from "services/profile";
-import {
-    isSpaceFriendLimitError,
-    type SpaceFriendRequest,
-} from "services/space";
+import type { SpaceFriendRequest } from "services/space";
 import {
     spaceAppBackground,
     spaceDialogBackground,
@@ -45,6 +42,10 @@ import {
     spaceTextMuted,
 } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
+import {
+    friendRequestErrorMessage,
+    isSpaceFriendLimitError,
+} from "utils/friend-errors";
 import {
     maximumSpaceFriendCount,
     spaceFriendLimitMessage,
@@ -629,30 +630,6 @@ interface AddFriendSheetProps {
     open: boolean;
     username: string;
 }
-
-const friendRequestErrorMessage = (error: unknown, username: string) => {
-    if (isSpaceFriendLimitError(error)) return spaceFriendLimitMessage;
-    if (!error || typeof error != "object") {
-        return "Couldn't send the friend request. Please try again.";
-    }
-
-    const { message, status } = error as {
-        message?: unknown;
-        status?: unknown;
-    };
-    if (status == 404) return `No Space profile found for @${username}.`;
-    if (
-        status == 400 &&
-        typeof message == "string" &&
-        message.includes("cannot add yourself")
-    ) {
-        return "You can't add yourself as a friend.";
-    }
-    if (status == 409) {
-        return `@${username} can't receive more friend requests right now.`;
-    }
-    return "Couldn't send the friend request. Please try again.";
-};
 
 const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
     friendRequests,

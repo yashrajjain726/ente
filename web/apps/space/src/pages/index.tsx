@@ -26,7 +26,6 @@ import {
     type SpaceInviteRoute,
 } from "services/invite";
 import {
-    isSpaceFriendLimitError,
     loadCurrentSpaceRelationship,
     loadPublicSpaceIdentity,
     openPublicSpaceLink,
@@ -37,6 +36,7 @@ import {
 } from "services/space";
 import { useSpaceAppState, type OnboardingEntrySource } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
+import { isSpaceFriendLimitError } from "utils/friend-errors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";

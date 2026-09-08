@@ -11,8 +11,6 @@ import {
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
-    isFriendRequestCanceledError,
-    isSpaceFriendLimitError,
     loadCurrentMessageActivityPostPreview,
     loadCurrentMessageConversationAvatar,
     loadCurrentMessageConversations,
@@ -29,6 +27,10 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
+import {
+    isFriendRequestCanceledError,
+    isSpaceFriendLimitError,
+} from "utils/friend-errors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
