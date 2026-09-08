@@ -12,9 +12,9 @@ void main() {
     applyMediaTypeMetadata(file, true, 1234);
     expect(file.pubMagicMetadata!.mediaType, 3);
     expect(file.pubMagicMetadata!.mvi, 1234);
-    applyMediaTypeMetadata(file, false, 0);
+    applyMediaTypeMetadata(file, false, null);
     expect(file.pubMagicMetadata!.mediaType, 2);
-    expect(file.pubMagicMetadata!.mvi, 0);
+    expect(file.pubMagicMetadata!.mvi, isNull);
     expect(file.pubMagicMetadata!.caption, "Keep me");
   });
 

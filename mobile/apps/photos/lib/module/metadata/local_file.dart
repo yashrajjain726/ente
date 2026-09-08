@@ -38,7 +38,7 @@ void applyDisplayDimensions(EnteFile file, int width, int height) {
 void applyMediaTypeMetadata(
   EnteFile file,
   bool isPanorama,
-  int motionVideoIndex,
+  int? motionVideoIndex,
 ) {
   file.pubMmdEncodedJson = jsonEncode({
     ...jsonDecode(file.pubMmdEncodedJson ?? '{}') as Map<String, dynamic>,

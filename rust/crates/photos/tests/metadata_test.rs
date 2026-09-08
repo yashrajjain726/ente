@@ -36,6 +36,8 @@ fn skips_partial_and_sentinel_capture_dates_and_continues_to_fallbacks() {
         ("2004-06-15", true),
         ("2004-06-15T12:30Z", true),
         ("1970-01-01T00:00:00Z", true),
+        ("1970-01-01T00:00:00", true),
+        ("1970-01-01T00:00:01", false),
         ("1970-01-01T05:30:00+05:30", true),
         ("4501-01-01T00:00:00.000Z", true),
         ("4501-01-01T00:00:00+05:30", true),

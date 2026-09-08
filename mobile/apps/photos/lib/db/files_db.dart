@@ -1246,7 +1246,8 @@ class FilesDB with SqlDbBase {
             heightKey: dimensions.height,
           },
           mediaTypeKey: ?mediaType,
-          motionVideoIndexKey: ?motionVideoIndex,
+          if (mediaType != null || motionVideoIndex != null)
+            motionVideoIndexKey: motionVideoIndex,
         }),
         processingVersion,
         localID,

@@ -125,7 +125,7 @@ class OfflineImportMetadataService {
         applyMediaTypeMetadata(
           file,
           metadata.isPanorama,
-          metadata.motionVideoStart?.toInt() ?? 0,
+          metadata.motionVideoStart?.toInt(),
         );
       }
 

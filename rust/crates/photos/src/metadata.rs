@@ -22,6 +22,7 @@ pub fn read_photo_metadata(path: impl AsRef<Path>) -> Result<PhotoMetadata, Erro
         capture_date_time: metadata.capture_date_time_with(|date| {
             date.precision == DateTimePrecision::Second
                 && date.timestamp_micros != Some(0)
+                && !(date.offset_time.is_none() && date.date_time == "1970-01-01T00:00:00")
                 && date.date_time != "4501-01-01T00:00:00"
         }),
         location: metadata.exif_location().or_else(|| metadata.xmp_location()),

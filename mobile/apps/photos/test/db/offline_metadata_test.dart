@@ -73,6 +73,23 @@ void main() {
       );
       expect(rows.last[FilesDB.columnMetadataVersion], 1);
 
+      await files.updateOfflineImportMetadataForLocalID(
+        "local",
+        processingVersion: 3,
+        modificationTime: 100,
+        mediaType: 0,
+      );
+      final unknown = await db.getAll(
+        'SELECT * FROM ${FilesDB.filesTable} WHERE ${FilesDB.columnUploadedFileID} = -1',
+      );
+      for (final row in unknown) {
+        final metadata = jsonDecode(
+          row[FilesDB.columnPubMMdEncodedJson] as String,
+        );
+        expect(metadata.containsKey('mvi'), isFalse);
+        expect(metadata['mediaType'], 0);
+      }
+
       final edited = EnteFile()
         ..localID = "local"
         ..modificationTime = 200;
