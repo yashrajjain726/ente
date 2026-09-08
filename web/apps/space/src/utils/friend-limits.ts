@@ -1,3 +1,3 @@
-export const maximumSpaceFriendCount = 12;
+export const maximumSpaceFriendCount = 9;
 
-export const spaceFriendLimitMessage = "You've filled all 12 friend spots.";
+export const spaceFriendLimitMessage = "You've filled all 9 friend spots.";
