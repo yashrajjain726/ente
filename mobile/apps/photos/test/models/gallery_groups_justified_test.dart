@@ -12,6 +12,7 @@ import "package:photos/models/gallery/fixed_extent_section_layout.dart";
 import "package:photos/models/gallery/gallery_groups.dart";
 import "package:photos/models/gallery/justified_grid_row.dart";
 import "package:photos/models/gallery/justified_layout.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
@@ -47,6 +48,9 @@ void main() {
 
   setUp(() async {
     await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
+    await localSettings.setJustifiedLayoutStrategy(
+      JustifiedLayoutStrategy.comfort,
+    );
     await localSettings.setPhotoGridSize(4);
   });
 
@@ -127,6 +131,32 @@ void main() {
         expectedSectionOffset = justifiedSection.maxOffset;
       }
     }
+  });
+
+  test("routes justified galleries through the selected strategy", () async {
+    final files = List.generate(
+      4,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: 9,
+        height: 16,
+      ),
+    );
+    await localSettings.setPhotoGridSize(2);
+    GalleryGroups groups() => _galleryGroups(
+      files: files,
+      groupType: GroupType.none,
+      groupHeaderExtent: GalleryGroups.spacing,
+      widthAvailable: 402,
+    );
+    final comfort = groups().groupLayouts.single as JustifiedSectionLayout;
+    expect(comfort.rows.map((row) => row.itemWidths.length), [2, 2]);
+    await localSettings.setJustifiedLayoutStrategy(
+      JustifiedLayoutStrategy.flex,
+    );
+    final flex = groups().groupLayouts.single as JustifiedSectionLayout;
+    expect(flex.rows.single.itemWidths, hasLength(4));
   });
 
   test(
@@ -313,28 +343,37 @@ void main() {
     expect(groups.getOffsetOfFile(replacement), originalGeometry?.rowOffset);
   });
 
-  test("a layout override keeps an embedded gallery on the fixed grid", () {
-    final files = List<EnteFile>.generate(
-      12,
-      (index) => _file(
-        index: index,
-        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
-        width: 400,
-        height: 100,
-      ),
-      growable: false,
-    );
+  test(
+    "a layout override keeps an embedded gallery on the fixed grid",
+    () async {
+      await localSettings.setJustifiedLayoutStrategy(
+        JustifiedLayoutStrategy.flex,
+      );
+      final files = List<EnteFile>.generate(
+        12,
+        (index) => _file(
+          index: index,
+          creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+          width: 400,
+          height: 100,
+        ),
+        growable: false,
+      );
 
-    final groups = _galleryGroups(
-      files: files,
-      groupType: GroupType.none,
-      groupHeaderExtent: GalleryGroups.spacing,
-      layoutTypeOverride: GalleryLayoutType.grid,
-    );
+      final groups = _galleryGroups(
+        files: files,
+        groupType: GroupType.none,
+        groupHeaderExtent: GalleryGroups.spacing,
+        layoutTypeOverride: GalleryLayoutType.grid,
+      );
 
-    expect(groups.layoutType, GalleryLayoutType.grid);
-    expect(groups.groupLayouts, everyElement(isA<FixedExtentSectionLayout>()));
-  });
+      expect(groups.layoutType, GalleryLayoutType.grid);
+      expect(
+        groups.groupLayouts,
+        everyElement(isA<FixedExtentSectionLayout>()),
+      );
+    },
+  );
 }
 
 GalleryGroups _galleryGroups({

@@ -1,0 +1,10 @@
+import "package:ente_strings/ente_strings.dart";
+import "package:flutter/widgets.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
+
+extension JustifiedLayoutStrategyLabel on JustifiedLayoutStrategy {
+  String label(BuildContext context) => switch (this) {
+    JustifiedLayoutStrategy.comfort => context.strings.layoutJustifiedComfort,
+    JustifiedLayoutStrategy.flex => context.strings.layoutJustifiedFlex,
+  };
+}

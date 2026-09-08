@@ -6,9 +6,11 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/gallery_layout_changed_event.dart";
 import "package:photos/events/hide_shared_items_from_home_gallery_event.dart";
 import "package:photos/models/gallery/gallery_layout_config.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
+import "package:photos/ui/viewer/gallery/justified_layout_strategy_label.dart";
 
 class GallerySettingsScreen extends StatefulWidget {
   final bool fromGalleryLayoutSettingsCTA;
@@ -23,6 +25,7 @@ class GallerySettingsScreen extends StatefulWidget {
 
 class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
   late GalleryLayoutType _layoutType;
+  late JustifiedLayoutStrategy _justifiedStrategy;
   late int _photoGridSize;
   late GroupType _groupType;
 
@@ -33,6 +36,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
       localSettings.getGalleryLayoutType(),
     );
     _photoGridSize = localSettings.getPhotoGridSize();
+    _justifiedStrategy = localSettings.getJustifiedLayoutStrategy();
     _groupType = localSettings.getGalleryGroupType();
   }
 
@@ -48,7 +52,7 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
             title: l10n.layout,
             trailing: _trailingLabel(
               context,
-              _layoutTypeLabel(context, _layoutType),
+              _layoutTypeLabel(context, _layoutType, _justifiedStrategy),
             ),
             onTap: () async => _showLayoutTypeSheet(context),
           ),
@@ -101,10 +105,14 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
     );
   }
 
-  String _layoutTypeLabel(BuildContext context, GalleryLayoutType layoutType) {
+  String _layoutTypeLabel(
+    BuildContext context,
+    GalleryLayoutType layoutType,
+    JustifiedLayoutStrategy? strategy,
+  ) {
     return switch (layoutType) {
       GalleryLayoutType.grid => context.strings.grid,
-      GalleryLayoutType.justified => context.strings.layoutJustified,
+      GalleryLayoutType.justified => strategy!.label(context),
     };
   }
 
@@ -117,18 +125,24 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
         title: l10n.layout,
         content: MenuGroupComponent(
           items: [
-            for (final layoutType in GalleryLayoutType.values)
+            for (final (layoutType, strategy) in [
+              (GalleryLayoutType.grid, null),
+              for (final strategy in JustifiedLayoutStrategy.values)
+                (GalleryLayoutType.justified, strategy),
+            ])
               MenuComponent(
-                key: ValueKey(layoutType),
-                title: _layoutTypeLabel(sheetContext, layoutType),
-                trailing: _layoutType == layoutType
+                key: ValueKey((layoutType, strategy)),
+                title: _layoutTypeLabel(sheetContext, layoutType, strategy),
+                trailing:
+                    _layoutType == layoutType &&
+                        (strategy == null || _justifiedStrategy == strategy)
                     ? Icon(
                         Icons.check,
                         color: sheetContext.componentColors.primary,
                       )
                     : null,
                 onTap: () async {
-                  await _setLayoutType(layoutType);
+                  await _setLayoutType(layoutType, strategy);
                   if (sheetContext.mounted) {
                     Navigator.of(sheetContext).pop();
                   }
@@ -140,16 +154,27 @@ class _GallerySettingsScreenState extends State<GallerySettingsScreen> {
     );
   }
 
-  Future<void> _setLayoutType(GalleryLayoutType layoutType) async {
+  Future<void> _setLayoutType(
+    GalleryLayoutType layoutType,
+    JustifiedLayoutStrategy? strategy,
+  ) async {
     if (layoutType == GalleryLayoutType.justified &&
         !isJustifiedLayoutAvailable) {
       return;
     }
-    if (localSettings.getGalleryLayoutType() == layoutType) return;
-    await localSettings.setGalleryLayoutType(layoutType);
+    if (localSettings.getGalleryLayoutType() == layoutType &&
+        (strategy == null ||
+            localSettings.getJustifiedLayoutStrategy() == strategy)) {
+      return;
+    }
+    await Future.wait([
+      localSettings.setGalleryLayoutType(layoutType),
+      if (strategy != null) localSettings.setJustifiedLayoutStrategy(strategy),
+    ]);
     if (mounted) {
       setState(() {
         _layoutType = layoutType;
+        if (strategy != null) _justifiedStrategy = strategy;
       });
     }
     Bus.instance.fire(GalleryLayoutChangedEvent());
