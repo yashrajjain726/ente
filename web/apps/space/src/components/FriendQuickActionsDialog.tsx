@@ -10,7 +10,13 @@ import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
-import { spaceDialogBackground, spaceSurface, spaceText } from "styles/colors";
+import {
+    spaceAppBackgroundColor,
+    spaceDialogBackground,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+} from "styles/colors";
 
 const actionHeight = 40;
 const dialogPadding = 12;
@@ -110,12 +116,14 @@ export const FriendQuickActionsDialog: React.FC<
             aria-labelledby={nameID}
             maxWidth={false}
             transitionDuration={prefersReducedMotion ? 0 : 220}
+            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.64)" }}
             slotProps={{
                 paper: {
                     ref: paperRef,
                     sx: {
-                        bgcolor: spaceDialogBackground,
-                        boxShadow: "none",
+                        bgcolor: spaceSurface,
+                        boxShadow:
+                            "0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px rgba(0, 0, 0, 0.48)",
                         borderRadius: `${dialogRadius}px`,
                         boxSizing: "border-box",
                         display: "flex",
@@ -169,7 +177,7 @@ export const FriendQuickActionsDialog: React.FC<
                 sx={{
                     alignSelf: "center",
                     aspectRatio: "1",
-                    bgcolor: spaceSurface,
+                    bgcolor: spaceAppBackgroundColor,
                     borderRadius: `${innerRadius}px`,
                     flexShrink: 0,
                     overflow: "hidden",
@@ -182,7 +190,7 @@ export const FriendQuickActionsDialog: React.FC<
                     aria-hidden
                     sx={{
                         background:
-                            "linear-gradient(rgba(0, 0, 0, 0.28), transparent 45%)",
+                            "linear-gradient(rgba(0, 0, 0, 0.52), transparent 55%)",
                         inset: 0,
                         pointerEvents: "none",
                         position: "absolute",
@@ -256,22 +264,27 @@ export const FriendQuickActionsDialog: React.FC<
                         sx={{
                             alignItems: "center",
                             appearance: "none",
-                            bgcolor: spaceSurface,
+                            bgcolor: action.active
+                                ? "#24412E"
+                                : spaceDialogBackground,
                             border: 0,
                             borderRadius: `${innerRadius}px`,
-                            color: spaceText,
+                            color: action.active
+                                ? "color(display-p3 0.0314 0.7608 0.1451)"
+                                : spaceText,
                             cursor: action.disabled ? "default" : "pointer",
                             display: "grid",
                             justifyItems: "center",
                             height: actionHeight,
                             minWidth: 0,
                             p: "0 8px",
-                            transition: "filter 120ms ease",
+                            transition:
+                                "background-color 120ms ease, color 120ms ease",
                             "&:hover:not(:disabled)": {
-                                filter: "brightness(0.96)",
+                                bgcolor: spaceSurfaceHover,
                             },
                             "&:active:not(:disabled)": {
-                                filter: "brightness(0.92)",
+                                bgcolor: spaceAppBackgroundColor,
                             },
                             "&:focus-visible": {
                                 outline: `2px solid ${spaceText}`,
@@ -284,7 +297,6 @@ export const FriendQuickActionsDialog: React.FC<
                             aria-hidden
                             sx={{
                                 alignItems: "center",
-                                color: action.active ? "#08C225" : spaceText,
                                 display: "flex",
                                 height: 24,
                                 justifyContent: "center",

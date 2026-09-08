@@ -27,6 +27,7 @@ import log from "ente-base/log";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import type { SpaceInviteIntent } from "services/invite";
+import { spaceDialogBackground, spaceTextMuted } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom, formatSpaceDate } from "utils/display";
 import { clampSpaceMessageText } from "utils/message-limits";
@@ -1812,7 +1813,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             }}
                         />
                         <Box
-                            className="green-bg"
                             component="button"
                             type="button"
                             aria-label={
@@ -1827,12 +1827,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             onPointerDown={handleInputActionPointerDown}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: green,
+                                bgcolor: "#FFFFFF",
                                 border: 0,
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color: "#FFFFFF",
+                                color: "#1C1C1E",
                                 cursor: isDraftPostPublishDisabled
                                     ? "default"
                                     : "pointer",
@@ -1966,12 +1966,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             onClick={updateCaption}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: controlBackground,
+                                bgcolor: "#FFFFFF",
                                 border: 0,
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color: textBase,
+                                color: "#1C1C1E",
                                 cursor: isCaptionUpdateDisabled
                                     ? "default"
                                     : "pointer",
@@ -1987,19 +1987,23 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 minWidth: 70,
                                 px: "20px",
                                 py: "10px",
-                                "&:disabled": {
-                                    opacity: captionUpdateActionPhase
-                                        ? 1
-                                        : 0.62,
-                                },
+                                transition:
+                                    "background-color 160ms ease, color 160ms ease, filter 120ms ease",
+                                "&:disabled": isCaptionUpdateActionRunning
+                                    ? undefined
+                                    : {
+                                          bgcolor: spaceDialogBackground,
+                                          color: spaceTextMuted,
+                                      },
                                 "&:focus-visible": {
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "&:hover": {
-                                    bgcolor: isCaptionUpdateDisabled
-                                        ? controlBackground
-                                        : controlBackgroundHover,
+                                "&:hover:not(:disabled)": {
+                                    filter: "brightness(0.96)",
+                                },
+                                "&:active:not(:disabled)": {
+                                    filter: "brightness(0.92)",
                                 },
                             }}
                         >
@@ -2055,7 +2059,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 >
                                     <HugeiconsIcon
                                         icon={Tick02Icon}
-                                        primaryColor={green}
                                         size={22}
                                         strokeWidth={1.8}
                                     />

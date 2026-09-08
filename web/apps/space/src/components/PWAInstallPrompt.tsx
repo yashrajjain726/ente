@@ -17,9 +17,11 @@ import { useSpacePWAInstallPrompt } from "hooks/use-pwa-install-prompt";
 import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
 import {
+    spaceAppBackgroundColor,
     spaceDialogBackground,
     spaceOnAccent,
     spaceSurface,
+    spaceSurfaceHover,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -278,17 +280,16 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             <Box sx={{ alignItems: "center", display: "flex", flexShrink: 0 }}>
                 {onAction && (
                     <Box
-                        className="green-bg"
                         component="button"
                         type="button"
                         disabled={actionDisabled}
                         onClick={onAction}
                         sx={{
                             alignItems: "center",
-                            bgcolor: green,
+                            bgcolor: "#FFFFFF",
                             border: 0,
                             borderRadius: "14px",
-                            color: spaceOnAccent,
+                            color: spaceAppBackgroundColor,
                             cursor: actionDisabled ? "default" : "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -297,8 +298,18 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                             height: 34,
                             justifyContent: "center",
                             minWidth: 48,
-                            opacity: actionDisabled ? 0.7 : 1,
                             px: "17px",
+                            transition:
+                                "background-color 120ms ease, color 120ms ease",
+                            "&:disabled": {
+                                bgcolor: spaceSurfaceHover,
+                                color: spaceTextMuted,
+                            },
+                            "&:focus-visible": {
+                                outline: `2px solid ${spaceText}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover:not(:disabled)": { bgcolor: spaceText },
                         }}
                     >
                         {actionLabel}
@@ -321,6 +332,10 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                             justifyContent: "center",
                             p: 0,
                             width: 36,
+                            "&:focus-visible": {
+                                outline: `2px solid ${spaceText}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
                         <HugeiconsIcon
