@@ -13,10 +13,9 @@ import React from "react";
 import { spaceDialogBackground, spaceSurface, spaceText } from "styles/colors";
 
 const actionHeight = 40;
-const actionRowPadding = 12;
-const photoBorder = 2;
+const dialogPadding = 12;
 const innerRadius = actionHeight / 2;
-const dialogRadius = innerRadius + actionRowPadding;
+const dialogRadius = innerRadius + dialogPadding;
 
 interface FriendQuickActionsDialogProps {
     anchorRect: DOMRect;
@@ -126,8 +125,8 @@ export const FriendQuickActionsDialog: React.FC<
                         maxWidth: "calc(100vw - 32px)",
                         overflow: "hidden",
                         position: "relative",
-                        pt: `${photoBorder}px`,
-                        top: -160,
+                        pt: `${dialogPadding}px`,
+                        top: -155,
                         width: "288px",
                         "@media (max-height: 720px)": { top: 0 },
                     },
@@ -171,11 +170,11 @@ export const FriendQuickActionsDialog: React.FC<
                     alignSelf: "center",
                     aspectRatio: "1",
                     bgcolor: spaceSurface,
-                    borderRadius: `${dialogRadius - photoBorder}px`,
+                    borderRadius: `${innerRadius}px`,
                     flexShrink: 0,
                     overflow: "hidden",
                     position: "relative",
-                    width: `min(calc(100% - ${photoBorder * 2}px), calc(100svh - ${photoBorder + actionRowPadding * 2 + actionHeight + 32}px))`,
+                    width: `min(calc(100% - ${dialogPadding * 2}px), calc(100svh - ${dialogPadding * 3 + actionHeight + 32}px))`,
                 }}
             >
                 <SpaceAvatarImage src={avatarUrl} />
@@ -219,14 +218,14 @@ export const FriendQuickActionsDialog: React.FC<
                         sx={{
                             bgcolor: "rgba(0, 0, 0, 0.7)",
                             borderRadius: "12px",
-                            bottom: actionRowPadding,
+                            bottom: dialogPadding,
                             color: "#FFFFFF",
                             fontSize: 12,
-                            left: actionRowPadding,
+                            left: dialogPadding,
                             lineHeight: "16px",
                             p: "8px 12px",
                             position: "absolute",
-                            right: actionRowPadding,
+                            right: dialogPadding,
                             textAlign: "center",
                         }}
                     >
@@ -239,7 +238,7 @@ export const FriendQuickActionsDialog: React.FC<
                     display: "grid",
                     gap: "6px",
                     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    p: `${actionRowPadding}px`,
+                    p: `${dialogPadding}px`,
                 }}
             >
                 {actions.map((action, index) => (
