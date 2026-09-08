@@ -250,18 +250,27 @@ impl MlDb {
         &self,
         face_ids: &[String],
     ) -> Result<HashMap<String, Vec<u8>>> {
-        let mut rows: Vec<(String, Vec<u8>)> = self.db.read_chunked_in(
-            "SELECT face_id, embedding FROM faces WHERE face_id IN ({}) ORDER BY face_id DESC",
-            face_ids,
-            MAX_SQL_BIND_PARAMS_PER_QUERY,
-            pair,
-        )?;
-        if rows.len() > FACE_EMBEDDING_MAP_MAX_ROWS {
-            rows.sort_by(|left, right| right.0.cmp(&left.0));
-            rows.dedup_by(|left, right| left.0 == right.0);
-            rows.truncate(FACE_EMBEDDING_MAP_MAX_ROWS);
+        let mut face_ids: Vec<&str> = face_ids.iter().map(String::as_str).collect();
+        face_ids.sort_unstable_by(|left, right| right.cmp(left));
+        face_ids.dedup();
+
+        let mut result = HashMap::new();
+        for chunk in face_ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY - 1) {
+            let remaining_limit = (FACE_EMBEDDING_MAP_MAX_ROWS - result.len()) as i64;
+            if remaining_limit == 0 {
+                break;
+            }
+            let sql = format!(
+                "SELECT face_id, embedding FROM faces WHERE face_id IN ({}) ORDER BY face_id DESC LIMIT ?",
+                bind_placeholders(chunk.len())
+            );
+            let mut parameters: Vec<&dyn ToSql> = chunk.iter().map(|id| id as &dyn ToSql).collect();
+            parameters.push(&remaining_limit);
+            let rows: Vec<(String, Vec<u8>)> =
+                self.db.read_all(&sql, parameters.as_slice(), pair)?;
+            result.extend(rows);
         }
-        Ok(rows.into_iter().collect())
+        Ok(result)
     }
 
     pub fn get_total_face_count(&self) -> Result<i64> {
@@ -647,6 +656,7 @@ pub(super) mod tests {
         db.bulk_insert_faces(&faces).unwrap();
         assert_eq!(db.get_total_face_count().unwrap(), 20005);
         let mut face_ids: Vec<String> = faces.iter().map(|face| face.face_id.clone()).collect();
+        face_ids.rotate_left(1337);
 
         let embeddings = db.get_face_embedding_map_for_faces(&face_ids).unwrap();
         assert_eq!(embeddings.len(), 20000);
@@ -666,6 +676,26 @@ pub(super) mod tests {
         assert_eq!(embeddings.len(), 20000);
         for face_id in &face_ids[5..] {
             assert!(embeddings.contains_key(face_id));
+        }
+
+        let expected = embeddings;
+        let mut with_missing = face_ids.clone();
+        with_missing.extend((0..20000).map(|index| format!("missing_{index}")));
+        with_missing.extend(face_ids.iter().cloned());
+        with_missing.reverse();
+        assert_eq!(
+            db.get_face_embedding_map_for_faces(&with_missing).unwrap(),
+            expected
+        );
+
+        for count in [9998, 9999, 10000, 19999, 20000, 20001] {
+            let embeddings = db
+                .get_face_embedding_map_for_faces(&face_ids[..count])
+                .unwrap();
+            assert_eq!(embeddings.len(), count.min(20000));
+            for face_id in &face_ids[count.saturating_sub(20000)..count] {
+                assert!(embeddings.contains_key(face_id));
+            }
         }
     }
 
