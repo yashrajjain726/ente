@@ -9,6 +9,7 @@ import "package:flutter_animate/flutter_animate.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
+import "package:photos/events/collection_updated_event.dart";
 import "package:photos/events/event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
@@ -53,6 +54,8 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   late StreamSubscription<PeopleChangedEvent> _peopleChangedSubscription;
   late StreamSubscription<LocalPhotosUpdatedEvent>
   _localPhotosUpdatedSubscription;
+  late StreamSubscription<CollectionUpdatedEvent>
+  _collectionUpdatedSubscription;
   late double _cardWidth;
 
   // Delay cover warming past startup; generations invalidate stale work.
@@ -101,6 +104,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _localPhotosUpdatedSubscription = Bus.instance
         .on<LocalPhotosUpdatedEvent>()
         .listen(_onLocalPhotosUpdated);
+    _collectionUpdatedSubscription = Bus.instance
+        .on<CollectionUpdatedEvent>()
+        .listen(_onCollectionUpdated);
     _memoryLaneLoaded = _loadScheduledMemoryLane();
     MemoryLaneService.instance.readyPersonIds.addListener(
       _onMemoryLaneReadyTimelinesChanged,
@@ -115,6 +121,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _mlConsentChangedSubscription.cancel();
     _peopleChangedSubscription.cancel();
     _localPhotosUpdatedSubscription.cancel();
+    _collectionUpdatedSubscription.cancel();
     _warmTimer?.cancel();
     _videoPrefetcher.dispose();
     _scrollController.dispose();
@@ -505,6 +512,33 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         !memoryLane.entries.any(
           (entry) => updatedFileIds.contains(entry.fileId),
         )) {
+      return;
+    }
+    setState(() {
+      _memoryLane = null;
+      _oldestMemoryLaneFile = null;
+      _newestMemoryLaneFace = null;
+      _memoryLanePersonName = null;
+    });
+  }
+
+  // TODO: Recompute the timeline instead of hiding the card.
+  Future<void> _onCollectionUpdated(CollectionUpdatedEvent event) async {
+    final memoryLane = _memoryLane;
+    if (!mounted ||
+        memoryLane == null ||
+        isLocalGalleryMode ||
+        event.type != EventType.deletedFromRemote ||
+        event.updatedFiles.isNotEmpty) {
+      return;
+    }
+    final files = await MemoryLaneService.instance.getTimelineFiles(
+      memoryLane.entries.map((entry) => entry.fileId),
+    );
+    final hasMissingFiles = memoryLane.entries.any(
+      (entry) => !files.containsKey(entry.fileId),
+    );
+    if (!mounted || _memoryLane == null || !hasMissingFiles) {
       return;
     }
     setState(() {
