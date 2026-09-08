@@ -48,7 +48,6 @@ export const App: React.FC = () => {
     const [fetchSuccess, setFetchSuccess] = useState(false);
     const [tabValue, setTabValue] = useState(0);
     const [userData, setUserData] = useState<UserDetailsData | null>(null);
-    const [activeUserID, setActiveUserID] = useState<number>();
     const [scheduledDeletions, setScheduledDeletions] = useState<
         ScheduledDeletion[]
     >([]);
@@ -58,6 +57,7 @@ export const App: React.FC = () => {
         useState(false);
     const [fileCountInitPending, setFileCountInitPending] = useState(false);
     const searchRequestID = useRef(0);
+    const activeUserIDRef = useRef<number | undefined>(undefined);
 
     useEffect(() => {
         if (authToken) {
@@ -73,7 +73,7 @@ export const App: React.FC = () => {
         setError("");
         setFetchSuccess(false);
         setUserData(null);
-        setActiveUserID(undefined);
+        activeUserIDRef.current = undefined;
         setScheduledDeletions([]);
         setScheduledDeletionsLoading(false);
         setScheduledDeletionsLoaded(false);
@@ -91,7 +91,7 @@ export const App: React.FC = () => {
                 );
                 setSelectedUserEmail(userDetailsData.email);
                 setUserData(userDetailsData);
-                setActiveUserID(userResult.user.ID);
+                activeUserIDRef.current = userResult.user.ID;
             } else {
                 if (!userSearchInput.includes("@")) {
                     throw new Error("User not found");
@@ -174,11 +174,7 @@ export const App: React.FC = () => {
         () => ({ email: selectedUserEmail, token: authToken }),
         [authToken, selectedUserEmail],
     );
-    const displayedRequestID = searchRequestID.current;
-    const initializeDisplayedFileCounts = async (
-        userID: number,
-        requestID: number,
-    ) => {
+    const initializeDisplayedFileCounts = async (userID: number) => {
         setFileCountInitPending(true);
         try {
             const result = await initializeFileCounts(
@@ -186,7 +182,7 @@ export const App: React.FC = () => {
                 userID,
             );
             if (result.reason) alert(result.reason);
-            if (result.initialized && requestID === searchRequestID.current) {
+            if (result.initialized && userID === activeUserIDRef.current) {
                 await fetchData(`${userID}`, authToken);
             }
         } catch (error) {
@@ -234,7 +230,7 @@ export const App: React.FC = () => {
                             </Button>
                             <AdHocActions
                                 email={selectedUserEmail}
-                                activeUserID={activeUserID}
+                                activeUserID={userData?.userID}
                                 scheduledDeletions={scheduledDeletions}
                                 scheduledDeletionsLoading={
                                     scheduledDeletionsLoading
@@ -319,7 +315,6 @@ export const App: React.FC = () => {
                                             onInitializeFileCounts={() =>
                                                 initializeDisplayedFileCounts(
                                                     userData.userID,
-                                                    displayedRequestID,
                                                 )
                                             }
                                         />
