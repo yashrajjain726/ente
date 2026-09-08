@@ -1,4 +1,4 @@
-import { ArrowLeft02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft02Icon, ArrowRight02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
@@ -326,7 +326,7 @@ const LayoutDemoPage: React.FC = () => {
                         }}
                     >
                         <HugeiconsIcon
-                            icon={ArrowRight01Icon}
+                            icon={ArrowRight02Icon}
                             size={22}
                             strokeWidth={2.2}
                         />
