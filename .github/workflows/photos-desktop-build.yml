@@ -166,7 +166,6 @@ jobs:
                       npm exec -- electron-builder --$platform --publish never
                   fi
               env:
-                  ELECTRON_BUILDER_7Z_FILTER: BCJ
                   GH_TOKEN: ${{ steps.nightly_token.outputs.token }}
                   MAC_OS_CERTIFICATE: ${{ secrets.MAC_OS_CERTIFICATE }}
                   MAC_OS_CERTIFICATE_PASSWORD: ${{ secrets.MAC_OS_CERTIFICATE_PASSWORD }}
@@ -181,6 +180,8 @@ jobs:
                   # Workaround recommended in
                   # https://github.com/electron-userland/electron-builder/issues/3179
                   USE_HARD_LINKS: false
+                  # TODO: Remove when updating to the next electron-builder version.
+                  ELECTRON_BUILDER_7Z_FILTER: BCJ
 
             - name: Upload to nightly
               uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
