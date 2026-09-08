@@ -8,7 +8,7 @@ import (
 	"github.com/ente/museum/pkg/repo/public"
 )
 
-func TestGetFileCountsReturnsStoredCountsOrUninitialized(t *testing.T) {
+func TestGetStoredFileCountsReturnsMinusOneUntilInitialized(t *testing.T) {
 	_, db, userID := setupCollectionMembershipTest(t)
 	usageRepo := &UsageRepository{DB: db}
 	for _, tt := range []struct {
@@ -17,8 +17,7 @@ func TestGetFileCountsReturnsStoredCountsOrUninitialized(t *testing.T) {
 		photos, locker int64
 	}{
 		{"uninitialized", "", -1, -1},
-		{"empty", `UPDATE usage SET photos_file_count = 0, locker_file_count = 0 WHERE user_id = $1`, 0, 0},
-		{"ready", `UPDATE usage SET photos_file_count = 23, locker_file_count = 7 WHERE user_id = $1`, 23, 7},
+		{"ready", `UPDATE usage SET photos_file_count = 0, locker_file_count = 7 WHERE user_id = $1`, 0, 7},
 		{"missing", `DELETE FROM usage WHERE user_id = $1`, -1, -1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -27,9 +26,9 @@ func TestGetFileCountsReturnsStoredCountsOrUninitialized(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			photos, locker, err := usageRepo.GetFileCounts(t.Context(), userID)
+			photos, locker, err := usageRepo.GetStoredFileCounts(t.Context(), userID)
 			if err != nil || photos != tt.photos || locker != tt.locker {
-				t.Fatalf("GetFileCounts() = (%d, %d, %v), want (%d, %d, nil)", photos, locker, err, tt.photos, tt.locker)
+				t.Fatalf("GetStoredFileCounts() = (%d, %d, %v), want (%d, %d, nil)", photos, locker, err, tt.photos, tt.locker)
 			}
 		})
 	}

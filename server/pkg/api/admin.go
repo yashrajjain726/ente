@@ -710,7 +710,7 @@ func (h *AdminHandler) attachSubscription(ctx *gin.Context, userID int64, respon
 	if err == nil {
 		response["details"] = details
 	}
-	photos, locker, err := h.UsageRepo.GetFileCounts(ctx.Request.Context(), userID)
+	photos, locker, err := h.UsageRepo.GetStoredFileCounts(ctx.Request.Context(), userID)
 	if err == nil {
 		response["photosFileCount"] = photos
 		response["lockerFileCount"] = locker

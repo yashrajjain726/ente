@@ -43,8 +43,7 @@ func (repo *UsageRepository) GetUsage(userID int64) (int64, error) {
 	return usage, stacktrace.Propagate(err, "")
 }
 
-// GetFileCounts returns the stored counts, or -1 for both until initialized.
-func (repo *UsageRepository) GetFileCounts(ctx context.Context, userID int64) (int64, int64, error) {
+func (repo *UsageRepository) GetStoredFileCounts(ctx context.Context, userID int64) (int64, int64, error) {
 	var photos, locker int64
 	err := repo.DB.QueryRowContext(ctx, `SELECT photos_file_count, locker_file_count
 		FROM usage WHERE user_id = $1

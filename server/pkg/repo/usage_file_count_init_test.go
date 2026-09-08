@@ -9,7 +9,7 @@ import (
 	"github.com/ente/museum/pkg/repo/public"
 )
 
-func TestInitializeFileCountsUsesActiveOwnedMemberships(t *testing.T) {
+func TestInitializeFileCountsIncludesLegacyMembershipsInDeletedCollections(t *testing.T) {
 	_, db, userID := setupCollectionMembershipTest(t)
 	usageRepo := &UsageRepository{DB: db}
 	otherUserID := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 2, Email: "other@ente.io", CreationTime: 1})
@@ -20,8 +20,6 @@ func TestInitializeFileCountsUsesActiveOwnedMemberships(t *testing.T) {
 		collectionID := insertObjectTestCollection(t, db, userID)
 		linkObjectTestFileToCollection(t, db, collectionID, photosFile, userID)
 		linkObjectTestFileToCollection(t, db, collectionID, foreignFile, otherUserID)
-		// Pre-60 Photos memberships have NULL denormalized owners. A collection
-		// scheduled for deletion remains countable until its memberships are trashed.
 		if _, err := db.Exec(`UPDATE collection_files SET c_owner_id = NULL, f_owner_id = NULL
 			WHERE collection_id = $1`, collectionID); err != nil {
 			t.Fatal(err)
@@ -57,16 +55,15 @@ func TestInitializeFileCountsRejectsInconsistentHistory(t *testing.T) {
 		name string
 		sql  string
 	}{
-		{"orphan", `UPDATE collection_files SET is_deleted = TRUE WHERE file_id = 201`},
-		{"shared_only", `UPDATE collections SET owner_id = 2 WHERE collection_id = 101`},
 		{"cross_app", `INSERT INTO collection_files(collection_id, file_id, encrypted_key, key_decryption_nonce, updation_time)
 			VALUES (102, 201, 'key', 'nonce', 1)`},
+		{"cross_app_shared", `UPDATE collections SET owner_id = 2 WHERE collection_id = 102;
+			INSERT INTO collection_files(collection_id, file_id, encrypted_key, key_decryption_nonce, updation_time)
+			VALUES (102, 201, 'key', 'nonce', 1)`},
 		{"active_trash", `INSERT INTO trash(file_id, user_id, collection_id, delete_by) VALUES (201, 1, 101, 1)`},
-		{"wrong_trash_owner", `UPDATE collection_files SET is_deleted = TRUE WHERE file_id = 201;
-			INSERT INTO trash(file_id, user_id, collection_id, delete_by) VALUES (201, 2, 101, 1)`},
+		{"wrong_trash_owner", `INSERT INTO trash(file_id, user_id, collection_id, delete_by) VALUES (201, 2, 101, 1)`},
 		{"locker_null_owner", `UPDATE collection_files SET f_owner_id = NULL WHERE file_id = 201`},
-		// The legacy and canonical totals both equal one; different files qualify.
-		{"locker_canceling_errors", `UPDATE collection_files
+		{"locker_equal_counts_different_files", `UPDATE collection_files
 			SET f_owner_id = CASE WHEN file_id = 201 THEN NULL ELSE 1 END WHERE collection_id = 101`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -102,20 +99,22 @@ func TestInitializeFileCountsRejectsInconsistentHistory(t *testing.T) {
 	}
 }
 
-func TestInitializeFileCountsAllowsEmptyAndPermanentlyDeletedLibraries(t *testing.T) {
-	for _, name := range []string{"empty", "permanently_deleted"} {
+func TestInitializeFileCountsExcludesInactiveFiles(t *testing.T) {
+	for _, name := range []string{"empty", "orphan", "permanently_deleted"} {
 		t.Run(name, func(t *testing.T) {
 			_, db, userID := setupCollectionMembershipTest(t)
-			if name == "permanently_deleted" {
+			if name != "empty" {
 				collectionID := insertObjectTestCollection(t, db, userID)
 				fileID := insertObjectTestFile(t, db, userID)
 				linkObjectTestFileToCollection(t, db, collectionID, fileID, userID)
 				if _, err := db.Exec(`UPDATE collection_files SET is_deleted = TRUE WHERE file_id = $1`, fileID); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := db.Exec(`INSERT INTO trash(file_id, user_id, collection_id, delete_by, is_deleted)
-					VALUES ($1, $2, $3, 1, TRUE)`, fileID, userID, collectionID); err != nil {
-					t.Fatal(err)
+				if name == "permanently_deleted" {
+					if _, err := db.Exec(`INSERT INTO trash(file_id, user_id, collection_id, delete_by, is_deleted)
+						VALUES ($1, $2, $3, 1, TRUE)`, fileID, userID, collectionID); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			if initialized, err := (&UsageRepository{DB: db}).InitializeFileCounts(t.Context(), userID); err != nil || !initialized {
@@ -126,7 +125,7 @@ func TestInitializeFileCountsAllowsEmptyAndPermanentlyDeletedLibraries(t *testin
 	}
 }
 
-func TestInitializeFileCountsSerializesWithWriters(t *testing.T) {
+func TestInitializeFileCountsRejectsStaleSnapshots(t *testing.T) {
 	repository, db, userID := setupCollectionMembershipTest(t)
 	usageRepo := &UsageRepository{DB: db}
 	collectionID := insertObjectTestCollection(t, db, userID)
@@ -134,7 +133,7 @@ func TestInitializeFileCountsSerializesWithWriters(t *testing.T) {
 	linkObjectTestFileToCollection(t, db, collectionID, fileID, userID)
 	repository.TrashRepo.FileLinkRepo = public.NewFileLinkRepo(db)
 
-	counts, err := usageRepo.readInitialFileCounts(t.Context(), userID)
+	counts, err := usageRepo.readFileCountInitSnapshot(t.Context(), userID)
 	if err != nil {
 		t.Fatal(err)
 	}
