@@ -129,29 +129,69 @@ interface PostMasonryRow {
     tiles: PostMasonryTile[];
 }
 
-const buildPostMasonryRows = (
+const buildPostMasonrySections = (
     items: ProfilePostItem[],
     loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
-): PostMasonryRow[] => {
-    const tiles = items.map((item, index) => {
+) => {
+    const now = new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const sections = [
+        {
+            title: "Today",
+            sinceMs: new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+            ).getTime(),
+        },
+        {
+            title: "Yesterday",
+            sinceMs: new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate() - 1,
+            ).getTime(),
+        },
+        { title: "Last 7 days", sinceMs: now.getTime() - 7 * dayMs },
+        { title: "Last 30 days", sinceMs: now.getTime() - 30 * dayMs },
+        { title: "Older", sinceMs: -Infinity },
+    ].map((section) => ({ ...section, tiles: new Array<PostMasonryTile>() }));
+
+    items.forEach((item, index) => {
         const dimensions = loadedDimensionsByID[item.id] ?? {
             height: item.height ?? 1,
             width: item.width ?? 1,
         };
-        return {
+        const section = sections.find(
+            ({ sinceMs }) => item.timestampMs >= sinceMs,
+        )!;
+        section.tiles.push({
             aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
             dimensions,
             index,
             item,
-        };
+        });
     });
+
+    return sections
+        .filter(({ tiles }) => tiles.length > 0)
+        .map(({ title, tiles }) => ({
+            title,
+            rows: buildPostMasonryRows(tiles, title == "Today"),
+        }));
+};
+
+const buildPostMasonryRows = (
+    tiles: PostMasonryTile[],
+    isToday: boolean,
+): PostMasonryRow[] => {
     const rows = new Array<PostMasonryRow>();
     let nextTileIndex = 0;
 
     while (nextTileIndex < tiles.length) {
-        const rowSize = preferredPostMasonryRowSize(
-            tiles.length - nextTileIndex,
-        );
+        const rowSize = isToday
+            ? 1
+            : preferredPostMasonryRowSize(tiles.length - nextTileIndex);
         const rowTiles = tiles.slice(nextTileIndex, nextTileIndex + rowSize);
         rows.push({
             aspectRatio: rowTiles.reduce(
@@ -638,7 +678,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const postImageLoadRootMargin = isAnonymousPublicProfile
         ? publicPhotoMasonryLoadRootMargin
         : photoMasonryLoadRootMargin;
-    const masonryRows = buildPostMasonryRows(
+    const masonrySections = buildPostMasonrySections(
         visiblePostItems,
         loadedPhotoDimensionsByID,
     );
@@ -1829,39 +1869,68 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {hasProfilePosts ? (
                         <Box
                             sx={{
-                                borderRadius: photoMasonryRadius,
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: photoMasonryGap,
+                                gap: "24px",
                                 mt: "6px",
                                 mx: "16px",
-                                overflow: "hidden",
                                 width: "calc(100% - 32px)",
                             }}
                         >
-                            {masonryRows.map((row, rowIndex) => {
-                                const isSingleItemRow = row.tiles.length == 1;
-                                return (
+                            {masonrySections.map(({ title, rows }) => (
+                                <Box component="section" key={title}>
                                     <Box
-                                        key={`row-${rowIndex}`}
+                                        component="h2"
                                         sx={{
-                                            aspectRatio: isSingleItemRow
-                                                ? undefined
-                                                : `${row.aspectRatio} / 1`,
-                                            display: "flex",
-                                            gap: photoMasonryGap,
-                                            width: "100%",
+                                            color: textSoft,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            lineHeight: "18px",
+                                            m: 0,
+                                            pb: "8px",
                                         }}
                                     >
-                                        {row.tiles.map((tile) =>
-                                            renderPostTile(
-                                                tile,
-                                                isSingleItemRow,
-                                            ),
-                                        )}
+                                        {title}
                                     </Box>
-                                );
-                            })}
+                                    <Box
+                                        sx={{
+                                            borderRadius: photoMasonryRadius,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: photoMasonryGap,
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {rows.map((row) => {
+                                            const isSingleItemRow =
+                                                row.tiles.length == 1;
+                                            return (
+                                                <Box
+                                                    key={row.tiles[0]!.item.id}
+                                                    sx={{
+                                                        aspectRatio:
+                                                            isSingleItemRow
+                                                                ? undefined
+                                                                : `${row.aspectRatio} / 1`,
+                                                        display: "flex",
+                                                        gap: photoMasonryGap,
+                                                        width: "100%",
+                                                    }}
+                                                >
+                                                    {row.tiles.map((tile) =>
+                                                        renderPostTile(
+                                                            tile,
+                                                            isSingleItemRow,
+                                                        ),
+                                                    )}
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
+                                </Box>
+                            ))}
                         </Box>
                     ) : shouldShowPostLoadingIndicator ? (
                         <ProfilePostLoadingIndicator />
