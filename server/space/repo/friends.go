@@ -20,7 +20,7 @@ var (
 )
 
 const (
-	MaxFriendsPerSpace               = 12
+	MaxFriendsPerSpace               = 9
 	MaxPendingFriendRequestsPerSpace = 100
 )
 

@@ -474,16 +474,16 @@ func TestConfirmFriendRequestCountsSentRequestsTowardFriendLimit(t *testing.T) {
 	require.ErrorIs(t, err, ErrSpaceFriendLimitReached)
 }
 
-func TestConfirmFriendRequestAllowsTwelfthFriend(t *testing.T) {
+func TestConfirmFriendRequestAllowsNinthFriend(t *testing.T) {
 	module := newSpaceTestModule(t)
 	ctx := context.Background()
-	requesterID := insertSpaceUser(t, module, "twelfth-friend-requester@example.com", "twelfth-friend-requester-public")
-	targetID := insertSpaceUser(t, module, "twelfth-friend-target@example.com", "twelfth-friend-target-public")
-	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "twelfth_friend_requester", "root", "public", "secret", "nonce", "profile")
+	requesterID := insertSpaceUser(t, module, "ninth-friend-requester@example.com", "ninth-friend-requester-public")
+	targetID := insertSpaceUser(t, module, "ninth-friend-target@example.com", "ninth-friend-target-public")
+	requesterSpace, err := testCreateSpace(ctx, module, requesterID, "ninth_friend_requester", "root", "public", "secret", "nonce", "profile")
 	require.NoError(t, err)
-	targetSpace, err := testCreateSpace(ctx, module, targetID, "twelfth_friend_target", "root", "public", "secret", "nonce", "profile")
+	targetSpace, err := testCreateSpace(ctx, module, targetID, "ninth_friend_target", "root", "public", "secret", "nonce", "profile")
 	require.NoError(t, err)
-	fillSpaceFriendLimit(t, ctx, module, targetSpace, "twelfth_friend_member", MaxFriendsPerSpace-1)
+	fillSpaceFriendLimit(t, ctx, module, targetSpace, "ninth_friend_member", MaxFriendsPerSpace-1)
 	request, created, err := testCreateFriendRequest(ctx, module, requesterID, requesterSpace.SpaceID, targetSpace.SpaceID, "requester-share-key", requesterSpace.CurrentVersion)
 	require.NoError(t, err)
 	require.True(t, created)
