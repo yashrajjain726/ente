@@ -7,6 +7,7 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_animate/flutter_animate.dart";
 import "package:photos/core/event_bus.dart";
+import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/event.dart";
 import "package:photos/events/files_updated_event.dart";
@@ -411,8 +412,56 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     });
   }
 
-  void _onPeopleChanged(PeopleChangedEvent _) {
-    if (!mounted || _memoryLane == null) {
+  Future<void> _onPeopleChanged(PeopleChangedEvent event) async {
+    final memoryLane = _memoryLane;
+    if (!mounted ||
+        memoryLane == null ||
+        event.type == PeopleEventType.syncDone) {
+      return;
+    }
+    if (event.persons == null && (event.person?.data.isIgnored ?? false)) {
+      // MemoryLaneService invalidates these timelines and updates readyPersonIds.
+      return;
+    }
+    var shouldHide = false;
+    if (memoryLane.isCluster) {
+      if (!isLocalGalleryMode) {
+        final personClusterIDs = event.person?.data.assigned.map(
+          (cluster) => cluster.id,
+        );
+        final peopleClusterIDs = event.persons
+            ?.expand((person) => person.data.assigned)
+            .map((cluster) => cluster.id);
+        final assignedClusterIDs = <String>{};
+        assignedClusterIDs.addAll(event.newClusterIDs ?? []);
+        assignedClusterIDs.addAll(personClusterIDs ?? []);
+        assignedClusterIDs.addAll(peopleClusterIDs ?? []);
+        if (event.type == PeopleEventType.addedClusterToPerson) {
+          assignedClusterIDs.add(event.source);
+        }
+        shouldHide = assignedClusterIDs.contains(memoryLane.personId);
+      }
+    } else {
+      final person = await PersonService.instance.getPerson(
+        memoryLane.personId,
+      );
+      shouldHide =
+          person == null ||
+          person.data.hideFromMemories ||
+          person.data.name != _memoryLanePersonName;
+    }
+    if (!shouldHide) {
+      final mlDataDB = isLocalGalleryMode
+          ? MLDataDB.localGalleryInstance
+          : MLDataDB.instance;
+      final faceIDs = memoryLane.isCluster
+          ? (await mlDataDB.getFaceIDsForCluster(memoryLane.personId)).toSet()
+          : await mlDataDB.getFaceIDsForPerson(memoryLane.personId);
+      shouldHide = memoryLane.entries.any(
+        (entry) => !faceIDs.contains(entry.faceId),
+      );
+    }
+    if (!mounted || _memoryLane == null || !shouldHide) {
       return;
     }
     setState(() {
