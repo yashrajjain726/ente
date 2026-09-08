@@ -29,6 +29,11 @@ import {
 } from "styles/colors";
 import "styles/globals.css";
 
+const interFontURL = new URL(
+    "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+    import.meta.url,
+).href;
+
 const darkPalette = shareTheme.colorSchemes.dark!.palette;
 
 const spaceTheme = createTheme(
@@ -116,6 +121,13 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
                 title="Ente Space"
                 viewportContent="width=device-width, initial-scale=1, maximum-scale=1"
             >
+                <link
+                    rel="preload"
+                    href={interFontURL}
+                    as="font"
+                    type="font/woff2"
+                    crossOrigin="anonymous"
+                />
                 <meta name="color-scheme" content="dark" />
                 <meta name="theme-color" content={spaceAppBackgroundColor} />
                 <meta name="application-name" content="Ente Space" />

@@ -77,7 +77,7 @@ const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = spaceSurface;
-const photoMasonryRadius = "12px";
+const photoMasonryRadius = "16px";
 const profileCoverRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
 const publicPhotoMasonryLoadRootMargin = "400px 0px";

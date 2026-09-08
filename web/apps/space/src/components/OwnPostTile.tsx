@@ -6,9 +6,17 @@ import log from "ente-base/log";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpacePost, SpacePostAssetURLLoader } from "services/space";
-import { spaceSurface, spaceText, spaceTextMuted } from "styles/colors";
+import { useSpaceAppState } from "state/app-state";
+import { spaceSurface, spaceTextMuted } from "styles/colors";
+import {
+    spacePostTileRadius,
+    spaceTileCircleInset,
+    spaceTileCornerStyles,
+} from "styles/tiles";
+import { spaceDefaultCoverImagePath } from "utils/post-image";
 
 const green = "#08C225";
+const actionSize = 44;
 
 interface SpaceOwnPostTileProps {
     profile: SetupProfile | null;
@@ -33,6 +41,10 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     onOpenProfile,
     onNewPost,
 }) => {
+    const { cachedProfileAvatarUrl } = useSpaceAppState();
+    const avatarUrl = profile ? profile.avatarUrl : cachedProfileAvatarUrl;
+    const isAvatarLoading =
+        !avatarUrl && (!profile || Boolean(profile.avatarObjectID));
     const [loadedImage, setLoadedImage] = React.useState<{
         post: SpacePost;
         url?: string;
@@ -44,6 +56,8 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
         isUnavailable || post?.isUnavailable || postImage?.failed;
     const loading =
         isLoading || Boolean(post?.imageAsset && !imageUrl && !unavailable);
+    const isEmpty = !post && !loading && !unavailable;
+    const coverUrl = isEmpty ? spaceDefaultCoverImagePath : imageUrl;
 
     React.useEffect(() => {
         if (!post?.imageAsset || post.imageUrl || !onLoadPostImage) return;
@@ -67,9 +81,9 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
             component="section"
             aria-label="Your latest post"
             sx={{
+                ...spaceTileCornerStyles(spacePostTileRadius),
                 aspectRatio: "1.7",
                 bgcolor: spaceSurface,
-                borderRadius: "24px",
                 flexShrink: 0,
                 fontFamily: '"Inter Variable", Inter, sans-serif',
                 overflow: "hidden",
@@ -101,11 +115,11 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                     width: "100%",
                 }}
             >
-                {imageUrl && !unavailable ? (
+                {coverUrl && !unavailable ? (
                     <Box
                         component="img"
-                        alt={post?.caption || "Your latest post"}
-                        src={imageUrl}
+                        alt={isEmpty ? "" : post?.caption || "Your latest post"}
+                        src={coverUrl}
                         onError={() =>
                             post && setLoadedImage({ post, failed: true })
                         }
@@ -122,26 +136,74 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         sx={{ height: "100%", transform: "none" }}
                     />
                 ) : (
-                    <Box sx={{ fontSize: 15, pb: "56px", px: "24px" }}>
-                        {unavailable
-                            ? "Couldn't load your latest post"
-                            : "Share your first photo"}
+                    <Box
+                        sx={{
+                            fontSize: 15,
+                            pb: "56px",
+                            px: "var(--space-tile-padding)",
+                        }}
+                    >
+                        Couldn&apos;t load your latest post
+                    </Box>
+                )}
+                {isEmpty && (
+                    <Box
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "rgba(0, 0, 0, 0.18)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            inset: 0,
+                            justifyContent: "center",
+                            position: "absolute",
+                            px: "var(--space-tile-padding)",
+                            textAlign: "center",
+                        }}
+                    >
+                        <Box
+                            component="span"
+                            sx={{
+                                bgcolor: "rgba(249, 252, 239, 0.94)",
+                                borderRadius: "999px",
+                                color: "#24351B",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "18px",
+                                px: "12px",
+                                py: "3px",
+                            }}
+                        >
+                            Your posts will show up here
+                        </Box>
+                        <Box
+                            component="span"
+                            sx={{
+                                backdropFilter: "blur(12px)",
+                                bgcolor: "rgba(28, 28, 30, 0.48)",
+                                borderRadius: "999px",
+                                color: "#E3E7DA",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                lineHeight: "18px",
+                                px: "10px",
+                                py: "3px",
+                            }}
+                        >
+                            Share a little moment from your day!
+                        </Box>
                     </Box>
                 )}
             </Box>
             <Box
                 sx={{
-                    alignItems: "center",
                     background:
                         imageUrl && !unavailable
                             ? "linear-gradient(transparent, rgba(0, 0, 0, 0.72))"
                             : undefined,
                     bottom: 0,
-                    display: "flex",
-                    gap: "12px",
-                    justifyContent: "space-between",
+                    height: "50%",
                     left: 0,
-                    p: "32px 16px 16px",
                     pointerEvents: "none",
                     position: "absolute",
                     right: 0,
@@ -157,37 +219,43 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         appearance: "none",
                         bgcolor: "transparent",
                         border: 0,
-                        borderRadius: "12px",
-                        color: spaceText,
+                        borderRadius: "50%",
+                        bottom: spaceTileCircleInset(actionSize),
                         cursor: onOpenProfile ? "pointer" : "default",
                         display: "flex",
-                        font: "inherit",
-                        gap: "10px",
-                        minWidth: 0,
+                        height: actionSize,
+                        justifyContent: "center",
+                        left: spaceTileCircleInset(actionSize),
                         p: 0,
                         pointerEvents: "auto",
-                        textAlign: "left",
+                        position: "absolute",
+                        width: actionSize,
                     }}
                 >
                     <Box
                         sx={{
-                            border: "2px solid rgba(255, 255, 255, 0.8)",
+                            border: avatarUrl
+                                ? "2px solid rgba(255, 255, 255, 0.36)"
+                                : "2px solid rgba(255, 255, 255, 0.28)",
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             flexShrink: 0,
-                            height: 44,
+                            height: actionSize,
                             overflow: "hidden",
-                            width: 44,
+                            width: actionSize,
                         }}
                     >
-                        <SpaceAvatarImage src={profile?.avatarUrl} />
-                    </Box>
-                    <Box>
-                        <Box sx={{ fontSize: 16, fontWeight: 650 }}>You</Box>
-                        {post && (
-                            <Box sx={{ fontSize: 11, mt: "3px", opacity: 0.8 }}>
-                                Latest post
-                            </Box>
+                        {isAvatarLoading ? (
+                            <Skeleton
+                                variant="circular"
+                                sx={{
+                                    bgcolor: spaceSurface,
+                                    height: "100%",
+                                    width: "100%",
+                                }}
+                            />
+                        ) : (
+                            <SpaceAvatarImage src={avatarUrl} />
                         )}
                     </Box>
                 </Box>
@@ -195,6 +263,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                     className="green-bg"
                     component="button"
                     type="button"
+                    aria-label="New post"
                     disabled={isNewPostDisabled}
                     onClick={onNewPost}
                     sx={{
@@ -202,25 +271,24 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         appearance: "none",
                         bgcolor: green,
                         border: 0,
-                        borderRadius: "999px",
+                        borderRadius: "50%",
+                        bottom: spaceTileCircleInset(actionSize),
                         color: "#FFFFFF",
                         cursor: isNewPostDisabled ? "default" : "pointer",
                         display: "flex",
-                        flexShrink: 0,
-                        font: "inherit",
-                        fontSize: 13,
-                        fontWeight: 650,
-                        gap: "6px",
-                        minHeight: 44,
+                        height: actionSize,
+                        justifyContent: "center",
                         opacity: isNewPostDisabled ? 0.6 : 1,
-                        px: "14px",
+                        p: 0,
                         pointerEvents: "auto",
+                        position: "absolute",
+                        right: spaceTileCircleInset(actionSize),
+                        width: actionSize,
                         "&:hover": { bgcolor: "#07B422" },
                         "&:focus-visible": { outlineColor: "#FFFFFF" },
                     }}
                 >
-                    <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={2} />
-                    New post
+                    <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={2} />
                 </Box>
             </Box>
         </Box>
