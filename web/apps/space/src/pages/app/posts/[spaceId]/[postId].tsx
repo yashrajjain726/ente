@@ -15,7 +15,7 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
-import { useSpaceRouter } from "utils/route-transitions";
+import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
 const postBackground = "#000000";
@@ -145,12 +145,12 @@ const Page: React.FC = () => {
     }, [post?.spaceId, post?.username, profile?.spaceId, router, spaceId]);
 
     const closePost = React.useCallback(() => {
-        if (typeof window != "undefined" && window.history.length > 1) {
+        if (hasPreviousSpaceRoute()) {
             router.back();
             return;
         }
-        openOwnerProfile();
-    }, [openOwnerProfile, router]);
+        void router.replace(spaceRoutes.home);
+    }, [router]);
 
     if (
         !router.isReady ||
