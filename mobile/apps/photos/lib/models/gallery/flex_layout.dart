@@ -4,12 +4,12 @@ import "dart:typed_data";
 
 import "package:photos/models/gallery/justified_layout.dart";
 
-/// Experimental whole-group row breaking inspired by Google Photos' FlexLayout:
-/// https://medium.com/google-design/google-photos-45b714dfbed1
-///
-/// Each possible row is an edge between two file indices. A backward dynamic
-/// programming pass chooses the least expensive path through the entire group.
-/// Density is a sizing preference rather than Comfort's hard 3/4/5 item cap.
+// Experimental whole-group row breaking inspired by Google Photos' FlexLayout:
+// https://medium.com/google-design/google-photos-45b714dfbed1
+//
+// Each possible row is an edge between two file indices. A backward dynamic
+// programming pass chooses the least expensive path through the entire group.
+// Density is a sizing preference rather than Comfort's hard 3/4/5 item cap.
 class FlexLayoutCalculator {
   static const double _minimumTappableExtent = 48;
   static const double _maximumRowHeightFactor = 1.6;
