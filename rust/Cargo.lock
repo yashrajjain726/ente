@@ -2732,6 +2732,7 @@ name = "ente-photos"
 version = "0.0.0"
 dependencies = [
  "ente-assets",
+ "ente-exif",
  "ente-location",
  "quick-xml",
  "rusqlite",
