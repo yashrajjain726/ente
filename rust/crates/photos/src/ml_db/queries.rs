@@ -263,9 +263,9 @@ pub(super) mod tests {
 
     use super::{CLIP_EMBEDDING_DIMENSIONS, ClipEmbedding, ClipRow, MlDb};
     use crate::db::Connection;
-    use crate::ml_db::tests::{cases, check, open};
+    use crate::ml_db::tests::{cases, check, open, strings};
     use crate::ml_db::vector_encoding::encode_f32;
-    use crate::ml_db::{caches, filedata};
+    use crate::ml_db::{caches, clusters, faces, filedata, persons, pets};
     use tempfile::TempDir;
 
     fn clip(file_id: i64, embedding: Vec<f64>) -> ClipEmbedding {
@@ -280,7 +280,7 @@ pub(super) mod tests {
         clip(file_id, vec![0.25; CLIP_EMBEDDING_DIMENSIONS])
     }
 
-    fn seed(db: &MlDb) {
+    pub(in crate::ml_db) fn seed(db: &MlDb) {
         db.insert_clip_rows(&[
             full_clip(1),
             ClipEmbedding {
@@ -303,6 +303,10 @@ pub(super) mod tests {
         let (directory, db) = seeded();
         filedata::tests::seed(&db);
         caches::tests::seed(&db);
+        faces::tests::seed(&db);
+        clusters::tests::seed(&db);
+        persons::tests::seed(&db);
+        pets::tests::seed(&db);
         (directory, db)
     }
 
@@ -393,8 +397,19 @@ pub(super) mod tests {
     fn clear_non_pet_tables_leaves_pets_and_caches() {
         let (_directory, db) = seeded_all();
         db.clear_non_pet_tables().unwrap();
+        assert_eq!(db.get_total_face_count().unwrap(), 0);
+        assert!(db.cluster_id_to_face_count().unwrap().is_empty());
+        assert!(db.get_person_to_cluster_ids().unwrap().is_empty());
+        assert!(db.get_person_to_rejected_suggestions().unwrap().is_empty());
+        assert_eq!(db.count_cluster_summaries().unwrap(), 0);
+        assert!(
+            db.get_cluster_centroid_vector_id_map(&strings(["c1"]), false)
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(db.count_clip_rows().unwrap(), 0);
         assert!(db.get_file_ids_with_fd_data(None).unwrap().is_empty());
+        assert_eq!(db.get_pet_indexed_file_count(1).unwrap(), 2);
         assert_eq!(
             db.get_face_id_used_for_person_or_cluster("p1").unwrap(),
             Some("1_0".to_string())
@@ -409,13 +424,6 @@ pub(super) mod tests {
     fn clear_pet_tables_leaves_non_pet_tables() {
         let (directory, db) = seeded_all();
         let connection = Connection::open(directory.path().join("ente.ml.db")).unwrap();
-        connection
-            .execute_batch(
-                "INSERT INTO pet_face_vector_id_map (pet_face_id) VALUES ('1_pet_0');
-                 INSERT INTO pet_body_vector_id_map (pet_body_id) VALUES ('1_body_0');",
-            )
-            .unwrap();
-        db.clear_pet_tables().unwrap();
         let row_count = |table: &str| -> i64 {
             connection
                 .query_row(&format!("SELECT COUNT(*) FROM {table}"), (), |row| {
@@ -423,8 +431,19 @@ pub(super) mod tests {
                 })
                 .unwrap()
         };
+        assert_eq!(row_count("pet_face_vector_id_map"), 2);
+        assert_eq!(row_count("pet_body_vector_id_map"), 1);
+        db.clear_pet_tables().unwrap();
         assert_eq!(row_count("pet_face_vector_id_map"), 0);
         assert_eq!(row_count("pet_body_vector_id_map"), 0);
+        assert_eq!(db.get_pet_indexed_file_count(0).unwrap(), 0);
+        assert_eq!(
+            db.get_pet_rows_for_files(&[1, 2, 3]).unwrap().faces.len(),
+            0
+        );
+        assert_eq!(db.get_total_face_count().unwrap(), 9);
+        assert_eq!(db.cluster_id_to_face_count().unwrap().len(), 6);
+        assert_eq!(db.get_person_cluster_ids("p1").unwrap().len(), 2);
         assert_eq!(db.count_clip_rows().unwrap(), 4);
         assert_eq!(
             db.get_file_ids_with_fd_data(None).unwrap(),
