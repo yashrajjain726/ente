@@ -1,6 +1,6 @@
 import { wrap } from "comlink";
 import { readAndFree } from "ente-utils/wasm";
-import type { KDFWorker } from "./kdf.worker";
+import type { FileLinkWorker } from "./file-link.worker";
 import type {
     OpenSessionInput,
     Session,
@@ -65,21 +65,36 @@ interface EncryptedBox {
     nonce: BytesOrB64;
 }
 
-interface KeyPair {
-    publicKey: string;
-    privateKey: string;
-}
-
-export const deriveInteractiveKey = async (password: string) => {
-    const worker = new Worker(new URL("kdf.worker.ts", import.meta.url));
+export const prepareFileLink = async (session: Session, fileKeyB64: string) => {
+    const worker = new Worker(new URL("file-link.worker.ts", import.meta.url));
     try {
-        const RemoteWorker = wrap<typeof KDFWorker>(worker);
+        const RemoteWorker = wrap<typeof FileLinkWorker>(worker);
         const remote = await new RemoteWorker();
-        return await remote.deriveInteractiveKey(password);
+        const payload = await remote.prepareFileLinkPayload(fileKeyB64);
+        const encryptedShareKey = (await wasm()).lockerSealFileLinkSecret(
+            session,
+            payload.fragment,
+        );
+        return {
+            secret: payload.fragment,
+            metadata: {
+                encryptedFileKey: payload.encryptedFileKey,
+                encryptedFileKeyNonce: payload.encryptedFileKeyNonce,
+                kdfNonce: payload.kdfNonce,
+                kdfMemLimit: payload.kdfMemLimit,
+                kdfOpsLimit: payload.kdfOpsLimit,
+                encryptedShareKey,
+            },
+        };
     } finally {
         worker.terminate();
     }
 };
+
+export const openFileLinkSecret = async (
+    session: Session,
+    encryptedShareKey: string,
+) => (await wasm()).lockerOpenFileLinkSecret(session, encryptedShareKey);
 
 export const generateKey = async () => (await wasm()).cryptoGenerateKey();
 
@@ -143,16 +158,6 @@ export const boxSeal = async (
     dataB64: string,
     publicKeyB64: string,
 ): Promise<string> => (await wasm()).cryptoBoxSeal(dataB64, publicKeyB64);
-
-export const boxSealOpen = async (
-    encryptedData: string,
-    keyPair: KeyPair,
-): Promise<string> =>
-    (await wasm()).cryptoBoxSealOpen(
-        encryptedData,
-        keyPair.publicKey,
-        keyPair.privateKey,
-    );
 
 export const md5Base64 = async (data: Uint8Array) =>
     (await wasm()).cryptoMd5Base64(data);

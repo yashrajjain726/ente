@@ -18,10 +18,6 @@ import {
 } from "ente-accounts/services/crypto";
 import { ensureMasterKeyFromSession } from "ente-accounts/services/prelogin-session";
 import {
-    ensureMasterKeyFromSession as readMasterKeyFromSession,
-    type DecryptBox,
-} from "ente-accounts/services/session-storage";
-import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,
     updateSRPAndKeyAttributes,
@@ -102,23 +98,6 @@ export const RemoteKeyAttributes = z.object({
 
 export const ensureSavedKeyAttributes = (): KeyAttributes =>
     ensureExpectedLoggedInValue(savedKeyAttributes());
-
-export interface UserKeyPair {
-    publicKey: string;
-    privateKey: string;
-}
-
-export const ensureUserKeyPair = async (
-    decrypt: DecryptBox,
-): Promise<UserKeyPair> => {
-    const { encryptedSecretKey, secretKeyDecryptionNonce, publicKey } =
-        ensureSavedKeyAttributes();
-    const privateKey = await decrypt(
-        { encryptedData: encryptedSecretKey, nonce: secretKeyDecryptionNonce },
-        await readMasterKeyFromSession(decrypt),
-    );
-    return { publicKey, privateKey };
-};
 
 export const getPublicKey = async (email: string) => {
     const res = await fetch(await apiURL("/users/public-key", { email }), {

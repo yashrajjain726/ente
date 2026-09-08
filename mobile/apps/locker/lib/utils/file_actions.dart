@@ -263,7 +263,8 @@ class FileActions {
           file,
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _logger.severe("Failed to create file link", e, stackTrace);
       await dialog.hide();
 
       if (context.mounted) {

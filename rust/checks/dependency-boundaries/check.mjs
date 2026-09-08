@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 const requestedRoot = resolve(process.argv[2]);
@@ -73,6 +73,32 @@ for (const manifest of git(
     .filter((path) => path && existsSync(resolve(root, path)))) {
     if (registered.has(manifest)) continue;
     console.error(`${manifest}: domain crate is not registered in the Cargo workspace`);
+    process.exitCode = 1;
+}
+
+for (const path of git(
+    "ls-files",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "-z",
+    "--",
+    "rust/bindings/wasm/lib/src",
+    "rust/bindings/frb/lib/src",
+)
+    .split("\0")
+    .filter((path) => path.endsWith(".rs") && existsSync(resolve(root, path)))) {
+    const source = readFileSync(resolve(root, path), "utf8");
+    const declarations = [
+        ...source.matchAll(
+            /^\s*pub\s+(?:async\s+)?(?:struct|enum|type|fn)\s+([A-Za-z_][A-Za-z0-9_]*)/gm,
+        ),
+    ].map((match) => match[1]);
+    const error = declarations.find((name) => name.endsWith("Error"));
+    if (!error || declarations[0] === error) continue;
+    console.error(
+        `${path}: ${declarations[0]} precedes ${error}; put boundary errors before exported types and functions`,
+    );
     process.exitCode = 1;
 }
 

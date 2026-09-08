@@ -2567,6 +2567,7 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "ente-legacy",
+ "ente-locker",
  "flutter_rust_bridge",
 ]
 
@@ -2642,6 +2643,14 @@ dependencies = [
  "shapefile",
  "thiserror 2.0.18",
  "zip 8.6.0",
+]
+
+[[package]]
+name = "ente-locker"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2873,6 +2882,7 @@ dependencies = [
  "ente-collections",
  "ente-contacts",
  "ente-core",
+ "ente-locker",
  "js-sys",
  "log",
  "md-5 0.11.0",
