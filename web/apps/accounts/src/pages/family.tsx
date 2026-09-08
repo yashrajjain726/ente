@@ -11,7 +11,8 @@ import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import { t } from "i18next";
-import React, { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase =
     | "loading"
@@ -22,10 +23,11 @@ type Phase =
     | "failed";
 
 const Page: React.FC = () => {
+    const router = useRouter();
     const { onGenericError } = useBaseContext();
     const [phase, setPhase] = useState<Phase>("loading");
     const [invite, setInvite] = useState<FamilyInviteInfo>();
-    const [token, setToken] = useState<string>();
+    const token = useRef<string | null>(null);
 
     const loadInvite = useCallback(
         async (token: string) => {
@@ -45,22 +47,23 @@ const Page: React.FC = () => {
     );
 
     useEffect(() => {
-        const token = new URLSearchParams(window.location.hash.slice(1)).get(
-            "inviteToken",
-        );
-        if (!token) {
+        // Hydration can restore the original URL until the router is ready.
+        if (!router.isReady) return;
+        token.current ??= new URLSearchParams(
+            window.location.hash.slice(1),
+        ).get("inviteToken");
+        if (!token.current) {
             setPhase("invalid");
             return;
         }
-        setToken(token);
-        void loadInvite(token);
-    }, [loadInvite]);
+        window.history.replaceState(null, "", window.location.pathname);
+        void loadInvite(token.current);
+    }, [loadInvite, router.isReady]);
 
     const accept = async () => {
         setPhase("accepting");
         try {
-            setInvite(await acceptFamilyInvite(token!));
-            window.history.replaceState(null, "", window.location.pathname);
+            setInvite(await acceptFamilyInvite(token.current!));
             setPhase("accepted");
         } catch (e) {
             const invalid =
@@ -99,7 +102,9 @@ const Page: React.FC = () => {
                     <Typography variant="h3" sx={{ textAlign: "center" }}>
                         {t("generic_error_retry")}
                     </Typography>
-                    <FocusVisibleButton onClick={() => void loadInvite(token!)}>
+                    <FocusVisibleButton
+                        onClick={() => void loadInvite(token.current!)}
+                    >
                         {t("retry")}
                     </FocusVisibleButton>
                 </Stack>
