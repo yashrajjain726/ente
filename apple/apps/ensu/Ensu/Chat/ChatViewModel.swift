@@ -1902,8 +1902,8 @@ final class ChatViewModel: ObservableObject {
         switch error {
         case AssetDownloadError.Validation:
             return false
-        case let AssetDownloadError.Http(status):
-            if status == 401 || status == 403 || status == 404 { return false }
+        case let AssetDownloadError.Http(_, retryable):
+            return retryable
         default:
             break
         }

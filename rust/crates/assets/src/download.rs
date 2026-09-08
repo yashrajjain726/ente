@@ -54,6 +54,19 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 }
 
+impl Error {
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            Self::Target { source, .. } | Self::Fallback { single: source, .. } => {
+                source.is_retryable()
+            }
+            Self::Cancelled | Self::Validation(_) | Self::StorageFull => false,
+            Self::Http(401 | 403 | 404) => false,
+            _ => true,
+        }
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         if err.kind() == std::io::ErrorKind::StorageFull {
@@ -523,8 +536,9 @@ async fn download_file_single(
         }
 
         if !response.status().is_success() {
-            if attempt == MAX_ATTEMPTS {
-                return Err(Error::Http(response.status().as_u16()));
+            let error = Error::Http(response.status().as_u16());
+            if attempt == MAX_ATTEMPTS || !error.is_retryable() {
+                return Err(error);
             }
             retry_count = retry_count.saturating_add(1);
             continue;
@@ -837,13 +851,13 @@ impl RangeDownloadContext<'_, '_> {
             };
 
             if response.status() != StatusCode::PARTIAL_CONTENT {
+                let error = Error::Http(response.status().as_u16());
                 if response.status() == StatusCode::OK
                     || response.status() == StatusCode::RANGE_NOT_SATISFIABLE
+                    || attempt == MAX_ATTEMPTS
+                    || !error.is_retryable()
                 {
-                    return Err(Error::Http(response.status().as_u16()));
-                }
-                if attempt == MAX_ATTEMPTS {
-                    return Err(Error::Http(response.status().as_u16()));
+                    return Err(error);
                 }
                 self.increment_retry(part_index);
                 self.emit_progress();
@@ -2586,6 +2600,214 @@ mod tests {
         assert_eq!(full_get_count.load(Ordering::SeqCst), 0);
 
         let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[tokio::test]
+    async fn permanent_http_errors_stop_single_stream_retries() {
+        for status in [401, 403, 404] {
+            let requests = http_failure_requests(status, false).await;
+            assert_eq!(requests.get(&None), Some(&1), "HTTP {status}");
+        }
+    }
+
+    #[tokio::test]
+    async fn permanent_http_errors_allow_one_full_stream_fallback() {
+        for status in [401, 403, 404] {
+            let requests = http_failure_requests(status, true).await;
+            assert!(requests.keys().any(Option::is_some));
+            assert_eq!(requests.get(&None), Some(&1), "HTTP {status}");
+            assert!(
+                requests.values().all(|count| *count == 1),
+                "HTTP {status}: {requests:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn other_http_errors_keep_single_stream_retries() {
+        for status in [400, 416, 429, 500] {
+            let requests = http_failure_requests(status, false).await;
+            assert_eq!(requests.get(&None), Some(&MAX_ATTEMPTS), "HTTP {status}");
+        }
+    }
+
+    #[tokio::test]
+    async fn recoverable_http_failures_still_download() {
+        for (ranged, status) in [
+            (false, 429),
+            (false, 500),
+            (true, 200),
+            (true, 403),
+            (true, 416),
+        ] {
+            let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize));
+            let full_gets = Arc::new(AtomicUsize::new(0));
+            let server = {
+                let bytes = Arc::clone(&bytes);
+                let full_gets = Arc::clone(&full_gets);
+                TestServer::spawn(move |mut stream| {
+                    let Some(request) = read_test_request(&stream) else {
+                        return;
+                    };
+                    if request.line.starts_with("HEAD ") {
+                        let ranges = if ranged {
+                            "Accept-Ranges: bytes\r\n"
+                        } else {
+                            ""
+                        };
+                        let response = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n{ranges}Connection: close\r\n\r\n",
+                            bytes.len()
+                        );
+                        let _ = stream.write_all(response.as_bytes());
+                        return;
+                    }
+                    if request.range.is_some()
+                        || (!ranged && full_gets.fetch_add(1, Ordering::SeqCst) == 0)
+                    {
+                        let response = format!(
+                            "HTTP/1.1 {status} Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        );
+                        let _ = stream.write_all(response.as_bytes());
+                        return;
+                    }
+                    if ranged {
+                        full_gets.fetch_add(1, Ordering::SeqCst);
+                    }
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        bytes.len()
+                    );
+                    let _ = stream.write_all(response.as_bytes());
+                    let _ = stream.write_all(bytes.as_slice());
+                })
+            };
+            let test_dir = scratch_dir(&format!("recoverable-{status}-{ranged}"));
+            let destination = test_dir.join("model.bin");
+            download(
+                vec![DownloadTarget {
+                    label: "Model".to_string(),
+                    url: server.url("/model.bin"),
+                    expected_size: bytes.len() as u64,
+                    sha256: sha_hex(&bytes),
+                    destination: destination.clone(),
+                }],
+                |_| {},
+                false,
+            )
+            .await
+            .expect("recoverable download");
+            assert_eq!(fs::read(&destination).unwrap(), *bytes);
+            assert_eq!(full_gets.load(Ordering::SeqCst), if ranged { 1 } else { 2 });
+            let _ = fs::remove_dir_all(test_dir);
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_http_errors_prefer_non_retryable_failure() {
+        use crate::{Asset, AssetFile, AssetStore};
+
+        let server = TestServer::spawn(|mut stream| {
+            let Some(request) = read_test_request(&stream) else {
+                return;
+            };
+            let (status, size) = if request.line.starts_with("HEAD ") {
+                (200, 1)
+            } else {
+                let path = request.line.split_whitespace().nth(1).unwrap();
+                (path[1..].parse::<u16>().unwrap(), 0)
+            };
+            let response = format!(
+                "HTTP/1.1 {status} Test\r\nContent-Length: {size}\r\nConnection: close\r\n\r\n"
+            );
+            let _ = stream.write_all(response.as_bytes());
+        });
+
+        for (statuses, expected) in [([500, 403], 403), ([403, 500], 403), ([500, 502], 500)] {
+            let assets = statuses.map(|status| {
+                Asset::file(
+                    vec![status.to_string()],
+                    AssetFile {
+                        name: "model".to_string(),
+                        url: server.url(&format!("/{status}")),
+                        size: 1,
+                        sha256: "0".repeat(64),
+                    },
+                )
+                .unwrap()
+            });
+            let root = scratch_dir("batch-retryability");
+            let error = AssetStore::new(&root)
+                .download(&assets, |_| {}, CancellationToken::new())
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(
+                    &error,
+                    Error::Target { source, .. }
+                        if matches!(**source, Error::Http(status) if status == expected)
+                ),
+                "{statuses:?}: {error}"
+            );
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    async fn http_failure_requests(
+        status: u16,
+        ranged: bool,
+    ) -> std::collections::HashMap<Option<String>, usize> {
+        let requests = Arc::new(Mutex::new(std::collections::HashMap::new()));
+        let server = {
+            let requests = Arc::clone(&requests);
+            TestServer::spawn(move |mut stream| {
+                let Some(request) = read_test_request(&stream) else {
+                    return;
+                };
+                let response = if request.line.starts_with("HEAD ") {
+                    let ranges = if ranged {
+                        "Accept-Ranges: bytes\r\n"
+                    } else {
+                        ""
+                    };
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {MIN_RANGE_DOWNLOAD_BYTES}\r\n{ranges}Connection: close\r\n\r\n"
+                    )
+                } else {
+                    *requests.lock().unwrap().entry(request.range).or_insert(0) += 1;
+                    format!(
+                        "HTTP/1.1 {status} Failure\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                };
+                let _ = stream.write_all(response.as_bytes());
+            })
+        };
+        let test_dir = scratch_dir(&format!("http-{status}-{ranged}"));
+        let destination = test_dir.join("model.bin");
+        let error = download(
+            vec![DownloadTarget {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                expected_size: MIN_RANGE_DOWNLOAD_BYTES,
+                destination: destination.clone(),
+                sha256: "0".repeat(64),
+            }],
+            |_| {},
+            false,
+        )
+        .await
+        .expect_err("HTTP failure");
+        let Error::Target { source, .. } = error else {
+            panic!("missing download context")
+        };
+        let error = match *source {
+            Error::Fallback { single, .. } => *single,
+            error => error,
+        };
+        assert!(matches!(error, Error::Http(actual) if actual == status));
+        assert!(!destination.exists());
+        let _ = fs::remove_dir_all(test_dir);
+        requests.lock().unwrap().clone()
     }
 
     #[tokio::test]
