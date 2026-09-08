@@ -8,12 +8,10 @@ import {
     savedPartialLocalUser,
 } from "ente-accounts/services/accounts-db";
 import { decryptBox } from "ente-accounts/services/crypto";
+import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/prelogin-session";
 import { recoveryKeyFromMnemonic } from "ente-accounts/services/recovery-key";
 import { appHomeRoute, stashRedirect } from "ente-accounts/services/redirect";
-import {
-    haveMasterKeyInSession,
-    saveMasterKeyInSessionAndSafeStore,
-} from "ente-accounts/services/session-storage";
+import { haveMasterKeyInSession } from "ente-accounts/services/session-storage";
 import type { KeyAttributes } from "ente-accounts/services/user";
 import {
     decryptAndStoreTokenIfNeeded,
