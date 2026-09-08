@@ -55,3 +55,39 @@ impl MlDb {
             .map_err(Into::into)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::ml_db::tests::{cases, check_seeded, ids, preview, seeded, status};
+
+    #[test]
+    fn seeded_file_id_sets() {
+        check_seeded(&cases![
+            "fd data": ids([1, 2, 3]) => |db| db.get_file_ids_with_fd_data(None),
+            "fd mldata": ids([2]) => |db| db.get_file_ids_with_fd_data(Some("mldata")),
+        ]);
+    }
+
+    #[test]
+    fn seeded_video_previews() {
+        check_seeded(&cases![
+            "video previews": HashMap::from([(1, preview("obj1", 10)), (3, preview("obj3", 30))]) =>
+                |db| db.get_file_ids_vid_preview(),
+        ]);
+    }
+
+    #[test]
+    fn filedata_upsert() {
+        let (_directory, db) = seeded();
+        db.put_fd_status(&[]).unwrap();
+        db.put_fd_status(&[status(1, "vid_preview", Some("obj1b"))])
+            .unwrap();
+        assert_eq!(
+            db.get_file_ids_vid_preview().unwrap(),
+            HashMap::from([(1, preview("obj1b", 10)), (3, preview("obj3", 30))])
+        );
+        assert_eq!(db.get_file_ids_with_fd_data(None).unwrap(), ids([1, 2, 3]));
+    }
+}
