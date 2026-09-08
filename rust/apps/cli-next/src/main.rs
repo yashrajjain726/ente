@@ -2,7 +2,6 @@ mod api;
 mod args;
 mod login;
 mod output;
-mod permissions;
 mod vault;
 
 use std::{
@@ -12,10 +11,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use ente_core::{
-    b64,
-    crypto::{Key, PublicKey, SecretKey},
-};
+use ente_core::{b64, crypto::Key};
 use ente_photos::collections;
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -81,16 +77,11 @@ async fn album_list(selected: Option<&str>, json_output: bool) -> Result<()> {
     let state = State::load()?;
     let account = &state.accounts[state.resolve(selected)?];
     let session = api::session(account, Product::Photos)?;
-    let albums = collections::list(
-        &session,
-        account.user_id,
-        &PublicKey::try_from_slice(&account.identity.public_key)?,
-        &SecretKey::try_from_slice(&account.identity.secret_key)?,
-    )
-    .await?
-    .into_iter()
-    .map(AlbumView::try_from)
-    .collect::<Result<Vec<_>>>()?;
+    let albums = collections::list(&session)
+        .await?
+        .into_iter()
+        .map(AlbumView::try_from)
+        .collect::<Result<Vec<_>>>()?;
     if json_output {
         output::json(&albums)
     } else {
@@ -111,12 +102,12 @@ async fn session(
             api::raw(&state.accounts[index], product, args).await
         }
         SessionCommand::Login(args) => {
-            let (state, index) = login::login(Vault::open()?, product, args, selected).await?;
+            let (state, index) = login::login(product, args, selected).await?;
             let account = AccountView::new(&state.accounts[index], state.selected);
             if json_output {
                 output::json(&json!({ "account": account, "product": product }))
             } else {
-                output::accounts(&[account])
+                output::account(&account)
             }
         }
         SessionCommand::Logout => {
@@ -138,7 +129,7 @@ async fn session(
             output::action(
                 json_output,
                 &json!({ "account": name, "product": product, "loggedOut": true }),
-                &format!("Logged out of {} for {:?}.", product.name(), name),
+                &format!("Logged out of {} for {:?}.", product.display_name(), name),
             )
         }
     }
@@ -165,7 +156,7 @@ fn account_command(command: AccountCommand, json_output: bool) -> Result<()> {
             if json_output {
                 output::json(&account)
             } else {
-                output::accounts(&[account])
+                output::account(&account)
             }
         }
         AccountCommand::Switch { name } => {
@@ -211,7 +202,7 @@ fn output_account(state: State, index: usize, json_output: bool) -> Result<()> {
     if json_output {
         output::json(&account)
     } else {
-        output::accounts(&[account])
+        output::account(&account)
     }
 }
 

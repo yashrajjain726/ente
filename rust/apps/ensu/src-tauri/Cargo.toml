@@ -29,7 +29,7 @@ libc = "0.2.0"
 rustix = { version = "1.1.4", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

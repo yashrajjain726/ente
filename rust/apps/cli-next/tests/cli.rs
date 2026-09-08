@@ -19,6 +19,12 @@ fn reads_do_not_initialize_storage() {
         if existing_home {
             fs::create_dir(&path).unwrap();
         }
+        let output = home
+            .command(&["account", "list"])
+            .env("ENTE_CLI_HOME", &path)
+            .output()
+            .unwrap();
+        assert_eq!(success(output).stdout, b"No accounts on this device.\n");
         for args in [
             vec!["account", "list", "--json"],
             vec!["account", "view", "missing"],
@@ -66,6 +72,19 @@ fn reads_do_not_initialize_storage() {
 }
 
 #[test]
+fn invalid_login_host_does_not_initialize_storage() {
+    let home = TestHome::new();
+    let path = home.dir.path().join("unused");
+    let output = home
+        .command(&["photos", "login", "--host", "https://["])
+        .env("ENTE_CLI_HOME", &path)
+        .output()
+        .unwrap();
+    assert!(failure(&output).contains("invalid API host"));
+    assert!(!path.exists());
+}
+
+#[test]
 fn deleted_collections_are_filtered_before_decryption() {
     let mut server = mockito::Server::new();
     let request = server
@@ -81,10 +100,15 @@ fn deleted_collections_are_filtered_before_decryption() {
             }]})
             .to_string(),
         )
+        .expect(2)
         .create();
     let home = TestHome::new();
     home.seed(&server.url());
     assert_eq!(home.json(&["photos", "album", "list"]), json!([]));
+    assert_eq!(
+        success(home.run(&["photos", "album", "list"])).stdout,
+        b"No albums.\n"
+    );
     request.assert();
 }
 
@@ -213,26 +237,9 @@ fn vault_schema_version_is_checked_after_decryption() {
 #[tokio::test]
 async fn raw_api_preserves_requests_and_responses_without_leaking_credentials() {
     let mut origin = mockito::Server::new_async().await;
-    let mut other = mockito::Server::new_async().await;
     let home = TestHome::new();
     home.seed(&origin.url());
     let secret = "--8=";
-    let escaped = other
-        .mock("GET", mockito::Matcher::Any)
-        .expect(0)
-        .create_async()
-        .await;
-    let redirect = origin
-        .mock("GET", "/redirect")
-        .with_status(302)
-        .with_header("location", &format!("{}/stolen", other.url()))
-        .create_async()
-        .await;
-    failure(&home.run(&["photos", "api", "/redirect"]));
-    failure(&home.run(&["photos", "api", &format!("{}/stolen", other.url())]));
-    redirect.assert_async().await;
-    escaped.assert_async().await;
-
     let headers = home.dir.path().join("headers.json");
     fs::write(&headers, br#"{"Host":"different.example.org"}"#).unwrap();
     let mismatched_host = origin.mock("GET", "/host").expect(0).create_async().await;
@@ -312,7 +319,7 @@ fn private_json_errors_do_not_echo_values() {
     let ping = server
         .mock("GET", "/ping")
         .with_body(r#"{"message":"pong","id":"fixture"}"#)
-        .expect(5)
+        .expect(0)
         .create();
     let authentication = server
         .mock("GET", "/users/srp/attributes")
@@ -321,8 +328,6 @@ fn private_json_errors_do_not_echo_values() {
         .create();
     let request = server.mock("GET", "/request").expect(0).create();
     let home = TestHome::new();
-    home.seed(&server.url());
-    let original = fs::read(home.dir.path().join("vault.json")).unwrap();
     let mut errors = Vec::new();
     for input in [
         json!({"email": "fixture@example.org", "password": 987654321}),
@@ -340,6 +345,9 @@ fn private_json_errors_do_not_echo_values() {
         assert!(error.contains("login input must contain"), "{error}");
         errors.push(error);
     }
+    assert_eq!(fs::read_dir(home.dir.path()).unwrap().count(), 0);
+    home.seed(&server.url());
+    let original = fs::read(home.dir.path().join("vault.json")).unwrap();
     for input in [
         json!({"x-auth-token": 987654321}),
         json!("private-987654321"),
@@ -394,10 +402,23 @@ fn logout_reconciles_remote_and_local_session_state() {
         .create();
     let home = TestHome::new();
     home.seed(&server.url());
-    success(home.run(&["photos", "logout"]));
+    assert_eq!(
+        success(home.run(&["photos", "logout"])).stdout,
+        b"Logged out of Ente Photos for \"fixture\".\n"
+    );
     assert_eq!(
         home.json(&["account", "view", "fixture"])["products"],
         json!([])
+    );
+    let origin = server.url();
+    assert_eq!(
+        success(home.run(&["account", "list"])).stdout,
+        format!(
+            "SELECTED  NAME     EMAIL                {host:<width$}  LOGGED IN  ID\n*         fixture  fixture@example.org  {origin}  none       9007199254740993\n",
+            host = "HOST",
+            width = origin.len()
+        )
+        .as_bytes()
     );
     revoked.assert();
 
@@ -421,6 +442,10 @@ fn logout_reconciles_remote_and_local_session_state() {
 fn account_updates_preserve_identity_and_selection() {
     let home = TestHome::new();
     home.seed("http://localhost:8080");
+    assert_eq!(
+        success(home.run(&["account", "view", "fixture"])).stdout,
+        b"Name       fixture\nEmail      fixture@example.org\nHost       http://localhost:8080\nLogged in  photos\nSelected   yes\nID         9007199254740993\n"
+    );
     assert_eq!(
         home.json(&["account", "list"]),
         json!([{
@@ -567,7 +592,7 @@ impl TestHome {
             "accounts": [{
                 "storage_id": id, "name": "fixture", "email": "fixture@example.org",
                 "origin": origin, "user_id": 9007199254740993i64,
-                "identity": {"master_key": vec![0u8; 32], "secret_key": vec![0u8; 32], "public_key": vec![0u8; 32]},
+                "identity": {"master_key": vec![0u8; 32], "secret_key": vec![0u8; 32]},
                 "sessions": {"photos": {"token": [0xfb, 0xef]}}
             }]
         }));

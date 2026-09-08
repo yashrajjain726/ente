@@ -47,12 +47,8 @@ pub struct AccountsClient {
 
 impl AccountsClient {
     pub fn new(config: AccountsClientConfig) -> Result<Self> {
-        Ok(Self::with_http(config, Http::new()?))
-    }
-
-    pub fn with_http(config: AccountsClientConfig, http: Http) -> Self {
         let api = Api::new(
-            http,
+            Http::new()?,
             ApiConfig {
                 origin: config.origin,
                 client_package: Some(config.client_package.clone()),
@@ -61,10 +57,10 @@ impl AccountsClient {
                 auth: config.auth_token.map(Auth::User),
             },
         );
-        Self {
+        Ok(Self {
             api,
             client_package: config.client_package,
-        }
+        })
     }
 
     pub fn set_auth_token(&self, auth_token: Option<String>) {

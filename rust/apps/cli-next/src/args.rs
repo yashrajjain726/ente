@@ -16,7 +16,7 @@ pub struct Cli {
         long,
         global = true,
         value_name = "NAME",
-        help = "Use this saved account instead of the selected one"
+        help = "Use this account instead of the selected one"
     )]
     pub account: Option<String>,
     #[command(subcommand)]
@@ -25,22 +25,22 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    #[command(about = "Log in to Ente Photos, list albums, or call the Photos API")]
+    #[command(about = "Manage Ente Photos")]
     Photos {
         #[command(subcommand)]
         command: PhotosCommand,
     },
-    #[command(about = "Log in to Ente Locker or call the Locker API")]
+    #[command(about = "Manage Ente Locker")]
     Locker {
         #[command(subcommand)]
         command: SessionCommand,
     },
-    #[command(about = "Log in to Ente Auth or call the Auth API")]
+    #[command(about = "Manage Ente Auth")]
     Auth {
         #[command(subcommand)]
         command: SessionCommand,
     },
-    #[command(about = "View and manage saved accounts")]
+    #[command(about = "Manage accounts on this device")]
     Account {
         #[command(subcommand)]
         command: AccountCommand,
@@ -63,7 +63,7 @@ Keep the same home and key across unattended invocations."
 pub enum PhotosCommand {
     #[command(flatten)]
     Session(SessionCommand),
-    #[command(about = "Work with albums")]
+    #[command(about = "Manage albums")]
     Album {
         #[command(subcommand)]
         command: AlbumCommand,
@@ -83,7 +83,7 @@ otp is the email code. totp is the authenticator code. Include them only when re
     #[command(about = "Log out")]
     Logout,
     #[command(
-        about = "Send a raw API request",
+        about = "Make an authenticated API request",
         after_help = "The response body is written unchanged, including when --json is set."
     )]
     Api(ApiArgs),
@@ -100,7 +100,7 @@ pub struct LoginArgs {
     #[arg(
         long,
         conflicts_with = "account",
-        help = "Name for a new saved account; defaults to the account's email"
+        help = "Name for a new account on this device; defaults to the account's email"
     )]
     pub name: Option<String>,
     #[arg(
@@ -142,28 +142,28 @@ pub enum AlbumCommand {
 
 #[derive(Subcommand)]
 pub enum AccountCommand {
-    #[command(about = "List saved accounts")]
+    #[command(about = "List accounts on this device")]
     List,
-    #[command(about = "Show a saved account")]
+    #[command(about = "Show an account")]
     View {
-        #[arg(help = "Saved account name")]
+        #[arg(help = "Account name")]
         name: String,
     },
     #[command(about = "Make an account the selected one")]
     Switch {
-        #[arg(help = "Saved account name")]
+        #[arg(help = "Account name")]
         name: String,
     },
     #[command(about = "Change an account's local name")]
     Rename {
-        #[arg(help = "Saved account name")]
+        #[arg(help = "Account name")]
         name: String,
         #[arg(help = "New local name")]
         new_name: String,
     },
-    #[command(about = "Forget an account on this machine; remote sessions stay valid")]
+    #[command(about = "Forget an account on this device; remote sessions stay valid")]
     Remove {
-        #[arg(help = "Saved account name")]
+        #[arg(help = "Account name")]
         name: String,
     },
 }
@@ -197,6 +197,14 @@ impl Product {
             Self::Photos => "photos",
             Self::Locker => "locker",
             Self::Auth => "auth",
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Photos => "Ente Photos",
+            Self::Locker => "Ente Locker",
+            Self::Auth => "Ente Auth",
         }
     }
 

@@ -4,6 +4,7 @@ edition.workspace = true
 
 [dependencies]
 ente-assets.workspace = true
+ente-collections.workspace = true
 ente-core.workspace = true
 ente-exif.workspace = true
 ente-location.workspace = true
@@ -11,7 +12,6 @@ quick-xml.workspace = true
 rusqlite = { workspace = true, default-features = true }
 serde.workspace = true
 thiserror.workspace = true
-zeroize.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

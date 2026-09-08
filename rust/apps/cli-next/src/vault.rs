@@ -2,7 +2,7 @@ use std::{
     collections::BTreeMap,
     env,
     fs::{self, File, OpenOptions},
-    io::ErrorKind,
+    io::{self, ErrorKind},
     path::{Path, PathBuf},
 };
 
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
-use crate::{args::Product, parse_json, permissions};
+use crate::{args::Product, parse_json};
 
 const SCHEMA_VERSION: u8 = 1;
 const VAULT_FILE: &str = "vault.json";
@@ -65,7 +65,6 @@ pub struct Account {
 pub struct AccountKeys {
     pub master_key: Vec<u8>,
     pub secret_key: Vec<u8>,
-    pub public_key: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, ZeroizeOnDrop)]
@@ -77,7 +76,7 @@ impl Vault {
     pub fn open() -> Result<Self> {
         let override_key = environment_key()?;
         let home = application_home()?;
-        permissions::create_home(&home).context("cannot create private CLI home")?;
+        create_home(&home).context("cannot create private CLI home")?;
         let home = fs::canonicalize(home)?;
         let lock = lock(&home)?;
         let encrypted = read_vault(&home)?;
@@ -227,6 +226,20 @@ fn read_vault(home: &Path) -> Result<Option<Vec<u8>>> {
     }
 }
 
+fn create_home(path: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    builder.mode(0o700);
+    builder.create(path)?;
+    #[cfg(unix)]
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
+
 fn lock(home: &Path) -> Result<File> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true);
@@ -312,26 +325,22 @@ fn keyring_error(error: keyring::Error, exists: bool) -> anyhow::Error {
 }
 
 fn decrypt(bytes: &[u8], key: &Key) -> Result<State> {
-    let unlock_error = || {
-        anyhow::anyhow!(
-            "cannot unlock CLI vault: wrong key or damaged ciphertext; it has not been modified"
-        )
-    };
-    let encrypted: EncryptedVault = parse_json(bytes)
-        .context("unsupported or invalid CLI vault format; it has not been modified")?;
-    let ciphertext = b64::decode(&encrypted.data).map_err(|_| {
-        anyhow::anyhow!("unsupported or invalid CLI vault format; it has not been modified")
-    })?;
+    let unlock_error =
+        || anyhow::anyhow!("cannot unlock CLI vault: wrong key or damaged ciphertext");
+    let encrypted: EncryptedVault =
+        parse_json(bytes).context("unsupported or invalid CLI vault format")?;
+    let ciphertext = b64::decode(&encrypted.data)
+        .map_err(|_| anyhow::anyhow!("unsupported or invalid CLI vault format"))?;
     let plaintext =
         Zeroizing::new(blob::decrypt_combined(&ciphertext, key).map_err(|_| unlock_error())?);
     let version: VersionedState<serde::de::IgnoredAny> =
-        parse_json(&plaintext).context("invalid CLI vault contents; it has not been modified")?;
+        parse_json(&plaintext).context("invalid CLI vault contents")?;
     ensure!(
         version.schema_version == SCHEMA_VERSION,
-        "unsupported CLI vault schema; it has not been modified"
+        "unsupported CLI vault schema"
     );
     let stored: VersionedState<State> =
-        parse_json(&plaintext).context("invalid CLI vault contents; it has not been modified")?;
+        parse_json(&plaintext).context("invalid CLI vault contents")?;
     Ok(stored.state)
 }
 

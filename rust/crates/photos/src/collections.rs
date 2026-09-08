@@ -1,10 +1,10 @@
+use ente_collections::open_collection_key;
 use ente_core::{
     Session, b64,
-    crypto::{self, Header, Key, Nonce, PublicKey, SecretKey, blob, sealed, secretbox},
+    crypto::{self, Header, Nonce, blob, secretbox},
     http,
 };
 use serde::Deserialize;
-use zeroize::Zeroizing;
 
 const DEFAULT_HIDDEN_SUBTYPE: u8 = 1;
 const ARCHIVED_VISIBILITY: u8 = 1;
@@ -14,10 +14,27 @@ const HIDDEN_VISIBILITY: u8 = 2;
 pub struct Collection {
     pub id: i64,
     pub name: String,
-    pub kind: String,
+    pub kind: Kind,
     pub visibility: Visibility,
     pub owner_id: i64,
     pub updated_at_micros: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Kind {
+    Album,
+    Favorites,
+    Uncategorized,
+}
+
+impl Kind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Album => "album",
+            Self::Favorites => "favorites",
+            Self::Uncategorized => "uncategorized",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -35,16 +52,13 @@ pub enum Error {
     Crypto(#[from] crypto::Error),
     #[error(transparent)]
     Base64(#[from] b64::DecodeError),
+    #[error(transparent)]
+    Collections(#[from] ente_collections::Error),
     #[error("invalid collection {id}: {reason}")]
     InvalidCollection { id: i64, reason: &'static str },
 }
 
-pub async fn list(
-    session: &Session,
-    user_id: i64,
-    public_key: &PublicKey,
-    secret_key: &SecretKey,
-) -> Result<Vec<Collection>, Error> {
+pub async fn list(session: &Session) -> Result<Vec<Collection>, Error> {
     let response: CollectionsResponse = session
         .api
         .get("/collections/v2")
@@ -55,26 +69,18 @@ pub async fn list(
         .await?
         .json()
         .await?;
-    let master_key = Key::try_from_slice(&session.master_key)?;
-
     response
         .collections
         .into_iter()
         .filter(|c| c.is_deleted != Some(true))
         .map(|c| {
-            let owned = c.owner.id == user_id;
-            let encrypted_key = b64::decode(&c.encrypted_key)?;
-            let key_bytes = Zeroizing::new(if owned {
-                let nonce = c.required(&c.key_decryption_nonce, "missing key nonce")?;
-                secretbox::decrypt(
-                    &encrypted_key,
-                    &Nonce::try_from_slice(&b64::decode(nonce)?)?,
-                    &master_key,
-                )?
-            } else {
-                sealed::open(&encrypted_key, public_key, secret_key)?
-            });
-            let key = Key::try_from_slice(&key_bytes)?;
+            let owned = c.owner.id == session.user_id;
+            let key = open_collection_key(
+                session,
+                c.owner.id,
+                &c.encrypted_key,
+                c.key_decryption_nonce.as_deref(),
+            )?;
             let name = match c.name.as_deref().filter(|name| !name.is_empty()) {
                 Some(name) => name.to_owned(),
                 None => {
@@ -118,7 +124,11 @@ pub async fn list(
             Ok(Collection {
                 id: c.id,
                 name,
-                kind: c.kind,
+                kind: match c.kind.as_str() {
+                    "favorites" => Kind::Favorites,
+                    "uncategorized" => Kind::Uncategorized,
+                    _ => Kind::Album,
+                },
                 visibility: match visibility {
                     ARCHIVED_VISIBILITY => Visibility::Archived,
                     HIDDEN_VISIBILITY => Visibility::Hidden,

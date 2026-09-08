@@ -10,7 +10,7 @@ use ente_accounts::{
     AuthFlow, AuthFlowUi, DEFAULT_API_ORIGIN, LoginParams, OtpPurpose, SecondFactorMethod,
     TotpPurpose,
 };
-use ente_core::http::{Api, ApiConfig};
+use ente_core::http::{Api, ApiConfig, Http};
 use serde::Deserialize;
 use url::Url;
 use uuid::Uuid;
@@ -24,27 +24,36 @@ use crate::{
 };
 
 pub async fn login(
-    vault: Vault,
     product: Product,
     args: LoginArgs,
     selected: Option<&str>,
 ) -> Result<(State, usize)> {
+    let requested_origin = match selected {
+        Some(_) => None,
+        None => Some(normalize_host(
+            args.host.as_deref().unwrap_or(DEFAULT_API_ORIGIN),
+        )?),
+    };
+    let credentials = args.input.as_deref().map(Credentials::read).transpose()?;
+    let vault = Vault::open()?;
     let (expected, origin) = match selected {
         Some(name) => {
             let account = &vault.state.accounts[vault.state.named(name)?];
             (Some(account.storage_id), account.origin.clone())
         }
-        None => (
-            None,
-            normalize_host(args.host.as_deref().unwrap_or(DEFAULT_API_ORIGIN))?,
-        ),
+        None => (None, requested_origin.unwrap()),
     };
     let (snapshot, access) = vault.release();
-    Api::new(api::http()?.into(), ApiConfig::new(origin.clone()))
+    let mut config = ApiConfig::new(origin.clone());
+    config.user_agent = Some(api::USER_AGENT.into());
+    Api::new(Http::new()?, config)
         .ping()
         .await
         .context("cannot reach the selected Ente server")?;
-    let (params, mut ui) = LoginUi::read(args.input.as_deref())?;
+    let (params, mut ui) = match credentials {
+        Some(credentials) => credentials.into_login(),
+        None => LoginUi::prompt()?,
+    };
     let client = api::accounts_client(&origin, product)?;
     let mut authenticated = AuthFlow::new(&client, &mut ui).login(params).await?;
     client.set_auth_token(Some(ente_core::b64::encode_url_safe(
@@ -63,16 +72,11 @@ pub async fn login(
             ensure!(
                 snapshot_existing
                     .is_some_and(|index| snapshot.accounts[index].storage_id == expected),
-                "authenticated identity does not match --account; local state has not changed"
+                "authenticated identity does not match --account"
             );
         }
         let mut new_name = requested_name.unwrap_or_else(|| email.clone());
-        if snapshot_existing.is_some() {
-            ensure!(
-                !supplied_name,
-                "account already exists; use account rename to change its local name"
-            );
-        } else {
+        if snapshot_existing.is_none() {
             while let Err(error) = snapshot.check_name(&new_name) {
                 if !ui.interactive {
                     return Err(error);
@@ -97,18 +101,15 @@ pub async fn login(
                 .accounts
                 .iter()
                 .position(|account| account.storage_id == expected)
-                .context(
-                    "selected account was removed during login; local state has not changed",
-                )?;
+                .context("selected account was removed during login")?;
             ensure!(
                 existing == Some(current),
-                "authenticated identity does not match --account; local state has not changed"
+                "authenticated identity does not match --account"
             );
         }
         let identity = AccountKeys {
             master_key: std::mem::take(&mut authenticated.secrets.master_key),
             secret_key: std::mem::take(&mut authenticated.secrets.secret_key),
-            public_key: std::mem::take(&mut authenticated.secrets.public_key),
         };
         let session = StoredSession {
             token: std::mem::take(&mut authenticated.secrets.token),
@@ -200,29 +201,34 @@ struct Credentials {
     totp: Option<String>,
 }
 
+impl Credentials {
+    fn read(path: &Path) -> Result<Self> {
+        parse_json(&read_input(path)?)
+            .context("login input must contain email and password, with optional otp and totp")
+    }
+
+    fn into_login(mut self) -> (LoginParams, LoginUi) {
+        let params = LoginParams {
+            email: std::mem::take(&mut self.email),
+            password: Zeroizing::new(std::mem::take(&mut self.password)),
+        };
+        (
+            params,
+            LoginUi {
+                interactive: false,
+                credentials: Some(self),
+            },
+        )
+    }
+}
+
 struct LoginUi {
     interactive: bool,
     credentials: Option<Credentials>,
 }
 
 impl LoginUi {
-    fn read(path: Option<&Path>) -> Result<(LoginParams, Self)> {
-        if let Some(path) = path {
-            let mut credentials: Credentials = parse_json(&read_input(path)?).context(
-                "login input must contain email and password, with optional otp and totp",
-            )?;
-            let params = LoginParams {
-                email: std::mem::take(&mut credentials.email),
-                password: Zeroizing::new(std::mem::take(&mut credentials.password)),
-            };
-            return Ok((
-                params,
-                Self {
-                    interactive: false,
-                    credentials: Some(credentials),
-                },
-            ));
-        }
+    fn prompt() -> Result<(LoginParams, Self)> {
         ensure!(
             io::stdin().is_terminal() && io::stderr().is_terminal(),
             "noninteractive login requires --input <file> or --input -"

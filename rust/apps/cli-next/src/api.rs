@@ -4,13 +4,12 @@ use anyhow::{Context, Result, ensure};
 use ente_accounts::{AccountsClient, AccountsClientConfig};
 use ente_core::{
     Session, b64,
-    crypto::SecretVec,
-    http::{Api, ApiConfig, Auth},
+    crypto::{Key, SecretKey},
+    http::{ApiConfig, Auth},
 };
 use reqwest::{
     Client, Method,
     header::{HeaderMap, HeaderName, HeaderValue},
-    redirect::Policy,
 };
 use url::Url;
 use zeroize::Zeroizing;
@@ -21,42 +20,36 @@ use crate::{
     vault::Account,
 };
 
+pub(crate) const USER_AGENT: &str = concat!("ente-cli-next/", env!("CARGO_PKG_VERSION"));
+
 pub fn http() -> Result<Client> {
     Ok(Client::builder()
-        .user_agent(concat!("ente-cli-next/", env!("CARGO_PKG_VERSION")))
+        .user_agent(USER_AGENT)
         .connect_timeout(Duration::from_secs(15))
         .read_timeout(Duration::from_secs(30))
-        .redirect(Policy::custom(|attempt| {
-            if attempt.previous().len() >= 10 {
-                attempt.error("too many redirects")
-            } else if attempt
-                .previous()
-                .first()
-                .is_some_and(|first| first.origin() != attempt.url().origin())
-            {
-                attempt.error("redirect leaves the selected account's origin")
-            } else {
-                attempt.follow()
-            }
-        }))
         .build()?)
 }
 
 pub fn accounts_client(origin: &str, product: Product) -> Result<AccountsClient> {
-    Ok(AccountsClient::with_http(
-        AccountsClientConfig::new(product.client_package()).with_origin(origin),
-        http()?.into(),
-    ))
+    Ok(AccountsClient::new(
+        AccountsClientConfig::new(product.client_package())
+            .with_origin(origin)
+            .with_user_agent(USER_AGENT),
+    )?)
 }
 
 pub fn session(account: &Account, product: Product) -> Result<Session> {
     let mut config = ApiConfig::new(account.origin.clone());
     config.client_package = Some(product.client_package().into());
+    config.user_agent = Some(USER_AGENT.into());
     config.auth = Some(Auth::User(b64::encode_url_safe(account.token(product)?)));
-    Ok(Session {
-        api: Api::new(http()?.into(), config),
-        master_key: SecretVec::new(account.identity.master_key.clone()),
-    })
+    Session::new(
+        config,
+        account.user_id,
+        Key::try_from_slice(&account.identity.master_key)?,
+        SecretKey::try_from_slice(&account.identity.secret_key)?,
+    )
+    .map_err(Into::into)
 }
 
 pub async fn raw(account: &Account, product: Product, args: ApiArgs) -> Result<()> {
@@ -111,13 +104,13 @@ pub async fn raw(account: &Account, product: Product, args: ApiArgs) -> Result<(
     if let Some(path) = args.body {
         request = request.body(read_input(&path)?.to_vec());
     }
-    let mut response = request.send().await.map_err(reqwest::Error::without_url)?;
+    let mut response = request.send().await.map_err(ente_core::http::Error::from)?;
     let status = response.status();
     let mut stdout = std::io::stdout().lock();
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(reqwest::Error::without_url)?
+        .map_err(ente_core::http::Error::from)?
     {
         stdout.write_all(&chunk)?;
     }
