@@ -34,12 +34,13 @@ type fileCountInitSnapshot struct {
 
 func (repo *UsageRepository) readFileCountInitSnapshot(ctx context.Context, userID int64) (fileCountInitSnapshot, error) {
 	var counts fileCountInitSnapshot
-	err := repo.DB.QueryRowContext(ctx, `WITH memberships AS MATERIALIZED (
+	err := repo.DB.QueryRowContext(ctx, `WITH owned_collections AS MATERIALIZED (
+		SELECT collection_id, app FROM collections WHERE owner_id = $1
+	), memberships AS MATERIALIZED (
 		SELECT cf.file_id, c.app, f.owner_id, cf.f_owner_id
-		FROM collections AS c
+		FROM owned_collections AS c
 		JOIN collection_files AS cf ON cf.collection_id = c.collection_id AND cf.is_deleted = FALSE
 		JOIN files AS f ON f.file_id = cf.file_id
-		WHERE c.owner_id = $1
 	), owned_files AS MATERIALIZED (
 		SELECT DISTINCT file_id FROM memberships WHERE owner_id = $1
 	), source AS (
