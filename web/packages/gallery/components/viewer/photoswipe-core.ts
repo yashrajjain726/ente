@@ -201,6 +201,9 @@ export class FileViewerPhotoSwipe<
                     const i = newIndex;
 
                     pswp.goTo(i);
+                    // Rebind the annotation to the refreshed destination slide.
+                    _currentAnnotatedFile = undefined;
+                    pswp.refreshSlideContent(i);
                     pswp.refreshSlideContent(i == 0 ? newFileCount - 1 : i - 1);
                     pswp.refreshSlideContent(i + 1 == newFileCount ? 0 : i + 1);
                 }
