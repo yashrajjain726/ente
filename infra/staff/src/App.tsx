@@ -172,6 +172,7 @@ export const App: React.FC = () => {
         () => ({ email: selectedUserEmail, token: authToken }),
         [authToken, selectedUserEmail],
     );
+    const displayedRequestID = searchRequestID.current;
 
     return (
         <StaffSessionProvider session={session}>
@@ -287,10 +288,13 @@ export const App: React.FC = () => {
                                         <UserDetails
                                             userData={userData}
                                             onFileCountsInitialized={() =>
-                                                fetchData(
-                                                    selectedUserEmail,
-                                                    authToken,
-                                                )
+                                                displayedRequestID ===
+                                                searchRequestID.current
+                                                    ? fetchData(
+                                                          selectedUserEmail,
+                                                          authToken,
+                                                      )
+                                                    : Promise.resolve()
                                             }
                                         />
                                     )}
