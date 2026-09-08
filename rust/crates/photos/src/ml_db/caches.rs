@@ -12,7 +12,8 @@ impl MlDb {
         self.db.execute(
             "INSERT OR REPLACE INTO text_embeddings_cache (text_query, embedding, ml_version, created_at) VALUES (?, ?, ?, ?)",
             (query, embedding_bytes, CLIP_ML_VERSION, now_millis()),
-        ).map_err(Into::into)
+        )?;
+        Ok(())
     }
 
     pub fn get_repeated_text_embedding_cache(&self, query: &str) -> Result<Option<Vec<f32>>> {
@@ -42,12 +43,11 @@ impl MlDb {
         person_or_cluster_id: &str,
         face_id: &str,
     ) -> Result<()> {
-        self.db
-            .execute(
-                "INSERT OR REPLACE INTO face_cache (person_or_cluster_id, face_id) VALUES (?, ?)",
-                [person_or_cluster_id, face_id],
-            )
-            .map_err(Into::into)
+        self.db.execute(
+            "INSERT OR REPLACE INTO face_cache (person_or_cluster_id, face_id) VALUES (?, ?)",
+            [person_or_cluster_id, face_id],
+        )?;
+        Ok(())
     }
 
     pub fn get_face_id_used_for_person_or_cluster(
@@ -66,12 +66,11 @@ impl MlDb {
         &self,
         person_or_cluster_id: &str,
     ) -> Result<()> {
-        self.db
-            .execute(
-                "DELETE FROM face_cache WHERE person_or_cluster_id = ?",
-                [person_or_cluster_id],
-            )
-            .map_err(Into::into)
+        self.db.execute(
+            "DELETE FROM face_cache WHERE person_or_cluster_id = ?",
+            [person_or_cluster_id],
+        )?;
+        Ok(())
     }
 }
 

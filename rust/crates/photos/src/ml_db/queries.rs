@@ -194,13 +194,11 @@ impl MlDb {
 
     pub fn insert_clip_rows(&self, embeddings: &[ClipEmbedding]) -> Result<()> {
         if let [embedding] = embeddings {
-            return self
-                .db
-                .execute(
-                    "INSERT OR REPLACE INTO clip (file_id, embedding, ml_version) VALUES (?, ?, ?)",
-                    clip_row(embedding),
-                )
-                .map_err(Into::into);
+            self.db.execute(
+                "INSERT OR REPLACE INTO clip (file_id, embedding, ml_version) VALUES (?, ?, ?)",
+                clip_row(embedding),
+            )?;
+            return Ok(());
         }
         self.db
             .write_batch(

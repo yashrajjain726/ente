@@ -1,14 +1,14 @@
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use rusqlite::{OpenFlags, types::FromSql};
+use rusqlite::{OpenFlags, TransactionBehavior, params_from_iter, types::FromSql};
 
 pub use rusqlite::types;
 pub use rusqlite::{
-    Error as SqliteError, OptionalExtension, Params, Result as SqliteResult, Row, Rows, Statement,
-    ToSql, Transaction, TransactionBehavior, params, params_from_iter,
+    Error as SqliteError, OptionalExtension, Params, Result as SqliteResult, Row, ToSql,
+    Transaction,
 };
 
 const WRITER_PRAGMAS: &str = "PRAGMA journal_mode = WAL;
@@ -23,9 +23,22 @@ pub enum Error {
     Sqlite(#[from] SqliteError),
     #[error("currentVersion({current}) cannot be greater than toVersion({target})")]
     Downgrade { current: i64, target: i64 },
+    #[error("reader_count must be at least 1")]
+    InvalidReaderCount,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone, Copy, Debug)]
+pub struct OpenOptions {
+    pub reader_count: usize,
+}
+
+impl Default for OpenOptions {
+    fn default() -> Self {
+        Self { reader_count: 1 }
+    }
+}
 
 pub struct Connection(rusqlite::Connection);
 
@@ -71,13 +84,23 @@ pub struct Database {
 
 impl Database {
     pub fn open(path: impl AsRef<Path>, migration_scripts: &[&str]) -> Result<Self> {
+        Self::open_with_options(path, migration_scripts, OpenOptions::default())
+    }
+
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        migration_scripts: &[&str],
+        options: OpenOptions,
+    ) -> Result<Self> {
+        if options.reader_count == 0 {
+            return Err(Error::InvalidReaderCount);
+        }
         let path = path.as_ref();
         let mut writer = Connection::open(path)?;
         migrate(&mut writer, migration_scripts)?;
-        let readers = [
-            Connection::open_read_only(path)?,
-            Connection::open_read_only(path)?,
-        ];
+        let readers = (0..options.reader_count)
+            .map(|_| Connection::open_read_only(path))
+            .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             pool: Pool::new(writer, readers),
         })
@@ -90,7 +113,7 @@ impl Database {
         map: impl FnMut(&Row<'_>) -> SqliteResult<T>,
     ) -> Result<C> {
         self.pool.read(|connection| {
-            let mut statement = connection.prepare(sql)?;
+            let mut statement = connection.prepare_cached(sql)?;
             let rows = statement.query_map(parameters, map)?;
             Ok(rows.collect::<SqliteResult<C>>()?)
         })
@@ -105,8 +128,11 @@ impl Database {
     }
 
     pub fn read_value<T: FromSql>(&self, sql: &str, parameters: impl Params) -> Result<T> {
-        self.pool
-            .read(|connection| Ok(connection.query_row(sql, parameters, |row| row.get(0))?))
+        self.pool.read(|connection| {
+            Ok(connection
+                .prepare_cached(sql)?
+                .query_row(parameters, |row| row.get(0))?)
+        })
     }
 
     pub fn read_optional<T: FromSql>(
@@ -116,23 +142,51 @@ impl Database {
     ) -> Result<Option<T>> {
         self.pool.read(|connection| {
             Ok(connection
-                .query_row(sql, parameters, |row| row.get(0))
+                .prepare_cached(sql)?
+                .query_row(parameters, |row| row.get(0))
                 .optional()?)
         })
     }
 
-    pub fn execute(&self, sql: &str, parameters: impl Params) -> Result<()> {
-        self.pool.write(|connection| {
-            connection.execute(sql, parameters)?;
-            Ok(())
+    pub fn read_transaction<T>(
+        &self,
+        read: impl FnOnce(&Transaction<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.pool.read(|connection| {
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+            let result = read(&transaction)?;
+            transaction.commit()?;
+            Ok(result)
         })
     }
 
-    pub fn execute_chunked_in<I: ToSql>(&self, sql: &str, ids: &[I]) -> Result<()> {
+    pub fn write_transaction<T>(
+        &self,
+        write: impl FnOnce(&Transaction<'_>) -> Result<T>,
+    ) -> Result<T> {
         self.pool.write(|connection| {
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let result = write(&transaction)?;
+            transaction.commit()?;
+            Ok(result)
+        })
+    }
+
+    pub fn execute(&self, sql: &str, parameters: impl Params) -> Result<usize> {
+        self.pool
+            .write(|connection| Ok(connection.prepare_cached(sql)?.execute(parameters)?))
+    }
+
+    pub fn execute_chunked_in<I: ToSql>(&self, sql: &str, ids: &[I]) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        self.write_transaction(|transaction| {
             for chunk in ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY) {
                 let sql = sql.replacen("{}", &bind_placeholders(chunk.len()), 1);
-                connection.execute(&sql, params_from_iter(chunk))?;
+                transaction.execute(&sql, params_from_iter(chunk))?;
             }
             Ok(())
         })
@@ -142,9 +196,9 @@ impl Database {
         &self,
         statements: impl IntoIterator<Item = &'a str>,
     ) -> Result<()> {
-        self.pool.write(|connection| {
+        self.write_transaction(|transaction| {
             for statement in statements {
-                connection.execute_batch(statement)?;
+                transaction.execute_batch(statement)?;
             }
             Ok(())
         })
@@ -155,16 +209,11 @@ impl Database {
         sql: &str,
         parameter_sets: impl IntoIterator<Item = P>,
     ) -> Result<()> {
-        self.pool.write(|connection| {
-            let transaction =
-                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            {
-                let mut statement = transaction.prepare(sql)?;
-                for parameters in parameter_sets {
-                    statement.execute(parameters)?;
-                }
+        self.write_transaction(|transaction| {
+            let mut statement = transaction.prepare_cached(sql)?;
+            for parameters in parameter_sets {
+                statement.execute(parameters)?;
             }
-            transaction.commit()?;
             Ok(())
         })
     }
@@ -172,25 +221,38 @@ impl Database {
 
 struct Pool {
     writer: Mutex<Connection>,
-    readers: [Mutex<Connection>; 2],
+    readers: Mutex<Vec<Connection>>,
+    reader_available: Condvar,
 }
 
 impl Pool {
-    fn new(writer: Connection, readers: [Connection; 2]) -> Self {
-        let [first, second] = readers;
+    fn new(writer: Connection, readers: Vec<Connection>) -> Self {
         Self {
             writer: Mutex::new(writer),
-            readers: [Mutex::new(first), Mutex::new(second)],
+            readers: Mutex::new(readers),
+            reader_available: Condvar::new(),
         }
     }
 
-    fn read<T>(&self, query: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-        for reader in &self.readers {
-            if let Ok(connection) = reader.try_lock() {
-                return query(&connection);
+    fn acquire_reader(&self) -> Reader<'_> {
+        let mut readers = lock(&self.readers);
+        loop {
+            if let Some(connection) = readers.pop() {
+                return Reader {
+                    pool: self,
+                    connection: Some(connection),
+                };
             }
+            readers = self
+                .reader_available
+                .wait(readers)
+                .unwrap_or_else(PoisonError::into_inner);
         }
-        query(&lock(&self.readers[0]))
+    }
+
+    fn read<T>(&self, query: impl FnOnce(&mut Connection) -> Result<T>) -> Result<T> {
+        let mut reader = self.acquire_reader();
+        query(reader.connection.as_mut().unwrap())
     }
 
     fn write<T>(&self, statement: impl FnOnce(&mut Connection) -> Result<T>) -> Result<T> {
@@ -198,8 +260,22 @@ impl Pool {
     }
 }
 
-fn lock(connection: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
-    connection.lock().unwrap_or_else(PoisonError::into_inner)
+struct Reader<'a> {
+    pool: &'a Pool,
+    connection: Option<Connection>,
+}
+
+impl Drop for Reader<'_> {
+    fn drop(&mut self) {
+        if let Some(connection) = self.connection.take() {
+            lock(&self.pool.readers).push(connection);
+            self.pool.reader_available.notify_one();
+        }
+    }
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 fn migrate(connection: &mut Connection, scripts: &[&str]) -> Result<()> {
@@ -245,10 +321,21 @@ pub(crate) fn optional_parameter(value: &Option<impl ToSql>) -> Vec<&dyn ToSql> 
 
 #[cfg(test)]
 mod tests {
-    use super::{Connection, Database, Error, bind_placeholders, types};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::thread;
+    use std::time::Duration;
+
+    use super::{Connection, Database, Error, OpenOptions, bind_placeholders, lock, types};
 
     const CREATE_ITEMS: &str = "CREATE TABLE items (id INTEGER PRIMARY KEY)";
     const ADD_LABEL: &str = "ALTER TABLE items ADD COLUMN label TEXT NOT NULL DEFAULT 'item'";
+
+    fn open() -> (tempfile::TempDir, Database) {
+        let directory = tempfile::tempdir().unwrap();
+        let db = Database::open(directory.path().join("items.db"), &[CREATE_ITEMS]).unwrap();
+        (directory, db)
+    }
 
     fn pragma<T: types::FromSql>(connection: &Connection, name: &str) -> T {
         connection
@@ -308,8 +395,7 @@ mod tests {
 
     #[test]
     fn reader_queries_reject_writes() {
-        let directory = tempfile::tempdir().unwrap();
-        let db = Database::open(directory.path().join("items.db"), &[CREATE_ITEMS]).unwrap();
+        let (_directory, db) = open();
         db.execute("INSERT INTO items (id) VALUES (?)", [7])
             .unwrap();
         let deleted: Result<Vec<i64>, _> = db.read_column("DELETE FROM items RETURNING id", ());
@@ -323,8 +409,7 @@ mod tests {
 
     #[test]
     fn failed_batch_rolls_back_and_writer_recovers() {
-        let directory = tempfile::tempdir().unwrap();
-        let db = Database::open(directory.path().join("items.db"), &[CREATE_ITEMS]).unwrap();
+        let (_directory, db) = open();
         assert!(
             db.write_batch("INSERT INTO items (id) VALUES (?)", [[1], [2], [1]])
                 .is_err()
@@ -334,8 +419,15 @@ mod tests {
                 .unwrap(),
             0
         );
-        db.execute("INSERT INTO items (id) VALUES (?)", [3])
-            .unwrap();
+        assert_eq!(
+            db.execute("INSERT INTO items (id) VALUES (?)", [3])
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            db.execute("DELETE FROM items WHERE id = ?", [4]).unwrap(),
+            0
+        );
         assert_eq!(
             db.read_column::<Vec<i64>, _, _>("SELECT id FROM items", ())
                 .unwrap(),
@@ -344,9 +436,177 @@ mod tests {
     }
 
     #[test]
-    fn chunked_delete_handles_large_and_empty_id_lists() {
+    fn write_transactions_commit_or_rollback_and_writer_recovers() {
+        let (_directory, db) = open();
+        let result = db.write_transaction(|transaction| {
+            transaction.execute("INSERT INTO items VALUES (?)", [1])?;
+            transaction.execute("INSERT INTO missing_table VALUES (?)", [2])?;
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert_eq!(
+            db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
+                .unwrap(),
+            0
+        );
+
+        assert!(
+            catch_unwind(AssertUnwindSafe(|| {
+                let _: super::Result<()> = db.write_transaction(|transaction| {
+                    transaction.execute("INSERT INTO items VALUES (?)", [3])?;
+                    panic!("transaction callback failed");
+                });
+            }))
+            .is_err()
+        );
+        assert_eq!(
+            db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
+                .unwrap(),
+            0
+        );
+        let total = db
+            .write_transaction(|transaction| {
+                transaction.execute("INSERT INTO items VALUES (?)", [1])?;
+                transaction.execute("INSERT INTO items VALUES (?)", [2])?;
+                Ok(transaction
+                    .query_row("SELECT SUM(id) FROM items", (), |row| row.get::<_, i64>(0))?)
+            })
+            .unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(
+            db.read_value::<i64>("SELECT SUM(id) FROM items", ())
+                .unwrap(),
+            3
+        );
+    }
+
+    #[test]
+    fn read_transaction_keeps_a_snapshot_and_rejects_writes() {
+        let (_directory, db) = open();
+        db.execute("INSERT INTO items VALUES (?)", [1]).unwrap();
+        let counts = db
+            .read_transaction(|transaction| {
+                let before: i64 =
+                    transaction.query_row("SELECT COUNT(*) FROM items", (), |row| row.get(0))?;
+                db.execute("INSERT INTO items VALUES (?)", [2])?;
+                let after: i64 =
+                    transaction.query_row("SELECT COUNT(*) FROM items", (), |row| row.get(0))?;
+                assert!(
+                    transaction
+                        .execute("INSERT INTO items VALUES (?)", [3])
+                        .is_err()
+                );
+                Ok((before, after))
+            })
+            .unwrap();
+        assert_eq!(counts, (1, 1));
+        assert_eq!(
+            db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
+                .unwrap(),
+            2
+        );
+    }
+
+    #[test]
+    fn statement_sequence_rolls_back_if_a_later_statement_fails() {
+        let (_directory, db) = open();
+        assert!(
+            db.execute_statements([
+                "INSERT INTO items VALUES (1)",
+                "INSERT INTO missing_table VALUES (2)",
+            ])
+            .is_err()
+        );
+        assert_eq!(
+            db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
+                .unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn zero_readers_is_rejected_before_creating_a_database() {
         let directory = tempfile::tempdir().unwrap();
-        let db = Database::open(directory.path().join("items.db"), &[CREATE_ITEMS]).unwrap();
+        let path = directory.path().join("items.db");
+        assert!(matches!(
+            Database::open_with_options(&path, &[CREATE_ITEMS], OpenOptions { reader_count: 0 }),
+            Err(Error::InvalidReaderCount)
+        ));
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn configured_readers_bound_concurrency_and_wake_on_any_returned_connection() {
+        for reader_count in [1, 2, 3] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("items.db");
+            let db = if reader_count == 1 {
+                Database::open(path, &[CREATE_ITEMS])
+            } else {
+                Database::open_with_options(path, &[CREATE_ITEMS], OpenOptions { reader_count })
+            }
+            .unwrap();
+
+            thread::scope(|scope| {
+                let mut release_readers = Vec::new();
+                for _ in 0..reader_count {
+                    let (entered_tx, entered_rx) = mpsc::channel();
+                    let (release_tx, release_rx) = mpsc::channel();
+                    release_readers.push(release_tx);
+                    let db = &db;
+                    scope.spawn(move || {
+                        db.read_transaction(|transaction| {
+                            transaction.query_row("SELECT 1", (), |_| Ok(()))?;
+                            entered_tx.send(()).unwrap();
+                            release_rx.recv().unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
+                    });
+                    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }
+
+                let (result_tx, result_rx) = mpsc::channel();
+                let db = &db;
+                scope.spawn(move || {
+                    result_tx
+                        .send(db.read_value::<i64>("SELECT 7", ()))
+                        .unwrap();
+                });
+                let was_blocked = matches!(
+                    result_rx.recv_timeout(Duration::from_millis(100)),
+                    Err(RecvTimeoutError::Timeout)
+                );
+                release_readers.pop().unwrap().send(()).unwrap();
+                let result = result_rx.recv_timeout(Duration::from_secs(5));
+                for release in release_readers {
+                    release.send(()).unwrap();
+                }
+                assert!(was_blocked);
+                assert_eq!(result.unwrap().unwrap(), 7);
+            });
+        }
+    }
+
+    #[test]
+    fn reader_returns_to_pool_after_a_callback_panics() {
+        let (_directory, db) = open();
+        assert!(
+            catch_unwind(AssertUnwindSafe(|| {
+                let _: super::Result<()> = db.read_transaction(|transaction| {
+                    transaction.query_row("SELECT 1", (), |_| Ok(()))?;
+                    panic!("reader callback failed");
+                });
+            }))
+            .is_err()
+        );
+        assert_eq!(lock(&db.pool.readers).len(), 1);
+        assert_eq!(db.read_value::<i64>("SELECT 7", ()).unwrap(), 7);
+    }
+
+    #[test]
+    fn chunked_delete_handles_empty_lists_and_rolls_back_on_failure() {
+        let (_directory, db) = open();
         let ids: Vec<i64> = (0..10_001).collect();
         db.write_batch(
             "INSERT INTO items (id) VALUES (?)",
@@ -360,6 +620,20 @@ mod tests {
                 .unwrap(),
             10_001
         );
+        db.execute_statements(["CREATE TRIGGER reject_last_delete BEFORE DELETE ON items
+             WHEN OLD.id = 10000 BEGIN SELECT RAISE(ABORT, 'cannot delete'); END"])
+            .unwrap();
+        assert!(
+            db.execute_chunked_in("DELETE FROM items WHERE id IN ({})", &ids)
+                .is_err()
+        );
+        assert_eq!(
+            db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
+                .unwrap(),
+            10_001
+        );
+        db.execute_statements(["DROP TRIGGER reject_last_delete"])
+            .unwrap();
         db.execute_chunked_in("DELETE FROM items WHERE id IN ({})", &ids)
             .unwrap();
         assert_eq!(

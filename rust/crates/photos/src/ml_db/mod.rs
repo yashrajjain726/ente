@@ -6,7 +6,7 @@ mod vector_encoding;
 
 use std::path::Path;
 
-use crate::db::Database;
+use crate::db::{Database, OpenOptions};
 
 pub use filedata::{FdStatus, PreviewInfo};
 pub use queries::{
@@ -42,7 +42,11 @@ pub struct MlDb {
 impl MlDb {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
-            db: Database::open(path, &schema::MIGRATION_SCRIPTS)?,
+            db: Database::open_with_options(
+                path,
+                &schema::MIGRATION_SCRIPTS,
+                OpenOptions { reader_count: 2 },
+            )?,
         })
     }
 }
