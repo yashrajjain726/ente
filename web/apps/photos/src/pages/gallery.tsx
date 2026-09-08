@@ -553,10 +553,7 @@ const Page: React.FC = () => {
                     log.error("Failed to join album", error);
                     showMiniDialog({
                         title: t("error"),
-                        message:
-                            t("album_join_failed") +
-                            ": " +
-                            (error as Error).message,
+                        message: t("album_join_failed"),
                     });
                 }
             }

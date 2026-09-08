@@ -507,6 +507,11 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         waiting_handle.session().status,
         LegacyKitRecoveryStatus::Waiting
     );
+    assert!(matches!(
+        ente_legacy::update_kit_recovery_notice(&owner.owner_session, &waiting_kit.kit.id, 168)
+            .await,
+        Err(ente_legacy::Error::ActiveRecoverySession)
+    ));
     assert!(
         waiting_handle.session().wait_till > 0,
         "legacy kit waitTill should be remaining wait duration"

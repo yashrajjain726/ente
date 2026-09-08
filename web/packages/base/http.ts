@@ -97,7 +97,7 @@ export const isMuseumHTTPError = async (
         try {
             const payload = z
                 .object({ code: z.string() })
-                .parse(await e.res.json());
+                .parse(await e.res.clone().json());
             return payload.code == code;
         } catch (e) {
             log.warn("Ignoring error when parsing error payload", e);
