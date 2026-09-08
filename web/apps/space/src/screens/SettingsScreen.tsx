@@ -24,16 +24,22 @@ import {
 } from "hooks/use-pwa-install-prompt";
 import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
-export const settingsBackground = "#FAFAFA";
-
 const green = "#08C225";
-const textBase = "#000";
-const rowBackground = "#FFFFFF";
+const textBase = spaceText;
+const rowBackground = "#F7F7F7";
+const rowHover = "#F0F0F0";
 const dangerColor = "#F63A3A";
-const iconMuted = "#8C8C8C";
-const textLight = "#969696";
+const iconMuted = spaceTextMuted;
+const textLight = spaceTextMuted;
 const supportMailURL = "mailto:space@ente.com";
 const spaceLinks = [
     {
@@ -144,12 +150,12 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
                 transition: "background-color 120ms ease",
                 width: "100%",
                 ...(rowInteractive && {
-                    "&:active": { bgcolor: "rgba(0, 0, 0, 0.025)" },
+                    "&:active": { bgcolor: rowHover },
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.025)" },
+                    "&:hover": { bgcolor: rowHover },
                 }),
             }}
         >
@@ -298,12 +304,12 @@ const SpaceIcon: React.FC<SpaceIconProps> = ({ label, src, url }) => (
             textDecoration: "none",
             transition: "background-color 120ms ease",
             width: spaceTouchTargetSize,
-            "&:active": { bgcolor: "rgba(0, 0, 0, 0.025)" },
+            "&:active": { bgcolor: spaceSurfaceHover },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
             },
-            "&:hover": { bgcolor: "rgba(0, 0, 0, 0.025)" },
+            "&:hover": { bgcolor: spaceSurfaceHover },
         }}
     >
         <Box
@@ -402,7 +408,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: settingsBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -412,7 +418,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: settingsBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -631,7 +637,7 @@ export const ChangeNameSettingsScreen: React.FC<
         <Box
             component="main"
             sx={{
-                bgcolor: settingsBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -641,7 +647,7 @@ export const ChangeNameSettingsScreen: React.FC<
         >
             <Box
                 sx={{
-                    bgcolor: settingsBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -739,7 +745,7 @@ export const ChangeNameSettingsScreen: React.FC<
                         <Box
                             sx={{
                                 alignItems: "center",
-                                bgcolor: rowBackground,
+                                bgcolor: spaceSurface,
                                 borderRadius: "16px",
                                 display: "flex",
                                 height: 52,

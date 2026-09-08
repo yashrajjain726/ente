@@ -3,6 +3,7 @@ import "dart:io";
 import 'package:home_widget/home_widget.dart' as hw;
 import 'package:photos/app_mode.dart';
 import 'package:photos/core/constants.dart';
+import 'package:photos/models/gallery/justified_layout_strategy.dart';
 import 'package:photos/ui/viewer/gallery/component/group/type.dart';
 import "package:photos/utils/ram_check_util.dart";
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,6 +58,7 @@ class LocalSettings {
   static const kCollectionSortPref = "collection_sort_pref";
   static const kGalleryGroupType = "gallery_group_type";
   static const kGalleryLayoutType = "gallery_layout_type";
+  static const kJustifiedLayoutStrategy = "justified_layout_strategy";
   static const kPhotoGridSize = "photo_grid_size";
   static const _kisMLLocalIndexingEnabled = "ls.ml_local_indexing";
   static const _kLocalGalleryMLLocalIndexingEnabled =
@@ -277,6 +279,19 @@ class LocalSettings {
 
   Future<void> setGalleryLayoutType(GalleryLayoutType layoutType) async {
     await _prefs.setString(kGalleryLayoutType, layoutType.name);
+  }
+
+  JustifiedLayoutStrategy getJustifiedLayoutStrategy() {
+    return switch (_prefs.getString(kJustifiedLayoutStrategy)) {
+      "flex" => JustifiedLayoutStrategy.flex,
+      _ => JustifiedLayoutStrategy.comfort,
+    };
+  }
+
+  Future<void> setJustifiedLayoutStrategy(
+    JustifiedLayoutStrategy strategy,
+  ) async {
+    await _prefs.setString(kJustifiedLayoutStrategy, strategy.name);
   }
 
   int getPhotoGridSize() {

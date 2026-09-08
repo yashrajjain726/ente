@@ -159,6 +159,23 @@ export class LlmProvider {
         promise: Promise<void>;
         emitsProgress: boolean;
     };
+    private modelOperationTail: Promise<void> = Promise.resolve();
+
+    private async withExclusiveModelOperation<T>(
+        operation: () => Promise<T>,
+    ): Promise<T> {
+        const previous = this.modelOperationTail;
+        let release: () => void = () => undefined;
+        this.modelOperationTail = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await previous;
+        try {
+            return await operation();
+        } finally {
+            release();
+        }
+    }
 
     public async initialize() {
         if (this.initialized) return;
@@ -314,7 +331,7 @@ export class LlmProvider {
             }
         }
 
-        const ensurePromise = (async () => {
+        const ensurePromise = this.withExclusiveModelOperation(async () => {
             log.info("LLM ensureModelReady", {
                 backend: this.backend.kind,
                 modelId: model.id,
@@ -377,7 +394,7 @@ export class LlmProvider {
             if (emitProgress) {
                 this.emitProgress({ percent: 100, status: "Ready" });
             }
-        })();
+        });
 
         this.ensureInFlight = {
             key: ensureKey,
@@ -460,14 +477,49 @@ export class LlmProvider {
                 "Knowledge retrieval is only available in the desktop app",
             );
         }
-        const { invoke } = await import("@tauri-apps/api/core");
-        const retrievalEpoch = await invoke<number>("llm_retrieval_epoch");
-        await this.ensureInFlight?.promise.catch(() => undefined);
-        if (!shouldContinue()) {
-            throw namedError("cancelled", "Knowledge retrieval cancelled");
-        }
-        this.invalidateModelState();
-        return operation(retrievalEpoch);
+        return this.withExclusiveModelOperation(async () => {
+            const { invoke } = await import("@tauri-apps/api/core");
+            const retrievalEpoch = await invoke<number>("llm_retrieval_epoch");
+            if (!shouldContinue()) {
+                throw namedError("cancelled", "Knowledge retrieval cancelled");
+            }
+
+            const modelStateEpoch = await invoke<number>(
+                "llm_model_state_epoch",
+            );
+            const previousModelState = {
+                currentModel: this.currentModel,
+                currentModelPath: this.currentModelPath,
+                currentMmprojPath: this.currentMmprojPath,
+                currentContextKey: this.currentContextKey,
+                modelReady: this.modelReady,
+            };
+            this.invalidateModelState();
+            try {
+                return await operation(retrievalEpoch);
+            } finally {
+                try {
+                    const currentModelStateEpoch = await invoke<number>(
+                        "llm_model_state_epoch",
+                    );
+                    if (currentModelStateEpoch === modelStateEpoch) {
+                        this.currentModel = previousModelState.currentModel;
+                        this.currentModelPath =
+                            previousModelState.currentModelPath;
+                        this.currentMmprojPath =
+                            previousModelState.currentMmprojPath;
+                        this.currentContextKey =
+                            previousModelState.currentContextKey;
+                        this.modelReady = previousModelState.modelReady;
+                    }
+                } catch (error) {
+                    log.warn(
+                        "Failed to reconcile model state after knowledge retrieval",
+                        { error },
+                    );
+                }
+            }
+        });
     }
 
     public cancelDownload() {

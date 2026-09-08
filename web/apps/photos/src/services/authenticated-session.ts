@@ -1,6 +1,16 @@
+import {
+    ensureLocalUser,
+    ensureSavedKeyAttributes,
+} from "ente-accounts/services/user";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
-import { openSession, type Session } from "ente-photos-wasm";
+import { masterKeyFromSession } from "ente-base/session";
+import { savedAuthToken } from "ente-base/token";
+import {
+    bindCollectionKeyOpener,
+    unbindCollectionKeyOpener,
+} from "ente-new/photos/services/collection";
+import { openCollectionKey, openSession, type Session } from "ente-photos-wasm";
 
 let current: { key: string; opening: Promise<Session> } | undefined;
 let generation = 0;
@@ -17,10 +27,13 @@ export const openAuthenticatedSession = async (
     }
     const key = `${baseUrl}:${userID}`;
     if (current?.key !== key) {
+        const keyAttributes = ensureSavedKeyAttributes();
         const opening = openSession({
             baseUrl,
             authToken,
+            userID,
             masterKeyB64,
+            keyAttributes,
             clientPackage: clientPackageName,
             clientVersion: isDesktop ? desktopAppVersion : undefined,
         })
@@ -36,6 +49,14 @@ export const openAuthenticatedSession = async (
                 throw error;
             });
         current = { key, opening };
+        bindCollectionKeyOpener(async (input) =>
+            openCollectionKey(
+                await (current?.opening ?? ensureAuthenticatedSession()),
+                input.ownerID,
+                input.encryptedKey,
+                input.keyDecryptionNonce,
+            ),
+        );
     }
 
     const entry = current;
@@ -47,8 +68,24 @@ export const openAuthenticatedSession = async (
     return session;
 };
 
+export const ensureAuthenticatedSession = async () => {
+    const startedGeneration = generation;
+    const userID = ensureLocalUser().id;
+    const [authToken, masterKeyB64] = await Promise.all([
+        savedAuthToken(),
+        masterKeyFromSession(),
+    ]);
+    if (startedGeneration !== generation) {
+        throw new Error("Authenticated session was cleared");
+    }
+    if (!masterKeyB64) throw new Error("Missing current master key");
+    if (!authToken) throw new Error("Missing auth token");
+    return openAuthenticatedSession(userID, authToken, masterKeyB64);
+};
+
 export const clearAuthenticatedSession = () => {
     generation++;
+    unbindCollectionKeyOpener();
     // In-flight calls may still borrow the handle; wasm-bindgen finalizes it.
     current = undefined;
 };

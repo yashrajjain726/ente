@@ -11,6 +11,8 @@ jobs:
     analyze:
         name: Analyze (${{ matrix.language }})
         runs-on: 'ubuntu-latest'
+        env:
+            CODEQL_EXTRACTOR_RUST_OPTION_CARGO_CFG_OVERRIDES: "-test"
         permissions:
             contents: read
             security-events: write
@@ -39,6 +41,9 @@ jobs:
               with:
                   languages: ${{ matrix.language }}
                   build-mode: ${{ matrix.build-mode }}
+                  config: |
+                      paths-ignore:
+                          - rust/**/tests/**
 
             - name: Perform CodeQL Analysis
               uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2

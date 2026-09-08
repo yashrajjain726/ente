@@ -269,46 +269,36 @@ export const useLockerData = ({
         }
     }, [loadLockerUsage]);
 
-    const fetchAndStoreLockerData = useCallback(
-        async (key: string) => {
-            const requestID = ++latestDataRequestRef.current;
+    const fetchAndStoreLockerData = useCallback(async () => {
+        const requestID = ++latestDataRequestRef.current;
 
-            const data = await syncLockerState(key);
+        const data = await syncLockerState();
 
-            if (
-                !mountedRef.current ||
-                requestID !== latestDataRequestRef.current
-            ) {
-                return;
+        if (!mountedRef.current || requestID !== latestDataRequestRef.current) {
+            return;
+        }
+
+        setCollections(data.collections);
+        setTrashItems(data.trashItems);
+        setTrashLastUpdatedAt(data.trashLastUpdatedAt);
+        setInitialLoadError(null);
+        void refreshUserDetailsForSyncState(data);
+    }, [refreshUserDetailsForSyncState]);
+
+    const refreshData = useCallback(async () => {
+        if (!masterKey) {
+            return;
+        }
+
+        try {
+            await fetchAndStoreLockerData();
+        } catch (error) {
+            log.error("Failed to refresh locker data", error);
+            if (isHTTP401Error(error)) {
+                showMiniDialog(sessionExpiredDialogAttributes(logout));
             }
-
-            setCollections(data.collections);
-            setTrashItems(data.trashItems);
-            setTrashLastUpdatedAt(data.trashLastUpdatedAt);
-            setInitialLoadError(null);
-            void refreshUserDetailsForSyncState(data);
-        },
-        [refreshUserDetailsForSyncState],
-    );
-
-    const refreshData = useCallback(
-        async (mk?: string) => {
-            const key = mk ?? masterKey;
-            if (!key) {
-                return;
-            }
-
-            try {
-                await fetchAndStoreLockerData(key);
-            } catch (error) {
-                log.error("Failed to refresh locker data", error);
-                if (isHTTP401Error(error)) {
-                    showMiniDialog(sessionExpiredDialogAttributes(logout));
-                }
-            }
-        },
-        [fetchAndStoreLockerData, logout, masterKey, showMiniDialog],
-    );
+        }
+    }, [fetchAndStoreLockerData, logout, masterKey, showMiniDialog]);
 
     useEffect(() => {
         let cancelled = false;
@@ -344,7 +334,7 @@ export const useLockerData = ({
                     );
                 });
 
-                const persisted = await loadPersistedLockerState(mk);
+                const persisted = await loadPersistedLockerState();
                 if (canApplyState() && persisted.hasPersistedState) {
                     setCollections(persisted.collections);
                     setTrashItems(persisted.trashItems);
@@ -354,7 +344,7 @@ export const useLockerData = ({
                     void refreshUserDetailsForSyncState(persisted);
                 }
 
-                await fetchAndStoreLockerData(mk);
+                await fetchAndStoreLockerData();
                 if (canApplyState()) {
                     setHasFetched(true);
                 }

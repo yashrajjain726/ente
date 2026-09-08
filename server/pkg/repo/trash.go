@@ -127,6 +127,16 @@ func (t *TrashRepository) TrashFiles(ctx context.Context, userID int64, trash en
 	if err := lockFiles(ctx, tx, userID, fileIDs); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	photosFileDelta, lockerFileDelta, ambiguousFileApp, err := activeOwnedFileCountDeltas(ctx, tx, userID, fileIDs)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to calculate file count transition")
+	}
+	if ambiguousFileApp {
+		logrus.WithFields(logrus.Fields{
+			"user_id":    userID,
+			"file_count": len(fileIDs),
+		}).Error("found cross-app or invalid app memberships while trashing files")
+	}
 	updationTime := time.Microseconds()
 	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT collection_id FROM 
 			collection_files WHERE file_id = ANY($1) AND is_deleted = $2`, pq.Array(fileIDs), false)
@@ -160,6 +170,15 @@ func (t *TrashRepository) TrashFiles(ctx context.Context, userID int64, trash en
 	if err = t.FileLinkRepo.DisableLinkForFilesTx(ctx, tx, fileIDs); err != nil {
 		return stacktrace.Propagate(err, "failed to disable file links for files being trashed")
 	}
+	if photosFileDelta != 0 || lockerFileDelta != 0 || ambiguousFileApp {
+		if _, err := applyUsageChange(ctx, tx, userID, usageChange{
+			PhotosFileDelta:      photosFileDelta,
+			LockerFileDelta:      lockerFileDelta,
+			InvalidateFileCounts: ambiguousFileApp,
+		}); err != nil {
+			return stacktrace.Propagate(err, "failed to update file counts")
+		}
+	}
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
@@ -173,25 +192,29 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT collection_id FROM 
-		collection_files WHERE file_id = ANY($1) AND is_deleted = $2`, pq.Array(fileIDs), false)
+	updationTime := time.Microseconds()
+	rows, err := tx.QueryContext(ctx, `UPDATE collection_files AS cf
+		SET is_deleted = TRUE, updation_time = $2
+		FROM collections AS c
+		WHERE cf.file_id = ANY($1) AND cf.is_deleted = FALSE
+			AND c.collection_id = cf.collection_id
+		RETURNING cf.collection_id, c.owner_id = $3`, pq.Array(fileIDs), updationTime, userID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
 	cIDs := make([]int64, 0)
+	removedOwnedMembership := false
 	for rows.Next() {
 		var cID int64
-		if err := rows.Scan(&cID); err != nil {
+		var owned bool
+		if err := rows.Scan(&cID, &owned); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 		cIDs = append(cIDs, cID)
+		removedOwnedMembership = removedOwnedMembership || owned
 	}
-	updationTime := time.Microseconds()
-	_, err = tx.ExecContext(ctx, `UPDATE collection_files 
-		SET is_deleted = $1, updation_time = $2 WHERE file_id = ANY($3)`,
-		true, updationTime, pq.Array(fileIDs))
-	if err != nil {
+	if err := rows.Err(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
@@ -199,8 +222,21 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	err = tx.Commit()
-	return stacktrace.Propagate(err, "")
+	if removedOwnedMembership {
+		if _, err := applyUsageChange(ctx, tx, userID, usageChange{InvalidateFileCounts: true}); err != nil {
+			return stacktrace.Propagate(err, "failed to invalidate file counts")
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if removedOwnedMembership {
+		logrus.WithFields(logrus.Fields{
+			"user_id":  userID,
+			"file_ids": fileIDs,
+		}).Info("cleaned stale owned file memberships")
+	}
+	return nil
 }
 
 func (t *TrashRepository) Delete(ctx context.Context, userID int64, fileIDs []int64) error {

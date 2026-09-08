@@ -2,10 +2,8 @@ import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import log from "ente-base/log";
 import React from "react";
-import {
-    onOpenSpaceShareLinkDialog,
-    type SpaceShareLinkDialogMode,
-} from "services/share-link";
+import { onOpenSpaceShareLinkDialog } from "services/share-link";
+import { spaceText, spaceTextMuted } from "styles/colors";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
@@ -25,21 +23,16 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
     const [error, setError] = React.useState<string>();
     const [copied, setCopied] = React.useState(false);
     const [useNativeShare, setUseNativeShare] = React.useState(false);
-    const [mode, setMode] = React.useState<SpaceShareLinkDialogMode>("profile");
 
-    const showLink = React.useCallback(
-        (nextMode: SpaceShareLinkDialogMode, nextProfileLink: string) => {
-            setOpen(true);
-            setMode(nextMode);
-            setProfileLink(nextProfileLink);
-            setError(undefined);
-            setCopied(false);
-            setUseNativeShare(
-                isMobileBrowser() && typeof navigator.share == "function",
-            );
-        },
-        [],
-    );
+    const showLink = React.useCallback((nextProfileLink: string) => {
+        setOpen(true);
+        setProfileLink(nextProfileLink);
+        setError(undefined);
+        setCopied(false);
+        setUseNativeShare(
+            isMobileBrowser() && typeof navigator.share == "function",
+        );
+    }, []);
 
     React.useEffect(() => {
         return onOpenSpaceShareLinkDialog(showLink);
@@ -92,7 +85,6 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: "#FAFAFA",
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",
@@ -127,6 +119,7 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                 <Box
                     component="h2"
                     sx={{
+                        color: spaceText,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 15,
                         fontWeight: 600,
@@ -136,11 +129,11 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                         textAlign: "center",
                     }}
                 >
-                    {mode == "invite" ? "Invite friends" : "Share your profile"}
+                    Invite friends
                 </Box>
                 <Box
                     sx={{
-                        color: "#666",
+                        color: spaceTextMuted,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 13,
                         lineHeight: "18px",
@@ -164,10 +157,10 @@ export const SpaceShareLinkDialogHost: React.FC = () => {
                         disabled={!profileLink}
                         label={
                             copied
-                                ? "Copied"
+                                ? "Invite link copied"
                                 : useNativeShare
-                                  ? "Share profile"
-                                  : "Copy link"
+                                  ? "Share invite link"
+                                  : "Copy invite link"
                         }
                         onClick={share}
                     />

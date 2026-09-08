@@ -410,7 +410,7 @@ class ClusterFeedbackService<T> {
         _logger.info(
           "Cluster centroid vector DB unavailable for all-people suggestions, falling back to legacy mean suggestions",
         );
-        return _getAllLargePersonSuggestionsLegacy(
+        return await _getAllLargePersonSuggestionsLegacy(
           personsMap,
           allClusterIdsToCountMap,
           personToClusterIDs,
@@ -511,7 +511,7 @@ class ClusterFeedbackService<T> {
           e,
           s,
         );
-        return _getAllLargePersonSuggestionsLegacy(
+        return await _getAllLargePersonSuggestionsLegacy(
           personsMap,
           allClusterIdsToCountMap,
           personToClusterIDs,

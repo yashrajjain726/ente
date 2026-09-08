@@ -1,7 +1,7 @@
 {
     "name": "Ente Space",
     "short_name": "Ente Space",
-    "description": "Share everyday moments with friends and family, privately.",
+    "description": "Share everyday photos with friends and family, privately.",
     "id": "/app",
     "scope": "/",
     "display": "standalone",

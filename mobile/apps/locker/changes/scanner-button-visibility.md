@@ -1,0 +1,1 @@
+- Made the document scanner button more prominent with a blue border.

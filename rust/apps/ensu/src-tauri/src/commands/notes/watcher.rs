@@ -5,6 +5,7 @@ use std::sync::PoisonError;
 
 use ente_ensu::notes::{
     NotesCollectionIndex, NotesError, NotesIndexWriter, notes_content_revision,
+    prepare_notes_document,
 };
 use notify::event::{CreateKind, ModifyKind, RemoveKind};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -211,9 +212,23 @@ pub(super) fn inspect_startup_freshness(
         .iter()
         .map(String::as_str)
         .collect::<BTreeSet<_>>();
+    let mut changed = !plan.deleted_document_ids.is_empty();
     let mut forced_document_ids = BTreeSet::new();
     for source in &inventory {
         if planned.contains(source.document_id.as_str()) {
+            if writer.indexed_revision(&source.document_id).is_some() {
+                changed = true;
+                continue;
+            }
+            match read_collection_source(&canonical_root, &source.document_id) {
+                Ok((_, bytes, _)) => {
+                    changed |= prepare_notes_document(&source.document_id, &bytes).is_ok();
+                }
+                Err(error) if error.name == Some("source_changed") => {
+                    changed = true;
+                }
+                Err(error) => return Err(error),
+            }
             continue;
         }
         let Some(indexed_revision) = writer.indexed_revision(&source.document_id) else {
@@ -242,7 +257,7 @@ pub(super) fn inspect_startup_freshness(
     };
     Ok(StartupInspection {
         initial_complete,
-        changed: !plan.is_up_to_date() || !forced_document_ids.is_empty(),
+        changed: changed || !forced_document_ids.is_empty(),
         forced_document_ids,
         opened_index,
     })
@@ -678,7 +693,7 @@ fn notify_error(_: notify::Error) -> ApiError {
 mod tests {
     use super::super::TestDirectory;
     use super::*;
-    use ente_ensu::notes::{NotesSourceDocument, prepare_notes_document};
+    use ente_ensu::notes::NotesSourceDocument;
     use notify::event::RenameMode;
 
     const COLLECTION_ID: &str = "123e4567-e89b-12d3-a456-426614174000";

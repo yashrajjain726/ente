@@ -34,7 +34,6 @@ import React, { useCallback, useState } from "react";
 
 interface ItemCardProps {
     item: LockerItem;
-    masterKey?: string;
     onClick: () => void;
     isTrashView?: boolean;
     isIncomingShared?: boolean;
@@ -53,7 +52,6 @@ interface ItemCardProps {
 
 export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
     item,
-    masterKey,
     onClick,
     isTrashView,
     isIncomingShared,
@@ -78,23 +76,18 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
     const longPressTriggeredRef = React.useRef(false);
 
     const handleDownload = useCallback(async () => {
-        if (!masterKey || downloading || !hasDownloadableObject(item)) return;
+        if (downloading || !hasDownloadableObject(item)) return;
         setDownloading(true);
         setDownloadProgress(null);
         try {
             const fileName = getItemTitle(item);
-            await downloadLockerFile(
-                item.id,
-                fileName,
-                masterKey,
-                ({ loaded, total }) => {
-                    if (total && total > 0) {
-                        setDownloadProgress(
-                            Math.min(100, Math.round((loaded / total) * 100)),
-                        );
-                    }
-                },
-            );
+            await downloadLockerFile(item.id, fileName, ({ loaded, total }) => {
+                if (total && total > 0) {
+                    setDownloadProgress(
+                        Math.min(100, Math.round((loaded / total) * 100)),
+                    );
+                }
+            });
         } catch (e) {
             log.error(`Failed to download file ${item.id}`, e);
             setDownloadError(true);
@@ -102,7 +95,7 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
             setDownloading(false);
             setDownloadProgress(null);
         }
-    }, [item, masterKey, downloading]);
+    }, [item, downloading]);
 
     const title = getItemTitle(item);
     const downloadable = hasDownloadableObject(item);
@@ -175,12 +168,7 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                         }
                         return;
                     }
-                    if (
-                        !isTrashView &&
-                        item.type === "file" &&
-                        masterKey &&
-                        downloadable
-                    ) {
+                    if (!isTrashView && item.type === "file" && downloadable) {
                         void handleDownload();
                         return;
                     }

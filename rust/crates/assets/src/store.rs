@@ -189,7 +189,11 @@ impl AssetStore {
         if cancellation.is_cancelled() {
             return Err(Error::Cancelled);
         }
-        if let Some(error) = results.into_iter().find_map(Result::err) {
+        if let Some(error) = results
+            .into_iter()
+            .filter_map(Result::err)
+            .min_by_key(Error::is_retryable)
+        {
             return Err(error);
         }
         Ok(())

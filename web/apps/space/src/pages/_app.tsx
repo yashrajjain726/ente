@@ -2,6 +2,8 @@ import "@fontsource-variable/inter";
 import "@fontsource/nunito/800.css";
 import { CssBaseline } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { SpacePostComposerHost } from "components/PostComposer";
+import { SpacePostToast } from "components/PostToast";
 import { SpaceRouteTransitionBoundary } from "components/RouteTransitionBoundary";
 import { SpaceShareLinkDialogHost } from "components/ShareLinkDialog";
 import "configure-zod";
@@ -16,12 +18,25 @@ import React from "react";
 import "react-easy-crop/react-easy-crop.css";
 import { registerSpaceServiceWorker } from "services/web-push";
 import { SpaceAppStateProvider } from "state/AppStateProvider";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceDialogBackground,
+} from "styles/colors";
 import "styles/globals.css";
 
 const spaceTheme = createTheme(shareTheme, {
     components: {
+        MuiCssBaseline: {
+            styleOverrides: {
+                html: { backgroundColor: spaceAppBackgroundColor },
+                body: { background: spaceAppBackground },
+                "#__next": { minHeight: "100svh" },
+            },
+        },
         MuiDialog: {
             styleOverrides: {
+                paper: { backgroundColor: spaceDialogBackground },
                 root: {
                     ".MuiBackdrop-root": {
                         backgroundColor:
@@ -81,6 +96,8 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             <SpaceRouteTransitionBoundary>
                 <SpaceAppStateProvider>
                     <Component {...pageProps} />
+                    <SpacePostComposerHost />
+                    <SpacePostToast />
                     <SpaceShareLinkDialogHost />
                 </SpaceAppStateProvider>
             </SpaceRouteTransitionBoundary>

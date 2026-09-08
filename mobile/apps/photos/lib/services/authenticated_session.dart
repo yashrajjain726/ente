@@ -22,15 +22,28 @@ Session authenticatedSession() {
     return current;
   }
 
+  final keyAttributes = config.getKeyAttributes();
+  if (keyAttributes == null) {
+    throw StateError('Authenticated session is not available');
+  }
   final services = ServiceLocator.instance;
   final opened = openSession(
-    baseUrl: baseUrl,
-    authToken: authToken,
-    masterKey: config.getKey()!,
-    userAgent:
-        services.enteDio.options.headers[HttpHeaders.userAgentHeader] as String,
-    clientPackage: services.packageInfo.packageName,
-    clientVersion: services.packageInfo.version,
+    input: OpenSessionInput(
+      baseUrl: baseUrl,
+      authToken: authToken,
+      userId: userId,
+      masterKey: config.getKey()!,
+      keyAttributes: SessionKeyAttributes(
+        publicKey: keyAttributes.publicKey,
+        encryptedSecretKey: keyAttributes.encryptedSecretKey,
+        secretKeyDecryptionNonce: keyAttributes.secretKeyDecryptionNonce,
+      ),
+      userAgent:
+          services.enteDio.options.headers[HttpHeaders.userAgentHeader]
+              as String,
+      clientPackage: services.packageInfo.packageName,
+      clientVersion: services.packageInfo.version,
+    ),
   );
   clearAuthenticatedSession();
   _session = opened;

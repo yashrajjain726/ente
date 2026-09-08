@@ -12,7 +12,6 @@ export type NotesCollectionActivity =
     | "starting"
     | "waitingForGeneration"
     | "waitingForModel"
-    | "scheduled"
     | "failed"
     | null;
 
@@ -28,6 +27,7 @@ export class NotesLifecycleController {
     private readonly active = new Set<string>();
     private readonly queued = new Map<string, boolean>();
     private readonly failed = new Set<string>();
+    private readonly automaticRequestKeys = new Map<string, number>();
     private readonly removing = new Set<string>();
     private removalWaitCollection: string | null = null;
     private mutation = 0;
@@ -53,15 +53,29 @@ export class NotesLifecycleController {
         return "start";
     }
 
-    ensureIndex(collectionId: string, blocked: boolean): NotesIndexRequest {
+    ensureIndex(
+        collectionId: string,
+        blocked: boolean,
+        requestKey?: number,
+    ): NotesIndexRequest {
         if (
             this.disposed ||
             this.removing.has(collectionId) ||
-            this.failed.has(collectionId) ||
             this.active.has(collectionId) ||
             this.queued.has(collectionId)
         ) {
             return "ignored";
+        }
+        if (
+            this.failed.has(collectionId) &&
+            (requestKey === undefined ||
+                this.automaticRequestKeys.get(collectionId) === requestKey)
+        ) {
+            return "ignored";
+        }
+        if (requestKey !== undefined) {
+            this.automaticRequestKeys.set(collectionId, requestKey);
+            this.failed.delete(collectionId);
         }
         if (blocked) {
             this.queueIndex(collectionId, false);
@@ -140,6 +154,7 @@ export class NotesLifecycleController {
     finishRemoval(collectionId: string) {
         this.removing.delete(collectionId);
         this.failed.delete(collectionId);
+        this.automaticRequestKeys.delete(collectionId);
         if (this.removalWaitCollection === collectionId) {
             this.removalWaitCollection = null;
         }
@@ -187,6 +202,7 @@ export class NotesLifecycleController {
         this.active.clear();
         this.queued.clear();
         this.failed.clear();
+        this.automaticRequestKeys.clear();
         this.removing.clear();
         this.cancelRefreshes();
     }

@@ -1,33 +1,30 @@
 import { wrap } from "comlink";
 import { readAndFree } from "ente-utils/wasm";
 import type { KDFWorker } from "./kdf.worker";
-import type { WrappedRootContactKey } from "./pkg/ente_locker_wasm";
-
-interface OpenSessionInput {
-    baseUrl: string;
-    authToken: string;
-    masterKeyB64: string;
-    clientPackage?: string;
-    clientVersion?: string;
-}
+import type {
+    OpenSessionInput,
+    Session,
+    WrappedRootContactKey,
+} from "./pkg/ente_locker_wasm";
 
 const wasm = () => import("./pkg/ente_locker_wasm");
 
-export type Session = import("./pkg/ente_locker_wasm").Session;
+export type { OpenSessionInput, Session } from "./pkg/ente_locker_wasm";
 
-export const openSession = async ({
-    baseUrl,
-    authToken,
-    masterKeyB64,
-    clientPackage,
-    clientVersion,
-}: OpenSessionInput): Promise<Session> =>
-    (await wasm()).openSession(
-        baseUrl,
-        authToken,
-        masterKeyB64,
-        clientPackage,
-        clientVersion,
+export const openSession = async (input: OpenSessionInput): Promise<Session> =>
+    (await wasm()).openSession(input);
+
+export const openCollectionKey = async (
+    session: Session,
+    ownerID: number,
+    encryptedKey: string,
+    keyDecryptionNonce?: string,
+) =>
+    (await wasm()).collectionsOpenKey(
+        session,
+        BigInt(ownerID),
+        encryptedKey,
+        keyDecryptionNonce,
     );
 
 export const contactsGetDiff = async (

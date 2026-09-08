@@ -25,6 +25,11 @@ vi.mock("../src/services/account-keys", () => ({
 }));
 vi.mock("ente-accounts/services/user", () => ({
     ensureLocalUser: () => ({ id: 1 }),
+    ensureSavedKeyAttributes: () => ({
+        publicKey: "public-key",
+        encryptedSecretKey: "encrypted-secret-key",
+        secretKeyDecryptionNonce: "secret-key-nonce",
+    }),
 }));
 vi.mock("ente-accounts/services/accounts-db", () => ({
     savedLocalUser: () => ({ id: 1 }),

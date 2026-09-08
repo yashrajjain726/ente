@@ -5,10 +5,16 @@ import {
 } from "components/ActionFeedback";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import React from "react";
+import {
+    spaceDialogBackground,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
-const textBase = "#000";
+const textBase = spaceText;
 
 interface ConfirmationActionSheetProps {
     appearance?: "light" | "dark";
@@ -73,7 +79,7 @@ export const ConfirmationActionSheet: React.FC<
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: isDark ? "#1E1E1E" : "#FAFAFA",
+                        bgcolor: isDark ? "#1E1E1E" : spaceDialogBackground,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",
@@ -125,7 +131,7 @@ export const ConfirmationActionSheet: React.FC<
                 {description && (
                     <Box
                         sx={{
-                            color: isDark ? "#BDBDBD" : "#666666",
+                            color: isDark ? "#BDBDBD" : spaceTextMuted,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 13,
                             lineHeight: "18px",
@@ -156,8 +162,8 @@ export const ConfirmationActionSheet: React.FC<
                     />
                     <SheetButton
                         label={cancelLabel}
-                        backgroundColor={isDark ? "#333333" : "#F2F2F2"}
-                        color={isDark ? "#D8D8D8" : "#666666"}
+                        backgroundColor={isDark ? "#333333" : spaceSurface}
+                        color={isDark ? "#D8D8D8" : spaceTextMuted}
                         disabled={cancelDisabled}
                         onClick={onCancel}
                     />

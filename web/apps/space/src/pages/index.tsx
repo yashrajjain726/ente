@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { AuthenticatedFriendProfile } from "components/AuthenticatedFriendProfile";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
+import { SpaceFriendLimitToast } from "components/FriendLimitToast";
 import { SpaceMobileBestToast } from "components/MobileBestToast";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpacePublicProfileNotificationControl } from "components/PublicProfileNotificationControl";
@@ -8,7 +9,7 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
 import { OnboardingScreen, onboardingGreen } from "screens/OnboardingScreen";
-import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
+import { ProfileScreen } from "screens/ProfileScreen";
 import {
     clearPendingSpaceInvite,
     clearPendingSpaceInviteFriend,
@@ -34,6 +35,8 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState, type OnboardingEntrySource } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
+import { isSpaceFriendLimitError } from "utils/friend-errors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -54,7 +57,7 @@ const addFriendOnboardingTitle = (username: string) => (
     <>
         {`See @${username}'s`}
         <br />
-        everyday moments
+        everyday photos
     </>
 );
 
@@ -125,7 +128,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
     <Box
         component="main"
         sx={{
-            bgcolor: "white",
+            background: "white",
             boxSizing: "border-box",
             display: "grid",
             minHeight: "100svh",
@@ -226,7 +229,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     <Box component="span" sx={{ display: "block" }}>
                         {`See @${identity.username}’s`}
                     </Box>
-                    everyday moments
+                    everyday photos
                 </Box>
                 <Box
                     component="p"
@@ -265,10 +268,10 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         appearance: "none",
-                        bgcolor: { xs: "white", sm: "black" },
+                        bgcolor: "white",
                         border: 0,
                         borderRadius: "24px",
-                        color: { xs: "black", sm: "white" },
+                        color: "black",
                         cursor: isAddingFriend ? "default" : "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -282,7 +285,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         width: "min(100%, 300px)",
                         "&:hover": isAddingFriend
                             ? undefined
-                            : { bgcolor: { xs: "#F4F4F4", sm: "#121212" } },
+                            : { bgcolor: "#F4F4F4" },
                         "&:focus-visible": {
                             outline: "2px solid rgba(255 255 255 / 0.88)",
                             outlineOffset: 3,
@@ -330,6 +333,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     const [pendingInviteIntent, setPendingInviteIntent] =
         useState<SpaceInviteIntent>();
     const [isAddingFriend, setIsAddingFriend] = useState(false);
+    const [showFriendLimitToast, setShowFriendLimitToast] = useState(false);
     const publicPostItems = useMemo(
         () => profilePostItemsFromPosts(publicPosts),
         [publicPosts],
@@ -522,7 +526,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     if (hasProfileLoadError) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -535,7 +539,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     ) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 preview={invitePreview ? "invite" : "home"}
             />
         );
@@ -546,7 +550,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             return (
                 <>
                     <SpacePageMeta
-                        themeColor={profileBackground}
+                        themeColor={spaceAppBackgroundColor}
                         preview="invite"
                     />
                     <PublicProfileUnavailable />
@@ -558,7 +562,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
             profileLoadStatus == "loading" ||
             (profile && authenticatedProfileRouteStatus != "complete")
         ) {
-            return <SpaceRouteFallback background={profileBackground} />;
+            return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
         }
 
         if (authenticatedProfileRoute == "friend" && publicIdentity) {
@@ -571,11 +575,11 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         }
 
         if (authenticatedProfileRoute == "self") {
-            return <SpaceRouteFallback background={profileBackground} />;
+            return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
         }
 
         if (!publicIdentity) {
-            return <SpaceRouteFallback background={profileBackground} />;
+            return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
         }
 
         const inviteFriend = {
@@ -616,6 +620,13 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                 void router.push(spaceRoutes.home);
             } catch (error) {
                 setIsAddingFriend(false);
+                if (isSpaceFriendLimitError(error)) {
+                    clearPendingSpaceInvite();
+                    clearPendingSpaceInviteFriend();
+                    clearPendingSpaceInviteIntent();
+                    setShowFriendLimitToast(true);
+                    return;
+                }
                 log.error("Failed to send friend request", error);
             }
         };
@@ -629,7 +640,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         return (
             <>
                 <SpacePageMeta
-                    themeColor={profileBackground}
+                    themeColor={spaceAppBackgroundColor}
                     preview="invite"
                 />
                 {publicLink ? (
@@ -671,6 +682,11 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         showAddingFriendSpinner={
                             isAddingFriend && Boolean(profile)
                         }
+                    />
+                )}
+                {showFriendLimitToast && (
+                    <SpaceFriendLimitToast
+                        onClose={() => setShowFriendLimitToast(false)}
                     />
                 )}
             </>
