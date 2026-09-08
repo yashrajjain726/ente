@@ -284,7 +284,15 @@ export const App: React.FC = () => {
                                     }}
                                 >
                                     {tabValue === 0 && (
-                                        <UserDetails userData={userData} />
+                                        <UserDetails
+                                            userData={userData}
+                                            onFileCountsInitialized={() =>
+                                                fetchData(
+                                                    selectedUserEmail,
+                                                    authToken,
+                                                )
+                                            }
+                                        />
                                     )}
                                     {tabValue === 1 && <FamilyTable />}
                                     {tabValue === 2 && (
@@ -337,9 +345,15 @@ const buildUserDetailsData = (
         (userResponse.details?.profileData?.passkeyCount ?? 0) > 0;
     const canDisableEmailMFA =
         userResponse.details?.profileData?.canDisableEmailMFA ?? false;
+    const { photosFileCount, lockerFileCount } = userResponse;
+    const fileCountsAvailable =
+        photosFileCount !== undefined && lockerFileCount !== undefined;
 
     return {
         email: userResponse.user.email || userSearchInput,
+        userID: userResponse.user.ID,
+        showFileCountInitializer:
+            photosFileCount === -1 && lockerFileCount === -1,
         user: [
             {
                 kind: "text",
@@ -408,11 +422,21 @@ const buildUserDetailsData = (
                 enabled: twoFactorEnabled,
             },
             { kind: "passkeys", label: "Passkeys", enabled: passkeysEnabled },
-            {
-                kind: "text",
-                label: "AuthCodes",
-                value: `${userResponse.authCodes}`,
-            },
+            { kind: "text", label: "Auth", value: `${userResponse.authCodes}` },
+            ...(fileCountsAvailable
+                ? [
+                      {
+                          kind: "text" as const,
+                          label: "Photos",
+                          value: fileCountLabel(photosFileCount),
+                      },
+                      {
+                          kind: "text" as const,
+                          label: "Locker",
+                          value: fileCountLabel(lockerFileCount),
+                      },
+                  ]
+                : []),
         ],
         securityState: {
             emailMFAEnabled,
@@ -421,3 +445,6 @@ const buildUserDetailsData = (
         },
     };
 };
+
+const fileCountLabel = (count: number) =>
+    count === -1 ? "Uninitialized" : `${count}`;
