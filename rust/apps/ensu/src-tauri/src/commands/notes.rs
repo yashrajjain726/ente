@@ -937,7 +937,9 @@ fn report_index_error(
                     .is_ok_and(|collection| source_root_is_available(&collection.source_root))
         });
     let mut runtime = state.runtime(collection_id);
-    runtime.indexing_progress = None;
+    if !cancelled {
+        runtime.indexing_progress = None;
+    }
     runtime.status = if cancelled || superseded_file_error {
         NotesCollectionStatusDto::Pending
     } else if unavailable {
@@ -1024,7 +1026,8 @@ pub async fn notes_index_collection(
     if !matches!(
         runtime.status,
         NotesCollectionStatusDto::Indexing | NotesCollectionStatusDto::Updating
-    ) {
+    ) && runtime.indexing_progress.is_none()
+    {
         runtime.indexing_progress = Some(0);
     }
     runtime.status = if had_index {

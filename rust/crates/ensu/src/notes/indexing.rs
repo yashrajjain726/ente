@@ -3,8 +3,9 @@ use std::path::Path;
 
 use super::{NotesError, NotesIndexWriter, NotesSourceDocument, PreparedNotesDocument};
 
-const INITIAL_CHECKPOINT_DOCUMENTS: usize = 64;
-const INITIAL_CHECKPOINT_CHUNKS: usize = 128;
+const MIN_CHECKPOINT_DOCUMENTS: usize = 8;
+const MIN_CHECKPOINT_CHUNKS: usize = 32;
+const TARGET_CHECKPOINT_COUNT: usize = 50;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotesDocumentLoad {
@@ -154,18 +155,24 @@ pub fn index_notes_collection<E>(
     NotesIndexWriter::validate_inventory_capacity(&collection_id, &verified_inventory)?;
     writer.validate_reconciliation_capacity(&verified_inventory, &prepared_chunk_counts)?;
 
-    let mut progress_document_count = source_document_count.saturating_sub(requested.len() as u64);
+    let mut checkpointed_document_count =
+        source_document_count.saturating_sub(requested.len() as u64);
     report_indexing_progress(
         &writer,
-        progress_document_count,
+        checkpointed_document_count,
         source_document_count,
         &mut on_progress,
     );
     let mut processed_requested = 0_usize;
-    let mut embedded_documents = 0_usize;
-    let mut embedded_chunks = 0_usize;
-    let mut next_document_checkpoint = INITIAL_CHECKPOINT_DOCUMENTS;
-    let mut next_chunk_checkpoint = INITIAL_CHECKPOINT_CHUNKS;
+    let mut documents_since_checkpoint = 0_usize;
+    let mut chunks_since_checkpoint = 0_usize;
+    let document_checkpoint = checkpoint_interval(requested.len(), MIN_CHECKPOINT_DOCUMENTS);
+    let requested_chunk_count = prepared_chunk_counts
+        .values()
+        .fold(0_usize, |total, count| {
+            total.saturating_add(*count as usize)
+        });
+    let chunk_checkpoint = checkpoint_interval(requested_chunk_count, MIN_CHECKPOINT_CHUNKS);
     for document_id in &requested {
         check_for_cancellation().map_err(NotesIndexingError::Adapter)?;
         let (prepared, source_metadata) =
@@ -206,13 +213,6 @@ pub fn index_notes_collection<E>(
         let Some(prepared) = prepared else {
             writer.commit_deletions(std::slice::from_ref(document_id))?;
             processed_requested += 1;
-            progress_document_count += 1;
-            report_indexing_progress(
-                &writer,
-                progress_document_count,
-                source_document_count,
-                &mut on_progress,
-            );
             continue;
         };
         let validated = match writer.validate_document(&prepared, &source_metadata) {
@@ -220,13 +220,6 @@ pub fn index_notes_collection<E>(
             Err(NotesError::InvalidInput(_)) => {
                 writer.commit_deletions(std::slice::from_ref(document_id))?;
                 processed_requested += 1;
-                progress_document_count += 1;
-                report_indexing_progress(
-                    &writer,
-                    progress_document_count,
-                    source_document_count,
-                    &mut on_progress,
-                );
                 continue;
             }
             Err(error) => return Err(error.into()),
@@ -235,13 +228,6 @@ pub fn index_notes_collection<E>(
         else {
             writer.commit_deletions(std::slice::from_ref(document_id))?;
             processed_requested += 1;
-            progress_document_count += 1;
-            report_indexing_progress(
-                &writer,
-                progress_document_count,
-                source_document_count,
-                &mut on_progress,
-            );
             continue;
         };
         check_for_cancellation().map_err(NotesIndexingError::Adapter)?;
@@ -269,31 +255,42 @@ pub fn index_notes_collection<E>(
         }
         writer.commit_validated_document(validated, &embeddings)?;
         processed_requested += 1;
-        progress_document_count += 1;
-        report_indexing_progress(
-            &writer,
-            progress_document_count,
-            source_document_count,
-            &mut on_progress,
-        );
-        embedded_documents += 1;
-        embedded_chunks += prepared.chunks.len();
+        documents_since_checkpoint += 1;
+        chunks_since_checkpoint += prepared.chunks.len();
         if processed_requested < requested.len()
-            && (embedded_documents >= next_document_checkpoint
-                || embedded_chunks >= next_chunk_checkpoint)
+            && (documents_since_checkpoint >= document_checkpoint
+                || chunks_since_checkpoint >= chunk_checkpoint)
         {
             writer.publish(index_was_ready)?;
-            next_document_checkpoint = next_document_checkpoint.saturating_mul(2);
-            next_chunk_checkpoint = next_chunk_checkpoint.saturating_mul(2);
+            checkpointed_document_count =
+                checkpointed_document_count.saturating_add(documents_since_checkpoint as u64);
+            report_indexing_progress(
+                &writer,
+                checkpointed_document_count,
+                source_document_count,
+                &mut on_progress,
+            );
+            documents_since_checkpoint = 0;
+            chunks_since_checkpoint = 0;
         }
     }
 
     writer.publish(true)?;
+    report_indexing_progress(
+        &writer,
+        source_document_count,
+        source_document_count,
+        &mut on_progress,
+    );
     Ok(NotesIndexOutcome {
         changed_during_indexing: None,
         unchecked_document_ids: Vec::new(),
         indexed_document_count: writer.indexed_document_count() as u64,
     })
+}
+
+fn checkpoint_interval(total: usize, minimum: usize) -> usize {
+    total.div_ceil(TARGET_CHECKPOINT_COUNT).max(minimum)
 }
 
 fn report_indexing_progress(

@@ -19,6 +19,7 @@ pub struct State {
     context: Mutex<Option<llm::ContextRef>>,
     lifecycle: async_runtime::Mutex<()>,
     retrieval_epoch: Arc<AtomicU64>,
+    model_state_epoch: AtomicU64,
 }
 
 impl State {
@@ -33,11 +34,24 @@ impl State {
     fn cancel_retrieval(&self) {
         self.retrieval_epoch.fetch_add(1, Ordering::Relaxed);
     }
+
+    fn model_state_epoch(&self) -> u64 {
+        self.model_state_epoch.load(Ordering::SeqCst)
+    }
+
+    fn mark_model_state_changed(&self) {
+        self.model_state_epoch.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 #[tauri::command]
 pub fn llm_retrieval_epoch(state: TauriState<'_, State>) -> u64 {
     state.retrieval_epoch.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn llm_model_state_epoch(state: TauriState<'_, State>) -> u64 {
+    state.model_state_epoch()
 }
 
 pub struct ModelDownloadState {
@@ -143,6 +157,9 @@ pub(crate) fn replace_state(
 
     *model_guard = model;
     *context_guard = context;
+    state.mark_model_state_changed();
+    drop(context_guard);
+    drop(model_guard);
     Ok(())
 }
 
@@ -519,6 +536,8 @@ pub async fn llm_create_context(
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = Some(context);
+    state.mark_model_state_changed();
+    drop(context_guard);
 
     logging::log("LLM", "create context succeeded");
     Ok(())
@@ -532,6 +551,8 @@ pub async fn llm_free_context(state: TauriState<'_, State>) -> Result<(), ApiErr
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = None;
+    state.mark_model_state_changed();
+    drop(context_guard);
     Ok(())
 }
 
