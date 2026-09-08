@@ -356,7 +356,6 @@ internal class ModelSettingsActions(
 
     companion object {
         private const val MAX_DOWNLOAD_RETRIES = 5
-        private val NON_RETRYABLE_HTTP = setOf(401, 403, 404)
         private const val RETRY_DELAY_BASE_MS = 1500L
         private const val RETRY_DELAY_MAX_MS = 12000L
         private const val DEFAULT_TEMPERATURE = 0.5f
@@ -371,8 +370,7 @@ internal class ModelSettingsActions(
         if (err is RequiredModelValidationError) return false
         when (err) {
             is AssetDownloadException.Validation -> return false
-            is AssetDownloadException.Http ->
-                if (err.status.toInt() in NON_RETRYABLE_HTTP) return false
+            is AssetDownloadException.Http -> return err.retryable
             else -> {}
         }
         return true
