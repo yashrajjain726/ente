@@ -19,7 +19,6 @@ interface CollectionSharingDeps<TCollectionRecord> {
     ) => TCollectionRecord | undefined;
     decryptCollectionKey: (
         collectionRecord: TCollectionRecord,
-        masterKey: string,
     ) => Promise<string>;
     updateCollectionShareesInCache: (
         collectionID: number,
@@ -53,7 +52,6 @@ export const fetchCollectionShareesWithDeps = async <TCollectionRecord>(
 export const shareCollectionWithDeps = async <TCollectionRecord>(
     collectionID: number,
     email: string,
-    masterKey: string,
     deps: CollectionSharingDeps<TCollectionRecord>,
 ): Promise<LockerCollectionParticipant[]> => {
     const collectionRecord = deps.getCollectionRecord(collectionID);
@@ -61,10 +59,7 @@ export const shareCollectionWithDeps = async <TCollectionRecord>(
         throw new Error(`Collection ${collectionID} not in cache`);
     }
 
-    const collectionKey = await deps.decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await deps.decryptCollectionKey(collectionRecord);
     const publicKey = await getPublicKey(email);
     const encryptedKey = await boxSeal(collectionKey, publicKey);
 

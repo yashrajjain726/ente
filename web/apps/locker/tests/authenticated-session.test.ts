@@ -62,6 +62,9 @@ test("opens each artifact only when needed, reuses sessions, and clears both at 
     expect(await sessions.openAuthenticatedSession(1, "token", "key")).toBe(
         locker,
     );
+    expect(await sessions.ensureAuthenticatedSession()).toBe(locker);
+    expect(masterKeyFromSession).not.toHaveBeenCalled();
+    expect(openLocker).toHaveBeenCalledTimes(1);
     expect(openLegacy).not.toHaveBeenCalled();
 
     const first = sessions.authenticatedLegacySession();
@@ -81,6 +84,19 @@ test("opens each artifact only when needed, reuses sessions, and clears both at 
     expect(openLegacy).toHaveBeenCalledTimes(1);
     await sessions.authenticatedLegacySession();
     expect(openLegacy).toHaveBeenCalledTimes(2);
+});
+
+test("retries a failed Locker session", async () => {
+    const locker = mockSession();
+    openLocker
+        .mockRejectedValueOnce(new Error("Download failed"))
+        .mockResolvedValueOnce(locker);
+
+    await expect(sessions.ensureAuthenticatedSession()).rejects.toThrow(
+        "Download failed",
+    );
+    expect(await sessions.ensureAuthenticatedSession()).toBe(locker);
+    expect(openLocker).toHaveBeenCalledTimes(2);
 });
 
 test("logout during credential lookup cannot reopen a Legacy session", async () => {
