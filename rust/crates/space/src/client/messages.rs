@@ -226,8 +226,11 @@ impl AccountSpaceCtx {
             open_with_keypair(&sealed_key, &identity.public_key, &identity.secret_key)?;
         let packed_message = b64::decode(&message.message_cipher)?;
         let plaintext = decrypt_secretbox_payload(&message_key, &packed_message)?;
-        let payload: MessagePayload = serde_json::from_slice(&plaintext)
+        let mut payload: MessagePayload = serde_json::from_slice(&plaintext)
             .map_err(|err| Error::InvalidInput(format!("invalid message payload: {err}")))?;
+        if message.kind != MESSAGE_KIND_REGULAR || payload.kind != MESSAGE_KIND_POKE {
+            payload.kind = message.kind.clone();
+        }
         Ok(DecryptedMessage {
             message_key,
             payload,

@@ -1608,8 +1608,7 @@ mod tests {
         assert_eq!(converted.next_cursor, "next");
     }
 
-    #[tokio::test]
-    async fn corrupt_message_and_activity_become_unavailable() {
+    fn message_context() -> (AccountSpaceCtx, Key, String) {
         let root_key = Key::generate();
         let secret_key = SecretKey::generate();
         let public_key = secret_key.public_key();
@@ -1635,6 +1634,82 @@ mod tests {
         let message_key = Key::generate();
         let sealed_message_key = sealed::seal(message_key.as_bytes(), &public_key).unwrap();
         let encrypted_message_key = b64::encode(&sealed_message_key);
+        (ctx, message_key, encrypted_message_key)
+    }
+
+    #[tokio::test]
+    async fn encrypted_message_kinds_preserve_server_events_and_allow_pokes() {
+        let (ctx, message_key, encrypted_message_key) = message_context();
+
+        for (server_kind, payload_kind, expected_kind) in [
+            ("regular", "regular", "regular"),
+            ("regular", "poke", "poke"),
+            ("regular", "post_like", "regular"),
+            ("regular", "post_reply", "regular"),
+            ("regular", "friend_added", "regular"),
+            ("regular", "unknown", "regular"),
+            ("post_reply", "post_reply", "post_reply"),
+            ("post_reply", "regular", "post_reply"),
+            ("post_reply", "poke", "post_reply"),
+            ("post_reply", "post_like", "post_reply"),
+            ("post_reply", "friend_added", "post_reply"),
+        ] {
+            let plaintext = format!(r#"{{"version":1,"kind":"{payload_kind}","text":"hello"}}"#);
+            let cipher = b64::encode(&secretbox::encrypt_combined(
+                plaintext.as_bytes(),
+                &message_key,
+            ));
+            let mut response = message("message-1", &encrypted_message_key, &cipher);
+            response.kind = server_kind.into();
+            response.reply_post_id = (server_kind == "post_reply").then_some(42);
+            let activity = MessageConversationActivity {
+                id: "activity-1".into(),
+                activity_type: if server_kind == "post_reply" {
+                    "post_reply".into()
+                } else {
+                    "message".into()
+                },
+                kind: response.kind.clone(),
+                created_at: response.created_at.clone(),
+                outgoing: false,
+                message_id: Some(response.message_id.clone()),
+                sender_space_id: response.sender_space_id.clone(),
+                recipient_space_id: response.recipient_space_id.clone(),
+                message_cipher: response.message_cipher.clone(),
+                encrypted_message_key: response.encrypted_message_key.clone(),
+                reply_message_id: None,
+                post_id: response.reply_post_id,
+                post_space_id: response.reply_post_id.map(|_| "space-1".into()),
+            };
+            let converted = resilient_account_message_response_to_js(&ctx, "space-1", response)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
+            let converted_activity =
+                resilient_message_conversation_activity_to_js(&ctx, "space-1", activity.clone())
+                    .await
+                    .unwrap_or_else(|error| panic!("{error}"));
+
+            assert_eq!(
+                converted.kind, expected_kind,
+                "message: server={server_kind}, payload={payload_kind}"
+            );
+            assert_eq!(
+                converted_activity.kind, expected_kind,
+                "activity: server={server_kind}, payload={payload_kind}"
+            );
+            assert_eq!(converted.text, "hello");
+            assert_eq!(converted.reply_post_id, activity.post_id);
+            assert!(!converted.is_unavailable);
+            assert_eq!(converted_activity.text.as_deref(), Some("hello"));
+            assert_eq!(converted_activity.activity_type, activity.activity_type);
+            assert_eq!(converted_activity.post_id, activity.post_id);
+            assert!(!converted_activity.is_unavailable);
+        }
+    }
+
+    #[tokio::test]
+    async fn corrupt_message_and_activity_become_unavailable() {
+        let (ctx, message_key, encrypted_message_key) = message_context();
         let valid_cipher = b64::encode(&secretbox::encrypt_combined(
             br#"{"version":1,"kind":"regular","text":"hello"}"#,
             &message_key,
