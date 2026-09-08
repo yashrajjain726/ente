@@ -4,6 +4,7 @@ import { Box } from "@mui/material";
 import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import React from "react";
 import { spaceEmptyStateButtonSx } from "styles/buttons";
+import { spaceAppBackgroundColor, spaceText } from "styles/colors";
 
 export const SpaceShareIcon: React.FC<{
     size?: number;
@@ -15,7 +16,7 @@ export const SpaceShareIcon: React.FC<{
 interface SpaceShareInviteButtonProps {
     profileLink?: string;
     sharing?: boolean;
-    variant?: "green" | "white";
+    variant?: "green" | "secondary";
     onShareError?: (error: unknown) => void;
     onSharingChange?: (sharing: boolean) => void;
 }
@@ -81,16 +82,16 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
             disabled={isDisabled}
             onClick={() => void shareInvite()}
             sx={
-                variant == "white"
+                variant == "secondary"
                     ? {
                           ...spaceEmptyStateButtonSx,
-                          bgcolor: "#FFF",
-                          color: "#303030",
+                          bgcolor: "#FFFFFF",
+                          color: spaceAppBackgroundColor,
                           "&:focus-visible": {
-                              outline: "2px solid #303030",
+                              outline: `2px solid ${spaceText}`,
                               outlineOffset: 2,
                           },
-                          "&:hover:not(:disabled)": { bgcolor: "#F4F4F4" },
+                          "&:hover:not(:disabled)": { bgcolor: spaceText },
                       }
                     : spaceEmptyStateButtonSx
             }

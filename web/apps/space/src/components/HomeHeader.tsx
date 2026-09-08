@@ -1,44 +1,34 @@
-import { BubbleChatIcon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Skeleton } from "@mui/material";
-import { SpaceAvatarImage } from "components/AvatarImage";
+import { alpha, Box } from "@mui/material";
 import React from "react";
-import type { SetupProfile } from "screens/SetupProfileScreen";
-import { useSpaceAppState } from "state/app-state";
-import { spaceAppBackgroundColor, spaceText } from "styles/colors";
+import {
+    spaceAppBackgroundColor,
+    spaceSurface,
+    spaceText,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
-const headerAvatarSize = 36;
-const headerAvatarImageSize = 28;
 const headerChatCircleSize = 36;
-export const spaceHomeHeaderChromeColor = "#F0F0F0";
 const headerIconSize = 25;
 const headerSideWidth = 36;
-const mediaPlaceholderColor = "#E5E7EA";
-const avatarFadeSx = {
-    "@keyframes spaceAvatarFade": { from: { opacity: 0 }, to: { opacity: 1 } },
-    animation: "spaceAvatarFade 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
-    "@media (prefers-reduced-motion: reduce)": { animation: "none" },
-} as const;
 
 export const spaceHomeHeaderHeight = 64;
 
 interface SpaceHomeHeaderProps {
     children?: React.ReactNode;
     onOpenMessages?: () => void;
-    onOpenProfile?: () => void;
-    profile: SetupProfile | null;
+    onOpenSettings?: () => void;
     showUnreadIndicator?: boolean;
 }
 
 export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
     children,
     onOpenMessages,
-    onOpenProfile,
-    profile,
+    onOpenSettings,
     showUnreadIndicator = false,
 }) => (
     <Box
@@ -60,7 +50,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
             width: "100%",
             zIndex: 4,
             "&::after": {
-                bgcolor: spaceHomeHeaderChromeColor,
+                bgcolor: spaceSurface,
                 borderRadius: "999px",
                 content: '""',
                 height: 44,
@@ -76,7 +66,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 WebkitMaskImage:
                     "linear-gradient(to bottom, #000 0%, transparent 100%)",
                 backdropFilter: "blur(4px)",
-                background: `linear-gradient(to bottom, ${spaceAppBackgroundColor}, rgba(255, 255, 255, 0.35) 75%, transparent)`,
+                background: `linear-gradient(to bottom, ${spaceAppBackgroundColor}, ${alpha(spaceAppBackgroundColor, 0.35)} 75%, transparent)`,
                 content: '""',
                 height: "calc(100% + 28px)",
                 left: 0,
@@ -95,8 +85,8 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
         <Box
             component="button"
             type="button"
-            aria-label="Open profile"
-            onClick={onOpenProfile}
+            aria-label="Settings"
+            onClick={onOpenSettings}
             sx={{
                 appearance: "none",
                 alignItems: "center",
@@ -104,8 +94,8 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 border: 0,
                 borderRadius: "50%",
                 boxSizing: "border-box",
-                color: green,
-                cursor: onOpenProfile ? "pointer" : "default",
+                color: spaceText,
+                cursor: onOpenSettings ? "pointer" : "default",
                 display: "flex",
                 height: headerActionSize,
                 justifyContent: "center",
@@ -116,24 +106,13 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 position: "relative",
                 width: headerActionSize,
                 zIndex: 1,
+                "&:focus-visible": {
+                    outline: `2px solid ${green}`,
+                    outlineOffset: 2,
+                },
             }}
         >
-            <Box
-                sx={{
-                    alignItems: "center",
-                    bgcolor: "transparent",
-                    borderRadius: "50%",
-                    boxSizing: "border-box",
-                    display: "flex",
-                    height: headerAvatarSize,
-                    justifyContent: "center",
-                    overflow: "hidden",
-                    p: "2.5px",
-                    width: headerAvatarSize,
-                }}
-            >
-                <SpaceHomeHeaderAvatar profile={profile} />
-            </Box>
+            <HugeiconsIcon icon={Menu01Icon} size={24} strokeWidth={2.4} />
         </Box>
         <Box
             sx={{
@@ -157,12 +136,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 component="img"
                 alt="Space"
                 src="/images/space.svg"
-                sx={{
-                    display: "block",
-                    filter: "invert(1)",
-                    height: 19,
-                    width: "auto",
-                }}
+                sx={{ display: "block", height: 19, width: "auto" }}
             />
         </Box>
         <Box
@@ -221,7 +195,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                     <Box
                         sx={{
                             bgcolor: dangerColor,
-                            border: `2px solid ${spaceHomeHeaderChromeColor}`,
+                            border: `2px solid ${spaceSurface}`,
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             height: 12.5,
@@ -237,36 +211,3 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
         </Box>
     </Box>
 );
-
-const SpaceHomeHeaderAvatar: React.FC<{ profile: SetupProfile | null }> = ({
-    profile,
-}) => {
-    const { cachedProfileAvatarUrl } = useSpaceAppState();
-    const avatarUrl = profile ? profile.avatarUrl : cachedProfileAvatarUrl;
-
-    return avatarUrl || (profile && !profile.avatarObjectID) ? (
-        <Box
-            key={avatarUrl ?? "default-avatar"}
-            sx={{
-                ...avatarFadeSx,
-                borderRadius: "50%",
-                filter: avatarUrl ? undefined : "brightness(0.9)",
-                height: headerAvatarImageSize,
-                overflow: "hidden",
-                width: headerAvatarImageSize,
-            }}
-        >
-            <SpaceAvatarImage src={avatarUrl} />
-        </Box>
-    ) : (
-        <Skeleton
-            variant="circular"
-            sx={{
-                bgcolor: mediaPlaceholderColor,
-                height: headerAvatarImageSize,
-                transform: "none",
-                width: headerAvatarImageSize,
-            }}
-        />
-    );
-};

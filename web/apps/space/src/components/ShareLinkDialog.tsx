@@ -3,7 +3,7 @@ import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import log from "ente-base/log";
 import React from "react";
 import { onOpenSpaceShareLinkDialog } from "services/share-link";
-import { spaceText, spaceTextMuted } from "styles/colors";
+import { spaceOnAccent, spaceText, spaceTextMuted } from "styles/colors";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
@@ -209,7 +209,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
             bgcolor: green,
             border: 0,
             borderRadius: "20px",
-            color: "#FFF",
+            color: spaceOnAccent,
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',

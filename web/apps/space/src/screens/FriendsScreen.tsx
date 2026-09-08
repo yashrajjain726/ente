@@ -36,6 +36,7 @@ import type { SpaceFriendRequest } from "services/space";
 import {
     spaceAppBackground,
     spaceDialogBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -368,10 +369,12 @@ const FriendRow: React.FC<FriendRowProps> = ({
                             py: "4px",
                             whiteSpace: "nowrap",
                             "&.Mui-focusVisible": {
-                                bgcolor: "rgba(0, 0, 0, 0.04)",
+                                bgcolor: "rgba(255, 255, 255, 0.08)",
                             },
-                            "&:active": { bgcolor: "rgba(0, 0, 0, 0.04)" },
-                            "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" },
+                            "&:active": {
+                                bgcolor: "rgba(255, 255, 255, 0.08)",
+                            },
+                            "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)" },
                         }}
                     >
                         <HugeiconsIcon
@@ -405,10 +408,10 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         py: "4px",
                         whiteSpace: "nowrap",
                         "&.Mui-focusVisible": {
-                            bgcolor: "rgba(246, 58, 58, 0.06)",
+                            bgcolor: "rgba(246, 58, 58, 0.14)",
                         },
-                        "&:active": { bgcolor: "rgba(246, 58, 58, 0.06)" },
-                        "&:hover": { bgcolor: "rgba(246, 58, 58, 0.06)" },
+                        "&:active": { bgcolor: "rgba(246, 58, 58, 0.14)" },
+                        "&:hover": { bgcolor: "rgba(246, 58, 58, 0.14)" },
                     }}
                 >
                     <HugeiconsIcon
@@ -506,7 +509,7 @@ const FriendRequestRow: React.FC<FriendRequestRowProps> = ({
                                 bgcolor: green,
                                 border: 0,
                                 borderRadius: "12px",
-                                color: "#FFFFFF",
+                                color: spaceOnAccent,
                                 cursor: isBusy ? "default" : "pointer",
                                 display: "flex",
                                 fontFamily:
@@ -905,7 +908,7 @@ const AddFriendSheet: React.FC<AddFriendSheetProps> = ({
                         bgcolor: green,
                         border: 0,
                         borderRadius: "20px",
-                        color: "#FFFFFF",
+                        color: spaceOnAccent,
                         cursor: isSubmitting || isSent ? "default" : "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',

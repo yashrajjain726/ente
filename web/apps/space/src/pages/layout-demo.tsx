@@ -1,24 +1,51 @@
-import { ArrowLeft02Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft02Icon, ArrowRight02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceAddFriendTile } from "components/AddFriendTile";
+import { SpaceFileViewer } from "components/FileViewer";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
+import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
 import { FriendPostTile } from "screens/HomeScreen";
+import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpacePost } from "services/space";
-import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
 import {
-    homeTileGridLayout,
-    homeTilePlacements,
+    spacePostTileRadius,
+    spaceTileCircleInset,
+    spaceTileCornerStyles,
+} from "styles/tiles";
+import {
+    homeTileGap,
+    homeTileLayout,
     maximumHomeTileCount,
-    usesHomeTileGrid,
+    minimumHomeTileCanvasHeight,
     type HomeTilePlacement,
 } from "utils/home-tile-layout";
+import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
 const controlButtonColor = spaceSurface;
+const demoProfile: SetupProfile = {
+    avatarUrl: null,
+    fullName: "Alex Morgan",
+    spaceId: "demo-self",
+    username: "you",
+};
+const demoOwnPosts: SpacePost[] = [
+    spaceDefaultCoverImagePath,
+    "/images/invite-bg.jpg",
+].map((imageUrl, index) => ({
+    friendID: "demo-self",
+    imageUrl,
+    name: demoProfile.fullName,
+    postId: 100 - index,
+    spaceId: "demo-self",
+    timestampMs: 1_700_000_000_000 - index * 86_400_000,
+    viewerLiked: false,
+}));
 
 interface CanvasSize {
     height: number;
@@ -28,7 +55,7 @@ interface CanvasSize {
 interface LayoutDemoPostProps {
     count: number;
     index: number;
-    placement?: HomeTilePlacement;
+    placement: HomeTilePlacement;
 }
 
 const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
@@ -87,7 +114,7 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
                 hasPlaceholderMedia
                     ? "/images/invite-bg.jpg"
                     : isUnread
-                      ? "/images/default-cover-image.jpg"
+                      ? spaceDefaultCoverImagePath
                       : undefined
             }
             isAvatarPending={false}
@@ -118,8 +145,36 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
 
 const LayoutDemoPage: React.FC = () => {
     const router = useSpaceRouter();
-    const { profile } = useSpaceAppState();
-    const [friendCount, setFriendCount] = React.useState(1);
+    const [{ friendCount, ownPosts }, setDemo] = React.useState({
+        friendCount: 0,
+        ownPosts: [] as SpacePost[],
+    });
+    const changeFriendCount = React.useCallback((delta: number) => {
+        setDemo(({ friendCount }) => {
+            const count = Math.max(
+                0,
+                Math.min(maximumHomeTileCount, friendCount + delta),
+            );
+            return {
+                friendCount: count,
+                ownPosts: count % 2 == 0 ? [] : demoOwnPosts,
+            };
+        });
+    }, []);
+    const [ownViewerPosts, setOwnViewerPosts] = React.useState<SpacePost[]>([]);
+    const [ownPostIndex, setOwnPostIndex] = React.useState<number>();
+    const ownViewerOpen = ownPostIndex !== undefined;
+    useBrowserBackClose({
+        open: ownViewerOpen,
+        onClose: () => setOwnPostIndex(undefined),
+        stateKey: "space-layout-demo-viewer",
+    });
+    const ownPostPhotos = ownViewerPosts.map((post) => ({
+        ...post,
+        alt: "Your post",
+        avatarUrl: demoProfile.avatarUrl,
+        imageUrl: post.imageUrl ?? "",
+    }));
     const [canvasSize, setCanvasSize] = React.useState<CanvasSize>({
         height: 0,
         width: 0,
@@ -141,26 +196,20 @@ const LayoutDemoPage: React.FC = () => {
     }, []);
 
     React.useEffect(() => {
+        if (ownViewerOpen) return;
+
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key == "ArrowLeft") {
-                setFriendCount((count) => Math.max(1, count - 1));
+                changeFriendCount(-1);
             } else if (event.key == "ArrowRight") {
-                setFriendCount((count) =>
-                    Math.min(maximumHomeTileCount, count + 1),
-                );
+                changeFriendCount(1);
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, []);
+    }, [changeFriendCount, ownViewerOpen]);
 
-    const usesGrid = usesHomeTileGrid(friendCount);
-    const placements = homeTilePlacements(
-        friendCount,
-        canvasSize.width,
-        canvasSize.height,
-    );
-    const gridLayout = homeTileGridLayout(
+    const layout = homeTileLayout(
         friendCount,
         canvasSize.width,
         canvasSize.height,
@@ -193,14 +242,8 @@ const LayoutDemoPage: React.FC = () => {
                 }}
             >
                 <SpaceHomeHeader
-                    profile={profile}
-                    onOpenMessages={() =>
-                        void router.push(spaceRoutes.messages)
-                    }
-                    onOpenProfile={
-                        profile
-                            ? () => void router.push(spaceRoutes.profile)
-                            : undefined
+                    onOpenSettings={() =>
+                        void router.push(spaceRoutes.settings)
                     }
                 />
                 <Box
@@ -208,131 +251,184 @@ const LayoutDemoPage: React.FC = () => {
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        height: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
+                        gap: `${homeTileGap}px`,
+                        minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
-                        pb: "calc(env(safe-area-inset-bottom) + 112px)",
+                        pb: "calc(env(safe-area-inset-bottom) + 16px)",
                         px: "16px",
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${spaceHomeHeaderHeight}px)`,
+                        pt: "4px",
                         width: "100%",
                     }}
                 >
                     <Box
                         ref={canvasRef}
+                        component="ul"
+                        aria-label="Friends and friend requests"
                         sx={{
-                            display: usesGrid ? "grid" : "block",
                             flex: "1 1 auto",
-                            gap: gridLayout ? `${gridLayout.gap}px` : undefined,
-                            gridTemplateColumns: gridLayout
-                                ? `repeat(3, ${gridLayout.size}px)`
-                                : undefined,
-                            gridTemplateRows: gridLayout
-                                ? `repeat(${gridLayout.rows}, ${gridLayout.size}px)`
-                                : undefined,
-                            minHeight: 0,
-                            placeContent: usesGrid ? "center" : undefined,
+                            m: 0,
+                            minHeight: minimumHomeTileCanvasHeight(friendCount),
+                            p: 0,
                             position: "relative",
                             width: "100%",
                         }}
                     >
-                        {usesGrid && gridLayout
-                            ? Array.from(
-                                  { length: friendCount },
-                                  (_, index) => (
-                                      <LayoutDemoPost
-                                          key={index}
-                                          count={friendCount}
-                                          index={index}
-                                      />
-                                  ),
-                              )
-                            : placements.map((placement, index) => (
-                                  <LayoutDemoPost
-                                      key={index}
-                                      count={friendCount}
-                                      index={index}
-                                      placement={placement}
-                                  />
-                              ))}
-                    </Box>
-                </Box>
-                <Box
-                    sx={{
-                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
-                        display: "flex",
-                        gap: "8px",
-                        left: "max(20px, calc((100vw - 390px) / 2 + 20px))",
-                        position: "fixed",
-                        zIndex: 5,
-                    }}
-                >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Show one fewer friend"
-                        disabled={friendCount == 1}
-                        onClick={() =>
-                            setFriendCount((count) => Math.max(1, count - 1))
-                        }
-                        sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: controlButtonColor,
-                            border: 0,
-                            borderRadius: "50%",
-                            color: spaceText,
-                            cursor: friendCount == 1 ? "default" : "pointer",
-                            display: "flex",
-                            height: 36,
-                            justifyContent: "center",
-                            opacity: friendCount == 1 ? 0.3 : 1,
-                            p: 0,
-                            width: 36,
-                        }}
-                    >
-                        <HugeiconsIcon
-                            icon={ArrowLeft02Icon}
-                            size={22}
-                            strokeWidth={2.2}
-                        />
+                        {layout && (
+                            <>
+                                {layout.friends.map((placement, index) => (
+                                    <LayoutDemoPost
+                                        key={index}
+                                        count={friendCount}
+                                        index={index}
+                                        placement={placement}
+                                    />
+                                ))}
+                                {layout.addFriend && (
+                                    <SpaceAddFriendTile
+                                        placement={layout.addFriend}
+                                        variant={layout.addFriendVariant}
+                                        onClick={() => changeFriendCount(1)}
+                                    />
+                                )}
+                            </>
+                        )}
                     </Box>
                     <Box
-                        component="button"
-                        type="button"
-                        aria-label="Show one more friend"
-                        disabled={friendCount == maximumHomeTileCount}
-                        onClick={() =>
-                            setFriendCount((count) =>
-                                Math.min(maximumHomeTileCount, count + 1),
-                            )
-                        }
                         sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: controlButtonColor,
-                            border: 0,
-                            borderRadius: "50%",
-                            color: spaceText,
-                            cursor:
-                                friendCount == maximumHomeTileCount
-                                    ? "default"
-                                    : "pointer",
-                            display: "flex",
-                            height: 36,
-                            justifyContent: "center",
-                            opacity:
-                                friendCount == maximumHomeTileCount ? 0.3 : 1,
-                            p: 0,
-                            width: 36,
+                            ...spaceTileCornerStyles(spacePostTileRadius),
+                            flexShrink: 0,
+                            position: "relative",
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={ArrowRight01Icon}
-                            size={22}
-                            strokeWidth={2.2}
+                        <SpaceOwnPostTile
+                            profile={demoProfile}
+                            post={ownPosts[0]}
+                            onNewPost={() =>
+                                setDemo((current) => ({
+                                    ...current,
+                                    ownPosts: demoOwnPosts,
+                                }))
+                            }
+                            onOpenPost={() => {
+                                setOwnViewerPosts(ownPosts);
+                                setOwnPostIndex(0);
+                            }}
                         />
+                        <Box
+                            sx={{
+                                display: "flex",
+                                gap: "8px",
+                                position: "absolute",
+                                right: spaceTileCircleInset(36),
+                                top: spaceTileCircleInset(36),
+                                zIndex: 5,
+                            }}
+                        >
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Show one fewer friend"
+                                disabled={friendCount == 0}
+                                onClick={() => changeFriendCount(-1)}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: controlButtonColor,
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: spaceText,
+                                    cursor:
+                                        friendCount == 0
+                                            ? "default"
+                                            : "pointer",
+                                    display: "flex",
+                                    height: 36,
+                                    justifyContent: "center",
+                                    opacity: friendCount == 0 ? 0.3 : 1,
+                                    p: 0,
+                                    width: 36,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={ArrowLeft02Icon}
+                                    size={22}
+                                    strokeWidth={2.2}
+                                />
+                            </Box>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Show one more friend"
+                                disabled={friendCount == maximumHomeTileCount}
+                                onClick={() => changeFriendCount(1)}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: controlButtonColor,
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: spaceText,
+                                    cursor:
+                                        friendCount == maximumHomeTileCount
+                                            ? "default"
+                                            : "pointer",
+                                    display: "flex",
+                                    height: 36,
+                                    justifyContent: "center",
+                                    opacity:
+                                        friendCount == maximumHomeTileCount
+                                            ? 0.3
+                                            : 1,
+                                    p: 0,
+                                    width: 36,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={ArrowRight02Icon}
+                                    size={22}
+                                    strokeWidth={2.2}
+                                />
+                            </Box>
+                        </Box>
                     </Box>
                 </Box>
-                <SpacePostFloatingActionButton />
+                {ownPostIndex !== undefined && (
+                    <SpaceFileViewer
+                        photo={ownPostPhotos[ownPostIndex]!}
+                        photos={ownPostPhotos}
+                        photoIndex={ownPostIndex}
+                        onPhotoIndexChange={setOwnPostIndex}
+                        postActionMode="hidden"
+                        onClose={() => setOwnPostIndex(undefined)}
+                        onDeletePost={() => {
+                            const postId = ownViewerPosts[ownPostIndex]!.postId;
+                            setDemo((current) => ({
+                                ...current,
+                                ownPosts: current.ownPosts.filter(
+                                    (post) => post.postId != postId,
+                                ),
+                            }));
+                        }}
+                        onUpdatePostCaption={(postId, caption) => {
+                            const updatePosts = (posts: SpacePost[]) =>
+                                posts.map((post) =>
+                                    post.postId == postId
+                                        ? {
+                                              ...post,
+                                              caption:
+                                                  caption.trim() || undefined,
+                                          }
+                                        : post,
+                                );
+                            setDemo((current) => ({
+                                ...current,
+                                ownPosts: updatePosts(current.ownPosts),
+                            }));
+                            setOwnViewerPosts(updatePosts);
+                            return Promise.resolve();
+                        }}
+                    />
+                )}
             </Box>
         </Box>
     );

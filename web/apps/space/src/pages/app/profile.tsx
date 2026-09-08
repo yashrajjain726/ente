@@ -23,8 +23,13 @@ const initialPostLoadingIndicatorDelayMs = 350;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
-    const { profile, profileLoadError, profileLoadStatus, publishPost } =
-        useSpaceAppState();
+    const {
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        publishPost,
+        setPostPublication,
+    } = useSpaceAppState();
     const [friendsCount, setFriendsCount] = useState(0);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
@@ -120,19 +125,17 @@ const Page: React.FC = () => {
                 profile={profile}
                 showPostLoadingIndicator={showInitialPostLoadingIndicator}
                 onBack={() => void router.push(spaceRoutes.home)}
+                onPostSubmitted={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
-                    const post = await publishPost(image, caption);
-                    setPosts((currentPosts) => [
-                        post,
-                        ...currentPosts.filter(
-                            (currentPost) => currentPost.postId != post.postId,
-                        ),
-                    ]);
+                    await publishPost(image, caption);
                 }}
                 onDeletePost={async (postId) => {
                     const spaceId = profile.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
+                    setPostPublication((current) =>
+                        current?.post.postId == postId ? null : current,
+                    );
                     setPosts((currentPosts) =>
                         currentPosts.filter((post) => post.postId != postId),
                     );
@@ -143,6 +146,17 @@ const Page: React.FC = () => {
 
                     await updateCurrentPostCaption(spaceId, postId, caption);
                     const normalizedCaption = caption.trim() || undefined;
+                    setPostPublication((current) =>
+                        current?.post.postId == postId
+                            ? {
+                                  ...current,
+                                  post: {
+                                      ...current.post,
+                                      caption: normalizedCaption,
+                                  },
+                              }
+                            : current,
+                    );
                     setPosts((currentPosts) =>
                         currentPosts.map((post) =>
                             post.postId == postId
@@ -158,7 +172,6 @@ const Page: React.FC = () => {
                 onOpenProfilePhoto={() =>
                     void router.push(spaceRoutes.profilePhoto)
                 }
-                onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onSetPostLiked={async (postId, liked) => {
                     await setCurrentPostLiked(actorSpaceId, postId, liked);

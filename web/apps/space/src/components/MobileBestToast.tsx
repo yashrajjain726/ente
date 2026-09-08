@@ -91,7 +91,7 @@ export const SpaceMobileBestToast: React.FC = () => {
                     p: 0,
                     width: 40,
                     "&:focus-visible": {
-                        outline: "2px solid rgba(0 0 0 / 0.72)",
+                        outline: `2px solid ${spaceText}`,
                         outlineOffset: 2,
                     },
                 }}

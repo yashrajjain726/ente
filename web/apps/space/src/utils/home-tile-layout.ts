@@ -1,126 +1,65 @@
-import { maximumSpaceFriendCount } from "utils/friend-limits";
+import { maximumSpaceFriendCount } from "./friend-limits";
 
-interface TileSlot {
-    column: number;
-    row: number;
-}
-
-const gridFriendCountStart = 9;
-const gridColumnCount = 3;
-const tileGapRatio = 0.1;
-const verticalInset = 16;
+export const homeTileGap = 12;
 
 export const maximumHomeTileCount = maximumSpaceFriendCount;
 
-export const usesHomeTileGrid = (count: number) =>
-    count >= gridFriendCountStart && count <= maximumHomeTileCount;
-
 export interface HomeTilePlacement {
-    size: number;
+    height: number;
+    width: number;
     x: number;
     y: number;
 }
 
-export interface HomeTileGridLayout {
-    gap: number;
-    rows: number;
-    size: number;
-}
+export type AddFriendTileVariant = "empty" | "tile";
 
-const tileSlotsForCount = (count: number) => {
-    if (count == 1) {
-        return { columns: 1, rows: 1, slots: [{ column: 0, row: 0 }] };
-    }
-    if (count == 2) {
-        return {
-            columns: 1,
-            rows: 2,
-            slots: [
-                { column: 0, row: 0 },
-                { column: 0, row: 1 },
-            ],
-        };
-    }
-    if (count == 3) {
-        return {
-            columns: 2,
-            rows: 2,
-            slots: [
-                { column: 0.5, row: 0 },
-                { column: 0, row: 1 },
-                { column: 1, row: 1 },
-            ],
-        };
-    }
+const friendColumnCount = (count: number) =>
+    count == maximumHomeTileCount ? 3 : count <= 2 ? 1 : 2;
 
-    const columns = 2;
-    const rows = Math.ceil(count / columns);
-    const stagger = count % columns ? 0.5 : 0;
-    const slots: TileSlot[] = [];
-    for (let index = 0; index < count; index++) {
-        const column = index % columns;
-        slots.push({
-            column,
-            row: Math.floor(index / columns) + column * stagger,
-        });
-    }
-    return { columns, rows, slots };
+const friendRowCount = (count: number) =>
+    Math.ceil(count / friendColumnCount(count));
+
+export const minimumHomeTileCanvasHeight = (count: number) => {
+    const rows = friendRowCount(count);
+    return Math.max(320, rows * 104 + Math.max(0, rows - 1) * homeTileGap);
 };
 
-const layoutDimensions = (columns: number, rows: number) => ({
-    height: rows + (rows - 1) * tileGapRatio,
-    width: columns + (columns - 1) * tileGapRatio,
-});
-
-export const homeTileGridLayout = (
+export const homeTileLayout = (
     count: number,
     canvasWidth: number,
     canvasHeight: number,
-): HomeTileGridLayout | undefined => {
-    if (!usesHomeTileGrid(count) || canvasWidth <= 0 || canvasHeight <= 0) {
-        return undefined;
+):
+    | {
+          friends: HomeTilePlacement[];
+          addFriend?: HomeTilePlacement;
+          addFriendVariant: AddFriendTileVariant;
+      }
+    | undefined => {
+    if (canvasWidth <= 0 || canvasHeight <= 0) return undefined;
+
+    if (count == 0) {
+        return {
+            friends: [],
+            addFriend: { x: 0, y: 0, width: canvasWidth, height: canvasHeight },
+            addFriendVariant: "empty",
+        };
     }
 
-    const rows = Math.ceil(count / gridColumnCount);
-    const layout = layoutDimensions(gridColumnCount, rows);
-    const availableHeight = Math.max(0, canvasHeight - 2 * verticalInset);
-    const size = Math.min(
-        canvasWidth / layout.width,
-        availableHeight / layout.height,
-    );
-    return { gap: size * tileGapRatio, rows, size };
-};
-
-export const homeTilePlacements = (
-    count: number,
-    canvasWidth: number,
-    canvasHeight: number,
-): HomeTilePlacement[] => {
-    if (
-        count < 1 ||
-        count > maximumHomeTileCount ||
-        usesHomeTileGrid(count) ||
-        canvasWidth <= 0 ||
-        canvasHeight <= 0
-    ) {
-        return [];
-    }
-
-    const { columns, rows, slots } = tileSlotsForCount(count);
-    const layout = layoutDimensions(columns, rows);
-    const availableHeight = Math.max(0, canvasHeight - 2 * verticalInset);
-    const size = Math.min(
-        canvasWidth / layout.width,
-        availableHeight / layout.height,
-    );
-    const tileStep = size * (1 + tileGapRatio);
-    const renderedWidth = size + tileStep * (columns - 1);
-    const renderedHeight = size * layout.height;
-    const originX = (canvasWidth - renderedWidth) / 2;
-    const originY = (canvasHeight - renderedHeight) / 2;
-    return slots.map(({ column, row }) => ({
-        size,
-        x: originX + column * tileStep,
-        y: originY + row * tileStep,
-    }));
+    const columns = friendColumnCount(count);
+    const rows = friendRowCount(count);
+    const width = (canvasWidth - (columns - 1) * homeTileGap) / columns;
+    const height = (canvasHeight - (rows - 1) * homeTileGap) / rows;
+    const placementFor = (index: number): HomeTilePlacement => ({
+        x: (index % columns) * (width + homeTileGap),
+        y: Math.floor(index / columns) * (height + homeTileGap),
+        width,
+        height,
+    });
+    return {
+        friends: Array.from({ length: count }, (_, index) =>
+            placementFor(index),
+        ),
+        addFriend: [3, 5, 7].includes(count) ? placementFor(count) : undefined,
+        addFriendVariant: "tile",
+    };
 };

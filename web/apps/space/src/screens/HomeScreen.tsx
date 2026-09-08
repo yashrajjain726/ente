@@ -1,11 +1,12 @@
 import { Cancel01Icon, UserAdd02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Skeleton } from "@mui/material";
+import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/ActionFeedback";
 import {
     SpaceActionToast,
     spaceToastAutoDismissDurationMs,
 } from "components/ActionToast";
+import { SpaceAddFriendTile } from "components/AddFriendTile";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import {
     SpaceFileViewer,
@@ -14,39 +15,48 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
-import {
-    SpaceHomeHeader,
-    spaceHomeHeaderChromeColor,
-    spaceHomeHeaderHeight,
-} from "components/HomeHeader";
-import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
 import {
     SpacePostBadge,
     SpacePostUnreadBadge,
 } from "components/PostUnreadBadge";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
-import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { markSpaceHomePostRead } from "services/home-posts";
+import { openSpaceShareLinkDialog } from "services/share-link";
 import {
     isSpaceContentError,
     type SpaceFriendRequest,
     type SpacePost,
     type SpacePostAssetURLLoader,
-    type SpaceProfilePostPage,
 } from "services/space";
-import { spaceAppBackground, spaceText, spaceTextMuted } from "styles/colors";
+import {
+    spaceAppBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
+import {
+    spacePostTileRadius,
+    spaceTileAvatarSize,
+    spaceTileCircleInset,
+    spaceTileCornerStyles,
+    spaceTileInnerRadius,
+} from "styles/tiles";
 import { firstNameFrom } from "utils/display";
 import {
-    homeTileGridLayout,
-    homeTilePlacements,
+    homeTileGap,
+    homeTileLayout,
     maximumHomeTileCount,
-    usesHomeTileGrid,
+    minimumHomeTileCanvasHeight,
     type HomeTilePlacement,
 } from "utils/home-tile-layout";
 import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
@@ -62,12 +72,16 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 const green = "#08C225";
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
-const avatarFallbackColor = "#888888";
+const avatarFallbackColor = spaceSurfaceHover;
 const avatarFallbackTextColor = "#FFFFFF";
-const mediaPlaceholderColor = spaceHomeHeaderChromeColor;
+const mediaPlaceholderColor = spaceSurface;
+const tileBadgeBackground = "#343438";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
+    ownLatestPost?: SpacePost;
+    isOwnLatestPostLoading?: boolean;
+    isOwnLatestPostUnavailable?: boolean;
     latestPosts: SpacePost[];
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
@@ -83,12 +97,9 @@ interface HomeScreenProps {
         image: SpaceDraftPostImage,
         caption: string,
     ) => Promise<void>;
+    onDeletePost?: (postId: number) => Promise<void>;
+    onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
-    onLoadFriendPosts?: (
-        friendSpaceId: string,
-        viewerSpaceId?: string,
-        cursor?: string,
-    ) => Promise<SpaceProfilePostPage>;
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
     onAcceptFriendRequest?: (requestID: number) => Promise<void>;
@@ -99,6 +110,7 @@ interface HomeScreenProps {
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
     onOpenProfile?: () => void;
+    onOpenSettings?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
         postId: number,
@@ -125,7 +137,6 @@ interface PostTileCanvasSize {
 
 interface SelectedHomeViewer {
     avatarUrl?: string | null;
-    browseHistory?: boolean;
     draftFile?: File;
     draftImageError?: string;
     focusReplyOnOpen?: boolean;
@@ -269,7 +280,7 @@ interface FriendPostTileProps {
         photo: SpaceViewerPhoto,
     ) => void;
     isTwoTileLayout?: boolean;
-    placement?: HomeTilePlacement;
+    placement: HomeTilePlacement;
     posts: SpacePost[];
     showFriendRequestDetails?: boolean;
 }
@@ -336,53 +347,25 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         isFriendRequestActionBusy ||
         (isRequestPending && !canOpenFriendRequest) ||
         Boolean(post && !postUnavailable && !isPhotoReady);
-    const avatarSize = placement ? Math.min(36, placement.size * 0.22) : "22%";
-    const requestActionSize = placement
-        ? showFriendRequestDetails
-            ? Math.min(44, Math.max(40, placement.size * 0.13))
-            : Math.min(40, Math.max(26, placement.size * 0.14))
-        : 26;
+    const tileSize = Math.min(placement.width, placement.height);
+    const tileRadius = Math.min(spacePostTileRadius, tileSize * 0.2);
+    const avatarSize = spaceTileAvatarSize(placement);
+    const requestActionSize = showFriendRequestDetails
+        ? Math.min(44, Math.max(40, tileSize * 0.13))
+        : Math.min(40, Math.max(26, tileSize * 0.14));
     const requestUsernameTextSize = isTwoTileLayout
         ? 14
         : showFriendRequestDetails
-          ? placement
-              ? Math.min(18, Math.max(15, placement.size * 0.05))
-              : 15
+          ? Math.min(18, Math.max(15, tileSize * 0.05))
           : 11;
     const requestActionTextSize = isTwoTileLayout
         ? 12
         : showFriendRequestDetails
           ? 13
-          : placement
-            ? Math.min(13, Math.max(10, placement.size * 0.04))
-            : 10;
-    const requestActionInset = placement
-        ? placement.size * 0.2 - requestActionSize / 2
-        : `calc(20% - ${requestActionSize / 2}px)`;
+          : Math.min(13, Math.max(10, tileSize * 0.04));
     const requestCloseIconSize = 14;
-    const requestCloseInset = placement
-        ? Math.max(
-              0,
-              placement.size * 0.2 -
-                  requestActionSize / 2 -
-                  (requestActionSize - requestCloseIconSize) / 2,
-          )
-        : 3;
     const requestButtonGap = 6;
-    const twoTileRequestActionTop =
-        isTwoTileLayout && placement
-            ? placement.size -
-              (placement.size * 0.2 - requestActionSize / 2) -
-              requestActionSize * 2 -
-              requestButtonGap
-            : undefined;
-    const twoTileRequestUsernameGap = placement
-        ? Math.min(60, Math.max(45, placement.size * 0.23))
-        : 45;
-    const twoTileRequestUsernameTop =
-        twoTileRequestActionTop === undefined
-            ? undefined
-            : twoTileRequestActionTop - twoTileRequestUsernameGap;
+    const stackRequestActions = placement.height >= 176;
 
     const hasMediaToLoad =
         isAvatarPending || Boolean(post && !postUnavailable && !imageUrl);
@@ -482,15 +465,16 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
             ref={rootRef}
             component="li"
             sx={{
-                aspectRatio: "1",
+                ...spaceTileCornerStyles(tileRadius),
                 listStyle: "none",
                 minWidth: 0,
-                position: placement ? "absolute" : "relative",
-                transition: placement
-                    ? "left 420ms cubic-bezier(0.2, 0.8, 0.2, 1), top 420ms cubic-bezier(0.2, 0.8, 0.2, 1), width 420ms cubic-bezier(0.2, 0.8, 0.2, 1)"
-                    : "none",
-                width: placement?.size ?? "100%",
-                ...(placement && { left: placement.x, top: placement.y }),
+                position: "absolute",
+                transition:
+                    "left 420ms ease, top 420ms ease, width 420ms ease, height 420ms ease",
+                width: placement.width,
+                height: placement.height,
+                left: placement.x,
+                top: placement.y,
                 "@media (prefers-reduced-motion: reduce)": {
                     transition: "none",
                 },
@@ -519,10 +503,12 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 sx={{
                     alignItems: "center",
                     appearance: "none",
-                    aspectRatio: "1",
-                    bgcolor: mediaPlaceholderColor,
+                    bgcolor:
+                        !isLoading && (!post || postUnavailable)
+                            ? mediaPlaceholderColor
+                            : "transparent",
                     border: 0,
-                    borderRadius: "20%",
+                    borderRadius: "inherit",
                     color: textBase,
                     cursor: isTileDisabled ? "default" : "pointer",
                     display: "flex",
@@ -536,29 +522,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     zIndex: 1,
                 }}
             >
-                {isLoading ? (
-                    <Skeleton
-                        variant="rectangular"
-                        sx={{
-                            bgcolor: mediaPlaceholderColor,
-                            height: "100%",
-                            transform: "none",
-                            width: "100%",
-                        }}
-                    />
-                ) : post && !postUnavailable ? (
+                {post && !postUnavailable && (
                     <>
-                        {!thumbHashDataURL && !isPhotoReady && (
-                            <Skeleton
-                                variant="rectangular"
-                                sx={{
-                                    bgcolor: mediaPlaceholderColor,
-                                    height: "100%",
-                                    transform: "none",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
                         {thumbHashDataURL && (
                             <Box
                                 component="img"
@@ -601,15 +566,6 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                             />
                         )}
                     </>
-                ) : (
-                    <Box
-                        aria-hidden
-                        sx={{
-                            bgcolor: mediaPlaceholderColor,
-                            height: "100%",
-                            width: "100%",
-                        }}
-                    />
                 )}
                 {!isLoading &&
                     !post &&
@@ -619,8 +575,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         showFriendRequestDetails
                     ) && (
                         <SpacePostBadge
-                            backgroundColor="rgba(255, 255, 255, 0.82)"
-                            color="#5A5A5A"
+                            backgroundColor={tileBadgeBackground}
+                            color={textBase}
                             placement="center"
                         >
                             {friendRequestDirection == "sent"
@@ -636,7 +592,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                             component="span"
                             title={`@${friend.username}’s posts will appear here`}
                             sx={{
-                                bgcolor: "#FFFFFF",
+                                bgcolor: tileBadgeBackground,
                                 borderRadius: "999px",
                                 boxSizing: "border-box",
                                 color: textSecondary,
@@ -647,9 +603,10 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 fontWeight: 600,
                                 left: "50%",
                                 lineHeight: "17px",
-                                maxWidth: "calc(100% - 16px)",
-                                px: isTwoTileLayout ? "9px" : "14px",
-                                py: isTwoTileLayout ? "8px" : "7px",
+                                maxWidth:
+                                    "calc(100% - 2 * var(--space-tile-padding))",
+                                px: "12px",
+                                py: "7px",
                                 position: "absolute",
                                 textAlign: "center",
                                 top: "50%",
@@ -675,8 +632,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     )}
                 {!isLoading && postUnavailable && (
                     <SpacePostBadge
-                        backgroundColor="rgba(255, 255, 255, 0.82)"
-                        color={textSecondary}
+                        backgroundColor={tileBadgeBackground}
+                        color={textBase}
                     >
                         Unavailable
                     </SpacePostBadge>
@@ -704,13 +661,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 ? "2px solid rgba(255, 255, 255, 0.36)"
                                 : "2px solid rgba(255, 255, 255, 0.28)",
                             borderRadius: "50%",
-                            bottom: "10%",
+                            bottom: spaceTileCircleInset(avatarSize),
                             boxSizing: "border-box",
                             cursor: canOpenAvatar ? "pointer" : "default",
                             height: avatarSize,
-                            left: "10%",
-                            maxHeight: 36,
-                            maxWidth: 36,
+                            left: spaceTileCircleInset(avatarSize),
                             overflow: "hidden",
                             p: 0,
                             position: "absolute",
@@ -746,8 +701,16 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
             {friendRequestDirection == "received" && (
                 <Box
                     sx={{
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: `${requestButtonGap}px`,
                         height: "100%",
                         inset: 0,
+                        p: "var(--space-tile-padding)",
+                        pt: showFriendRequestDetails
+                            ? "var(--space-tile-padding)"
+                            : `calc(var(--space-tile-padding) + ${requestActionSize + requestButtonGap}px)`,
                         pointerEvents: "none",
                         position: "absolute",
                         width: "100%",
@@ -755,69 +718,73 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     }}
                 >
                     <Box
-                        component="span"
-                        aria-hidden
-                        title={`@${friend.username}`}
                         sx={{
                             alignItems: "center",
-                            bgcolor: "#FFFFFF",
-                            borderRadius: "999px",
-                            boxSizing: "border-box",
-                            color: textBase,
-                            display: "inline-flex",
-                            fontFamily: '"Nunito", sans-serif',
-                            fontSize: requestUsernameTextSize,
-                            fontWeight: 800,
-                            height: showFriendRequestDetails ? undefined : 24,
+                            display: "flex",
+                            flex: 1,
+                            flexDirection: "column",
+                            gap: "8px",
                             justifyContent: "center",
-                            left: "50%",
-                            lineHeight: 1,
-                            maxWidth: "84%",
-                            overflow: "hidden",
-                            position: "absolute",
-                            px: showFriendRequestDetails ? "11px" : "10px",
-                            py: showFriendRequestDetails ? "6px" : 0,
-                            textOverflow: "ellipsis",
-                            top: isTwoTileLayout
-                                ? twoTileRequestUsernameTop
-                                : showFriendRequestDetails
-                                  ? "30%"
-                                  : "50%",
-                            transform: "translate(-50%, -50%)",
-                            whiteSpace: "nowrap",
+                            minHeight: 0,
                         }}
                     >
-                        @{friend.username}
-                    </Box>
-                    {showFriendRequestDetails && !isTwoTileLayout && (
                         <Box
                             component="span"
                             aria-hidden
+                            title={`@${friend.username}`}
                             sx={{
-                                color: textSecondary,
-                                fontSize: 13,
-                                fontWeight: 500,
-                                left: "50%",
-                                lineHeight: 1,
-                                position: "absolute",
-                                top: "40%",
-                                transform: "translate(-50%, -50%)",
+                                bgcolor: tileBadgeBackground,
+                                borderRadius: "999px",
+                                boxSizing: "border-box",
+                                color: textBase,
+                                display: "block",
+                                fontFamily: '"Nunito", sans-serif',
+                                fontSize: requestUsernameTextSize,
+                                fontWeight: 800,
+                                height: showFriendRequestDetails
+                                    ? undefined
+                                    : 24,
+                                lineHeight: showFriendRequestDetails
+                                    ? "20px"
+                                    : "24px",
+                                flexShrink: 0,
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                px: showFriendRequestDetails ? "12px" : "8px",
+                                py: showFriendRequestDetails ? "6px" : 0,
+                                textOverflow: "ellipsis",
+                                textAlign: "center",
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            sent you a friend request
+                            @{friend.username}
                         </Box>
-                    )}
+                        {showFriendRequestDetails && !isTwoTileLayout && (
+                            <Box
+                                component="span"
+                                aria-hidden
+                                sx={{
+                                    color: textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                    lineHeight: 1.4,
+                                    textAlign: "center",
+                                }}
+                            >
+                                sent you a friend request
+                            </Box>
+                        )}
+                    </Box>
                     <Box
                         sx={{
-                            bottom: requestActionInset,
                             display: "flex",
-                            flexDirection: "column",
+                            flexDirection:
+                                showFriendRequestDetails && !stackRequestActions
+                                    ? "row"
+                                    : "column",
+                            flexShrink: 0,
                             gap: `${requestButtonGap}px`,
-                            left: requestActionInset,
                             pointerEvents: "auto",
-                            position: "absolute",
-                            right: requestActionInset,
                         }}
                     >
                         <Box
@@ -839,9 +806,9 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 alignItems: "center",
                                 bgcolor: green,
                                 border: 0,
-                                borderRadius: `${requestActionSize / 2}px`,
+                                borderRadius: spaceTileInnerRadius,
                                 boxSizing: "border-box",
-                                color: "#FFFFFF",
+                                color: spaceOnAccent,
                                 cursor: isFriendRequestActionBusy
                                     ? "default"
                                     : "pointer",
@@ -890,11 +857,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 }
                                 sx={{
                                     alignItems: "center",
-                                    bgcolor: "#E8E8E8",
+                                    bgcolor: spaceSurfaceHover,
                                     border: 0,
-                                    borderRadius: `${requestActionSize / 2}px`,
+                                    borderRadius: spaceTileInnerRadius,
                                     boxSizing: "border-box",
-                                    color: "#5A5A5A",
+                                    color: textBase,
                                     cursor: isFriendRequestActionBusy
                                         ? "default"
                                         : "pointer",
@@ -914,7 +881,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                     },
                                     "&:hover": isFriendRequestActionBusy
                                         ? undefined
-                                        : { bgcolor: "#DEDEDE" },
+                                        : { bgcolor: "#48484E" },
                                 }}
                             >
                                 {friendRequestAction == "discard" ? (
@@ -958,8 +925,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 p: 0,
                                 pointerEvents: "auto",
                                 position: "absolute",
-                                right: requestCloseInset,
-                                top: requestCloseInset,
+                                right: spaceTileCircleInset(requestActionSize),
+                                top: spaceTileCircleInset(requestActionSize),
                                 width: requestActionSize,
                                 "&:disabled": { opacity: 0.55 },
                                 "&:focus-visible": {
@@ -1007,6 +974,9 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    ownLatestPost,
+    isOwnLatestPostLoading = false,
+    isOwnLatestPostUnavailable = false,
     latestPosts,
     unreadPosts,
     friendRequestSentToastName,
@@ -1019,10 +989,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isHomeCacheLoading = false,
     showInstallPrompt = false,
     onCreatePost,
+    onDeletePost,
+    onUpdatePostCaption,
     onAcceptFriendRequest,
     onDiscardFriendRequest,
     onLoadFriendAvatar,
-    onLoadFriendPosts,
     onLoadPostImage,
     onFriendRequestSentToastClose,
     onOpenFriend,
@@ -1031,6 +1002,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onMessageFriend,
     onPokeFriend,
     onOpenProfile,
+    onOpenSettings,
     onReplyToPost,
     onSetPostLiked,
     profile,
@@ -1072,6 +1044,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const isPostPhotoButtonDisabled =
         isPostPhotoOpening || !viewerSpaceId || !onCreatePost;
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
+    const selectedPhotoPostId = selectedViewer?.photo.postId;
     const selectedPhotoIsOwn =
         Boolean(viewerSpaceId) && selectedPhotoFriendID == viewerSpaceId;
     const latestPostByFriendID = React.useMemo(() => {
@@ -1140,21 +1113,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         updateSize();
         return () => observer.disconnect();
     }, []);
-    const postTilePlacements = homeTilePlacements(
+    const postLayout = homeTileLayout(
         orderedHomeItems.length,
         postTileCanvasSize.width,
         postTileCanvasSize.height,
     );
-    const usesPostGrid = usesHomeTileGrid(orderedHomeItems.length);
-    const postGridLayout = homeTileGridLayout(
-        orderedHomeItems.length,
-        postTileCanvasSize.width,
-        postTileCanvasSize.height,
-    );
-    const emptyFriendTileSize = Math.min(
-        postTileCanvasSize.width,
-        Math.max(0, postTileCanvasSize.height - 64),
-    );
+    const firstFriendTile = postLayout?.friends[0];
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
     const isHomeItemsLoading = isFriendsLoading || isFriendRequestsLoading;
@@ -1167,11 +1131,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         );
         localPostObjectUrlsRef.current.clear();
     }, []);
-    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
-        localPostObjectUrlsRef.current.delete(objectUrl);
-        URL.revokeObjectURL(objectUrl);
-    }, []);
-
     const openPostPhotoPicker = () => {
         if (isPostPhotoButtonDisabled) return;
 
@@ -1192,7 +1151,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         friend: FriendProfile,
         posts: SpacePost[],
         photo: SpaceViewerPhoto,
-        browseHistory = false,
     ) => {
         if (photo.postId) {
             markPostRead({
@@ -1204,7 +1162,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             Boolean(viewerSpaceId) && photo.friendID == viewerSpaceId;
         setSelectedViewer({
             avatarUrl: photo.avatarUrl,
-            browseHistory,
             friend,
             photo,
             postIndex: 0,
@@ -1323,59 +1280,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
     const selectedViewerPostIndex = selectedViewer?.postIndex;
     const selectedViewerPosts = selectedViewer?.posts;
-    const historySessionId = selectedViewer?.browseHistory
-        ? selectedViewer.sessionId
-        : undefined;
-    const selectedFriendSpaceId =
-        selectedViewer?.friend?.spaceId ?? selectedViewer?.friend?.id;
-    React.useEffect(() => {
-        if (!historySessionId || !selectedFriendSpaceId || !onLoadFriendPosts) {
-            return;
-        }
-
-        let cancelled = false;
-        const loadHistory = async () => {
-            let cursor: string | undefined;
-            do {
-                const page = await onLoadFriendPosts(
-                    selectedFriendSpaceId,
-                    viewerSpaceId,
-                    cursor,
-                );
-                if (cancelled) return;
-                setSelectedViewer((viewer) => {
-                    if (viewer?.sessionId !== historySessionId || !viewer.posts)
-                        return viewer;
-
-                    const oldestPost = viewer.posts[viewer.posts.length - 1]!;
-                    const olderPosts = page.items.filter(
-                        (post) =>
-                            !post.isUnavailable &&
-                            (post.timestampMs < oldestPost.timestampMs ||
-                                (post.timestampMs == oldestPost.timestampMs &&
-                                    post.postId < oldestPost.postId)),
-                    );
-                    return {
-                        ...viewer,
-                        posts: [...viewer.posts, ...olderPosts],
-                    };
-                });
-                cursor = page.nextCursor;
-            } while (cursor);
-        };
-        void loadHistory().catch((error: unknown) =>
-            log.error("Failed to load friend post history", error),
-        );
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        historySessionId,
-        onLoadFriendPosts,
-        selectedFriendSpaceId,
-        viewerSpaceId,
-    ]);
 
     const selectedViewerPhotos = React.useMemo(() => {
         const friend = selectedViewer?.friend;
@@ -1465,6 +1369,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         },
         [onSetPostLiked],
     );
+    const updateSelectedViewerPostCaption = async (
+        postId: number,
+        caption: string,
+    ) => {
+        await onUpdatePostCaption?.(postId, caption);
+        const normalizedCaption = caption.trim() || undefined;
+        setSelectedViewer((viewer) =>
+            viewer
+                ? {
+                      ...viewer,
+                      photo:
+                          viewer.photo.postId == postId
+                              ? { ...viewer.photo, caption: normalizedCaption }
+                              : viewer.photo,
+                      posts: viewer.posts?.map((post) =>
+                          post.postId == postId
+                              ? { ...post, caption: normalizedCaption }
+                              : post,
+                      ),
+                  }
+                : viewer,
+        );
+    };
 
     React.useEffect(() => {
         if (!selectedViewerPosts || selectedViewerPostIndex == undefined)
@@ -1483,7 +1410,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         selectedViewerPosts,
     ]);
     const friendPostTileFor = (friend: FriendProfile, index: number) => {
-        const placement = usesPostGrid ? undefined : postTilePlacements[index];
+        const placement = postLayout!.friends[index]!;
         const friendID = friend.spaceId ?? friend.id;
         const unreadFriendPosts = (
             unreadPostsByFriendID.get(friendID) ?? []
@@ -1531,9 +1458,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onOpenAvatar={(anchorRect) =>
                     setSelectedContact({ anchorRect, friend, avatarUrl })
                 }
-                onOpenPosts={(friend, posts, photo) =>
-                    openPostPhotos(friend, posts, photo, isRead)
-                }
+                onOpenPosts={openPostPhotos}
                 placement={placement}
                 posts={posts}
             />
@@ -1584,7 +1509,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
                 onOpenPosts={openPostPhotos}
                 isTwoTileLayout={orderedHomeItems.length == 2}
-                placement={usesPostGrid ? undefined : postTilePlacements[index]}
+                placement={postLayout!.friends[index]!}
                 posts={[]}
                 showFriendRequestDetails={orderedHomeItems.length <= 2}
             />
@@ -1734,10 +1659,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }}
             >
                 <SpaceHomeHeader
-                    profile={profile}
                     showUnreadIndicator={showUnreadIndicator}
                     onOpenMessages={onOpenMessages}
-                    onOpenProfile={onOpenProfile}
+                    onOpenSettings={onOpenSettings}
                 >
                     <Box
                         ref={postInputRef}
@@ -1753,11 +1677,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        height: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
+                        gap: `${homeTileGap}px`,
+                        minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
-                        pb: "calc(env(safe-area-inset-bottom) + 112px)",
+                        pb: "calc(env(safe-area-inset-bottom) + 16px)",
                         px: homeHorizontalPadding,
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${spaceHomeHeaderHeight}px)`,
+                        pt: "4px",
                         width: "100%",
                     }}
                 >
@@ -1765,7 +1690,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         ref={postTileCanvasRef}
                         sx={{
                             flex: "1 1 auto",
-                            minHeight: 0,
+                            minHeight: minimumHomeTileCanvasHeight(
+                                orderedHomeItems.length,
+                            ),
                             position: "relative",
                             width: "100%",
                         }}
@@ -1784,37 +1711,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     <SpaceLoadingSpinner ariaLabel="Loading friends and requests" />
                                 )}
                             </Box>
-                        ) : orderedHomeItems.length > 0 ? (
-                            <Box
-                                component="ul"
-                                aria-label="Friends and friend requests"
-                                sx={{
-                                    display: usesPostGrid ? "grid" : "block",
-                                    gap: postGridLayout
-                                        ? `${postGridLayout.gap}px`
-                                        : undefined,
-                                    gridTemplateColumns: postGridLayout
-                                        ? `repeat(3, ${postGridLayout.size}px)`
-                                        : undefined,
-                                    gridTemplateRows: postGridLayout
-                                        ? `repeat(${postGridLayout.rows}, ${postGridLayout.size}px)`
-                                        : undefined,
-                                    height: "100%",
-                                    m: 0,
-                                    minHeight: 0,
-                                    p: 0,
-                                    placeContent: usesPostGrid
-                                        ? "center"
-                                        : undefined,
-                                    position: "relative",
-                                    width: "100%",
-                                }}
-                            >
-                                {((usesPostGrid && postGridLayout) ||
-                                    (!usesPostGrid &&
-                                        postTilePlacements.length ==
-                                            orderedHomeItems.length)) &&
-                                    orderedHomeItems.map((item, index) =>
+                        ) : (
+                            postLayout && (
+                                <Box
+                                    component="ul"
+                                    aria-label="Friends and friend requests"
+                                    sx={{
+                                        inset: 0,
+                                        m: 0,
+                                        p: 0,
+                                        position: "absolute",
+                                    }}
+                                >
+                                    {orderedHomeItems.map((item, index) =>
                                         item.type == "friend"
                                             ? friendPostTileFor(
                                                   item.friend,
@@ -1825,136 +1734,60 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                   index,
                                               ),
                                     )}
-                            </Box>
-                        ) : (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    display: "flex",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    height: "calc(100% + 32px)",
-                                    justifyContent: "center",
-                                    mt: "-32px",
-                                    width: "100%",
-                                }}
-                            >
-                                {emptyFriendTileSize > 0 && (
-                                    <Box
-                                        className="green-bg"
-                                        sx={{
-                                            alignItems: "flex-start",
-                                            bgcolor: green,
-                                            border: 0,
-                                            borderRadius: "24px",
-                                            boxSizing: "border-box",
-                                            color: "#FFF",
-                                            display: "flex",
-                                            flex: "0 0 auto",
-                                            flexDirection: "column",
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            gap: "7px",
-                                            height: "100%",
-                                            justifyContent: "flex-start",
-                                            overflow: "hidden",
-                                            px: "24px",
-                                            pt: "32px",
-                                            position: "relative",
-                                            width: "100%",
-                                        }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                alignItems: "center",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                mt: "40px",
-                                                position: "relative",
-                                                width: "100%",
-                                                zIndex: 1,
-                                                "@media (max-height: 720px)": {
-                                                    mt: 0,
-                                                },
-                                            }}
-                                        >
-                                            <Box
-                                                component="h1"
-                                                sx={{
-                                                    color: "#FFF",
-                                                    fontFamily:
-                                                        '"Nunito", "Inter Variable", sans-serif',
-                                                    fontSize: 25,
-                                                    fontWeight: 800,
-                                                    lineHeight: "30px",
-                                                    m: 0,
-                                                    maxWidth: 260,
-                                                    textAlign: "center",
-                                                }}
-                                            >
-                                                Invite your close friends and
-                                                family
-                                            </Box>
-                                            <Box
-                                                component="p"
-                                                sx={{
-                                                    color: "rgba(255, 255, 255, 0.84)",
-                                                    fontSize: 14,
-                                                    fontWeight: 500,
-                                                    lineHeight: "20px",
-                                                    m: 0,
-                                                    mt: "10px",
-                                                    maxWidth: 260,
-                                                    textAlign: "center",
-                                                }}
-                                            >
-                                                Each person gets a little spot
-                                                of their own in your Space.
-                                            </Box>
-                                            <Box sx={{ mt: "24px" }}>
-                                                <SpaceShareInviteButton
-                                                    profileLink={profileLink}
-                                                    variant="white"
-                                                    onShareError={(error) =>
-                                                        log.error(
-                                                            "Failed to share Space invite link",
-                                                            error,
-                                                        )
-                                                    }
-                                                />
-                                            </Box>
-                                        </Box>
-                                        <Box
-                                            component="img"
-                                            alt=""
-                                            aria-hidden
-                                            src="/images/ducky-space.svg"
-                                            sx={{
-                                                bottom: 0,
-                                                height: "auto",
-                                                left: "52%",
-                                                maxWidth: 300,
-                                                pointerEvents: "none",
-                                                position: "absolute",
-                                                transform:
-                                                    "translate(-50%, -7%)",
-                                                width: "84%",
-                                                "@media (max-height: 720px)": {
-                                                    maxWidth: 228,
-                                                    width: "64%",
-                                                },
+                                    {postLayout.addFriend && (
+                                        <SpaceAddFriendTile
+                                            placement={postLayout.addFriend}
+                                            profileLink={profileLink}
+                                            variant={
+                                                postLayout.addFriendVariant
+                                            }
+                                            onClick={() => {
+                                                if (profileLink)
+                                                    openSpaceShareLinkDialog(
+                                                        profileLink,
+                                                    );
                                             }}
                                         />
-                                    </Box>
-                                )}
-                            </Box>
+                                    )}
+                                </Box>
+                            )
                         )}
                     </Box>
+                    <SpaceOwnPostTile
+                        profile={profile}
+                        post={ownLatestPost}
+                        avatarSize={
+                            firstFriendTile
+                                ? spaceTileAvatarSize(firstFriendTile)
+                                : undefined
+                        }
+                        isLoading={isOwnLatestPostLoading}
+                        isUnavailable={isOwnLatestPostUnavailable}
+                        isNewPostDisabled={isPostPhotoButtonDisabled}
+                        onLoadPostImage={onLoadPostImage}
+                        onNewPost={openPostPhotoPicker}
+                        onOpenProfile={onOpenProfile}
+                        onOpenPost={(imageUrl) => {
+                            if (!ownLatestPost || !profile) return;
+
+                            const self = {
+                                ...profile,
+                                id: ownLatestPost.spaceId,
+                                friendsCount: friends.length,
+                            };
+                            openPostPhotos(
+                                self,
+                                [ownLatestPost],
+                                viewerPhotoForPost(
+                                    ownLatestPost,
+                                    self,
+                                    profile.avatarUrl,
+                                    imageUrl,
+                                ),
+                            );
+                        }}
+                    />
                 </Box>
-                <SpacePostFloatingActionButton
-                    disabled={isPostPhotoButtonDisabled}
-                    onClick={openPostPhotoPicker}
-                />
                 {selectedContact && (
                     <FriendQuickActionsDialog
                         {...selectedContact}
@@ -1985,7 +1818,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         postActionMode={selectedViewer.postActionMode}
                         showSequenceProgress={Boolean(
-                            !selectedViewer.browseHistory &&
                             selectedViewerPosts &&
                             selectedViewerPosts.length > 1,
                         )}
@@ -1995,6 +1827,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 : undefined
                         }
                         onClose={closeSelectedPhoto}
+                        onDeletePost={
+                            selectedPhotoIsOwn &&
+                            selectedPhotoPostId &&
+                            onDeletePost
+                                ? () => onDeletePost(selectedPhotoPostId)
+                                : undefined
+                        }
+                        onUpdatePostCaption={
+                            selectedPhotoIsOwn && onUpdatePostCaption
+                                ? updateSelectedViewerPostCaption
+                                : undefined
+                        }
                         onOpenProfile={
                             selectedPhotoIsOwn && onOpenProfile
                                 ? () => {
@@ -2020,10 +1864,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   : undefined
                         }
                         onSwipeLeft={
-                            !selectedViewer.browseHistory &&
-                            (!selectedViewerPosts ||
-                                selectedViewerPostIndex ==
-                                    selectedViewerPosts.length - 1)
+                            !selectedViewerPosts ||
+                            selectedViewerPostIndex ==
+                                selectedViewerPosts.length - 1
                                 ? closeSelectedPhoto
                                 : undefined
                         }
@@ -2043,15 +1886,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                               cropArea: edit.cropArea,
                                               file: selectedViewer.draftFile!,
                                               height: edit.height,
+                                              previewUrl,
                                               rotationDegrees:
                                                   edit.rotationDegrees,
                                               width: edit.width,
                                           },
                                           caption,
                                       );
-                                      return publishPromise.finally(() =>
-                                          releaseLocalPostObjectUrl(previewUrl),
+                                      localPostObjectUrlsRef.current.delete(
+                                          previewUrl,
                                       );
+                                      return publishPromise;
                                   }
                                 : undefined
                         }

@@ -17,7 +17,11 @@ import { useSpacePWAInstallPrompt } from "hooks/use-pwa-install-prompt";
 import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
 import {
+    spaceAppBackgroundColor,
     spaceDialogBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceSurfaceHover,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -276,17 +280,16 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             <Box sx={{ alignItems: "center", display: "flex", flexShrink: 0 }}>
                 {onAction && (
                     <Box
-                        className="green-bg"
                         component="button"
                         type="button"
                         disabled={actionDisabled}
                         onClick={onAction}
                         sx={{
                             alignItems: "center",
-                            bgcolor: green,
+                            bgcolor: "#FFFFFF",
                             border: 0,
                             borderRadius: "14px",
-                            color: "#FFFFFF",
+                            color: spaceAppBackgroundColor,
                             cursor: actionDisabled ? "default" : "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -295,8 +298,18 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                             height: 34,
                             justifyContent: "center",
                             minWidth: 48,
-                            opacity: actionDisabled ? 0.7 : 1,
                             px: "17px",
+                            transition:
+                                "background-color 120ms ease, color 120ms ease",
+                            "&:disabled": {
+                                bgcolor: spaceSurfaceHover,
+                                color: spaceTextMuted,
+                            },
+                            "&:focus-visible": {
+                                outline: `2px solid ${spaceText}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover:not(:disabled)": { bgcolor: spaceText },
                         }}
                     >
                         {actionLabel}
@@ -319,6 +332,10 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                             justifyContent: "center",
                             p: 0,
                             width: 36,
+                            "&:focus-visible": {
+                                outline: `2px solid ${spaceText}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
                         <HugeiconsIcon
@@ -577,7 +594,7 @@ export const SpacePWAInstallInstructions: React.FC<
                         bgcolor: green,
                         border: 0,
                         borderRadius: "20px",
-                        color: "#FFFFFF",
+                        color: spaceOnAccent,
                         cursor: "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -592,7 +609,7 @@ export const SpacePWAInstallInstructions: React.FC<
                         width: "100%",
                         "&:active": { filter: "brightness(0.96)" },
                         "&:focus-visible": {
-                            outline: "2px solid rgba(0 0 0 / 0.72)",
+                            outline: `2px solid ${spaceText}`,
                             outlineOffset: 2,
                         },
                         "&:hover": { filter: "brightness(0.98)" },
@@ -609,7 +626,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: "#FAFAFA",
+            bgcolor: spaceSurface,
             borderRadius: "18px",
             color: textSoft,
             display: "flex",

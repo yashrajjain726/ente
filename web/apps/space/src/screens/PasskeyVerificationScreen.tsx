@@ -2,12 +2,12 @@ import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import React from "react";
-import { spaceAppBackground, spaceText } from "styles/colors";
+import { spaceAppBackground, spaceOnAccent, spaceText } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
-const primaryLight = "#DDEEDF";
-const primaryDark = "#069D1E";
+const primarySurface = "#193C22";
+const primaryText = "#79DD8B";
 const textBase = spaceText;
 const warning = "#F63A3A";
 
@@ -228,7 +228,7 @@ export const PasskeyVerificationScreen: React.FC<
                             bgcolor: green,
                             border: 0,
                             borderRadius: "20px",
-                            color: "white",
+                            color: spaceOnAccent,
                             cursor: "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -257,10 +257,10 @@ export const PasskeyVerificationScreen: React.FC<
                         onClick={onCheckStatus}
                         sx={{
                             alignItems: "center",
-                            bgcolor: primaryLight,
+                            bgcolor: primarySurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: primaryDark,
+                            color: primaryText,
                             cursor: isChecking ? "default" : "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
