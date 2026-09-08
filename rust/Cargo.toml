@@ -111,7 +111,8 @@ zeroize = { version = "1.9.0", features = ["derive"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(frb_expand)'] }
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 allow_attributes = "deny"

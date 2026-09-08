@@ -110,6 +110,10 @@ pub(super) fn check_adapter() -> AdapterCheck {
 }
 
 #[cfg(target_os = "android")]
+#[expect(
+    unsafe_code,
+    reason = "Probe Vulkan device vendors through ash's unsafe API"
+)]
 fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     use ash::vk;
 
