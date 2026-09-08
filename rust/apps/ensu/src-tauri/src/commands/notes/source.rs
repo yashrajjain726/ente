@@ -2,8 +2,6 @@ use std::collections::BTreeSet;
 use std::fs::{self, File, Metadata};
 use std::io::Read;
 #[cfg(unix)]
-use std::os::fd::{AsRawFd, FromRawFd};
-#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
@@ -190,74 +188,46 @@ pub(super) fn read_collection_source(
 
 #[cfg(unix)]
 fn open_collection_source(root: &Path, document_id: &str, _path: &Path) -> Result<File, ApiError> {
+    use rustix::fs::{Mode, OFlags, fcntl_getfl, fcntl_setfl, open, openat};
     use std::ffi::CString;
 
     let root = CString::new(root.as_os_str().as_bytes())
         .map_err(|_| ApiError::new("invalid_document", "Source note path is not allowed"))?;
-    let root_fd = unsafe {
-        libc::open(
-            root.as_ptr(),
-            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
-        )
-    };
-    if root_fd < 0 {
-        return Err(scoped_open_error(std::io::Error::last_os_error()));
-    }
-    let mut directory = unsafe { File::from_raw_fd(root_fd) };
+    let directory_flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC | OFlags::NOFOLLOW;
+    let mut directory =
+        open(root.as_c_str(), directory_flags, Mode::empty()).map_err(scoped_open_error)?;
     let components = document_id.split('/').collect::<Vec<_>>();
     for component in &components[..components.len().saturating_sub(1)] {
-        let component = CString::new(component.as_bytes())
-            .map_err(|_| ApiError::new("invalid_document", "Source note path is not allowed"))?;
-        let fd = unsafe {
-            libc::openat(
-                directory.as_raw_fd(),
-                component.as_ptr(),
-                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
-            )
-        };
-        if fd < 0 {
-            return Err(scoped_open_error(std::io::Error::last_os_error()));
-        }
-        directory = unsafe { File::from_raw_fd(fd) };
+        directory = openat(&directory, *component, directory_flags, Mode::empty())
+            .map_err(scoped_open_error)?;
     }
-    let file_name = CString::new(components.last().copied().unwrap_or_default().as_bytes())
-        .map_err(|_| ApiError::new("invalid_document", "Source note path is not allowed"))?;
-    let fd = unsafe {
-        libc::openat(
-            directory.as_raw_fd(),
-            file_name.as_ptr(),
-            libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK,
+    let file = File::from(
+        openat(
+            &directory,
+            components.last().copied().unwrap_or_default(),
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
+            Mode::empty(),
         )
-    };
-    if fd < 0 {
-        return Err(scoped_open_error(std::io::Error::last_os_error()));
-    }
-    let file = unsafe { File::from_raw_fd(fd) };
+        .map_err(scoped_open_error)?,
+    );
     if !file.metadata().map_err(source_file_error)?.is_file() {
         return Err(ApiError::new(
             "invalid_document",
             "Source note is not supported",
         ));
     }
-    let flags = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFL) };
-    if flags < 0 {
-        return Err(source_file_error(std::io::Error::last_os_error()));
-    }
-    if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_SETFL, flags & !libc::O_NONBLOCK) } < 0 {
-        return Err(source_file_error(std::io::Error::last_os_error()));
-    }
+    let flags = fcntl_getfl(&file).map_err(|error| source_file_error(error.into()))?;
+    fcntl_setfl(&file, flags & !OFlags::NONBLOCK)
+        .map_err(|error| source_file_error(error.into()))?;
     Ok(file)
 }
 
 #[cfg(unix)]
-fn scoped_open_error(error: std::io::Error) -> ApiError {
-    if matches!(
-        error.raw_os_error(),
-        Some(code) if code == libc::ELOOP || code == libc::ENOTDIR
-    ) {
+fn scoped_open_error(error: rustix::io::Errno) -> ApiError {
+    if matches!(error, rustix::io::Errno::LOOP | rustix::io::Errno::NOTDIR) {
         ApiError::new("invalid_document", "Source note path is not allowed")
     } else {
-        source_file_error(error)
+        source_file_error(error.into())
     }
 }
 
@@ -427,7 +397,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn collection_read_rejects_an_intermediate_directory_symlink_swap() {
+    fn collection_read_rejects_symlink_swaps() {
         use std::os::unix::fs::symlink;
 
         let temp = TestDirectory::new();
@@ -441,6 +411,13 @@ mod tests {
         let root = fs::canonicalize(root).unwrap();
         let inventory = inventory_source_root(&root, || Ok(())).unwrap();
         assert_eq!(inventory.len(), 1);
+        let (_, bytes, _) = read_collection_source(&root, "nested/note.md").unwrap();
+        assert_eq!(bytes, b"inside");
+
+        fs::remove_file(root.join("nested/note.md")).unwrap();
+        symlink(outside.join("note.md"), root.join("nested/note.md")).unwrap();
+        let error = read_collection_source(&root, "nested/note.md").unwrap_err();
+        assert_eq!(error.name, Some("invalid_document"));
 
         fs::remove_file(root.join("nested/note.md")).unwrap();
         fs::remove_dir(root.join("nested")).unwrap();
