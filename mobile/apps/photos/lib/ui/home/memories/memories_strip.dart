@@ -7,6 +7,7 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_animate/flutter_animate.dart";
 import "package:photos/core/event_bus.dart";
+import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
@@ -422,19 +423,38 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     });
   }
 
-  void _onLocalPhotosUpdated(LocalPhotosUpdatedEvent event) {
-    if (!mounted ||
-        (event.type != EventType.hide &&
-            event.type != EventType.deletedFromEverywhere &&
-            event.type != EventType.deletedFromRemote)) {
+  Future<void> _onLocalPhotosUpdated(LocalPhotosUpdatedEvent event) async {
+    final memoryLane = _memoryLane;
+    if (!mounted || memoryLane == null) {
       return;
     }
-    final memoryLane = _memoryLane;
-    if (memoryLane == null ||
+    if (event.type != EventType.hide &&
+        event.type != EventType.deletedFromEverywhere &&
+        event.type !=
+            (isLocalGalleryMode
+                ? EventType.deletedFromDevice
+                : EventType.deletedFromRemote)) {
+      return;
+    }
+    final Set<int> updatedFileIds;
+    if (isLocalGalleryMode) {
+      final localIds = event.updatedFiles
+          .map((file) => file.localID)
+          .whereType<String>()
+          .where((id) => id.isNotEmpty);
+      updatedFileIds = (await OfflineFilesDB.instance.getLocalIntIdsForLocalIds(
+        localIds,
+      )).values.toSet();
+    } else {
+      updatedFileIds = event.updatedFiles
+          .map((file) => file.uploadedFileID)
+          .whereType<int>()
+          .toSet();
+    }
+    if (!mounted ||
+        _memoryLane == null ||
         !memoryLane.entries.any(
-          (entry) => event.updatedFiles.any(
-            (file) => file.uploadedFileID == entry.fileId,
-          ),
+          (entry) => updatedFileIds.contains(entry.fileId),
         )) {
       return;
     }
