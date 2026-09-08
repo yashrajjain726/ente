@@ -9,19 +9,17 @@ import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
 import {
-    b64ToBytes,
-    boxSeal,
-    boxSealOpen,
     decryptBox,
     decryptMetadataJSON,
-    deriveInteractiveKey,
     encryptBlob,
     encryptBox,
     generateKey,
+    openFileLinkSecret,
+    prepareFileLink,
     stringToB64,
 } from "ente-locker-wasm";
 import { z } from "zod";
-import { ensureUserKeyPair } from "./account-keys";
+import { ensureAuthenticatedSession } from "./authenticated-session";
 import {
     clearLockerCache,
     findCollectionByType,
@@ -72,8 +70,6 @@ export {
     syncLockerState,
 };
 
-const utf8Decoder = new TextDecoder();
-
 const RemoteFileShareLink = z.object({
     linkID: z.union([z.string(), z.number().transform(String)]),
     url: z.string(),
@@ -112,66 +108,6 @@ export interface LockerFileShareLinkSummary {
     enableDownload: boolean;
     passwordEnabled: boolean;
 }
-
-const decodeUTF8B64 = (b64: string) => utf8Decoder.decode(b64ToBytes(b64));
-
-const generateBase62Secret = (length: number) => {
-    const charset =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    const charsetLength = charset.length;
-    const maxUnbiasedValue = 256 - (256 % charsetLength);
-    let secret = "";
-
-    while (secret.length < length) {
-        const randomValues = crypto.getRandomValues(
-            new Uint8Array(length - secret.length),
-        );
-        for (const value of randomValues) {
-            if (value >= maxUnbiasedValue) continue;
-            secret += charset[value % charsetLength]!;
-        }
-    }
-
-    return secret;
-};
-
-const prepareFileLinkSecretPayload = async (fileKey: string) => {
-    const secret = generateBase62Secret(12);
-    const secretB64 = stringToB64(secret);
-    const derivedKey = await deriveInteractiveKey(secret);
-    const encryptedFileKey = await encryptBox(fileKey, derivedKey.key);
-    const keyPair = await ensureUserKeyPair();
-    const encryptedShareKey = await boxSeal(
-        stringToB64(secretB64),
-        keyPair.publicKey,
-    );
-
-    return {
-        secret,
-        metadata: {
-            encryptedFileKey: encryptedFileKey.encryptedData,
-            encryptedFileKeyNonce: encryptedFileKey.nonce,
-            kdfNonce: derivedKey.salt,
-            kdfMemLimit: derivedKey.memLimit,
-            kdfOpsLimit: derivedKey.opsLimit,
-            encryptedShareKey,
-        },
-    };
-};
-
-const resolveFileLinkSecret = async (
-    link: z.infer<typeof RemoteFileShareLink>,
-    generatedSecret: string,
-) => {
-    if (!link.encryptedShareKey) {
-        return generatedSecret;
-    }
-
-    const decryptedSecretB64 = decodeUTF8B64(
-        await boxSealOpen(link.encryptedShareKey, await ensureUserKeyPair()),
-    );
-    return decodeUTF8B64(decryptedSecretB64);
-};
 
 const infoItemTitle = (
     infoType: LockerItemType,
@@ -222,7 +158,8 @@ export const getOrCreateLockerFileShareLink = async (
     }
 
     const fileKey = await decryptFileKeyForRecord(fileRecord);
-    const payload = await prepareFileLinkSecretPayload(fileKey);
+    const session = await ensureAuthenticatedSession();
+    const payload = await prepareFileLink(session, fileKey);
 
     const res = await fetch(await apiURL("/files/share-url"), {
         method: "POST",
@@ -235,7 +172,9 @@ export const getOrCreateLockerFileShareLink = async (
     ensureOk(res);
 
     const link = RemoteFileShareLink.parse(await res.json());
-    const secret = await resolveFileLinkSecret(link, payload.secret);
+    const secret = link.encryptedShareKey
+        ? await openFileLinkSecret(session, link.encryptedShareKey)
+        : payload.secret;
 
     return {
         linkID: link.linkID,

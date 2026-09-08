@@ -9,6 +9,7 @@ on:
             - "rust/crates/collections/**"
             - "rust/crates/contacts/**"
             - "rust/crates/core/**"
+            - "rust/crates/locker/**"
             - "rust/crates/paste/**"
             - "rust/crates/space/**"
             - "rust/Cargo.lock"

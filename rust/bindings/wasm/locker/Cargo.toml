@@ -6,7 +6,7 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-ente-wasm-lib = { workspace = true, features = ["accounts", "collections", "contacts", "crypto-file", "crypto-seal"] }
+ente-wasm-lib = { workspace = true, features = ["collections", "contacts", "crypto-file", "crypto-seal", "locker"] }
 
 [lints]
 workspace = true
