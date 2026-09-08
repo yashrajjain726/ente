@@ -1436,32 +1436,25 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             aria-label={`Post ${activePhotoIndex + 1} of ${viewerPhotos.length}`}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: controlBackground,
+                                bgcolor: "#F63A3A",
                                 borderRadius: "999px",
                                 boxSizing: "border-box",
+                                color: "#FFFFFF",
                                 display: "inline-flex",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 12,
                                 fontVariantNumeric: "tabular-nums",
                                 fontWeight: 700,
-                                gap: "6px",
-                                height: 28,
+                                height: 24,
                                 justifyContent: "center",
                                 lineHeight: "16px",
                                 minWidth: 48,
-                                px: "9px",
+                                px: "10px",
+                                whiteSpace: "nowrap",
                             }}
                         >
-                            <Box component="span" sx={{ color: textBase }}>
-                                {activePhotoIndex + 1}
-                            </Box>
-                            <Box component="span" sx={{ color: textTertiary }}>
-                                /
-                            </Box>
-                            <Box component="span" sx={{ color: textBase }}>
-                                {viewerPhotos.length}
-                            </Box>
+                            {activePhotoIndex + 1} of {viewerPhotos.length}
                         </Box>
                     )}
                     {canManagePost && !isCaptionEditing && (

@@ -5,6 +5,7 @@ interface SpacePostBadgeProps extends React.PropsWithChildren {
     backgroundColor: string;
     color: string;
     placement?: "center" | "top-right";
+    variant?: "default" | "unread";
 }
 
 export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
@@ -12,6 +13,7 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
     children,
     color,
     placement = "top-right",
+    variant = "default",
 }) => (
     <Box
         component="span"
@@ -42,6 +44,13 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
                       transform: "translate(-50%, -50%)",
                   }
                 : { right: "10%", top: "10%" }),
+            ...(variant == "unread" && {
+                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.15)",
+                fontSize: 12,
+                height: 24,
+                minWidth: 24,
+                px: "6px",
+            }),
         }}
     >
         {children}
@@ -51,7 +60,7 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
 export const SpacePostUnreadBadge: React.FC<{ count: number }> = ({
     count,
 }) => (
-    <SpacePostBadge backgroundColor="#F63A3A" color="#FFFFFF">
+    <SpacePostBadge backgroundColor="#F63A3A" color="#FFFFFF" variant="unread">
         {count}
     </SpacePostBadge>
 );
