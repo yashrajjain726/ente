@@ -1,6 +1,6 @@
 [package]
 name = "ente-photos-frb"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
@@ -18,8 +18,8 @@ ente-photos.workspace = true
 flutter_rust_bridge.workspace = true
 log.workspace = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+[lints]
+workspace = true
 
 [features]
 default = []

@@ -388,13 +388,11 @@ impl MlIndexingTestContext {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) struct GoldenModelAsset {
     pub(crate) path: PathBuf,
     pub(crate) sha256: String,
 }
 
-#[allow(dead_code)]
 pub(crate) struct GoldenTestAssets {
     pub(crate) face_detection: GoldenModelAsset,
     pub(crate) face_embedding: GoldenModelAsset,
@@ -403,7 +401,6 @@ pub(crate) struct GoldenTestAssets {
     pub(crate) clip_text_vocab: PathBuf,
 }
 
-#[allow(dead_code)]
 impl GoldenTestAssets {
     pub(crate) async fn load() -> Result<Self> {
         let repo_root = repo_root()?;
@@ -487,9 +484,7 @@ struct ModelAssets {
     face_detection: ModelAsset,
     face_embedding: ModelAsset,
     clip_image: ModelAsset,
-    #[allow(dead_code)]
     clip_text: ModelAsset,
-    #[allow(dead_code)]
     clip_text_vocab: ModelAsset,
 }
 
@@ -547,7 +542,6 @@ struct ComparableFace {
     embedding: Vec<f64>,
 }
 
-#[allow(dead_code)]
 pub(crate) async fn load_onnx_runtime() -> Result<()> {
     let repo_root = repo_root()?;
     let asset_lock = load_asset_lock(&repo_root)?;
@@ -555,7 +549,6 @@ pub(crate) async fn load_onnx_runtime() -> Result<()> {
     init_onnx_runtime(&store, &asset_lock).await
 }
 
-#[allow(dead_code)]
 pub(crate) fn asset_cache_dir() -> Result<PathBuf> {
     Ok(cache_dir(&repo_root()?))
 }

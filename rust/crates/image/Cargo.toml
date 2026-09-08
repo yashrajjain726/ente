@@ -1,6 +1,6 @@
 [package]
 name = "ente-image"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 ente_heic = { package = "heic_decoder", git = "https://github.com/ente/heic-decoder.git", rev = "2017f4ddaf91017483f6eb71500f520fba47391a", features = [
@@ -13,3 +13,6 @@ kamadak-exif = "0.6.1"
 moxcms = { version = "0.8.1", features = ["in_place"] }
 thiserror.workspace = true
 tiff = "0.10.3"
+
+[lints]
+workspace = true

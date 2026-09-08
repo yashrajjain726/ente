@@ -45,6 +45,12 @@ for package in packages:
     manifest = Path(package["manifest_path"])
     path = manifest.relative_to(root).as_posix()
     cargo = tomllib.loads(manifest.read_text())
+    if cargo["package"].get("edition") != {"workspace": True}:
+        print(f"{path}: use edition.workspace = true", file=sys.stderr)
+        failed = True
+    if cargo.get("lints") != {"workspace": True}:
+        print(f"{path}: use [lints] workspace = true", file=sys.stderr)
+        failed = True
     tables = [(section, cargo.get(section, {})) for section in sections]
     tables += [
         (f"target.{target}.{section}", config.get(section, {}))

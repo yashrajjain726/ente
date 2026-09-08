@@ -1,6 +1,6 @@
 [package]
 name = "ente-ml"
-edition = "2024"
+edition.workspace = true
 
 [features]
 default = []
@@ -86,3 +86,6 @@ tar.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
 url.workspace = true
+
+[lints]
+workspace = true

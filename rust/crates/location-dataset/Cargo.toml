@@ -1,6 +1,6 @@
 [package]
 name = "ente-location-dataset"
-edition = "2024"
+edition.workspace = true
 publish = false
 
 [dependencies]
@@ -12,3 +12,6 @@ sha2.workspace = true
 shapefile = { version = "0.9.0", features = ["geo-types"] }
 thiserror.workspace = true
 zip.workspace = true
+
+[lints]
+workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "ente-cast-wasm"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -12,3 +12,6 @@ ente-wasm-lib.workspace = true
 js-sys.workspace = true
 thiserror.workspace = true
 wasm-bindgen.workspace = true
+
+[lints]
+workspace = true

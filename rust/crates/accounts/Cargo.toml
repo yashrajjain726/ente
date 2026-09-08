@@ -1,6 +1,6 @@
 [package]
 name = "ente-accounts"
-edition = "2024"
+edition.workspace = true
 
 [features]
 museum = []
@@ -26,3 +26,6 @@ hmac.workspace = true
 mockito.workspace = true
 sha1.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "ente-legacy"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 ente-accounts.workspace = true
@@ -10,3 +10,6 @@ serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 uuid = { workspace = true, features = ["v4", "js"] }
+
+[lints]
+workspace = true

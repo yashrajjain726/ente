@@ -1,6 +1,6 @@
 [package]
 name = "ente-core"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 # Keep argon2 on stable 0.5.x for now. This retains a second digest 0.10
@@ -39,3 +39,6 @@ gloo-timers = { version = "0.3.0", features = ["futures"] }
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 mockito.workspace = true
+
+[lints]
+workspace = true

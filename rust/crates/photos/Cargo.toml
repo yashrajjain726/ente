@@ -1,6 +1,6 @@
 [package]
 name = "ente-photos"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 ente-assets.workspace = true
@@ -10,3 +10,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[lints]
+workspace = true

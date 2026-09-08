@@ -1,6 +1,6 @@
 [package]
 name = "ente-ensu"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 ente-assets.workspace = true
@@ -58,3 +58,6 @@ transcription = [
     "dep:rubato",
     "dep:transcribe-rs",
 ]
+
+[lints]
+workspace = true

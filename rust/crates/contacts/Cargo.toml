@@ -1,6 +1,6 @@
 [package]
 name = "ente-contacts"
-edition = "2024"
+edition.workspace = true
 
 [features]
 museum = []
@@ -23,3 +23,6 @@ sha1.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 uuid = { workspace = true, features = ["v4", "js"] }
 zeroize.workspace = true
+
+[lints]
+workspace = true
