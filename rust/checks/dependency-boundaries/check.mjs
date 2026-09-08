@@ -25,6 +25,24 @@ const domain = metadata.packages.filter((pkg) =>
     pathFromRoot(pkg.manifest_path).startsWith("rust/crates/"),
 );
 
+const httpOwners = new Set([
+    "rust/crates/core/Cargo.toml",
+    "rust/crates/assets/Cargo.toml",
+    "rust/crates/location-dataset/Cargo.toml",
+]);
+
+for (const pkg of metadata.packages) {
+    const manifest = pathFromRoot(pkg.manifest_path);
+    if (httpOwners.has(manifest)) continue;
+    for (const dependency of pkg.dependencies) {
+        if (dependency.name !== "reqwest" || dependency.kind === "dev") continue;
+        console.error(
+            `${manifest}: use ente-core::http instead of a production reqwest dependency`,
+        );
+        process.exitCode = 1;
+    }
+}
+
 if (!domain.length) {
     console.error(`${resolve(root, "rust/crates")}: found no domain crates`);
     process.exitCode = 1;

@@ -1733,11 +1733,11 @@ class CollectionsService {
       await showErrorDialog(
         context,
         context.strings.canNotOpenTitle,
-        context.strings.linkRequestLimitExceeded,
+        context.strings.pleaseTryAgain,
       );
       return null;
-    } on PublicCollectionInfoUnauthorizedException catch (e, s) {
-      _logger.warning("Public collection link is unauthorized", e, s);
+    } on PublicCollectionInfoUnavailableException catch (e, s) {
+      _logger.warning("Public collection link is unavailable", e, s);
       if (!context.mounted) return null;
       await showErrorDialog(
         context,

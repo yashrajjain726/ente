@@ -157,6 +157,7 @@ describe("Legacy", () => {
             othersRecoverySession: [{ ...recovery, status: "READY" }],
         };
         let updateBody: unknown;
+        let recoveryErrorBody: object = { code: "ACTIVE_RECOVERY_SESSION" };
         mockFetch(async (request) => {
             switch (new URL(request.url).pathname) {
                 case "/emergency-contacts/info":
@@ -168,10 +169,7 @@ describe("Legacy", () => {
                     updateBody = await request.json();
                     return new Response(null, { status: 204 });
                 case "/emergency-contacts/update-recovery-notice":
-                    return new Response(
-                        "Cannot update during an active recovery session",
-                        { status: 400 },
-                    );
+                    return Response.json(recoveryErrorBody, { status: 400 });
                 default:
                     throw new Error(`Unexpected request: ${request.url}`);
             }
@@ -195,6 +193,13 @@ describe("Legacy", () => {
             await expect(
                 legacy.updateRecoveryNotice(session, 43, 30),
             ).rejects.toMatchObject({ name: "active_recovery_session" });
+            recoveryErrorBody = {
+                code: "BAD_REQUEST",
+                message: "Cannot update during an active recovery session",
+            };
+            await expect(
+                legacy.updateRecoveryNotice(session, 43, 30),
+            ).rejects.not.toMatchObject({ name: "active_recovery_session" });
             recovery.createdAt = Number.MAX_SAFE_INTEGER + 1;
             await expect(legacy.getInfo(session)).rejects.toBeInstanceOf(Error);
         } finally {

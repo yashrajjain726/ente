@@ -1,11 +1,10 @@
 use ente_accounts::auth::KeyAttributes;
 use ente_core::crypto::{self, sealed};
-use ente_core::http;
 use ente_core::{Session, b64};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::current_recovery_key;
+use super::{current_recovery_key, map_recovery_notice_error};
 use crate::{Error, Result};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -157,28 +156,18 @@ pub async fn update_recovery_notice(
     emergency_contact_id: i64,
     recovery_notice_in_days: i32,
 ) -> Result<()> {
-    let path = "/emergency-contacts/update-recovery-notice";
-    let response = session
+    session
         .api
-        .post(path)
+        .post("/emergency-contacts/update-recovery-notice")
         .json(&LegacyUpdateRecoveryNoticeRequest {
             emergency_contact_id,
             recovery_notice_in_days,
         })
         .send()
-        .await?;
-    if response.status() == 400 {
-        return if response.text().await?.contains("active recovery session") {
-            Err(Error::ActiveRecoverySession)
-        } else {
-            Err(http::Error::Http {
-                status: 400,
-                path: path.into(),
-            }
-            .into())
-        };
-    }
-    response.error_for_status()?;
+        .await?
+        .error_for_code()
+        .await
+        .map_err(map_recovery_notice_error)?;
     Ok(())
 }
 

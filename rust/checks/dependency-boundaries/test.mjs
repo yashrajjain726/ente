@@ -49,6 +49,28 @@ result = run({ deleted: true });
 assert.equal(result.status, 0, result.stderr);
 assert.equal(result.stderr, "");
 
+for (const dependencyKind of [
+    "dependencies",
+    "build-dependencies",
+    `target.'cfg(target_arch = "wasm32")'.dependencies`,
+]) {
+    result = run({ framework: "reqwest", dependencyKind });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /use ente-core::http instead of a production reqwest dependency/);
+}
+
+result = run({ framework: "reqwest" });
+assert.equal(result.status, 0, result.stderr);
+
+result = run({ framework: "reqwest", bindingDependencyKind: "dependencies" });
+assert.equal(result.status, 1, result.stderr);
+assert.match(result.stderr, /rust\/bindings\/wasm\/lib\/Cargo\.toml: use ente-core::http/);
+
+for (const domainName of ["core", "assets", "location-dataset"]) {
+    result = run({ framework: "reqwest", dependencyKind: "dependencies", domainName });
+    assert.equal(result.status, 0, result.stderr);
+}
+
 function run({
     source = "pub fn domain() {}\n",
     framework,
@@ -56,14 +78,17 @@ function run({
     empty = false,
     unregistered = false,
     deleted = false,
+    dependencyKind = "dev-dependencies",
+    domainName = "domain",
+    bindingDependencyKind,
 } = {}) {
-    const root = mkdtempSync(join(tmpdir(), "ente-rust-binding-"));
+    const root = mkdtempSync(join(tmpdir(), "ente-rust-dependencies-"));
     try {
         spawn("git", ["init", "-q"], root);
         if (empty) {
             write(root, "rust/Cargo.toml", '[workspace]\nresolver = "2"\n');
         } else {
-            const members = ["crates/domain", "bindings/wasm/lib"];
+            const members = [`crates/${domainName}`, "bindings/wasm/lib"];
             if (framework) members.push("vendor/framework");
             write(
                 root,
@@ -71,17 +96,22 @@ function run({
                 `[workspace]\nmembers = ${JSON.stringify(members)}\nresolver = "2"\n`,
             );
             const dependencies = framework
-                ? `\n[dev-dependencies]\nbinding = { package = ${JSON.stringify(framework)}, path = "../../vendor/framework" }\n`
+                ? `\n[${dependencyKind}]\nbinding = { package = ${JSON.stringify(framework)}, path = "../../vendor/framework" }\n`
                 : binding
                   ? '\n[dependencies]\nbinding = { package = "ente-binding", path = "../../bindings/wasm/lib" }\n'
                   : "";
             write(
                 root,
-                "rust/crates/domain/Cargo.toml",
-                packageToml("domain", dependencies),
+                `rust/crates/${domainName}/Cargo.toml`,
+                packageToml(domainName, dependencies),
             );
-            write(root, "rust/crates/domain/src/lib.rs", source);
-            write(root, "rust/bindings/wasm/lib/Cargo.toml", packageToml("ente-binding"));
+            write(root, `rust/crates/${domainName}/src/lib.rs`, source);
+            write(root, "rust/bindings/wasm/lib/Cargo.toml", packageToml(
+                "ente-binding",
+                bindingDependencyKind
+                    ? `\n[${bindingDependencyKind}]\nhttp = { package = ${JSON.stringify(framework)}, path = "../../../vendor/framework" }\n`
+                    : "",
+            ));
             write(root, "rust/bindings/wasm/lib/src/lib.rs", "pub fn binding() {}\n");
             if (framework) {
                 write(root, "rust/vendor/framework/Cargo.toml", packageToml(framework));

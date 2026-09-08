@@ -33,11 +33,11 @@ func (m *MemoryShareMiddleware) Authenticate(urlSanitizer func(_ *gin.Context) s
 		}
 
 		if share.IsDeleted {
-			c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "memory share is deleted"})
+			c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkDisabled, "error": "memory share is deleted"})
 			return
 		}
 		if ente.IsMemoryShareExpired(share.CreatedAt) {
-			c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+			c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 			return
 		}
 
