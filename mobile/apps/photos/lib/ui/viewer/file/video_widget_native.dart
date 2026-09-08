@@ -36,7 +36,6 @@ import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import "package:photos/ui/viewer/file/video_double_tap_seek.dart";
 import "package:photos/ui/viewer/file/video_seek_controller.dart";
-import "package:photos/ui/viewer/file/video_stream_change.dart";
 import "package:photos/ui/viewer/file/zoomable_video_viewer.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:video_player/video_player.dart" as vp;
@@ -50,7 +49,6 @@ class VideoWidgetNative extends StatefulWidget {
   final bool isFromMemories;
   final bool isActive;
   final bool? isAudioMutedOverride;
-  final void Function()? onStreamChange;
   final PlaylistData? playlistData;
   final bool selectedPreview;
   final ValueNotifier<double> playbackSpeed;
@@ -64,7 +62,6 @@ class VideoWidgetNative extends StatefulWidget {
     this.isFromMemories = false,
     required this.isActive,
     this.isAudioMutedOverride,
-    required this.onStreamChange,
     super.key,
     this.playlistData,
     this.onFinalFileLoad,
@@ -164,7 +161,10 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     });
     _streamSwitchedSubscription = Bus.instance.on<StreamSwitchedEvent>().listen(
       (event) {
-        if (event.type != PlayerType.nativeVideoPlayer) return;
+        if (event.fileTag != widget.file.tag ||
+            event.type != PlayerType.nativeVideoPlayer) {
+          return;
+        }
         _filePath = null;
         if (event.selectedPreview) {
           loadPreview(update: true);
@@ -484,30 +484,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                             seekController: _seekController,
                                           )
                                         : const SizedBox.shrink(),
-                                  ),
-                                ),
-                          widget.isFromMemories
-                              ? const SizedBox.shrink()
-                              : GalleryBottomControlsPositioned(
-                                  bottom: videoStreamControlBottomInset(
-                                    widget.file.caption?.isNotEmpty ?? false,
-                                  ),
-                                  child: SafeArea(
-                                    top: false,
-                                    left: false,
-                                    right: false,
-                                    child: ValueListenableBuilder(
-                                      valueListenable: _showControls,
-                                      builder: (context, value, _) {
-                                        return VideoStreamChangeWidget(
-                                          showControls: value,
-                                          file: widget.file,
-                                          isPreviewPlayer:
-                                              widget.selectedPreview,
-                                          onStreamChange: widget.onStreamChange,
-                                        );
-                                      },
-                                    ),
                                   ),
                                 ),
                         ],

@@ -162,10 +162,3 @@ class VideoProgressRow extends StatelessWidget {
     );
   }
 }
-
-double videoStreamControlBottomInset(bool hasCaption) {
-  return kVideoProgressBottomInset +
-      kVideoProgressHeight +
-      (hasCaption ? kVideoCaptionGap + kVideoCaptionLineHeight : 0) +
-      8;
-}

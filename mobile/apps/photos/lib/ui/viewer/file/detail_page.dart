@@ -44,11 +44,13 @@ import "package:photos/ui/viewer/file/panorama_viewer_screen.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/qr_code_highlight_overlay.dart";
 import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
+import "package:photos/ui/viewer/file/video_stream_change.dart";
 import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
 
 const _socialRightInset = 24.0;
 const _socialBottomBarClearance = 130.0;
+const _videoStreamControlHeight = 32.0;
 const _galleryBottomBarHeight = 60.0;
 const _galleryCaptionGap = 12.0;
 const _galleryCaptionLineHeight = 16.0;
@@ -197,6 +199,8 @@ class _BodyState extends State<_Body> {
   final Map<String, File> _renderedFiles = {};
   final _playbackSpeed = ValueNotifier<double>(1.0);
   final Map<EnteFile, int> _fileIndexByIdentity = Map.identity();
+  final Map<EnteFile, VideoStreamChangeController>
+  _videoStreamChangeControllers = Map.identity();
   ValueNotifier<double>? _bottomControlsAdditionalInsetNotifier;
 
   @override
@@ -278,6 +282,9 @@ class _BodyState extends State<_Body> {
     _guestViewEventSubscription.cancel();
     _captionUpdatedSubscription.cancel();
     _filmstripCoordinator.dispose();
+    for (final controller in _videoStreamChangeControllers.values) {
+      controller.dispose();
+    }
     _pageController.dispose();
     _selectedIndexNotifier.dispose();
     _qrHelper?.dispose();
@@ -344,6 +351,9 @@ class _BodyState extends State<_Body> {
                   showEditAction: widget.config.showEditAction,
                   onBackPressed: widget.config.onBackPressed,
                   playbackSpeed: _playbackSpeed,
+                  streamChangeController: _videoStreamChangeControllerFor(
+                    _files![selectedIndex],
+                  ),
                 );
               },
               valueListenable: _selectedIndexNotifier,
@@ -582,6 +592,7 @@ class _BodyState extends State<_Body> {
           },
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
           playbackSpeed: _playbackSpeed,
+          streamChangeController: _videoStreamChangeControllerFor(file),
           onTextSelectionStart:
               flagService.ocrOverlayEnabled &&
                   widget.config.mode != DetailPageMode.minimalistic &&
@@ -695,7 +706,17 @@ class _BodyState extends State<_Body> {
         : oldSelectedIndex;
     setState(() {
       _shouldDisableScroll = false;
-      files.removeAt(removedIndex);
+      final removedFile = files.removeAt(removedIndex);
+      final removedController = _videoStreamChangeControllers.remove(
+        removedFile,
+      );
+      if (removedController != null) {
+        // The outgoing page and app bar detach from this controller while the
+        // removal frame is built. Dispose it only after those widgets unmount.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          removedController.dispose();
+        });
+      }
       _rebuildFileIndex();
       if (_selectedIndexNotifier.value == nextSelectedIndex) {
         // The item at this index may have changed even though the index did not.
@@ -888,6 +909,14 @@ class _BodyState extends State<_Body> {
     return value is EnteFile ? _fileIndexByIdentity[value] : null;
   }
 
+  VideoStreamChangeController? _videoStreamChangeControllerFor(EnteFile file) {
+    if (file.fileType != FileType.video) return null;
+    return _videoStreamChangeControllers.putIfAbsent(
+      file,
+      VideoStreamChangeController.new,
+    );
+  }
+
   void _rebuildFileIndex() {
     _fileIndexByIdentity.clear();
     final files = _files;
@@ -1045,7 +1074,8 @@ class _GallerySocialOverlay extends StatelessWidget {
       right: padding.right + _socialRightInset,
       bottom:
           padding.bottom +
-          _socialBottomBarClearance +
+          _socialBottomBarClearance -
+          (file.fileType == FileType.video ? _videoStreamControlHeight : 0) +
           (hasFilmstrip
               ? GalleryFileViewerFilmstripLayout.additionalBottomInset
               : 0),
