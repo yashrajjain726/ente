@@ -1,4 +1,3 @@
-pub mod backend;
 mod caches;
 mod clip;
 pub mod codec;
@@ -12,7 +11,6 @@ use std::path::Path;
 
 use crate::db::Database;
 
-pub use backend::{Backend, decide};
 pub use error::{Error, Result};
 pub use types::*;
 
