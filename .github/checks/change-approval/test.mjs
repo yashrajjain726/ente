@@ -441,3 +441,100 @@ test("CI mode with nothing flagged", (t) => {
 test("ordinary change is silent", (t) => {
     assert.equal(scan(t, { "src/a.txt": "a\n" }, { "src/a.txt": "b\n", "src/b.txt": "c\n" }), "");
 });
+
+test("Cargo lint changes need approval across TOML layouts", (t) => {
+    for (const [before, after] of [
+        ['', '[workspace.lints.rust]\nunsafe_code = "deny"\n'],
+        ['[workspace.lints.rust]\nunsafe_code = "deny"\n', '[workspace.lints.rust]\nunsafe_code = "warn"\n'],
+        ['[workspace.lints.rust]\nunsafe_code = "deny"\n', ''],
+        ['[lints]\nworkspace = true\n', '[lints.rust]\nunsafe_code = "allow"\n'],
+        ['', 'workspace.lints = { rust = { unsafe_code = "allow" } }\n'],
+        ['[workspace]\nmembers = ["a", "b"]\n', '[workspace]\nmembers = ["a", "b"]\ndefault-members = ["a"]\n'],
+        ['[workspace]\nmembers = ["a", "b"]\n', '[workspace]\nmembers = ["a"]\nexclude = ["b"]\n'],
+    ]) {
+        const { output, summary } = scan(t, { "rust/Cargo.toml": before }, { "rust/Cargo.toml": after }, { ci: true });
+        assert.equal(output, 'categories=["Rust lint policy files"]\n');
+        assert.match(summary, /## Rust lint policy and exceptions\n\n- `rust\/Cargo.toml`/);
+    }
+});
+
+test("Cargo dependency edits and equivalent lint layouts need no lint approval", (t) => {
+    assert.equal(scan(t, {
+        "rust/Cargo.toml": '[workspace.lints.rust]\nunsafe_code = "deny"\ndead_code = "warn"\n[workspace.dependencies]\nserde = "1"\n',
+    }, {
+        "rust/Cargo.toml": 'workspace.lints.rust = { dead_code = "warn", unsafe_code = "deny" }\n[workspace.dependencies]\nserde = "2"\n',
+    }), "");
+});
+
+test("Rust lint attributes, conditions and scopes need approval", (t) => {
+    const expect = '#[expect(unsafe_code, reason = "FFI") ]';
+    const body = 'fn call() { unsafe { ffi(); } }';
+    for (const [before, after] of [
+        [body, `${expect}\n${body}`],
+        [`${expect}\n${body}`, body],
+        [`${expect}\n${body}`, `${expect.replace("FFI", "New reason")}\n${body}`],
+        [`${expect}\n${body}`, `${expect}\n${body.replace("ffi();", "ffi(); more_ffi();")}`],
+        [`#[cfg(unix)]\n${expect}\n${body}`, `${expect}\n${body}`],
+        [`#[cfg_attr(unix, expect(unsafe_code, reason = "FFI"))]\n${body}`, `#[cfg_attr(test, expect(unsafe_code, reason = "FFI"))]\n${body}`],
+        [`${expect}\n${body}\nfn other() {}`, `${body}\n${expect}\nfn other() {}`],
+        [body, `#![allow(clippy::allow_attributes, clippy::allow_attributes_without_reason, unsafe_code)]\n${body}`],
+        [body, `#[allow(unsafe_code, reason = "FFI")]\n${body}`],
+        [`#[deny(unsafe_code)]\nmod guarded {}`, 'mod guarded {}'],
+        [body, `#[r#expect(unsafe_code, reason = "FFI")]\n${body}`],
+    ]) {
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }), /^1 Rust lint policy file\n/);
+    }
+});
+
+test("Rust statement exceptions cover the whole initializer and their enclosing function", (t) => {
+    const binding = '#[expect(unsafe_code, reason = "FFI")] let x = unsafe { ffi() };';
+    const before = `fn a() { ${binding} } fn b() {}`;
+    for (const after of [
+        `fn a() {} fn b() { ${binding} }`,
+        before.replace('ffi() };', 'ffi() } + unsafe { other() };'),
+    ]) {
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }), /^1 Rust lint policy file\n/);
+    }
+});
+
+test("Rust generic signatures do not truncate an exception's scope", (t) => {
+    for (const signature of ['fn f<T, U>() -> Array<{ 2 }>', 'fn f<T>() where T: A, T: B']) {
+        const before = `#[expect(unsafe_code, reason = "FFI")] ${signature} { unsafe { ffi() } }`;
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": before.replace('ffi()', 'other()') }), /^1 Rust lint policy file\n/);
+    }
+    const binding = '#[expect(unsafe_code, reason = "FFI")] let x = unsafe { ffi() };';
+    assert.match(scan(t, {
+        "src/lib.rs": `fn a<T, U>() -> Array<{ 2 }> { ${binding} } fn b<T, U>() -> Array<{ 2 }> {}`,
+    }, {
+        "src/lib.rs": `fn a<T, U>() -> Array<{ 2 }> {} fn b<T, U>() -> Array<{ 2 }> { ${binding} }`,
+    }), /^1 Rust lint policy file\n/);
+});
+
+test("Rust closure parameters do not truncate an exception's initializer", (t) => {
+    const before = 'fn f() { #[expect(unsafe_code, reason = "FFI")] let f = |p, q| unsafe { ffi(p, q) }; }';
+    assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": before.replace('ffi(p, q)', 'other(p, q)') }), /^1 Rust lint policy file\n/);
+});
+
+test("Rust comments, strings and unrelated edits do not change exceptions", (t) => {
+    const decoys = '/* nested /* #[allow(unsafe_code)] */ comment */\nconst EXAMPLE: &str = r##"#[expect(unsafe_code)]"##;\n';
+    const before = `${decoys}#[expect(unsafe_code, reason = "brackets: ] [ escaped: \\\"")] fn call() { unsafe { ffi(); } }\nfn constructor() {}`;
+    const after = before
+        .replace('fn constructor() {}', "fn constructor() { let c = ']'; }")
+        .replace('unsafe { ffi(); }', 'unsafe { /* reason */ ffi( ); }')
+        .replace('expect(unsafe_code, reason', 'expect(\n unsafe_code,\n reason');
+    assert.equal(scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }), "");
+});
+
+test("code under deny or forbid can change without changing lint policy", (t) => {
+    for (const attribute of ['#![forbid(unsafe_code)]', '#[deny(unsafe_code)]']) {
+        const before = `${attribute}\nfn a() { first(); }`;
+        assert.equal(scan(t, { "src/lib.rs": before }, { "src/lib.rs": before.replace('first()', 'second()') }), "");
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": before.replace('unsafe_code', 'dead_code') }), /^1 Rust lint policy file\n/);
+    }
+});
+
+test("new untracked Rust exceptions and deleted exception files are scanned", (t) => {
+    const source = '#[expect(dead_code, reason = "Shared helper")] fn helper() {}';
+    assert.match(scan(t, {}, { "src/lib.rs": source }, { commit: false }), /^1 Rust lint policy file\n/);
+    assert.match(scan(t, { "src/lib.rs": source }, { "src/lib.rs": null }), /^1 Rust lint policy file\n/);
+});

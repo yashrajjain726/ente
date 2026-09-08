@@ -25,6 +25,109 @@ const guardrailFiles = new Set([
 const configFile =
     /(^|\/)(\.gitattributes|rust-toolchain\.toml|\.cargo\/(config|audit)\.toml|\.npmrc|\.nvmrc|\.tool-versions|\.node-version|\.python-version|gradle-wrapper\.properties)$/;
 
+const cargoLints = (source) =>
+    execFileSync("python3", ["-c", `
+import json, sys, tomllib
+cargo = tomllib.loads(sys.stdin.read())
+workspace = cargo.get("workspace", {})
+selection = {key: workspace.get(key) for key in ("members", "exclude", "default-members")}
+print(json.dumps([cargo.get("lints"), workspace.get("lints"), selection], sort_keys=True))
+`], { encoding: "utf8", input: source });
+
+function rustLintScopes(source) {
+    const lexer = /\/\/[^\n]*|\/\*|[bc]?r(#+)?"[\s\S]*?"\1|[bc]?"(?:\\[\s\S]|[^"\\])*"|b?'(?:\\(?:u\{[\da-fA-F_]+\}|x[\da-fA-F]{2}|[\s\S])|[^'\\\r\n])'|(?:r#)?[a-zA-Z_]\w*|[^\s]/gu;
+    const tokens = [];
+    let match;
+    while ((match = lexer.exec(source))) {
+        const token = match[0];
+        if (token.startsWith("//")) continue;
+        if (token === "/*") {
+            const comments = /\/\*|\*\//g;
+            comments.lastIndex = lexer.lastIndex;
+            for (let depth = 1; depth;) {
+                const comment = comments.exec(source);
+                if (!comment) throw new Error("Unclosed Rust comment");
+                depth += comment[0] === "/*" ? 1 : -1;
+            }
+            lexer.lastIndex = comments.lastIndex;
+        } else {
+            tokens.push(token);
+        }
+    }
+    const pairs = { "(": ")", "[": "]", "{": "}" };
+    let cursor = 0;
+    const group = (closing) => {
+        const nodes = [];
+        while (cursor < tokens.length) {
+            const token = tokens[cursor++];
+            if (token === closing) return nodes;
+            if (Object.hasOwn(pairs, token)) nodes.push([token, ...group(pairs[token]), pairs[token]]);
+            else if ([")", "]", "}"].includes(token)) throw new Error("Unmatched Rust delimiter");
+            else nodes.push(token);
+        }
+        if (closing) throw new Error("Unclosed Rust delimiter");
+        return nodes;
+    };
+    const lint = (nodes, levels = /^(?:r#)?(?:allow|expect|warn|deny|forbid)$/) => nodes.some((node, i) =>
+        Array.isArray(node) ? lint(node, levels) : levels.test(node) && nodes[i + 1]?.[0] === "(",
+    );
+    const scopes = [];
+    const visit = (nodes, context) => {
+        let boundary = 0;
+        let angles = 0;
+        for (let i = 0; i < nodes.length; i++) {
+            if (nodes[i] === "#") {
+                let end = i;
+                let hasLint = false;
+                let exception = false;
+                let inner = false;
+                while (nodes[end] === "#") {
+                    const bang = nodes[end + 1] === "!";
+                    const attribute = nodes[end + (bang ? 2 : 1)];
+                    if (!Array.isArray(attribute) || attribute[0] !== "[") break;
+                    hasLint ||= lint(attribute);
+                    exception ||= lint(attribute, /^(?:r#)?(?:allow|expect)$/);
+                    inner ||= bang;
+                    end += bang ? 3 : 2;
+                }
+                if (hasLint) {
+                    let stop = end;
+                    const statement = nodes[end] === "let";
+                    let angles = 0;
+                    let whereClause = false;
+                    while (stop < nodes.length) {
+                        const node = nodes[stop++];
+                        whereClause ||= node === "where";
+                        if (!statement && node === "<") angles++;
+                        if (!statement && node === ">") angles = Math.max(0, angles - 1);
+                        if (node === ";" || (!statement && !angles && ((node === "," && !whereClause) || (Array.isArray(node) && node[0] === "{")))) break;
+                    }
+                    const scope = inner ? (exception ? nodes : nodes.slice(i, end)) : nodes.slice(i, stop);
+                    if (!inner && !exception && scope.at(-1)?.[0] === "{") scope[scope.length - 1] = ["{", "}"];
+                    scopes.push(JSON.stringify([context, scope]));
+                }
+                if (end > i) {
+                    i = end - 1;
+                    continue;
+                }
+            }
+            if (Array.isArray(nodes[i])) {
+                visit(nodes[i].slice(1, -1), [...context, nodes.slice(boundary, i), nodes[i][0]]);
+                if (nodes[i][0] === "{" && !angles) boundary = i + 1;
+            } else if (nodes[i] === ";") {
+                boundary = i + 1;
+                angles = 0;
+            } else if (nodes[i] === "<") {
+                angles++;
+            } else if (nodes[i] === ">") {
+                angles = Math.max(0, angles - 1);
+            }
+        }
+    };
+    visit(group(), []);
+    return JSON.stringify(scopes.sort());
+}
+
 const tomlPackages = (text) =>
     text
         .split("[[package]]\n")
@@ -171,6 +274,15 @@ const guardrails = [
     ...[...numstat("--diff-filter=A"), ...additions].map(([, , file]) => file).filter((file) => file.startsWith(".github/")),
 ];
 const configs = [...numstat(), ...additions].map(([, , file]) => file).filter((file) => configFile.test(file));
+const lintPolicies = [...numstat(), ...additions]
+    .map(([, , file]) => file)
+    .filter((file) => file.endsWith(".rs") || path.basename(file) === "Cargo.toml")
+    .filter((file) => {
+        const before = kept.includes(file) ? git("show", `${mergeBase}:${file}`) : "";
+        const after = sizes.has(file) ? (local ? readFileSync(file, "utf8") : git("show", `HEAD:${file}`)) : "";
+        const policy = file.endsWith(".rs") ? rustLintScopes : cargoLints;
+        return policy(before) !== policy(after);
+    });
 
 const categories = [
     ["binary file", "binary files", binaries.length],
@@ -179,6 +291,7 @@ const categories = [
     ["dependency source change", "dependency source changes", moved],
     ["guardrail file", "guardrail files", guardrails.length],
     ["config file", "config files", configs.length],
+    ["Rust lint policy file", "Rust lint policy files", lintPolicies.length],
 ].filter(([, , n]) => n);
 const summary = categories.map(([one, many, n]) => `${n} ${n === 1 ? one : many}`).join(", ");
 const detail = [
@@ -190,6 +303,7 @@ const detail = [
             .join("\n\n")}`,
     guardrails.length && `## Guardrail changes\n\n${list(guardrails.map(code))}`,
     configs.length && `## Toolchain and registry config\n\n${list(configs.map(code))}`,
+    lintPolicies.length && `## Rust lint policy and exceptions\n\n${list(lintPolicies.map(code))}`,
 ]
     .filter(Boolean)
     .join("\n\n");
