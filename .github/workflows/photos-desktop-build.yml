@@ -166,6 +166,7 @@ jobs:
                       npm exec -- electron-builder --$platform --publish never
                   fi
               env:
+                  ELECTRON_BUILDER_7Z_FILTER: BCJ
                   GH_TOKEN: ${{ steps.nightly_token.outputs.token }}
                   MAC_OS_CERTIFICATE: ${{ secrets.MAC_OS_CERTIFICATE }}
                   MAC_OS_CERTIFICATE_PASSWORD: ${{ secrets.MAC_OS_CERTIFICATE_PASSWORD }}
