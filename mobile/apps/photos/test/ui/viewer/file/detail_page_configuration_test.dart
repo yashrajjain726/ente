@@ -20,10 +20,11 @@ void main() {
     expect(galleryConfig.copyWith().showGalleryFilmstrip, isTrue);
   });
 
-  test("gallery filmstrip visibility requires an eligible gallery", () {
+  test("gallery filmstrip requires its flag and an eligible gallery", () {
     for (final scenario in [
       (
         name: "eligible gallery",
+        isFeatureEnabled: true,
         isEnabled: true,
         isMinimalistic: false,
         isGuestView: false,
@@ -31,7 +32,17 @@ void main() {
         expected: true,
       ),
       (
+        name: "feature flag disabled",
+        isFeatureEnabled: false,
+        isEnabled: true,
+        isMinimalistic: false,
+        isGuestView: false,
+        itemCount: 2,
+        expected: false,
+      ),
+      (
         name: "not opted in",
+        isFeatureEnabled: true,
         isEnabled: false,
         isMinimalistic: false,
         isGuestView: false,
@@ -40,6 +51,7 @@ void main() {
       ),
       (
         name: "minimalistic viewer",
+        isFeatureEnabled: true,
         isEnabled: true,
         isMinimalistic: true,
         isGuestView: false,
@@ -48,6 +60,7 @@ void main() {
       ),
       (
         name: "guest view",
+        isFeatureEnabled: true,
         isEnabled: true,
         isMinimalistic: false,
         isGuestView: true,
@@ -56,6 +69,7 @@ void main() {
       ),
       (
         name: "single file",
+        isFeatureEnabled: true,
         isEnabled: true,
         isMinimalistic: false,
         isGuestView: false,
@@ -65,6 +79,7 @@ void main() {
     ]) {
       expect(
         shouldShowGalleryFileViewerFilmstrip(
+          isFeatureEnabled: scenario.isFeatureEnabled,
           isEnabled: scenario.isEnabled,
           isMinimalistic: scenario.isMinimalistic,
           isGuestView: scenario.isGuestView,

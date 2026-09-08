@@ -132,6 +132,7 @@ class _DetailPageState extends State<DetailPage> {
     super.initState();
     _bottomControlsAdditionalInsetNotifier.value =
         shouldShowGalleryFileViewerFilmstrip(
+          isFeatureEnabled: isGalleryFileViewerFilmstripEnabled,
           isEnabled: widget.config.showGalleryFilmstrip,
           isMinimalistic: widget.config.mode == DetailPageMode.minimalistic,
           isGuestView: false,
@@ -843,6 +844,7 @@ class _BodyState extends State<_Body> {
   EnteFile? get _selectedFile => _fileAt(_selectedIndexNotifier.value);
 
   bool get _shouldShowFilmstrip => shouldShowGalleryFileViewerFilmstrip(
+    isFeatureEnabled: isGalleryFileViewerFilmstripEnabled,
     isEnabled: widget.config.showGalleryFilmstrip,
     isMinimalistic: widget.config.mode == DetailPageMode.minimalistic,
     isGuestView: isGuestView,

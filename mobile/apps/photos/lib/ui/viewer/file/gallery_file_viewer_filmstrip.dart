@@ -4,6 +4,7 @@ import "package:flutter/material.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_preview_layer.dart";
@@ -17,13 +18,22 @@ abstract final class GalleryFileViewerFilmstripLayout {
       FileViewerFilmstripLayout.height + bottomControlsGap + upperContentGap;
 }
 
+/// Keeps the filmstrip limited to internal users while it is being evaluated.
+bool get isGalleryFileViewerFilmstripEnabled => flagService.internalUser;
+
 /// Whether the gallery-specific viewer may expose its neighboring files.
 bool shouldShowGalleryFileViewerFilmstrip({
+  required bool isFeatureEnabled,
   required bool isEnabled,
   required bool isMinimalistic,
   required bool isGuestView,
   required int itemCount,
-}) => isEnabled && !isMinimalistic && !isGuestView && itemCount > 1;
+}) =>
+    isFeatureEnabled &&
+    isEnabled &&
+    !isMinimalistic &&
+    !isGuestView &&
+    itemCount > 1;
 
 /// Renders the opaque, lightweight gallery thumbnail used while scrubbing.
 ///
