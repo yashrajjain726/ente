@@ -30,11 +30,11 @@ const cargoLints = (source) =>
 import json, sys, tomllib
 cargo = tomllib.loads(sys.stdin.read())
 workspace = cargo.get("workspace", {})
-selection = {key: workspace.get(key) for key in ("members", "exclude", "default-members")}
+selection = {key: sorted(workspace[key]) if key in workspace else None for key in ("members", "exclude", "default-members")}
 print(json.dumps([cargo.get("lints"), workspace.get("lints"), selection], sort_keys=True))
 `], { encoding: "utf8", input: source });
 
-function rustLintScopes(source) {
+function rustPolicy(source) {
     const lexer = /\/\/[^\n]*|\/\*|[bc]?r(#+)?"[\s\S]*?"\1|[bc]?"(?:\\[\s\S]|[^"\\])*"|b?'(?:\\(?:u\{[\da-fA-F_]+\}|x[\da-fA-F]{2}|[\s\S])|[^'\\\r\n])'|(?:r#)?[a-zA-Z_]\w*|[^\s]/gu;
     const tokens = [];
     let match;
@@ -68,64 +68,39 @@ function rustLintScopes(source) {
         if (closing) throw new Error("Unclosed Rust delimiter");
         return nodes;
     };
-    const lint = (nodes, levels = /^(?:r#)?(?:allow|expect|warn|deny|forbid)$/) => nodes.some((node, i) =>
-        Array.isArray(node) ? lint(node, levels) : levels.test(node) && nodes[i + 1]?.[0] === "(",
+    const lint = (nodes) => nodes.some((node, i) =>
+        Array.isArray(node) ? lint(node) : /^(?:r#)?(?:allow|expect|warn|deny|forbid)$/.test(node) && nodes[i + 1]?.[0] === "(",
     );
-    const scopes = [];
-    const visit = (nodes, context) => {
-        let boundary = 0;
-        let angles = 0;
+    const declarations = [];
+    const visit = (nodes) => {
         for (let i = 0; i < nodes.length; i++) {
             if (nodes[i] === "#") {
                 let end = i;
                 let hasLint = false;
-                let exception = false;
-                let inner = false;
                 while (nodes[end] === "#") {
                     const bang = nodes[end + 1] === "!";
                     const attribute = nodes[end + (bang ? 2 : 1)];
                     if (!Array.isArray(attribute) || attribute[0] !== "[") break;
                     hasLint ||= lint(attribute);
-                    exception ||= lint(attribute, /^(?:r#)?(?:allow|expect)$/);
-                    inner ||= bang;
                     end += bang ? 3 : 2;
                 }
                 if (hasLint) {
                     let stop = end;
-                    const statement = nodes[end] === "let";
-                    let angles = 0;
-                    let whereClause = false;
-                    while (stop < nodes.length) {
-                        const node = nodes[stop++];
-                        whereClause ||= node === "where";
-                        if (!statement && node === "<") angles++;
-                        if (!statement && node === ">") angles = Math.max(0, angles - 1);
-                        if (node === ";" || (!statement && !angles && ((node === "," && !whereClause) || (Array.isArray(node) && node[0] === "{")))) break;
+                    if (nodes[i + 1] !== "!") {
+                        while (stop < nodes.length && !["{", ";", ",", "="].includes(Array.isArray(nodes[stop]) ? nodes[stop][0] : nodes[stop])) stop++;
                     }
-                    const scope = inner ? (exception ? nodes : nodes.slice(i, end)) : nodes.slice(i, stop);
-                    if (!inner && !exception && scope.at(-1)?.[0] === "{") scope[scope.length - 1] = ["{", "}"];
-                    scopes.push(JSON.stringify([context, scope]));
+                    declarations.push(JSON.stringify(nodes.slice(i, stop)));
                 }
                 if (end > i) {
                     i = end - 1;
                     continue;
                 }
             }
-            if (Array.isArray(nodes[i])) {
-                visit(nodes[i].slice(1, -1), [...context, nodes.slice(boundary, i), nodes[i][0]]);
-                if (nodes[i][0] === "{" && !angles) boundary = i + 1;
-            } else if (nodes[i] === ";") {
-                boundary = i + 1;
-                angles = 0;
-            } else if (nodes[i] === "<") {
-                angles++;
-            } else if (nodes[i] === ">") {
-                angles = Math.max(0, angles - 1);
-            }
+            if (Array.isArray(nodes[i])) visit(nodes[i].slice(1, -1));
         }
     };
-    visit(group(), []);
-    return JSON.stringify(scopes.sort());
+    visit(group());
+    return { unsafe: tokens.includes("unsafe"), declarations: JSON.stringify(declarations.sort()) };
 }
 
 const tomlPackages = (text) =>
@@ -280,8 +255,10 @@ const lintPolicies = [...numstat(), ...additions]
     .filter((file) => {
         const before = kept.includes(file) ? git("show", `${mergeBase}:${file}`) : "";
         const after = sizes.has(file) ? (local ? readFileSync(file, "utf8") : git("show", `HEAD:${file}`)) : "";
-        const policy = file.endsWith(".rs") ? rustLintScopes : cargoLints;
-        return policy(before) !== policy(after);
+        if (!file.endsWith(".rs")) return cargoLints(before) !== cargoLints(after);
+        const oldPolicy = rustPolicy(before);
+        const newPolicy = rustPolicy(after);
+        return oldPolicy.unsafe || newPolicy.unsafe || oldPolicy.declarations !== newPolicy.declarations;
     });
 
 const categories = [
@@ -303,7 +280,7 @@ const detail = [
             .join("\n\n")}`,
     guardrails.length && `## Guardrail changes\n\n${list(guardrails.map(code))}`,
     configs.length && `## Toolchain and registry config\n\n${list(configs.map(code))}`,
-    lintPolicies.length && `## Rust lint policy and exceptions\n\n${list(lintPolicies.map(code))}`,
+    lintPolicies.length && `## Rust lint declarations and files containing unsafe\n\n${list(lintPolicies.map(code))}`,
 ]
     .filter(Boolean)
     .join("\n\n");
