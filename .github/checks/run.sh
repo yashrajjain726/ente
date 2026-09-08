@@ -5,3 +5,5 @@ cd "$(dirname "$0")/../.."
 
 node .github/checks/documentation-comments/check.mjs
 node .github/checks/documentation-comments/test.mjs
+ruby .github/checks/workflow-paths/check.rb
+ruby .github/checks/workflow-paths/test.rb

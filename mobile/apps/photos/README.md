@@ -61,10 +61,6 @@ To build a release APK, [setup your keystore](https://docs.flutter.dev/deploymen
 
 After updating Flutter dependencies, run `pod install` from `ios/` on macOS and commit `ios/Podfile.lock` if it changes.
 
-## 🏙️ Attributions
-
-See the [location dataset attribution](../../../rust/crates/location-dataset/README.md).
-
 ## 🌍 Translate
 
 [![Crowdin](https://badges.crowdin.net/ente-photos-app/localized.svg)](https://crowdin.com/project/ente-photos-app)

@@ -14,8 +14,8 @@ resolver = "2"
 edition = "2024"
 
 [workspace.dependencies]
-shared = { path = "shared" }
 serde = "1.0.0"
+shared = { path = "shared" }
 
 [workspace.lints.clippy]
 allow_attributes = "deny"
@@ -32,15 +32,15 @@ workspace = true
 """
 
 
-def run(app_b, members='"app-*"', app_b_package=package):
+def run(app_b, members='"app-*"', app_b_package=package, workspace_toml=workspace):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         rust = root / "rust"
-        write(rust / "Cargo.toml", workspace.replace('"app-*"', members))
+        write(rust / "Cargo.toml", workspace_toml.replace('"app-*"', members))
         write(
             rust / "app-a/Cargo.toml",
             package.format("app-a")
-            + "\n[dependencies]\nshared.workspace = true\nserde.workspace = true\n",
+            + "\n[dependencies]\nserde.workspace = true\nshared.workspace = true\n",
         )
         write(rust / "app-b/Cargo.toml", app_b_package.format("app-b") + app_b)
         write(
@@ -103,7 +103,7 @@ assert "target.cfg(windows)" not in result.stderr
 
 result = run("\n[dependencies]\nshared.workspace = true\n", '"app-b", "app-a"')
 assert result.returncode == 1, result.stderr
-assert "rust/Cargo.toml: workspace.members 'app-b' precedes 'app-a'; sort members" in result.stderr
+assert "rust/Cargo.toml: workspace.members must be sorted: 'app-b' precedes 'app-a'" in result.stderr
 
 result = run("\n[dependencies]\nshared.workspace = true\n", '"app-a", "app-b"')
 assert result.returncode == 0, result.stderr
@@ -116,3 +116,28 @@ assert "rust/app-b/Cargo.toml: use edition.workspace = true" in result.stderr
 result = run("", app_b_package=package.replace("\n[lints]\nworkspace = true\n", ""))
 assert result.returncode == 1, result.stderr
 assert "rust/app-b/Cargo.toml: use [lints] workspace = true" in result.stderr
+
+for section in (
+    "dependencies",
+    "dev-dependencies",
+    "build-dependencies",
+    "target.'cfg(unix)'.dependencies",
+):
+    result = run(f"\n[{section}]\nshared.workspace = true\nserde.workspace = true\n")
+    assert result.returncode == 1, result.stderr
+    table = section.replace("'", "")
+    assert f"{table} must be sorted" in result.stderr
+
+result = run("", workspace_toml=workspace.replace(
+    'serde = "1.0.0"\nshared = { path = "shared" }',
+    'shared = { path = "shared" }\nserde = "1.0.0"',
+))
+assert result.returncode == 1, result.stderr
+assert "workspace.dependencies must be sorted" in result.stderr
+
+result = run("\n[features]\nzeta = []\nalpha = []\n")
+assert result.returncode == 1, result.stderr
+assert "features must be sorted" in result.stderr
+
+result = run("\n[features]\nalpha = []\nzeta = []\n")
+assert result.returncode == 0, result.stderr

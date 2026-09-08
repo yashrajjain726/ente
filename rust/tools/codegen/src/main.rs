@@ -163,7 +163,7 @@ fn generate_frb(target: FrbTarget) -> Result<(), DynError> {
     let rust_root = rust_root()?;
     let repo_root = rust_root
         .parent()
-        .ok_or("failed to resolve repo root from rust/apps/codegen")?;
+        .ok_or("failed to resolve repo root from rust/tools/codegen")?;
 
     let apps: &[&str] = match target {
         FrbTarget::All => &["photos", "locker"],
@@ -370,7 +370,7 @@ fn rust_root() -> Result<PathBuf, DynError> {
 fn repo_root() -> Result<PathBuf, DynError> {
     Ok(rust_root()?
         .parent()
-        .ok_or("failed to resolve repo root from rust/apps/codegen")?
+        .ok_or("failed to resolve repo root from rust/tools/codegen")?
         .to_path_buf())
 }
 

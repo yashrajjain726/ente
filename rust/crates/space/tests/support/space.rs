@@ -21,20 +21,17 @@ struct SpaceEntityKeyResponse {
 
 pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx {
     let space_root_key = ensure_space_root_key(endpoint, account).await;
-    let session = reqwest::Client::new()
-        .post(format!("{endpoint}/account/space/sessions"))
+    let session = http::Http::new()
+        .expect("HTTP client")
+        .post(&format!("{endpoint}/account/space/sessions"))
         .header("X-Auth-Token", &account.auth_token)
         .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&serde_json::json!({ "sessionWrapKey": b64::encode(Key::generate().as_bytes()) }))
         .send()
         .await
-        .expect("space session create request failed");
-    assert!(
-        session.status().is_success(),
-        "space session create failed with HTTP {}",
-        session.status()
-    );
-    let session = session
+        .expect("space session create request failed")
+        .error_for_status()
+        .expect("space session create should succeed")
         .json::<SpaceBrowserSessionResponse>()
         .await
         .expect("space session create response parse failed");
@@ -57,8 +54,9 @@ async fn ensure_space_root_key(endpoint: &str, account: &TestAccount) -> Vec<u8>
     let encrypted = secretbox::encrypt_combined(&candidate, &master_key);
     let (header, encrypted_key) = encrypted.split_at(Nonce::BYTES);
 
-    let response = reqwest::Client::new()
-        .post(format!("{endpoint}/user-entity/key/ensure"))
+    let ensured = http::Http::new()
+        .expect("HTTP client")
+        .post(&format!("{endpoint}/user-entity/key/ensure"))
         .header("X-Auth-Token", &account.auth_token)
         .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&serde_json::json!({
@@ -68,13 +66,9 @@ async fn ensure_space_root_key(endpoint: &str, account: &TestAccount) -> Vec<u8>
         }))
         .send()
         .await
-        .expect("space entity key ensure request failed");
-    assert!(
-        response.status().is_success(),
-        "space entity key ensure failed with HTTP {}",
-        response.status()
-    );
-    let ensured = response
+        .expect("space entity key ensure request failed")
+        .error_for_status()
+        .expect("space entity key ensure should succeed")
         .json::<SpaceEntityKeyResponse>()
         .await
         .expect("space entity key ensure response parse failed");
