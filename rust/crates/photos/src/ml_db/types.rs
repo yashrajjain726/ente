@@ -77,25 +77,6 @@ pub struct PetRowsForFiles {
     pub bodies: Vec<PetBodyVectorRow>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ClipEmbedding {
-    pub file_id: i64,
-    pub embedding: Vec<f64>,
-    pub version: i64,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct EmbeddingVector {
-    pub file_id: i64,
-    pub embedding: Vec<f32>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ClipRow {
-    pub file_id: i64,
-    pub embedding: Vec<u8>,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClusterSummary {
     pub avg: Vec<u8>,
@@ -106,21 +87,4 @@ pub struct ClusterSummary {
 pub struct ClusterCentroidRow {
     pub cluster_id: String,
     pub avg: Vec<u8>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FdStatus {
-    pub file_id: i64,
-    pub user_id: i64,
-    pub data_type: String,
-    pub size: i64,
-    pub object_id: Option<String>,
-    pub object_nonce: Option<String>,
-    pub updated_at: i64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PreviewInfo {
-    pub object_id: String,
-    pub object_size: i64,
 }

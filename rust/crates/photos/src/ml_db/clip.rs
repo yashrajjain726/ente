@@ -2,12 +2,32 @@ use std::collections::HashMap;
 
 use crate::db::pair;
 
-use super::MlDb;
 use super::codec::{decode_f32, encode_f32};
-use super::constants::CLIP_EMBEDDING_BYTES_LENGTH;
-use super::error::Result;
 use super::schema::DELETE_CLIP_EMBEDDINGS;
-use super::types::{ClipEmbedding, ClipRow, EmbeddingVector};
+use super::{MlDb, Result};
+
+pub const CLIP_ML_VERSION: i64 = 1;
+pub const CLIP_EMBEDDING_DIMENSIONS: usize = 512;
+pub const CLIP_EMBEDDING_BYTES_LENGTH: i64 = CLIP_EMBEDDING_DIMENSIONS as i64 * 4;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClipEmbedding {
+    pub file_id: i64,
+    pub embedding: Vec<f64>,
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EmbeddingVector {
+    pub file_id: i64,
+    pub embedding: Vec<f32>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClipRow {
+    pub file_id: i64,
+    pub embedding: Vec<u8>,
+}
 
 impl MlDb {
     pub fn get_all_clip_vectors(&self) -> Result<Vec<EmbeddingVector>> {
@@ -107,31 +127,70 @@ fn clip_row(embedding: &ClipEmbedding) -> (i64, Vec<u8>, i64) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::collections::HashMap;
 
-    use super::ClipRow;
+    use super::{CLIP_EMBEDDING_DIMENSIONS, ClipEmbedding, ClipRow, MlDb};
     use crate::ml_db::codec::encode_f32;
-    use crate::ml_db::constants::CLIP_EMBEDDING_DIMENSIONS;
-    use crate::ml_db::tests::{cases, check_seeded, clip, full_clip, seeded};
+    use crate::ml_db::tests::{cases, check, open};
+    use tempfile::TempDir;
+
+    fn clip(file_id: i64, embedding: Vec<f64>) -> ClipEmbedding {
+        ClipEmbedding {
+            file_id,
+            embedding,
+            version: 1,
+        }
+    }
+
+    pub(in crate::ml_db) fn full_clip(file_id: i64) -> ClipEmbedding {
+        clip(file_id, vec![0.25; CLIP_EMBEDDING_DIMENSIONS])
+    }
+
+    pub(in crate::ml_db) fn seed(db: &MlDb) {
+        db.insert_clip_rows(&[
+            full_clip(1),
+            ClipEmbedding {
+                version: 2,
+                ..full_clip(2)
+            },
+            clip(3, vec![1.0, 2.0]),
+            clip(4, vec![]),
+        ])
+        .unwrap();
+    }
+
+    fn seeded() -> (TempDir, MlDb) {
+        let (directory, db) = open();
+        seed(&db);
+        (directory, db)
+    }
 
     #[test]
     fn seeded_counts() {
-        check_seeded(&cases![
-            "clip files": 4 => |db| db.get_clip_indexed_file_count(1),
-            "clip files v2": 1 => |db| db.get_clip_indexed_file_count(2),
-            "clip vectorizable": 2 => |db| db.get_clip_vectorizable_file_count(1),
-            "clip vectorizable v2": 1 => |db| db.get_clip_vectorizable_file_count(2),
-            "clip rows": 4 => |db| db.count_clip_rows(),
-        ]);
+        let (_directory, db) = seeded();
+        check(
+            &db,
+            &cases![
+                "clip files": 4 => |db| db.get_clip_indexed_file_count(1),
+                "clip files v2": 1 => |db| db.get_clip_indexed_file_count(2),
+                "clip vectorizable": 2 => |db| db.get_clip_vectorizable_file_count(1),
+                "clip vectorizable v2": 1 => |db| db.get_clip_vectorizable_file_count(2),
+                "clip rows": 4 => |db| db.count_clip_rows(),
+            ],
+        );
     }
 
     #[test]
     fn seeded_versions() {
-        check_seeded(&cases![
-            "clip versions": HashMap::from([(1, 1), (2, 2), (3, 1), (4, 1)]) =>
-                |db| db.clip_indexed_file_with_version(),
-        ]);
+        let (_directory, db) = seeded();
+        check(
+            &db,
+            &cases![
+                "clip versions": HashMap::from([(1, 1), (2, 2), (3, 1), (4, 1)]) =>
+                    |db| db.clip_indexed_file_with_version(),
+            ],
+        );
     }
 
     #[test]

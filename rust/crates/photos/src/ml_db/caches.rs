@@ -1,9 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::MlDb;
+use super::clip::CLIP_ML_VERSION;
 use super::codec::{decode_f32, encode_f32};
-use super::constants::CLIP_ML_VERSION;
-use super::error::Result;
+use super::{MlDb, Result};
 
 const THREE_MONTHS_MILLIS: i64 = 90 * 24 * 60 * 60 * 1000;
 
@@ -84,21 +83,43 @@ fn now_millis() -> i64 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
+    use super::MlDb;
     use crate::db::Connection;
-    use crate::ml_db::tests::{cases, check_seeded, seeded};
+    use crate::ml_db::tests::{cases, check, open};
+    use tempfile::TempDir;
+
+    pub(in crate::ml_db) fn seed(db: &MlDb) {
+        db.put_repeated_text_embedding_cache("dog", &[0.5, -1.0])
+            .unwrap();
+        db.put_face_id_cached_for_person_or_cluster("p1", "1_0")
+            .unwrap();
+    }
+
+    fn seeded() -> (TempDir, MlDb) {
+        let (directory, db) = open();
+        seed(&db);
+        (directory, db)
+    }
 
     #[test]
     fn seeded_optional_values() {
-        check_seeded(&cases![
-            "cached face p1": Some("1_0".to_string()) =>
-                |db| db.get_face_id_used_for_person_or_cluster("p1"),
-            "cached face p2": None => |db| db.get_face_id_used_for_person_or_cluster("p2"),
-        ]);
-        check_seeded(&cases![
-            "cached dog": Some(vec![0.5, -1.0]) => |db| db.get_repeated_text_embedding_cache("dog"),
-            "uncached cat": None => |db| db.get_repeated_text_embedding_cache("cat"),
-        ]);
+        let (_directory, db) = seeded();
+        check(
+            &db,
+            &cases![
+                "cached face p1": Some("1_0".to_string()) =>
+                    |db| db.get_face_id_used_for_person_or_cluster("p1"),
+                "cached face p2": None => |db| db.get_face_id_used_for_person_or_cluster("p2"),
+            ],
+        );
+        check(
+            &db,
+            &cases![
+                "cached dog": Some(vec![0.5, -1.0]) => |db| db.get_repeated_text_embedding_cache("dog"),
+                "uncached cat": None => |db| db.get_repeated_text_embedding_cache("cat"),
+            ],
+        );
     }
 
     #[test]

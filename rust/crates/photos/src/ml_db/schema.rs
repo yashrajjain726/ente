@@ -1,35 +1,3 @@
-pub const FACES_TABLE: &str = "faces";
-pub const FACE_CLUSTERS_TABLE: &str = "face_clusters";
-pub const CLUSTER_PERSON_TABLE: &str = "cluster_person";
-pub const CLUSTER_SUMMARY_TABLE: &str = "cluster_summary";
-pub const NOT_PERSON_FEEDBACK_TABLE: &str = "not_person_feedback";
-pub const CLIP_TABLE: &str = "clip";
-pub const FILEDATA_TABLE: &str = "filedata";
-pub const FACE_CACHE_TABLE: &str = "face_cache";
-pub const TEXT_EMBEDDINGS_CACHE_TABLE: &str = "text_embeddings_cache";
-pub const CLUSTER_CENTROID_VECTOR_ID_MAP_TABLE: &str = "cluster_centroid_vector_id_map";
-pub const PET_FACES_TABLE: &str = "pet_faces";
-pub const PET_BODIES_TABLE: &str = "pet_bodies";
-pub const PET_FACE_VECTOR_ID_MAP_TABLE: &str = "pet_face_vector_id_map";
-pub const PET_BODY_VECTOR_ID_MAP_TABLE: &str = "pet_body_vector_id_map";
-
-pub const ALL_TABLES: [&str; 14] = [
-    FACES_TABLE,
-    FACE_CLUSTERS_TABLE,
-    CLUSTER_PERSON_TABLE,
-    CLUSTER_SUMMARY_TABLE,
-    NOT_PERSON_FEEDBACK_TABLE,
-    CLIP_TABLE,
-    FILEDATA_TABLE,
-    FACE_CACHE_TABLE,
-    TEXT_EMBEDDINGS_CACHE_TABLE,
-    CLUSTER_CENTROID_VECTOR_ID_MAP_TABLE,
-    PET_FACES_TABLE,
-    PET_BODIES_TABLE,
-    PET_FACE_VECTOR_ID_MAP_TABLE,
-    PET_BODY_VECTOR_ID_MAP_TABLE,
-];
-
 pub const CREATE_FACES_TABLE: &str = "CREATE TABLE IF NOT EXISTS faces (
   file_id INTEGER NOT NULL,
   face_id TEXT NOT NULL UNIQUE,

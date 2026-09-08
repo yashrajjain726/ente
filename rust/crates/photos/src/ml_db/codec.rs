@@ -1,4 +1,4 @@
-use super::error::{Error, Result};
+use super::{Error, Result};
 
 const EVECTOR_VALUES_PACKED_TAG: u64 = 0x0A;
 const EVECTOR_VALUES_FIXED64_TAG: u64 = 0x09;

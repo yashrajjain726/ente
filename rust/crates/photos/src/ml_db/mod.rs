@@ -1,18 +1,44 @@
 mod caches;
 mod clip;
-pub mod codec;
-pub mod constants;
-mod error;
+mod codec;
+mod constants;
 mod filedata;
-pub mod schema;
-pub mod types;
+mod schema;
+mod types;
 
 use std::path::Path;
 
 use crate::db::Database;
 
-pub use error::{Error, Result};
-pub use types::*;
+pub use clip::{
+    CLIP_EMBEDDING_BYTES_LENGTH, CLIP_EMBEDDING_DIMENSIONS, CLIP_ML_VERSION, ClipEmbedding,
+    ClipRow, EmbeddingVector,
+};
+pub use codec::{decode_evector, decode_f32, encode_evector, encode_f32};
+pub use constants::{
+    FACE_ML_VERSION, LAPLACIAN_HARD_THRESHOLD, LAPLACIAN_SOFT_THRESHOLD,
+    LAPLACIAN_VERY_SOFT_THRESHOLD, MEDIUM_QUALITY_FACE_SCORE, MINIMUM_QUALITY_FACE_SCORE,
+    PET_ML_VERSION, is_bad_face_for_clustering,
+};
+pub use filedata::{FdStatus, PreviewInfo};
+pub use types::{
+    ClusterCentroidRow, ClusterSummary, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding,
+    PetBodyRow, PetBodyVectorRow, PetFaceRow, PetFaceVectorRow, PetRowsForFiles,
+};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Database(#[from] crate::db::Error),
+    #[error("{0}")]
+    Codec(String),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("{0}")]
+    InvalidArgument(String),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub const TARGET_VERSION: i64 = schema::MIGRATION_SCRIPTS.len() as i64;
 
@@ -60,10 +86,9 @@ mod tests {
     use std::fmt::Debug;
     use std::path::Path;
 
+    use super::clip::tests::full_clip;
+    use super::{Error, MlDb, TARGET_VERSION, caches, clip, filedata};
     use crate::db::Connection;
-    use crate::ml_db::constants::CLIP_EMBEDDING_DIMENSIONS;
-    use crate::ml_db::schema::ALL_TABLES;
-    use crate::ml_db::{ClipEmbedding, Error, FdStatus, MlDb, PreviewInfo, TARGET_VERSION};
     use tempfile::TempDir;
 
     type Query<T> = fn(&MlDb) -> Result<T, Error>;
@@ -76,7 +101,7 @@ mod tests {
 
     pub(super) use cases;
 
-    fn open() -> (TempDir, MlDb) {
+    pub(super) fn open() -> (TempDir, MlDb) {
         let directory = tempfile::tempdir().unwrap();
         let db = MlDb::open(directory.path().join("ente.ml.db")).unwrap();
         (directory, db)
@@ -100,70 +125,17 @@ mod tests {
             .unwrap()
     }
 
-    pub(super) fn clip(file_id: i64, embedding: Vec<f64>) -> ClipEmbedding {
-        ClipEmbedding {
-            file_id,
-            embedding,
-            version: 1,
-        }
-    }
-
-    pub(super) fn full_clip(file_id: i64) -> ClipEmbedding {
-        clip(file_id, vec![0.25; CLIP_EMBEDDING_DIMENSIONS])
-    }
-
-    pub(super) fn status(file_id: i64, data_type: &str, object_id: Option<&str>) -> FdStatus {
-        FdStatus {
-            file_id,
-            user_id: 42,
-            data_type: data_type.to_string(),
-            size: file_id * 10,
-            object_id: object_id.map(str::to_string),
-            object_nonce: None,
-            updated_at: 1000,
-        }
-    }
-
-    pub(super) fn preview(object_id: &str, object_size: i64) -> PreviewInfo {
-        PreviewInfo {
-            object_id: object_id.to_string(),
-            object_size,
-        }
-    }
-
-    pub(super) fn ids<const N: usize>(values: [i64; N]) -> HashSet<i64> {
-        HashSet::from(values)
-    }
-
-    pub(super) fn check_seeded<T: PartialEq + Debug>(cases: &[(&str, T, Query<T>)]) {
-        let (_directory, db) = seeded();
+    pub(super) fn check<T: PartialEq + Debug>(db: &MlDb, cases: &[(&str, T, Query<T>)]) {
         for (name, expected, query) in cases {
-            assert_eq!(&query(&db).unwrap(), expected, "{name}");
+            assert_eq!(&query(db).unwrap(), expected, "{name}");
         }
     }
 
-    pub(super) fn seeded() -> (TempDir, MlDb) {
+    fn seeded() -> (TempDir, MlDb) {
         let (directory, db) = open();
-        db.insert_clip_rows(&[
-            full_clip(1),
-            ClipEmbedding {
-                version: 2,
-                ..full_clip(2)
-            },
-            clip(3, vec![1.0, 2.0]),
-            clip(4, vec![]),
-        ])
-        .unwrap();
-        db.put_fd_status(&[
-            status(1, "vid_preview", Some("obj1")),
-            status(2, "mldata", None),
-            status(3, "vid_preview", Some("obj3")),
-        ])
-        .unwrap();
-        db.put_repeated_text_embedding_cache("dog", &[0.5, -1.0])
-            .unwrap();
-        db.put_face_id_cached_for_person_or_cluster("p1", "1_0")
-            .unwrap();
+        clip::tests::seed(&db);
+        filedata::tests::seed(&db);
+        caches::tests::seed(&db);
         (directory, db)
     }
 
@@ -181,7 +153,22 @@ mod tests {
         assert_eq!(TARGET_VERSION, 15);
         assert_eq!(user_version(&path), 15);
         let connection = Connection::open(&path).unwrap();
-        for table in ALL_TABLES {
+        for table in [
+            "faces",
+            "face_clusters",
+            "cluster_person",
+            "cluster_summary",
+            "not_person_feedback",
+            "clip",
+            "filedata",
+            "face_cache",
+            "text_embeddings_cache",
+            "cluster_centroid_vector_id_map",
+            "pet_faces",
+            "pet_bodies",
+            "pet_face_vector_id_map",
+            "pet_body_vector_id_map",
+        ] {
             let count: i64 = connection
                 .query_row(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?",
@@ -278,7 +265,10 @@ mod tests {
         assert_eq!(row_count("pet_face_vector_id_map"), 0);
         assert_eq!(row_count("pet_body_vector_id_map"), 0);
         assert_eq!(db.count_clip_rows().unwrap(), 4);
-        assert_eq!(db.get_file_ids_with_fd_data(None).unwrap(), ids([1, 2, 3]));
+        assert_eq!(
+            db.get_file_ids_with_fd_data(None).unwrap(),
+            HashSet::from([1, 2, 3])
+        );
         assert_eq!(
             db.get_face_id_used_for_person_or_cluster("p1").unwrap(),
             Some("1_0".to_string())
