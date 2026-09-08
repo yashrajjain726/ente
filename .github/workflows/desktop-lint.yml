@@ -5,12 +5,12 @@ on:
         paths:
             - ".github/workflows/desktop-lint.yml"
             - "desktop/**"
+            - "rust/Cargo.lock"
+            - "rust/Cargo.toml"
             - "rust/bindings/napi/**"
             - "rust/crates/image/**"
             - "rust/crates/ml/**"
             - "rust/tools/codegen/**"
-            - "rust/Cargo.toml"
-            - "rust/Cargo.lock"
 
 permissions:
     contents: read

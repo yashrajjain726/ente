@@ -26,10 +26,13 @@ const domain = metadata.packages.filter((pkg) =>
 );
 
 const httpOwners = new Set([
-    "rust/crates/core/Cargo.toml",
     "rust/crates/assets/Cargo.toml",
+    "rust/crates/core/Cargo.toml",
     "rust/tools/location-dataset/Cargo.toml",
 ]);
+if ([...httpOwners].some((path, i, paths) => i > 0 && paths[i - 1] > path)) {
+    throw new Error("httpOwners must be sorted");
+}
 
 for (const pkg of metadata.packages) {
     const manifest = pathFromRoot(pkg.manifest_path);

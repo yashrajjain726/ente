@@ -5,10 +5,9 @@ on:
         paths:
             - ".github/workflows/mobile-lint.yml"
             - "mobile/**"
-            - "rust/tools/codegen/**"
-            - "rust/bindings/frb/**"
             - "rust/Cargo.lock"
             - "rust/Cargo.toml"
+            - "rust/bindings/frb/**"
             - "rust/crates/cast/**"
             - "rust/crates/contacts/**"
             - "rust/crates/core/**"
@@ -16,6 +15,7 @@ on:
             - "rust/crates/locker/**"
             - "rust/crates/ml/**"
             - "rust/crates/photos/**"
+            - "rust/tools/codegen/**"
     workflow_dispatch:
 
 permissions:

@@ -3,7 +3,6 @@ name: "Dependency review"
 on:
     pull_request:
         paths:
-            - ".github/workflows/dependency-review.yml"
             - "**/Cargo.lock"
             - "**/Cargo.toml"
             - "**/go.mod"
@@ -13,6 +12,7 @@ on:
             - "**/pubspec.lock"
             - "**/pubspec.yaml"
             - "**/uv.lock"
+            - ".github/workflows/dependency-review.yml"
 
 permissions:
     contents: read

@@ -3,7 +3,9 @@ name: "Lint (Web)"
 on:
     pull_request:
         paths:
-            - "web/**"
+            - ".github/workflows/web-lint.yml"
+            - "rust/Cargo.lock"
+            - "rust/Cargo.toml"
             - "rust/bindings/wasm/**"
             - "rust/crates/cast/**"
             - "rust/crates/collections/**"
@@ -12,9 +14,7 @@ on:
             - "rust/crates/locker/**"
             - "rust/crates/paste/**"
             - "rust/crates/space/**"
-            - "rust/Cargo.lock"
-            - "rust/Cargo.toml"
-            - ".github/workflows/web-lint.yml"
+            - "web/**"
 
 permissions:
     contents: read

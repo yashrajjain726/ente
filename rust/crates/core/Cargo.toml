@@ -28,17 +28,17 @@ x25519-dalek = { version = "3.0.0", features = ["static_secrets"] }
 zeroize.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-reqwest = { workspace = true, features = ["stream"] }
 bytes = "1.11.1"
 futures-core = "0.3.32"
+reqwest = { workspace = true, features = ["stream"] }
 tokio = { workspace = true, features = ["time"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 gloo-timers = { version = "0.3.0", features = ["futures"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 mockito.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true

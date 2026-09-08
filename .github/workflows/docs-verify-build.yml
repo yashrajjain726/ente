@@ -3,8 +3,8 @@ name: "Verify build (Docs)"
 on:
     pull_request:
         paths:
-            - "docs/**"
             - ".github/workflows/docs-verify-build.yml"
+            - "docs/**"
 
 permissions:
     contents: read
