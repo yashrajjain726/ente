@@ -960,6 +960,7 @@ func main() {
 		EmergencyController:    emergencyCtrl,
 		RemoteStoreController:  remoteStoreController,
 		FileRepo:               fileRepo,
+		UsageRepo:              usageRepo,
 		StorageBonusRepo:       storagBonusRepo,
 		BillingRepo:            billingRepo,
 		BillingController:      billingController,
@@ -992,6 +993,7 @@ func main() {
 	adminAPI.POST("/emails-from-hashes", adminHandler.GetEmailsFromHashes)
 	adminAPI.PUT("/user/subscription", adminHandler.UpdateSubscription)
 	adminAPI.POST("/queue/re-queue", adminHandler.ReQueueItem)
+	adminAPI.POST("/user/init-file-counts", adminHandler.InitializeFileCounts)
 	adminAPI.POST("/user/bonus", adminHandler.UpdateBonus)
 
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}

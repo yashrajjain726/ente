@@ -44,6 +44,7 @@ type AdminHandler struct {
 	AuthenticatorRepo      *authenticator.Repository
 	UserAuthRepo           *repo.UserAuthRepository
 	FileRepo               *repo.FileRepository
+	UsageRepo              *repo.UsageRepository
 	BillingRepo            *repo.BillingRepository
 	StorageBonusRepo       *storagebonus.Repository
 	BillingController      *controller.BillingController
@@ -510,6 +511,29 @@ func (h *AdminHandler) ReQueueItem(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
+func (h *AdminHandler) InitializeFileCounts(c *gin.Context) {
+	var r ente.AdminOpsForUserRequest
+	if err := handler.BindJSON(c, &r); err != nil {
+		handler.Error(c, stacktrace.Propagate(err, "Bad request"))
+		return
+	}
+	initialized, err := h.UsageRepo.InitializeFileCounts(c.Request.Context(), r.UserID)
+	logrus.WithFields(logrus.Fields{
+		"admin_id":    auth.GetUserID(c.Request.Header),
+		"user_id":     r.UserID,
+		"initialized": initialized,
+	}).WithError(err).Info("file count initialization")
+	if err != nil && !errors.Is(err, repo.ErrFileCountIneligible) {
+		handler.Error(c, stacktrace.Propagate(err, "failed to initialize file counts"))
+		return
+	}
+	response := gin.H{"initialized": initialized}
+	if err != nil {
+		response["reason"] = err.Error()
+	}
+	c.JSON(http.StatusOK, response)
+}
+
 func (h *AdminHandler) UpdateBonus(c *gin.Context) {
 	var r ente.SupportUpdateBonus
 	if err := handler.BindJSON(c, &r); err != nil {
@@ -678,6 +702,11 @@ func (h *AdminHandler) attachSubscription(ctx *gin.Context, userID int64, respon
 	details, err := h.UserController.GetDetailsV2(ctx, userID, false, ente.Photos)
 	if err == nil {
 		response["details"] = details
+	}
+	photos, locker, err := h.UsageRepo.GetStoredFileCounts(ctx.Request.Context(), userID)
+	if err == nil {
+		response["photosFileCount"] = photos
+		response["lockerFileCount"] = locker
 	}
 	tokenInfos, err := h.UserAuthRepo.GetUserTokenInfo(userID)
 	if err == nil {

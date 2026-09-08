@@ -8,6 +8,32 @@ import (
 	"github.com/ente/museum/pkg/repo/public"
 )
 
+func TestGetStoredFileCountsReturnsMinusOneUntilInitialized(t *testing.T) {
+	_, db, userID := setupCollectionMembershipTest(t)
+	usageRepo := &UsageRepository{DB: db}
+	for _, tt := range []struct {
+		name           string
+		sql            string
+		photos, locker int64
+	}{
+		{"uninitialized", "", -1, -1},
+		{"ready", `UPDATE usage SET photos_file_count = 0, locker_file_count = 7 WHERE user_id = $1`, 0, 7},
+		{"missing", `DELETE FROM usage WHERE user_id = $1`, -1, -1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.sql != "" {
+				if _, err := db.Exec(tt.sql, userID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			photos, locker, err := usageRepo.GetStoredFileCounts(t.Context(), userID)
+			if err != nil || photos != tt.photos || locker != tt.locker {
+				t.Fatalf("GetStoredFileCounts() = (%d, %d, %v), want (%d, %d, nil)", photos, locker, err, tt.photos, tt.locker)
+			}
+		})
+	}
+}
+
 func TestTrashAndRestoreMaintainReadyLockerCount(t *testing.T) {
 	repository, db, userID := setupCollectionMembershipTest(t)
 	setReadyFileCounts(t, db, userID, 0, 1)
