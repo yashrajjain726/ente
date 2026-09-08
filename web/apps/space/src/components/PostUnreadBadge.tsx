@@ -55,7 +55,7 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
                           maxWidth: `calc(100% - 2 * (${inset}))`,
                       }),
                 ...(variant == "unread" && {
-                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.15)",
+                    border: "1px solid #FFFFFF",
                     fontSize: 12,
                     px: "6px",
                 }),

@@ -529,6 +529,7 @@ interface ProfileScreenProps {
     isStatsLoading?: boolean;
     showPostLoadingIndicator?: boolean;
     onBack?: () => void;
+    onPostSubmitted?: () => void;
     onAddFriend?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
     onCreateSpace?: () => void;
@@ -568,6 +569,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     isPostsLoading = false,
     isStatsLoading = false,
     onBack,
+    onPostSubmitted,
     onAddFriend,
     onAddFriendForPostAction,
     onCreateSpace,
@@ -732,10 +734,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         );
         localPostObjectUrlsRef.current.clear();
     }, []);
-    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
-        localPostObjectUrlsRef.current.delete(objectUrl);
-        URL.revokeObjectURL(objectUrl);
-    }, []);
     const openPostPhotoPicker = () => {
         if (isPostPhotoOpening) return;
 
@@ -748,13 +746,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
     };
-    useBrowserBackClose({
-        open: Boolean(selectedPost),
-        onClose: () => {
-            if (!isDraftPostExiting) closeSelectedPost();
-        },
-        stateKey: "space-profile-viewer",
-    });
+    const { clearBrowserBackState: clearSelectedPostHistory } =
+        useBrowserBackClose({
+            open: Boolean(selectedPost),
+            onClose: () => {
+                if (!isDraftPostExiting) closeSelectedPost();
+            },
+            stateKey: "space-profile-viewer",
+        });
     const rememberLoadedPhotoDimensions = (
         itemID: string,
         image: HTMLImageElement,
@@ -2013,6 +2012,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             setIsDraftPostExitAnimating(true);
                         }}
                         onDraftPostExitStart={() => setIsDraftPostExiting(true)}
+                        onDraftPostPublished={() => {
+                            void clearSelectedPostHistory("back").then(() =>
+                                onPostSubmitted?.(),
+                            );
+                        }}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
@@ -2037,9 +2041,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                           },
                                           caption,
                                       );
-                                      return publishPromise.finally(() =>
-                                          releaseLocalPostObjectUrl(previewUrl),
+                                      localPostObjectUrlsRef.current.delete(
+                                          previewUrl,
                                       );
+                                      return publishPromise;
                                   }
                                 : undefined
                         }

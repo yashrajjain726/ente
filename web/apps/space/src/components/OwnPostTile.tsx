@@ -1,12 +1,12 @@
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Skeleton } from "@mui/material";
+import { Box, Fade, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import log from "ente-base/log";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpacePost, SpacePostAssetURLLoader } from "services/space";
-import { useSpaceAppState } from "state/app-state";
+import { useSpaceAppState, type SpacePostPublishPhase } from "state/app-state";
 import { spaceSurface, spaceTextMuted } from "styles/colors";
 import {
     spacePostTileRadius,
@@ -14,13 +14,90 @@ import {
     spaceTileCornerStyles,
 } from "styles/tiles";
 import { spaceDefaultCoverImagePath } from "utils/post-image";
+import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 const green = "#08C225";
-const actionSize = 44;
+const actionSize = 56;
+
+const PostStatus: React.FC<{
+    phase: SpacePostPublishPhase;
+    expiresAtMs?: number;
+}> = ({ phase, expiresAtMs }) => {
+    const [dotCount, setDotCount] = React.useState(1);
+    const [isVisible, setIsVisible] = React.useState(
+        () => !expiresAtMs || expiresAtMs > Date.now(),
+    );
+
+    React.useEffect(() => {
+        setIsVisible(!expiresAtMs || expiresAtMs > Date.now());
+        if (!expiresAtMs) return;
+
+        const timeoutID = window.setTimeout(
+            () => setIsVisible(false),
+            Math.max(0, expiresAtMs - Date.now()),
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [expiresAtMs]);
+
+    React.useEffect(() => {
+        if (phase != "posting") return;
+
+        setDotCount(1);
+        const intervalID = window.setInterval(() => {
+            setDotCount((count) => (count % 3) + 1);
+        }, 500);
+        return () => window.clearInterval(intervalID);
+    }, [phase]);
+
+    const label =
+        phase == "posting"
+            ? "Posting"
+            : phase == "posted"
+              ? "Posted"
+              : "Failed";
+
+    return (
+        <Fade in={isVisible} appear={false} timeout={200} unmountOnExit>
+            <Box
+                role="status"
+                aria-label={label}
+                sx={{
+                    bgcolor:
+                        phase == "posted"
+                            ? green
+                            : phase == "failed"
+                              ? "#F63A3A"
+                              : "rgba(0, 0, 0, 0.64)",
+                    borderRadius: "999px",
+                    color: "#FFFFFF",
+                    display: "inline-flex",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    left: "var(--space-tile-padding)",
+                    lineHeight: "16px",
+                    pointerEvents: "none",
+                    position: "absolute",
+                    px: "10px",
+                    py: "4px",
+                    top: "var(--space-tile-padding)",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {label}
+                {phase == "posting" && (
+                    <Box component="span" aria-hidden sx={{ width: 12 }}>
+                        {".".repeat(dotCount)}
+                    </Box>
+                )}
+            </Box>
+        </Fade>
+    );
+};
 
 interface SpaceOwnPostTileProps {
     profile: SetupProfile | null;
     post?: SpacePost;
+    avatarSize?: number;
     isLoading?: boolean;
     isUnavailable?: boolean;
     isNewPostDisabled?: boolean;
@@ -33,6 +110,7 @@ interface SpaceOwnPostTileProps {
 export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     profile,
     post,
+    avatarSize = 36,
     isLoading = false,
     isUnavailable = false,
     isNewPostDisabled = false,
@@ -41,7 +119,11 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     onOpenProfile,
     onNewPost,
 }) => {
-    const { cachedProfileAvatarUrl } = useSpaceAppState();
+    const { cachedProfileAvatarUrl, postPublication } = useSpaceAppState();
+    const tileRef = React.useRef<HTMLElement>(null);
+    const publishPhase =
+        postPublication?.post == post ? postPublication?.phase : undefined;
+    const hasPublication = Boolean(publishPhase);
     const avatarUrl = profile ? profile.avatarUrl : cachedProfileAvatarUrl;
     const isAvatarLoading =
         !avatarUrl && (!profile || Boolean(profile.avatarObjectID));
@@ -52,12 +134,27 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     }>();
     const postImage = loadedImage?.post == post ? loadedImage : undefined;
     const imageUrl = post?.imageUrl ?? postImage?.url;
+    const thumbHashDataURL = React.useMemo(
+        () => thumbHashDataURLFromBase64(post?.thumbHash),
+        [post?.thumbHash],
+    );
     const unavailable =
         isUnavailable || post?.isUnavailable || postImage?.failed;
+    const canOpenPost = Boolean(
+        imageUrl &&
+        !unavailable &&
+        onOpenPost &&
+        (!publishPhase || publishPhase == "posted"),
+    );
     const loading =
         isLoading || Boolean(post?.imageAsset && !imageUrl && !unavailable);
     const isEmpty = !post && !loading && !unavailable;
     const coverUrl = isEmpty ? spaceDefaultCoverImagePath : imageUrl;
+
+    React.useEffect(() => {
+        if (hasPublication)
+            tileRef.current?.scrollIntoView({ block: "nearest" });
+    }, [hasPublication]);
 
     React.useEffect(() => {
         if (!post?.imageAsset || post.imageUrl || !onLoadPostImage) return;
@@ -78,12 +175,13 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
 
     return (
         <Box
+            ref={tileRef}
             component="section"
             aria-label="Your latest post"
             sx={{
                 ...spaceTileCornerStyles(spacePostTileRadius),
                 aspectRatio: "1.7",
-                bgcolor: spaceSurface,
+                bgcolor: unavailable ? spaceSurface : "transparent",
                 flexShrink: 0,
                 fontFamily: '"Inter Variable", Inter, sans-serif',
                 overflow: "hidden",
@@ -99,7 +197,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                 component="button"
                 type="button"
                 aria-label="Open your posts"
-                disabled={!imageUrl || unavailable || !onOpenPost}
+                disabled={!canOpenPost}
                 onClick={() => imageUrl && onOpenPost?.(imageUrl)}
                 sx={{
                     appearance: "none",
@@ -107,7 +205,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                     border: 0,
                     borderRadius: "inherit",
                     color: spaceTextMuted,
-                    cursor: imageUrl && onOpenPost ? "pointer" : "default",
+                    cursor: canOpenPost ? "pointer" : "default",
                     font: "inherit",
                     inset: 0,
                     p: 0,
@@ -115,27 +213,49 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                     width: "100%",
                 }}
             >
-                {coverUrl && !unavailable ? (
-                    <Box
-                        component="img"
-                        alt={isEmpty ? "" : post?.caption || "Your latest post"}
-                        src={coverUrl}
-                        onError={() =>
-                            post && setLoadedImage({ post, failed: true })
-                        }
-                        sx={{
-                            display: "block",
-                            height: "100%",
-                            objectFit: "cover",
-                            width: "100%",
-                        }}
-                    />
-                ) : loading ? (
-                    <Skeleton
-                        variant="rectangular"
-                        sx={{ height: "100%", transform: "none" }}
-                    />
-                ) : (
+                {(coverUrl || thumbHashDataURL) && !unavailable ? (
+                    <>
+                        {thumbHashDataURL && (
+                            <Box
+                                component="img"
+                                alt=""
+                                aria-hidden
+                                src={thumbHashDataURL}
+                                sx={{
+                                    filter: "blur(14px)",
+                                    height: "100%",
+                                    inset: 0,
+                                    objectFit: "cover",
+                                    position: "absolute",
+                                    transform: "scale(1.08)",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                        {coverUrl && (
+                            <Box
+                                component="img"
+                                alt={
+                                    isEmpty
+                                        ? ""
+                                        : post?.caption || "Your latest post"
+                                }
+                                src={coverUrl}
+                                onError={() =>
+                                    post &&
+                                    setLoadedImage({ post, failed: true })
+                                }
+                                sx={{
+                                    display: "block",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    position: "relative",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                    </>
+                ) : !loading ? (
                     <Box
                         sx={{
                             fontSize: 15,
@@ -145,7 +265,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                     >
                         Couldn&apos;t load your latest post
                     </Box>
-                )}
+                ) : null}
                 {isEmpty && (
                     <Box
                         sx={{
@@ -174,7 +294,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                                 py: "3px",
                             }}
                         >
-                            Your posts will show up here
+                            Your latest posts will show up here
                         </Box>
                         <Box
                             component="span"
@@ -197,10 +317,6 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
             </Box>
             <Box
                 sx={{
-                    background:
-                        coverUrl && !unavailable
-                            ? "linear-gradient(transparent, rgba(0, 0, 0, 0.72))"
-                            : undefined,
                     bottom: 0,
                     height: "50%",
                     left: 0,
@@ -220,16 +336,16 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         bgcolor: "transparent",
                         border: 0,
                         borderRadius: "50%",
-                        bottom: spaceTileCircleInset(actionSize),
+                        bottom: spaceTileCircleInset(avatarSize),
                         cursor: onOpenProfile ? "pointer" : "default",
                         display: "flex",
-                        height: actionSize,
+                        height: avatarSize,
                         justifyContent: "center",
-                        left: spaceTileCircleInset(actionSize),
+                        left: spaceTileCircleInset(avatarSize),
                         p: 0,
                         pointerEvents: "auto",
                         position: "absolute",
-                        width: actionSize,
+                        width: avatarSize,
                     }}
                 >
                     <Box
@@ -240,9 +356,9 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             flexShrink: 0,
-                            height: actionSize,
+                            height: avatarSize,
                             overflow: "hidden",
-                            width: actionSize,
+                            width: avatarSize,
                         }}
                     >
                         {isAvatarLoading ? (
@@ -288,9 +404,15 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         "&:focus-visible": { outlineColor: "#FFFFFF" },
                     }}
                 >
-                    <HugeiconsIcon icon={Add01Icon} size={24} strokeWidth={2} />
+                    <HugeiconsIcon icon={Add01Icon} size={28} strokeWidth={2} />
                 </Box>
             </Box>
+            {publishPhase && (
+                <PostStatus
+                    phase={publishPhase}
+                    expiresAtMs={postPublication?.statusExpiresAtMs}
+                />
+            )}
         </Box>
     );
 };

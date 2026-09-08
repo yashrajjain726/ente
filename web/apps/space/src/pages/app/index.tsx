@@ -58,14 +58,14 @@ const Page: React.FC = () => {
         [],
     );
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
+    const [spaceId, setSpaceId] = useState<string>();
     const {
         ownLatestPost,
         isOwnLatestPostLoading,
         isOwnLatestPostUnavailable,
-        setCreatedPost,
         deleteOwnPost,
         updateOwnPostCaption,
-    } = useOwnLatestPost();
+    } = useOwnLatestPost(spaceId);
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
@@ -77,7 +77,6 @@ const Page: React.FC = () => {
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         useState(false);
     const [showFriendLimitToast, setShowFriendLimitToast] = useState(false);
-    const [spaceId, setSpaceId] = useState<string>();
     const closeFriendRequestSentToast = React.useCallback(
         () => setFriendRequestSentToastName(undefined),
         [],
@@ -343,8 +342,7 @@ const Page: React.FC = () => {
                 onCreatePost={
                     profile
                         ? async (image, caption) => {
-                              const post = await publishPost(image, caption);
-                              setCreatedPost(post);
+                              await publishPost(image, caption);
                           }
                         : undefined
                 }

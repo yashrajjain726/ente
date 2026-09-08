@@ -37,7 +37,7 @@ export interface SpaceDraftPostImage {
     cropArea?: SpaceImageCropArea;
     file: File;
     height?: number;
-    previewUrl?: string;
+    previewUrl: string;
     rotationDegrees?: number;
     width?: number;
 }

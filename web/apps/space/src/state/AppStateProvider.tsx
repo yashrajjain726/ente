@@ -30,11 +30,13 @@ import {
     type RefreshSpaceProfileOptions,
     type SpaceAppState,
     SpaceAppStateContext,
-    type SpacePostPublishPhase,
+    type SpacePostPublication,
     type SpaceProfileLoadStatus,
     initialFriends,
 } from "state/app-state";
 import { prepareSpacePostImageFromEdit } from "utils/post-image";
+
+const postStatusDurationMs = 2000;
 
 export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     children,
@@ -62,8 +64,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [profileLoadError, setProfileLoadError] = useState<string>();
     const [profileLoadStatus, setProfileLoadStatus] =
         useState<SpaceProfileLoadStatus>("loading");
-    const [postPublishPhase, setPostPublishPhase] =
-        useState<SpacePostPublishPhase | null>(null);
+    const [postPublication, setPostPublication] =
+        useState<SpacePostPublication | null>(null);
     const [signupEmail, setSignupEmail] = useState("");
     const avatarURLRef = useRef<string | null>(null);
     const coverURLRef = useRef<string | null>(null);
@@ -71,27 +73,61 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const profileLoadGenerationRef = useRef(0);
     const postPublishGenerationRef = useRef(0);
 
-    const dismissPostPublishToast = useCallback(() => {
-        postPublishGenerationRef.current += 1;
-        setPostPublishPhase(null);
-    }, []);
+    const postPreviewUrl = postPublication?.previewUrl;
+    useEffect(
+        () => () => {
+            if (postPreviewUrl) URL.revokeObjectURL(postPreviewUrl);
+        },
+        [postPreviewUrl],
+    );
 
     const publishPost = useCallback(
         async (
             image: Parameters<SpaceAppState["publishPost"]>[0],
             caption: string,
         ) => {
-            const spaceId = profileRef.current?.spaceId;
+            const profile = profileRef.current;
+            const spaceId = profile?.spaceId;
             if (!spaceId) throw new Error("Missing space.");
 
             const generation = ++postPublishGenerationRef.current;
-            setPostPublishPhase("posting");
+            let publication: SpacePostPublication = {
+                phase: "posting",
+                previewUrl: image.previewUrl,
+                post: {
+                    caption: caption.trim() || undefined,
+                    friendID: spaceId,
+                    height: image.height,
+                    imageUrl: image.previewUrl,
+                    name: profile.fullName,
+                    postId: 0,
+                    spaceId,
+                    timestampMs: Date.now(),
+                    viewerLiked: false,
+                    width: image.width,
+                },
+            };
+            setPostPublication(publication);
             try {
                 const preparedImage = await prepareSpacePostImageFromEdit(
                     image.file,
                     image.cropArea,
                     image.rotationDegrees,
                 );
+                if (postPublishGenerationRef.current == generation) {
+                    const previewUrl = URL.createObjectURL(preparedImage.file);
+                    publication = {
+                        ...publication,
+                        previewUrl,
+                        post: {
+                            ...publication.post,
+                            height: preparedImage.height,
+                            imageUrl: previewUrl,
+                            width: preparedImage.width,
+                        },
+                    };
+                    setPostPublication(publication);
+                }
                 const post = await createCurrentPhotoPost({
                     caption,
                     file: preparedImage.file,
@@ -101,12 +137,21 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                     width: preparedImage.width,
                 });
                 if (postPublishGenerationRef.current == generation) {
-                    setPostPublishPhase("posted");
+                    setPostPublication({
+                        ...publication,
+                        phase: "posted",
+                        post,
+                        statusExpiresAtMs: Date.now() + postStatusDurationMs,
+                    });
                 }
                 return post;
             } catch (error) {
                 if (postPublishGenerationRef.current == generation) {
-                    setPostPublishPhase("failed");
+                    setPostPublication({
+                        ...publication,
+                        phase: "failed",
+                        statusExpiresAtMs: Date.now() + postStatusDurationMs,
+                    });
                 }
                 throw error;
             }
@@ -278,7 +323,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         applyProfile(null);
         setProfileLoadError(undefined);
         setProfileLoadStatus("ready");
-        dismissPostPublishToast();
+        postPublishGenerationRef.current += 1;
+        setPostPublication(null);
         setPendingLoginCredentials(null);
         setPendingPasskeyVerification(null);
         setPendingPostPhotoFile(null);
@@ -287,7 +333,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingCreateProfile(null);
         setOnboardingEntrySource("direct");
         setFriends(initialFriends());
-    }, [applyProfile, dismissPostPublishToast]);
+    }, [applyProfile]);
 
     useEffect(() => {
         void refreshProfile();
@@ -305,13 +351,13 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
             pendingCreateProfile,
-            postPublishPhase,
+            postPublication,
             profile,
             profileLoadError,
             profileLoadStatus,
             refreshProfile,
             resetAfterLogout,
-            dismissPostPublishToast,
+            setPostPublication,
             publishPost,
             setFriends,
             setIsLiveSignupVerification,
@@ -337,13 +383,12 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingProfileAvatarFile,
             pendingProfileCoverFile,
             pendingCreateProfile,
-            postPublishPhase,
+            postPublication,
             profile,
             profileLoadError,
             profileLoadStatus,
             refreshProfile,
             resetAfterLogout,
-            dismissPostPublishToast,
             publishPost,
             signupEmail,
             applyProfile,

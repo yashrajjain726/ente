@@ -1,5 +1,6 @@
 import log from "ente-base/log";
 import { useCallback, useEffect, useState } from "react";
+import { loadCachedOwnLatestPost } from "services/post-cache";
 import {
     deleteCurrentPost,
     loadCurrentSpaceProfilePostsPage,
@@ -8,9 +9,8 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 
-export const useOwnLatestPost = () => {
-    const { profile, profileLoadStatus } = useSpaceAppState();
-    const spaceId = profile?.spaceId;
+export const useOwnLatestPost = (spaceId: string | undefined) => {
+    const { postPublication, setPostPublication } = useSpaceAppState();
     const [ownLatestPost, setOwnLatestPost] = useState<SpacePost>();
     const [ownPostsVersion, setOwnPostsVersion] = useState(0);
     const [isOwnLatestPostLoading, setIsOwnLatestPostLoading] = useState(true);
@@ -18,21 +18,30 @@ export const useOwnLatestPost = () => {
         useState(false);
 
     useEffect(() => {
-        if (profileLoadStatus != "ready") return;
-
         setOwnLatestPost(undefined);
-        setIsOwnLatestPostLoading(Boolean(spaceId));
+        setIsOwnLatestPostLoading(true);
         setIsOwnLatestPostUnavailable(false);
         if (!spaceId) return;
 
         let cancelled = false;
-        void loadCurrentSpaceProfilePostsPage(spaceId, spaceId)
+        let cachedPost: SpacePost | undefined;
+        void loadCachedOwnLatestPost(spaceId)
+            .then((post) => {
+                if (cancelled) return;
+                cachedPost = post;
+                if (post) {
+                    setOwnLatestPost(post);
+                    setIsOwnLatestPostLoading(false);
+                }
+                return loadCurrentSpaceProfilePostsPage(spaceId, spaceId);
+            })
             .then((page) => {
-                if (!cancelled) setOwnLatestPost(page.items[0]);
+                if (!cancelled && page) setOwnLatestPost(page.items[0]);
             })
             .catch((error: unknown) => {
                 log.error("Failed to load own latest Space post", error);
-                if (!cancelled) setIsOwnLatestPostUnavailable(true);
+                if (!cancelled && !cachedPost)
+                    setIsOwnLatestPostUnavailable(true);
             })
             .finally(() => {
                 if (!cancelled) setIsOwnLatestPostLoading(false);
@@ -40,26 +49,26 @@ export const useOwnLatestPost = () => {
         return () => {
             cancelled = true;
         };
-    }, [spaceId, profileLoadStatus, ownPostsVersion]);
-
-    const setCreatedPost = useCallback((post: SpacePost) => {
-        setOwnLatestPost(post);
-        setIsOwnLatestPostLoading(false);
-        setIsOwnLatestPostUnavailable(false);
-    }, []);
+    }, [spaceId, ownPostsVersion]);
 
     const deleteOwnPost = useCallback(
         async (postId: number) => {
             if (!spaceId) throw new Error("Missing space.");
 
             await deleteCurrentPost(spaceId, postId);
-            if (ownLatestPost?.postId == postId) {
+            if (
+                ownLatestPost?.postId == postId ||
+                postPublication?.post.postId == postId
+            ) {
+                setPostPublication((current) =>
+                    current?.post.postId == postId ? null : current,
+                );
                 setOwnLatestPost(undefined);
                 setIsOwnLatestPostLoading(true);
                 setOwnPostsVersion((version) => version + 1);
             }
         },
-        [spaceId, ownLatestPost?.postId],
+        [spaceId, ownLatestPost?.postId, postPublication, setPostPublication],
     );
 
     const updateOwnPostCaption = useCallback(
@@ -67,20 +76,31 @@ export const useOwnLatestPost = () => {
             if (!spaceId) throw new Error("Missing space.");
 
             await updateCurrentPostCaption(spaceId, postId, caption);
+            setPostPublication((current) =>
+                current?.post.postId == postId
+                    ? {
+                          ...current,
+                          post: {
+                              ...current.post,
+                              caption: caption.trim() || undefined,
+                          },
+                      }
+                    : current,
+            );
             setOwnLatestPost((post) =>
                 post?.postId == postId
                     ? { ...post, caption: caption.trim() || undefined }
                     : post,
             );
         },
-        [spaceId],
+        [spaceId, setPostPublication],
     );
 
     return {
-        ownLatestPost,
-        isOwnLatestPostLoading,
-        isOwnLatestPostUnavailable,
-        setCreatedPost,
+        ownLatestPost: postPublication?.post ?? ownLatestPost,
+        isOwnLatestPostLoading: !postPublication && isOwnLatestPostLoading,
+        isOwnLatestPostUnavailable:
+            !postPublication && isOwnLatestPostUnavailable,
         deleteOwnPost,
         updateOwnPostCaption,
     };

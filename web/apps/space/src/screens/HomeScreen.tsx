@@ -1,6 +1,6 @@
 import { Cancel01Icon, UserAdd02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Skeleton } from "@mui/material";
+import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/ActionFeedback";
 import {
     SpaceActionToast,
@@ -46,6 +46,7 @@ import {
 } from "styles/colors";
 import {
     spacePostTileRadius,
+    spaceTileAvatarSize,
     spaceTileCircleInset,
     spaceTileCornerStyles,
     spaceTileInnerRadius,
@@ -348,7 +349,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         Boolean(post && !postUnavailable && !isPhotoReady);
     const tileSize = Math.min(placement.width, placement.height);
     const tileRadius = Math.min(spacePostTileRadius, tileSize * 0.2);
-    const avatarSize = Math.min(36, tileSize * 0.22);
+    const avatarSize = spaceTileAvatarSize(placement);
     const requestActionSize = showFriendRequestDetails
         ? Math.min(44, Math.max(40, tileSize * 0.13))
         : Math.min(40, Math.max(26, tileSize * 0.14));
@@ -502,7 +503,10 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 sx={{
                     alignItems: "center",
                     appearance: "none",
-                    bgcolor: mediaPlaceholderColor,
+                    bgcolor:
+                        !isLoading && (!post || postUnavailable)
+                            ? mediaPlaceholderColor
+                            : "transparent",
                     border: 0,
                     borderRadius: "inherit",
                     color: textBase,
@@ -518,29 +522,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     zIndex: 1,
                 }}
             >
-                {isLoading ? (
-                    <Skeleton
-                        variant="rectangular"
-                        sx={{
-                            bgcolor: mediaPlaceholderColor,
-                            height: "100%",
-                            transform: "none",
-                            width: "100%",
-                        }}
-                    />
-                ) : post && !postUnavailable ? (
+                {post && !postUnavailable && (
                     <>
-                        {!thumbHashDataURL && !isPhotoReady && (
-                            <Skeleton
-                                variant="rectangular"
-                                sx={{
-                                    bgcolor: mediaPlaceholderColor,
-                                    height: "100%",
-                                    transform: "none",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
                         {thumbHashDataURL && (
                             <Box
                                 component="img"
@@ -583,15 +566,6 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                             />
                         )}
                     </>
-                ) : (
-                    <Box
-                        aria-hidden
-                        sx={{
-                            bgcolor: mediaPlaceholderColor,
-                            height: "100%",
-                            width: "100%",
-                        }}
-                    />
                 )}
                 {!isLoading &&
                     !post &&
@@ -1144,6 +1118,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         postTileCanvasSize.width,
         postTileCanvasSize.height,
     );
+    const firstFriendTile = postLayout?.friends[0];
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
     const isHomeItemsLoading = isFriendsLoading || isFriendRequestsLoading;
@@ -1156,11 +1131,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         );
         localPostObjectUrlsRef.current.clear();
     }, []);
-    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
-        localPostObjectUrlsRef.current.delete(objectUrl);
-        URL.revokeObjectURL(objectUrl);
-    }, []);
-
     const openPostPhotoPicker = () => {
         if (isPostPhotoButtonDisabled) return;
 
@@ -1767,6 +1737,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     {postLayout.addFriend && (
                                         <SpaceAddFriendTile
                                             placement={postLayout.addFriend}
+                                            profileLink={profileLink}
                                             variant={
                                                 postLayout.addFriendVariant
                                             }
@@ -1785,6 +1756,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <SpaceOwnPostTile
                         profile={profile}
                         post={ownLatestPost}
+                        avatarSize={
+                            firstFriendTile
+                                ? spaceTileAvatarSize(firstFriendTile)
+                                : undefined
+                        }
                         isLoading={isOwnLatestPostLoading}
                         isUnavailable={isOwnLatestPostUnavailable}
                         isNewPostDisabled={isPostPhotoButtonDisabled}
@@ -1910,15 +1886,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                               cropArea: edit.cropArea,
                                               file: selectedViewer.draftFile!,
                                               height: edit.height,
+                                              previewUrl,
                                               rotationDegrees:
                                                   edit.rotationDegrees,
                                               width: edit.width,
                                           },
                                           caption,
                                       );
-                                      return publishPromise.finally(() =>
-                                          releaseLocalPostObjectUrl(previewUrl),
+                                      localPostObjectUrlsRef.current.delete(
+                                          previewUrl,
                                       );
+                                      return publishPromise;
                                   }
                                 : undefined
                         }

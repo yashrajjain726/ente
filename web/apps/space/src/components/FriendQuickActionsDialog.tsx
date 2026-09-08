@@ -122,8 +122,7 @@ export const FriendQuickActionsDialog: React.FC<
                     ref: paperRef,
                     sx: {
                         bgcolor: spaceSurface,
-                        boxShadow:
-                            "0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 64px rgba(0, 0, 0, 0.48)",
+                        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.48)",
                         borderRadius: `${dialogRadius}px`,
                         boxSizing: "border-box",
                         display: "flex",
@@ -264,9 +263,7 @@ export const FriendQuickActionsDialog: React.FC<
                         sx={{
                             alignItems: "center",
                             appearance: "none",
-                            bgcolor: action.active
-                                ? "#24412E"
-                                : spaceDialogBackground,
+                            bgcolor: spaceDialogBackground,
                             border: 0,
                             borderRadius: `${innerRadius}px`,
                             color: action.active
@@ -278,14 +275,15 @@ export const FriendQuickActionsDialog: React.FC<
                             height: actionHeight,
                             minWidth: 0,
                             p: "0 8px",
-                            transition:
-                                "background-color 120ms ease, color 120ms ease",
-                            "&:hover:not(:disabled)": {
-                                bgcolor: spaceSurfaceHover,
-                            },
-                            "&:active:not(:disabled)": {
-                                bgcolor: spaceAppBackgroundColor,
-                            },
+                            ...(action.label != "Poke" && {
+                                transition: "background-color 120ms ease",
+                                "&:hover:not(:disabled)": {
+                                    bgcolor: spaceSurfaceHover,
+                                },
+                                "&:active:not(:disabled)": {
+                                    bgcolor: spaceAppBackgroundColor,
+                                },
+                            }),
                             "&:focus-visible": {
                                 outline: `2px solid ${spaceText}`,
                                 outlineOffset: 2,
