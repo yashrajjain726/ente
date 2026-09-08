@@ -15,62 +15,86 @@ import 'package:uuid/uuid.dart';
 
 typedef LivePhotoUploadData = ({File sourceFile, String fileHash});
 
-typedef _LivePhotoVideoData = ({File file, String fileHash});
-
 final _logger = Logger('LivePhotoUpload');
 
 // Uploads may prepare several files concurrently. Keep this per-file pipeline
 // sequential to limit duplicate reads and I/O pressure.
 Future<LivePhotoUploadData> prepareLivePhotoForUpload(
-  EnteFile file,
+  EnteFile livePhoto,
   File imageFile,
   String imageHash,
 ) async {
-  final videoData = await _getLivePhotoVideoData(file, imageHash);
-  final archiveFile = await _createLivePhotoArchiveFile(
-    file,
-    imageFile,
-    videoData.file,
-  );
+  final exportedVideo = await _exportLivePhotoVideo(livePhoto);
   try {
-    // photo_manager can return the same iOS temp copy to concurrent upload or
-    // hash-check paths, where cleanup may have already run.
-    await deleteFileSystemEntityIfPresent(imageFile);
-    return (sourceFile: archiveFile, fileHash: videoData.fileHash);
-  } catch (_) {
-    await deleteFileSystemEntityIfPresent(archiveFile);
-    rethrow;
+    final livePhotoHash = await _computeLivePhotoHash(exportedVideo, imageHash);
+    final archiveFile = await _createLivePhotoArchiveFile(
+      livePhoto,
+      imageFile,
+      exportedVideo,
+    );
+    try {
+      // photo_manager can return the same iOS temp copy to concurrent upload or
+      // hash-check paths, where cleanup may have already run.
+      await deleteFileSystemEntityIfPresent(imageFile);
+      return (sourceFile: archiveFile, fileHash: livePhotoHash);
+    } catch (_) {
+      await deleteFileSystemEntityIfPresent(archiveFile);
+      rethrow;
+    }
+  } finally {
+    await _deleteExportedVideo(exportedVideo);
   }
 }
 
-Future<String> getLivePhotoFileHash(EnteFile file, String imageHash) async {
-  return (await _getLivePhotoVideoData(file, imageHash)).fileHash;
-}
-
-Future<_LivePhotoVideoData> _getLivePhotoVideoData(
-  EnteFile file,
+Future<String> getLivePhotoFileHash(
+  EnteFile livePhoto,
   String imageHash,
 ) async {
-  final videoFile = await Motionphoto.getLivePhotoFile(file.localID!);
-  if (videoFile == null || !videoFile.existsSync()) {
+  final exportedVideo = await _exportLivePhotoVideo(livePhoto);
+  try {
+    return await _computeLivePhotoHash(exportedVideo, imageHash);
+  } finally {
+    await _deleteExportedVideo(exportedVideo);
+  }
+}
+
+Future<File> _exportLivePhotoVideo(EnteFile livePhoto) async {
+  final exportedVideo = await Motionphoto.getLivePhotoFile(livePhoto.localID!);
+  if (exportedVideo == null || !exportedVideo.existsSync()) {
     final message =
-        'missing livePhoto url for  ${file.toString()} with subType ${file.fileSubType}';
+        'missing livePhoto url for  ${livePhoto.toString()} with subType ${livePhoto.fileSubType}';
     _logger.severe(message);
     throw InvalidFileError(message, InvalidReason.livePhotoVideoMissing);
   }
+  return exportedVideo;
+}
 
-  final videoHash = CryptoUtil.bin2base64(await CryptoUtil.getHash(videoFile));
-  final fileHash = '$imageHash$kLivePhotoHashSeparator$videoHash';
-  return (file: videoFile, fileHash: fileHash);
+Future<void> _deleteExportedVideo(File exportedVideo) async {
+  try {
+    await deleteFileSystemEntityIfPresent(exportedVideo);
+  } catch (e, s) {
+    // Preserve the processing error or the archive prepared for upload.
+    _logger.warning('Failed to delete backup Live Photo video export', e, s);
+  }
+}
+
+Future<String> _computeLivePhotoHash(
+  File exportedVideo,
+  String imageHash,
+) async {
+  final videoHash = CryptoUtil.bin2base64(
+    await CryptoUtil.getHash(exportedVideo),
+  );
+  return '$imageHash$kLivePhotoHashSeparator$videoHash';
 }
 
 Future<File> _createLivePhotoArchiveFile(
-  EnteFile file,
+  EnteFile livePhoto,
   File imageFile,
-  File videoFile,
+  File exportedVideo,
 ) async {
   final archivePath =
-      '${Configuration.instance.getTempDirectory()}${const Uuid().v4()}_${file.generatedID}.elp';
+      '${Configuration.instance.getTempDirectory()}${const Uuid().v4()}_${livePhoto.generatedID}.elp';
   final archiveFile = File(archivePath);
   _logger.info('Creating zip for live photo from ${basename(archivePath)}');
 
@@ -78,7 +102,7 @@ Future<File> _createLivePhotoArchiveFile(
     await createLivePhotoArchive(
       archivePath: archivePath,
       imagePath: imageFile.path,
-      videoPath: videoFile.path,
+      videoPath: exportedVideo.path,
     );
     return archiveFile;
   } catch (_) {
