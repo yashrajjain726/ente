@@ -46,10 +46,11 @@ pub(crate) struct TextDetector {
 impl TextDetector {
     pub(crate) fn new(model_path: &str) -> Self {
         Self {
-            session: Mutex::new(
-                OnnxSession::new(model_path, MODEL_NAMESPACE, ExecutionMode::CpuAccelerated)
-                    .with_unvalidated_acceleration(),
-            ),
+            session: Mutex::new(OnnxSession::new(
+                model_path,
+                MODEL_NAMESPACE,
+                ExecutionMode::CpuOnly,
+            )),
         }
     }
 
