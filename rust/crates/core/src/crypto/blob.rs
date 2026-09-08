@@ -215,12 +215,6 @@ mod tests {
             name: String,
         }
 
-        #[derive(serde::Deserialize, Debug)]
-        #[allow(dead_code)]
-        struct Different {
-            count: u64,
-        }
-
         let encrypted = encrypt_json(
             &Original {
                 name: "test".to_string(),
@@ -229,7 +223,7 @@ mod tests {
         )
         .unwrap();
 
-        let result: std::result::Result<Different, _> = decrypt_json(&encrypted, &key);
+        let result: std::result::Result<u64, _> = decrypt_json(&encrypted, &key);
         assert!(
             matches!(result, Err(Error::Json(_))),
             "Expected Error::Json, got: {:?}",

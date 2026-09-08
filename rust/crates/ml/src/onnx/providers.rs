@@ -193,7 +193,6 @@ pub(super) fn provider_attempt(
         },
         #[cfg(target_os = "android")]
         ExecutionProvider::Xnnpack => xnnpack_attempt(),
-        #[allow(unreachable_patterns)]
         _ => unreachable!("provider is not available on this platform"),
     }
 }
