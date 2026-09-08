@@ -15,7 +15,7 @@ use super::{
     unique_in_order,
 };
 
-const FACE_EMBEDDING_MAP_MAX_ROWS: usize = 20000;
+const FACE_EMBEDDING_MAX_ROWS: usize = 20000;
 
 const UPSERT_FACE: &str = "INSERT INTO faces (file_id, face_id, detection, embedding, score, blur, is_sideways, height, width, ml_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(file_id, face_id) DO UPDATE SET face_id = excluded.face_id, detection = excluded.detection, embedding = excluded.embedding, score = excluded.score, blur = excluded.blur, is_sideways = excluded.is_sideways, height = excluded.height, width = excluded.width, ml_version = excluded.ml_version";
 
@@ -246,17 +246,17 @@ impl MlDb {
         Ok(result)
     }
 
-    pub fn get_face_embedding_map_for_faces(
+    pub fn get_face_embedding_rows_for_faces(
         &self,
         face_ids: &[String],
-    ) -> Result<HashMap<String, Vec<u8>>> {
+    ) -> Result<Vec<(String, Vec<u8>)>> {
         let mut face_ids: Vec<&str> = face_ids.iter().map(String::as_str).collect();
         face_ids.sort_unstable_by(|left, right| right.cmp(left));
         face_ids.dedup();
 
-        let mut result = HashMap::new();
+        let mut result = Vec::new();
         for chunk in face_ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY - 1) {
-            let remaining_limit = (FACE_EMBEDDING_MAP_MAX_ROWS - result.len()) as i64;
+            let remaining_limit = (FACE_EMBEDDING_MAX_ROWS - result.len()) as i64;
             if remaining_limit == 0 {
                 break;
             }
@@ -448,7 +448,7 @@ pub(super) mod tests {
     use std::ops::RangeInclusive;
 
     use super::{FaceRow, MlDb};
-    use crate::ml_db::tests::{cases, check, ids, open, pairs, sorted, strings};
+    use crate::ml_db::tests::{cases, check, ids, open, sorted, strings};
     use crate::ml_db::vector_encoding::encode_evector;
     use crate::ml_db::{Error, PetFaceRow, clusters, persons, pets, queries};
     use tempfile::TempDir;
@@ -608,14 +608,19 @@ pub(super) mod tests {
         );
 
         assert_eq!(
-            db.get_face_embedding_map_for_faces(&strings(["1_0", "2_0", "nope"]))
+            db.get_face_embedding_rows_for_faces(&strings(["1_0", "2_0", "1_1", "1_0", "nope"]))
                 .unwrap(),
-            pairs([
-                ("1_0", encode_evector(&[1.0, 0.0, 0.5])),
-                ("2_0", encode_evector(&[2.0, 0.0, 0.5]))
-            ])
+            vec![
+                ("2_0".to_string(), encode_evector(&[2.0, 0.0, 0.5])),
+                ("1_1".to_string(), encode_evector(&[1.0, 1.0, 0.5])),
+                ("1_0".to_string(), encode_evector(&[1.0, 0.0, 0.5])),
+            ]
         );
-        assert!(db.get_face_embedding_map_for_faces(&[]).unwrap().is_empty());
+        assert!(
+            db.get_face_embedding_rows_for_faces(&[])
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -650,7 +655,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn face_embedding_map_keeps_twenty_thousand_highest_face_ids() {
+    fn face_embedding_rows_keep_twenty_thousand_highest_face_ids_in_order() {
         let (_directory, db) = open();
         let faces: Vec<FaceRow> = (0..20005).map(|index| good_face(index, 0)).collect();
         db.bulk_insert_faces(&faces).unwrap();
@@ -658,44 +663,50 @@ pub(super) mod tests {
         let mut face_ids: Vec<String> = faces.iter().map(|face| face.face_id.clone()).collect();
         face_ids.rotate_left(1337);
 
-        let embeddings = db.get_face_embedding_map_for_faces(&face_ids).unwrap();
+        let embeddings = db.get_face_embedding_rows_for_faces(&face_ids).unwrap();
         assert_eq!(embeddings.len(), 20000);
         face_ids.sort();
-        for face_id in &face_ids[..5] {
-            assert!(!embeddings.contains_key(face_id));
-        }
-        for face_id in &face_ids[5..] {
-            assert!(embeddings.contains_key(face_id));
-        }
+        assert_eq!(
+            embeddings
+                .iter()
+                .map(|(face_id, _)| face_id)
+                .collect::<Vec<_>>(),
+            face_ids[5..].iter().rev().collect::<Vec<_>>()
+        );
+        let expected = embeddings;
 
         let mut with_duplicates = face_ids[5..].to_vec();
         with_duplicates.extend(face_ids[5..10].iter().cloned());
-        let embeddings = db
-            .get_face_embedding_map_for_faces(&with_duplicates)
-            .unwrap();
-        assert_eq!(embeddings.len(), 20000);
-        for face_id in &face_ids[5..] {
-            assert!(embeddings.contains_key(face_id));
-        }
+        assert_eq!(
+            db.get_face_embedding_rows_for_faces(&with_duplicates)
+                .unwrap(),
+            expected
+        );
 
-        let expected = embeddings;
         let mut with_missing = face_ids.clone();
         with_missing.extend((0..20000).map(|index| format!("missing_{index}")));
         with_missing.extend(face_ids.iter().cloned());
         with_missing.reverse();
         assert_eq!(
-            db.get_face_embedding_map_for_faces(&with_missing).unwrap(),
+            db.get_face_embedding_rows_for_faces(&with_missing).unwrap(),
             expected
         );
 
         for count in [9998, 9999, 10000, 19999, 20000, 20001] {
             let embeddings = db
-                .get_face_embedding_map_for_faces(&face_ids[..count])
+                .get_face_embedding_rows_for_faces(&face_ids[..count])
                 .unwrap();
-            assert_eq!(embeddings.len(), count.min(20000));
-            for face_id in &face_ids[count.saturating_sub(20000)..count] {
-                assert!(embeddings.contains_key(face_id));
-            }
+            assert_eq!(
+                embeddings
+                    .iter()
+                    .map(|(face_id, _)| face_id)
+                    .collect::<Vec<_>>(),
+                face_ids[..count]
+                    .iter()
+                    .rev()
+                    .take(20000)
+                    .collect::<Vec<_>>()
+            );
         }
     }
 
@@ -820,7 +831,7 @@ pub(super) mod tests {
         let face_ids: Vec<String> = (0..12000).map(|index| format!("{index}_0")).collect();
         assert_eq!(db.get_face_ids_to_cluster_ids(&face_ids).unwrap().len(), 30);
         assert_eq!(
-            db.get_face_embedding_map_for_faces(&face_ids)
+            db.get_face_embedding_rows_for_faces(&face_ids)
                 .unwrap()
                 .len(),
             30
