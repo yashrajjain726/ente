@@ -126,10 +126,6 @@ flutter:
         - asset: assets/fonts/Inter-Light.ttf
         - asset: assets/fonts/Inter-SemiBold.ttf
         - asset: assets/fonts/Inter-Bold.ttf
-    - family: Montserrat
-      fonts:
-        - asset: assets/fonts/Montserrat-Bold.ttf
-
 flutter_launcher_icons:
   android: true
   ios: true
