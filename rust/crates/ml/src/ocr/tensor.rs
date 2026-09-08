@@ -1,5 +1,26 @@
+use std::sync::OnceLock;
+
+use rayon::{ThreadPool, ThreadPoolBuilder};
+
 use crate::cv::image::ImageU8;
 use crate::error::{MlError, MlResult};
+
+pub(crate) fn prepare_crop_tensor(
+    prepare: impl FnOnce() -> MlResult<Vec<f32>> + Send,
+) -> MlResult<Vec<f32>> {
+    static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
+    let pool = POOL.get_or_init(|| {
+        ThreadPoolBuilder::new()
+            .num_threads(1)
+            .thread_name(|_| "ocr-crop-preparation".to_string())
+            .build()
+            .ok()
+    });
+    match pool {
+        Some(pool) => pool.install(prepare),
+        None => prepare(),
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct BgrNormalization {
@@ -62,6 +83,17 @@ mod tests {
 
     fn centered(value: u8) -> f32 {
         (value as f32 / 255.0 - 0.5) / 0.5
+    }
+
+    #[test]
+    fn preparation_keeps_the_callers_worker_pool_unchanged() {
+        let caller = ThreadPoolBuilder::new().num_threads(4).build().unwrap();
+        caller.install(|| {
+            let values =
+                prepare_crop_tensor(|| Ok(vec![rayon::current_num_threads() as f32])).unwrap();
+            assert_eq!(values, [1.0]);
+            assert_eq!(rayon::current_num_threads(), 4);
+        });
     }
 
     #[test]

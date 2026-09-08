@@ -382,9 +382,18 @@ fn crop_candidates(
     working: &ImageU8,
     candidates: &[DetectionCandidate],
 ) -> MlResult<Vec<TextCrop>> {
+    if candidates.is_empty() {
+        return Ok(Vec::new());
+    }
+    let source = image::RgbImage::from_raw(
+        working.width as u32,
+        working.height as u32,
+        working.data.clone(),
+    )
+    .ok_or_else(|| MlError::Preprocess("OCR crop source buffer mismatch".to_string()))?;
     candidates
         .iter()
-        .map(|candidate| crop_text(working, &candidate.points))
+        .map(|candidate| crop_text(&source, &candidate.points))
         .collect()
 }
 
@@ -562,6 +571,12 @@ mod tests {
                 }],
             },
         }
+    }
+
+    #[test]
+    fn no_detected_regions_produce_no_crops() {
+        let image = ImageU8::zeros(32, 32, 3).unwrap();
+        assert!(crop_candidates(&image, &[]).unwrap().is_empty());
     }
 
     #[test]

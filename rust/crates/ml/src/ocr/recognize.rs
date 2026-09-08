@@ -4,11 +4,14 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use super::OcrError;
 use super::cancel::RequestGuard;
 use super::dictionary::load_dictionary;
-use super::tensor::{BgrNormalization, write_bgr_planes};
+use super::tensor::{BgrNormalization, prepare_crop_tensor, write_bgr_planes};
 use crate::cv;
 use crate::cv::image::ImageU8;
 use crate::error::{MlError, MlResult};
-use crate::onnx::{ExecutionMode, OnnxSession, PreparedF32Input, SessionRunError, run_f32};
+use crate::onnx::{
+    BorrowedFloatTensor, ExecutionMode, FloatTensorData, OnnxSession, PreparedF32Input,
+    with_prepared_float_output,
+};
 
 const MODEL_NAMESPACE: &str = "ocr-recognition";
 const REC_VOCABULARY_SIZE: usize = 18385;
@@ -86,7 +89,7 @@ impl TextRecognizer {
 
     fn infer_batch(&self, batch: &[&ImageU8], dictionary: &[String]) -> MlResult<Vec<Recognition>> {
         let layout = BatchLayout::new(batch);
-        let input = PreparedF32Input::new(layout.tensor(batch)?);
+        let input = PreparedF32Input::new(prepare_crop_tensor(|| layout.tensor(batch))?);
         let count = batch.len();
         let input_shape = [
             count as i64,
@@ -95,25 +98,43 @@ impl TextRecognizer {
             i64::from(layout.target_width),
         ];
         let mut session = self.session.lock().unwrap_or_else(PoisonError::into_inner);
-        let (output, _usage) = session.run(|session| {
-            let (shape, values) = run_f32(session, &input, input_shape)?;
-            SequenceOutput::new(&shape, values, count, dictionary.len())
-                .map_err(SessionRunError::from)
-        })?;
-        Ok(layout
-            .content_widths
-            .iter()
-            .zip(output.sequences())
-            .map(|(&content_width, logits)| {
-                ctc_decode(
-                    logits,
-                    output.vocabulary,
-                    dictionary,
-                    layout.padding_scale(content_width),
-                )
+        let (recognized, _usage) = session.run(|session| {
+            with_prepared_float_output(session, &input, input_shape, |shape, values| match values {
+                BorrowedFloatTensor::F32(values) => {
+                    decode_output(shape, values, &layout, dictionary)
+                }
+                BorrowedFloatTensor::F16(values) => {
+                    decode_output(shape, values, &layout, dictionary)
+                }
             })
-            .collect())
+        })?;
+        Ok(recognized)
     }
+}
+
+fn decode_output<'a, T>(
+    shape: &[i64],
+    values: &'a [T],
+    layout: &BatchLayout,
+    dictionary: &[String],
+) -> MlResult<Vec<Recognition>>
+where
+    &'a [T]: FloatTensorData,
+{
+    let output = SequenceOutput::new(shape, values, layout.content_widths.len(), dictionary.len())?;
+    Ok(layout
+        .content_widths
+        .iter()
+        .zip(output.sequences())
+        .map(|(&content_width, logits)| {
+            ctc_decode(
+                logits,
+                output.vocabulary,
+                dictionary,
+                layout.padding_scale(content_width),
+            )
+        })
+        .collect())
 }
 
 fn recognize_in_batches(
@@ -209,14 +230,14 @@ fn content_width(crop: &ImageU8, target_width: i32) -> i32 {
 }
 
 #[derive(Debug)]
-struct SequenceOutput {
+struct SequenceOutput<'a, T> {
     steps: usize,
     vocabulary: usize,
-    values: Vec<f32>,
+    values: &'a [T],
 }
 
-impl SequenceOutput {
-    fn new(shape: &[i64], values: Vec<f32>, count: usize, vocabulary: usize) -> MlResult<Self> {
+impl<'a, T> SequenceOutput<'a, T> {
+    fn new(shape: &[i64], values: &'a [T], count: usize, vocabulary: usize) -> MlResult<Self> {
         match *shape {
             [n, steps, v]
                 if n == count as i64
@@ -237,17 +258,20 @@ impl SequenceOutput {
         }
     }
 
-    fn sequences(&self) -> impl Iterator<Item = &[f32]> {
+    fn sequences(&self) -> impl Iterator<Item = &'a [T]> {
         self.values.chunks_exact(self.steps * self.vocabulary)
     }
 }
 
-fn ctc_decode(
-    logits: &[f32],
+fn ctc_decode<'a, T>(
+    logits: &'a [T],
     vocabulary: usize,
     dictionary: &[String],
     padding_scale: f32,
-) -> Recognition {
+) -> Recognition
+where
+    &'a [T]: FloatTensorData,
+{
     let best = best_per_step(logits, vocabulary);
     let spans: Vec<CharacterSpan> = character_runs(&best)
         .iter()
@@ -266,19 +290,23 @@ struct StepBest {
     probability: f32,
 }
 
-fn best_per_step(logits: &[f32], vocabulary: usize) -> Vec<StepBest> {
+fn best_per_step<'a, T>(logits: &'a [T], vocabulary: usize) -> Vec<StepBest>
+where
+    &'a [T]: FloatTensorData,
+{
     if vocabulary == 0 {
         return Vec::new();
     }
     logits.chunks_exact(vocabulary).map(argmax).collect()
 }
 
-fn argmax(step: &[f32]) -> StepBest {
+fn argmax(step: impl FloatTensorData) -> StepBest {
     let mut best = StepBest {
         index: 0,
         probability: f32::NEG_INFINITY,
     };
-    for (index, &probability) in step.iter().enumerate() {
+    for index in 0..step.len() {
+        let probability = step.value(index);
         if probability > best.probability {
             best = StepBest { index, probability };
         }
@@ -497,15 +525,56 @@ mod tests {
 
     #[test]
     fn sequence_output_requires_the_dictionary_vocabulary() {
-        let ok = SequenceOutput::new(&[1, 2, 4], vec![0.0; 8], 1, 4).unwrap();
+        let ok = SequenceOutput::new(&[1, 2, 4], &[0.0f32; 8], 1, 4).unwrap();
         assert_eq!((ok.steps, ok.vocabulary), (2, 4));
         assert_eq!(ok.sequences().count(), 1);
         for shape in [[1, 2, 5], [2, 2, 4], [1, 0, 4]] {
-            let error = SequenceOutput::new(&shape, vec![0.0; 8], 1, 4).unwrap_err();
+            let error = SequenceOutput::new(&shape, &[0.0f32; 8], 1, 4).unwrap_err();
             assert!(matches!(error, MlError::CorruptModel(_)), "{error}");
         }
-        let short = SequenceOutput::new(&[1, 2, 4], vec![0.0; 7], 1, 4).unwrap_err();
+        let short = SequenceOutput::new(&[1, 2, 4], &[0.0f32; 7], 1, 4).unwrap_err();
         assert!(matches!(short, MlError::CorruptModel(_)), "{short}");
+    }
+
+    #[test]
+    fn crop_preparation_preserves_resized_batch_values() {
+        let crops: Vec<_> = [(79, 11), (12, 160), (611, 53)]
+            .into_iter()
+            .map(|(width, height)| {
+                let pixels = (0..width * height * 3)
+                    .map(|index| (index * 37 % 256) as u8)
+                    .collect();
+                ImageU8::new(width, height, 3, pixels).unwrap()
+            })
+            .collect();
+        let batch = crops.iter().collect::<Vec<_>>();
+        let layout = BatchLayout::new(&batch);
+        let parallel = rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build()
+            .unwrap();
+        let expected = parallel.install(|| layout.tensor(&batch)).unwrap();
+        let prepared = prepare_crop_tensor(|| layout.tensor(&batch)).unwrap();
+        assert_eq!(prepared, expected);
+    }
+
+    #[test]
+    fn borrowed_outputs_preserve_ties_blanks_and_half_precision_confidences() {
+        let values = [
+            0.0, 0.75, 0.75, 0.0, 0.0, 0.5, 0.0, 0.0, 0.875, 0.0, 0.0, 0.0, 0.0, 0.625, 0.0, 0.0,
+        ];
+        let half_values = values.map(half::f16::from_f32);
+        let layout = BatchLayout {
+            target_width: 320,
+            content_widths: vec![320],
+        };
+        let full = decode_output(&[1, 4, 4], &values, &layout, &dictionary()).unwrap();
+        let half = decode_output(&[1, 4, 4], &half_values, &layout, &dictionary()).unwrap();
+        assert_eq!(full, half);
+        assert_eq!(full[0].text, "aa");
+        assert_span(&full[0].spans[0], "a", 0.625, 0.0, 0.5);
+        assert_span(&full[0].spans[1], "a", 0.625, 0.75, 1.0);
+        assert_eq!(full[0].confidence, 0.625);
     }
 
     #[test]
