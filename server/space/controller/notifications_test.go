@@ -26,6 +26,7 @@ type recordedSpaceActivity struct {
 	actorUserID  int64
 	actorSpaceID string
 	actorSlug    string
+	postID       int64
 	recipientIDs []int64
 }
 
@@ -37,8 +38,14 @@ func newRecordingSpaceActivityNotifier() *recordingSpaceActivityNotifier {
 	return &recordingSpaceActivityNotifier{events: make(chan recordedSpaceActivity, 8)}
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actor SpaceActivityActor) {
-	n.record(spaceActivityPostCreated, actor)
+func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actor SpaceActivityActor, postID int64) {
+	n.events <- recordedSpaceActivity{
+		event:        spaceActivityPostCreated,
+		actorUserID:  actor.UserID,
+		actorSpaceID: actor.SpaceID,
+		actorSlug:    actor.Slug,
+		postID:       postID,
+	}
 }
 
 func (n *recordingSpaceActivityNotifier) OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64) {
@@ -182,13 +189,14 @@ func TestNewPostNotifiesWithNoAccountFriends(t *testing.T) {
 	notifier := newRecordingSpaceActivityNotifier()
 	posts := NewModule(repos, nil, notifier, nil).Posts
 
-	posts.notifyFriendsOfNewPost(SpaceActivityActor{UserID: 1, SpaceID: "space_id", Slug: "alice"})
+	posts.notifyFriendsOfNewPost(SpaceActivityActor{UserID: 1, SpaceID: "space_id", Slug: "alice"}, 42)
 
 	require.Equal(t, recordedSpaceActivity{
 		event:        spaceActivityPostCreated,
 		actorUserID:  1,
 		actorSpaceID: "space_id",
 		actorSlug:    "alice",
+		postID:       42,
 	}, requireSpaceActivity(t, notifier))
 }
 
