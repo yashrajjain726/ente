@@ -102,11 +102,18 @@ const UserResponse = z.object({
     }),
     subscription: Subscription.nullish().transform(nullToUndefined),
     authCodes: z.number().nullish().transform(nullishToZero),
+    photosFileCount: z.number().nullish().transform(nullToUndefined),
+    lockerFileCount: z.number().nullish().transform(nullToUndefined),
     tokens: z.array(TokenData).nullish().transform(nullishToEmpty),
     details: UserDetails,
 });
 
 export type UserResponse = z.infer<typeof UserResponse>;
+
+const InitializeFileCountsResponse = z.object({
+    initialized: z.boolean(),
+    reason: z.string().optional(),
+});
 
 const ScheduledDeletionResponse = z.object({
     scheduledDeletions: z.array(
@@ -172,6 +179,19 @@ export const getUser = async (
 
     await ensureOk(response, "Network response was not ok");
     return UserResponse.parse(await response.json());
+};
+
+export const initializeFileCounts = async (
+    session: Pick<StaffSession, "token">,
+    userID: number,
+) => {
+    const response = await fetch(apiURL("/admin/user/init-file-counts"), {
+        method: "POST",
+        headers: staffJSONRequestHeaders(session),
+        body: JSON.stringify({ userID }),
+    });
+    await ensureOk(response, "Failed to initialize file counts");
+    return InitializeFileCountsResponse.parse(await response.json());
 };
 
 export const getScheduledDeletions = async (

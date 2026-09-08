@@ -23,6 +23,7 @@ import duckieimage from "./components/duckie.png";
 import {
     getScheduledDeletions,
     getUser,
+    initializeFileCounts,
     type ScheduledDeletion,
     type UserResponse,
 } from "./services/admin-user";
@@ -47,7 +48,6 @@ export const App: React.FC = () => {
     const [fetchSuccess, setFetchSuccess] = useState(false);
     const [tabValue, setTabValue] = useState(0);
     const [userData, setUserData] = useState<UserDetailsData | null>(null);
-    const [activeUserID, setActiveUserID] = useState<number>();
     const [scheduledDeletions, setScheduledDeletions] = useState<
         ScheduledDeletion[]
     >([]);
@@ -55,7 +55,9 @@ export const App: React.FC = () => {
         useState(false);
     const [scheduledDeletionsLoaded, setScheduledDeletionsLoaded] =
         useState(false);
+    const [fileCountInitPending, setFileCountInitPending] = useState(false);
     const searchRequestID = useRef(0);
+    const activeUserIDRef = useRef<number | undefined>(undefined);
 
     useEffect(() => {
         if (authToken) {
@@ -71,7 +73,7 @@ export const App: React.FC = () => {
         setError("");
         setFetchSuccess(false);
         setUserData(null);
-        setActiveUserID(undefined);
+        activeUserIDRef.current = undefined;
         setScheduledDeletions([]);
         setScheduledDeletionsLoading(false);
         setScheduledDeletionsLoaded(false);
@@ -89,7 +91,7 @@ export const App: React.FC = () => {
                 );
                 setSelectedUserEmail(userDetailsData.email);
                 setUserData(userDetailsData);
-                setActiveUserID(userResult.user.ID);
+                activeUserIDRef.current = userResult.user.ID;
             } else {
                 if (!userSearchInput.includes("@")) {
                     throw new Error("User not found");
@@ -172,6 +174,27 @@ export const App: React.FC = () => {
         () => ({ email: selectedUserEmail, token: authToken }),
         [authToken, selectedUserEmail],
     );
+    const initializeDisplayedFileCounts = async (userID: number) => {
+        setFileCountInitPending(true);
+        try {
+            const result = await initializeFileCounts(
+                { token: authToken },
+                userID,
+            );
+            if (result.reason) alert(result.reason);
+            if (result.initialized && userID === activeUserIDRef.current) {
+                await fetchData(`${userID}`, authToken);
+            }
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to initialize file counts",
+            );
+        } finally {
+            setFileCountInitPending(false);
+        }
+    };
 
     return (
         <StaffSessionProvider session={session}>
@@ -207,7 +230,7 @@ export const App: React.FC = () => {
                             </Button>
                             <AdHocActions
                                 email={selectedUserEmail}
-                                activeUserID={activeUserID}
+                                activeUserID={userData?.userID}
                                 scheduledDeletions={scheduledDeletions}
                                 scheduledDeletionsLoading={
                                     scheduledDeletionsLoading
@@ -284,7 +307,17 @@ export const App: React.FC = () => {
                                     }}
                                 >
                                     {tabValue === 0 && (
-                                        <UserDetails userData={userData} />
+                                        <UserDetails
+                                            userData={userData}
+                                            fileCountInitPending={
+                                                fileCountInitPending
+                                            }
+                                            onInitializeFileCounts={() =>
+                                                initializeDisplayedFileCounts(
+                                                    userData.userID,
+                                                )
+                                            }
+                                        />
                                     )}
                                     {tabValue === 1 && <FamilyTable />}
                                     {tabValue === 2 && (
@@ -337,9 +370,15 @@ const buildUserDetailsData = (
         (userResponse.details?.profileData?.passkeyCount ?? 0) > 0;
     const canDisableEmailMFA =
         userResponse.details?.profileData?.canDisableEmailMFA ?? false;
+    const { photosFileCount, lockerFileCount } = userResponse;
+    const fileCountsAvailable =
+        photosFileCount !== undefined && lockerFileCount !== undefined;
 
     return {
         email: userResponse.user.email || userSearchInput,
+        userID: userResponse.user.ID,
+        showFileCountInitializer:
+            photosFileCount === -1 && lockerFileCount === -1,
         user: [
             {
                 kind: "text",
@@ -408,11 +447,21 @@ const buildUserDetailsData = (
                 enabled: twoFactorEnabled,
             },
             { kind: "passkeys", label: "Passkeys", enabled: passkeysEnabled },
-            {
-                kind: "text",
-                label: "AuthCodes",
-                value: `${userResponse.authCodes}`,
-            },
+            { kind: "text", label: "Auth", value: `${userResponse.authCodes}` },
+            ...(fileCountsAvailable
+                ? [
+                      {
+                          kind: "text" as const,
+                          label: "Photos",
+                          value: fileCountLabel(photosFileCount),
+                      },
+                      {
+                          kind: "text" as const,
+                          label: "Locker",
+                          value: fileCountLabel(lockerFileCount),
+                      },
+                  ]
+                : []),
         ],
         securityState: {
             emailMFAEnabled,
@@ -421,3 +470,6 @@ const buildUserDetailsData = (
         },
     };
 };
+
+const fileCountLabel = (count: number) =>
+    count === -1 ? "Uninitialized" : `${count}`;
