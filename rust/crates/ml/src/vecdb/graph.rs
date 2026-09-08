@@ -13,7 +13,7 @@ const SELECTION_WINDOW_FACTOR: usize = 2;
 const EF_SEARCH_UPPER: usize = 1;
 const EF_SEARCH_FLOOR: usize = 64;
 const EF_SEARCH_LIMIT_FACTOR: usize = 4;
-const EF_SEARCH_STORED_FACTOR: usize = 2;
+const EF_SEARCH_STORED_HALVES: usize = 3;
 const SMALL_FILTER_FLOOR: usize = 1024;
 const SMALL_FILTER_LIMIT_FACTOR: usize = 4;
 const RANGE_SEARCH_FLOOR: usize = 200;
@@ -876,11 +876,12 @@ fn approx_limited(
     stored_slot: Option<u32>,
 ) -> Vec<Match> {
     let bound = result_bound(context.arena, allowed);
-    let factor = match stored_slot {
-        Some(_) => EF_SEARCH_STORED_FACTOR,
-        None => EF_SEARCH_LIMIT_FACTOR,
-    };
-    let ef = limit.saturating_mul(factor).max(EF_SEARCH_FLOOR).min(bound);
+    let ef = match stored_slot {
+        Some(_) => limit.saturating_mul(EF_SEARCH_STORED_HALVES) / 2,
+        None => limit.saturating_mul(EF_SEARCH_LIMIT_FACTOR),
+    }
+    .max(EF_SEARCH_FLOOR)
+    .min(bound);
     let admit = admission(context.arena, allowed, stored_slot);
     let scored = match stored_slot {
         Some(slot) => context.top_scored_near(slot, ef, &admit),
@@ -1687,7 +1688,7 @@ mod tests {
             .iter()
             .filter(|hit| expected.contains(hit.key.as_str()))
             .count();
-        assert!(hits >= 8, "filtered recall@10 was {hits}/10");
+        assert!(hits >= 9, "filtered recall@10 was {hits}/10");
         let within = search(
             graph,
             arena,
@@ -2173,7 +2174,7 @@ mod tests {
                     .filter(|hit| expected.contains(hit.key.as_str()))
                     .count();
                 assert!(
-                    hits + 2 >= top.len(),
+                    hits + 1 >= top.len(),
                     "churn recall was {hits}/{}",
                     top.len()
                 );
@@ -2301,7 +2302,7 @@ mod tests {
         let recall = measured_recall(&arena, &graph, 50, |index| {
             clustered_unit_vector(seed + index % 64, seed + 0x0200_0000 + index, 64)
         });
-        assert!(recall >= 0.95, "recall@10 was {recall}");
+        assert!(recall >= 0.98, "recall@10 was {recall}");
     }
 
     #[test]
@@ -2324,6 +2325,6 @@ mod tests {
                 clustered_unit_vector(seed + index % 512, seed + 0x0200_0000 + index, LATENT_DIMS);
             projected_unit_vector(&projection, &latent)
         });
-        assert!(recall >= 0.95, "recall@10 was {recall}");
+        assert!(recall >= 0.97, "recall@10 was {recall}");
     }
 }
