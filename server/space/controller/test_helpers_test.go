@@ -28,7 +28,7 @@ func setupPostsControllerTest(t *testing.T) (*PostsController, *spacerepo.Module
 
 type noopSpaceActivityNotifier struct{}
 
-func (noopSpaceActivityNotifier) OnSpacePostCreated(SpaceActivityActor)            {}
+func (noopSpaceActivityNotifier) OnSpacePostCreated(SpaceActivityActor, int64)     {}
 func (noopSpaceActivityNotifier) OnSpacePostLiked(SpaceActivityActor, int64)       {}
 func (noopSpaceActivityNotifier) OnSpacePostReplied(SpaceActivityActor, int64)     {}
 func (noopSpaceActivityNotifier) OnSpaceMessageSent(SpaceActivityActor, int64)     {}

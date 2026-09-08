@@ -91,12 +91,12 @@ func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, r
 			space.SpaceID, space.OwnerID, postCount, repo.MaxPostsPerSpace,
 		))
 	}
-	c.notifyFriendsOfNewPost(spaceActivityActor(space))
+	c.notifyFriendsOfNewPost(spaceActivityActor(space), postID)
 	return &models.CreatePostResponse{PostID: postID}, nil
 }
 
-func (c *PostsController) notifyFriendsOfNewPost(actor SpaceActivityActor) {
-	go c.ActivityNotifier.OnSpacePostCreated(actor)
+func (c *PostsController) notifyFriendsOfNewPost(actor SpaceActivityActor, postID int64) {
+	go c.ActivityNotifier.OnSpacePostCreated(actor, postID)
 }
 
 func (c *PostsController) postResponses(ctx context.Context, posts []repo.SpacePostRecord, includeAuthor bool) ([]models.PostResponse, error) {
