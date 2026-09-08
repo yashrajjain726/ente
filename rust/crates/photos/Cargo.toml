@@ -6,6 +6,7 @@ edition.workspace = true
 ente-assets.workspace = true
 ente-location.workspace = true
 quick-xml.workspace = true
+rusqlite = { workspace = true, default-features = true }
 thiserror.workspace = true
 
 [dev-dependencies]

@@ -1,4 +1,6 @@
+pub mod db;
 pub mod location;
+pub mod ml_db;
 pub mod motion_photo;
 
 pub use motion_photo::{
