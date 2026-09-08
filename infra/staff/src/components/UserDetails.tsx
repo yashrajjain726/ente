@@ -15,8 +15,6 @@ import {
     Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import { initializeFileCounts } from "../services/admin-user";
-import { useStaffSession } from "../services/session";
 import { SUCCESS_COLOR } from "../utils";
 import { AddOTT } from "./AddOTT";
 import { ChangeEmail } from "./ChangeEmail";
@@ -53,14 +51,15 @@ type UserSectionKey = "user" | "storage" | "subscription" | "security";
 
 interface UserDetailsProps {
     userData: UserDetailsData;
-    onFileCountsInitialized: () => Promise<void>;
+    fileCountInitPending: boolean;
+    onInitializeFileCounts: () => Promise<void>;
 }
 
 export const UserDetails: React.FC<UserDetailsProps> = ({
     userData,
-    onFileCountsInitialized,
+    fileCountInitPending,
+    onInitializeFileCounts,
 }) => {
-    const session = useStaffSession();
     const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
     const [emailMFAEnabled, setEmailMFAEnabled] = useState(
         userData.securityState.emailMFAEnabled,
@@ -74,7 +73,6 @@ export const UserDetails: React.FC<UserDetailsProps> = ({
     const [changeEmailOpen, setChangeEmailOpen] = useState(false);
     const [disablePasskeysOpen, setDisablePasskeysOpen] = useState(false);
     const [addOTTOpen, setAddOTTOpen] = useState(false);
-    const [fileCountInitDisabled, setFileCountInitDisabled] = useState(false);
     const { canDisableEmailMFA } = userData.securityState;
 
     useEffect(() => {
@@ -97,22 +95,6 @@ export const UserDetails: React.FC<UserDetailsProps> = ({
             setDisable2FAOpen(true);
         }
     };
-    const handleInitializeFileCounts = async () => {
-        setFileCountInitDisabled(true);
-        window.setTimeout(() => setFileCountInitDisabled(false), 30_000);
-        try {
-            const result = await initializeFileCounts(session, userData.userID);
-            if (result.reason) alert(result.reason);
-            if (result.initialized) await onFileCountsInitialized();
-        } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Failed to initialize file counts",
-            );
-        }
-    };
-
     const sections: {
         key: UserSectionKey;
         title: string;
@@ -158,11 +140,13 @@ export const UserDetails: React.FC<UserDetailsProps> = ({
             {userData.showFileCountInitializer && (
                 <Button
                     variant="contained"
-                    disabled={fileCountInitDisabled}
-                    onClick={() => handleInitializeFileCounts()}
+                    disabled={fileCountInitPending}
+                    onClick={onInitializeFileCounts}
                     sx={{ textTransform: "none" }}
                 >
-                    Initialize file counts
+                    {fileCountInitPending
+                        ? "Initializing..."
+                        : "Initialize file counts"}
                 </Button>
             )}
 

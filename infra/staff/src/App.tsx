@@ -23,6 +23,7 @@ import duckieimage from "./components/duckie.png";
 import {
     getScheduledDeletions,
     getUser,
+    initializeFileCounts,
     type ScheduledDeletion,
     type UserResponse,
 } from "./services/admin-user";
@@ -55,6 +56,7 @@ export const App: React.FC = () => {
         useState(false);
     const [scheduledDeletionsLoaded, setScheduledDeletionsLoaded] =
         useState(false);
+    const [fileCountInitPending, setFileCountInitPending] = useState(false);
     const searchRequestID = useRef(0);
 
     useEffect(() => {
@@ -173,6 +175,30 @@ export const App: React.FC = () => {
         [authToken, selectedUserEmail],
     );
     const displayedRequestID = searchRequestID.current;
+    const initializeDisplayedFileCounts = async (
+        userID: number,
+        requestID: number,
+    ) => {
+        setFileCountInitPending(true);
+        try {
+            const result = await initializeFileCounts(
+                { token: authToken },
+                userID,
+            );
+            if (result.reason) alert(result.reason);
+            if (result.initialized && requestID === searchRequestID.current) {
+                await fetchData(`${userID}`, authToken);
+            }
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to initialize file counts",
+            );
+        } finally {
+            setFileCountInitPending(false);
+        }
+    };
 
     return (
         <StaffSessionProvider session={session}>
@@ -287,14 +313,14 @@ export const App: React.FC = () => {
                                     {tabValue === 0 && (
                                         <UserDetails
                                             userData={userData}
-                                            onFileCountsInitialized={() =>
-                                                displayedRequestID ===
-                                                searchRequestID.current
-                                                    ? fetchData(
-                                                          selectedUserEmail,
-                                                          authToken,
-                                                      )
-                                                    : Promise.resolve()
+                                            fileCountInitPending={
+                                                fileCountInitPending
+                                            }
+                                            onInitializeFileCounts={() =>
+                                                initializeDisplayedFileCounts(
+                                                    userData.userID,
+                                                    displayedRequestID,
+                                                )
                                             }
                                         />
                                     )}
