@@ -1,6 +1,6 @@
 use std::{fs::File, path::Path};
 
-use ente_exif::{CaptureDateTime, Dimensions, Error, Limits, Location, Mode};
+use ente_exif::{CaptureDateTime, DateTimePrecision, Dimensions, Error, Limits, Location, Mode};
 
 #[derive(Debug)]
 pub struct PhotoMetadata {
@@ -13,7 +13,11 @@ pub fn read_photo_metadata(path: impl AsRef<Path>) -> Result<PhotoMetadata, Erro
     let metadata = ente_exif::read(&mut File::open(path)?, Mode::Summary, Limits::default())?;
     Ok(PhotoMetadata {
         dimensions: metadata.display_dimensions(),
-        capture_date_time: metadata.capture_date_time(),
+        capture_date_time: metadata.capture_date_time_with(|date| {
+            date.precision == DateTimePrecision::Second
+                && date.timestamp_micros != Some(0)
+                && date.date_time != "4501-01-01T00:00:00"
+        }),
         location: metadata.exif_location().or_else(|| metadata.xmp_location()),
     })
 }
