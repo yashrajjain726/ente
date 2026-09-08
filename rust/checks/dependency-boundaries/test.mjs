@@ -71,6 +71,29 @@ for (const domainName of ["core", "assets", "location-dataset"]) {
     assert.equal(result.status, 0, result.stderr);
 }
 
+result = run({
+    projections: {
+        "rust/bindings/wasm/lib/src/projection.rs":
+            "pub struct Output;\npub enum Error { Other }\n",
+        "rust/bindings/frb/lib/src/projection.rs":
+            "pub fn operation() {}\npub enum LockerError { Other }\n",
+    },
+});
+assert.equal(result.status, 1, result.stderr);
+assert.match(result.stderr, /projection\.rs: Output precedes Error/);
+assert.match(result.stderr, /projection\.rs: operation precedes LockerError/);
+
+result = run({
+    projections: {
+        "rust/bindings/wasm/lib/src/projection.rs":
+            "pub enum Error { Other }\npub struct Output;\n",
+        "rust/bindings/frb/lib/src/projection.rs":
+            "pub enum LockerError { Other }\npub fn operation() {}\n",
+    },
+});
+assert.equal(result.status, 0, result.stderr);
+assert.equal(result.stderr, "");
+
 function run({
     source = "pub fn domain() {}\n",
     framework,
@@ -81,6 +104,7 @@ function run({
     dependencyKind = "dev-dependencies",
     domainName = "domain",
     bindingDependencyKind,
+    projections = {},
 } = {}) {
     const root = mkdtempSync(join(tmpdir(), "ente-rust-dependencies-"));
     try {
@@ -113,6 +137,9 @@ function run({
                     : "",
             ));
             write(root, "rust/bindings/wasm/lib/src/lib.rs", "pub fn binding() {}\n");
+            for (const [path, source] of Object.entries(projections)) {
+                write(root, path, source);
+            }
             if (framework) {
                 write(root, "rust/vendor/framework/Cargo.toml", packageToml(framework));
                 write(root, "rust/vendor/framework/src/lib.rs", "pub fn framework() {}\n");
