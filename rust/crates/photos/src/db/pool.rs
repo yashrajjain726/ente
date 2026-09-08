@@ -1,10 +1,8 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use crate::db::Connection;
+use super::{Connection, Result};
 
-use super::error::Result;
-
-pub struct Pool {
+pub(super) struct Pool {
     writer: Mutex<Connection>,
     readers: [Mutex<Connection>; 2],
 }

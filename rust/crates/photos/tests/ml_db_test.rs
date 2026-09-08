@@ -160,7 +160,7 @@ fn open_refuses_downgrade() {
         .pragma_update(None, "user_version", 16)
         .unwrap();
     match MlDb::open(&path) {
-        Err(Error::Downgrade { current, target }) => {
+        Err(Error::Database(ente_photos::db::Error::Downgrade { current, target })) => {
             assert_eq!(current, 16);
             assert_eq!(target, 15);
         }
