@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -518,20 +517,14 @@ func (h *AdminHandler) InitializeFileCounts(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(err, "Bad request"))
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*gTime.Second)
-	defer cancel()
-	initialized, err := h.UsageRepo.InitializeFileCounts(ctx, r.UserID)
+	initialized, err := h.UsageRepo.InitializeFileCounts(c.Request.Context(), r.UserID)
 	logrus.WithFields(logrus.Fields{
 		"admin_id":    auth.GetUserID(c.Request.Header),
 		"user_id":     r.UserID,
 		"initialized": initialized,
 	}).WithError(err).Info("file count initialization")
 	if err != nil && !errors.Is(err, repo.ErrFileCountIneligible) {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			c.Status(http.StatusGatewayTimeout)
-		} else {
-			handler.Error(c, stacktrace.Propagate(err, "failed to initialize file counts"))
-		}
+		handler.Error(c, stacktrace.Propagate(err, "failed to initialize file counts"))
 		return
 	}
 	response := gin.H{"initialized": initialized}
