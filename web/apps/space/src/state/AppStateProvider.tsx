@@ -147,11 +147,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                 return post;
             } catch (error) {
                 if (postPublishGenerationRef.current == generation) {
-                    setPostPublication({
-                        ...publication,
-                        phase: "failed",
-                        statusExpiresAtMs: Date.now() + postStatusDurationMs,
-                    });
+                    setPostPublication({ ...publication, phase: "failed" });
                 }
                 throw error;
             }
