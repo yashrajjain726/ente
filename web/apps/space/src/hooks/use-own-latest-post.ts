@@ -11,6 +11,7 @@ import { useSpaceAppState } from "state/app-state";
 
 export const useOwnLatestPost = (spaceId: string | undefined) => {
     const { postPublication, setPostPublication } = useSpaceAppState();
+    const isPublishingPost = postPublication?.phase == "posting";
     const [ownLatestPost, setOwnLatestPost] = useState<SpacePost>();
     const [ownPostsVersion, setOwnPostsVersion] = useState(0);
     const [isOwnLatestPostLoading, setIsOwnLatestPostLoading] = useState(true);
@@ -21,7 +22,7 @@ export const useOwnLatestPost = (spaceId: string | undefined) => {
         setOwnLatestPost(undefined);
         setIsOwnLatestPostLoading(true);
         setIsOwnLatestPostUnavailable(false);
-        if (!spaceId) return;
+        if (!spaceId || isPublishingPost) return;
 
         let cancelled = false;
         let cachedPost: SpacePost | undefined;
@@ -49,7 +50,7 @@ export const useOwnLatestPost = (spaceId: string | undefined) => {
         return () => {
             cancelled = true;
         };
-    }, [spaceId, ownPostsVersion]);
+    }, [spaceId, ownPostsVersion, isPublishingPost]);
 
     const deleteOwnPost = useCallback(
         async (postId: number) => {
