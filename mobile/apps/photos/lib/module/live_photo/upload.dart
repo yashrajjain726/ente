@@ -73,7 +73,6 @@ Future<void> _deleteExportedVideo(File exportedVideo) async {
   try {
     await deleteFileSystemEntityIfPresent(exportedVideo);
   } catch (e, s) {
-    // Preserve the processing error or the archive prepared for upload.
     _logger.warning('Failed to delete backup Live Photo video export', e, s);
   }
 }
@@ -91,7 +90,7 @@ Future<String> _computeLivePhotoHash(
 Future<File> _createLivePhotoArchiveFile(
   EnteFile livePhoto,
   File imageFile,
-  File exportedVideo,
+  File videoFile,
 ) async {
   final archivePath =
       '${Configuration.instance.getTempDirectory()}${const Uuid().v4()}_${livePhoto.generatedID}.elp';
@@ -102,7 +101,7 @@ Future<File> _createLivePhotoArchiveFile(
     await createLivePhotoArchive(
       archivePath: archivePath,
       imagePath: imageFile.path,
-      videoPath: exportedVideo.path,
+      videoPath: videoFile.path,
     );
     return archiveFile;
   } catch (_) {
