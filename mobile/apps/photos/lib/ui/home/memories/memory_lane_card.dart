@@ -36,12 +36,13 @@ class MemoryLaneCardWidget extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: SizedBox(
-          width: size.width * 1.013513513514,
+          width: size.width,
           height: size.height,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               Positioned(
-                left: 0,
+                left: -size.width * 0.013513513514,
                 top: size.height * 0.004651162791,
                 width: size.width * 0.270270270270,
                 height: size.width * 0.270270270270,
@@ -54,7 +55,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: size.width * 0.013513513514,
+                left: 0,
                 top: 0,
                 bottom: 0,
                 width: size.width,
@@ -80,7 +81,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: size.width * 0.094594594595,
+                left: size.width * 0.081081081081,
                 bottom: 16,
                 width: size.width * 0.837837837838,
                 child: Text(
