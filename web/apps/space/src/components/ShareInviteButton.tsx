@@ -4,7 +4,7 @@ import { Box } from "@mui/material";
 import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import React from "react";
 import { spaceEmptyStateButtonSx } from "styles/buttons";
-import { spaceSurfaceHover, spaceText } from "styles/colors";
+import { spaceAppBackgroundColor, spaceText } from "styles/colors";
 
 export const SpaceShareIcon: React.FC<{
     size?: number;
@@ -85,13 +85,13 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
                 variant == "secondary"
                     ? {
                           ...spaceEmptyStateButtonSx,
-                          bgcolor: spaceSurfaceHover,
-                          color: spaceText,
+                          bgcolor: "#FFFFFF",
+                          color: spaceAppBackgroundColor,
                           "&:focus-visible": {
                               outline: `2px solid ${spaceText}`,
                               outlineOffset: 2,
                           },
-                          "&:hover:not(:disabled)": { bgcolor: "#404040" },
+                          "&:hover:not(:disabled)": { bgcolor: spaceText },
                       }
                     : spaceEmptyStateButtonSx
             }
