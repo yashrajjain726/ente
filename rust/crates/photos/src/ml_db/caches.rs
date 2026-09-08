@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::clip::CLIP_ML_VERSION;
-use super::codec::{decode_f32, encode_f32};
+use super::queries::CLIP_ML_VERSION;
+use super::vector_encoding::{decode_f32, encode_f32};
 use super::{MlDb, Result};
 
 const THREE_MONTHS_MILLIS: i64 = 90 * 24 * 60 * 60 * 1000;

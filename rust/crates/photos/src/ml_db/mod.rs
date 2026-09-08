@@ -1,30 +1,23 @@
 mod caches;
-mod clip;
-mod codec;
-mod constants;
 mod filedata;
+mod queries;
 mod schema;
-mod types;
+mod vector_encoding;
 
 use std::path::Path;
 
 use crate::db::Database;
 
-pub use clip::{
-    CLIP_EMBEDDING_BYTES_LENGTH, CLIP_EMBEDDING_DIMENSIONS, CLIP_ML_VERSION, ClipEmbedding,
-    ClipRow, EmbeddingVector,
-};
-pub use codec::{decode_evector, decode_f32, encode_evector, encode_f32};
-pub use constants::{
-    FACE_ML_VERSION, LAPLACIAN_HARD_THRESHOLD, LAPLACIAN_SOFT_THRESHOLD,
-    LAPLACIAN_VERY_SOFT_THRESHOLD, MEDIUM_QUALITY_FACE_SCORE, MINIMUM_QUALITY_FACE_SCORE,
-    PET_ML_VERSION, is_bad_face_for_clustering,
-};
 pub use filedata::{FdStatus, PreviewInfo};
-pub use types::{
-    ClusterCentroidRow, ClusterSummary, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding,
-    PetBodyRow, PetBodyVectorRow, PetFaceRow, PetFaceVectorRow, PetRowsForFiles,
+pub use queries::{
+    CLIP_EMBEDDING_BYTES_LENGTH, CLIP_EMBEDDING_DIMENSIONS, CLIP_ML_VERSION, ClipEmbedding,
+    ClipRow, ClusterCentroidRow, ClusterSummary, EmbeddingVector, FACE_ML_VERSION,
+    FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding, LAPLACIAN_HARD_THRESHOLD,
+    LAPLACIAN_SOFT_THRESHOLD, LAPLACIAN_VERY_SOFT_THRESHOLD, MEDIUM_QUALITY_FACE_SCORE,
+    MINIMUM_QUALITY_FACE_SCORE, PET_ML_VERSION, PetBodyRow, PetBodyVectorRow, PetFaceRow,
+    PetFaceVectorRow, PetRowsForFiles, is_bad_face_for_clustering,
 };
+pub use vector_encoding::{decode_evector, decode_f32, encode_evector, encode_f32};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -52,42 +45,15 @@ impl MlDb {
             db: Database::open(path, &schema::MIGRATION_SCRIPTS)?,
         })
     }
-
-    pub fn clear_non_pet_tables(&self) -> Result<()> {
-        self.db
-            .execute_statements([
-                schema::DELETE_FACES,
-                schema::DELETE_FACE_CLUSTERS,
-                schema::DELETE_CLUSTER_PERSON,
-                schema::DELETE_CLUSTER_SUMMARY,
-                schema::DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING,
-                schema::DELETE_NOT_PERSON_FEEDBACK,
-                schema::DELETE_CLIP_EMBEDDINGS,
-                schema::DELETE_FILE_DATA,
-            ])
-            .map_err(Into::into)
-    }
-
-    pub fn clear_pet_tables(&self) -> Result<()> {
-        self.db
-            .execute_statements([
-                schema::DELETE_PET_FACES,
-                schema::DELETE_PET_BODIES,
-                schema::DELETE_PET_FACE_VECTOR_ID_MAPPING,
-                schema::DELETE_PET_BODY_VECTOR_ID_MAPPING,
-            ])
-            .map_err(Into::into)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use std::fmt::Debug;
     use std::path::Path;
 
-    use super::clip::tests::full_clip;
-    use super::{Error, MlDb, TARGET_VERSION, caches, clip, filedata};
+    use super::queries::tests::full_clip;
+    use super::{Error, MlDb, TARGET_VERSION};
     use crate::db::Connection;
     use tempfile::TempDir;
 
@@ -129,14 +95,6 @@ mod tests {
         for (name, expected, query) in cases {
             assert_eq!(&query(db).unwrap(), expected, "{name}");
         }
-    }
-
-    fn seeded() -> (TempDir, MlDb) {
-        let (directory, db) = open();
-        clip::tests::seed(&db);
-        filedata::tests::seed(&db);
-        caches::tests::seed(&db);
-        (directory, db)
     }
 
     #[test]
@@ -226,52 +184,5 @@ mod tests {
         let db = MlDb::open(&path).unwrap();
         assert_eq!(user_version(&path), 15);
         assert_eq!(db.count_clip_rows().unwrap(), 0);
-    }
-
-    #[test]
-    fn clear_non_pet_tables_leaves_pets_and_caches() {
-        let (_directory, db) = seeded();
-        db.clear_non_pet_tables().unwrap();
-        assert_eq!(db.count_clip_rows().unwrap(), 0);
-        assert!(db.get_file_ids_with_fd_data(None).unwrap().is_empty());
-        assert_eq!(
-            db.get_face_id_used_for_person_or_cluster("p1").unwrap(),
-            Some("1_0".to_string())
-        );
-        assert_eq!(
-            db.get_repeated_text_embedding_cache("dog").unwrap(),
-            Some(vec![0.5f32, -1.0])
-        );
-    }
-
-    #[test]
-    fn clear_pet_tables_leaves_non_pet_tables() {
-        let (directory, db) = seeded();
-        let connection = Connection::open(directory.path().join("ente.ml.db")).unwrap();
-        connection
-            .execute_batch(
-                "INSERT INTO pet_face_vector_id_map (pet_face_id) VALUES ('1_pet_0');
-                 INSERT INTO pet_body_vector_id_map (pet_body_id) VALUES ('1_body_0');",
-            )
-            .unwrap();
-        db.clear_pet_tables().unwrap();
-        let row_count = |table: &str| -> i64 {
-            connection
-                .query_row(&format!("SELECT COUNT(*) FROM {table}"), (), |row| {
-                    row.get(0)
-                })
-                .unwrap()
-        };
-        assert_eq!(row_count("pet_face_vector_id_map"), 0);
-        assert_eq!(row_count("pet_body_vector_id_map"), 0);
-        assert_eq!(db.count_clip_rows().unwrap(), 4);
-        assert_eq!(
-            db.get_file_ids_with_fd_data(None).unwrap(),
-            HashSet::from([1, 2, 3])
-        );
-        assert_eq!(
-            db.get_face_id_used_for_person_or_cluster("p1").unwrap(),
-            Some("1_0".to_string())
-        );
     }
 }
