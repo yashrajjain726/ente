@@ -58,13 +58,11 @@ interface UploadDeps<TCollectionRecord> {
     ) => TCollectionRecord | undefined;
     decryptCollectionKey: (
         collectionRecord: TCollectionRecord,
-        masterKey: string,
     ) => Promise<string>;
     addFileToCollections: (
         fileID: number,
         fileKey: string,
         targetCollectionIDs: number[],
-        masterKey: string,
     ) => Promise<void>;
 }
 
@@ -283,7 +281,6 @@ const createAggregateUploadProgressReporter = (
 export const uploadLockerFileWithDeps = async <TCollectionRecord>(
     file: File,
     collectionIDs: number[],
-    masterKey: string,
     deps: UploadDeps<TCollectionRecord>,
     onProgress?: (progress: LockerUploadProgress) => void,
 ): Promise<number> => {
@@ -443,10 +440,7 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
     if (!collectionRecord) {
         throw new Error(`Collection ${collectionID} not in cache`);
     }
-    const collectionKey = await deps.decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await deps.decryptCollectionKey(collectionRecord);
     const encryptedKey = await encryptBox(fileKey, collectionKey);
 
     const now = Date.now();
@@ -509,7 +503,6 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
             created.id,
             fileKey,
             additionalCollectionIDs,
-            masterKey,
         );
     }
     return created.id;

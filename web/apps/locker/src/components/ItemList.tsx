@@ -72,7 +72,6 @@ const uniqueCollectionsByID = (collections: LockerCollection[]) => {
 
 interface ItemListProps {
     collections: LockerCollection[];
-    masterKey?: string;
     trashItems?: LockerItem[];
     isTrashView: boolean;
     isCollectionsView: boolean;
@@ -103,7 +102,6 @@ const contentMaxWidth = 560;
 
 export const ItemList: React.FC<ItemListProps> = ({
     collections,
-    masterKey,
     trashItems,
     isTrashView,
     isCollectionsView,
@@ -609,9 +607,6 @@ export const ItemList: React.FC<ItemListProps> = ({
     }, [isCreatingFileLink, isDeleteFileLinkConfirmOpen, isDeletingFileLink]);
     const openFileLinkDialog = useCallback(
         async (item: LockerItem) => {
-            if (!masterKey) {
-                return;
-            }
             if (!canShareLockerFileLink(item, currentUserID)) {
                 setFeedbackMessage(t("shareNotSupportedForSharedFiles"));
                 return;
@@ -621,10 +616,7 @@ export const ItemList: React.FC<ItemListProps> = ({
             setActiveFileLink(null);
             setIsCreatingFileLink(true);
             try {
-                const link = await getOrCreateLockerFileShareLink(
-                    item.id,
-                    masterKey,
-                );
+                const link = await getOrCreateLockerFileShareLink(item.id);
                 setActiveFileLink(link);
             } catch (error) {
                 log.error(
@@ -641,7 +633,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                 setIsCreatingFileLink(false);
             }
         },
-        [currentUserID, masterKey],
+        [currentUserID],
     );
     const copyActiveFileLink = useCallback(async () => {
         if (!activeFileLink?.url) {
@@ -703,11 +695,7 @@ export const ItemList: React.FC<ItemListProps> = ({
         }
     }, [activeFileLink?.linkID, activeFileLinkItem]);
     const downloadSelectedFiles = useCallback(async () => {
-        if (
-            !masterKey ||
-            bulkDownloading ||
-            selectedDownloadableItems.length === 0
-        ) {
+        if (bulkDownloading || selectedDownloadableItems.length === 0) {
             return;
         }
 
@@ -718,11 +706,7 @@ export const ItemList: React.FC<ItemListProps> = ({
         });
         try {
             for (const [index, item] of selectedDownloadableItems.entries()) {
-                await downloadLockerFile(
-                    item.id,
-                    getItemTitle(item),
-                    masterKey,
-                );
+                await downloadLockerFile(item.id, getItemTitle(item));
                 setBulkDownloadProgress({
                     completed: index + 1,
                     total: selectedDownloadableItems.length,
@@ -745,7 +729,6 @@ export const ItemList: React.FC<ItemListProps> = ({
         }
     }, [
         bulkDownloading,
-        masterKey,
         selectedDownloadableItems,
         skippedDownloadSelectionCount,
         stopSelectionMode,
@@ -901,7 +884,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
                             <ItemsSection
                                 items={homeFilteredItems}
-                                masterKey={masterKey}
                                 isTrashView={false}
                                 onEditItem={onEditItem}
                                 onDeleteItem={onDeleteItem}
@@ -1060,7 +1042,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
                             <ItemsSection
                                 items={sortedItems}
-                                masterKey={masterKey}
                                 isTrashView={isTrashView}
                                 onEditItem={onEditItem}
                                 onDeleteItem={onDeleteItem}
@@ -1190,7 +1171,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
                             <ItemsSection
                                 items={sortedItems}
-                                masterKey={masterKey}
                                 isTrashView={isTrashView}
                                 onEditItem={onEditItem}
                                 onDeleteItem={onDeleteItem}
@@ -1243,9 +1223,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                     allSelected={allVisibleItemsSelected}
                     bulkDownloading={bulkDownloading}
                     bulkDownloadProgress={bulkDownloadProgress}
-                    canDownload={
-                        !!masterKey && selectedDownloadableItems.length > 0
-                    }
+                    canDownload={selectedDownloadableItems.length > 0}
                     canDelete={
                         !!onDeleteItems && selectedVisibleItems.length > 0
                     }
@@ -1258,7 +1236,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
             <ItemDetailView
                 item={selectedItem}
-                masterKey={masterKey}
                 onClose={() => setSelectedItemID(null)}
                 onEdit={
                     onEditItem &&
@@ -1438,7 +1415,6 @@ const SectionHeader: React.FC<{
 
 const ItemsSection: React.FC<{
     items: LockerItem[];
-    masterKey?: string;
     isTrashView: boolean;
     onEditItem?: (item: LockerItem) => void;
     onDeleteItem?: (item: LockerItem) => void;
@@ -1454,7 +1430,6 @@ const ItemsSection: React.FC<{
     emptyState: React.ReactNode;
 }> = ({
     items,
-    masterKey,
     isTrashView,
     onEditItem,
     onDeleteItem,
@@ -1482,7 +1457,6 @@ const ItemsSection: React.FC<{
                     <ItemCard
                         key={item.id}
                         item={item}
-                        masterKey={masterKey}
                         isTrashView={isTrashView}
                         isIncomingShared={!isOwnedByCurrentUser}
                         onClick={() => onSelectItem(item)}

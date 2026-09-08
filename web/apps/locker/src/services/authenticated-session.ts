@@ -15,7 +15,7 @@ let generation = 0;
 
 export const openAuthenticatedSession = lockerSessions.open;
 
-export const authenticatedLegacySession = async () => {
+const savedSessionCredentials = async () => {
     const startedGeneration = generation;
     const userID = ensureLocalUser().id;
     const [authToken, masterKeyB64] = await Promise.all([
@@ -27,6 +27,19 @@ export const authenticatedLegacySession = async () => {
     }
     if (!masterKeyB64) throw new Error("Missing current master key");
     if (!authToken) throw new Error("Missing auth token");
+    return { userID, authToken, masterKeyB64 };
+};
+
+export const ensureAuthenticatedSession = async () => {
+    const current = lockerSessions.current();
+    if (current) return current;
+
+    const { userID, authToken, masterKeyB64 } = await savedSessionCredentials();
+    return lockerSessions.open(userID, authToken, masterKeyB64);
+};
+
+export const authenticatedLegacySession = async () => {
+    const { userID, authToken, masterKeyB64 } = await savedSessionCredentials();
     return legacySessions.open(userID, authToken, masterKeyB64);
 };
 
@@ -42,6 +55,7 @@ function sessionCache<T extends Pick<Session, "free" | "updateAuthToken">>(
     let current: { key: string; opening: Promise<T> } | undefined;
 
     return {
+        current: () => current?.opening,
         open: async (
             userID: number,
             authToken: string,

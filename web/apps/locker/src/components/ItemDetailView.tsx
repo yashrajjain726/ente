@@ -35,7 +35,6 @@ import React, { useCallback, useState } from "react";
 
 interface ItemDetailViewProps {
     item: LockerItem | null;
-    masterKey?: string;
     onClose: () => void;
     onEdit?: (item: LockerItem) => void;
     onDelete?: (item: LockerItem) => void;
@@ -46,7 +45,6 @@ interface ItemDetailViewProps {
 
 export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
     item,
-    masterKey,
     onClose,
     onEdit,
     onDelete,
@@ -78,7 +76,7 @@ export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
     }, []);
 
     const handleDownload = useCallback(async () => {
-        if (!item || !masterKey || downloading) {
+        if (!item || downloading) {
             return;
         }
 
@@ -88,7 +86,6 @@ export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
             await downloadLockerFile(
                 item.id,
                 getItemTitle(item),
-                masterKey,
                 ({ loaded, total }) => {
                     if (total && total > 0) {
                         setDownloadProgress(
@@ -104,7 +101,7 @@ export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
             setDownloading(false);
             setDownloadProgress(null);
         }
-    }, [downloading, item, masterKey]);
+    }, [downloading, item]);
 
     return (
         <Drawer
@@ -223,39 +220,33 @@ export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     data={item.data as GenericFileData}
                                     onCopy={copyToClipboard}
                                 />
-                                {masterKey && (
-                                    <Stack sx={{ mt: 1, gap: 1 }}>
-                                        <Button
-                                            variant="contained"
-                                            endIcon={
-                                                downloading &&
-                                                downloadProgress !== null ? (
-                                                    <CircularProgress
-                                                        variant="determinate"
-                                                        value={downloadProgress}
-                                                        size={16}
-                                                        thickness={6}
-                                                        color="inherit"
-                                                    />
-                                                ) : undefined
-                                            }
-                                            startIcon={
-                                                <FileDownloadOutlinedIcon />
-                                            }
-                                            onClick={() =>
-                                                void handleDownload()
-                                            }
-                                            disabled={downloading}
-                                            fullWidth
-                                        >
-                                            {downloading
-                                                ? downloadProgress !== null
-                                                    ? `${t("downloading")} ${downloadProgress}%`
-                                                    : t("downloading")
-                                                : t("download")}
-                                        </Button>
-                                    </Stack>
-                                )}
+                                <Stack sx={{ mt: 1, gap: 1 }}>
+                                    <Button
+                                        variant="contained"
+                                        endIcon={
+                                            downloading &&
+                                            downloadProgress !== null ? (
+                                                <CircularProgress
+                                                    variant="determinate"
+                                                    value={downloadProgress}
+                                                    size={16}
+                                                    thickness={6}
+                                                    color="inherit"
+                                                />
+                                            ) : undefined
+                                        }
+                                        startIcon={<FileDownloadOutlinedIcon />}
+                                        onClick={() => void handleDownload()}
+                                        disabled={downloading}
+                                        fullWidth
+                                    >
+                                        {downloading
+                                            ? downloadProgress !== null
+                                                ? `${t("downloading")} ${downloadProgress}%`
+                                                : t("downloading")
+                                            : t("download")}
+                                    </Button>
+                                </Stack>
                             </>
                         )}
                         {onShareLink && (

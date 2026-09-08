@@ -14,6 +14,19 @@ export type { OpenSessionInput, Session } from "./pkg/ente_locker_wasm";
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
 
+export const openCollectionKey = async (
+    session: Session,
+    ownerID: number,
+    encryptedKey: string,
+    keyDecryptionNonce?: string,
+) =>
+    (await wasm()).collectionsOpenKey(
+        session,
+        BigInt(ownerID),
+        encryptedKey,
+        keyDecryptionNonce,
+    );
+
 export const contactsGetDiff = async (
     session: Session,
     wrappedRootContactKey: WrappedRootContactKey | undefined,

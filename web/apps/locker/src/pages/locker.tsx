@@ -189,7 +189,6 @@ export const LockerPage: React.FC = () => {
             >
                 <ItemList
                     collections={collections}
-                    masterKey={masterKey}
                     trashItems={isTrashView ? trashItems : undefined}
                     isTrashView={isTrashView}
                     isCollectionsView={isCollectionsView}

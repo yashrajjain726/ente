@@ -447,10 +447,10 @@ export const useLockerActions = ({
             clearUploadRefreshTimeout();
             uploadRefreshTimeoutRef.current = window.setTimeout(() => {
                 uploadRefreshTimeoutRef.current = null;
-                void refreshData(masterKey);
+                void refreshData();
             }, delayMs);
         },
-        [clearUploadRefreshTimeout, masterKey, refreshData],
+        [clearUploadRefreshTimeout, refreshData],
     );
 
     const scheduleUploadFollowUpRefreshes = useCallback(() => {
@@ -458,10 +458,10 @@ export const useLockerActions = ({
         uploadFollowUpRefreshTimeoutsRef.current =
             UPLOAD_REFRESH_FOLLOW_UP_DELAYS_MS.map((delayMs) =>
                 window.setTimeout(() => {
-                    void refreshData(masterKey);
+                    void refreshData();
                 }, delayMs),
             );
-    }, [clearUploadFollowUpRefreshes, masterKey, refreshData]);
+    }, [clearUploadFollowUpRefreshes, refreshData]);
 
     const handleCreateItem = useCallback(
         async (
@@ -497,7 +497,7 @@ export const useLockerActions = ({
         async (uploadedCount: number) => {
             clearUploadRefreshTimeout();
             clearUploadFollowUpRefreshes();
-            await refreshData(masterKey);
+            await refreshData();
             scheduleUploadFollowUpRefreshes();
             setToast(
                 uploadedCount === 1
@@ -508,7 +508,6 @@ export const useLockerActions = ({
         [
             clearUploadFollowUpRefreshes,
             clearUploadRefreshTimeout,
-            masterKey,
             refreshData,
             scheduleUploadFollowUpRefreshes,
         ],
@@ -531,9 +530,9 @@ export const useLockerActions = ({
             if (type === "file") {
                 const editedName =
                     typeof data.name === "string" ? data.name : "";
-                await updateFileItem(editItem.id, editedName, masterKey);
+                await updateFileItem(editItem.id, editedName);
             } else {
-                await updateInfoItem(editItem.id, type, data, masterKey);
+                await updateInfoItem(editItem.id, type, data);
             }
 
             await updateItemCollections(editItem.id, collectionIDs, masterKey);
@@ -695,18 +694,14 @@ export const useLockerActions = ({
 
     const handleRestoreItem = useCallback(
         async (item: LockerItem, collectionID: number) => {
-            if (!masterKey) {
-                return;
-            }
             await restoreFromTrash(
                 [{ id: item.id, collectionID: item.collectionID }],
                 collectionID,
-                masterKey,
             );
             await refreshData();
             setToast(t("filesRestoredSuccessfully", { count: 1 }));
         },
-        [masterKey, refreshData],
+        [refreshData],
     );
 
     const handleEmptyTrash = useCallback(() => {
@@ -889,14 +884,11 @@ export const useLockerActions = ({
 
     const handleRenameCollection = useCallback(
         async (collectionID: number, newName: string) => {
-            if (!masterKey) {
-                return;
-            }
-            await renameCollectionAPI(collectionID, newName, masterKey);
+            await renameCollectionAPI(collectionID, newName);
             await refreshData();
             setToast(t("collectionRenamedSuccessfully"));
         },
-        [masterKey, refreshData],
+        [refreshData],
     );
 
     const handleDeleteCollection = useCallback(
@@ -1003,14 +995,11 @@ export const useLockerActions = ({
 
     const handleShareCollection = useCallback(
         async (collectionID: number, email: string) => {
-            if (!masterKey) {
-                throw new Error("No master key");
-            }
-            await shareCollectionAPI(collectionID, email, masterKey);
+            await shareCollectionAPI(collectionID, email);
             await refreshData();
             setToast(t("collectionSharedSuccessfully"));
         },
-        [masterKey, refreshData],
+        [refreshData],
     );
 
     const handleUnshareCollection = useCallback(
