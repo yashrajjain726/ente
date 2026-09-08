@@ -2,7 +2,6 @@ import {
     AddSquareIcon,
     ArrowLeft02Icon,
     BubbleChatIcon,
-    Menu01Icon,
     MoreHorizontalIcon,
     Tick02Icon,
     UserRemove01Icon,
@@ -542,7 +541,6 @@ interface ProfileScreenProps {
     onOpenPost?: (post: ProfilePostItem) => void;
     onOpenProfileCover?: () => void;
     onOpenProfilePhoto?: () => void;
-    onOpenSettings?: () => void;
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
     onMessageFriend?: () => void;
     onReplyToPost?: (
@@ -579,7 +577,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onOpenPost,
     onOpenProfileCover,
     onOpenProfilePhoto,
-    onOpenSettings,
     onLoadPostImage,
     onMessageFriend,
     onReplyToPost,
@@ -1379,39 +1376,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {firstName}
                             </Box>
-                            {isOwnerProfile ? (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label="Settings"
-                                    onClick={onOpenSettings}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: "inherit",
-                                        cursor: onOpenSettings
-                                            ? "pointer"
-                                            : "default",
-                                        display: "flex",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "flex-end",
-                                        p: 0,
-                                        width: spaceTouchTargetSize,
-                                        "&:focus-visible": {
-                                            borderRadius: "50%",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={Menu01Icon}
-                                        size={20}
-                                        strokeWidth={2.4}
-                                    />
-                                </Box>
-                            ) : onMessageFriend ? (
+                            {!isOwnerProfile && onMessageFriend ? (
                                 <Box
                                     component="button"
                                     type="button"

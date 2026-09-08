@@ -118,7 +118,7 @@ export const SpaceAddFriendTile: React.FC<SpaceAddFriendTileProps> = ({
                     bgcolor: spaceSurface,
                     border: 0,
                     borderRadius: "inherit",
-                    color: spaceText,
+                    color: "#65656D",
                     cursor: "pointer",
                     display: "flex",
                     height: "100%",

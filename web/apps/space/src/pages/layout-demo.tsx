@@ -24,6 +24,8 @@ import {
     type HomeTilePlacement,
 } from "utils/home-tile-layout";
 import { spaceDefaultCoverImagePath } from "utils/post-image";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
 const controlButtonColor = spaceSurface;
 const demoProfile: SetupProfile = {
@@ -142,6 +144,7 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
 };
 
 const LayoutDemoPage: React.FC = () => {
+    const router = useSpaceRouter();
     const [{ friendCount, ownPosts }, setDemo] = React.useState({
         friendCount: 0,
         ownPosts: [] as SpacePost[],
@@ -238,7 +241,11 @@ const LayoutDemoPage: React.FC = () => {
                     "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
-                <SpaceHomeHeader profile={demoProfile} />
+                <SpaceHomeHeader
+                    onOpenSettings={() =>
+                        void router.push(spaceRoutes.settings)
+                    }
+                />
                 <Box
                     sx={{
                         boxSizing: "border-box",

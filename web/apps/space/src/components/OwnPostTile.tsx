@@ -198,7 +198,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
             <Box
                 sx={{
                     background:
-                        imageUrl && !unavailable
+                        coverUrl && !unavailable
                             ? "linear-gradient(transparent, rgba(0, 0, 0, 0.72))"
                             : undefined,
                     bottom: 0,

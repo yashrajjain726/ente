@@ -25,7 +25,6 @@ import {
     loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
-    loadCurrentSpaceProfilePostsPage,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
     sendCurrentPoke,
@@ -366,7 +365,6 @@ const Page: React.FC = () => {
                     }
                 }}
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
-                onLoadFriendPosts={loadCurrentSpaceProfilePostsPage}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onMessageFriend={(friend) =>
@@ -435,6 +433,7 @@ const Page: React.FC = () => {
                         ? () => void router.push(spaceRoutes.profile)
                         : undefined
                 }
+                onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onReplyToPost={
                     profile?.spaceId
                         ? (

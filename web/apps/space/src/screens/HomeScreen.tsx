@@ -35,7 +35,6 @@ import {
     type SpaceFriendRequest,
     type SpacePost,
     type SpacePostAssetURLLoader,
-    type SpaceProfilePostPage,
 } from "services/space";
 import {
     spaceAppBackground,
@@ -100,11 +99,6 @@ interface HomeScreenProps {
     onDeletePost?: (postId: number) => Promise<void>;
     onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
-    onLoadFriendPosts?: (
-        friendSpaceId: string,
-        viewerSpaceId?: string,
-        cursor?: string,
-    ) => Promise<SpaceProfilePostPage>;
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
     onAcceptFriendRequest?: (requestID: number) => Promise<void>;
@@ -115,6 +109,7 @@ interface HomeScreenProps {
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
     onOpenProfile?: () => void;
+    onOpenSettings?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
         postId: number,
@@ -141,7 +136,6 @@ interface PostTileCanvasSize {
 
 interface SelectedHomeViewer {
     avatarUrl?: string | null;
-    browseHistory?: boolean;
     draftFile?: File;
     draftImageError?: string;
     focusReplyOnOpen?: boolean;
@@ -742,7 +736,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         p: "var(--space-tile-padding)",
                         pt: showFriendRequestDetails
                             ? "var(--space-tile-padding)"
-                            : `calc(${spaceTileCircleInset(requestActionSize)} + ${requestActionSize}px)`,
+                            : `calc(var(--space-tile-padding) + ${requestActionSize + requestButtonGap}px)`,
                         pointerEvents: "none",
                         position: "absolute",
                         width: "100%",
@@ -1026,7 +1020,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onAcceptFriendRequest,
     onDiscardFriendRequest,
     onLoadFriendAvatar,
-    onLoadFriendPosts,
     onLoadPostImage,
     onFriendRequestSentToastClose,
     onOpenFriend,
@@ -1035,6 +1028,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onMessageFriend,
     onPokeFriend,
     onOpenProfile,
+    onOpenSettings,
     onReplyToPost,
     onSetPostLiked,
     profile,
@@ -1187,7 +1181,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         friend: FriendProfile,
         posts: SpacePost[],
         photo: SpaceViewerPhoto,
-        browseHistory = false,
     ) => {
         if (photo.postId) {
             markPostRead({
@@ -1199,7 +1192,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             Boolean(viewerSpaceId) && photo.friendID == viewerSpaceId;
         setSelectedViewer({
             avatarUrl: photo.avatarUrl,
-            browseHistory,
             friend,
             photo,
             postIndex: 0,
@@ -1318,59 +1310,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
     const selectedViewerPostIndex = selectedViewer?.postIndex;
     const selectedViewerPosts = selectedViewer?.posts;
-    const historySessionId = selectedViewer?.browseHistory
-        ? selectedViewer.sessionId
-        : undefined;
-    const selectedFriendSpaceId =
-        selectedViewer?.friend?.spaceId ?? selectedViewer?.friend?.id;
-    React.useEffect(() => {
-        if (!historySessionId || !selectedFriendSpaceId || !onLoadFriendPosts) {
-            return;
-        }
-
-        let cancelled = false;
-        const loadHistory = async () => {
-            let cursor: string | undefined;
-            do {
-                const page = await onLoadFriendPosts(
-                    selectedFriendSpaceId,
-                    viewerSpaceId,
-                    cursor,
-                );
-                if (cancelled) return;
-                setSelectedViewer((viewer) => {
-                    if (viewer?.sessionId !== historySessionId || !viewer.posts)
-                        return viewer;
-
-                    const oldestPost = viewer.posts[viewer.posts.length - 1]!;
-                    const olderPosts = page.items.filter(
-                        (post) =>
-                            !post.isUnavailable &&
-                            (post.timestampMs < oldestPost.timestampMs ||
-                                (post.timestampMs == oldestPost.timestampMs &&
-                                    post.postId < oldestPost.postId)),
-                    );
-                    return {
-                        ...viewer,
-                        posts: [...viewer.posts, ...olderPosts],
-                    };
-                });
-                cursor = page.nextCursor;
-            } while (cursor);
-        };
-        void loadHistory().catch((error: unknown) =>
-            log.error("Failed to load friend post history", error),
-        );
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        historySessionId,
-        onLoadFriendPosts,
-        selectedFriendSpaceId,
-        viewerSpaceId,
-    ]);
 
     const selectedViewerPhotos = React.useMemo(() => {
         const friend = selectedViewer?.friend;
@@ -1549,9 +1488,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onOpenAvatar={(anchorRect) =>
                     setSelectedContact({ anchorRect, friend, avatarUrl })
                 }
-                onOpenPosts={(friend, posts, photo) =>
-                    openPostPhotos(friend, posts, photo, isRead)
-                }
+                onOpenPosts={openPostPhotos}
                 placement={placement}
                 posts={posts}
             />
@@ -1752,10 +1689,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }}
             >
                 <SpaceHomeHeader
-                    profile={profile}
                     showUnreadIndicator={showUnreadIndicator}
                     onOpenMessages={onOpenMessages}
-                    onOpenProfile={onOpenProfile}
+                    onOpenSettings={onOpenSettings}
                 >
                     <Box
                         ref={postInputRef}
@@ -1872,7 +1808,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     profile.avatarUrl,
                                     imageUrl,
                                 ),
-                                true,
                             );
                         }}
                     />
@@ -1907,7 +1842,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         postActionMode={selectedViewer.postActionMode}
                         showSequenceProgress={Boolean(
-                            !selectedViewer.browseHistory &&
                             selectedViewerPosts &&
                             selectedViewerPosts.length > 1,
                         )}
@@ -1954,10 +1888,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   : undefined
                         }
                         onSwipeLeft={
-                            !selectedViewer.browseHistory &&
-                            (!selectedViewerPosts ||
-                                selectedViewerPostIndex ==
-                                    selectedViewerPosts.length - 1)
+                            !selectedViewerPosts ||
+                            selectedViewerPostIndex ==
+                                selectedViewerPosts.length - 1
                                 ? closeSelectedPhoto
                                 : undefined
                         }
