@@ -71,7 +71,7 @@ const profileCoverTopShadow =
 const profileCoverSkeletonBackground = spaceSurface;
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
-const profileAvatarSize = 120;
+const profileAvatarSize = 132;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "3px";
@@ -1466,7 +1466,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 sx={{
                                     bgcolor: profileCoverSkeletonBackground,
                                     borderRadius: "50%",
-                                    inset: 2,
+                                    inset: 3,
                                     overflow: "hidden",
                                     position: "absolute",
                                 }}
