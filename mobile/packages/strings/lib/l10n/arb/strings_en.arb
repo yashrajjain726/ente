@@ -2105,6 +2105,8 @@
   "layout": "Layout",
   "layoutGrouped": "Grouped",
   "layoutJustified": "Justified",
+  "layoutJustifiedComfort": "Justified · Comfort",
+  "layoutJustifiedFlex": "Justified · Flex",
   "layoutMasonry": "Masonry",
   "layoutTrip": "Trip",
   "leave": "Leave",
