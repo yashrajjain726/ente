@@ -693,11 +693,23 @@ impl QueryContext<'_> {
         self.search_layer(&entries, 0, ef, None, admit)
     }
 
-    fn top_scored_near(&self, slot: u32, ef: usize, admit: &impl Fn(u32) -> bool) -> Vec<Scored> {
+    fn top_scored_near(
+        &self,
+        slot: u32,
+        ef: usize,
+        fill: usize,
+        admit: &impl Fn(u32) -> bool,
+    ) -> Vec<Scored> {
         if self.graph.level_neighbors(slot, 0).is_empty() {
             return self.top_scored(ef, admit);
         }
-        self.search_layer(&[self.scored(slot)], 0, ef, None, admit)
+        let near = self.search_layer(&[self.scored(slot)], 0, ef, None, admit);
+        if near.len() >= fill {
+            return near;
+        }
+        let mut entries = vec![self.scored(slot)];
+        entries.extend(self.level_zero_entries());
+        self.search_layer(&entries, 0, ef, None, admit)
     }
 
     fn range_scored(&self, max_distance: f32, admit: &impl Fn(u32) -> bool) -> Vec<Scored> {
@@ -822,13 +834,7 @@ fn search_from(
         query,
     };
     match params.limit {
-        Some(limit) => approx_limited(
-            &context,
-            limit,
-            params.max_distance,
-            allowed_slots,
-            stored_slot,
-        ),
+        Some(limit) => approx_limited(&context, limit, params, allowed_slots, stored_slot),
         None => approx_threshold(
             &context,
             params.max_distance.unwrap_or(f32::MAX),
@@ -865,22 +871,22 @@ fn ef_search_floor(live: usize) -> usize {
     }
 }
 
+fn admissible(arena: &VectorArena, allowed: Option<&HashSet<u32>>, slot: u32) -> bool {
+    arena.is_alive(slot) && allowed.is_none_or(|set| set.contains(&slot))
+}
+
 fn admission<'a>(
     arena: &'a VectorArena,
     allowed: Option<&'a HashSet<u32>>,
     banned: Option<u32>,
 ) -> impl Fn(u32) -> bool + 'a {
-    move |slot| {
-        banned != Some(slot)
-            && arena.is_alive(slot)
-            && allowed.is_none_or(|set| set.contains(&slot))
-    }
+    move |slot| banned != Some(slot) && admissible(arena, allowed, slot)
 }
 
 fn approx_limited(
     context: &QueryContext<'_>,
     limit: usize,
-    max_distance: Option<f32>,
+    params: &SearchParams,
     allowed: Option<&HashSet<u32>>,
     stored_slot: Option<u32>,
 ) -> Vec<Match> {
@@ -892,11 +898,16 @@ fn approx_limited(
     .max(ef_search_floor(context.arena.live_count()))
     .min(bound);
     let admit = admission(context.arena, allowed, stored_slot);
+    let excluded = stored_slot.is_some_and(|slot| admissible(context.arena, allowed, slot));
+    let available = bound - usize::from(excluded);
     let scored = match stored_slot {
-        Some(slot) => context.top_scored_near(slot, ef, &admit),
+        Some(slot) => context.top_scored_near(slot, ef, ef.min(available), &admit),
         None => context.top_scored(ef, &admit),
     };
-    to_matches(context.arena, scored, Some(limit), max_distance)
+    if scored.len() < limit.min(available) {
+        return brute_force(context.arena, context.query, params, allowed, stored_slot);
+    }
+    to_matches(context.arena, scored, Some(limit), params.max_distance)
 }
 
 fn approx_threshold(
@@ -1116,6 +1127,39 @@ mod tests {
         let arena = build_arena(count, dims, seed);
         let graph = Graph::rebuild(&arena);
         (arena, graph)
+    }
+
+    const DUPLICATE_GROUP_SEED: u64 = 0x1DEA_0000;
+
+    fn build_duplicate_groups(groups: usize, per_group: usize) -> (VectorArena, Graph) {
+        let mut arena = VectorArena::new(16).unwrap();
+        for index in 0..groups * per_group {
+            let vector = seeded_unit_vector(DUPLICATE_GROUP_SEED + (index / per_group) as u64, 16);
+            arena.upsert(&format!("key-{index}"), &vector).unwrap();
+        }
+        let graph = Graph::rebuild(&arena);
+        (arena, graph)
+    }
+
+    fn group_of(arena: &VectorArena, key: &str, per_group: usize) -> usize {
+        arena.slot_of_key(key).unwrap() as usize / per_group
+    }
+
+    fn assert_leading_group(
+        arena: &VectorArena,
+        found: &[Match],
+        count: usize,
+        group: usize,
+        per_group: usize,
+    ) {
+        let (head, tail) = found.split_at(count);
+        for hit in head {
+            assert_eq!(group_of(arena, &hit.key, per_group), group);
+            assert_eq!(hit.distance, head[0].distance);
+        }
+        for hit in tail {
+            assert!(hit.distance > head[0].distance);
+        }
     }
 
     fn params(limit: Option<usize>, max_distance: Option<f32>, exact: bool) -> SearchParams {
@@ -1437,6 +1481,82 @@ mod tests {
                 assert!(by_threshold.is_empty());
             }
         }
+    }
+
+    #[test]
+    fn stored_key_search_fills_across_duplicate_groups() {
+        let (arena, graph) = build_duplicate_groups(4, 80);
+        let stored = 120;
+        let found = search_stored(
+            &graph,
+            &arena,
+            stored,
+            &params(Some(100), None, false),
+            None,
+        );
+        assert_eq!(found.len(), 100.min(arena.live_count() - 1));
+        assert_sorted(&found);
+        assert!(found.iter().all(|hit| hit.key != "key-120"));
+        assert_leading_group(&arena, &found, 79, 1, 80);
+    }
+
+    #[test]
+    fn stored_key_search_reaches_its_own_group_from_a_node_linked_elsewhere() {
+        let (arena, graph) = build_duplicate_groups(4, 80);
+        let stray = 80;
+        assert!(
+            graph
+                .neighbors_of(stray, 0)
+                .iter()
+                .all(|&neighbor| neighbor / 80 == 0)
+        );
+        let found = search_stored(&graph, &arena, stray, &params(Some(10), None, false), None);
+        assert_eq!(found.len(), 10);
+        assert_leading_group(&arena, &found, 10, 1, 80);
+    }
+
+    #[test]
+    fn filtered_stored_key_search_fills_from_other_duplicate_groups() {
+        let (arena, graph) = build_duplicate_groups(4, 400);
+        let stored = 600;
+        let allowed: HashSet<u32> = arena.live_slots().filter(|slot| slot / 400 != 1).collect();
+        assert!(allowed.len() > small_filter_cap(Some(100)));
+        let found = search_stored(
+            &graph,
+            &arena,
+            stored,
+            &params(Some(100), None, false),
+            Some(&allowed),
+        );
+        assert_eq!(found.len(), 100);
+        assert_sorted(&found);
+        for hit in &found {
+            assert!(allowed.contains(&arena.slot_of_key(&hit.key).unwrap()));
+        }
+        let nearest = group_of(&arena, &found[0].key, 400);
+        assert_ne!(nearest, 1);
+        assert_leading_group(&arena, &found, 100, nearest, 400);
+    }
+
+    #[test]
+    fn cold_search_fills_across_duplicate_groups() {
+        let (arena, graph) = build_duplicate_groups(4, 80);
+        let query = arena
+            .pack_query(&seeded_unit_vector(DUPLICATE_GROUP_SEED, 16))
+            .unwrap();
+        let ten = search(&graph, &arena, &query, &params(Some(10), None, false), None);
+        assert_eq!(ten.len(), 10);
+        assert_leading_group(&arena, &ten, 10, 0, 80);
+        let hundred = search(
+            &graph,
+            &arena,
+            &query,
+            &params(Some(100), None, false),
+            None,
+        );
+        assert_eq!(hundred.len(), 100);
+        assert_sorted(&hundred);
+        assert_leading_group(&arena, &hundred, 80, 0, 80);
     }
 
     #[test]
