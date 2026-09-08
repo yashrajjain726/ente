@@ -138,7 +138,7 @@ func (c *Controller) UpdateRecoveryNotice(ctx *gin.Context, userID int64, reques
 		return stacktrace.Propagate(err, "failed to check active recovery sessions")
 	}
 	if len(activeSessions) > 0 {
-		return stacktrace.Propagate(ente.NewBadRequestWithMessage("cannot update recovery notice while there is an active recovery session"), "")
+		return stacktrace.Propagate(&ente.ErrActiveRecoverySession, "")
 	}
 
 	noticePeriodInHrs := request.RecoveryNoticeInDays * 24
