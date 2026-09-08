@@ -35,6 +35,19 @@ void applyDisplayDimensions(EnteFile file, int width, int height) {
   });
 }
 
+void applyMediaTypeMetadata(
+  EnteFile file,
+  bool isPanorama,
+  int motionVideoIndex,
+) {
+  file.pubMmdEncodedJson = jsonEncode({
+    ...jsonDecode(file.pubMmdEncodedJson ?? '{}') as Map<String, dynamic>,
+    mediaTypeKey:
+        ((file.pubMagicMetadata?.mediaType ?? 0) & ~1) | (isPanorama ? 1 : 0),
+    motionVideoIndexKey: motionVideoIndex,
+  });
+}
+
 void applyCreationTimeMetadata(EnteFile file, ParsedExifDateTime? exifTime) {
   final hasExifTime = exifTime != null;
   if (exifTime != null) {

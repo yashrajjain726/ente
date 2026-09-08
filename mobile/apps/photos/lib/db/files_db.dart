@@ -1199,6 +1199,8 @@ class FilesDB with SqlDbBase {
             jsonEncode({
               widthKey: file.hasDimensions ? file.width : null,
               heightKey: file.hasDimensions ? file.height : null,
+              mediaTypeKey: null,
+              motionVideoIndexKey: null,
             }),
             file.localID,
             file.modificationTime,
@@ -1216,6 +1218,8 @@ class FilesDB with SqlDbBase {
     Location? location,
     int? fileSize,
     ({int width, int height})? dimensions,
+    int? mediaType,
+    int? motionVideoIndex,
   }) async {
     final db = await instance.sqliteAsyncDB;
     final result = await db.execute(
@@ -1236,11 +1240,14 @@ class FilesDB with SqlDbBase {
         location?.latitude,
         location?.longitude,
         fileSize,
-        jsonEncode(
-          dimensions == null
-              ? {}
-              : {widthKey: dimensions.width, heightKey: dimensions.height},
-        ),
+        jsonEncode({
+          if (dimensions != null) ...{
+            widthKey: dimensions.width,
+            heightKey: dimensions.height,
+          },
+          mediaTypeKey: ?mediaType,
+          motionVideoIndexKey: ?motionVideoIndex,
+        }),
         processingVersion,
         localID,
         modificationTime,

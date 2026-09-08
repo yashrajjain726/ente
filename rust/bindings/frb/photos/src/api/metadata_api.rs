@@ -5,6 +5,8 @@ pub struct PhotoMetadata {
     pub dimensions: Option<Dimensions>,
     pub capture_date_time: Option<CaptureDateTime>,
     pub location: Option<LocationCoordinate>,
+    pub motion_video_start: Option<u64>,
+    pub is_panorama: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -24,6 +26,8 @@ pub fn read_photo_metadata(file_path: String) -> Result<PhotoMetadata, String> {
     let metadata =
         ente_photos::metadata::read_photo_metadata(file_path).map_err(|error| error.to_string())?;
     Ok(PhotoMetadata {
+        motion_video_start: metadata.motion_video.map(|video| video.start),
+        is_panorama: metadata.is_panorama,
         dimensions: metadata.dimensions.map(|dimensions| Dimensions {
             width: dimensions.width,
             height: dimensions.height,

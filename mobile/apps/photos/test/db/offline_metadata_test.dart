@@ -26,7 +26,7 @@ void main() {
   });
 
   test(
-    "persists dimensions, refreshes edits and rejects stale results only for local rows",
+    "persists media metadata, refreshes edits and rejects stale results only for local rows",
     () async {
       final db = await files.sqliteAsyncDB;
       for (final (uploadedID, collectionID) in [(-1, 1), (-1, 2), (99, 3)]) {
@@ -49,6 +49,8 @@ void main() {
           processingVersion: 2,
           modificationTime: 100,
           dimensions: (width: 3000, height: 4000),
+          mediaType: 1,
+          motionVideoIndex: 1234,
         ),
         isTrue,
       );
@@ -61,6 +63,8 @@ void main() {
           ..pubMmdEncodedJson = row[FilesDB.columnPubMMdEncodedJson] as String;
         expect((file.width, file.height), (3000, 4000));
         expect(file.pubMagicMetadata!.caption, "Keep me");
+        expect(file.pubMagicMetadata!.mediaType, 1);
+        expect(file.pubMagicMetadata!.mvi, 1234);
         expect(row[FilesDB.columnMetadataVersion], 2);
       }
       expect(
@@ -80,6 +84,8 @@ void main() {
           processingVersion: 2,
           modificationTime: 100,
           dimensions: (width: 3000, height: 4000),
+          mediaType: 1,
+          motionVideoIndex: 1234,
         ),
         isFalse,
       );

@@ -6,6 +6,18 @@ import "package:photos/module/metadata/photo.dart";
 import "package:photos/src/rust/api/metadata_api.dart";
 
 void main() {
+  test("media detection preserves other bits and clears stale detections", () {
+    final file = EnteFile()
+      ..pubMmdEncodedJson = '{"mediaType":2,"caption":"Keep me"}';
+    applyMediaTypeMetadata(file, true, 1234);
+    expect(file.pubMagicMetadata!.mediaType, 3);
+    expect(file.pubMagicMetadata!.mvi, 1234);
+    applyMediaTypeMetadata(file, false, 0);
+    expect(file.pubMagicMetadata!.mediaType, 2);
+    expect(file.pubMagicMetadata!.mvi, 0);
+    expect(file.pubMagicMetadata!.caption, "Keep me");
+  });
+
   test("local discovery supplies oriented mosaic dimensions", () {
     final file = fileFromAsset(
       "Camera",
@@ -41,6 +53,8 @@ void main() {
   test("uses the parsed instant without applying the offset twice", () {
     const metadata = PhotoMetadata(
       dimensions: null,
+      isPanorama: false,
+      motionVideoStart: null,
       location: null,
       captureDateTime: CaptureDateTime(
         dateTime: "2024-01-01T12:00:00.123456",
@@ -57,6 +71,8 @@ void main() {
   test("resolves an offset-free time locally without inventing an offset", () {
     const metadata = PhotoMetadata(
       dimensions: null,
+      isPanorama: false,
+      motionVideoStart: null,
       location: null,
       captureDateTime: CaptureDateTime(
         dateTime: "2024-01-01T12:00:00",

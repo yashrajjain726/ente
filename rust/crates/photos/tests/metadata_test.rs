@@ -73,7 +73,30 @@ fn skips_partial_and_sentinel_capture_dates_and_continues_to_fallbacks() {
     );
 }
 
+#[test]
+fn reads_panorama_and_motion_video() {
+    let plain = read("");
+    assert!(!plain.is_panorama);
+    assert_eq!(plain.motion_video, None);
+    let video = b"\0\0\0\x10ftypisom\0\0\0\0\0\0\0\x08moov\0\0\0\x08mdat";
+    let metadata = read_with_tail(
+        r#"xmlns:GPano="http://ns.google.com/photos/1.0/panorama/"
+            GPano:ProjectionType="equirectangular"
+            xmlns:GCamera="http://ns.google.com/photos/1.0/camera/"
+            GCamera:MicroVideoOffset="32""#,
+        video,
+    );
+    assert!(metadata.is_panorama);
+    let range = metadata.motion_video.unwrap();
+    assert!(range.start > 0);
+    assert_eq!(range.end - range.start, video.len() as u64);
+}
+
 fn read(properties: &str) -> PhotoMetadata {
+    read_with_tail(properties, &[])
+}
+
+fn read_with_tail(properties: &str, tail: &[u8]) -> PhotoMetadata {
     let xmp = format!(
         "http://ns.adobe.com/xap/1.0/\0<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><rdf:Description xmlns:exif=\"http://ns.adobe.com/exif/1.0/\" xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\" xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\" {properties}/></rdf:RDF>"
     );
@@ -86,5 +109,6 @@ fn read(properties: &str) -> PhotoMetadata {
         0xff, 0xc0, 0, 11, 8, 0, 48, 0, 64, 1, 1, 0x11, 0, 0xff, 0xd9,
     ])
     .unwrap();
+    file.write_all(tail).unwrap();
     read_photo_metadata(file.path()).unwrap()
 }

@@ -18,7 +18,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/process_activity.dart";
 
 class OfflineImportMetadataService {
-  static const kProcessingVersion = 2;
+  static const kProcessingVersion = 3;
   static const kDefaultBatchSize = 25;
 
   final _logger = Logger("OfflineImportMetadataService");
@@ -121,6 +121,13 @@ class OfflineImportMetadataService {
       );
 
       applyCreationTimeMetadata(file, metadata?.creationDateTime);
+      if (metadata != null) {
+        applyMediaTypeMetadata(
+          file,
+          metadata.isPanorama,
+          metadata.motionVideoStart?.toInt() ?? 0,
+        );
+      }
 
       final updated = await _db.updateOfflineImportMetadataForLocalID(
         file.localID!,
@@ -129,6 +136,8 @@ class OfflineImportMetadataService {
         creationTime: file.creationTime,
         location: file.location,
         fileSize: fileSize,
+        mediaType: metadata == null ? null : file.pubMagicMetadata!.mediaType,
+        motionVideoIndex: metadata == null ? null : file.pubMagicMetadata!.mvi,
         dimensions: file.hasDimensions
             ? (width: file.width, height: file.height)
             : null,
