@@ -1,7 +1,10 @@
 [package]
 name = "ente-collections"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 ente-core.workspace = true
 thiserror.workspace = true
+
+[lints]
+workspace = true

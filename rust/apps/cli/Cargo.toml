@@ -1,7 +1,7 @@
 [package]
 name = "ente-rs"
 version = "0.0.1"
-edition = "2024"
+edition.workspace = true
 description = "Command-line interface for Ente"
 homepage = "https://ente.com"
 repository = "https://github.com/ente/ente"
@@ -39,3 +39,6 @@ mockito.workspace = true
 sha2.workspace = true
 srp.workspace = true
 url.workspace = true
+
+[lints]
+workspace = true

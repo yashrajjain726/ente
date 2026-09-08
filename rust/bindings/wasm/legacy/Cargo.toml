@@ -1,6 +1,6 @@
 [package]
 name = "ente-legacy-wasm"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -17,3 +17,6 @@ thiserror.workspace = true
 tsify.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
+
+[lints]
+workspace = true

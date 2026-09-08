@@ -1,9 +1,12 @@
 [package]
 name = "ente-photos-wasm"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
 ente-wasm-lib = { workspace = true, features = ["collections", "contacts"] }
+
+[lints]
+workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "ente-space-wasm"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -19,3 +19,6 @@ wasm-bindgen-futures.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

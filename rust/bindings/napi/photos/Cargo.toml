@@ -1,6 +1,6 @@
 [package]
 name = "ente-photos-napi"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -16,3 +16,6 @@ ort = { workspace = true, features = ["load-dynamic"] }
 
 [build-dependencies]
 napi-build = "2.0.0"
+
+[lints]
+workspace = true

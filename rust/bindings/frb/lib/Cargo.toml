@@ -1,6 +1,6 @@
 [package]
 name = "ente-frb-lib"
-edition = "2024"
+edition.workspace = true
 
 [features]
 contacts = ["dep:ente-contacts"]
@@ -12,5 +12,5 @@ ente-core.workspace = true
 ente-legacy = { workspace = true, optional = true }
 flutter_rust_bridge.workspace = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+[lints]
+workspace = true

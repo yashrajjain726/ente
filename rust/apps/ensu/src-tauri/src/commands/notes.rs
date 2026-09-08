@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
-use std::fs::{self, File, OpenOptions};
 #[cfg(unix)]
-use std::os::fd::AsRawFd;
+use std::fs::TryLockError;
+use std::fs::{self, File, OpenOptions};
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 #[cfg(windows)]
@@ -1233,16 +1233,10 @@ fn acquire_notes_ownership(notes_directory: &Path) -> Result<File, ApiError> {
         .map_err(notes_ownership_open_error)?;
 
     #[cfg(unix)]
-    {
-        let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
-        if result != 0 {
-            let error = std::io::Error::last_os_error();
-            if error.kind() == std::io::ErrorKind::WouldBlock {
-                return Err(notes_in_use_error());
-            }
-            return Err(io_error(error));
-        }
-    }
+    file.try_lock().map_err(|error| match error {
+        TryLockError::WouldBlock => notes_in_use_error(),
+        TryLockError::Error(error) => io_error(error),
+    })?;
 
     Ok(file)
 }

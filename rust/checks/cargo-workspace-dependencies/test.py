@@ -10,19 +10,29 @@ members = ["app-*"]
 exclude = ["app-excluded"]
 resolver = "2"
 
+[workspace.package]
+edition = "2024"
+
 [workspace.dependencies]
 shared = { path = "shared" }
 serde = "1.0.0"
+
+[workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 """
 package = """\
 [package]
 name = "{}"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+
+[lints]
+workspace = true
 """
 
 
-def run(app_b, members='"app-*"'):
+def run(app_b, members='"app-*"', app_b_package=package):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         rust = root / "rust"
@@ -32,10 +42,10 @@ def run(app_b, members='"app-*"'):
             package.format("app-a")
             + "\n[dependencies]\nshared.workspace = true\nserde.workspace = true\n",
         )
-        write(rust / "app-b/Cargo.toml", package.format("app-b") + app_b)
+        write(rust / "app-b/Cargo.toml", app_b_package.format("app-b") + app_b)
         write(
             rust / "app-excluded/Cargo.toml",
-            package.format("app-excluded")
+            '[package]\nname = "app-excluded"\nversion = "0.1.0"\nedition = "2024"\n'
             + '\n[dependencies]\nsolo = { path = "../solo" }\n',
         )
         write(rust / "shared/Cargo.toml", package.format("shared"))
@@ -98,3 +108,11 @@ assert "rust/Cargo.toml: workspace.members 'app-b' precedes 'app-a'; sort member
 result = run("\n[dependencies]\nshared.workspace = true\n", '"app-a", "app-b"')
 assert result.returncode == 0, result.stderr
 assert not result.stderr
+
+result = run("", app_b_package=package.replace('edition.workspace = true', 'edition = "2024"'))
+assert result.returncode == 1, result.stderr
+assert "rust/app-b/Cargo.toml: use edition.workspace = true" in result.stderr
+
+result = run("", app_b_package=package.replace("\n[lints]\nworkspace = true\n", ""))
+assert result.returncode == 1, result.stderr
+assert "rust/app-b/Cargo.toml: use [lints] workspace = true" in result.stderr

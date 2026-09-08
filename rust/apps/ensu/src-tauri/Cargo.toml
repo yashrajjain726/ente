@@ -1,7 +1,7 @@
 [package]
 name = "ensu-desktop"
 version = "0.1.20-beta"
-edition = "2024"
+edition.workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
@@ -26,9 +26,13 @@ uuid = { workspace = true, features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.0"
+rustix = { version = "1.1.4", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+
+[lints]
+workspace = true

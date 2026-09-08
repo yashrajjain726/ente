@@ -155,7 +155,10 @@ impl fmt::Debug for CheckSessionValidityParams {
 }
 
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "A single session-check result does not need a separate allocation"
+)]
 pub enum SessionValidity {
     Invalid,
     Valid,

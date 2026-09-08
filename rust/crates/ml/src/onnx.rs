@@ -381,8 +381,7 @@ fn build_and_validate_session(
     ))]
     let execution_provider = attempt.execution_provider();
 
-    #[cfg_attr(not(any(target_os = "ios", target_os = "macos")), allow(unused_mut))]
-    let mut session = match providers::build_session(model_path, attempt) {
+    let session = match providers::build_session(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
             #[cfg(any(
@@ -401,6 +400,9 @@ fn build_and_validate_session(
             return Err(error);
         }
     };
+
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    let mut session = session;
 
     #[cfg(any(target_os = "ios", target_os = "macos"))]
     if execution_provider == ExecutionProvider::CoreMl

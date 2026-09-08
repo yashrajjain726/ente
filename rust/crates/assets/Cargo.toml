@@ -1,6 +1,6 @@
 [package]
 name = "ente-assets"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 flate2.workspace = true
@@ -12,3 +12,6 @@ sha2.workspace = true
 tar.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+
+[lints]
+workspace = true
