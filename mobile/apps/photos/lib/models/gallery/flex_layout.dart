@@ -4,12 +4,7 @@ import "dart:typed_data";
 
 import "package:photos/models/gallery/justified_layout.dart";
 
-// Experimental whole-group row breaking inspired by Google Photos' FlexLayout:
-// https://medium.com/google-design/google-photos-45b714dfbed1
-//
-// Each possible row is an edge between two file indices. A backward dynamic
-// programming pass chooses the least expensive path through the entire group.
-// Density is a sizing preference rather than Comfort's hard 3/4/5 item cap.
+// Selects the minimum-cost sequence from candidate row breaks across the group.
 class FlexLayoutCalculator {
   static const double _minimumTappableExtent = 48;
   static const double _maximumRowHeightFactor = 1.6;
@@ -50,8 +45,7 @@ class FlexLayoutCalculator {
 
     double rowHeight(double fittedHeight, double minimumRatio, bool isTail) {
       if (!isTail && fittedHeight <= maximumHeight) return fittedHeight;
-      // Sparse tails and unavoidable standalone portraits can leave a gap.
-      // Accessibility takes precedence when a narrow portrait needs more height.
+      // Allow sparse tails to leave unused width while preserving tap extents.
       return math.min(
         fittedHeight,
         math.max(
@@ -74,8 +68,8 @@ class FlexLayoutCalculator {
         final contentWidth = availableWidth - spacing * (itemCount - 1);
         if (contentWidth <= 0) break;
         final fittedHeight = contentWidth / ratioSum;
-        // Adding more items only makes these extents smaller. This bounds the
-        // search by the viewport's tap capacity, not the number of files.
+        // Adding items only shrinks these extents, so no later candidate can
+        // restore the minimum tap target.
         if (itemCount > 1 &&
             (fittedHeight < _minimumTappableExtent ||
                 fittedHeight * minimumRatio < _minimumTappableExtent)) {
@@ -94,10 +88,9 @@ class FlexLayoutCalculator {
           0.0,
           1 - height * ratioSum / contentWidth,
         );
-        // Logarithmic error treats stretching and shrinking symmetrically.
-        // Weight by file count so adding more rows cannot dilute the cost.
-        // A small break cost avoids fragmenting ordinary photos into many
-        // standalone rows. Panoramas can still stand alone without this bias.
+        // Log error treats shrinking and stretching symmetrically. Weighting by
+        // item count prevents extra rows from diluting the cost; the small
+        // per-row cost discourages fragmentation without excluding panoramas.
         final singletonPenalty = itemCount == 1 && count > 1
             ? isTail
                   ? 0.15
