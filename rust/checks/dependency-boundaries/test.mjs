@@ -51,16 +51,15 @@ assert.equal(result.stderr, "");
 
 for (const dependencyKind of [
     "dependencies",
+    "dev-dependencies",
     "build-dependencies",
     `target.'cfg(target_arch = "wasm32")'.dependencies`,
+    `target.'cfg(target_arch = "wasm32")'.dev-dependencies`,
 ]) {
     result = run({ framework: "reqwest", dependencyKind });
     assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stderr, /use ente-core::http instead of a production reqwest dependency/);
+    assert.match(result.stderr, /use ente-core::http instead of a direct reqwest dependency/);
 }
-
-result = run({ framework: "reqwest" });
-assert.equal(result.status, 0, result.stderr);
 
 result = run({ framework: "reqwest", bindingDependencyKind: "dependencies" });
 assert.equal(result.status, 1, result.stderr);

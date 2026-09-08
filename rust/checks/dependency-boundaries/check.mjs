@@ -35,9 +35,9 @@ for (const pkg of metadata.packages) {
     const manifest = pathFromRoot(pkg.manifest_path);
     if (httpOwners.has(manifest)) continue;
     for (const dependency of pkg.dependencies) {
-        if (dependency.name !== "reqwest" || dependency.kind === "dev") continue;
+        if (dependency.name !== "reqwest") continue;
         console.error(
-            `${manifest}: use ente-core::http instead of a production reqwest dependency`,
+            `${manifest}: use ente-core::http instead of a direct reqwest dependency`,
         );
         process.exitCode = 1;
     }
