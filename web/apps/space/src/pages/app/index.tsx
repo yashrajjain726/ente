@@ -58,6 +58,10 @@ const Page: React.FC = () => {
         [],
     );
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
+    const [ownLatestPost, setOwnLatestPost] = useState<SpacePost>();
+    const [isOwnLatestPostLoading, setIsOwnLatestPostLoading] = useState(true);
+    const [isOwnLatestPostUnavailable, setIsOwnLatestPostUnavailable] =
+        useState(false);
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
@@ -97,6 +101,29 @@ const Page: React.FC = () => {
 
         setFriendRequestSentToastName(sentFriend.username.trim());
     }, [router.isReady]);
+
+    useEffect(() => {
+        if (profileLoadStatus != "ready" || !profile?.spaceId) return;
+
+        let cancelled = false;
+        setOwnLatestPost(undefined);
+        setIsOwnLatestPostLoading(true);
+        setIsOwnLatestPostUnavailable(false);
+        void loadCurrentSpaceProfilePostsPage(profile.spaceId, profile.spaceId)
+            .then((page) => {
+                if (!cancelled) setOwnLatestPost(page.items[0]);
+            })
+            .catch((error: unknown) => {
+                log.error("Failed to load own latest Space post", error);
+                if (!cancelled) setIsOwnLatestPostUnavailable(true);
+            })
+            .finally(() => {
+                if (!cancelled) setIsOwnLatestPostLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [profile?.spaceId, profileLoadStatus]);
 
     useEffect(() => {
         const request = { cancelled: false };
@@ -248,6 +275,9 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <HomeScreen
+                ownLatestPost={ownLatestPost}
+                isOwnLatestPostLoading={isOwnLatestPostLoading}
+                isOwnLatestPostUnavailable={isOwnLatestPostUnavailable}
                 latestPosts={latestPosts}
                 unreadPosts={unreadPosts}
                 friendRequestSentToastName={friendRequestSentToastName}
@@ -332,7 +362,10 @@ const Page: React.FC = () => {
                 onCreatePost={
                     profile
                         ? async (image, caption) => {
-                              await publishPost(image, caption);
+                              const post = await publishPost(image, caption);
+                              setOwnLatestPost(post);
+                              setIsOwnLatestPostLoading(false);
+                              setIsOwnLatestPostUnavailable(false);
                           }
                         : undefined
                 }

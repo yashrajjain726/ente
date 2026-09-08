@@ -1,8 +1,10 @@
 import { ArrowLeft02Icon, ArrowRight02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceFileViewer } from "components/FileViewer";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
+import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
 import { FriendPostTile } from "screens/HomeScreen";
 import type { SpacePost } from "services/space";
@@ -19,6 +21,20 @@ import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
 const controlButtonColor = spaceSurface;
+
+const demoOwnPosts: SpacePost[] = [
+    "/images/default-cover-image.jpg",
+    "/images/invite-bg.jpg",
+    "/images/default-profile-pic.png",
+].map((imageUrl, index) => ({
+    friendID: "demo-self",
+    imageUrl,
+    name: "You",
+    postId: 100 - index,
+    spaceId: "demo-self",
+    timestampMs: 1_700_000_000_000 - index * 86_400_000,
+    viewerLiked: false,
+}));
 
 interface CanvasSize {
     height: number;
@@ -119,6 +135,18 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
 const LayoutDemoPage: React.FC = () => {
     const router = useSpaceRouter();
     const { profile } = useSpaceAppState();
+    const [ownPostIndex, setOwnPostIndex] = React.useState<number>();
+    useBrowserBackClose({
+        open: ownPostIndex !== undefined,
+        onClose: () => setOwnPostIndex(undefined),
+        stateKey: "space-layout-demo-viewer",
+    });
+    const ownPostPhotos = demoOwnPosts.map((post) => ({
+        ...post,
+        alt: "Your post",
+        avatarUrl: profile?.avatarUrl,
+        imageUrl: post.imageUrl!,
+    }));
     const [friendCount, setFriendCount] = React.useState(1);
     const [canvasSize, setCanvasSize] = React.useState<CanvasSize>({
         height: 0,
@@ -208,14 +236,24 @@ const LayoutDemoPage: React.FC = () => {
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        height: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
+                        gap: "16px",
+                        minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
-                        pb: "calc(env(safe-area-inset-bottom) + 112px)",
+                        pb: "calc(env(safe-area-inset-bottom) + 72px)",
                         px: "16px",
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${spaceHomeHeaderHeight}px)`,
+                        pt: "12px",
                         width: "100%",
                     }}
                 >
+                    <SpaceOwnPostTile
+                        profile={profile}
+                        post={demoOwnPosts[0]}
+                        onNewPost={() => void router.push("/app/post")}
+                        onOpenPost={() => setOwnPostIndex(0)}
+                        onOpenProfile={() =>
+                            void router.push(spaceRoutes.profile)
+                        }
+                    />
                     <Box
                         ref={canvasRef}
                         sx={{
@@ -228,7 +266,7 @@ const LayoutDemoPage: React.FC = () => {
                             gridTemplateRows: gridLayout
                                 ? `repeat(${gridLayout.rows}, ${gridLayout.size}px)`
                                 : undefined,
-                            minHeight: 0,
+                            minHeight: 320,
                             placeContent: usesGrid ? "center" : undefined,
                             position: "relative",
                             width: "100%",
@@ -332,7 +370,16 @@ const LayoutDemoPage: React.FC = () => {
                         />
                     </Box>
                 </Box>
-                <SpacePostFloatingActionButton />
+                {ownPostIndex !== undefined && (
+                    <SpaceFileViewer
+                        photo={ownPostPhotos[ownPostIndex]!}
+                        photos={ownPostPhotos}
+                        photoIndex={ownPostIndex}
+                        onPhotoIndexChange={setOwnPostIndex}
+                        postActionMode="hidden"
+                        onClose={() => setOwnPostIndex(undefined)}
+                    />
+                )}
             </Box>
         </Box>
     );

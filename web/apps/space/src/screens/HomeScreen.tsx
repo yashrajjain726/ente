@@ -15,7 +15,7 @@ import {
 } from "components/FileViewer";
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
 import {
     SpacePostBadge,
     SpacePostUnreadBadge,
@@ -72,6 +72,9 @@ const tileBadgeBackground = "#343438";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
+    ownLatestPost?: SpacePost;
+    isOwnLatestPostLoading?: boolean;
+    isOwnLatestPostUnavailable?: boolean;
     latestPosts: SpacePost[];
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
@@ -1012,6 +1015,9 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    ownLatestPost,
+    isOwnLatestPostLoading = false,
+    isOwnLatestPostUnavailable = false,
     latestPosts,
     unreadPosts,
     friendRequestSentToastName,
@@ -1758,19 +1764,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        height: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
+                        gap: "16px",
+                        minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
-                        pb: "calc(env(safe-area-inset-bottom) + 112px)",
+                        pb: "calc(env(safe-area-inset-bottom) + 72px)",
                         px: homeHorizontalPadding,
-                        pt: `calc(env(safe-area-inset-bottom) + 112px - ${spaceHomeHeaderHeight}px)`,
+                        pt: "12px",
                         width: "100%",
                     }}
                 >
+                    <SpaceOwnPostTile
+                        profile={profile}
+                        post={ownLatestPost}
+                        isLoading={isOwnLatestPostLoading}
+                        isUnavailable={isOwnLatestPostUnavailable}
+                        isNewPostDisabled={isPostPhotoButtonDisabled}
+                        onLoadPostImage={onLoadPostImage}
+                        onNewPost={openPostPhotoPicker}
+                        onOpenProfile={onOpenProfile}
+                        onOpenPost={(imageUrl) => {
+                            if (!ownLatestPost || !profile) return;
+
+                            const self = {
+                                ...profile,
+                                id: ownLatestPost.spaceId,
+                                friendsCount: friends.length,
+                            };
+                            openPostPhotos(
+                                self,
+                                [ownLatestPost],
+                                viewerPhotoForPost(
+                                    ownLatestPost,
+                                    self,
+                                    profile.avatarUrl,
+                                    imageUrl,
+                                ),
+                                true,
+                            );
+                        }}
+                    />
                     <Box
                         ref={postTileCanvasRef}
                         sx={{
                             flex: "1 1 auto",
-                            minHeight: 0,
+                            minHeight: 320,
                             position: "relative",
                             width: "100%",
                         }}
@@ -1838,9 +1875,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     display: "flex",
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    height: "calc(100% + 32px)",
+                                    height: "100%",
+                                    inset: 0,
                                     justifyContent: "center",
-                                    mt: "-32px",
+                                    position: "absolute",
                                     width: "100%",
                                 }}
                             >
@@ -1862,8 +1900,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             height: "100%",
                                             justifyContent: "flex-start",
                                             overflow: "hidden",
-                                            px: "24px",
-                                            pt: "32px",
+                                            p: "24px",
                                             position: "relative",
                                             width: "100%",
                                         }}
@@ -1873,13 +1910,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                                 alignItems: "center",
                                                 display: "flex",
                                                 flexDirection: "column",
-                                                mt: "40px",
                                                 position: "relative",
                                                 width: "100%",
                                                 zIndex: 1,
-                                                "@media (max-height: 720px)": {
-                                                    mt: 0,
-                                                },
                                             }}
                                         >
                                             <Box
@@ -1934,19 +1967,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             aria-hidden
                                             src="/images/ducky-space.svg"
                                             sx={{
-                                                bottom: 0,
-                                                height: "auto",
-                                                left: "52%",
-                                                maxWidth: 300,
+                                                alignSelf: "center",
+                                                flex: "1 1 0",
+                                                maxHeight: 160,
+                                                maxWidth: 180,
+                                                minHeight: 0,
+                                                mt: "16px",
+                                                objectFit: "contain",
                                                 pointerEvents: "none",
-                                                position: "absolute",
-                                                transform:
-                                                    "translate(-50%, -7%)",
-                                                width: "84%",
-                                                "@media (max-height: 720px)": {
-                                                    maxWidth: 228,
-                                                    width: "64%",
-                                                },
+                                                width: "64%",
                                             }}
                                         />
                                     </Box>
@@ -1955,10 +1984,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         )}
                     </Box>
                 </Box>
-                <SpacePostFloatingActionButton
-                    disabled={isPostPhotoButtonDisabled}
-                    onClick={openPostPhotoPicker}
-                />
                 {selectedContact && (
                     <FriendQuickActionsDialog
                         {...selectedContact}
