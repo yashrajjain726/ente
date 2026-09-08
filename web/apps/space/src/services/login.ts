@@ -20,7 +20,7 @@ import {
 import {
     stashKeyEncryptionKeyInSessionStore,
     unstashKeyEncryptionKeyFromSession,
-} from "ente-accounts/services/session-storage";
+} from "ente-accounts/services/prelogin-session";
 import { getSRPAttributes, verifySRP } from "ente-accounts/services/srp";
 import {
     type EmailOrSRPVerificationResponse,

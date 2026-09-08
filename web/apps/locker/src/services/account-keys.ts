@@ -1,4 +1,8 @@
-import { masterKeyFromSession as readMasterKeyFromSession } from "ente-accounts/services/session-storage";
-import { decryptBox } from "ente-locker-wasm";
+import { createSessionStorage } from "ente-accounts/services/session-storage";
+import { decryptBox, encryptBox, generateKey } from "ente-locker-wasm";
 
-export const masterKeyFromSession = () => readMasterKeyFromSession(decryptBox);
+export const { masterKeyFromSession } = createSessionStorage({
+    decryptBox,
+    encryptBox,
+    generateKey,
+});

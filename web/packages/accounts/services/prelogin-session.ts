@@ -1,10 +1,11 @@
-import { decryptBox } from "ente-prelogin-wasm";
-import {
-    masterKeyFromSession as readMasterKeyFromSession,
-    ensureMasterKeyFromSession as readRequiredMasterKeyFromSession,
-} from "./session-storage";
+import { decryptBox, encryptBox, generateKey } from "ente-prelogin-wasm";
+import { createSessionStorage } from "./session-storage";
 
-export const masterKeyFromSession = () => readMasterKeyFromSession(decryptBox);
-
-export const ensureMasterKeyFromSession = () =>
-    readRequiredMasterKeyFromSession(decryptBox);
+export const {
+    ensureMasterKeyFromSession,
+    masterKeyFromSession,
+    saveMasterKeyInSessionAndSafeStore,
+    stashKeyEncryptionKeyInSessionStore,
+    unstashKeyEncryptionKeyFromSession,
+    updateSessionFromElectronSafeStorageIfNeeded,
+} = createSessionStorage({ decryptBox, encryptBox, generateKey });

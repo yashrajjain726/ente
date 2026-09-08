@@ -7,11 +7,9 @@ import type { KDFWorker } from "./kdf.worker";
 export {
     boxSealOpenBytes,
     decryptBox,
-    deriveSubKeyBytes,
     encryptBox,
     generateKey,
     generateKeyPair,
-    generateSRPSetup,
     recoveryKeyFromMnemonicOrHex,
 } from "ente-prelogin-wasm";
 export type {
