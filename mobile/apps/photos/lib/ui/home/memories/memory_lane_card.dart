@@ -9,6 +9,7 @@ import "package:photos/ui/home/memories/memory_card_constants.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 
 class MemoryLaneCardWidget extends StatelessWidget {
+  final String id;
   final EnteFile oldestFile;
   final Uint8List face;
   final String personName;
@@ -16,6 +17,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
   final VoidCallback onTap;
 
   const MemoryLaneCardWidget({
+    required this.id,
     required this.oldestFile,
     required this.face,
     required this.personName,
@@ -29,7 +31,10 @@ class MemoryLaneCardWidget extends StatelessWidget {
     final name = personName.trim();
     final title = name.isEmpty
         ? context.strings.facesTimelineAppBarTitle
-        : context.strings.memoryLaneCardTitle(name: name);
+        : context.strings.memoryLaneCardTitle(
+            name: name,
+            nameEndsWithS: name.toLowerCase().endsWith("s").toString(),
+          );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: kMemoryCardStripGap / 2),
@@ -83,17 +88,21 @@ class MemoryLaneCardWidget extends StatelessWidget {
                 left: size.width * 0.081081081081,
                 bottom: 16,
                 width: size.width * 0.837837837838,
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyles.body.copyWith(
-                    height: 16 / 14,
-                    fontFamily: TextStyles.outfitFontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                child: Hero(
+                  tag: 'memory-lane-title-$id',
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyles.body.copyWith(
+                      inherit: false,
+                      height: 16 / 14,
+                      fontFamily: TextStyles.outfitFontFamily,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.left,
                   ),
-                  textAlign: TextAlign.left,
                 ),
               ),
             ],
