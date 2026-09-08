@@ -5,7 +5,7 @@ on:
         paths:
             - "android/apps/ensu/**"
             - "android/apps/ensu/rust/**"
-            - "rust/apps/codegen/**"
+            - "rust/tools/codegen/**"
             - "rust/crates/core/**"
             - "rust/crates/ensu/**"
             - "rust/bindings/uniffi/**"

@@ -5,7 +5,7 @@ on:
         paths:
             - "apple/apps/ensu/**"
             - "apple/packages/EnteOnnxRuntime/**"
-            - "rust/apps/codegen/**"
+            - "rust/tools/codegen/**"
             - "rust/crates/core/**"
             - "rust/crates/ensu/**"
             - "rust/bindings/uniffi/**"

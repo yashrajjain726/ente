@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "apps/cli",
-    "apps/codegen",
     "apps/ensu/src-tauri",
     "bindings/frb/lib",
     "bindings/frb/locker",
@@ -33,13 +32,14 @@ members = [
     "crates/image",
     "crates/legacy",
     "crates/location",
-    "crates/location-dataset",
     "crates/locker",
     "crates/ml",
     "crates/paste",
     "crates/photos",
     "crates/space",
     "crates/test-support",
+    "tools/codegen",
+    "tools/location-dataset",
 ]
 
 [workspace.package]

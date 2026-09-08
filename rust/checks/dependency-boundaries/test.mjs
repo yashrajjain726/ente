@@ -65,7 +65,7 @@ result = run({ framework: "reqwest", bindingDependencyKind: "dependencies" });
 assert.equal(result.status, 1, result.stderr);
 assert.match(result.stderr, /rust\/bindings\/wasm\/lib\/Cargo\.toml: use ente-core::http/);
 
-for (const domainName of ["core", "assets", "location-dataset"]) {
+for (const domainName of ["core", "assets"]) {
     result = run({ framework: "reqwest", dependencyKind: "dependencies", domainName });
     assert.equal(result.status, 0, result.stderr);
 }
