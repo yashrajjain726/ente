@@ -11,9 +11,10 @@ const UPPER_LEVEL_NEIGHBOR_CAP: usize = M;
 const EF_CONSTRUCTION: usize = 96;
 const SELECTION_WINDOW_FACTOR: usize = 2;
 const EF_SEARCH_UPPER: usize = 1;
-const EF_SEARCH_FLOOR: usize = 64;
+const EF_SEARCH_FLOOR_SMALL: usize = 72;
+const EF_SEARCH_FLOOR_LARGE: usize = 56;
+const EF_SEARCH_FLOOR_CROSSOVER: usize = 20_000;
 const EF_SEARCH_LIMIT_FACTOR: usize = 4;
-const EF_SEARCH_STORED_HALVES: usize = 3;
 const SMALL_FILTER_FLOOR: usize = 1024;
 const SMALL_FILTER_LIMIT_FACTOR: usize = 4;
 const RANGE_SEARCH_FLOOR: usize = 200;
@@ -856,6 +857,14 @@ fn result_bound(arena: &VectorArena, allowed: Option<&HashSet<u32>>) -> usize {
     allowed.map_or(live, |set| set.len().min(live))
 }
 
+fn ef_search_floor(live: usize) -> usize {
+    if live < EF_SEARCH_FLOOR_CROSSOVER {
+        EF_SEARCH_FLOOR_SMALL
+    } else {
+        EF_SEARCH_FLOOR_LARGE
+    }
+}
+
 fn admission<'a>(
     arena: &'a VectorArena,
     allowed: Option<&'a HashSet<u32>>,
@@ -877,10 +886,10 @@ fn approx_limited(
 ) -> Vec<Match> {
     let bound = result_bound(context.arena, allowed);
     let ef = match stored_slot {
-        Some(_) => limit.saturating_mul(EF_SEARCH_STORED_HALVES) / 2,
+        Some(_) => limit,
         None => limit.saturating_mul(EF_SEARCH_LIMIT_FACTOR),
     }
-    .max(EF_SEARCH_FLOOR)
+    .max(ef_search_floor(context.arena.live_count()))
     .min(bound);
     let admit = admission(context.arena, allowed, stored_slot);
     let scored = match stored_slot {
