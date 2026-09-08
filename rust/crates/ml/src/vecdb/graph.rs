@@ -8,8 +8,9 @@ use super::{Match, SearchParams, VecDbError};
 const M: usize = 16;
 const LEVEL_ZERO_NEIGHBOR_CAP: usize = 2 * M;
 const UPPER_LEVEL_NEIGHBOR_CAP: usize = M;
-const EF_CONSTRUCTION: usize = 128;
-const EF_SEARCH_UPPER: usize = 2;
+const EF_CONSTRUCTION: usize = 96;
+const SELECTION_WINDOW_FACTOR: usize = 2;
+const EF_SEARCH_UPPER: usize = 1;
 const EF_SEARCH_FLOOR: usize = 64;
 const EF_SEARCH_LIMIT_FACTOR: usize = 4;
 const EF_SEARCH_STORED_FACTOR: usize = 2;
@@ -28,6 +29,40 @@ fn neighbor_cap(level: usize) -> usize {
     } else {
         UPPER_LEVEL_NEIGHBOR_CAP
     }
+}
+
+fn select_neighbors(
+    arena: &VectorArena,
+    candidates: &[Scored],
+    cap: usize,
+    selected: &mut [u32; LEVEL_ZERO_NEIGHBOR_CAP],
+) -> usize {
+    let window = candidates
+        .len()
+        .min(cap.saturating_mul(SELECTION_WINDOW_FACTOR));
+    let mut count = 0;
+    for candidate in &candidates[..window] {
+        if count == cap {
+            break;
+        }
+        let diverse = selected[..count]
+            .iter()
+            .all(|&kept| arena.distance_between_slots(candidate.slot, kept) > candidate.distance);
+        if diverse {
+            selected[count] = candidate.slot;
+            count += 1;
+        }
+    }
+    for candidate in candidates {
+        if count == cap {
+            break;
+        }
+        if !selected[..count].contains(&candidate.slot) {
+            selected[count] = candidate.slot;
+            count += 1;
+        }
+    }
+    count
 }
 
 #[derive(Clone, Copy)]
@@ -254,15 +289,12 @@ impl Graph {
                 context.search_layer(&entries, link_level, EF_CONSTRUCTION, Some(slot), &|_| true)
             };
             let cap = neighbor_cap(link_level);
-            let chosen: Vec<u32> = candidates
-                .iter()
-                .take(cap)
-                .map(|candidate| candidate.slot)
-                .collect();
+            let mut selected = [0u32; LEVEL_ZERO_NEIGHBOR_CAP];
+            let count = select_neighbors(arena, &candidates, cap, &mut selected);
             if self.holds_level(slot, link_level) {
-                self.write_level_list(slot, link_level, &chosen);
+                self.write_level_list(slot, link_level, &selected[..count]);
             }
-            for &neighbor in &chosen {
+            for &neighbor in &selected[..count] {
                 self.link_back(neighbor, link_level, slot, cap, arena);
             }
             entries = candidates;
@@ -504,10 +536,8 @@ impl Graph {
         }
         scored[..count].sort_unstable();
         let mut kept = [0u32; LEVEL_ZERO_NEIGHBOR_CAP];
-        for (target, entry) in kept.iter_mut().zip(&scored[..cap]) {
-            *target = entry.slot;
-        }
-        self.write_level_list(slot, level, &kept[..cap]);
+        let kept_count = select_neighbors(arena, &scored[..count], cap, &mut kept);
+        self.write_level_list(slot, level, &kept[..kept_count]);
     }
 
     fn highest_slot(&self) -> Option<u32> {
