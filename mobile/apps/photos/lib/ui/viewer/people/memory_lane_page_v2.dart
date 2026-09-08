@@ -4,7 +4,6 @@ import "dart:typed_data";
 import "dart:ui";
 
 import "package:collection/collection.dart";
-import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
@@ -69,7 +68,7 @@ class MemoryLanePageV2 extends StatefulWidget {
 }
 
 class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
-  static const _playbackInterval = Duration(seconds: 3);
+  static const _playbackInterval = Duration(milliseconds: 800);
 
   final _logger = Logger("MemoryLanePageV2");
   Timer? _playbackTimer;
@@ -259,6 +258,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.sizeOf(context);
     return FutureBuilder<void>(
       future: _memoryLaneLoaded,
       builder: (context, snapshot) {
@@ -396,8 +396,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                       ),
                   ],
                 ),
-                leadingWidth: 48 + 16,
-                actionsPadding: const EdgeInsets.only(right: 16),
+                leadingWidth: 48 + screenSize.width * 0.04,
+                actionsPadding: EdgeInsets.only(right: screenSize.width * 0.04),
                 // TODO: Replace with an Ente component when it supports this pressed overlay.
                 leading: Align(
                   alignment: Alignment.centerRight,
@@ -440,9 +440,11 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
               body: Column(
                 children: [
                   Expanded(
-                    flex: 4,
                     child: Padding(
-                      padding: const EdgeInsetsGeometry.all(32),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: screenSize.width * 0.08,
+                        vertical: screenSize.height * 0.04,
+                      ),
                       child: Align(
                         child: AspectRatio(
                           aspectRatio: 3 / 4,
@@ -547,23 +549,29 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                       ),
                     ),
                   ),
-                  Expanded(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: screenSize.height * 0.2,
+                    ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         if (age != null && name != null && name.isNotEmpty) ...[
-                          Expanded(
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
                             child: Align(
                               alignment: Alignment.bottomCenter,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 64,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: screenSize.width * 0.16,
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment:
                                       CrossAxisAlignment.baseline,
                                   textBaseline: TextBaseline.alphabetic,
-                                  spacing: 8,
+                                  spacing: screenSize.width * 0.02,
                                   children: [
                                     for (
                                       var index = 0;
@@ -598,17 +606,53 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: screenSize.height * 0.02),
                         ],
-                        Expanded(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 96),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenSize.width * 0.16,
+                            ),
                             child: Row(
                               mainAxisAlignment: .center,
                               children: [
-                                IconButtonComponent(
-                                  variant: IconButtonComponentVariant
-                                      .circularTranslucent,
+                                // TODO: Replace with an Ente component.
+                                IconButton(
+                                  style: ButtonStyle(
+                                    fixedSize: const WidgetStatePropertyAll(
+                                      Size.square(48),
+                                    ),
+                                    shape: const WidgetStatePropertyAll(
+                                      CircleBorder(),
+                                    ),
+                                    foregroundColor:
+                                        const WidgetStatePropertyAll(
+                                          Colors.white,
+                                        ),
+                                    overlayColor: const WidgetStatePropertyAll(
+                                      Colors.transparent,
+                                    ),
+                                    backgroundColor:
+                                        WidgetStateProperty.resolveWith(
+                                          (states) => Colors.white.withValues(
+                                            alpha:
+                                                states.contains(
+                                                  WidgetState.disabled,
+                                                )
+                                                ? 0.16
+                                                : states.contains(
+                                                    WidgetState.pressed,
+                                                  )
+                                                ? 0.36
+                                                : states.contains(
+                                                    WidgetState.hovered,
+                                                  )
+                                                ? 0.30
+                                                : 0.24,
+                                          ),
+                                        ),
+                                  ),
                                   tooltip: _playbackToken != null
                                       ? context
                                             .strings
@@ -616,16 +660,17 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                       : context
                                             .strings
                                             .facesTimelinePlaybackPlay,
-                                  onTap: _onPlayPauseTap,
+                                  onPressed: _onPlayPauseTap,
                                   icon: HugeIcon(
                                     icon: _playbackToken != null
                                         ? HugeIcons.strokeRoundedPause
                                         : HugeIcons.strokeRoundedPlay,
+                                    size: 18,
+                                    color: Colors.white,
                                   ),
-                                  size: 48,
                                 ),
                                 if (_entries.isNotEmpty) ...[
-                                  const SizedBox(width: 12),
+                                  SizedBox(width: screenSize.width * 0.03),
                                   Expanded(
                                     child: LayoutBuilder(
                                       builder: (context, constraints) {
@@ -705,7 +750,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 44),
+                        SizedBox(height: screenSize.height * 0.055),
                       ],
                     ),
                   ),
