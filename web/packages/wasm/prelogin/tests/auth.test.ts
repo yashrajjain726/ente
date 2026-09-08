@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+    authDeriveSrpLoginKey,
     authGenerateInteractiveKek,
     authGenerateSrpSetup,
     cryptoGenerateKey,
@@ -21,6 +22,7 @@ test("generates SRP setup attributes from a kek", () => {
     const generated = authGenerateSrpSetup(kek, "test-user-id");
 
     expect(Buffer.from(generated.srpSalt, "base64")).toHaveLength(16);
+    expect(authDeriveSrpLoginKey(kek)).toBe(generated.loginSubKey);
     expect(Buffer.from(generated.loginSubKey, "base64")).toHaveLength(16);
     expect(Buffer.from(generated.srpVerifier, "base64").length).toBeGreaterThan(
         0,

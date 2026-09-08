@@ -1,7 +1,4 @@
-use crate::{
-    accounts::{Error as AccountsError, GeneratedKek},
-    crypto::Error as CryptoError,
-};
+use crate::accounts::{Error as AccountsError, GeneratedKek};
 use ente_accounts::auth;
 use ente_core::{b64, crypto};
 use wasm_bindgen::prelude::*;
@@ -25,6 +22,13 @@ pub fn auth_derive_kek(
 ) -> Result<String, AccountsError> {
     let kek = auth::derive_kek(password, kek_salt_b64, mem_limit, ops_limit)?;
     Ok(b64::encode(&kek))
+}
+
+#[wasm_bindgen(js_name = authDeriveSrpLoginKey)]
+pub fn auth_derive_srp_login_key(kek_b64: &str) -> Result<String, AccountsError> {
+    let kek =
+        b64::decode(kek_b64).map_err(|e| ente_accounts::Error::Decode(format!("kek: {e}")))?;
+    Ok(b64::encode(&auth::derive_srp_login_key(&kek)?))
 }
 
 #[wasm_bindgen(js_name = authGenerateSensitiveKek)]
@@ -116,24 +120,4 @@ pub fn crypto_generate_key_pair() -> CryptoKeyPair {
         public_key: b64::encode(secret_key.public_key().as_bytes()),
         private_key: b64::encode(secret_key.as_bytes()),
     }
-}
-
-#[wasm_bindgen(js_name = cryptoDeriveSubKey)]
-pub fn crypto_derive_sub_key(
-    key_b64: &str,
-    sub_key_length: usize,
-    sub_key_id: u64,
-    context: &str,
-) -> Result<String, CryptoError> {
-    let key = b64::decode(key_b64)?;
-    let context: [u8; 8] = context.as_bytes().try_into().map_err(|_| {
-        crypto::Error::InvalidKeyDerivationParams("KDF context must be exactly 8 bytes".into())
-    })?;
-    let sub_key = crypto::kdf::derive_subkey(
-        &crypto::Key::try_from_slice(&key)?,
-        sub_key_length,
-        sub_key_id,
-        &context,
-    )?;
-    Ok(b64::encode(&sub_key))
 }

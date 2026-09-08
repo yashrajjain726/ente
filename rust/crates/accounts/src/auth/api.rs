@@ -139,8 +139,12 @@ fn generated_kek(derived: argon::DerivedKey) -> GeneratedKek {
     }
 }
 
+pub fn derive_srp_login_key(kek: &[u8]) -> Result<SecretVec> {
+    Ok(kdf::derive_login_key(&crypto::Key::try_from_slice(kek)?))
+}
+
 pub fn generate_srp_setup(kek: &[u8], srp_user_id: &str) -> Result<GeneratedSrpSetup> {
-    let login_sub_key = kdf::derive_login_key(&crypto::Key::try_from_slice(kek)?);
+    let login_sub_key = derive_srp_login_key(kek)?;
     generate_srp_setup_with_login_key(&login_sub_key, srp_user_id)
 }
 

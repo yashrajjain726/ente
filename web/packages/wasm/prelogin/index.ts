@@ -49,6 +49,9 @@ export const deriveInteractiveKey = async (
         derivedKeyValue,
     );
 
+export const deriveSRPLoginKey = async (kekB64: string) =>
+    (await wasm()).authDeriveSrpLoginKey(kekB64);
+
 export const generateSRPSetup = async (
     kekB64: string,
     srpUserID: string,
@@ -114,21 +117,6 @@ export const boxSealOpenBytes = async (
     keyPair: KeyPair,
 ): Promise<Uint8Array<ArrayBuffer>> =>
     fromB64String(await boxSealOpen(encryptedData, keyPair));
-
-export const deriveSubKeyBytes = async (
-    keyB64: string,
-    subKeyLength: number,
-    subKeyID: number,
-    context: string,
-): Promise<Uint8Array<ArrayBuffer>> =>
-    fromB64String(
-        (await wasm()).cryptoDeriveSubKey(
-            keyB64,
-            subKeyLength,
-            BigInt(subKeyID),
-            context,
-        ),
-    );
 
 const derivedKeyValue = (key: DerivedKey): DerivedKey => ({
     key: key.key,
