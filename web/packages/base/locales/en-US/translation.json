@@ -1112,5 +1112,10 @@
     "auto_lock_5_minutes": "5 minutes",
     "auto_lock_30_minutes": "30 minutes",
     "wrong_unlock_code_one": "You've entered the wrong unlock code {{count}} time.",
-    "wrong_unlock_code_other": "You've entered the wrong unlock code {{count}} times."
+    "wrong_unlock_code_other": "You've entered the wrong unlock code {{count}} times.",
+    "trusted_contacts": "Trusted contacts",
+    "legacy_accounts": "Legacy accounts",
+    "add_trusted_contact": "Add trusted contact",
+    "trusted_contacts_empty": "Nominate another Ente user as a trusted contact to recover your account",
+    "legacy_accounts_empty": "Trusted contacts can initiate account recovery, and if not blocked within 30 days, reset your password and access your account."
 }

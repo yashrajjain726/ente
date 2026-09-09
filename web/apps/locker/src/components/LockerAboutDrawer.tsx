@@ -4,7 +4,6 @@ import {
     Shield01Icon,
 } from "@hugeicons/core-free-icons";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import { Stack } from "@mui/material";
 import { t } from "i18next";
 import React from "react";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
@@ -28,28 +27,25 @@ export const LockerAboutDrawer: React.FC<
             {...{ open, onClose }}
             onRootClose={handleRootClose}
             title={t("about")}
-            hideRootCloseButton
         >
-            <Stack sx={{ px: 2, py: 1, gap: 1 }}>
-                <LockerSidebarCardButton
-                    icon={GithubIcon}
-                    label={t("we_are_open_source")}
-                    endIcon={<ChevronRightIcon />}
-                    onClick={() => openExternal("https://github.com/ente/ente")}
-                />
-                <LockerSidebarCardButton
-                    icon={Shield01Icon}
-                    label={t("privacy")}
-                    endIcon={<ChevronRightIcon />}
-                    onClick={() => openExternal("https://ente.com/privacy")}
-                />
-                <LockerSidebarCardButton
-                    icon={File01Icon}
-                    label={t("terms")}
-                    endIcon={<ChevronRightIcon />}
-                    onClick={() => openExternal("https://ente.com/terms")}
-                />
-            </Stack>
+            <LockerSidebarCardButton
+                icon={GithubIcon}
+                label={t("we_are_open_source")}
+                endIcon={<ChevronRightIcon />}
+                onClick={() => openExternal("https://github.com/ente/ente")}
+            />
+            <LockerSidebarCardButton
+                icon={Shield01Icon}
+                label={t("privacy")}
+                endIcon={<ChevronRightIcon />}
+                onClick={() => openExternal("https://ente.com/privacy")}
+            />
+            <LockerSidebarCardButton
+                icon={File01Icon}
+                label={t("terms")}
+                endIcon={<ChevronRightIcon />}
+                onClick={() => openExternal("https://ente.com/terms")}
+            />
         </LockerTitledNestedSidebarDrawer>
     );
 };

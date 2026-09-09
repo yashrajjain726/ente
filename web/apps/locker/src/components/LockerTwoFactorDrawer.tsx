@@ -44,7 +44,6 @@ export const LockerTwoFactorDrawer: React.FC<
             {...{ open, onClose }}
             onRootClose={handleRootClose}
             title={t("two_factor_authentication")}
-            hideRootCloseButton
         >
             <TwoFactorContents
                 open={open}

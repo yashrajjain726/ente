@@ -38,7 +38,6 @@ export const LockerPage: React.FC = () => {
         handleSelectTrash,
         isCollectionRoutePending,
         isCollectionsView,
-        isHomeView,
         isTrashView,
         navigateHome,
         selectedCollectionID,
@@ -215,11 +214,8 @@ export const LockerPage: React.FC = () => {
                 open={sidebarOpen}
                 onClose={closeSidebar}
                 collections={collections}
-                trashItemCount={trashItems.length}
-                onSelectHome={() => handleSelectCollection(null)}
                 onSelectCollections={handleSelectCollections}
                 onSelectTrash={handleSelectTrash}
-                isHomeView={isHomeView}
                 isTrashView={isTrashView}
                 isCollectionsView={isCollectionsView}
                 userDetails={userDetails}
