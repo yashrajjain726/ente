@@ -17,7 +17,7 @@ import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 const green = "#08C225";
-const actionSize = 56;
+const actionSize = 64;
 
 const PostStatus: React.FC<{
     phase: SpacePostPublishPhase;
@@ -405,7 +405,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         "&:focus-visible": { outlineColor: "#FFFFFF" },
                     }}
                 >
-                    <HugeiconsIcon icon={Add01Icon} size={28} strokeWidth={2} />
+                    <HugeiconsIcon icon={Add01Icon} size={32} strokeWidth={2} />
                 </Box>
             </Box>
             {publishPhase && (
