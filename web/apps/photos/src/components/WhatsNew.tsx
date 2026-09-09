@@ -78,7 +78,7 @@ const ChangelogContent: React.FC = () => {
             </Typography>
             <Typography sx={{ color: "text.muted" }}>
                 {ut(
-                    "Move photos between hidden albums and view video stream processing progress in Preferences. Title bars now match your theme on Windows and Linux. Plus bug fixes.",
+                    "Move photos between hidden albums and view video stream processing progress in Preferences. Title bars now match your theme on Windows and Linux. and bug fixes.",
                 )}
             </Typography>
         </Stack>
