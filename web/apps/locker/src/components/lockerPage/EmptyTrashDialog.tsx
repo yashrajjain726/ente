@@ -87,7 +87,6 @@ export function EmptyTrashDialog({
                 </Box>
                 <img
                     src="/images/collection_delete_icon.png"
-                    srcSet="/images/collection_delete_icon@2x.png 2x, /images/collection_delete_icon@3x.png 3x"
                     alt=""
                     style={{
                         width: 120,
