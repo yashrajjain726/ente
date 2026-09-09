@@ -32,6 +32,7 @@
     "deleteCollectionConfirmation": "Are you sure you want to delete \"{{collectionName}}\"?",
     "deleteCollectionDialogBody": "{{collectionName}} will be deleted permanently.",
     "deleteCollectionFromEverywhere": "Also delete items from everywhere",
+    "deletedTimeAgo": "Deleted {{time}}",
     "collectionDeletedSuccessfully": "Collection deleted successfully",
     "collectionRenamedSuccessfully": "Collection renamed successfully",
     "collectionNotFoundError": "Collection not found",

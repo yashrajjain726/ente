@@ -12,6 +12,8 @@ export const lockerColors = {
     iconColor: { light: "rgba(0, 0, 0, 0.75)", dark: "#ffffff" },
     primary: { light: "#1071ff", dark: "#1071ff" },
     primaryDark: { light: "#0e5fd9", dark: "#0e5fd9" },
+    warning: { light: "#f63a3a", dark: "#f63a3a" },
+    warningDark: { light: "#dd3434", dark: "#dd3434" },
     specialWhite: { light: "#ffffff", dark: "#ffffff" },
 } as const;
 
@@ -38,5 +40,36 @@ export const lockerContentMaxWidth = 700;
 export const lockerTextBodySx = {
     fontSize: "14px",
     lineHeight: "20px",
+    fontWeight: 500,
+};
+
+// Mirrors the Locker design-system text styles.
+export const lockerTextDisplay2Sx = {
+    fontSize: "24px",
+    lineHeight: "32px",
+    fontWeight: 600,
+};
+
+export const lockerTextH2Sx = {
+    fontSize: "18px",
+    lineHeight: "24px",
+    fontWeight: 600,
+};
+
+export const lockerTextLargeSx = {
+    fontSize: "16px",
+    lineHeight: "20px",
+    fontWeight: 600,
+};
+
+export const lockerTextBodyBoldSx = {
+    fontSize: "14px",
+    lineHeight: "20px",
+    fontWeight: 600,
+};
+
+export const lockerTextMiniSx = {
+    fontSize: "12px",
+    lineHeight: "16px",
     fontWeight: 500,
 };

@@ -17,6 +17,8 @@ import {
     sortLockerCollections,
     visibleLockerCollections,
 } from "@/types";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -24,7 +26,6 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import DeleteSweepOutlinedIcon from "@mui/icons-material/DeleteSweepOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
@@ -64,6 +65,9 @@ import {
     lockerColorSx,
     lockerContentMaxWidth,
     lockerTextBodySx,
+    lockerTextDisplay2Sx,
+    lockerTextLargeSx,
+    lockerTextMiniSx,
 } from "./locker-tokens";
 
 const uniqueCollectionsByID = (collections: LockerCollection[]) => {
@@ -1078,9 +1082,13 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         : (selectedCollection?.name ??
                                           t("allItems"))
                                 }
-                                countLabel={t("lockerItemsCount", {
-                                    count: sortedItems.length,
-                                })}
+                                countLabel={
+                                    isTrashView && sortedItems.length === 0
+                                        ? undefined
+                                        : t("lockerItemsCount", {
+                                              count: sortedItems.length,
+                                          })
+                                }
                                 onBack={onNavigateBack}
                                 action={
                                     <Stack
@@ -1090,15 +1098,46 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         {isTrashView &&
                                             sortedItems.length > 0 &&
                                             onEmptyTrash && (
-                                                <Button
-                                                    color="critical"
-                                                    startIcon={
-                                                        <DeleteSweepOutlinedIcon />
-                                                    }
-                                                    onClick={onEmptyTrash}
+                                                <Tooltip
+                                                    title={t("empty_trash")}
                                                 >
-                                                    {t("empty_trash")}
-                                                </Button>
+                                                    <IconButton
+                                                        aria-label={t(
+                                                            "empty_trash",
+                                                        )}
+                                                        onClick={onEmptyTrash}
+                                                        sx={(theme) => ({
+                                                            width: 36,
+                                                            height: 36,
+                                                            borderRadius:
+                                                                "12px",
+                                                            padding: 0,
+                                                            ...lockerColorSx(
+                                                                theme,
+                                                                {
+                                                                    backgroundColor:
+                                                                        "fillLight",
+                                                                    color: "warning",
+                                                                },
+                                                            ),
+                                                            "&:hover": {
+                                                                ...lockerColorSx(
+                                                                    theme,
+                                                                    {
+                                                                        backgroundColor:
+                                                                            "fillDark",
+                                                                    },
+                                                                ),
+                                                            },
+                                                        })}
+                                                    >
+                                                        <HugeiconsIcon
+                                                            icon={Delete02Icon}
+                                                            size={18}
+                                                            strokeWidth={1.5}
+                                                        />
+                                                    </IconButton>
+                                                </Tooltip>
                                             )}
                                         {selectedCollection &&
                                             canShareSelectedCollection &&
@@ -1193,8 +1232,11 @@ export const ItemList: React.FC<ItemListProps> = ({
                                 emptyState={
                                     isTrashView ? (
                                         <EmptyState
-                                            title={t("trashIsEmpty")}
-                                            subtitle={t("yourTrashIsEmpty")}
+                                            image={{
+                                                src: "/images/empty_state.png",
+                                                srcSet: "/images/empty_state@2x.png 2x, /images/empty_state@3x.png 3x",
+                                            }}
+                                            title={t("yourTrashIsEmpty")}
                                         />
                                     ) : (
                                         <EmptyState
@@ -1353,46 +1395,83 @@ export const ItemList: React.FC<ItemListProps> = ({
 
 const SectionHeader: React.FC<{
     title: string;
-    countLabel: string;
+    countLabel?: string;
     action?: React.ReactNode;
     onBack?: () => void;
-}> = ({ title, countLabel, action, onBack }) => (
-    <Stack
-        direction="row"
-        sx={{
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
-            maxWidth: lockerContentMaxWidth,
-            mx: "auto",
-            mt: 1,
-            mb: 2.25,
-        }}
-    >
+}> = ({ title, countLabel, action, onBack }) =>
+    onBack ? (
+        <Stack
+            sx={{
+                gap: 2,
+                maxWidth: lockerContentMaxWidth,
+                mx: "auto",
+                mt: 1,
+                mb: 2.25,
+            }}
+        >
+            <IconButton
+                aria-label="Back"
+                onClick={onBack}
+                sx={(theme) => ({
+                    alignSelf: "flex-start",
+                    width: 36,
+                    height: 36,
+                    flexShrink: 0,
+                    borderRadius: "12px",
+                    padding: 0,
+                    ...lockerColorSx(theme, {
+                        color: "iconColor",
+                        backgroundColor: "fillLight",
+                    }),
+                    "&:hover": {
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "fillDark",
+                        }),
+                    },
+                })}
+            >
+                <ArrowBackRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+            <Stack
+                direction="row"
+                sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 2,
+                }}
+            >
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ ...lockerTextDisplay2Sx, minWidth: 0 }}>
+                        {title}
+                    </Typography>
+                    {countLabel && (
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextMiniSx,
+                                mt: 1,
+                                ...lockerColorSx(theme, { color: "textLight" }),
+                            })}
+                        >
+                            {countLabel}
+                        </Typography>
+                    )}
+                </Box>
+                {action}
+            </Stack>
+        </Stack>
+    ) : (
         <Stack
             direction="row"
-            sx={{ minWidth: 0, gap: 1.5, alignItems: "center" }}
+            sx={{
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 2,
+                maxWidth: lockerContentMaxWidth,
+                mx: "auto",
+                mt: 1,
+                mb: 2.25,
+            }}
         >
-            {onBack && (
-                <IconButton
-                    aria-label="Back"
-                    onClick={onBack}
-                    sx={{
-                        alignSelf: "center",
-                        width: 44,
-                        height: 44,
-                        flexShrink: 0,
-                        color: "text.secondary",
-                        border: "1px solid rgba(255, 255, 255, 0.10)",
-                        backgroundColor: "rgba(255, 255, 255, 0.03)",
-                        "&:hover": {
-                            backgroundColor: "rgba(255, 255, 255, 0.08)",
-                        },
-                    }}
-                >
-                    <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
-                </IconButton>
-            )}
             <Box sx={{ minWidth: 0 }}>
                 <Typography
                     variant="h3"
@@ -1400,14 +1479,18 @@ const SectionHeader: React.FC<{
                 >
                     {title}
                 </Typography>
-                <Typography variant="small" sx={{ color: "text.muted", mt: 1 }}>
-                    {countLabel}
-                </Typography>
+                {countLabel && (
+                    <Typography
+                        variant="small"
+                        sx={{ color: "text.muted", mt: 1 }}
+                    >
+                        {countLabel}
+                    </Typography>
+                )}
             </Box>
+            {action}
         </Stack>
-        {action}
-    </Stack>
-);
+    );
 
 const ItemsSection: React.FC<{
     items: LockerItem[];
@@ -1969,17 +2052,39 @@ const CollectionFilterChip: React.FC<{
     </Tooltip>
 );
 
-const EmptyState: React.FC<{ title: string; subtitle: string }> = ({
-    title,
-    subtitle,
-}) => (
+const EmptyState: React.FC<{
+    title: string;
+    subtitle?: string;
+    image?: { src: string; srcSet?: string; alt?: string };
+}> = ({ title, subtitle, image }) => (
     <Box sx={{ textAlign: "center", py: 8 }}>
-        <Typography variant="h4" sx={{ mb: 0.5 }}>
-            {title}
-        </Typography>
-        <Typography variant="body" sx={{ color: "text.muted" }}>
-            {subtitle}
-        </Typography>
+        {image && (
+            <img
+                src={image.src}
+                srcSet={image.srcSet}
+                alt={image.alt ?? ""}
+                style={{
+                    height: 112,
+                    width: "auto",
+                    display: "block",
+                    margin: "0 auto",
+                }}
+            />
+        )}
+        {image ? (
+            <Typography sx={{ ...lockerTextLargeSx, mt: 2.5, mb: 0.5 }}>
+                {title}
+            </Typography>
+        ) : (
+            <Typography variant="h4" sx={{ mb: 0.5 }}>
+                {title}
+            </Typography>
+        )}
+        {subtitle && (
+            <Typography variant="body" sx={{ color: "text.muted" }}>
+                {subtitle}
+            </Typography>
+        )}
     </Box>
 );
 
