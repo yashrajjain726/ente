@@ -298,7 +298,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                                 py: "3px",
                             }}
                         >
-                            Your latest posts will show up here
+                            Your latest post will show up here
                         </Box>
                         <Box
                             component="span"
