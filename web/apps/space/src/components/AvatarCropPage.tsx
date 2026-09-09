@@ -5,6 +5,7 @@ import React from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
@@ -69,7 +70,7 @@ const SpaceAvatarCropPageButton: React.FC<{
             bgcolor: disabled && !loading ? spaceSurface : green,
             border: 0,
             borderRadius: "20px",
-            color: disabled && !loading ? textLight : "white",
+            color: disabled && !loading ? textLight : spaceOnAccent,
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             flex: "0 0 auto",
@@ -302,7 +303,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 <Box
                     sx={{
                         alignSelf: "center",
-                        bgcolor: isSquareCrop ? "#111" : "#FFFFFF",
+                        bgcolor: spaceAppBackground,
                         borderRadius: isSquareCrop
                             ? "50%"
                             : isCoverCrop

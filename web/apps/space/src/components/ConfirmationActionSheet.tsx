@@ -7,6 +7,7 @@ import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import React from "react";
 import {
     spaceDialogBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -17,7 +18,6 @@ const dangerColor = "#F63A3A";
 const textBase = spaceText;
 
 interface ConfirmationActionSheetProps {
-    appearance?: "light" | "dark";
     open: boolean;
     title: string;
     description?: React.ReactNode;
@@ -37,7 +37,6 @@ interface ConfirmationActionSheetProps {
 export const ConfirmationActionSheet: React.FC<
     ConfirmationActionSheetProps
 > = ({
-    appearance = "light",
     open,
     title,
     description,
@@ -54,7 +53,6 @@ export const ConfirmationActionSheet: React.FC<
     onExited,
 }) => {
     const titleID = React.useId();
-    const isDark = appearance == "dark";
     const isBottomSheet = useMediaQuery("(max-width: 599px)");
 
     return (
@@ -68,18 +66,14 @@ export const ConfirmationActionSheet: React.FC<
                     ? { transition: SpaceBottomSheetTransition }
                     : undefined
             }
-            sx={
-                isDark
-                    ? {
-                          zIndex: 1500,
-                          "--space-dialog-backdrop": "rgba(0 0 0 / 0.86)",
-                      }
-                    : undefined
-            }
+            sx={{
+                zIndex: 1500,
+                "--space-dialog-backdrop": "rgba(0 0 0 / 0.86)",
+            }}
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: isDark ? "#1E1E1E" : spaceDialogBackground,
+                        bgcolor: spaceDialogBackground,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",
@@ -116,7 +110,7 @@ export const ConfirmationActionSheet: React.FC<
                     component="h2"
                     id={titleID}
                     sx={{
-                        color: isDark ? "#F4F4F4" : textBase,
+                        color: textBase,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 15,
                         fontWeight: 600,
@@ -131,7 +125,7 @@ export const ConfirmationActionSheet: React.FC<
                 {description && (
                     <Box
                         sx={{
-                            color: isDark ? "#BDBDBD" : spaceTextMuted,
+                            color: spaceTextMuted,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 13,
                             lineHeight: "18px",
@@ -155,15 +149,15 @@ export const ConfirmationActionSheet: React.FC<
                         label={confirmLabel}
                         backgroundColor={confirmBackgroundColor}
                         className={confirmClassName}
-                        color="#FFFFFF"
+                        color={spaceOnAccent}
                         disabled={confirmDisabled}
                         actionPhase={confirmActionPhase}
                         onClick={onConfirm}
                     />
                     <SheetButton
                         label={cancelLabel}
-                        backgroundColor={isDark ? "#333333" : spaceSurface}
-                        color={isDark ? "#D8D8D8" : spaceTextMuted}
+                        backgroundColor={spaceSurface}
+                        color={spaceTextMuted}
                         disabled={cancelDisabled}
                         onClick={onCancel}
                     />

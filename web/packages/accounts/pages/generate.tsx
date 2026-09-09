@@ -15,11 +15,9 @@ import {
     savedPartialLocalUser,
     saveJustSignedUp,
 } from "ente-accounts/services/accounts-db";
+import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/prelogin-session";
 import { appHomeRoute } from "ente-accounts/services/redirect";
-import {
-    haveMasterKeyInSession,
-    saveMasterKeyInSessionAndSafeStore,
-} from "ente-accounts/services/session-storage";
+import { haveMasterKeyInSession } from "ente-accounts/services/session-storage";
 import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,

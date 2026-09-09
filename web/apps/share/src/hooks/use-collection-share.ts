@@ -4,6 +4,7 @@ import {
     HTTPError,
     isHTTP401Error,
     isHTTPErrorWithStatus,
+    isMuseumHTTPError,
 } from "ente-base/http";
 import { apiOrigin } from "ente-base/origins";
 import { extractCollectionKeyFromShareURL } from "ente-gallery/services/share";
@@ -112,29 +113,11 @@ const saveLinkDeviceToken = (
 const collectionShareLoadError = async (
     err: unknown,
 ): Promise<CollectionShareLoadError> => {
-    if (err instanceof HTTPError && err.res.status === 410) {
-        try {
-            const payload = (await err.res.clone().json()) as {
-                error?: string;
-            };
-            if (payload.error === "expired token") {
-                return {
-                    title: "Link expired",
-                    message:
-                        "This link has either expired or has been disabled.",
-                };
-            }
-        } catch {
-            // Ignore payload parse failures and use the generic gone-state copy.
-        }
-
-        return {
-            title: "Link expired",
-            message: "This link has either expired or has been disabled.",
-        };
+    if (await isMuseumHTTPError(err, 410, "LINK_EXPIRED")) {
+        return { title: "Link expired", message: "This link has expired." };
     }
 
-    if (isHTTPErrorWithStatus(err, 429)) {
+    if (await isMuseumHTTPError(err, 403, "LINK_DEVICE_LIMIT_EXCEEDED")) {
         return {
             title: "Too many viewers",
             message:
@@ -142,10 +125,18 @@ const collectionShareLoadError = async (
         };
     }
 
+    if (isHTTPErrorWithStatus(err, 429)) {
+        return {
+            title: "Too many requests",
+            message: "Please try again later.",
+        };
+    }
+
     if (
         isHTTP401Error(err) ||
         isHTTPErrorWithStatus(err, 403) ||
-        isHTTPErrorWithStatus(err, 404)
+        isHTTPErrorWithStatus(err, 404) ||
+        isHTTPErrorWithStatus(err, 410)
     ) {
         return {
             title: "Unable to open this collection",
@@ -187,7 +178,7 @@ const shouldPreserveLoadedStateOnSilentRefreshError = (err: unknown) => {
         return true;
     }
 
-    return err.res.status >= 500;
+    return err.res.status === 429 || err.res.status >= 500;
 };
 
 export const useCollectionShare = (): UseCollectionShareResult => {

@@ -16,6 +16,8 @@ import {
     spacePostPreviewImageForFile,
     type SpaceDraftPostImage,
 } from "utils/post-image";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
 interface PendingPostDraft {
     error?: string;
@@ -39,6 +41,8 @@ const SpacePostComposer: React.FC<SpacePostComposerProps> = ({
     onPublish,
     profile,
 }) => {
+    const router = useSpaceRouter();
+    const publishedPreviewURLRef = React.useRef<string>(undefined);
     const displayName =
         profile.fullName.trim() || profile.username.trim() || "You";
     const [draft, setDraft] = React.useState<PendingPostDraft>(() => ({
@@ -112,7 +116,9 @@ const SpacePostComposer: React.FC<SpacePostComposerProps> = ({
 
         return () => {
             cancelled = true;
-            if (previewURL) URL.revokeObjectURL(previewURL);
+            if (previewURL && previewURL != publishedPreviewURLRef.current) {
+                URL.revokeObjectURL(previewURL);
+            }
         };
     }, [displayName, file, profile.avatarUrl]);
 
@@ -128,22 +134,28 @@ const SpacePostComposer: React.FC<SpacePostComposerProps> = ({
                 }
                 onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                 onDraftPostPublished={() => {
-                    void clearBrowserBackState("back");
+                    void clearBrowserBackState("back").then(() =>
+                        router.push(spaceRoutes.home),
+                    );
                 }}
                 onPublishDraftPost={
                     draft.isPreviewPending || draft.error
                         ? undefined
-                        : (caption, edit) =>
-                              onPublish(
+                        : (caption, edit) => {
+                              publishedPreviewURLRef.current =
+                                  draft.photo.imageUrl;
+                              return onPublish(
                                   {
                                       cropArea: edit.cropArea,
                                       file,
                                       height: edit.height,
+                                      previewUrl: draft.photo.imageUrl,
                                       rotationDegrees: edit.rotationDegrees,
                                       width: edit.width,
                                   },
                                   caption,
-                              ).then(() => undefined)
+                              ).then(() => undefined);
+                          }
                 }
                 photo={draft.photo}
                 postActionMode="draft-post"

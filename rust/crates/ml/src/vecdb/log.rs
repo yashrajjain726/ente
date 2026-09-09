@@ -399,7 +399,10 @@ impl LogScanner<'_> {
     }
 
     fn read_attr_bytes(&mut self, body_budget: u64) -> Result<bool, VecDbError> {
-        let attr_count = *self.scratch.last().unwrap();
+        let attr_count = *self
+            .scratch
+            .last()
+            .expect("add record includes an attribute count");
         if attr_count as usize > MAX_ATTR_COUNT {
             return Ok(false);
         }
@@ -408,14 +411,14 @@ impl LogScanner<'_> {
             if !self.extend_within(body_budget, 1)? {
                 return Ok(false);
             }
-            let name_len = *self.scratch.last().unwrap() as usize;
+            let name_len = *self.scratch.last().expect("attribute name length was read") as usize;
             if name_len == 0 || name_len > MAX_ATTR_NAME_BYTES {
                 return Ok(false);
             }
             if !self.extend_within(body_budget, name_len + 1)? {
                 return Ok(false);
             }
-            let value_len = match *self.scratch.last().unwrap() {
+            let value_len = match *self.scratch.last().expect("attribute value tag was read") {
                 ATTR_TAG_STR => {
                     if !self.extend_within(body_budget, 2)? {
                         return Ok(false);
@@ -2250,7 +2253,7 @@ mod tests {
         *crc_flipped_tombstone.last_mut().unwrap() ^= 0x01;
         let mut oversized_key_payload = payload.clone();
         oversized_key_payload.push(0);
-        let mut over_counted_attrs = payload.clone();
+        let mut over_counted_attrs = payload;
         over_counted_attrs.push(17);
         let mut truncated = good.clone();
         truncated.pop();

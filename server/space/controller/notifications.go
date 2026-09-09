@@ -55,7 +55,7 @@ func spaceActivityActor(space *repo.SpaceRecord) SpaceActivityActor {
 }
 
 type SpaceActivityNotifier interface {
-	OnSpacePostCreated(actor SpaceActivityActor)
+	OnSpacePostCreated(actor SpaceActivityActor, postID int64)
 	OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64)
 	OnSpacePostReplied(actor SpaceActivityActor, recipientUserID int64)
 	OnSpaceMessageSent(actor SpaceActivityActor, recipientUserID int64)
@@ -103,7 +103,7 @@ func NewSpaceWebPushSender(
 	return sender
 }
 
-func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor) {
+func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor, postID int64) {
 	if !n.available() {
 		return
 	}
@@ -121,7 +121,7 @@ func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor) {
 		"posted a new photo",
 		"Check it out",
 		spaceActivityPostCreated,
-		"/app",
+		fmt.Sprintf("/app/posts/%s/%d", url.PathEscape(actor.SpaceID), postID),
 		subscriptions,
 	)
 }

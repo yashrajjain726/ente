@@ -31,19 +31,19 @@ import {
     openPasskeyVerificationURL,
     passkeyVerificationRedirectURL,
 } from "ente-accounts/services/passkey";
-import { masterKeyFromSession } from "ente-accounts/services/prelogin-session";
+import {
+    masterKeyFromSession,
+    saveMasterKeyInSessionAndSafeStore,
+    stashKeyEncryptionKeyInSessionStore,
+    unstashKeyEncryptionKeyFromSession,
+    updateSessionFromElectronSafeStorageIfNeeded,
+} from "ente-accounts/services/prelogin-session";
 import {
     appHomeRoute,
     stashRedirect,
     unstashRedirect,
 } from "ente-accounts/services/redirect";
 import { checkSessionValidity } from "ente-accounts/services/session";
-import {
-    saveMasterKeyInSessionAndSafeStore,
-    stashKeyEncryptionKeyInSessionStore,
-    unstashKeyEncryptionKeyFromSession,
-    updateSessionFromElectronSafeStorageIfNeeded,
-} from "ente-accounts/services/session-storage";
 import type { SRPAttributes } from "ente-accounts/services/srp";
 import {
     generateSRPSetupAttributes,

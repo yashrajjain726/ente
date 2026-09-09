@@ -135,7 +135,7 @@ impl DownloadManager {
             pb.set_style(
                 ProgressStyle::default_bar()
                     .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                    .unwrap()
+                    .expect("valid download progress template")
                     .progress_chars("#>-"),
             );
             pb.set_message("Downloading files...");

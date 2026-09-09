@@ -1,8 +1,3 @@
-import {
-    deriveSubKeyBytes,
-    generateSRPSetup,
-    toB64,
-} from "ente-accounts/services/crypto";
 import { namedError } from "ente-base/error";
 import {
     authenticatedRequestHeaders,
@@ -10,7 +5,11 @@ import {
     publicRequestHeaders,
 } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { createSRPSession } from "ente-prelogin-wasm";
+import {
+    createSRPSession,
+    deriveSRPLoginKey,
+    generateSRPSetup,
+} from "ente-prelogin-wasm";
 import { ensure } from "ente-utils/ensure";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
@@ -183,11 +182,6 @@ const updateSRPAndKeys = async (
     return UpdateSRPAndKeysResponse.parse(await res.json());
 };
 
-const deriveSRPLoginSubKey = async (kek: string) => {
-    const kekSubKeyBytes = await deriveSubKeyBytes(kek, 32, 1, "loginctx");
-    return toB64(kekSubKeyBytes.slice(0, 16));
-};
-
 export const verifySRP = async (
     { srpUserID, srpSalt }: SRPAttributes,
     kek: string,
@@ -195,7 +189,7 @@ export const verifySRP = async (
     const session = await createSRPSession(
         srpSalt,
         srpUserID,
-        await deriveSRPLoginSubKey(kek),
+        await deriveSRPLoginKey(kek),
     );
 
     const { srpB, sessionID } = await createSRPSessionOnRemote({

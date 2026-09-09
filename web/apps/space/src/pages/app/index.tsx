@@ -1,8 +1,10 @@
+import { SpaceAddFriendDialog } from "components/AddFriendDialog";
 import { SpaceFriendLimitToast } from "components/FriendLimitToast";
 import { SpaceFriendRequestCanceledToast } from "components/FriendRequestCanceledToast";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
+import { useOwnLatestPost } from "hooks/use-own-latest-post";
 import React, { useEffect, useState } from "react";
 import { HomeScreen } from "screens/HomeScreen";
 import {
@@ -24,9 +26,9 @@ import {
     loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
-    loadCurrentSpaceProfilePostsPage,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
+    requestFriendByUsername,
     sendCurrentPoke,
     setCurrentPostLiked,
     type SpaceFriendRequest,
@@ -54,10 +56,19 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
+    const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
     const [friendRequests, setFriendRequests] = useState<SpaceFriendRequest[]>(
         [],
     );
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
+    const [spaceId, setSpaceId] = useState<string>();
+    const {
+        ownLatestPost,
+        isOwnLatestPostLoading,
+        isOwnLatestPostUnavailable,
+        deleteOwnPost,
+        updateOwnPostCaption,
+    } = useOwnLatestPost(spaceId);
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
@@ -69,7 +80,6 @@ const Page: React.FC = () => {
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         useState(false);
     const [showFriendLimitToast, setShowFriendLimitToast] = useState(false);
-    const [spaceId, setSpaceId] = useState<string>();
     const closeFriendRequestSentToast = React.useCallback(
         () => setFriendRequestSentToastName(undefined),
         [],
@@ -248,6 +258,9 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <HomeScreen
+                ownLatestPost={ownLatestPost}
+                isOwnLatestPostLoading={isOwnLatestPostLoading}
+                isOwnLatestPostUnavailable={isOwnLatestPostUnavailable}
                 latestPosts={latestPosts}
                 unreadPosts={unreadPosts}
                 friendRequestSentToastName={friendRequestSentToastName}
@@ -259,11 +272,6 @@ const Page: React.FC = () => {
                 isFriendRequestsLoading={isFriendRequestsLoading}
                 isHomeCacheLoading={isHomeCacheLoading}
                 profile={profile}
-                profileLink={
-                    profile
-                        ? spaceInviteURL({ spaceUsername: profile.username })
-                        : undefined
-                }
                 viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&
@@ -272,6 +280,7 @@ const Page: React.FC = () => {
                     !isFriendsLoading
                 }
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
+                onAddFriend={() => setIsAddFriendOpen(true)}
                 onAcceptFriendRequest={async (requestID) => {
                     if (!profile?.spaceId) throw new Error("Missing space.");
                     const sentRequestCount = friendRequests.filter(
@@ -336,6 +345,8 @@ const Page: React.FC = () => {
                           }
                         : undefined
                 }
+                onDeletePost={deleteOwnPost}
+                onUpdatePostCaption={updateOwnPostCaption}
                 onOpenFriend={(friendID, username) => {
                     const friend = friends.find(
                         (candidate) =>
@@ -351,7 +362,6 @@ const Page: React.FC = () => {
                     }
                 }}
                 onLoadFriendAvatar={loadCurrentFriendAvatarURL}
-                onLoadFriendPosts={loadCurrentSpaceProfilePostsPage}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onMessageFriend={(friend) =>
@@ -420,6 +430,7 @@ const Page: React.FC = () => {
                         ? () => void router.push(spaceRoutes.profile)
                         : undefined
                 }
+                onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onReplyToPost={
                     profile?.spaceId
                         ? (
@@ -443,6 +454,62 @@ const Page: React.FC = () => {
             {showFriendRequestCanceledToast && (
                 <SpaceFriendRequestCanceledToast
                     onClose={() => setShowFriendRequestCanceledToast(false)}
+                />
+            )}
+            {profile && (
+                <SpaceAddFriendDialog
+                    friendRequests={friendRequests}
+                    friends={friends}
+                    open={isAddFriendOpen}
+                    onClose={() => setIsAddFriendOpen(false)}
+                    profileLink={spaceInviteURL({
+                        spaceUsername: profile.username,
+                    })}
+                    username={profile.username}
+                    onAddFriend={async (username) => {
+                        const actorSpaceId = profile.spaceId;
+                        if (!actorSpaceId) throw new Error("Missing space.");
+                        const status = await requestFriendByUsername({
+                            spaceUsername: username,
+                        });
+                        try {
+                            if (status == "friend") {
+                                clearSpaceFriendsCache();
+                                const [requests, friends] = await Promise.all([
+                                    loadCurrentFriendRequests(actorSpaceId),
+                                    loadCurrentSpaceFriends(actorSpaceId),
+                                ]);
+                                setFriendRequests(requests);
+                                setFriends(friends);
+                                const refreshedHomePosts =
+                                    await refreshSpaceHomePosts(
+                                        actorSpaceId,
+                                        friends,
+                                    );
+                                if (refreshedHomePosts) {
+                                    setLatestPosts(
+                                        refreshedHomePosts.latestPosts,
+                                    );
+                                    setUnreadPosts(
+                                        refreshedHomePosts.unreadPosts,
+                                    );
+                                }
+                                await refreshUnreadStatus(actorSpaceId);
+                            } else {
+                                setFriendRequests(
+                                    await loadCurrentFriendRequests(
+                                        actorSpaceId,
+                                    ),
+                                );
+                            }
+                        } catch (error) {
+                            log.error(
+                                "Failed to refresh friends after sending request",
+                                error,
+                            );
+                        }
+                        return status;
+                    }}
                 />
             )}
             {showFriendLimitToast && (

@@ -2,7 +2,6 @@ import {
     AddSquareIcon,
     ArrowLeft02Icon,
     BubbleChatIcon,
-    Menu01Icon,
     MoreHorizontalIcon,
     Tick02Icon,
     UserRemove01Icon,
@@ -41,6 +40,7 @@ import {
     spaceAppBackgroundColor,
     spaceDialogBackground,
     spaceSurface,
+    spaceSurfaceHover,
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
@@ -62,7 +62,7 @@ const dangerColor = "#F63A3A";
 const textBase = spaceText;
 const textSoft = spaceTextMuted;
 const coverForeground = "#FFFFFF";
-const profileIdentityColor = "#303030";
+const profileIdentityColor = spaceText;
 const profileStatsColor = spaceTextMuted;
 const profileStatsValueColor = spaceText;
 const profileCoverBackground = "#1F1F1F";
@@ -71,12 +71,12 @@ const profileCoverTopShadow =
 const profileCoverSkeletonBackground = spaceSurface;
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
-const profileAvatarSize = 120;
+const profileAvatarSize = 132;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = spaceSurface;
-const photoMasonryRadius = "12px";
+const photoMasonryRadius = "16px";
 const profileCoverRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
 const publicPhotoMasonryLoadRootMargin = "400px 0px";
@@ -129,29 +129,69 @@ interface PostMasonryRow {
     tiles: PostMasonryTile[];
 }
 
-const buildPostMasonryRows = (
+const buildPostMasonrySections = (
     items: ProfilePostItem[],
     loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
-): PostMasonryRow[] => {
-    const tiles = items.map((item, index) => {
+) => {
+    const now = new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const sections = [
+        {
+            title: "Today",
+            sinceMs: new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+            ).getTime(),
+        },
+        {
+            title: "Yesterday",
+            sinceMs: new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate() - 1,
+            ).getTime(),
+        },
+        { title: "Last 7 days", sinceMs: now.getTime() - 7 * dayMs },
+        { title: "Last 30 days", sinceMs: now.getTime() - 30 * dayMs },
+        { title: "Older", sinceMs: -Infinity },
+    ].map((section) => ({ ...section, tiles: new Array<PostMasonryTile>() }));
+
+    items.forEach((item, index) => {
         const dimensions = loadedDimensionsByID[item.id] ?? {
             height: item.height ?? 1,
             width: item.width ?? 1,
         };
-        return {
+        const section = sections.find(
+            ({ sinceMs }) => item.timestampMs >= sinceMs,
+        )!;
+        section.tiles.push({
             aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
             dimensions,
             index,
             item,
-        };
+        });
     });
+
+    return sections
+        .filter(({ tiles }) => tiles.length > 0)
+        .map(({ title, tiles }) => ({
+            title,
+            rows: buildPostMasonryRows(tiles, title == "Today"),
+        }));
+};
+
+const buildPostMasonryRows = (
+    tiles: PostMasonryTile[],
+    isToday: boolean,
+): PostMasonryRow[] => {
     const rows = new Array<PostMasonryRow>();
     let nextTileIndex = 0;
 
     while (nextTileIndex < tiles.length) {
-        const rowSize = preferredPostMasonryRowSize(
-            tiles.length - nextTileIndex,
-        );
+        const rowSize = isToday
+            ? 1
+            : preferredPostMasonryRowSize(tiles.length - nextTileIndex);
         const rowTiles = tiles.slice(nextTileIndex, nextTileIndex + rowSize);
         rows.push({
             aspectRatio: rowTiles.reduce(
@@ -243,10 +283,10 @@ const PublicProfileActionButton: React.FC<PublicProfileActionButtonProps> = ({
         sx={{
             alignItems: "center",
             appearance: "none",
-            bgcolor: "#FFF",
+            bgcolor: spaceSurface,
             border: 0,
             borderRadius: "14px",
-            color: "#000",
+            color: spaceText,
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             flexShrink: 0,
@@ -258,7 +298,7 @@ const PublicProfileActionButton: React.FC<PublicProfileActionButtonProps> = ({
             lineHeight: "18px",
             px: "14px",
             py: "8px",
-            "&:hover": { bgcolor: disabled ? "#FFF" : "#F4F4F4" },
+            "&:hover": { bgcolor: disabled ? spaceSurface : spaceSurfaceHover },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
@@ -489,6 +529,7 @@ interface ProfileScreenProps {
     isStatsLoading?: boolean;
     showPostLoadingIndicator?: boolean;
     onBack?: () => void;
+    onPostSubmitted?: () => void;
     onAddFriend?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
     onCreateSpace?: () => void;
@@ -501,7 +542,6 @@ interface ProfileScreenProps {
     onOpenPost?: (post: ProfilePostItem) => void;
     onOpenProfileCover?: () => void;
     onOpenProfilePhoto?: () => void;
-    onOpenSettings?: () => void;
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
     onMessageFriend?: () => void;
     onReplyToPost?: (
@@ -529,6 +569,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     isPostsLoading = false,
     isStatsLoading = false,
     onBack,
+    onPostSubmitted,
     onAddFriend,
     onAddFriendForPostAction,
     onCreateSpace,
@@ -538,7 +579,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onOpenPost,
     onOpenProfileCover,
     onOpenProfilePhoto,
-    onOpenSettings,
     onLoadPostImage,
     onMessageFriend,
     onReplyToPost,
@@ -638,7 +678,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const postImageLoadRootMargin = isAnonymousPublicProfile
         ? publicPhotoMasonryLoadRootMargin
         : photoMasonryLoadRootMargin;
-    const masonryRows = buildPostMasonryRows(
+    const masonrySections = buildPostMasonrySections(
         visiblePostItems,
         loadedPhotoDimensionsByID,
     );
@@ -694,10 +734,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         );
         localPostObjectUrlsRef.current.clear();
     }, []);
-    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
-        localPostObjectUrlsRef.current.delete(objectUrl);
-        URL.revokeObjectURL(objectUrl);
-    }, []);
     const openPostPhotoPicker = () => {
         if (isPostPhotoOpening) return;
 
@@ -710,13 +746,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
     };
-    useBrowserBackClose({
-        open: Boolean(selectedPost),
-        onClose: () => {
-            if (!isDraftPostExiting) closeSelectedPost();
-        },
-        stateKey: "space-profile-viewer",
-    });
+    const { clearBrowserBackState: clearSelectedPostHistory } =
+        useBrowserBackClose({
+            open: Boolean(selectedPost),
+            onClose: () => {
+                if (!isDraftPostExiting) closeSelectedPost();
+            },
+            stateKey: "space-profile-viewer",
+        });
     const rememberLoadedPhotoDimensions = (
         itemID: string,
         image: HTMLImageElement,
@@ -1338,39 +1375,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {firstName}
                             </Box>
-                            {isOwnerProfile ? (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label="Settings"
-                                    onClick={onOpenSettings}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: "inherit",
-                                        cursor: onOpenSettings
-                                            ? "pointer"
-                                            : "default",
-                                        display: "flex",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "flex-end",
-                                        p: 0,
-                                        width: spaceTouchTargetSize,
-                                        "&:focus-visible": {
-                                            borderRadius: "50%",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={Menu01Icon}
-                                        size={20}
-                                        strokeWidth={2.4}
-                                    />
-                                </Box>
-                            ) : onMessageFriend ? (
+                            {!isOwnerProfile && onMessageFriend ? (
                                 <Box
                                     component="button"
                                     type="button"
@@ -1466,7 +1471,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 sx={{
                                     bgcolor: profileCoverSkeletonBackground,
                                     borderRadius: "50%",
-                                    inset: 2,
+                                    inset: 3,
                                     overflow: "hidden",
                                     position: "absolute",
                                 }}
@@ -1682,15 +1687,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 whiteSpace: "nowrap",
                                                 "&.Mui-focusVisible": {
                                                     bgcolor:
-                                                        "rgba(246, 58, 58, 0.06)",
+                                                        "rgba(246, 58, 58, 0.14)",
                                                 },
                                                 "&:active": {
                                                     bgcolor:
-                                                        "rgba(246, 58, 58, 0.06)",
+                                                        "rgba(246, 58, 58, 0.14)",
                                                 },
                                                 "&:hover": {
                                                     bgcolor:
-                                                        "rgba(246, 58, 58, 0.06)",
+                                                        "rgba(246, 58, 58, 0.14)",
                                                 },
                                             }}
                                         >
@@ -1829,39 +1834,68 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {hasProfilePosts ? (
                         <Box
                             sx={{
-                                borderRadius: photoMasonryRadius,
                                 display: "flex",
                                 flexDirection: "column",
-                                gap: photoMasonryGap,
+                                gap: "24px",
                                 mt: "6px",
                                 mx: "16px",
-                                overflow: "hidden",
                                 width: "calc(100% - 32px)",
                             }}
                         >
-                            {masonryRows.map((row, rowIndex) => {
-                                const isSingleItemRow = row.tiles.length == 1;
-                                return (
+                            {masonrySections.map(({ title, rows }) => (
+                                <Box component="section" key={title}>
                                     <Box
-                                        key={`row-${rowIndex}`}
+                                        component="h2"
                                         sx={{
-                                            aspectRatio: isSingleItemRow
-                                                ? undefined
-                                                : `${row.aspectRatio} / 1`,
-                                            display: "flex",
-                                            gap: photoMasonryGap,
-                                            width: "100%",
+                                            color: textSoft,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            lineHeight: "18px",
+                                            m: 0,
+                                            pb: "8px",
                                         }}
                                     >
-                                        {row.tiles.map((tile) =>
-                                            renderPostTile(
-                                                tile,
-                                                isSingleItemRow,
-                                            ),
-                                        )}
+                                        {title}
                                     </Box>
-                                );
-                            })}
+                                    <Box
+                                        sx={{
+                                            borderRadius: photoMasonryRadius,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: photoMasonryGap,
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {rows.map((row) => {
+                                            const isSingleItemRow =
+                                                row.tiles.length == 1;
+                                            return (
+                                                <Box
+                                                    key={row.tiles[0]!.item.id}
+                                                    sx={{
+                                                        aspectRatio:
+                                                            isSingleItemRow
+                                                                ? undefined
+                                                                : `${row.aspectRatio} / 1`,
+                                                        display: "flex",
+                                                        gap: photoMasonryGap,
+                                                        width: "100%",
+                                                    }}
+                                                >
+                                                    {row.tiles.map((tile) =>
+                                                        renderPostTile(
+                                                            tile,
+                                                            isSingleItemRow,
+                                                        ),
+                                                    )}
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
+                                </Box>
+                            ))}
                         </Box>
                     ) : shouldShowPostLoadingIndicator ? (
                         <ProfilePostLoadingIndicator />
@@ -1978,6 +2012,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             setIsDraftPostExitAnimating(true);
                         }}
                         onDraftPostExitStart={() => setIsDraftPostExiting(true)}
+                        onDraftPostPublished={() => {
+                            void clearSelectedPostHistory("back").then(() =>
+                                onPostSubmitted?.(),
+                            );
+                        }}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
@@ -2002,9 +2041,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                           },
                                           caption,
                                       );
-                                      return publishPromise.finally(() =>
-                                          releaseLocalPostObjectUrl(previewUrl),
+                                      localPostObjectUrlsRef.current.delete(
+                                          previewUrl,
                                       );
+                                      return publishPromise;
                                   }
                                 : undefined
                         }

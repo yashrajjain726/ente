@@ -218,9 +218,8 @@ fn is_non_empty_file(path: &Path) -> bool {
 }
 
 fn looks_like_gguf(path: &Path) -> bool {
-    let mut file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => return false,
+    let Ok(mut file) = File::open(path) else {
+        return false;
     };
     let mut header = [0u8; 4];
     file.read_exact(&mut header).is_ok() && &header == b"GGUF"

@@ -13,6 +13,12 @@ import type { CreateProfileSource } from "utils/routes";
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
 export type SpacePostPublishPhase = "failed" | "posted" | "posting";
+export interface SpacePostPublication {
+    phase: SpacePostPublishPhase;
+    post: SpacePost;
+    previewUrl: string;
+    statusExpiresAtMs?: number;
+}
 export type PendingCreateProfile = SetupProfileDetails & {
     source: CreateProfileSource;
 };
@@ -35,9 +41,11 @@ export interface SpaceAppState {
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
-    postPublishPhase: SpacePostPublishPhase | null;
+    postPublication: SpacePostPublication | null;
     signupEmail: string;
-    dismissPostPublishToast: () => void;
+    setPostPublication: React.Dispatch<
+        React.SetStateAction<SpacePostPublication | null>
+    >;
     publishPost: (
         image: SpaceDraftPostImage,
         caption: string,

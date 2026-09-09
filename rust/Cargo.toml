@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "apps/cli",
-    "apps/codegen",
     "apps/ensu/src-tauri",
     "bindings/frb/lib",
     "bindings/frb/locker",
@@ -33,12 +32,14 @@ members = [
     "crates/image",
     "crates/legacy",
     "crates/location",
-    "crates/location-dataset",
+    "crates/locker",
     "crates/ml",
     "crates/paste",
     "crates/photos",
     "crates/space",
     "crates/test-support",
+    "tools/codegen",
+    "tools/location-dataset",
 ]
 
 [workspace.package]
@@ -60,6 +61,7 @@ ente-frb-log = { path = "bindings/frb/log" }
 ente-image = { path = "crates/image" }
 ente-legacy = { path = "crates/legacy" }
 ente-location = { path = "crates/location" }
+ente-locker = { path = "crates/locker" }
 ente-ml = { path = "crates/ml" }
 ente-paste = { path = "crates/paste" }
 ente-photos = { path = "crates/photos" }
@@ -87,8 +89,8 @@ regex = "1.11.1"
 reqwest = { version = "0.12.28", default-features = false }
 rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
 serde-wasm-bindgen = "0.6.5"
+serde_json = "1.0.149"
 sha1 = "0.11.0"
 sha2 = "0.11.0"
 srp = { version = "0.7.0-rc.3", default-features = false }
@@ -109,12 +111,41 @@ zeroize = { version = "1.9.0", features = ["derive"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [workspace.lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(frb_expand)'] }
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 allow_attributes = "deny"
 allow_attributes_without_reason = "deny"
+collection_is_never_read = "deny"
+dbg_macro = "deny"
+debug_assert_with_mut_call = "deny"
+derive_partial_eq_without_eq = "deny"
+empty_drop = "deny"
+fallible_impl_from = "deny"
+implicit_clone = "deny"
+inefficient_to_string = "deny"
+large_stack_arrays = "deny"
+large_types_passed_by_value = "deny"
+manual_let_else = "deny"
+needless_collect = "deny"
+path_buf_push_overwrite = "deny"
+rc_mutex = "deny"
+read_zero_byte_vec = "deny"
+redundant_clone = "deny"
+redundant_closure_for_method_calls = "deny"
+suspicious_operation_groupings = "deny"
+trivially_copy_pass_by_ref = "deny"
+uninlined_format_args = "deny"
+unused_async = "deny"
+unused_peekable = "deny"
+unused_rounding = "deny"
+unwrap_used = "deny"
 
 # Unoptimized Argon2 makes production-strength derivations dominate test runtime.
 [profile.dev.package.argon2]
+opt-level = 3
+
+# Unoptimized HNSW construction makes the vecdb recall fixtures dominate test runtime.
+[profile.dev.package.ente-ml]
 opt-level = 3

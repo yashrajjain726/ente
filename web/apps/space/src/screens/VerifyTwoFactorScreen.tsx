@@ -7,6 +7,7 @@ import { SpaceOtpInput } from "components/OtpInput";
 import React, { useEffect, useRef, useState } from "react";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -264,7 +265,9 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
                                 : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: isVerifyButtonActive ? "white" : textLight,
+                            color: isVerifyButtonActive
+                                ? spaceOnAccent
+                                : textLight,
                             cursor: canVerify ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

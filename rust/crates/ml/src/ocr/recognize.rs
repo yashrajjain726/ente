@@ -757,7 +757,7 @@ mod tests {
 
         assert_eq!(batches, [vec![10, 20, 30, 40, 50, 60], vec![70, 80]]);
         let texts: Vec<String> = results.into_iter().map(|r| r.text).collect();
-        let expected: Vec<String> = widths.iter().map(|w| w.to_string()).collect();
+        let expected: Vec<String> = widths.iter().map(ToString::to_string).collect();
         assert_eq!(texts, expected);
     }
 

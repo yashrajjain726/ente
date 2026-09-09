@@ -5,7 +5,12 @@ import { spaceAppAvatarCropSize } from "components/AvatarCropPage";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import React, { useEffect, useRef } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
+import {
+    spaceAppBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceText,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import {
     spaceAvatarImageInputAccept,
@@ -347,7 +352,7 @@ export const ProfileImageViewerScreen: React.FC<
                             bgcolor: green,
                             border: 0,
                             borderRadius: "20px",
-                            color: "white",
+                            color: spaceOnAccent,
                             cursor: "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

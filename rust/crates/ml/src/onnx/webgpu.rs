@@ -110,6 +110,10 @@ pub(super) fn check_adapter() -> AdapterCheck {
 }
 
 #[cfg(target_os = "android")]
+#[expect(
+    unsafe_code,
+    reason = "Probe Vulkan device vendors through ash's unsafe API"
+)]
 fn probe_vulkan_vendor_ids() -> Result<Vec<u32>, String> {
     use ash::vk;
 
@@ -208,9 +212,8 @@ fn model_dir(model_path: &str) -> Option<PathBuf> {
     test
 ))]
 fn quarantined(dir: &Path) -> bool {
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return true,
+    let Ok(entries) = fs::read_dir(dir) else {
+        return true;
     };
     for entry in entries {
         let Ok(entry) = entry else {

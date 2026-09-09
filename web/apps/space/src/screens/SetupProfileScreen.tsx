@@ -3,6 +3,7 @@ import { SpaceBackIcon } from "components/BackIcon";
 import React, { useState } from "react";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -382,7 +383,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             bgcolor: canContinue ? green : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: canContinue ? "white" : textLight,
+                            color: canContinue ? spaceOnAccent : textLight,
                             cursor: canContinue ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

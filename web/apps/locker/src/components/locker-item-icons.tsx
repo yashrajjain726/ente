@@ -23,17 +23,17 @@ interface LockerIconConfig {
 const itemTypeIconConfigs: Record<LockerItemType, LockerIconConfig> = {
     note: {
         icon: NoteIcon,
-        color: "rgba(255, 152, 0, 1)",
+        color: "#f08a1e",
         backgroundColor: "rgba(255, 152, 0, 0.06)",
     },
     physicalRecord: {
         icon: Briefcase01Icon,
-        color: "rgba(156, 39, 176, 1)",
+        color: "#9610d6",
         backgroundColor: "rgba(156, 39, 176, 0.06)",
     },
     accountCredential: {
         icon: LockPasswordIcon,
-        color: "rgba(16, 113, 255, 1)",
+        color: "#1071ff",
         backgroundColor: "rgba(16, 113, 255, 0.06)",
     },
     emergencyContact: {
@@ -41,28 +41,28 @@ const itemTypeIconConfigs: Record<LockerItemType, LockerIconConfig> = {
         color: "rgba(244, 67, 54, 1)",
         backgroundColor: "rgba(244, 67, 54, 0.06)",
     },
-    file: { icon: File02Icon, color: "#757575", backgroundColor: "#FAFAFA" },
+    file: { icon: File02Icon, color: "#666666", backgroundColor: "#FAFAFA" },
 };
 
 const fileIconConfigs: Record<string, LockerIconConfig> = {
     pdf: {
         icon: File01Icon,
-        color: "rgba(246, 58, 58, 1)",
+        color: "#f63a3a",
         backgroundColor: "rgba(255, 58, 58, 0.06)",
     },
     image: {
         icon: Image01Icon,
-        color: "rgba(8, 194, 37, 1)",
+        color: "#08c225",
         backgroundColor: "rgba(8, 194, 37, 0.06)",
     },
     presentation: {
         icon: Presentation01Icon,
-        color: "rgba(16, 113, 255, 1)",
+        color: "#1071ff",
         backgroundColor: "rgba(16, 113, 255, 0.06)",
     },
     spreadsheet: {
         icon: Table01Icon,
-        color: "#388E3C",
+        color: "#08c225",
         backgroundColor: "#E8F5E9",
     },
     default: itemTypeIconConfigs.file,
@@ -70,7 +70,7 @@ const fileIconConfigs: Record<string, LockerIconConfig> = {
 
 export const createDocumentIconConfig: LockerIconConfig = {
     icon: FileUploadIcon,
-    color: "rgba(16, 113, 255, 1)",
+    color: "#1071ff",
     backgroundColor: "rgba(16, 113, 255, 0.06)",
 };
 

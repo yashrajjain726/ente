@@ -10,13 +10,18 @@ import type { FriendProfile } from "data/friends";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
-import { spaceDialogBackground, spaceSurface, spaceText } from "styles/colors";
+import {
+    spaceAppBackgroundColor,
+    spaceDialogBackground,
+    spaceSurface,
+    spaceSurfaceHover,
+    spaceText,
+} from "styles/colors";
 
 const actionHeight = 40;
-const actionRowPadding = 12;
-const photoBorder = 2;
+const dialogPadding = 12;
 const innerRadius = actionHeight / 2;
-const dialogRadius = innerRadius + actionRowPadding;
+const dialogRadius = innerRadius + dialogPadding;
 
 interface FriendQuickActionsDialogProps {
     anchorRect: DOMRect;
@@ -111,12 +116,13 @@ export const FriendQuickActionsDialog: React.FC<
             aria-labelledby={nameID}
             maxWidth={false}
             transitionDuration={prefersReducedMotion ? 0 : 220}
+            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.64)" }}
             slotProps={{
                 paper: {
                     ref: paperRef,
                     sx: {
-                        bgcolor: spaceDialogBackground,
-                        boxShadow: "none",
+                        bgcolor: spaceSurface,
+                        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.48)",
                         borderRadius: `${dialogRadius}px`,
                         boxSizing: "border-box",
                         display: "flex",
@@ -126,8 +132,8 @@ export const FriendQuickActionsDialog: React.FC<
                         maxWidth: "calc(100vw - 32px)",
                         overflow: "hidden",
                         position: "relative",
-                        pt: `${photoBorder}px`,
-                        top: -160,
+                        pt: `${dialogPadding}px`,
+                        top: -155,
                         width: "288px",
                         "@media (max-height: 720px)": { top: 0 },
                     },
@@ -170,12 +176,12 @@ export const FriendQuickActionsDialog: React.FC<
                 sx={{
                     alignSelf: "center",
                     aspectRatio: "1",
-                    bgcolor: spaceSurface,
-                    borderRadius: `${dialogRadius - photoBorder}px`,
+                    bgcolor: spaceAppBackgroundColor,
+                    borderRadius: `${innerRadius}px`,
                     flexShrink: 0,
                     overflow: "hidden",
                     position: "relative",
-                    width: `min(calc(100% - ${photoBorder * 2}px), calc(100svh - ${photoBorder + actionRowPadding * 2 + actionHeight + 32}px))`,
+                    width: `min(calc(100% - ${dialogPadding * 2}px), calc(100svh - ${dialogPadding * 3 + actionHeight + 32}px))`,
                 }}
             >
                 <SpaceAvatarImage src={avatarUrl} />
@@ -183,7 +189,7 @@ export const FriendQuickActionsDialog: React.FC<
                     aria-hidden
                     sx={{
                         background:
-                            "linear-gradient(rgba(0, 0, 0, 0.28), transparent 45%)",
+                            "linear-gradient(rgba(0, 0, 0, 0.52), transparent 55%)",
                         inset: 0,
                         pointerEvents: "none",
                         position: "absolute",
@@ -219,14 +225,14 @@ export const FriendQuickActionsDialog: React.FC<
                         sx={{
                             bgcolor: "rgba(0, 0, 0, 0.7)",
                             borderRadius: "12px",
-                            bottom: actionRowPadding,
+                            bottom: dialogPadding,
                             color: "#FFFFFF",
                             fontSize: 12,
-                            left: actionRowPadding,
+                            left: dialogPadding,
                             lineHeight: "16px",
                             p: "8px 12px",
                             position: "absolute",
-                            right: actionRowPadding,
+                            right: dialogPadding,
                             textAlign: "center",
                         }}
                     >
@@ -239,7 +245,7 @@ export const FriendQuickActionsDialog: React.FC<
                     display: "grid",
                     gap: "6px",
                     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    p: `${actionRowPadding}px`,
+                    p: `${dialogPadding}px`,
                 }}
             >
                 {actions.map((action, index) => (
@@ -257,23 +263,27 @@ export const FriendQuickActionsDialog: React.FC<
                         sx={{
                             alignItems: "center",
                             appearance: "none",
-                            bgcolor: spaceSurface,
+                            bgcolor: spaceDialogBackground,
                             border: 0,
                             borderRadius: `${innerRadius}px`,
-                            color: spaceText,
+                            color: action.active
+                                ? "color(display-p3 0.0314 0.7608 0.1451)"
+                                : spaceText,
                             cursor: action.disabled ? "default" : "pointer",
                             display: "grid",
                             justifyItems: "center",
                             height: actionHeight,
                             minWidth: 0,
                             p: "0 8px",
-                            transition: "filter 120ms ease",
-                            "&:hover:not(:disabled)": {
-                                filter: "brightness(0.96)",
-                            },
-                            "&:active:not(:disabled)": {
-                                filter: "brightness(0.92)",
-                            },
+                            ...(action.label != "Poke" && {
+                                transition: "background-color 120ms ease",
+                                "&:hover:not(:disabled)": {
+                                    bgcolor: spaceSurfaceHover,
+                                },
+                                "&:active:not(:disabled)": {
+                                    bgcolor: spaceAppBackgroundColor,
+                                },
+                            }),
                             "&:focus-visible": {
                                 outline: `2px solid ${spaceText}`,
                                 outlineOffset: 2,
@@ -285,7 +295,6 @@ export const FriendQuickActionsDialog: React.FC<
                             aria-hidden
                             sx={{
                                 alignItems: "center",
-                                color: action.active ? "#08C225" : spaceText,
                                 display: "flex",
                                 height: 24,
                                 justifyContent: "center",

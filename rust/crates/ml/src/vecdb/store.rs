@@ -10,7 +10,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use super::arena::{UpsertOutcome, VECTORS_PER_CHUNK, VectorArena};
-use super::graph::{Graph, search as graph_search, search_excluding};
+use super::graph::{Graph, search as graph_search, search_stored};
 use super::lock::WriterLock;
 use super::log::{
     HEADER_LEN, Log, LogEntry, LogRecord, header_generation, remove_if_present,
@@ -32,8 +32,6 @@ const HANDOFF_CLOSE_WAIT_ROUNDS: u32 = 2500;
 const HANDOFF_WAIT_PARK: Duration = Duration::from_millis(2);
 const KEY_TABLE_COPIES: usize = 2;
 const KEY_ENTRY_OVERHEAD_BYTES: usize = 48;
-const GRAPH_NODE_OVERHEAD_BYTES: usize = 48;
-const NEIGHBOR_LIST_OVERHEAD_BYTES: usize = 24;
 
 static REGISTRY: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<PathSlot>>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -685,13 +683,12 @@ impl VecDb {
                 });
                 continue;
             }
-            let mut matches = search_excluding(
+            let mut matches = search_stored(
                 st.search_graph(),
                 &st.arena,
-                st.arena.vector_lanes(slot),
+                slot,
                 &params,
                 allowed_slots.as_ref(),
-                Some(slot),
             );
             if let Some(cap) = max_distance {
                 let keep = matches.partition_point(|entry| entry.distance <= cap);
@@ -915,9 +912,8 @@ fn registry_holds_live(key: &Path) -> bool {
 }
 
 fn open_cost_from_files(path: &Path) -> OpenCost {
-    let mut file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => return OpenCost::Absent,
+    let Ok(mut file) = File::open(path) else {
+        return OpenCost::Absent;
     };
     let log_len = match file.metadata() {
         Ok(meta) => meta.len(),
@@ -1426,21 +1422,7 @@ fn approximate_memory_bytes(state: &SearchState) -> usize {
         .map(|key| KEY_TABLE_COPIES * (key.len() + KEY_ENTRY_OVERHEAD_BYTES))
         .sum();
     let free_list_bytes = state.arena.dead_count() * size_of::<u32>();
-    let graph_bytes: usize = state.graph.as_ref().map_or(0, |graph| {
-        graph
-            .slots()
-            .map(|slot| {
-                let level = graph.level_of(slot).unwrap_or(0);
-                GRAPH_NODE_OVERHEAD_BYTES
-                    + (0..=level)
-                        .map(|layer| {
-                            NEIGHBOR_LIST_OVERHEAD_BYTES
-                                + size_of_val(graph.neighbors_of(slot, layer))
-                        })
-                        .sum::<usize>()
-            })
-            .sum()
-    });
+    let graph_bytes = state.graph.as_ref().map_or(0, Graph::memory_bytes);
     vector_bytes + key_bytes + free_list_bytes + graph_bytes + state.attrs.memory_bytes()
 }
 
@@ -2635,6 +2617,10 @@ mod tests {
         let key = registry_key_for(&stalled_path).unwrap();
         let slot = path_slot(&key);
         let build_in_progress = lock_slot(&slot);
+        #[expect(
+            clippy::needless_collect,
+            reason = "Start both worker threads before releasing the slot lock"
+        )]
         let stalled_openers: Vec<_> = (0..2)
             .map(|_| {
                 let path = stalled_path.clone();
@@ -3266,7 +3252,7 @@ mod tests {
         assert_eq!(
             db.bulk_search(std::slice::from_ref(&query), &approx)
                 .unwrap(),
-            vec![expected.clone()]
+            vec![expected]
         );
         assert_eq!(
             db.bulk_search_stored(&stored_keys, 5, None, false, false)
@@ -4795,7 +4781,7 @@ mod tests {
         db.add("seed", &vector).unwrap();
         let log_bytes = db.stats().unwrap().log_bytes;
         let keys = vec!["x".to_string(), "y".to_string()];
-        let vectors = vec![vector.clone(), vector.clone()];
+        let vectors = vec![vector.clone(), vector];
         assert!(matches!(
             db.bulk_add_with_attrs(&keys, &vectors, &[None]),
             Err(VecDbError::LengthMismatch {

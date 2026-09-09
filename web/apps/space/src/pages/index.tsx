@@ -549,10 +549,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         if (!publicIdentity && publicError) {
             return (
                 <>
-                    <SpacePageMeta
-                        themeColor={spaceAppBackgroundColor}
-                        preview="invite"
-                    />
+                    <SpacePageMeta themeColor="#FFFFFF" preview="invite" />
                     <PublicProfileUnavailable />
                 </>
             );
@@ -640,7 +637,9 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         return (
             <>
                 <SpacePageMeta
-                    themeColor={spaceAppBackgroundColor}
+                    themeColor={
+                        publicLink ? spaceAppBackgroundColor : "#FFFFFF"
+                    }
                     preview="invite"
                 />
                 {publicLink ? (

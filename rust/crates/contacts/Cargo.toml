@@ -17,7 +17,6 @@ ente-legacy.workspace = true
 ente-test-support.workspace = true
 hmac.workspace = true
 mockito.workspace = true
-reqwest = { workspace = true, features = ["json"] }
 serde_json.workspace = true
 sha1.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }

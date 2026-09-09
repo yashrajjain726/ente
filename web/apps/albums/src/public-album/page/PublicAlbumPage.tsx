@@ -138,10 +138,6 @@ const loadJoinPublicAlbumRedirect = () =>
 
 const publicAlbumAllFilesCollectionID = 0;
 
-const isDeviceLimitExceededError = async (e: unknown) =>
-    isHTTPErrorWithStatus(e, 429) ||
-    (await isMuseumHTTPError(e, 403, "LINK_DEVICE_LIMIT_EXCEEDED"));
-
 const accessTokenFromURL = (url: URL) =>
     url.searchParams.get("t") || url.pathname.split("/").find(Boolean);
 
@@ -437,7 +433,11 @@ export default function PublicAlbumPage() {
                 }
             }
         } catch (e) {
-            const isDeviceLimitExceeded = await isDeviceLimitExceededError(e);
+            const isDeviceLimitExceeded = await isMuseumHTTPError(
+                e,
+                403,
+                "LINK_DEVICE_LIMIT_EXCEEDED",
+            );
             if (
                 isHTTPErrorWithStatus(e, 401) ||
                 isHTTPErrorWithStatus(e, 410) ||

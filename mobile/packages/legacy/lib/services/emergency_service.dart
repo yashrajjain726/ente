@@ -148,11 +148,9 @@ class EmergencyContactService {
       );
       return true;
     } on DioException catch (e) {
-      if (e.response?.statusCode == 400) {
-        final message = e.response?.data?['message'] as String?;
-        if (message != null && message.contains('active recovery session')) {
-          return false;
-        }
+      if (e.response?.statusCode == 400 &&
+          e.response?.data?['code'] == 'ACTIVE_RECOVERY_SESSION') {
+        return false;
       }
       _logger.severe('failed to update recovery notice', e);
       rethrow;

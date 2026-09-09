@@ -245,6 +245,10 @@ fn open_collection_source(root: &Path, _document_id: &str, path: &Path) -> Resul
 }
 
 #[cfg(windows)]
+#[expect(
+    unsafe_code,
+    reason = "Resolve the opened Windows handle to reject path escapes"
+)]
 fn final_windows_handle_path(file: &File) -> Result<PathBuf, ApiError> {
     use std::ffi::OsString;
     use windows_sys::Win32::Foundation::HANDLE;

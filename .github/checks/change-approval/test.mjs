@@ -441,3 +441,129 @@ test("CI mode with nothing flagged", (t) => {
 test("ordinary change is silent", (t) => {
     assert.equal(scan(t, { "src/a.txt": "a\n" }, { "src/a.txt": "b\n", "src/b.txt": "c\n" }), "");
 });
+
+test("Cargo lint changes need approval across TOML layouts", (t) => {
+    for (const [before, after] of [
+        ['', '[workspace.lints.rust]\nunsafe_code = "deny"\n'],
+        ['[workspace.lints.rust]\nunsafe_code = "deny"\n', '[workspace.lints.rust]\nunsafe_code = "warn"\n'],
+        ['[workspace.lints.rust]\nunsafe_code = "deny"\n', ''],
+        ['[lints]\nworkspace = true\n', '[lints.rust]\nunsafe_code = "allow"\n'],
+        ['', 'workspace.lints = { rust = { unsafe_code = "allow" } }\n'],
+        ['[workspace]\nmembers = ["a", "b"]\n', '[workspace]\nmembers = ["a", "b"]\ndefault-members = ["a"]\n'],
+        ['[workspace]\nmembers = ["a", "b"]\n', '[workspace]\nmembers = ["a"]\nexclude = ["b"]\n'],
+    ]) {
+        const { output, summary } = scan(t, { "rust/Cargo.toml": before }, { "rust/Cargo.toml": after }, { ci: true });
+        assert.equal(output, 'categories=["Rust lint policy files"]\n');
+        assert.match(summary, /## Rust lint declarations and files containing unsafe\n\n- `rust\/Cargo.toml`/);
+    }
+});
+
+test("Cargo dependency edits and equivalent lint layouts need no lint approval", (t) => {
+    assert.equal(scan(t, {
+        "rust/Cargo.toml": '[workspace.lints.rust]\nunsafe_code = "deny"\ndead_code = "warn"\n[workspace.dependencies]\nserde = "1"\n',
+    }, {
+        "rust/Cargo.toml": 'workspace.lints.rust = { dead_code = "warn", unsafe_code = "deny" }\n[workspace.dependencies]\nserde = "2"\n',
+    }), "");
+});
+
+test("reordering Cargo workspace selection lists needs no approval", (t) => {
+    for (const key of ["members", "exclude", "default-members"]) {
+        assert.equal(scan(t, {
+            "rust/Cargo.toml": `[workspace]\n${key} = ["a", "b"]\n`,
+        }, {
+            "rust/Cargo.toml": `[workspace]\n${key} = ["b", "a"]\n`,
+        }), "");
+    }
+});
+
+test("Rust lint declarations, reasons and conditions need approval", (t) => {
+    const expect = '#[expect(dead_code, reason = "Shared helper")]';
+    const body = 'fn helper() {}';
+    for (const [before, after] of [
+        [body, `${expect}\n${body}`],
+        [`${expect}\n${body}`, body],
+        [`${expect}\n${body}`, null],
+        [`${expect}\n${body}`, `${expect.replace("Shared helper", "New reason")}\n${body}`],
+        [`${expect}\n${body}`, `${expect.replace("dead_code", "unused_variables")}\n${body}`],
+        [`#[cfg(unix)]\n${expect}\n${body}`, `${expect}\n${body}`],
+        [`#[cfg_attr(unix, expect(dead_code))]\n${body}`, `#[cfg_attr(test, expect(dead_code))]\n${body}`],
+        [`#[cfg_attr(unix, cfg_attr(test, expect(dead_code)))]\n${body}`, body],
+        [`#[path = "a.rs"]\n${expect}\nmod support;`, `#[path = "b.rs"]\n${expect}\nmod support;`],
+        [body, `#![allow(clippy::allow_attributes, clippy::allow_attributes_without_reason, dead_code)]\n${body}`],
+        [body, `#[allow(dead_code, reason = "Shared helper")]\n${body}`],
+        [`#[deny(dead_code)]\nmod guarded {}`, 'mod guarded {}'],
+        [body, `#[r#expect(dead_code, reason = "Shared helper")]\n${body}`],
+        [`${expect}\nmod support {}`, `${expect.replace("#[", "#![")}\nmod support {}`],
+        [`${expect}\n${body}\nfn other() {}`, `${body}\n${expect}\nfn other() {}`],
+    ]) {
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }), /^1 Rust lint policy file\n/);
+    }
+});
+
+test("ordinary code under existing lint declarations needs no approval", (t) => {
+    for (const before of [
+        '#[expect(dead_code, reason = "Shared helper")] fn helper() { first(); }',
+        '#![expect(dead_code, reason = "Shared helpers")] fn helper() { first(); }',
+        '#![forbid(unsafe_code)] fn helper() { first(); }',
+        'fn helper() { #[expect(unused_variables, reason = "Temporary binding")] let value = first(); }',
+    ]) {
+        assert.equal(scan(t, { "src/lib.rs": before }, { "src/lib.rs": before.replace('first()', 'second()') }), "");
+    }
+});
+
+test("any edit in a file containing unsafe needs approval", (t) => {
+    for (const before of [
+        'fn call() { #[expect(unsafe_code)] if ready() {} else { unsafe { first(); } } }',
+        'unsafe impl Send for Context {}\nfn unrelated() { first(); }',
+        'unsafe fn ffi() {}\n// first',
+    ]) {
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": before.replace('first', 'second') }), /^1 Rust lint policy file\n/);
+    }
+});
+
+test("unsafe in either revision needs approval, including new and deleted files", (t) => {
+    const source = 'fn call() { unsafe { ffi(); } }';
+    for (const [before, after] of [
+        ['fn call() {}', source],
+        [source, 'fn call() {}'],
+        [source, null],
+    ]) {
+        assert.match(scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }), /^1 Rust lint policy file\n/);
+    }
+    assert.match(scan(t, {}, { "src/lib.rs": source }, { commit: false }), /^1 Rust lint policy file\n/);
+});
+
+test("external module edits need approval only when the edited file contains unsafe", (t) => {
+    for (const [before, needsApproval] of [
+        ['pub fn call() { unsafe {\n    first();\n} }', true],
+        ['fn helper() { first(); }', false],
+    ]) {
+        const { output } = scan(t, {
+            "src/lib.rs": '#[expect(dead_code, unsafe_code, reason = "Shared helpers")] #[path = "support/mod.rs"] mod support;',
+            "src/support/mod.rs": 'mod nested;',
+            "src/support/nested.rs": before,
+        }, {
+            "src/support/nested.rs": before.replace('first()', 'second()'),
+        }, { ci: true });
+        assert.equal(output, needsApproval ? 'categories=["Rust lint policy files"]\n' : 'categories=[]\n');
+    }
+});
+
+test("Rust comments, literals and raw identifiers do not count as unsafe or declarations", (t) => {
+    const before = String.raw`
+// unsafe { #[allow(dead_code)]
+/* nested /* unsafe #[allow(dead_code)] */ comment */
+const EXAMPLE: &str = r##"unsafe #[expect(dead_code)]"##;
+fn example() {
+    let r#unsafe = "unsafe #[allow(dead_code)]";
+    let _ = (b"unsafe", c"unsafe", br"unsafe", cr#"unsafe"#, ']');
+}
+#[expect(dead_code, reason = "brackets: ] [ escaped: \")]")]
+fn helper() {}
+`;
+    const after = before
+        .replaceAll('unsafe', 'example')
+        .replace('expect(dead_code, reason', 'expect(\n dead_code, /* comment */\n reason')
+        .replace('fn helper() {}', 'fn helper() { let c = \'[\'; }');
+    assert.equal(scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }), "");
+});

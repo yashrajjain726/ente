@@ -4,6 +4,12 @@ import { Box } from "@mui/material";
 import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import React from "react";
 import { spaceEmptyStateButtonSx } from "styles/buttons";
+import {
+    spaceAppBackgroundColor,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
+import { spaceTouchTargetSize } from "styles/touch-targets";
 
 export const SpaceShareIcon: React.FC<{
     size?: number;
@@ -13,14 +19,16 @@ export const SpaceShareIcon: React.FC<{
 );
 
 interface SpaceShareInviteButtonProps {
+    disabled?: boolean;
     profileLink?: string;
     sharing?: boolean;
-    variant?: "green" | "white";
+    variant?: "green" | "secondary" | "text";
     onShareError?: (error: unknown) => void;
     onSharingChange?: (sharing: boolean) => void;
 }
 
 export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
+    disabled = false,
     profileLink,
     sharing,
     variant = "green",
@@ -30,7 +38,7 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
     const [copied, setCopied] = React.useState(false);
     const [canShare, setCanShare] = React.useState(false);
     const isSharing = sharing ?? false;
-    const isDisabled = isSharing || !profileLink;
+    const isDisabled = disabled || isSharing || !profileLink;
 
     React.useEffect(() => {
         setCanShare(typeof navigator.share == "function");
@@ -81,26 +89,49 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
             disabled={isDisabled}
             onClick={() => void shareInvite()}
             sx={
-                variant == "white"
+                variant == "text"
                     ? {
-                          ...spaceEmptyStateButtonSx,
-                          bgcolor: "#FFF",
-                          color: "#303030",
+                          bgcolor: "transparent",
+                          border: 0,
+                          borderRadius: "8px",
+                          color: spaceTextMuted,
+                          cursor: "pointer",
+                          fontFamily: '"Inter Variable", Inter, sans-serif',
+                          fontSize: 13,
+                          fontWeight: 500,
+                          lineHeight: "18px",
+                          minHeight: spaceTouchTargetSize,
+                          p: "8px 12px",
+                          textDecoration: "underline",
+                          textUnderlineOffset: "3px",
+                          "&:disabled": { cursor: "default", opacity: 0.45 },
                           "&:focus-visible": {
-                              outline: "2px solid #303030",
+                              outline: `2px solid ${spaceText}`,
                               outlineOffset: 2,
                           },
-                          "&:hover:not(:disabled)": { bgcolor: "#F4F4F4" },
+                          "&:hover:not(:disabled)": { color: spaceText },
                       }
-                    : spaceEmptyStateButtonSx
+                    : variant == "secondary"
+                      ? {
+                            ...spaceEmptyStateButtonSx,
+                            bgcolor: "#FFFFFF",
+                            color: spaceAppBackgroundColor,
+                            "&:focus-visible": {
+                                outline: `2px solid ${spaceText}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover:not(:disabled)": { bgcolor: spaceText },
+                        }
+                      : spaceEmptyStateButtonSx
             }
         >
-            <SpaceShareIcon />
+            {variant != "text" && <SpaceShareIcon />}
             {copied
                 ? "Invite link copied"
                 : canShare
                   ? "Share invite link"
                   : "Copy invite link"}
+            {variant == "text" && !copied && " instead"}
         </Box>
     );
 };

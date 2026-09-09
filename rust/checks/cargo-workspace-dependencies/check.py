@@ -32,14 +32,22 @@ for package in packages:
 
 failed = False
 
-members = tomllib.loads((root / "rust/Cargo.toml").read_text())["workspace"]["members"]
-for previous, member in zip(members, members[1:]):
-    if previous > member:
-        print(
-            f"rust/Cargo.toml: workspace.members {previous!r} precedes {member!r}; sort members",
-            file=sys.stderr,
-        )
-        failed = True
+
+def check_order(entries, path, table):
+    entries = list(entries)
+    for previous, current in zip(entries, entries[1:]):
+        if previous > current:
+            print(
+                f"{path}: {table} must be sorted: {previous!r} precedes {current!r}",
+                file=sys.stderr,
+            )
+            return False
+    return True
+
+
+workspace = tomllib.loads((root / "rust/Cargo.toml").read_text())["workspace"]
+for table in ("members", "dependencies"):
+    failed |= not check_order(workspace.get(table, {}), "rust/Cargo.toml", f"workspace.{table}")
 
 for package in packages:
     manifest = Path(package["manifest_path"])
@@ -58,6 +66,7 @@ for package in packages:
         for section in sections
     ]
     for table, dependencies in tables:
+        failed |= not check_order(dependencies, path, table)
         for name, declaration in dependencies.items():
             if isinstance(declaration, dict) and declaration.get("workspace") is True:
                 continue
@@ -71,5 +80,6 @@ for package in packages:
                 file=sys.stderr,
             )
             failed = True
+    failed |= not check_order(cargo.get("features", {}), path, "features")
 
 sys.exit(1 if failed else 0)

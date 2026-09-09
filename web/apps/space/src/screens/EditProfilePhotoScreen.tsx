@@ -6,7 +6,7 @@ import { SpaceLoadingSpinner } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
-import { spaceAppBackground, spaceText } from "styles/colors";
+import { spaceAppBackground, spaceOnAccent, spaceText } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import {
     prepareSpaceAvatarImageFromCrop,
@@ -325,7 +325,7 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
                                         bgcolor: green,
                                         border: 0,
                                         borderRadius: "20px",
-                                        color: "white",
+                                        color: spaceOnAccent,
                                         cursor: "pointer",
                                         display: "flex",
                                         fontFamily:

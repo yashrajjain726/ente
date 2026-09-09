@@ -3,39 +3,11 @@ import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { getKV, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
+import { CachedSpacePost } from "services/post-cache";
 import { loadCurrentHomePostsPage, type SpacePost } from "services/space";
 import { z } from "zod";
 
 const homePostsVersion = 1;
-
-const CachedSpacePostAsset = z.object({
-    encryptedPostKey: z.string(),
-    keyVersion: z.number(),
-    mediaType: z.string().optional(),
-    objectKey: z.string(),
-    postId: z.number(),
-    spaceId: z.string(),
-});
-
-const CachedSpacePost = z.object({
-    avatarKeyVersion: z.number().optional(),
-    avatarObjectID: z.string().optional(),
-    avatarSize: z.number().optional(),
-    avatarUpdatedAt: z.string().optional(),
-    caption: z.string().optional(),
-    friendID: z.string(),
-    height: z.number().optional(),
-    imageAsset: CachedSpacePostAsset.optional(),
-    isUnavailable: z.boolean().optional(),
-    name: z.string(),
-    postId: z.number(),
-    spaceId: z.string(),
-    thumbHash: z.string().optional(),
-    timestampMs: z.number(),
-    username: z.string().optional(),
-    viewerLiked: z.boolean(),
-    width: z.number().optional(),
-});
 
 const PostMarker = z.object({
     postId: z.number().int().positive(),

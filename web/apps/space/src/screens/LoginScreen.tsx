@@ -4,6 +4,7 @@ import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import {
     spaceAppBackground,
+    spaceOnAccent,
     spaceSurface,
     spaceText,
     spaceTextMuted,
@@ -468,7 +469,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                                 : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: isContinueButtonActive ? "white" : textLight,
+                            color: isContinueButtonActive
+                                ? spaceOnAccent
+                                : textLight,
                             cursor: canContinue ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

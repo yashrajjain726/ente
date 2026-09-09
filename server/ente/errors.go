@@ -288,6 +288,9 @@ const (
 	LinkEditNotAllowed ErrorCode = "LINK_EDIT_NOT_ALLOWED"
 
 	LinkDeviceLimitExceeded ErrorCode = "LINK_DEVICE_LIMIT_EXCEEDED"
+	LinkExpired             ErrorCode = "LINK_EXPIRED"
+	LinkDisabled            ErrorCode = "LINK_DISABLED"
+	LinkUnavailable         ErrorCode = "LINK_UNAVAILABLE"
 
 	ActiveRecoverySession ErrorCode = "ACTIVE_RECOVERY_SESSION"
 )
