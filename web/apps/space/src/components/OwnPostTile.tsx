@@ -7,7 +7,11 @@ import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpacePost, SpacePostAssetURLLoader } from "services/space";
 import { useSpaceAppState, type SpacePostPublishPhase } from "state/app-state";
-import { spaceSurface, spaceTextMuted } from "styles/colors";
+import {
+    spaceAppBackground,
+    spaceSurface,
+    spaceTextMuted,
+} from "styles/colors";
 import {
     spacePostTileRadius,
     spaceTileCircleInset,
@@ -350,9 +354,8 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                 >
                     <Box
                         sx={{
-                            border: avatarUrl
-                                ? "2px solid rgba(255, 255, 255, 0.36)"
-                                : "2px solid rgba(255, 255, 255, 0.28)",
+                            bgcolor: spaceAppBackground,
+                            border: `3px solid ${spaceAppBackground}`,
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             flexShrink: 0,
