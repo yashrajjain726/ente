@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	b64 "encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -1107,7 +1108,7 @@ func main() {
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
-		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController)
+		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController, usageRepo, lockController)
 
 	primaryDBCollector := sqlstats.NewStatsCollector("prod_db", db)
 	latencySensitiveDBCollector := sqlstats.NewStatsCollector("latency_sensitive_db", latencySensitiveDB)
@@ -1297,7 +1298,9 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	healthCheckHandler *api.HealthCheckHandler,
 	castDb castRepo.Repository,
 	inactiveUserOrchestrator *user.InactiveUserOrchestrator,
-	spaceDripController *spacecontroller.SpaceDripController) {
+	spaceDripController *spacecontroller.SpaceDripController,
+	usageRepo *repo.UsageRepository,
+	lockController *lock.LockController) {
 	if viper.GetBool("jobs.cron.skip") {
 		log.Info("Skipping cron jobs")
 		return
@@ -1421,6 +1424,63 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 
 	schedule(c, "@every 24h", func() {
 		pushController.ClearExpiredTokens()
+	})
+
+	const (
+		fileCountInitializationBatchSize = 10
+		fileCountInitializationLock      = "file_count_initialization"
+	)
+	var afterFileCountUserID int64
+	var resumeFileCountInitializationAt time.Time
+	schedule(c, "@every 1m", func() {
+		if !lockController.TryLock(fileCountInitializationLock, timeUtil.MicrosecondsAfterHours(3)) {
+			return
+		}
+		defer lockController.ReleaseLock(fileCountInitializationLock)
+		if time.Now().Before(resumeFileCountInitializationAt) {
+			return
+		}
+
+		userIDs, err := usageRepo.GetFileCountInitializationCandidates(context.Background(), afterFileCountUserID, fileCountInitializationBatchSize)
+		if err != nil {
+			log.WithError(err).Error("Failed to fetch file count initialization candidates")
+			return
+		}
+		if len(userIDs) == 0 {
+			afterFileCountUserID = 0
+			resumeFileCountInitializationAt = time.Now().Add(24 * time.Hour)
+			return
+		}
+		initialized, deferred, ineligible := 0, 0, 0
+		for _, userID := range userIDs {
+			afterFileCountUserID = userID
+			updated, err := usageRepo.InitializeFileCounts(context.Background(), userID)
+			if errors.Is(err, repo.ErrFileCountIneligible) {
+				ineligible++
+				log.WithError(err).WithField("user_id", userID).Warn("File count initialization ineligible")
+				continue
+			}
+			if err != nil {
+				log.WithError(err).WithField("user_id", userID).Error("Failed to initialize file counts")
+				return
+			}
+			if updated {
+				initialized++
+			} else {
+				deferred++
+			}
+		}
+		if len(userIDs) < fileCountInitializationBatchSize {
+			afterFileCountUserID = 0
+			resumeFileCountInitializationAt = time.Now().Add(24 * time.Hour)
+		}
+		log.WithFields(log.Fields{
+			"attempted":    len(userIDs),
+			"initialized":  initialized,
+			"deferred":     deferred,
+			"ineligible":   ineligible,
+			"last_user_id": userIDs[len(userIDs)-1],
+		}).Info("Processed file count initialization batch")
 	})
 
 	c.Start()
