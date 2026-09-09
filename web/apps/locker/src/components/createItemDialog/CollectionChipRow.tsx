@@ -78,6 +78,7 @@ export const CollectionChipRow: React.FC<{
                 {items.map((item) => (
                     <ButtonBase
                         key={item.key}
+                        title={item.label}
                         onClick={item.onClick}
                         disabled={disabled}
                         sx={(theme) => ({
@@ -100,9 +101,12 @@ export const CollectionChipRow: React.FC<{
                                     : theme.vars.palette.fill.faintHover,
                             },
                             "&.Mui-disabled": {
-                                backgroundColor:
-                                    theme.vars.palette.fill.faintHover,
-                                color: theme.vars.palette.text.faint,
+                                backgroundColor: item.selected
+                                    ? theme.vars.palette.accent.main
+                                    : theme.vars.palette.fill.faintHover,
+                                color: item.selected
+                                    ? theme.vars.palette.accent.contrastText
+                                    : theme.vars.palette.text.faint,
                             },
                         })}
                     >
