@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"errors"
+	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/ente/museum/pkg/controller/lock"
@@ -16,6 +18,7 @@ type FileCountInitializer struct {
 	LockController *lock.LockController
 	afterUserID    int64
 	resumeAt       time.Time
+	running        atomic.Bool
 }
 
 const (
@@ -24,10 +27,10 @@ const (
 )
 
 func (c *FileCountInitializer) ProcessBatch() {
-	if !c.LockController.TryLock(fileCountInitializationLock, timeUtil.MicrosecondsAfterHours(3)) {
+	if !c.running.CompareAndSwap(false, true) {
 		return
 	}
-	defer c.LockController.ReleaseLock(fileCountInitializationLock)
+	defer c.running.Store(false)
 	if time.Now().Before(c.resumeAt) {
 		return
 	}
@@ -43,10 +46,18 @@ func (c *FileCountInitializer) ProcessBatch() {
 		return
 	}
 
-	initialized, deferred, ineligible := 0, 0, 0
+	initialized, deferred, ineligible, contended := 0, 0, 0, 0
 	for _, userID := range userIDs {
 		c.afterUserID = userID
-		updated, err := c.UsageRepo.InitializeFileCounts(context.Background(), userID)
+		lockID := fileCountInitializationLock + ":" + strconv.FormatInt(userID, 10)
+		if !c.LockController.TryLock(lockID, timeUtil.MicrosecondsAfterHours(3)) {
+			contended++
+			continue
+		}
+		updated, err := func() (bool, error) {
+			defer c.LockController.ReleaseLock(lockID)
+			return c.UsageRepo.InitializeFileCounts(context.Background(), userID)
+		}()
 		if errors.Is(err, repo.ErrFileCountIneligible) {
 			ineligible++
 			log.WithError(err).WithField("user_id", userID).Warn("File count initialization ineligible")
@@ -71,6 +82,7 @@ func (c *FileCountInitializer) ProcessBatch() {
 		"initialized":  initialized,
 		"deferred":     deferred,
 		"ineligible":   ineligible,
+		"contended":    contended,
 		"last_user_id": userIDs[len(userIDs)-1],
 	}).Info("Processed file count initialization batch")
 }
