@@ -13,15 +13,14 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
-import io.ente.photos.platform.R
 import java.io.IOException
 import kotlin.math.max
 import kotlin.math.min
 
-internal enum class Destination(val label: Int, val flags: Int) {
-    HOME(R.string.wallpaper_home, WallpaperManager.FLAG_SYSTEM),
-    LOCK(R.string.wallpaper_lock, WallpaperManager.FLAG_LOCK),
-    BOTH(R.string.wallpaper_both, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK),
+internal enum class Destination(val flags: Int) {
+    HOME(WallpaperManager.FLAG_SYSTEM),
+    LOCK(WallpaperManager.FLAG_LOCK),
+    BOTH(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK),
 }
 
 @android.annotation.TargetApi(24)

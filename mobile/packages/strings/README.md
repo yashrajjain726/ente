@@ -2,8 +2,6 @@
 
 This package contains the user-facing strings and translations shared by the Auth, Locker, and Photos apps. Flutter's localization generator turns the ARB files in `lib/l10n/arb` into the Dart files in `lib/l10n`.
 
-Native Android strings live in `android/values/`. Crowdin syncs their translations into `android/values-<locale>/`; Android modules include this resource directory directly.
-
 ## Translate
 
 The strings can be translated in the [Ente Mobile Crowdin project](https://crowdin.com/project/ente-photos-app).

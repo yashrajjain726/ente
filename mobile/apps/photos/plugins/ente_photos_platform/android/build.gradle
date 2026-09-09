@@ -39,21 +39,12 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
-        main.res.srcDir '../../../../../packages/strings/android'
-        main.assets.srcDir layout.buildDirectory.dir('generated/wallpaperAssets')
     }
 
     defaultConfig {
         minSdkVersion 23
     }
 }
-
-def wallpaperFonts = tasks.register('prepareWallpaperFonts', Copy) {
-    from '../../../../../packages/ente_components/fonts'
-    include 'Inter-Regular.ttf', 'Inter-SemiBold.ttf'
-    into layout.buildDirectory.dir('generated/wallpaperAssets')
-}
-tasks.named('preBuild').configure { dependsOn wallpaperFonts }
 
 dependencies {
     implementation 'androidx.exifinterface:exifinterface:1.3.7'
