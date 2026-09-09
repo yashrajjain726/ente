@@ -141,11 +141,7 @@ export const LockerSidebar: React.FC<LockerSidebarProps> = ({
         <>
             <LockerSidebarDrawer open={open} onClose={onClose} anchor="left">
                 <Stack
-                    sx={{
-                        height: "100dvh",
-                        minHeight: 0,
-                        overflow: "hidden",
-                    }}
+                    sx={{ height: "100dvh", minHeight: 0, overflow: "hidden" }}
                 >
                     <LockerSidebarTitlebar
                         onClose={onClose}
