@@ -13,6 +13,45 @@ mod store;
 
 pub use store::{OpenCost, Stats, VecDb};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageKind {
+    F32,
+    I8,
+}
+
+impl StorageKind {
+    pub(crate) fn lane_width(self) -> usize {
+        match self {
+            Self::F32 => kernel::LANE_WIDTH,
+            Self::I8 => kernel::LANE_WIDTH_I8,
+        }
+    }
+
+    pub(crate) fn header_tag(self) -> u8 {
+        match self {
+            Self::F32 => 0,
+            Self::I8 => 1,
+        }
+    }
+
+    pub(crate) fn from_header_tag(tag: u8) -> Option<Self> {
+        match tag {
+            0 => Some(Self::F32),
+            1 => Some(Self::I8),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for StorageKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::F32 => "f32",
+            Self::I8 => "i8",
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
     Str(String),
@@ -71,8 +110,13 @@ pub enum VecDbError {
     InvalidAttributes(String),
     #[error("dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch { expected: usize, actual: usize },
-    #[error("invalid dimensions {0}: must be a nonzero multiple of 8")]
-    InvalidDimensions(usize),
+    #[error("invalid dimensions {dims}: {storage} storage needs a nonzero multiple of {}", .storage.lane_width())]
+    InvalidDimensions { dims: usize, storage: StorageKind },
+    #[error("storage mismatch: expected {expected}, found {actual}")]
+    StorageMismatch {
+        expected: StorageKind,
+        actual: StorageKind,
+    },
     #[error("search requires a limit or a max distance")]
     UnboundedSearch,
     #[error("length mismatch: {keys} keys, {vectors} vectors")]
