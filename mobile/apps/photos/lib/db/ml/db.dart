@@ -207,6 +207,15 @@ class DartMLDataDB
   }
 
   @override
+  Future<void> markPetFileIndexed(int fileID, int mlVersion) async {
+    final db = await asyncDB;
+    await db.execute(
+      'UPDATE $petFacesTable SET $mlVersionColumn = ? WHERE $fileIDColumn = ?',
+      [mlVersion, fileID],
+    );
+  }
+
+  @override
   Future<void> bulkInsertPetBodies(List<DBPetBody> petBodies) async {
     final db = await asyncDB;
     const batchSize = 500;

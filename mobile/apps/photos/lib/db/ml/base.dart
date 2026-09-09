@@ -136,6 +136,7 @@ abstract class IMLDataDB<T> {
   Future<Map<int, int>> petIndexedFileIds({int minimumMlVersion});
   Future<int> getPetIndexedFileCount({int minimumMlVersion});
   Future<void> deletePetDataForFiles(List<int> fileIDs);
+  Future<void> markPetFileIndexed(int fileID, int mlVersion);
 
   Future<Set<int>> getFullyIndexedFileIds({required bool includePets});
 
