@@ -127,7 +127,7 @@ If you want to delete a photo from Ente, you must do it manually within the Ente
 
 **Changes in Ente → Your device:**
 
-- ❌ Choosing **Delete from Ente** does NOT delete the photo from your device
+- ❌ Deleting a photo in Ente does NOT delete it from your device
 - ❌ Moving photos between albums in Ente does NOT affect your device albums
 - ❌ Renaming albums in Ente does NOT rename device albums
 
@@ -148,13 +148,11 @@ If you want to delete a photo from Ente, you must do it manually within the Ente
 
 ✅ **Uploading**: Happens automatically for selected albums ✅ **Re-upload protection**: Ente won't re-upload photos you've already uploaded, even if you delete them from Ente and they're still on your device ❌ **Two-way sync**: Not supported - changes in Ente don't reflect on your device
 
-**To delete a photo from both Ente and your current device:**
+**If you want to delete a photo everywhere:**
 
-1. Select the photo in Ente and tap the trash icon
-2. Choose **Delete from both**. Tap **More options** if you need to change a saved choice
-3. Confirm the deletion and any system prompt
-
-On Android 11 and newer, the photo moves to Trash in your Ente account and to Android's system trash on your device. Photos stored on other devices are not deleted. Learn more in the [Deleting Photos Guide](/photos/features/albums-and-organization/deleting).
+1. Delete from Ente app
+2. Delete from your device's native Photos app
+3. Both deletions must be done manually
 
 ### Can I delete photos from my device after backing up to Ente? {#free-up-space-after-backup}
 
@@ -165,8 +163,6 @@ Yes! Once photos are safely backed up to Ente, you can delete them from your dev
 Use Ente's "Free up space" feature at `Settings > Free up space`. Ente will show photos that are backed up and can be safely deleted. Review and confirm deletion.
 
 This feature only deletes photos that have been successfully uploaded to Ente. Photos remain in Ente and can be re-downloaded anytime.
-
-On Android, **Free up device space** permanently removes those photos from your device without moving them to trash. Deleting photos from the gallery on Android 11 and newer moves them to Android's system trash, where they still use device storage until permanently deleted.
 
 Learn more in the [Storage optimization guide](/photos/features/albums-and-organization/storage-optimization).
 
@@ -395,11 +391,9 @@ During migration, Ente rechecks all local photos against what is already uploade
 
 This is temporary. Once verification finishes, the duplicate view disappears and only the synced photo remains.
 
-### When I choose "Delete from both" on a photo, why do I still see it in my device's native gallery? {#delete-both-photo-still-visible}
+### When I choose "Delete Both" on a photo, why do I still see it in my device's native gallery? {#delete-both-photo-still-visible}
 
-When you select **Delete from both**, Ente deletes the photo from your Ente account and from your device. On Android 11 and newer, you can still recover it from [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash). On iOS, use Apple Photos' **Recently Deleted** album.
-
-If Google Photos or iCloud Photos has also backed up the photo, it may still appear in those apps. Photos stored in those services are managed by Google or Apple, not by Ente.
+When you select "Delete Both", Ente deletes the copy stored in Ente as well as the copy stored on your device. However, if you have Google Photos backup or iCloud backup enabled, the cloud copy from those services will still be visible in your native gallery. That copy is managed by Google or Apple, not by Ente.
 
 ## Background Sync
 

@@ -72,7 +72,7 @@ Smaller batches usually work more reliably.
 
 ### Do items in trash count against my storage? {#trash-storage-count}
 
-Photos in Ente Trash count toward your Ente storage quota. Photos in Android's system trash use storage on your device instead. To free storage in your Ente account, select **Ente** if both trash tabs are shown, then:
+Items in Ente Trash count toward your Ente storage quota. Photos in Android's system trash use storage on your device. To free up Ente storage, you can:
 
 - Manually empty your trash
 - Permanently delete specific items
@@ -84,11 +84,9 @@ Learn more in [Albums and Organization FAQ](/photos/faq/albums-and-organization#
 
 ### I deleted photos from Ente, but my storage didn’t decrease. Why?
 
-Photos deleted from your Ente account move to Ente Trash first, where they still count toward your Ente storage quota.
+Photos deleted from your Ente account move to Trash first, where they still count toward your storage quota.
 
-To free up space immediately, empty Ente Trash from the app. Photos in Ente Trash are also permanently deleted after 30 days.
-
-On Android 11 and newer, select **Ente** in Trash to free storage in your Ente account. Emptying **Device** only frees storage on your device.
+To free up space immediately, empty Trash from the app. If both trash tabs are shown, select **Ente**. Emptying **Device** only frees storage on your device. Photos in Ente Trash are permanently deleted after 30 days.
 
 ### What happens if I exceed my storage limit? {#exceed-storage}
 

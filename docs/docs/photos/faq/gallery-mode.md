@@ -21,13 +21,11 @@ Ente needs access to your photo library to display your photos. On iOS, grant "A
 
 ## Features {#features}
 
-### Can I recover photos deleted in gallery mode? {#gallery-mode-trash-recovery}
+### Can I restore photos I deleted on Android? {#gallery-mode-android-recovery}
 
-On Android 11 and newer, photos and videos deleted through Ente move to Android's system trash. You can recover them without an account or a backup.
+On Android 11 and newer, photos and videos deleted from the gallery move to Android's system trash. Open **Albums**, tap the trash icon, select the photos, and tap **Restore**. Each photo shows how many days remain before permanent deletion.
 
-Open **Albums**, tap the trash icon, select the photos, and tap **Restore**. Each photo shows how many days remain before it is permanently deleted. Learn more about [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash).
-
-On iOS, use Apple Photos' **Recently Deleted** album. On Android 10 and older, deleting photos from your device is permanent.
+On Android 10 and older, deleting photos from your device is permanent. Learn more about [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash).
 
 ### Does face recognition work without an account? {#offline-face-recognition}
 

@@ -7,8 +7,6 @@ description: How to delete photos, manage trash, and permanently remove files in
 
 Ente uses a two-stage deletion system to protect against accidental data loss. When you delete a photo or video from your Ente account, it first moves to Trash where it stays for 30 days before being permanently deleted. This gives you time to recover accidentally deleted items.
 
-On Android 11 and newer, photos and videos deleted from your device through Ente Photos move to Android's system trash instead of being permanently removed immediately. You can recover them in Ente, including in gallery mode without an account. Learn more about [Android Device Trash](#android-device-trash).
-
 ## How Deletion Works
 
 When you delete a photo from your Ente account:
@@ -20,7 +18,7 @@ When you delete a photo from your Ente account:
 
 > [!IMPORTANT]
 >
-> Items in Ente Trash count toward your Ente storage quota until permanently deleted. Items in Android's system trash use storage on your device.
+> Items in Ente Trash count toward your Ente storage quota until permanently deleted.
 
 ## Deleting Photos
 
@@ -28,9 +26,9 @@ When you delete a photo from your Ente account:
 
 1. Long press to select the photo(s) you want to delete
 2. Tap the trash icon in the action bar
-3. Choose whether to delete from your device, from Ente, or from both, then confirm. Tap **More options** if you need to change a saved choice
+3. Confirm the deletion
 
-Photos deleted from your Ente account move to Ente Trash. On Android 11 and newer, photos deleted from your device move to Android's system trash. On Android 10 and older, deleting photos from your device is permanent.
+Photos deleted from your Ente account move to Trash. On Android 11 and newer, photos deleted from your device's gallery move to Android's system trash. Learn more about [Android Device Trash](#android-device-trash).
 
 ### On web/desktop
 
@@ -56,7 +54,7 @@ The selected photos will be moved to Trash.
 - Or use Ctrl/Cmd+A to select all photos
 - Press Delete key or click the trash icon and confirm
 
-Deleting multiple photos works the same way as deleting a single photo. On mobile, choose whether to delete from your device, from Ente, or from both.
+Photos deleted from your Ente account will be moved to Trash together.
 
 ## The Trash Folder
 
@@ -89,7 +87,7 @@ Trash is a special folder where deleted photos are held temporarily before perma
 
 ### Android device trash
 
-On Android 11 and newer, photos and videos deleted from your device through Ente Photos move to Android's system trash instead of being permanently removed immediately. To review or recover them in Ente:
+On Android 11 and newer, photos and videos deleted from your device's gallery through Ente Photos move to Android's system trash instead of being permanently removed immediately. To review or recover them in Ente:
 
 1. Open the **Albums** tab
 2. Tap the down-arrow icon on the right
@@ -97,19 +95,15 @@ On Android 11 and newer, photos and videos deleted from your device through Ente
 4. Select **Device** at the top
 5. Select the photos you want to restore, then tap **Restore**
 
-The **Ente** tab contains photos deleted from your Ente account, while **Device** contains photos in Android's system trash. Emptying either trash permanently deletes the items shown in that tab without emptying the other.
+The **Ente** tab contains files deleted from your Ente account, while **Device** contains photos deleted from your device's gallery. Emptying either trash permanently deletes the items shown in that tab.
 
-Each photo shows how many days remain before Android permanently deletes it. Photos in Android's system trash continue to use storage on your device until they are permanently deleted.
+Photos in Android's system trash still take up space on your device. Each photo shows how many days remain before permanent deletion.
 
-In gallery mode, tap the trash icon in **Albums** to open Android's system trash directly. You can restore deleted photos even if they were never backed up to Ente.
+You can also restore photos that were never backed up. In gallery mode, tap the trash icon in **Albums** to open trash directly.
 
 > [!NOTE]
 >
-> Some deletions do not go to Android's system trash:
->
-> - On Android 10 and older, deleting photos from your device is permanent.
-> - **Free up device space** permanently removes backed-up photos from your device on all Android versions. Your photos remain in Ente.
-> - Photos shared into Ente that were not saved to your device's gallery may also be deleted permanently.
+> On Android 10 and older, deleting photos from your device is permanent. **Free up device space** also removes backed-up photos permanently from your device on Android. Your backups remain in Ente.
 
 ### Storage considerations
 
@@ -124,15 +118,13 @@ Learn more about [Storage optimization](/photos/features/albums-and-organization
 
 ## Restoring Deleted Photos
 
-If you accidentally deleted photos from your Ente account, you can restore them from Ente Trash within 30 days.
-
-For photos deleted from your device, use [Android Device Trash](#android-device-trash) on Android 11 and newer, or Apple Photos' **Recently Deleted** album on iOS.
+If you accidentally deleted photos from your Ente account, you can restore them from Trash within 30 days. For photos deleted from your Android device, follow the [Android Device Trash](#android-device-trash) instructions above.
 
 ### On mobile
 
 1. Open the Albums tab
 2. Tap on 'v' icon at the right.
-3. Tap **Trash**, then select **Ente** if the Ente and Device tabs are shown
+3. Tap **Trash**, then select **Ente** if both tabs are shown
 4. Select the photos you want to restore
 5. Tap the "Restore" button
 
@@ -143,13 +135,13 @@ For photos deleted from your device, use [Android Device Trash](#android-device-
 3. Select the items to restore
 4. Click the "Restore" button
 
-Photos restored from Ente Trash will be moved to an album of choice.
+Restored photos will be moved to an album of choice.
 
 ### Recovery time limit
 
 > [!IMPORTANT]
 >
-> You can only recover photos from Ente Trash within 30 days of deletion. After 30 days, they are permanently deleted and cannot be recovered. For photos in Android's system trash, check the remaining days shown on each photo.
+> You can only recover files from Ente Trash within 30 days of deletion. After 30 days, files are permanently deleted and cannot be recovered. This is an irreversible operation.
 
 If you're unsure about deleting certain items, we recommend:
 
@@ -159,9 +151,7 @@ If you're unsure about deleting certain items, we recommend:
 
 ## Permanent Deletion
 
-To free up storage space immediately, you can permanently delete items from Trash.
-
-On Android 11 and newer, select **Ente** to free storage in your Ente account or **Device** to free storage on your device. Restoring or emptying one tab does not affect the other.
+To free up storage space immediately, you can permanently delete items from Trash. If the **Ente** and **Device** tabs are shown, select the trash you want to empty first.
 
 > [!WARNING]
 >
@@ -315,7 +305,6 @@ This prevents accidental deletion when reorganizing files on your computer. If y
 **Trash and Recovery:**
 
 - [How do I restore deleted photos?](/photos/faq/albums-and-organization#restore-photos)
-- [Can I recover photos deleted from my Android device?](/photos/faq/albums-and-organization#android-device-trash-recovery)
 - [How do I permanently delete photos or empty trash?](/photos/faq/albums-and-organization#empty-trash)
 - [Does trash count against my storage?](/photos/faq/albums-and-organization#trash-storage)
 - [Can I recover files after 30 days in trash?](/photos/faq/albums-and-organization#recover-after-30-days)

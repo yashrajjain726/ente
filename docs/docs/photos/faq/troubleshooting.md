@@ -113,7 +113,7 @@ If your photos or videos aren't uploading to Ente, try these troubleshooting ste
 
 - Check your storage quota in the app
 - If you've exceeded your limit, [upgrade your plan](/photos/faq/storage-and-plans#what-plans-does-ente-offer) or delete unwanted photos
-- Items in Ente Trash count towards your quota - empty Ente Trash to free up space
+- Items in trash count towards your quota - empty trash to free up space
 
 **Check file compatibility:**
 
@@ -421,17 +421,15 @@ Open device `Settings > Apps > Ente > Storage` and tap "Clear cache" (NOT "Clear
 
 ### Why does Android ask me to confirm every photo when I delete from Ente? {#android-media-management-delete}
 
-Android may ask for confirmation when Ente moves photos to system trash, restores them, or permanently deletes them from your device. If you select many photos, Android may show more than one confirmation prompt.
+When Ente deletes a photo or video that also exists in your device gallery, Android shows a system confirmation dialog for each item. This is an Android security measure for third-party apps. It is especially noticeable when using **Free up space**, where you may have to confirm a large number of files one by one.
 
-On Android 12 and newer, grant Ente the **media management** special access to avoid repeated prompts:
+To stop these repeated prompts, grant Ente the **media management** special access:
 
 **On Android:**
 
 Open device `Settings > Apps > Special app access > Media management apps > Ente Photos` and enable "Allow app to manage media".
 
 Once granted, Ente can delete media that it manages without asking for confirmation each time.
-
-Android 11 supports system trash but does not have this permission. Learn more about [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash).
 
 ### Why is the Linux desktop app still showing the old icon after updating? {#linux-icon-update}
 
