@@ -655,8 +655,9 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         onClick={openAvatar}
                         sx={{
                             appearance: "none",
+                            backgroundClip: "padding-box",
                             bgcolor: spaceAppBackground,
-                            border: `3px solid ${spaceAppBackground}`,
+                            border: "3px solid rgba(28, 28, 30, 0.75)",
                             borderRadius: "50%",
                             bottom: spaceTileCircleInset(avatarSize),
                             boxSizing: "border-box",

@@ -354,8 +354,9 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                 >
                     <Box
                         sx={{
+                            backgroundClip: "padding-box",
                             bgcolor: spaceAppBackground,
-                            border: `3px solid ${spaceAppBackground}`,
+                            border: "3px solid rgba(28, 28, 30, 0.75)",
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             flexShrink: 0,
