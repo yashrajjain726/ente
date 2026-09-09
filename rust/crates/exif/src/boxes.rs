@@ -33,7 +33,7 @@ pub(crate) fn box_at<R: Read + Seek>(
     }
     range(0, end, offset, size)?;
     Ok(BoxRange {
-        kind: header[4..8].try_into().unwrap(),
+        kind: header[4..8].try_into().expect("box type is four bytes"),
         start: offset + header_size,
         len: size - header_size,
     })
