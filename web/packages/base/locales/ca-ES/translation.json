@@ -1112,5 +1112,10 @@
     "auto_lock_5_minutes": "5 minuts",
     "auto_lock_30_minutes": "30 minuts",
     "wrong_unlock_code_one": "Has introduït un codi de desbloqueig incorrecte {{count}} vegada.",
-    "wrong_unlock_code_other": "Has introduït un codi de desbloqueig incorrecte {{count}} vegades."
+    "wrong_unlock_code_other": "Has introduït un codi de desbloqueig incorrecte {{count}} vegades.",
+    "trusted_contacts": "",
+    "legacy_accounts": "",
+    "add_trusted_contact": "",
+    "trusted_contacts_empty": "",
+    "legacy_accounts_empty": ""
 }
