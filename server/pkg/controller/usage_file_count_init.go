@@ -22,7 +22,7 @@ type FileCountInitializer struct {
 }
 
 const (
-	fileCountInitializationBatchSize = 10
+	fileCountInitializationBatchSize = 50
 	fileCountInitializationLock      = "file_count_initialization"
 )
 
