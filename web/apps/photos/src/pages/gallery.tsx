@@ -39,7 +39,6 @@ import {
 import {
     findCollectionCreatingIfNeeded,
     performCollectionOp,
-    validateKey,
 } from "@/components/gallery/helpers";
 import {
     useGalleryReducer,
@@ -80,6 +79,7 @@ import { useIsSmallWidth } from "ente-base/components/utils/hooks";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import { subscribeMainWindowFocus } from "ente-base/electron";
+import { isNamedError } from "ente-base/error";
 import { hasPendingAlbumToJoin } from "ente-base/join-album";
 import log from "ente-base/log";
 import {
@@ -501,8 +501,15 @@ const Page: React.FC = () => {
                 return;
             }
 
-            if (!(await validateKey())) {
-                logout();
+            let session;
+            try {
+                session = await ensureAuthenticatedSession();
+            } catch (e) {
+                if (isNamedError(e, "missing_recovery_key")) {
+                    showMiniDialog(sessionExpiredDialogAttributes(logout));
+                } else {
+                    onGenericError(e);
+                }
                 return;
             }
 
@@ -515,21 +522,17 @@ const Page: React.FC = () => {
             setIsFirstLoad(getAndClearIsFirstLogin());
 
             const user = ensureLocalUser();
-            void ensureAuthenticatedSession()
-                .then((session) =>
-                    ensureContactsReady(
-                        user.id,
-                        session,
-                        contactsGetDiff,
-                        contactsGetProfilePicture,
-                    ),
-                )
-                .catch((error: unknown) => {
-                    log.warn(
-                        "[gallery] Failed to warm contacts display cache",
-                        error,
-                    );
-                });
+            void ensureContactsReady(
+                user.id,
+                session,
+                contactsGetDiff,
+                contactsGetProfilePicture,
+            ).catch((error: unknown) => {
+                log.warn(
+                    "[gallery] Failed to warm contacts display cache",
+                    error,
+                );
+            });
             const userDetails = await savedUserDetailsOrTriggerPull();
             dispatch({
                 type: "mount",

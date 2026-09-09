@@ -1,4 +1,10 @@
 import {
+    generatePasskeyRecovery,
+    recoveryKeyMnemonic,
+} from "@/services/authenticated-session";
+import {
+    ComputerPhoneSyncIcon,
+    Key01Icon,
     Key02Icon,
     Mail01Icon,
     PasswordValidationIcon,
@@ -66,6 +72,15 @@ export const LockerAccountDrawer: React.FC<
         setAuthenticatedAction(undefined);
     };
 
+    const handleOpenPasskeys = async () => {
+        handleRootClose();
+        try {
+            await openAccountsManagePasskeysPage(generatePasskeyRecovery);
+        } catch (e) {
+            onGenericError(e);
+        }
+    };
+
     return (
         <>
             <LockerTitledNestedSidebarDrawer
@@ -102,7 +117,8 @@ export const LockerAccountDrawer: React.FC<
             <LockerRecoveryKeyDrawer
                 open={isRecoveryKeyOpen}
                 onClose={() => setIsRecoveryKeyOpen(false)}
-                onRootClose={handleRootClose}
+                getRecoveryKeyMnemonic={recoveryKeyMnemonic}
+                showMiniDialog={showMiniDialog}
             />
         </>
     );

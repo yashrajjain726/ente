@@ -1,6 +1,8 @@
 use ente_core::{b64, crypto};
 use wasm_bindgen::prelude::*;
 
+use crate::EncryptedBox;
+
 #[cfg(feature = "crypto-file")]
 mod file;
 
@@ -40,25 +42,11 @@ pub fn crypto_generate_key() -> String {
     b64::encode(crypto::Key::generate().as_bytes())
 }
 
-#[wasm_bindgen(getter_with_clone)]
-pub struct EncryptedBox {
-    #[wasm_bindgen(readonly, js_name = encryptedData)]
-    pub encrypted_data: String,
-    #[wasm_bindgen(readonly)]
-    pub nonce: String,
-}
-
 #[wasm_bindgen(js_name = cryptoEncryptBox)]
 pub fn crypto_encrypt_box(data_b64: &str, key_b64: &str) -> Result<EncryptedBox, Error> {
     let data = b64::decode(data_b64)?;
     let key = b64::decode(key_b64)?;
-
-    let out = crypto::secretbox::encrypt(&data, &crypto::Key::try_from_slice(&key)?);
-
-    Ok(EncryptedBox {
-        encrypted_data: b64::encode(&out.encrypted_data),
-        nonce: b64::encode(out.nonce.as_bytes()),
-    })
+    Ok(crypto::secretbox::encrypt(&data, &crypto::Key::try_from_slice(&key)?).into())
 }
 
 #[wasm_bindgen(js_name = cryptoDecryptBox)]

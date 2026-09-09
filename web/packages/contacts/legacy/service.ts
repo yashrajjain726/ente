@@ -1,5 +1,4 @@
 import { savedKeyAttributes } from "ente-accounts/services/accounts-db";
-import { getUserRecoveryKey } from "ente-accounts/services/recovery-key";
 import {
     addContact,
     changePassword,
@@ -13,19 +12,11 @@ export const legacyVerificationID = async (session: Session, email: string) => {
     return key ? verificationID(key) : undefined;
 };
 
-export const legacyAddContact = async (
+export const legacyAddContact = (
     session: Session,
     email: string,
     recoveryNoticeInDays?: number,
-) => {
-    await getUserRecoveryKey();
-    return addContact(
-        session,
-        email,
-        currentKeyAttributes(),
-        recoveryNoticeInDays,
-    );
-};
+) => addContact(session, email, currentKeyAttributes(), recoveryNoticeInDays);
 
 export const legacyChangePassword = (
     session: Session,

@@ -296,10 +296,10 @@ class MemoryLaneService {
       return null;
     }
 
-    if (!await areFullFaceCropsCached({
-      timeline.entries.first.faceId,
-      timeline.entries.last.faceId,
-    }, useTempCache: false)) {
+    if (!await areFullFaceCropsCached(
+      timeline.entries.map((entry) => entry.faceId),
+      useTempCache: false,
+    )) {
       return null;
     }
     return timeline;
@@ -986,6 +986,20 @@ class MemoryLaneService {
     return Map.fromEntries(
       files.map((file) => MapEntry(localIdToId[file.localID]!, file)),
     );
+  }
+
+  Future<Uint8List?> getNewestFaceCrop(
+    MemoryLanePersonTimeline timeline,
+  ) async {
+    final newest = timeline.entries.last;
+    final newestFile = (await getTimelineFiles([newest.fileId]))[newest.fileId];
+    if (newestFile == null) return null;
+    final faces = await _mlDataDB.getFacesForGivenFileID(newest.fileId);
+    final face = faces?.firstWhereOrNull((f) => f.faceID == newest.faceId);
+    if (face == null) return null;
+    return (await getCachedFaceCrops(newestFile, [
+      face,
+    ], useTempCache: false))?[newest.faceId];
   }
 
   Future<void> _scheduleTimelinesForMemoriesStrip(

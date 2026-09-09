@@ -97,8 +97,7 @@ pub async fn public_key(session: &Session, email: &str) -> Result<Option<String>
 pub fn verification_id(public_key_b64: &str) -> Result<String> {
     let public_key = b64::decode(public_key_b64)?;
     let digest = Sha256::digest(&public_key);
-    ente_accounts::auth::recovery_key_to_mnemonic(&b64::encode(digest.as_slice()))
-        .map_err(Into::into)
+    ente_accounts::auth::recovery_key_to_mnemonic(digest.as_slice()).map_err(Into::into)
 }
 
 pub async fn add_contact(

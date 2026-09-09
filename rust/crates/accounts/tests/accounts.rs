@@ -1,3 +1,4 @@
+#![cfg(test)]
 #![cfg(feature = "museum")]
 
 use std::time::{SystemTime, UNIX_EPOCH};

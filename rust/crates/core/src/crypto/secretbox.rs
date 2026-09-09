@@ -7,7 +7,7 @@ use crate::crypto::{Error, Key, Nonce, Result};
 // Same as libsodium's `crypto_secretbox_MACBYTES`.
 pub const MAC_BYTES: usize = 16;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncryptedBox {
     pub encrypted_data: Vec<u8>,
     pub nonce: Nonce,

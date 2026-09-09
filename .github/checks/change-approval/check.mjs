@@ -23,7 +23,7 @@ const guardrailFiles = new Set([
     "analysis_options.yaml",
 ]);
 const configFile =
-    /(^|\/)(\.gitattributes|rust-toolchain\.toml|\.cargo\/(config|audit)\.toml|\.npmrc|\.nvmrc|\.tool-versions|\.node-version|\.python-version|gradle-wrapper\.properties)$/;
+    /(^|\/)(\.gitattributes|\.?clippy\.toml|rust-toolchain\.toml|\.cargo\/(config|audit)\.toml|\.npmrc|\.nvmrc|\.tool-versions|\.node-version|\.python-version|gradle-wrapper\.properties)$/;
 
 const cargoLints = (source) =>
     execFileSync("python3", ["-c", `

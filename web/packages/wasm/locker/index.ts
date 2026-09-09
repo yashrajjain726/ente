@@ -1,5 +1,6 @@
 import { wrap } from "comlink";
 import { readAndFree } from "ente-utils/wasm";
+import { workerReady } from "ente-utils/worker";
 import type { FileLinkWorker } from "./file-link.worker";
 import type {
     OpenSessionInput,
@@ -13,6 +14,12 @@ export type { OpenSessionInput, Session } from "./pkg/ente_locker_wasm";
 
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
+
+export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
+    readAndFree(session.encryptWithRecoveryKey(dataB64), (box) => ({
+        encryptedData: box.encryptedData,
+        nonce: box.nonce,
+    }));
 
 export const openCollectionKey = async (
     session: Session,
@@ -67,9 +74,9 @@ interface EncryptedBox {
 
 export const prepareFileLink = async (session: Session, fileKeyB64: string) => {
     const worker = new Worker(new URL("file-link.worker.ts", import.meta.url));
+    const RemoteWorker = wrap<typeof FileLinkWorker>(worker);
+    const remote = await workerReady(worker, new RemoteWorker());
     try {
-        const RemoteWorker = wrap<typeof FileLinkWorker>(worker);
-        const remote = await new RemoteWorker();
         const payload = await remote.prepareFileLinkPayload(fileKeyB64);
         const encryptedShareKey = (await wasm()).lockerSealFileLinkSecret(
             session,

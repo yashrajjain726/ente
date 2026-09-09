@@ -863,10 +863,7 @@ mod tests {
     }
 
     fn key(components: &[&str]) -> Vec<String> {
-        components
-            .iter()
-            .map(|component| component.to_string())
-            .collect()
+        components.iter().map(ToString::to_string).collect()
     }
 
     fn file(name: &str, bytes: &[u8]) -> AssetFile {

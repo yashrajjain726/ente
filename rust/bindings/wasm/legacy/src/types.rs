@@ -202,7 +202,7 @@ pub struct OpenKitRecoveryInput {
     pub client_version: Option<String>,
 }
 
-#[derive(Deserialize, Tsify)]
+#[derive(Serialize, Deserialize, Tsify)]
 pub struct LegacyKitShare {
     #[serde(rename = "pv")]
     payload_version: u8,
@@ -219,6 +219,20 @@ pub struct LegacyKitShare {
     checksum: String,
     #[serde(rename = "n")]
     part_name: String,
+}
+
+impl From<ente_legacy::LegacyKitShare> for LegacyKitShare {
+    fn from(value: ente_legacy::LegacyKitShare) -> Self {
+        Self {
+            payload_version: value.payload_version,
+            variant: value.variant,
+            kit_id: value.kit_id,
+            share_index: value.share_index,
+            share: value.share,
+            checksum: value.checksum,
+            part_name: value.part_name,
+        }
+    }
 }
 
 impl From<LegacyKitShare> for ente_legacy::LegacyKitShare {
