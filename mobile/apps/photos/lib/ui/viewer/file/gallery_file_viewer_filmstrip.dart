@@ -1,10 +1,13 @@
+import "package:ente_components/ente_components.dart" show fillDarkDark;
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/theme/colors.dart" show strokeFaintDark;
 import "package:photos/ui/viewer/file/file_viewer_filmstrip.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_preview_layer.dart";
@@ -12,10 +15,9 @@ import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 
 /// Spacing contributed by the filmstrip to the gallery viewer's chrome.
 abstract final class GalleryFileViewerFilmstripLayout {
-  static const bottomControlsGap = 6.0;
   static const upperContentGap = 6.0;
   static const additionalBottomInset =
-      FileViewerFilmstripLayout.height + bottomControlsGap + upperContentGap;
+      FileViewerFilmstripLayout.height + upperContentGap;
 }
 
 /// Keeps the filmstrip limited to internal users while it is being evaluated.
@@ -56,9 +58,30 @@ class GalleryFileViewerFilmstripPreviewLayer extends StatelessWidget {
         if (index < 0 || index >= files.length) {
           return const SizedBox.shrink();
         }
-        return _GalleryFilmstripThumbnail(
-          file: files[index],
-          fit: BoxFit.contain,
+        final file = files[index];
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            _GalleryFilmstripThumbnail(file: file, fit: BoxFit.contain),
+            if (file.fileType == FileType.video)
+              Center(
+                child: Container(
+                  width: 54,
+                  height: 54,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: strokeFaintDark, width: 1),
+                  ),
+                  child: const HugeIcon(
+                    icon: HugeIcons.strokeRoundedPlay,
+                    size: 32,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -92,10 +115,7 @@ class GalleryFileViewerFilmstripOverlay extends StatelessWidget {
     return Positioned(
       left: safePadding.left,
       right: safePadding.right,
-      bottom:
-          safePadding.bottom +
-          bottomControlsHeight +
-          GalleryFileViewerFilmstripLayout.bottomControlsGap,
+      bottom: safePadding.bottom + bottomControlsHeight,
       height: FileViewerFilmstripLayout.height,
       child: ValueListenableBuilder<bool>(
         valueListenable: enableFullScreenNotifier,
@@ -153,6 +173,7 @@ class _GalleryFilmstripThumbnail extends StatelessWidget {
       file,
       key: ObjectKey(file),
       rawThumbnail: true,
+      placeholderColor: fillDarkDark,
       diskLoadDeferDuration: galleryThumbnailDiskLoadDeferDuration,
       serverLoadDeferDuration: galleryThumbnailServerLoadDeferDuration,
       shouldShowSyncStatus: false,

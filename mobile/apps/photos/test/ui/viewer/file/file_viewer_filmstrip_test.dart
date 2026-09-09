@@ -337,6 +337,40 @@ void main() {
     );
   });
 
+  testWidgets("iOS and Android filmstrips have the same fling deceleration", (
+    tester,
+  ) async {
+    final simulations = <TargetPlatform, List<Simulation>>{};
+    for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+      await tester.pumpWidget(
+        _TestApp(
+          platform: platform,
+          child: const _FilmstripHarness(itemCount: 100, selectedIndex: 50),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final position = _filmstripPosition(tester);
+      simulations[platform] = [
+        for (final velocity in [-500.0, 500.0, 5000.0])
+          position.physics.createBallisticSimulation(position, velocity)!,
+      ];
+    }
+
+    final android = simulations[TargetPlatform.android]!;
+    final ios = simulations[TargetPlatform.iOS]!;
+    for (var index = 0; index < android.length; index++) {
+      for (final time in [0.0, 0.1, 0.25, 0.5, 1.0]) {
+        expect(ios[index].x(time), closeTo(android[index].x(time), 0.01));
+        expect(ios[index].dx(time), closeTo(android[index].dx(time), 0.01));
+      }
+      expect(
+        _settlingTime(ios[index], start: 0),
+        closeTo(_settlingTime(android[index], start: 0), 0.01),
+      );
+    }
+  });
+
   testWidgets("a second fling keeps moving while the strip is coasting", (
     tester,
   ) async {
@@ -619,12 +653,14 @@ void _expectNearestToStripCenter(WidgetTester tester, int index) {
 
 class _TestApp extends StatelessWidget {
   final Widget child;
+  final TargetPlatform? platform;
 
-  const _TestApp({required this.child});
+  const _TestApp({required this.child, this.platform});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(platform: platform),
       home: Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: SizedBox(width: 380, child: child)),

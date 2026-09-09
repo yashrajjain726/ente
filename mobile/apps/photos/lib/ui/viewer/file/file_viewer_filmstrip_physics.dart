@@ -1,14 +1,15 @@
 import "package:flutter/widgets.dart";
 
-/// The capped, long-coasting scroll behavior used by the file-viewer filmstrip.
+/// The capped, Android-style scroll behavior used by the file-viewer filmstrip.
 const ScrollPhysics fileViewerFilmstripPhysics = _FilmstripScrollPhysics();
 
 const _maxFlingVelocity = 800.0;
-// Evaluating a slightly faster platform simulation on a slower clock keeps the
+// Evaluating a slightly faster clamping simulation on a slower clock keeps the
 // launch velocity unchanged while extending its distance and settling time.
 const _ballisticTimeScale = 0.7;
 
-class _FilmstripScrollPhysics extends ScrollPhysics {
+// Use the same deceleration on every platform, including iOS.
+class _FilmstripScrollPhysics extends ClampingScrollPhysics {
   const _FilmstripScrollPhysics({super.parent});
 
   @override
@@ -20,8 +21,7 @@ class _FilmstripScrollPhysics extends ScrollPhysics {
 
   @override
   double carriedMomentum(double existingVelocity) {
-    // Preserve repeated-fling acceleration on clamping platforms as well as
-    // platforms whose parent physics already bounce.
+    // Preserve repeated-fling acceleration with a cap on the added momentum.
     final momentum = const BouncingScrollPhysics().carriedMomentum(
       existingVelocity,
     );
