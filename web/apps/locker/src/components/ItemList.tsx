@@ -20,6 +20,7 @@ import {
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
@@ -58,6 +59,12 @@ import React, {
 import { ItemCard } from "./ItemCard";
 import { ItemDetailView } from "./ItemDetailView";
 import { ItemListDialogs } from "./itemList/ItemListDialogs";
+import {
+    lockerColors,
+    lockerColorSx,
+    lockerContentMaxWidth,
+    lockerTextBodySx,
+} from "./locker-tokens";
 
 const uniqueCollectionsByID = (collections: LockerCollection[]) => {
     const seen = new Set<number>();
@@ -97,8 +104,6 @@ interface ItemListProps {
     searchTerm: string;
     onNavigateBack?: () => void;
 }
-
-const contentMaxWidth = 560;
 
 export const ItemList: React.FC<ItemListProps> = ({
     collections,
@@ -800,44 +805,35 @@ export const ItemList: React.FC<ItemListProps> = ({
                     overflowY: "auto",
                     overscrollBehavior: "contain",
                     WebkitOverflowScrolling: "touch",
-                    backgroundColor: "#08090A",
-                    ...theme.applyStyles("light", {
-                        backgroundColor: "#F3F4F6",
+                    ...lockerColorSx(theme, {
+                        backgroundColor: "backgroundBase",
                     }),
                 })}
             >
                 <Box
                     sx={(theme) => ({
-                        px: { xs: 2, sm: 3 },
+                        px: 2,
+                        pt: 2,
                         pb: isTrashView
                             ? 3
                             : "calc(env(safe-area-inset-bottom) + 120px)",
-                        backgroundColor: "#08090A",
-                        ...theme.applyStyles("light", {
-                            backgroundColor: "#F3F4F6",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
                         }),
                     })}
                 >
                     {isHomeView && (
                         <>
-                            <SectionHeader
-                                title={t("recents")}
-                                countLabel={t("lockerItemsCount", {
-                                    count: homeFilteredItems.length,
-                                })}
-                            />
-
                             {displayCollections.length > 0 && (
                                 <Stack
                                     direction="row"
                                     sx={{
                                         width: "100%",
-                                        maxWidth: contentMaxWidth,
+                                        maxWidth: lockerContentMaxWidth,
                                         mx: "auto",
                                         alignItems: "center",
-                                        gap: 0.75,
-                                        mt: -0.25,
-                                        mb: 1.75,
+                                        gap: 1,
+                                        mb: 2,
                                         minWidth: 0,
                                     }}
                                 >
@@ -1367,9 +1363,9 @@ const SectionHeader: React.FC<{
             alignItems: "center",
             justifyContent: "space-between",
             gap: 2,
-            maxWidth: contentMaxWidth,
+            maxWidth: lockerContentMaxWidth,
             mx: "auto",
-            mt: 3,
+            mt: 1,
             mb: 2.25,
         }}
     >
@@ -1446,7 +1442,7 @@ const ItemsSection: React.FC<{
 }) =>
     items.length > 0 ? (
         <Stack
-            sx={{ maxWidth: contentMaxWidth, mx: "auto", gap: 1.1, mt: 1.25 }}
+            sx={{ maxWidth: lockerContentMaxWidth, mx: "auto", gap: 1, mt: 0 }}
         >
             {items.map((item) => {
                 const isOwnedByCurrentUser = isLockerItemOwner(
@@ -1501,7 +1497,9 @@ const ItemsSection: React.FC<{
             })}
         </Stack>
     ) : (
-        <Box sx={{ maxWidth: contentMaxWidth, mx: "auto" }}>{emptyState}</Box>
+        <Box sx={{ maxWidth: lockerContentMaxWidth, mx: "auto" }}>
+            {emptyState}
+        </Box>
     );
 
 const SelectionActionBar: React.FC<{
@@ -1696,7 +1694,7 @@ const CollectionGrid: React.FC<{
         <Box
             sx={{
                 width: "100%",
-                maxWidth: contentMaxWidth,
+                maxWidth: lockerContentMaxWidth,
                 mx: "auto",
                 display: "grid",
                 gap: 2,
@@ -1746,6 +1744,18 @@ const CollectionChipFilters: React.FC<{
     const [showLeftScrollHint, setShowLeftScrollHint] = useState(false);
     const [showRightScrollHint, setShowRightScrollHint] = useState(false);
 
+    const scrollLeft = () => {
+        const container = scrollContainerRef.current;
+        if (!container) {
+            return;
+        }
+
+        container.scrollBy({
+            left: -Math.max(container.clientWidth * 0.6, 160),
+            behavior: "smooth",
+        });
+    };
+
     const scrollRight = () => {
         const container = scrollContainerRef.current;
         if (!container) {
@@ -1787,14 +1797,32 @@ const CollectionChipFilters: React.FC<{
 
     return (
         <Box
-            sx={{
-                width: "100%",
-                maxWidth: contentMaxWidth,
-                mx: "auto",
-                mt: 0.5,
-            }}
+            sx={{ width: "100%", maxWidth: lockerContentMaxWidth, mx: "auto" }}
         >
             <Stack direction="row" sx={{ alignItems: "stretch", gap: 0 }}>
+                {showLeftScrollHint && (
+                    <Box
+                        sx={{
+                            width: 28,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <ButtonBase
+                            onClick={scrollLeft}
+                            sx={(theme) => ({
+                                width: 28,
+                                height: "100%",
+                                borderRadius: "999px",
+                                ...lockerColorSx(theme, { color: "iconColor" }),
+                            })}
+                        >
+                            <ChevronLeftRoundedIcon sx={{ fontSize: 28 }} />
+                        </ButtonBase>
+                    </Box>
+                )}
                 <Box sx={{ position: "relative", flex: 1, minWidth: 0 }}>
                     <Stack
                         ref={scrollContainerRef}
@@ -1823,28 +1851,25 @@ const CollectionChipFilters: React.FC<{
                                         onToggleCollection(collection.id)
                                     }
                                     sx={(theme) => ({
-                                        borderRadius: "999px",
-                                        px: 1.5,
-                                        py: 0.875,
+                                        minHeight: 44,
+                                        padding: "12px 20px",
+                                        borderRadius: "16px",
                                         whiteSpace: "nowrap",
                                         flexShrink: 0,
-                                        backgroundColor: isSelected
-                                            ? "#1071FF"
-                                            : theme.vars.palette.fill.faint,
-                                        color: isSelected
-                                            ? "#FFFFFF"
-                                            : theme.vars.palette.text.base,
-                                        ...theme.applyStyles("light", {
+                                        ...lockerColorSx(theme, {
                                             backgroundColor: isSelected
-                                                ? "#1071FF"
-                                                : "#FFFFFF",
-                                            border: isSelected
-                                                ? "none"
-                                                : "1px solid rgba(17, 24, 39, 0.06)",
+                                                ? "primary"
+                                                : "fillLight",
+                                            color: isSelected
+                                                ? "specialWhite"
+                                                : "textLight",
                                         }),
                                     })}
                                 >
-                                    <Typography variant="small">
+                                    <Typography
+                                        variant="small"
+                                        sx={lockerTextBodySx}
+                                    >
                                         {collection.name}
                                     </Typography>
                                 </ButtonBase>
@@ -1860,11 +1885,9 @@ const CollectionChipFilters: React.FC<{
                                 bottom: 0,
                                 width: 40,
                                 pointerEvents: "none",
-                                background:
-                                    "linear-gradient(90deg, #08090A 0%, rgba(8, 9, 10, 0) 100%)",
+                                background: `linear-gradient(90deg, ${lockerColors.backgroundBase.dark} 0%, ${lockerColors.backgroundBase.dark}00 100%)`,
                                 ...theme.applyStyles("light", {
-                                    background:
-                                        "linear-gradient(90deg, #F3F4F6 0%, rgba(243, 244, 246, 0) 100%)",
+                                    background: `linear-gradient(90deg, ${lockerColors.backgroundBase.light} 0%, ${lockerColors.backgroundBase.light}00 100%)`,
                                 }),
                             })}
                         />
@@ -1878,42 +1901,37 @@ const CollectionChipFilters: React.FC<{
                                 bottom: 0,
                                 width: 72,
                                 pointerEvents: "none",
-                                background:
-                                    "linear-gradient(90deg, rgba(8, 9, 10, 0) 0%, #08090A 100%)",
+                                background: `linear-gradient(90deg, ${lockerColors.backgroundBase.dark}00 0%, ${lockerColors.backgroundBase.dark} 100%)`,
                                 ...theme.applyStyles("light", {
-                                    background:
-                                        "linear-gradient(90deg, rgba(243, 244, 246, 0) 0%, #F3F4F6 100%)",
+                                    background: `linear-gradient(90deg, ${lockerColors.backgroundBase.light}00 0%, ${lockerColors.backgroundBase.light} 100%)`,
                                 }),
                             })}
                         />
                     )}
                 </Box>
-                <Box
-                    sx={{
-                        width: 28,
-                        flexShrink: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                    }}
-                >
-                    {showRightScrollHint && (
+                {showRightScrollHint && (
+                    <Box
+                        sx={{
+                            width: 28,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
                         <ButtonBase
                             onClick={scrollRight}
                             sx={(theme) => ({
                                 width: 28,
                                 height: "100%",
-                                color: "#4A4A4A",
                                 borderRadius: "999px",
-                                ...theme.applyStyles("dark", {
-                                    color: "#FFFFFF",
-                                }),
+                                ...lockerColorSx(theme, { color: "iconColor" }),
                             })}
                         >
                             <ChevronRightRoundedIcon sx={{ fontSize: 28 }} />
                         </ButtonBase>
-                    )}
-                </Box>
+                    </Box>
+                )}
             </Stack>
         </Box>
     );
@@ -1927,29 +1945,23 @@ const CollectionFilterChip: React.FC<{
         <ButtonBase
             onClick={onClick}
             sx={(theme) => ({
-                borderRadius: "999px",
-                px: 1.25,
-                py: 0.875,
+                width: 36,
+                height: 36,
+                borderRadius: "12px",
                 flexShrink: 0,
-                minWidth: 44,
-                color: selected ? "#FFFFFF" : theme.vars.palette.text.base,
-                backgroundColor: selected
-                    ? "#1071FF"
-                    : theme.vars.palette.fill.faint,
-                "&:hover": {
-                    backgroundColor: selected
-                        ? "#1071FF"
-                        : theme.vars.palette.fill.faintHover,
-                },
-                ...theme.applyStyles("light", {
-                    backgroundColor: selected ? "#1071FF" : "#FFFFFF",
-                    border: selected
-                        ? "none"
-                        : "1px solid rgba(17, 24, 39, 0.06)",
-                    "&:hover": {
-                        backgroundColor: selected ? "#1071FF" : "#F8FAFC",
-                    },
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                ...lockerColorSx(theme, {
+                    backgroundColor: selected ? "primary" : "fillLight",
+                    color: selected ? "specialWhite" : "iconColor",
                 }),
+                "&:hover": {
+                    ...lockerColorSx(theme, {
+                        backgroundColor: selected ? "primary" : "fillDark",
+                    }),
+                },
             })}
         >
             <FilterListRoundedIcon sx={{ fontSize: 18 }} />
@@ -1992,7 +2004,7 @@ const CollectionCard: React.FC<{
                 px: 1.5,
                 py: 1.25,
                 minHeight: 84,
-                borderRadius: "18px",
+                borderRadius: "20px",
                 backgroundColor:
                     collection.items.length > 0
                         ? theme.vars.palette.fill.faint

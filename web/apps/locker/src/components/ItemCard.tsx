@@ -1,7 +1,4 @@
-import {
-    lockerItemIcon,
-    lockerItemIconConfig,
-} from "@/components/locker-item-icons";
+import { lockerItemIcon } from "@/components/locker-item-icons";
 import { downloadLockerFile } from "@/services/remote";
 import type { GenericFileData, LockerItem } from "@/types";
 import { getItemTitle, hasDownloadableObject } from "@/types";
@@ -31,6 +28,7 @@ import {
 import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useState } from "react";
+import { lockerColors, lockerColorSx, lockerTextBodySx } from "./locker-tokens";
 
 interface ItemCardProps {
     item: LockerItem;
@@ -178,22 +176,19 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     display: "flex",
                     width: "100%",
                     textAlign: "left",
-                    borderRadius: "18px",
+                    borderRadius: "20px",
                     overflow: "hidden",
-                    px: 1.5,
-                    py: 1.25,
-                    gap: 1.25,
+                    p: 1.5,
+                    gap: 1.5,
                     alignItems: "center",
-                    backgroundColor: theme.vars.palette.fill.faint,
+                    ...lockerColorSx(theme, { backgroundColor: "fillLight" }),
                     transition: "background-color 0.15s",
                     opacity: selectionMode && !selectable ? 0.58 : 1,
                     "&:hover": {
-                        backgroundColor: theme.vars.palette.fill.faintHover,
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "fillDark",
+                        }),
                     },
-                    ...theme.applyStyles("light", {
-                        backgroundColor: "#FFFFFF",
-                        "&:hover": { backgroundColor: "#FFFFFF" },
-                    }),
                 })}
             >
                 {selectionMode && (
@@ -220,64 +215,50 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                 )}
 
                 <Box
-                    sx={{
+                    sx={(theme) => ({
                         position: "relative",
-                        width: 52,
-                        height: 52,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 40,
+                        height: 40,
                         flexShrink: 0,
-                    }}
+                        borderRadius: "12px",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
+                        }),
+                    })}
                 >
-                    <Box
-                        sx={{
-                            position: "relative",
-                            zIndex: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 40,
-                            height: 40,
-                            m: "6px",
-                            borderRadius:
-                                item.type === "file" ? "12px" : "10px",
-                            backgroundColor: iconBgColor(item),
-                        }}
-                    >
-                        {itemIcon(item)}
-                    </Box>
+                    {itemIcon(item)}
                     {isIncomingShared && !selectionMode && (
                         <Box
                             sx={(theme) => ({
                                 position: "absolute",
-                                right: 1,
-                                bottom: 6,
+                                right: -4,
+                                bottom: -4,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 width: 18,
                                 height: 18,
                                 borderRadius: "50%",
-                                backgroundColor: theme.vars.palette.fill.faint,
-                                p: "1px",
-                                zIndex: 2,
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "fillLight",
+                                }),
                             })}
                         >
                             <HugeiconsIcon
                                 icon={CircleArrowDownLeftIcon}
                                 size={16}
                                 strokeWidth={2}
-                                color="rgba(16, 113, 255, 1)"
-                                style={{ zIndex: 3 }}
+                                color={lockerColors.primary.dark}
                             />
                         </Box>
                     )}
                 </Box>
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
-                        variant="body"
-                        sx={{ fontWeight: "regular", lineHeight: 1.45 }}
-                        noWrap
-                    >
+                    <Typography variant="body" sx={lockerTextBodySx} noWrap>
                         {title}
                     </Typography>
                 </Box>
@@ -355,7 +336,12 @@ const ItemOverflowMenu: React.FC<{
     <OverflowMenu
         ariaID={`item-menu-${item.id}`}
         triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
-        triggerButtonSxProps={{ color: "text.faint", p: 0.5 }}
+        triggerButtonSxProps={(theme) => ({
+            width: 24,
+            height: 24,
+            p: 0,
+            ...lockerColorSx(theme, { color: "textLight" }),
+        })}
     >
         {onEdit && (
             <OverflowMenuOption
@@ -431,20 +417,13 @@ const TrashActions: React.FC<{
     </Stack>
 );
 
-const iconBgColor = (item: LockerItem): string => {
-    return lockerItemIconConfig(
-        item.type,
-        item.type === "file" ? (item.data as GenericFileData).name : undefined,
-    ).backgroundColor;
-};
-
 const itemIcon = (item: LockerItem) => {
     return lockerItemIcon(item.type, {
         fileName:
             item.type === "file"
                 ? (item.data as GenericFileData).name
                 : undefined,
-        size: item.type === "file" ? 24 : 20,
-        strokeWidth: 1.9,
+        size: 24,
+        strokeWidth: 1.5,
     });
 };
