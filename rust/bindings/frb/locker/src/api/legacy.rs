@@ -62,9 +62,8 @@ pub async fn create_kit(
         part_names,
         notice_period_in_hours,
     )
-    .await
-    .map(Into::into)
-    .map_err(Into::into)
+    .await?
+    .try_into()
 }
 
 pub async fn download_kit_shares(
@@ -72,9 +71,10 @@ pub async fn download_kit_shares(
     kit_id: String,
 ) -> Result<Vec<LegacyKitShare>, LegacyError> {
     ente_legacy::download_kit_shares(session.as_ref(), &kit_id)
-        .await
-        .map(|shares| shares.into_iter().map(Into::into).collect())
-        .map_err(Into::into)
+        .await?
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect()
 }
 
 pub async fn update_kit_recovery_notice(

@@ -49,38 +49,40 @@ pub struct LegacyKitCreateResult {
     pub shares: Vec<LegacyKitShare>,
 }
 
-impl From<ente_legacy::LegacyKitCreateResult> for LegacyKitCreateResult {
-    fn from(value: ente_legacy::LegacyKitCreateResult) -> Self {
-        Self {
+impl TryFrom<ente_legacy::LegacyKitCreateResult> for LegacyKitCreateResult {
+    type Error = LegacyError;
+
+    fn try_from(value: ente_legacy::LegacyKitCreateResult) -> Result<Self, Self::Error> {
+        Ok(Self {
             kit: value.kit.into(),
-            shares: value.shares.into_iter().map(Into::into).collect(),
-        }
+            shares: value
+                .shares
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 
 #[frb(unignore)]
 #[derive(Clone)]
 pub struct LegacyKitShare {
-    pub payload_version: u8,
-    pub variant: u8,
-    pub kit_id: String,
     pub share_index: u8,
-    pub share: String,
-    pub checksum: String,
     pub part_name: String,
+    pub qr_payload: String,
+    pub copy_code: String,
 }
 
-impl From<ente_legacy::LegacyKitShare> for LegacyKitShare {
-    fn from(value: ente_legacy::LegacyKitShare) -> Self {
-        Self {
-            payload_version: value.payload_version,
-            variant: value.variant.code(),
-            kit_id: value.kit_id,
+impl TryFrom<ente_legacy::LegacyKitShare> for LegacyKitShare {
+    type Error = LegacyError;
+
+    fn try_from(value: ente_legacy::LegacyKitShare) -> Result<Self, Self::Error> {
+        Ok(Self {
+            qr_payload: value.to_qr_payload()?,
+            copy_code: value.to_copy_code()?,
             share_index: value.share_index,
-            share: value.share,
-            checksum: value.checksum,
             part_name: value.part_name,
-        }
+        })
     }
 }
 
