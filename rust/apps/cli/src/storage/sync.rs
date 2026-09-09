@@ -42,14 +42,9 @@ impl<'a> SyncStore<'a> {
              ORDER BY collection_id",
         )?;
 
-        let collections = stmt
-            .query_map(params![user_id], |row| {
-                let metadata: String = row.get(0)?;
-                Ok(serde_json::from_str::<Collection>(&metadata).unwrap())
-            })?
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-        Ok(collections)
+        stmt.query_map(params![user_id], |row| row.get::<_, String>(0))?
+            .map(|metadata| Ok(serde_json::from_str(&metadata?)?))
+            .collect()
     }
 
     pub fn upsert_file(&self, file: &RemoteFile) -> Result<()> {
@@ -377,5 +372,27 @@ impl<'a> SyncStore<'a> {
             .optional()?;
 
         Ok(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Error, Result, storage::Storage};
+
+    #[test]
+    fn malformed_collection_metadata_returns_error() -> Result<()> {
+        let storage = Storage::new_in_memory()?;
+        storage.conn().execute(
+            "INSERT INTO collections
+             (collection_id, owner, name, type, metadata, updated_at)
+             VALUES (1, 1, 'album', 'album', '{', 0)",
+            [],
+        )?;
+
+        assert!(matches!(
+            storage.sync().get_collections(1),
+            Err(Error::Serialization(_))
+        ));
+        Ok(())
     }
 }

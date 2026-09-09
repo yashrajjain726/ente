@@ -12,7 +12,7 @@ use crate::storage::Storage;
 use crate::sync::SyncEngine;
 use ente_core::b64;
 use ente_core::crypto;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -476,17 +476,18 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
             "Uncategorized".to_string()
         };
 
-        if !album_existing_files.contains_key(&album_folder) {
-            let existing = load_album_metadata(export_path, &album_folder).await?;
-            log::debug!(
-                "Loaded {} existing files for album {}",
-                existing.len(),
-                album_folder
-            );
-            album_existing_files.insert(album_folder.clone(), existing);
-        }
-
-        let existing_files = album_existing_files.get_mut(&album_folder).unwrap();
+        let existing_files = match album_existing_files.entry(album_folder.clone()) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => {
+                let existing = load_album_metadata(export_path, entry.key()).await?;
+                log::debug!(
+                    "Loaded {} existing files for album {}",
+                    existing.len(),
+                    entry.key()
+                );
+                entry.insert(existing)
+            }
+        };
         // Remove current files so only deleted files remain after the loop.
         if let Some(existing) = existing_files.remove(&file.id) {
             if existing.file_path == file_path {
@@ -932,11 +933,13 @@ fn decrypt_file_metadata(
     file: &crate::api::models::File,
     file_key: &[u8],
 ) -> Result<Option<FileMetadata>> {
-    if file.metadata.encrypted_data.is_none() || file.metadata.decryption_header.is_empty() {
+    let Some(encrypted_data) = &file.metadata.encrypted_data else {
+        return Ok(None);
+    };
+    if file.metadata.decryption_header.is_empty() {
         return Ok(None);
     }
 
-    let encrypted_data = file.metadata.encrypted_data.as_ref().unwrap();
     let encrypted_bytes = b64::decode(encrypted_data)?;
     let header_bytes = b64::decode(&file.metadata.decryption_header)?;
 

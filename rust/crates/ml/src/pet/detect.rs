@@ -81,8 +81,8 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
     output_data: T,
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
-    let row_len = if output_shape.len() >= 2 {
-        *output_shape.last().unwrap() as usize
+    let row_len = if let [_, .., last] = output_shape {
+        *last as usize
     } else if output_shape.len() == 1 {
         let total = output_data.len();
         if total.is_multiple_of(13) {
