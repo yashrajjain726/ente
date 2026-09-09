@@ -10,6 +10,7 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
+import "package:photos/events/diff_sync_complete_event.dart";
 import "package:photos/events/event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
@@ -56,6 +57,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   _localPhotosUpdatedSubscription;
   late StreamSubscription<CollectionUpdatedEvent>
   _collectionUpdatedSubscription;
+  late StreamSubscription<DiffSyncCompleteEvent> _diffSyncCompleteSubscription;
   late double _cardWidth;
 
   // Delay cover warming past startup; generations invalidate stale work.
@@ -107,6 +109,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _collectionUpdatedSubscription = Bus.instance
         .on<CollectionUpdatedEvent>()
         .listen(_onCollectionUpdated);
+    _diffSyncCompleteSubscription = Bus.instance
+        .on<DiffSyncCompleteEvent>()
+        .listen((_) => _hideMemoryLaneIfFilesMissing());
     _memoryLaneLoaded = _loadScheduledMemoryLane();
     MemoryLaneService.instance.readyPersonIds.addListener(
       _onMemoryLaneReadyTimelinesChanged,
@@ -122,6 +127,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _peopleChangedSubscription.cancel();
     _localPhotosUpdatedSubscription.cancel();
     _collectionUpdatedSubscription.cancel();
+    _diffSyncCompleteSubscription.cancel();
     _warmTimer?.cancel();
     _videoPrefetcher.dispose();
     _scrollController.dispose();
@@ -493,6 +499,13 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
                 : EventType.deletedFromRemote)) {
       return;
     }
+    if (event.type != EventType.hide) {
+      if (event.type != EventType.deletedFromRemote ||
+          event.source != "syncDeleteFromRemote") {
+        await _hideMemoryLaneIfFilesMissing();
+      }
+      return;
+    }
     final Set<int> updatedFileIds;
     if (isLocalGalleryMode) {
       final localIds = event.updatedFiles
@@ -509,7 +522,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
           .toSet();
     }
     if (!mounted ||
-        _memoryLane == null ||
+        _memoryLane != memoryLane ||
         !memoryLane.entries.any(
           (entry) => updatedFileIds.contains(entry.fileId),
         )) {
@@ -520,12 +533,19 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
 
   // TODO: Recompute the timeline instead of hiding the card.
   Future<void> _onCollectionUpdated(CollectionUpdatedEvent event) async {
-    final memoryLane = _memoryLane;
     if (!mounted ||
-        memoryLane == null ||
+        _memoryLane == null ||
         isLocalGalleryMode ||
         event.type != EventType.deletedFromRemote ||
         event.updatedFiles.isNotEmpty) {
+      return;
+    }
+    await _hideMemoryLaneIfFilesMissing();
+  }
+
+  Future<void> _hideMemoryLaneIfFilesMissing() async {
+    final memoryLane = _memoryLane;
+    if (!mounted || memoryLane == null) {
       return;
     }
     final files = await MemoryLaneService.instance.getTimelineFiles(
@@ -534,7 +554,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     final hasMissingFiles = memoryLane.entries.any(
       (entry) => !files.containsKey(entry.fileId),
     );
-    if (!mounted || _memoryLane == null || !hasMissingFiles) {
+    if (!mounted || _memoryLane != memoryLane || !hasMissingFiles) {
       return;
     }
     _hideMemoryLane();
