@@ -2,23 +2,36 @@ use std::collections::{HashMap, HashSet};
 
 use crate::db::{MAX_SQL_BIND_PARAMS_PER_QUERY, pair};
 
-use super::schema::{
+use super::clusters::file_id_to_cluster_ids;
+use crate::ml_db::schema::{
     CREATE_CLUSTER_PERSON_TABLE, CREATE_NOT_PERSON_FEEDBACK_TABLE, DELETE_CLUSTER_PERSON,
     DELETE_NOT_PERSON_FEEDBACK,
 };
-use super::{MlDb, Result, file_id_to_cluster_ids};
+use crate::ml_db::{MlDb, Result};
 
 pub type PersonToClusterIdToFaceIds = HashMap<String, HashMap<String, HashSet<String>>>;
 
-const INSERT_CLUSTER_PERSON: &str = "INSERT INTO cluster_person (person_id, cluster_id) VALUES (?, ?) ON CONFLICT(person_id, cluster_id) DO NOTHING";
-const INSERT_NOT_PERSON_FEEDBACK: &str =
-    "INSERT INTO not_person_feedback (person_id, cluster_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
+const INSERT_CLUSTER_PERSON: &str = r#"
+    INSERT INTO cluster_person (person_id, cluster_id)
+    VALUES (?, ?)
+    ON CONFLICT (person_id, cluster_id) DO NOTHING
+"#;
+const INSERT_NOT_PERSON_FEEDBACK: &str = r#"
+    INSERT INTO not_person_feedback (person_id, cluster_id)
+    VALUES (?, ?)
+    ON CONFLICT DO NOTHING
+"#;
 
 impl MlDb {
     pub fn get_clusters_with_three_or_more_not_person_feedback(&self) -> Result<HashSet<String>> {
         self.db
             .read_column(
-                "SELECT cluster_id FROM not_person_feedback GROUP BY cluster_id HAVING COUNT(*) >= 3",
+                r#"
+                SELECT cluster_id
+                FROM not_person_feedback
+                GROUP BY cluster_id
+                HAVING COUNT(*) >= 3
+                "#,
                 (),
             )
             .map_err(Into::into)
@@ -26,7 +39,12 @@ impl MlDb {
 
     pub fn get_person_ignored_clusters(&self, person_id: &str) -> Result<HashSet<String>> {
         let mut ignored_cluster_ids: HashSet<String> = self.db.read_column(
-            "SELECT cluster_id FROM cluster_person WHERE person_id != ? AND person_id IS NOT NULL",
+            r#"
+            SELECT cluster_id
+            FROM cluster_person
+            WHERE person_id != ?
+                AND person_id IS NOT NULL
+            "#,
             [person_id],
         )?;
         let reject_cluster_ids: Vec<String> = self.db.read_column(
@@ -65,7 +83,12 @@ impl MlDb {
 
     pub fn get_person_to_cluster_id_to_face_ids(&self) -> Result<PersonToClusterIdToFaceIds> {
         let rows: Vec<(String, String, String)> = self.db.read_all(
-            "SELECT person_id, face_clusters.cluster_id, face_id FROM cluster_person INNER JOIN face_clusters ON cluster_person.cluster_id = face_clusters.cluster_id",
+            r#"
+            SELECT person_id, face_clusters.cluster_id, face_id
+            FROM cluster_person
+            INNER JOIN face_clusters
+                ON cluster_person.cluster_id = face_clusters.cluster_id
+            "#,
             (),
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )?;
@@ -93,7 +116,13 @@ impl MlDb {
     ) -> Result<HashMap<String, String>> {
         self.db
             .read_chunked_in(
-                "SELECT face_id, person_id FROM cluster_person INNER JOIN face_clusters ON cluster_person.cluster_id = face_clusters.cluster_id WHERE face_id IN ({})",
+                r#"
+                SELECT face_id, person_id
+                FROM cluster_person
+                INNER JOIN face_clusters
+                    ON cluster_person.cluster_id = face_clusters.cluster_id
+                WHERE face_id IN ({})
+                "#,
                 face_ids,
                 MAX_SQL_BIND_PARAMS_PER_QUERY,
                 pair,
@@ -107,7 +136,13 @@ impl MlDb {
     ) -> Result<HashMap<String, HashSet<String>>> {
         self.db
             .read_grouped(
-                "SELECT face_clusters.cluster_id, face_id FROM cluster_person INNER JOIN face_clusters ON cluster_person.cluster_id = face_clusters.cluster_id WHERE person_id = ?",
+                r#"
+                SELECT face_clusters.cluster_id, face_id
+                FROM cluster_person
+                INNER JOIN face_clusters
+                    ON cluster_person.cluster_id = face_clusters.cluster_id
+                WHERE person_id = ?
+                "#,
                 [person_id],
             )
             .map_err(Into::into)
@@ -116,7 +151,13 @@ impl MlDb {
     pub fn get_face_ids_for_person(&self, person_id: &str) -> Result<HashSet<String>> {
         self.db
             .read_column(
-                "SELECT face_id FROM face_clusters LEFT JOIN cluster_person ON face_clusters.cluster_id = cluster_person.cluster_id WHERE cluster_person.person_id = ?",
+                r#"
+                SELECT face_id
+                FROM face_clusters
+                LEFT JOIN cluster_person
+                    ON face_clusters.cluster_id = cluster_person.cluster_id
+                WHERE cluster_person.person_id = ?
+                "#,
                 [person_id],
             )
             .map_err(Into::into)
@@ -129,7 +170,17 @@ impl MlDb {
     ) -> Result<Vec<String>> {
         self.db
             .read_column(
-                "SELECT faces.face_id FROM faces JOIN face_clusters ON faces.face_id = face_clusters.face_id JOIN cluster_person ON face_clusters.cluster_id = cluster_person.cluster_id WHERE cluster_person.person_id = ? ORDER BY faces.score DESC LIMIT ?",
+                r#"
+                SELECT faces.face_id
+                FROM faces
+                JOIN face_clusters
+                    ON faces.face_id = face_clusters.face_id
+                JOIN cluster_person
+                    ON face_clusters.cluster_id = cluster_person.cluster_id
+                WHERE cluster_person.person_id = ?
+                ORDER BY faces.score DESC
+                LIMIT ?
+                "#,
                 (person_id, limit),
             )
             .map_err(Into::into)
@@ -162,7 +213,7 @@ impl MlDb {
         cluster_to_person_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.db
-            .write_batch(
+            .write_batch_atomic(
                 INSERT_CLUSTER_PERSON,
                 cluster_to_person_id
                     .iter()
@@ -182,7 +233,7 @@ impl MlDb {
         cluster_to_person_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.db
-            .write_batch(
+            .write_batch_atomic(
                 INSERT_NOT_PERSON_FEEDBACK,
                 cluster_to_person_id
                     .iter()
@@ -213,7 +264,13 @@ impl MlDb {
     ) -> Result<HashMap<i64, HashSet<String>>> {
         self.db
             .read_all(
-                "SELECT face_clusters.cluster_id, face_id FROM face_clusters INNER JOIN cluster_person ON face_clusters.cluster_id = cluster_person.cluster_id WHERE cluster_person.person_id = ?",
+                r#"
+                SELECT face_clusters.cluster_id, face_id
+                FROM face_clusters
+                INNER JOIN cluster_person
+                    ON face_clusters.cluster_id = cluster_person.cluster_id
+                WHERE cluster_person.person_id = ?
+                "#,
                 [person_id],
                 pair,
             )
@@ -245,7 +302,15 @@ impl MlDb {
     pub fn get_file_ids_of_person_id(&self, person_id: &str) -> Result<Vec<i64>> {
         self.db
             .read_column(
-                "SELECT DISTINCT faces.file_id FROM cluster_person JOIN face_clusters ON cluster_person.cluster_id = face_clusters.cluster_id JOIN faces ON face_clusters.face_id = faces.face_id WHERE cluster_person.person_id = ?",
+                r#"
+                SELECT DISTINCT faces.file_id
+                FROM cluster_person
+                JOIN face_clusters
+                    ON cluster_person.cluster_id = face_clusters.cluster_id
+                JOIN faces
+                    ON face_clusters.face_id = faces.face_id
+                WHERE cluster_person.person_id = ?
+                "#,
                 [person_id],
             )
             .map_err(Into::into)
@@ -253,14 +318,14 @@ impl MlDb {
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(in crate::ml_db) mod tests {
     use std::collections::HashMap;
 
     use super::MlDb;
+    use crate::ml_db::queries::{clusters, faces};
     use crate::ml_db::tests::{
         cases, check, grouped, grouped_by_file, map, open, set, sorted, strings,
     };
-    use crate::ml_db::{clusters, faces};
     use tempfile::TempDir;
 
     pub(in crate::ml_db) fn seed(db: &MlDb) {

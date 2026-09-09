@@ -5,24 +5,77 @@ use crate::db::{
     optional_parameter, pair, params_from_iter,
 };
 
-use super::queries::{
-    CLIP_ML_VERSION, FACE_ML_VERSION, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding,
-    LAPLACIAN_HARD_THRESHOLD, MINIMUM_QUALITY_FACE_SCORE, PET_ML_VERSION,
-};
-use super::vector_encoding::{decode_evector, encode_evector};
-use super::{
-    Error, MlDb, Result, file_id_from_face_id, limit_clause, non_empty, try_file_id_from_face_id,
-    unique_in_order,
-};
+use super::clip::CLIP_ML_VERSION;
+use super::pets::PET_ML_VERSION;
+use super::{limit_clause, unique_in_order};
+use crate::ml_db::vector_encoding::{decode_evector, encode_evector};
+use crate::ml_db::{Error, MlDb, Result};
+
+pub const FACE_ML_VERSION: i64 = 1;
+
+pub const LAPLACIAN_HARD_THRESHOLD: f64 = 10.0;
+pub const LAPLACIAN_SOFT_THRESHOLD: f64 = 50.0;
+pub const LAPLACIAN_VERY_SOFT_THRESHOLD: f64 = 200.0;
+pub const MINIMUM_QUALITY_FACE_SCORE: f64 = 0.80;
+pub const MEDIUM_QUALITY_FACE_SCORE: f64 = 0.85;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaceRow {
+    pub file_id: i64,
+    pub face_id: String,
+    pub detection_json: String,
+    pub embedding: Vec<f64>,
+    pub score: f64,
+    pub blur: f64,
+    pub is_sideways: bool,
+    pub image_height: i64,
+    pub image_width: i64,
+    pub ml_version: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaceWithoutEmbedding {
+    pub face_id: String,
+    pub file_id: i64,
+    pub score: f64,
+    pub detection_json: String,
+    pub blur: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaceDbInfoForClustering {
+    pub face_id: String,
+    pub cluster_id: Option<String>,
+    pub embedding_bytes: Vec<u8>,
+    pub face_score: f64,
+    pub blur_value: f64,
+    pub is_sideways: bool,
+}
 
 const FACE_EMBEDDING_MAX_ROWS: usize = 20000;
 
-const UPSERT_FACE: &str = "INSERT INTO faces (file_id, face_id, detection, embedding, score, blur, is_sideways, height, width, ml_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(file_id, face_id) DO UPDATE SET face_id = excluded.face_id, detection = excluded.detection, embedding = excluded.embedding, score = excluded.score, blur = excluded.blur, is_sideways = excluded.is_sideways, height = excluded.height, width = excluded.width, ml_version = excluded.ml_version";
+const UPSERT_FACE: &str = r#"
+    INSERT INTO faces (
+        file_id, face_id, detection, embedding, score, blur,
+        is_sideways, height, width, ml_version
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (file_id, face_id) DO UPDATE SET
+        face_id = excluded.face_id,
+        detection = excluded.detection,
+        embedding = excluded.embedding,
+        score = excluded.score,
+        blur = excluded.blur,
+        is_sideways = excluded.is_sideways,
+        height = excluded.height,
+        width = excluded.width,
+        ml_version = excluded.ml_version
+"#;
 
 impl MlDb {
     pub fn bulk_insert_faces(&self, faces: &[FaceRow]) -> Result<()> {
         self.db
-            .write_in_batches(
+            .write_batches_committing_each(
                 UPSERT_FACE,
                 500,
                 faces.iter().map(|face| {
@@ -68,7 +121,15 @@ impl MlDb {
         limit: Option<i64>,
     ) -> Result<Vec<Vec<u8>>> {
         let sql = format!(
-            "SELECT embedding FROM faces WHERE face_id in (SELECT face_id from face_clusters where cluster_id = ?){}",
+            r#"
+            SELECT embedding
+            FROM faces
+            WHERE face_id in (
+                SELECT face_id
+                from face_clusters
+                where cluster_id = ?
+            ) {}
+            "#,
             limit_clause(limit)
         );
         let mut parameters: Vec<&dyn ToSql> = vec![&cluster_id];
@@ -99,7 +160,13 @@ impl MlDb {
                 break;
             }
             let sql = format!(
-                "SELECT fc.cluster_id, fe.embedding FROM face_clusters fc INNER JOIN faces fe ON fc.face_id = fe.face_id WHERE fc.cluster_id IN ({}){}",
+                r#"
+                SELECT fc.cluster_id, fe.embedding
+                FROM face_clusters fc
+                INNER JOIN faces fe
+                    ON fc.face_id = fe.face_id
+                WHERE fc.cluster_id IN ({}) {}
+                "#,
                 bind_placeholders(cluster_chunk.len()),
                 limit_clause(remaining_limit)
             );
@@ -136,7 +203,17 @@ impl MlDb {
                 [person_id],
             )?;
             let sql = format!(
-                "SELECT * FROM faces WHERE face_id IN (SELECT face_id FROM face_clusters WHERE cluster_id IN ({})) AND file_id IN ({}) ORDER BY score DESC",
+                r#"
+                SELECT *
+                FROM faces
+                WHERE face_id IN (
+                    SELECT face_id
+                    FROM face_clusters
+                    WHERE cluster_id IN ({})
+                )
+                    AND file_id IN ({})
+                ORDER BY score DESC
+                "#,
                 bind_placeholders(cluster_ids.len()),
                 bind_placeholders(file_ids.len())
             );
@@ -160,11 +237,9 @@ impl MlDb {
                 "SELECT face_id FROM face_clusters WHERE cluster_id = ?",
                 [cluster_id],
             )?;
-            if let Some(faces) = self.get_faces_for_given_file_id(recent_file_id)? {
-                for face in faces {
-                    if face_ids.contains(&face.face_id) {
-                        return Ok(Some(face));
-                    }
+            for face in self.get_faces_for_given_file_id(recent_file_id)? {
+                if face_ids.contains(&face.face_id) {
+                    return Ok(Some(face));
                 }
             }
         }
@@ -176,15 +251,13 @@ impl MlDb {
         Ok(None)
     }
 
-    pub fn get_faces_for_given_file_id(&self, file_upload_id: i64) -> Result<Option<Vec<FaceRow>>> {
+    pub fn get_faces_for_given_file_id(&self, file_upload_id: i64) -> Result<Vec<FaceRow>> {
         let faces: Vec<StoredFace> = self.db.read_all(
             "SELECT * FROM faces WHERE file_id = ?",
             [file_upload_id],
             read_stored_face,
         )?;
-        non_empty(faces)
-            .map(|faces| faces.into_iter().map(StoredFace::decode).collect())
-            .transpose()
+        faces.into_iter().map(StoredFace::decode).collect()
     }
 
     pub fn get_file_ids_to_faces_without_embedding(
@@ -218,9 +291,30 @@ impl MlDb {
         let mut result = Vec::new();
         loop {
             let rows: Vec<(String, Vec<u8>, f64, f64, i64)> = self.db.read_all(
-                "SELECT face_id, embedding, score, blur, is_sideways FROM faces WHERE score > ? AND blur > ? ORDER BY face_id DESC LIMIT ? OFFSET ?",
-                (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD, batch_size, offset),
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+                r#"
+                SELECT face_id, embedding, score, blur, is_sideways
+                FROM faces
+                WHERE score > ?
+                    AND blur > ?
+                ORDER BY face_id DESC
+                LIMIT ?
+                OFFSET ?
+                "#,
+                (
+                    MINIMUM_QUALITY_FACE_SCORE,
+                    LAPLACIAN_HARD_THRESHOLD,
+                    batch_size,
+                    offset,
+                ),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
             )?;
             if rows.is_empty() {
                 break;
@@ -261,7 +355,13 @@ impl MlDb {
                 break;
             }
             let sql = format!(
-                "SELECT face_id, embedding FROM faces WHERE face_id IN ({}) ORDER BY face_id DESC LIMIT ?",
+                r#"
+                SELECT face_id, embedding
+                FROM faces
+                WHERE face_id IN ({})
+                ORDER BY face_id DESC
+                LIMIT ?
+                "#,
                 bind_placeholders(chunk.len())
             );
             let mut parameters: Vec<&dyn ToSql> = chunk.iter().map(|id| id as &dyn ToSql).collect();
@@ -300,7 +400,18 @@ impl MlDb {
         }
         self.db
             .execute_chunked_in(
-                "DELETE FROM faces WHERE file_id IN ({}) AND score < 0 AND EXISTS (SELECT 1 FROM faces AS successful WHERE successful.file_id = faces.file_id AND successful.score >= 0 AND successful.ml_version >= faces.ml_version)",
+                r#"
+                DELETE FROM faces
+                WHERE file_id IN ({})
+                    AND score < 0
+                    AND EXISTS (
+                        SELECT 1
+                        FROM faces AS successful
+                        WHERE successful.file_id = faces.file_id
+                            AND successful.score >= 0
+                            AND successful.ml_version >= faces.ml_version
+                    )
+                "#,
                 file_ids,
             )
             .map_err(Into::into)
@@ -314,7 +425,29 @@ impl MlDb {
         for chunk in file_ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY / 3) {
             let placeholders = bind_placeholders(chunk.len());
             let sql = format!(
-                "SELECT failed.file_id FROM faces AS failed WHERE failed.file_id IN ({placeholders}) AND failed.score < 0 AND NOT EXISTS (SELECT 1 FROM faces AS successful WHERE successful.file_id = failed.file_id AND successful.score >= 0 AND successful.ml_version >= failed.ml_version) UNION SELECT file_id FROM clip WHERE file_id IN ({placeholders}) AND LENGTH(embedding) = 0 UNION SELECT file_id FROM pet_faces WHERE file_id IN ({placeholders}) AND score < 0"
+                r#"
+                SELECT failed.file_id
+                FROM faces AS failed
+                WHERE failed.file_id IN ({placeholders})
+                    AND failed.score < 0
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM faces AS successful
+                        WHERE successful.file_id = failed.file_id
+                            AND successful.score >= 0
+                            AND successful.ml_version >= failed.ml_version
+                    )
+                UNION
+                SELECT file_id
+                FROM clip
+                WHERE file_id IN ({placeholders})
+                    AND LENGTH(embedding) = 0
+                UNION
+                SELECT file_id
+                FROM pet_faces
+                WHERE file_id IN ({placeholders})
+                    AND score < 0
+                "#
             );
             let matches: Vec<i64> = self.db.read_column(
                 &sql,
@@ -337,7 +470,15 @@ impl MlDb {
         }
         self.db
             .execute_chunked_in(
-                "DELETE FROM faces WHERE file_id IN ({}) AND NOT EXISTS (SELECT 1 FROM face_clusters WHERE face_clusters.face_id = faces.face_id)",
+                r#"
+                DELETE FROM faces
+                WHERE file_id IN ({})
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM face_clusters
+                        WHERE face_clusters.face_id = faces.face_id
+                    )
+                "#,
                 file_ids,
             )
             .map_err(Into::into)
@@ -367,7 +508,15 @@ impl MlDb {
     pub fn get_unclustered_face_count(&self) -> Result<i64> {
         self.db
             .read_value(
-                "SELECT COUNT(*) as count FROM faces f LEFT JOIN face_clusters fc ON f.face_id = fc.face_id WHERE f.score > ? AND f.blur > ? AND fc.face_id IS NULL",
+                r#"
+                SELECT COUNT(*) as count
+                FROM faces f
+                LEFT JOIN face_clusters fc
+                    ON f.face_id = fc.face_id
+                WHERE f.score > ?
+                    AND f.blur > ?
+                    AND fc.face_id IS NULL
+                "#,
                 (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
             )
             .map_err(Into::into)
@@ -376,7 +525,13 @@ impl MlDb {
     pub fn get_all_file_ids_of_face_ids_not_in_any_cluster(&self) -> Result<HashSet<i64>> {
         self.db
             .read_column(
-                "SELECT DISTINCT file_id FROM faces LEFT JOIN face_clusters ON faces.face_id = face_clusters.face_id WHERE face_clusters.face_id IS NULL",
+                r#"
+                SELECT DISTINCT file_id
+                FROM faces
+                LEFT JOIN face_clusters
+                    ON faces.face_id = face_clusters.face_id
+                WHERE face_clusters.face_id IS NULL
+                "#,
                 (),
             )
             .map_err(Into::into)
@@ -388,7 +543,13 @@ impl MlDb {
     ) -> Result<HashSet<i64>> {
         let except_clusters = except_clusters.unwrap_or_default();
         let sql = format!(
-            "SELECT DISTINCT faces.file_id FROM faces JOIN face_clusters on face_clusters.face_id = faces.face_id WHERE face_clusters.cluster_id NOT IN ({})",
+            r#"
+            SELECT DISTINCT faces.file_id
+            FROM faces
+            JOIN face_clusters
+                on face_clusters.face_id = faces.face_id
+            WHERE face_clusters.cluster_id NOT IN ({})
+            "#,
             bind_placeholders(except_clusters.len())
         );
         self.db
@@ -398,7 +559,15 @@ impl MlDb {
 
     pub fn get_fully_indexed_file_ids(&self, include_pets: bool) -> Result<HashSet<i64>> {
         let mut sql = String::from(
-            "SELECT file_id FROM faces WHERE ml_version >= ? INTERSECT SELECT file_id FROM clip WHERE ml_version >= ?",
+            r#"
+            SELECT file_id
+            FROM faces
+            WHERE ml_version >= ?
+            INTERSECT
+            SELECT file_id
+            FROM clip
+            WHERE ml_version >= ?
+            "#,
         );
         let mut parameters = vec![FACE_ML_VERSION, CLIP_ML_VERSION];
         if include_pets {
@@ -409,6 +578,24 @@ impl MlDb {
             .read_column(&sql, params_from_iter(parameters))
             .map_err(Into::into)
     }
+}
+
+pub fn is_bad_face_for_clustering(face_score: f64, blur_value: f64, is_sideways: bool) -> bool {
+    face_score < MINIMUM_QUALITY_FACE_SCORE
+        || blur_value < LAPLACIAN_SOFT_THRESHOLD
+        || (blur_value < LAPLACIAN_VERY_SOFT_THRESHOLD && face_score < MEDIUM_QUALITY_FACE_SCORE)
+        || is_sideways
+}
+
+pub(super) fn file_id_from_face_id(face_id: &str) -> Result<i64> {
+    try_file_id_from_face_id(face_id)
+        .ok_or_else(|| Error::Codec(format!("Error parsing faceId: {face_id}")))
+}
+
+fn try_file_id_from_face_id(face_id: &str) -> Option<i64> {
+    face_id
+        .split_once('_')
+        .and_then(|(file_id, _)| file_id.parse().ok())
 }
 
 #[derive(Clone)]
@@ -443,14 +630,15 @@ fn read_stored_face(row: &Row<'_>) -> SqliteResult<StoredFace> {
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(in crate::ml_db) mod tests {
     use std::collections::HashMap;
     use std::ops::RangeInclusive;
 
     use super::{FaceRow, MlDb};
+    use crate::ml_db::queries::{clip, clusters, persons, pets};
     use crate::ml_db::tests::{cases, check, ids, open, sorted, strings};
     use crate::ml_db::vector_encoding::encode_evector;
-    use crate::ml_db::{Error, PetFaceRow, clusters, persons, pets, queries};
+    use crate::ml_db::{Error, PetFaceRow};
     use tempfile::TempDir;
 
     fn face(file_id: i64, index: i64, score: f64, blur: f64, is_sideways: bool) -> FaceRow {
@@ -499,7 +687,7 @@ pub(super) mod tests {
 
     fn seeded() -> (TempDir, MlDb) {
         let (directory, db) = open();
-        queries::tests::seed(&db);
+        clip::tests::seed(&db);
         seed(&db);
         clusters::tests::seed(&db);
         persons::tests::seed(&db);
@@ -558,10 +746,10 @@ pub(super) mod tests {
     #[test]
     fn seeded_rows() {
         let (_directory, db) = seeded();
-        let mut faces = db.get_faces_for_given_file_id(1).unwrap().unwrap();
+        let mut faces = db.get_faces_for_given_file_id(1).unwrap();
         faces.sort_by(|left, right| left.face_id.cmp(&right.face_id));
         assert_eq!(faces, vec![good_face(1, 0), face(1, 1, 0.95, 300.0, false)]);
-        assert_eq!(db.get_faces_for_given_file_id(99).unwrap(), None);
+        assert!(db.get_faces_for_given_file_id(99).unwrap().is_empty());
 
         let without_embedding = db.get_file_ids_to_faces_without_embedding().unwrap();
         assert_eq!(without_embedding.len(), 10);
@@ -754,7 +942,7 @@ pub(super) mod tests {
         };
         db.bulk_insert_faces(std::slice::from_ref(&updated))
             .unwrap();
-        let faces = db.get_faces_for_given_file_id(1).unwrap().unwrap();
+        let faces = db.get_faces_for_given_file_id(1).unwrap();
         assert_eq!(faces.len(), 2);
         assert_eq!(
             faces.iter().find(|face| face.face_id == "1_0"),
@@ -764,13 +952,13 @@ pub(super) mod tests {
 
         db.delete_unclustered_face_index_for_files(&[]).unwrap();
         db.delete_unclustered_face_index_for_files(&[1, 6]).unwrap();
-        assert_eq!(db.get_faces_for_given_file_id(1).unwrap().unwrap().len(), 2);
-        assert_eq!(db.get_faces_for_given_file_id(6).unwrap(), None);
+        assert_eq!(db.get_faces_for_given_file_id(1).unwrap().len(), 2);
+        assert!(db.get_faces_for_given_file_id(6).unwrap().is_empty());
 
         db.delete_face_index_for_files(&[]).unwrap();
         db.delete_face_index_for_files(&[1, 2]).unwrap();
         assert_eq!(db.get_face_indexed_file_count(1).unwrap(), 6);
-        assert_eq!(db.get_faces_for_given_file_id(1).unwrap(), None);
+        assert!(db.get_faces_for_given_file_id(1).unwrap().is_empty());
     }
 
     #[test]
@@ -808,10 +996,7 @@ pub(super) mod tests {
         assert_eq!(db.get_errored_file_ids().unwrap(), ids([5, 11, 12]));
         db.prune_resolved_face_error_results(&[5, 11, 12]).unwrap();
         assert_eq!(db.get_errored_file_ids().unwrap(), ids([5, 12]));
-        assert_eq!(
-            db.get_faces_for_given_file_id(11).unwrap().unwrap().len(),
-            1
-        );
+        assert_eq!(db.get_faces_for_given_file_id(11).unwrap().len(), 1);
         assert_eq!(
             db.get_file_ids_with_error_results(&file_ids).unwrap(),
             ids([4, 5, 12, 13])

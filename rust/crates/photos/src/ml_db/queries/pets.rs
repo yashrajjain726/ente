@@ -2,16 +2,92 @@ use std::collections::HashMap;
 
 use crate::db::{Row, SqliteResult, bind_placeholders, pair, params_from_iter};
 
-use super::queries::{PetBodyRow, PetBodyVectorRow, PetFaceRow, PetFaceVectorRow, PetRowsForFiles};
-use super::{MlDb, Result, non_empty, unique_in_order};
+use super::unique_in_order;
+use crate::ml_db::{MlDb, Result};
 
-const UPSERT_PET_FACE: &str = "INSERT INTO pet_faces (file_id, pet_face_id, detection, face_vector_id, species, score, height, width, ml_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(file_id, pet_face_id) DO UPDATE SET detection = excluded.detection, face_vector_id = excluded.face_vector_id, species = excluded.species, score = excluded.score, height = excluded.height, width = excluded.width, ml_version = excluded.ml_version";
-const UPSERT_PET_BODY: &str = "INSERT INTO pet_bodies (file_id, pet_body_id, detection, body_vector_id, species, score, height, width, ml_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(file_id, pet_body_id) DO UPDATE SET detection = excluded.detection, body_vector_id = excluded.body_vector_id, species = excluded.species, score = excluded.score, height = excluded.height, width = excluded.width, ml_version = excluded.ml_version";
+pub const PET_ML_VERSION: i64 = 1;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PetFaceRow {
+    pub file_id: i64,
+    pub pet_face_id: String,
+    pub detection_json: String,
+    pub face_vector_id: Option<i64>,
+    pub species: i64,
+    pub face_score: f64,
+    pub image_height: i64,
+    pub image_width: i64,
+    pub ml_version: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PetBodyRow {
+    pub file_id: i64,
+    pub pet_body_id: String,
+    pub detection_json: String,
+    pub body_vector_id: Option<i64>,
+    pub species: i64,
+    pub score: f64,
+    pub image_height: i64,
+    pub image_width: i64,
+    pub ml_version: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PetFaceVectorRow {
+    pub pet_face_id: String,
+    pub face_vector_id: Option<i64>,
+    pub species: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PetBodyVectorRow {
+    pub pet_body_id: String,
+    pub body_vector_id: Option<i64>,
+    pub species: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PetRowsForFiles {
+    pub faces: Vec<PetFaceVectorRow>,
+    pub bodies: Vec<PetBodyVectorRow>,
+}
+
+const UPSERT_PET_FACE: &str = r#"
+    INSERT INTO pet_faces (
+        file_id, pet_face_id, detection, face_vector_id, species,
+        score, height, width, ml_version
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (file_id, pet_face_id) DO UPDATE SET
+        detection = excluded.detection,
+        face_vector_id = excluded.face_vector_id,
+        species = excluded.species,
+        score = excluded.score,
+        height = excluded.height,
+        width = excluded.width,
+        ml_version = excluded.ml_version
+"#;
+const UPSERT_PET_BODY: &str = r#"
+    INSERT INTO pet_bodies (
+        file_id, pet_body_id, detection, body_vector_id, species,
+        score, height, width, ml_version
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (file_id, pet_body_id) DO UPDATE SET
+        detection = excluded.detection,
+        body_vector_id = excluded.body_vector_id,
+        species = excluded.species,
+        score = excluded.score,
+        height = excluded.height,
+        width = excluded.width,
+        ml_version = excluded.ml_version
+"#;
 
 impl MlDb {
     pub fn bulk_insert_pet_faces(&self, pet_faces: &[PetFaceRow]) -> Result<()> {
         self.db
-            .write_in_batches(
+            .write_batches_committing_each(
                 UPSERT_PET_FACE,
                 500,
                 pet_faces.iter().map(|pet_face| {
@@ -33,7 +109,7 @@ impl MlDb {
 
     pub fn bulk_insert_pet_bodies(&self, pet_bodies: &[PetBodyRow]) -> Result<()> {
         self.db
-            .write_in_batches(
+            .write_batches_committing_each(
                 UPSERT_PET_BODY,
                 500,
                 pet_bodies.iter().map(|pet_body| {
@@ -61,7 +137,7 @@ impl MlDb {
             return Ok(());
         }
         self.db
-            .write_in_batches(
+            .write_batches_committing_each(
                 "UPDATE pet_faces SET face_vector_id = ? WHERE pet_face_id = ?",
                 500,
                 pet_face_id_to_vector_id
@@ -79,7 +155,7 @@ impl MlDb {
             return Ok(());
         }
         self.db
-            .write_in_batches(
+            .write_batches_committing_each(
                 "UPDATE pet_bodies SET body_vector_id = ? WHERE pet_body_id = ?",
                 500,
                 pet_body_id_to_vector_id
@@ -89,28 +165,24 @@ impl MlDb {
             .map_err(Into::into)
     }
 
-    pub fn get_pet_faces_for_file_id(
-        &self,
-        file_upload_id: i64,
-    ) -> Result<Option<Vec<PetFaceRow>>> {
-        let pet_faces = self.db.read_all(
-            "SELECT * FROM pet_faces WHERE file_id = ? AND species != -1",
-            [file_upload_id],
-            read_pet_face,
-        )?;
-        Ok(non_empty(pet_faces))
+    pub fn get_pet_faces_for_file_id(&self, file_upload_id: i64) -> Result<Vec<PetFaceRow>> {
+        self.db
+            .read_all(
+                "SELECT * FROM pet_faces WHERE file_id = ? AND species != -1",
+                [file_upload_id],
+                read_pet_face,
+            )
+            .map_err(Into::into)
     }
 
-    pub fn get_pet_bodies_for_file_id(
-        &self,
-        file_upload_id: i64,
-    ) -> Result<Option<Vec<PetBodyRow>>> {
-        let pet_bodies = self.db.read_all(
-            "SELECT * FROM pet_bodies WHERE file_id = ? AND species != -1",
-            [file_upload_id],
-            read_pet_body,
-        )?;
-        Ok(non_empty(pet_bodies))
+    pub fn get_pet_bodies_for_file_id(&self, file_upload_id: i64) -> Result<Vec<PetBodyRow>> {
+        self.db
+            .read_all(
+                "SELECT * FROM pet_bodies WHERE file_id = ? AND species != -1",
+                [file_upload_id],
+                read_pet_body,
+            )
+            .map_err(Into::into)
     }
 
     pub fn pet_indexed_file_ids(&self, minimum_ml_version: i64) -> Result<HashMap<i64, i64>> {
@@ -135,10 +207,18 @@ impl MlDb {
     pub fn get_pet_rows_for_files(&self, file_ids: &[i64]) -> Result<PetRowsForFiles> {
         let placeholders = bind_placeholders(file_ids.len());
         let faces_sql = format!(
-            "SELECT pet_face_id, face_vector_id, species FROM pet_faces WHERE file_id IN ({placeholders})"
+            r#"
+            SELECT pet_face_id, face_vector_id, species
+            FROM pet_faces
+            WHERE file_id IN ({placeholders})
+            "#
         );
         let bodies_sql = format!(
-            "SELECT pet_body_id, body_vector_id, species FROM pet_bodies WHERE file_id IN ({placeholders})"
+            r#"
+            SELECT pet_body_id, body_vector_id, species
+            FROM pet_bodies
+            WHERE file_id IN ({placeholders})
+            "#
         );
         let faces = self
             .db
@@ -210,7 +290,11 @@ impl MlDb {
             pet_face_ids,
             create_if_missing,
             "INSERT OR IGNORE INTO pet_face_vector_id_map (pet_face_id) VALUES (?)",
-            "SELECT pet_face_id, pet_face_vector_id FROM pet_face_vector_id_map WHERE pet_face_id IN",
+            r#"
+            SELECT pet_face_id, pet_face_vector_id
+            FROM pet_face_vector_id_map
+            WHERE pet_face_id IN
+            "#,
         )
     }
 
@@ -223,7 +307,11 @@ impl MlDb {
             pet_body_ids,
             create_if_missing,
             "INSERT OR IGNORE INTO pet_body_vector_id_map (pet_body_id) VALUES (?)",
-            "SELECT pet_body_id, pet_body_vector_id FROM pet_body_vector_id_map WHERE pet_body_id IN",
+            r#"
+            SELECT pet_body_id, pet_body_vector_id
+            FROM pet_body_vector_id_map
+            WHERE pet_body_id IN
+            "#,
         )
     }
 
@@ -240,7 +328,7 @@ impl MlDb {
         }
         if create_if_missing {
             self.db
-                .write_batch(insert_sql, unique_ids.iter().map(|id| [id]))?;
+                .write_batch_atomic(insert_sql, unique_ids.iter().map(|id| [id]))?;
         }
         let select_sql = select_prefix.to_owned() + " ({})";
         self.db
@@ -278,7 +366,7 @@ fn read_pet_body(row: &Row<'_>) -> SqliteResult<PetBodyRow> {
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(in crate::ml_db) mod tests {
     use std::collections::HashMap;
 
     use super::{MlDb, PetBodyRow, PetFaceRow};
@@ -383,26 +471,23 @@ pub(super) mod tests {
         };
         assert_eq!(
             db.get_pet_faces_for_file_id(1).unwrap(),
-            Some(vec![linked_pet_face])
+            vec![linked_pet_face]
         );
         let new_pet_face = PetFaceRow {
             ml_version: 2,
             ..pet_face(2, 0, 1)
         };
-        assert_eq!(
-            db.get_pet_faces_for_file_id(2).unwrap(),
-            Some(vec![new_pet_face])
-        );
-        assert_eq!(db.get_pet_faces_for_file_id(9).unwrap(), None);
+        assert_eq!(db.get_pet_faces_for_file_id(2).unwrap(), vec![new_pet_face]);
+        assert!(db.get_pet_faces_for_file_id(9).unwrap().is_empty());
         let linked_pet_body = PetBodyRow {
             body_vector_id: Some(1),
             ..pet_body(1, 0, 0)
         };
         assert_eq!(
             db.get_pet_bodies_for_file_id(1).unwrap(),
-            Some(vec![linked_pet_body])
+            vec![linked_pet_body]
         );
-        assert_eq!(db.get_pet_bodies_for_file_id(3).unwrap(), None);
+        assert!(db.get_pet_bodies_for_file_id(3).unwrap().is_empty());
 
         let rows = db.get_pet_rows_for_files(&[1, 3]).unwrap();
         let faces: Vec<(&str, Option<i64>, i64)> = rows
@@ -434,14 +519,11 @@ pub(super) mod tests {
         };
         db.bulk_insert_pet_faces(std::slice::from_ref(&updated))
             .unwrap();
-        assert_eq!(
-            db.get_pet_faces_for_file_id(2).unwrap(),
-            Some(vec![updated])
-        );
+        assert_eq!(db.get_pet_faces_for_file_id(2).unwrap(), vec![updated]);
         db.bulk_insert_pet_bodies(&[pet_body(2, 0, 1)]).unwrap();
         assert_eq!(
             db.get_pet_bodies_for_file_id(2).unwrap(),
-            Some(vec![pet_body(2, 0, 1)])
+            vec![pet_body(2, 0, 1)]
         );
 
         let face_vector_ids = db
@@ -457,7 +539,7 @@ pub(super) mod tests {
         db.update_pet_body_vector_ids(&HashMap::new()).unwrap();
         db.update_pet_face_vector_ids(&face_vector_ids).unwrap();
         assert_eq!(
-            db.get_pet_faces_for_file_id(2).unwrap().unwrap()[0].face_vector_id,
+            db.get_pet_faces_for_file_id(2).unwrap()[0].face_vector_id,
             Some(3)
         );
 
@@ -467,8 +549,8 @@ pub(super) mod tests {
             &strings(["1_body_0"]),
         )
         .unwrap();
-        assert_eq!(db.get_pet_faces_for_file_id(1).unwrap(), None);
-        assert_eq!(db.get_pet_bodies_for_file_id(1).unwrap(), None);
+        assert!(db.get_pet_faces_for_file_id(1).unwrap().is_empty());
+        assert!(db.get_pet_bodies_for_file_id(1).unwrap().is_empty());
         assert!(
             db.get_pet_face_vector_id_map(&strings(["1_pet_0", "1_pet_1"]), false)
                 .unwrap()
@@ -480,8 +562,8 @@ pub(super) mod tests {
                 .is_empty()
         );
         db.delete_pet_rows_for_files(&[2], &[], &[]).unwrap();
-        assert_eq!(db.get_pet_faces_for_file_id(2).unwrap(), None);
-        assert_eq!(db.get_pet_bodies_for_file_id(2).unwrap(), None);
+        assert!(db.get_pet_faces_for_file_id(2).unwrap().is_empty());
+        assert!(db.get_pet_bodies_for_file_id(2).unwrap().is_empty());
         assert_eq!(
             db.get_pet_face_vector_id_map(&strings(["2_pet_0"]), false)
                 .unwrap(),

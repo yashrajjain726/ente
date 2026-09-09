@@ -231,7 +231,7 @@ impl Database {
         })
     }
 
-    pub fn write_batch<P: Params>(
+    pub fn write_batch_atomic<P: Params>(
         &self,
         sql: &str,
         parameter_sets: impl IntoIterator<Item = P>,
@@ -245,7 +245,7 @@ impl Database {
         })
     }
 
-    pub fn write_in_batches<P: Params>(
+    pub fn write_batches_committing_each<P: Params>(
         &self,
         sql: &str,
         batch_size: usize,
@@ -482,7 +482,7 @@ mod tests {
     fn failed_batch_rolls_back_and_writer_recovers() {
         let (_directory, db) = open();
         assert!(
-            db.write_batch("INSERT INTO items (id) VALUES (?)", [[1], [2], [1]])
+            db.write_batch_atomic("INSERT INTO items (id) VALUES (?)", [[1], [2], [1]])
                 .is_err()
         );
         assert_eq!(
@@ -679,7 +679,7 @@ mod tests {
     fn chunked_delete_handles_empty_lists_and_rolls_back_on_failure() {
         let (_directory, db) = open();
         let ids: Vec<i64> = (0..10_001).collect();
-        db.write_batch(
+        db.write_batch_atomic(
             "INSERT INTO items (id) VALUES (?)",
             ids.iter().map(|id| [id]),
         )
@@ -717,14 +717,14 @@ mod tests {
     #[test]
     fn batched_writes_commit_each_completed_batch() {
         let (_directory, db) = open();
-        db.write_in_batches(
+        db.write_batches_committing_each(
             "INSERT INTO missing_table VALUES (?)",
             2,
             Vec::<[i64; 1]>::new(),
         )
         .unwrap();
         assert!(
-            db.write_in_batches(
+            db.write_batches_committing_each(
                 "INSERT INTO items (id) VALUES (?)",
                 2,
                 [[1], [2], [3], [4], [1]]
@@ -737,7 +737,7 @@ mod tests {
             [1, 2, 3, 4]
         );
         assert!(
-            db.write_in_batches(
+            db.write_batches_committing_each(
                 "INSERT INTO items (id) VALUES (?)",
                 2,
                 [[5], [6], [7], [5], [8]]
@@ -749,7 +749,7 @@ mod tests {
                 .unwrap(),
             [1, 2, 3, 4, 5, 6]
         );
-        db.write_in_batches("INSERT INTO items (id) VALUES (?)", 2, [[7], [8], [9]])
+        db.write_batches_committing_each("INSERT INTO items (id) VALUES (?)", 2, [[7], [8], [9]])
             .unwrap();
         assert_eq!(
             db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
@@ -761,7 +761,7 @@ mod tests {
     #[test]
     fn chunked_reads_query_each_chunk_in_order() {
         let (_directory, db) = open();
-        db.write_batch("INSERT INTO items (id) VALUES (?)", (1..=7).map(|id| [id]))
+        db.write_batch_atomic("INSERT INTO items (id) VALUES (?)", (1..=7).map(|id| [id]))
             .unwrap();
         let ids: Vec<i64> = (1..=7).collect();
         let by_chunk: Vec<i64> = db
@@ -806,7 +806,7 @@ mod tests {
     #[test]
     fn grouped_reads_collect_values_per_key() {
         let (_directory, db) = open();
-        db.write_batch("INSERT INTO items (id) VALUES (?)", (1..=5).map(|id| [id]))
+        db.write_batch_atomic("INSERT INTO items (id) VALUES (?)", (1..=5).map(|id| [id]))
             .unwrap();
         let by_parity: HashMap<i64, Vec<i64>> = db
             .read_grouped("SELECT id % 2, id FROM items ORDER BY id", ())

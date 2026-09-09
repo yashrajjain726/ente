@@ -5,18 +5,42 @@ use crate::db::{
     optional_parameter, pair, params_from_iter,
 };
 
-use super::queries::{ClusterCentroidRow, ClusterSummary, is_bad_face_for_clustering};
-use super::schema::{
+use super::faces::{file_id_from_face_id, is_bad_face_for_clustering};
+use super::unique_in_order;
+use crate::ml_db::schema::{
     CREATE_CLUSTER_CENTROID_VECTOR_ID_MAPPING_TABLE, CREATE_CLUSTER_PERSON_TABLE,
     CREATE_CLUSTER_SUMMARY_TABLE, CREATE_FACE_CLUSTERS_TABLE, CREATE_FACES_TABLE,
     CREATE_NOT_PERSON_FEEDBACK_TABLE, DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING,
     DELETE_CLUSTER_PERSON, DELETE_CLUSTER_SUMMARY, DELETE_FACE_CLUSTERS, DELETE_FACES,
     DELETE_NOT_PERSON_FEEDBACK, FC_CLUSTER_ID_INDEX,
 };
-use super::{MlDb, Result, file_id_to_cluster_ids, unique_in_order};
+use crate::ml_db::{MlDb, Result};
 
-const UPSERT_FACE_CLUSTER: &str = "INSERT INTO face_clusters (face_id, cluster_id) VALUES (?, ?) ON CONFLICT(face_id) DO UPDATE SET cluster_id = excluded.cluster_id";
-const UPSERT_CLUSTER_SUMMARY: &str = "INSERT INTO cluster_summary (cluster_id, avg, count) VALUES (?, ?, ?) ON CONFLICT(cluster_id) DO UPDATE SET avg = excluded.avg, count = excluded.count";
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClusterSummary {
+    pub avg: Vec<u8>,
+    pub count: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClusterCentroidRow {
+    pub cluster_id: String,
+    pub avg: Vec<u8>,
+}
+
+const UPSERT_FACE_CLUSTER: &str = r#"
+    INSERT INTO face_clusters (face_id, cluster_id)
+    VALUES (?, ?)
+    ON CONFLICT (face_id) DO UPDATE SET
+        cluster_id = excluded.cluster_id
+"#;
+const UPSERT_CLUSTER_SUMMARY: &str = r#"
+    INSERT INTO cluster_summary (cluster_id, avg, count)
+    VALUES (?, ?, ?)
+    ON CONFLICT (cluster_id) DO UPDATE SET
+        avg = excluded.avg,
+        count = excluded.count
+"#;
 
 impl MlDb {
     pub fn update_face_id_to_cluster_id(
@@ -24,14 +48,19 @@ impl MlDb {
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.db
-            .write_in_batches(UPSERT_FACE_CLUSTER, 500, face_id_to_cluster_id.iter())
+            .write_batches_committing_each(UPSERT_FACE_CLUSTER, 500, face_id_to_cluster_id.iter())
             .map_err(Into::into)
     }
 
     pub fn cluster_id_to_face_count(&self) -> Result<HashMap<String, i64>> {
         self.db
             .read_all(
-                "SELECT cluster_id, COUNT(*) as count FROM face_clusters where cluster_id IS NOT NULL GROUP BY cluster_id",
+                r#"
+                SELECT cluster_id, COUNT(*) as count
+                FROM face_clusters
+                where cluster_id IS NOT NULL
+                GROUP BY cluster_id
+                "#,
                 (),
                 pair,
             )
@@ -40,7 +69,14 @@ impl MlDb {
 
     pub fn get_bad_face_singleton_cluster_ids(&self) -> Result<HashSet<String>> {
         let rows: Vec<(String, f64, f64, i64)> = self.db.read_all(
-            "SELECT fc.cluster_id, f.score, f.blur, f.is_sideways FROM face_clusters fc INNER JOIN faces f ON fc.face_id = f.face_id GROUP BY fc.cluster_id HAVING COUNT(*) = 1",
+            r#"
+            SELECT fc.cluster_id, f.score, f.blur, f.is_sideways
+            FROM face_clusters fc
+            INNER JOIN faces f
+                ON fc.face_id = f.face_id
+            GROUP BY fc.cluster_id
+            HAVING COUNT(*) = 1
+            "#,
             (),
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )?;
@@ -101,7 +137,15 @@ impl MlDb {
     ) -> Result<Vec<String>> {
         self.db
             .read_column(
-                "SELECT faces.face_id FROM faces JOIN face_clusters ON faces.face_id = face_clusters.face_id WHERE face_clusters.cluster_id = ? ORDER BY faces.score DESC LIMIT ?",
+                r#"
+                SELECT faces.face_id
+                FROM faces
+                JOIN face_clusters
+                    ON faces.face_id = face_clusters.face_id
+                WHERE face_clusters.cluster_id = ?
+                ORDER BY faces.score DESC
+                LIMIT ?
+                "#,
                 (cluster_id, limit),
             )
             .map_err(Into::into)
@@ -109,7 +153,13 @@ impl MlDb {
 
     pub fn get_blur_values_for_cluster(&self, cluster_id: &str) -> Result<Vec<f64>> {
         let blur_values: Vec<f64> = self.db.read_column(
-            "SELECT faces.blur FROM faces JOIN face_clusters ON faces.face_id = face_clusters.face_id WHERE face_clusters.cluster_id = ?",
+            r#"
+            SELECT faces.blur
+            FROM faces
+            JOIN face_clusters
+                ON faces.face_id = face_clusters.face_id
+            WHERE face_clusters.cluster_id = ?
+            "#,
             [cluster_id],
         )?;
         let mut seen = HashSet::new();
@@ -145,7 +195,7 @@ impl MlDb {
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.db
-            .write_batch(UPSERT_FACE_CLUSTER, face_id_to_cluster_id.iter())
+            .write_batch_atomic(UPSERT_FACE_CLUSTER, face_id_to_cluster_id.iter())
             .map_err(Into::into)
     }
 
@@ -154,7 +204,7 @@ impl MlDb {
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.db
-            .write_batch(
+            .write_batch_atomic(
                 "DELETE FROM face_clusters WHERE face_id = ? AND cluster_id = ?",
                 face_id_to_cluster_id.iter(),
             )
@@ -178,7 +228,13 @@ impl MlDb {
     pub fn get_file_ids_of_cluster_id(&self, cluster_id: &str) -> Result<Vec<i64>> {
         self.db
             .read_column(
-                "SELECT DISTINCT faces.file_id FROM face_clusters JOIN faces ON face_clusters.face_id = faces.face_id WHERE face_clusters.cluster_id = ?",
+                r#"
+                SELECT DISTINCT faces.file_id
+                FROM face_clusters
+                JOIN faces
+                    ON face_clusters.face_id = faces.face_id
+                WHERE face_clusters.cluster_id = ?
+                "#,
                 [cluster_id],
             )
             .map_err(Into::into)
@@ -194,14 +250,18 @@ impl MlDb {
             return Ok(HashMap::new());
         }
         if create_if_missing {
-            self.db.write_batch(
+            self.db.write_batch_atomic(
                 "INSERT OR IGNORE INTO cluster_centroid_vector_id_map (cluster_id) VALUES (?)",
                 unique_cluster_ids.iter().map(|cluster_id| [cluster_id]),
             )?;
         }
         self.db
             .read_chunked_in(
-                "SELECT cluster_id, cluster_vector_id FROM cluster_centroid_vector_id_map WHERE cluster_id IN ({})",
+                r#"
+                SELECT cluster_id, cluster_vector_id
+                FROM cluster_centroid_vector_id_map
+                WHERE cluster_id IN ({})
+                "#,
                 &unique_cluster_ids,
                 800,
                 pair,
@@ -228,7 +288,7 @@ impl MlDb {
         summary: &HashMap<String, ClusterSummary>,
     ) -> Result<()> {
         self.db
-            .write_in_batches(
+            .write_batches_committing_each(
                 UPSERT_CLUSTER_SUMMARY,
                 400,
                 summary
@@ -298,7 +358,13 @@ impl MlDb {
                 read_cluster_centroid,
             ),
             Some(before_cluster_id) => self.db.read_all(
-                "SELECT cluster_id, avg FROM cluster_summary WHERE cluster_id < ? ORDER BY cluster_id DESC LIMIT ?",
+                r#"
+                SELECT cluster_id, avg
+                FROM cluster_summary
+                WHERE cluster_id < ?
+                ORDER BY cluster_id DESC
+                LIMIT ?
+                "#,
                 (before_cluster_id, limit),
                 read_cluster_centroid,
             ),
@@ -344,7 +410,15 @@ impl MlDb {
         let mut offset: i64 = 0;
         while clusters.len() < 20 {
             let batch: Vec<String> = self.db.read_column(
-                "SELECT cluster_id, COUNT(*) AS count FROM face_clusters WHERE cluster_id IS NOT NULL GROUP BY cluster_id ORDER BY count DESC, cluster_id LIMIT ? OFFSET ?",
+                r#"
+                SELECT cluster_id, COUNT(*) AS count
+                FROM face_clusters
+                WHERE cluster_id IS NOT NULL
+                GROUP BY cluster_id
+                ORDER BY count DESC, cluster_id
+                LIMIT ?
+                OFFSET ?
+                "#,
                 [batch_size, offset],
             )?;
             let batch_len = batch.len() as i64;
@@ -365,6 +439,17 @@ impl MlDb {
     }
 }
 
+pub(super) fn file_id_to_cluster_ids(
+    cluster_and_face_ids: Vec<(String, String)>,
+) -> Result<HashMap<i64, HashSet<String>>> {
+    let mut result: HashMap<i64, HashSet<String>> = HashMap::new();
+    for (cluster_id, face_id) in cluster_and_face_ids {
+        let file_id = file_id_from_face_id(&face_id)?;
+        result.entry(file_id).or_default().insert(cluster_id);
+    }
+    Ok(result)
+}
+
 fn read_cluster_summary(row: &Row<'_>) -> SqliteResult<(String, ClusterSummary)> {
     Ok((
         row.get("cluster_id")?,
@@ -383,15 +468,15 @@ fn read_cluster_centroid(row: &Row<'_>) -> SqliteResult<ClusterCentroidRow> {
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(in crate::ml_db) mod tests {
     use std::collections::HashMap;
 
     use super::{ClusterCentroidRow, ClusterSummary, MlDb};
+    use crate::ml_db::queries::{faces, persons};
     use crate::ml_db::tests::{
         cases, check, grouped, grouped_by_file, index_count, map, open, pairs, set, sorted, strings,
     };
     use crate::ml_db::vector_encoding::encode_evector;
-    use crate::ml_db::{faces, persons};
     use tempfile::TempDir;
 
     fn summary(count: i64) -> ClusterSummary {
