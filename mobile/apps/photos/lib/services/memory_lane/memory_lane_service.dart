@@ -988,6 +988,20 @@ class MemoryLaneService {
     );
   }
 
+  Future<Uint8List?> getNewestFaceCrop(
+    MemoryLanePersonTimeline timeline,
+  ) async {
+    final newest = timeline.entries.last;
+    final newestFile = (await getTimelineFiles([newest.fileId]))[newest.fileId];
+    if (newestFile == null) return null;
+    final faces = await _mlDataDB.getFacesForGivenFileID(newest.fileId);
+    final face = faces?.firstWhereOrNull((f) => f.faceID == newest.faceId);
+    if (face == null) return null;
+    return (await getCachedFaceCrops(newestFile, [
+      face,
+    ], useTempCache: false))?[newest.faceId];
+  }
+
   Future<void> _scheduleTimelinesForMemoriesStrip(
     List<PersonEntity> persons,
   ) async {
