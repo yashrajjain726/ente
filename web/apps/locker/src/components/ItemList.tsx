@@ -17,9 +17,14 @@ import {
     sortLockerCollections,
     visibleLockerCollections,
 } from "@/types";
-import { Delete02Icon } from "@hugeicons/core-free-icons";
+import {
+    Delete02Icon,
+    Link01Icon,
+    PlusSignIcon,
+    StarIcon,
+    Wallet05Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -29,10 +34,8 @@ import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
-import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
-import StarIcon from "@mui/icons-material/Star";
 import {
     Box,
     Button,
@@ -963,23 +966,31 @@ export const ItemList: React.FC<ItemListProps> = ({
                                                         true,
                                                     );
                                                 }}
-                                                sx={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    color: "#FFFFFF",
-                                                    background: "#0E6BFF",
-                                                    border: "1px solid rgba(160, 199, 255, 0.18)",
-                                                    boxShadow:
-                                                        "0 10px 24px rgba(0, 66, 173, 0.20)",
+                                                sx={(theme) => ({
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: "12px",
+                                                    padding: 0,
+                                                    ...lockerColorSx(theme, {
+                                                        backgroundColor:
+                                                            "fillLight",
+                                                        color: "iconColor",
+                                                    }),
                                                     "&:hover": {
-                                                        background: "#1A7AFF",
-                                                        boxShadow:
-                                                            "0 12px 28px rgba(0, 66, 173, 0.24)",
+                                                        ...lockerColorSx(
+                                                            theme,
+                                                            {
+                                                                backgroundColor:
+                                                                    "fillDark",
+                                                            },
+                                                        ),
                                                     },
-                                                }}
+                                                })}
                                             >
-                                                <AddOutlinedIcon
-                                                    sx={{ fontSize: 24 }}
+                                                <HugeiconsIcon
+                                                    icon={PlusSignIcon}
+                                                    size={18}
+                                                    strokeWidth={1.5}
                                                 />
                                             </IconButton>
                                         </Tooltip>
@@ -1007,8 +1018,8 @@ export const ItemList: React.FC<ItemListProps> = ({
                                 </Box>
                             ) : (
                                 <EmptyState
+                                    image={{ src: "/images/empty_state.png" }}
                                     title={t("noCollections")}
-                                    subtitle={t("createCollection")}
                                 />
                             )}
                         </>
@@ -1792,7 +1803,7 @@ const CollectionGrid: React.FC<{
                 maxWidth: lockerContentMaxWidth,
                 mx: "auto",
                 display: "grid",
-                gap: 2,
+                gap: 1,
             }}
         >
             {collections.map((collection) => (
@@ -2116,42 +2127,20 @@ const CollectionCard: React.FC<{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                gap: 1.25,
-                px: 1.5,
-                py: 1.25,
-                minHeight: 84,
+                gap: 1.5,
+                pl: 1.5,
+                pr: 0,
+                py: 1.5,
                 borderRadius: "20px",
-                backgroundColor:
-                    collection.items.length > 0
-                        ? theme.vars.palette.fill.faint
-                        : "rgba(255, 255, 255, 0.03)",
-                border: 1,
-                borderStyle: "solid",
-                borderColor:
-                    collection.items.length > 0
-                        ? "rgba(255, 255, 255, 0.08)"
-                        : "rgba(255, 255, 255, 0.08)",
+                border: "1.5px solid",
                 transition: "background-color 0.15s, border-color 0.15s",
-                "&:hover": {
-                    backgroundColor:
-                        collection.items.length > 0
-                            ? theme.vars.palette.fill.faintHover
-                            : "rgba(255, 255, 255, 0.05)",
-                    borderColor: "rgba(255, 255, 255, 0.13)",
-                },
-                ...theme.applyStyles("light", {
-                    backgroundColor:
-                        collection.items.length > 0 ? "#FFFFFF" : "#F8FAFC",
-                    borderColor:
-                        collection.items.length > 0
-                            ? "rgba(17, 24, 39, 0.08)"
-                            : "rgba(17, 24, 39, 0.06)",
-                    "&:hover": {
-                        backgroundColor:
-                            collection.items.length > 0 ? "#FFFFFF" : "#F1F5F9",
-                        borderColor: "rgba(17, 24, 39, 0.12)",
-                    },
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    borderColor: "fillLight",
                 }),
+                "&:hover": {
+                    ...lockerColorSx(theme, { backgroundColor: "fillDark" }),
+                },
             })}
         >
             <Stack
@@ -2159,58 +2148,66 @@ const CollectionCard: React.FC<{
                 sx={{ flex: 1, minWidth: 0, alignItems: "center", gap: 1.25 }}
             >
                 <Box
-                    sx={{
+                    sx={(theme) => ({
                         position: "relative",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: 52,
-                        height: 52,
+                        width: 40,
+                        height: 40,
                         flexShrink: 0,
-                    }}
+                        borderRadius: "12px",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
+                        }),
+                    })}
                 >
-                    <Box
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 40,
-                            height: 40,
-                            m: "6px",
-                            borderRadius: "12px",
-                            backgroundColor: isImportantCollection(collection)
-                                ? "rgba(16, 113, 255, 0.16)"
-                                : "rgba(18, 36, 63, 0.96)",
-                            border: isImportantCollection(collection)
-                                ? "none"
-                                : "1px solid rgba(159, 193, 255, 0.12)",
-                        }}
-                    >
-                        {isImportantCollection(collection) ? (
-                            <StarIcon sx={{ fontSize: 20, color: "#1071FF" }} />
-                        ) : (
-                            <FolderOutlinedIcon
-                                sx={{ fontSize: 20, color: "#D6E5FF" }}
+                    {isImportantCollection(collection) ? (
+                        <Box
+                            sx={(theme) => ({
+                                display: "flex",
+                                ...lockerColorSx(theme, { color: "primary" }),
+                            })}
+                        >
+                            <HugeiconsIcon
+                                icon={StarIcon}
+                                size={24}
+                                strokeWidth={1.5}
                             />
-                        )}
-                    </Box>
+                        </Box>
+                    ) : (
+                        <Box
+                            sx={(theme) => ({
+                                display: "flex",
+                                ...lockerColorSx(theme, { color: "textBase" }),
+                            })}
+                        >
+                            <HugeiconsIcon
+                                icon={Wallet05Icon}
+                                size={24}
+                                strokeWidth={1.5}
+                            />
+                        </Box>
+                    )}
                     {collection.isShared && <SharedCollectionBadge />}
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
-                        variant="body"
-                        sx={{
+                        sx={(theme) => ({
+                            ...lockerTextBodySx,
                             minWidth: 0,
-                            fontWeight: "regular",
-                            lineHeight: 1.45,
-                        }}
+                            ...lockerColorSx(theme, { color: "textBase" }),
+                        })}
                         noWrap
                     >
                         {collection.name}
                     </Typography>
                     <Typography
-                        variant="small"
-                        sx={{ color: "text.muted", mt: 0.25 }}
+                        sx={(theme) => ({
+                            ...lockerTextMiniSx,
+                            mt: "4px",
+                            ...lockerColorSx(theme, { color: "textLight" }),
+                        })}
                     >
                         {t("lockerItemsCount", {
                             count: collection.items.length,
@@ -2218,11 +2215,19 @@ const CollectionCard: React.FC<{
                     </Typography>
                 </Box>
             </Stack>
-            {(onShare || onLeave || onRename || onDelete) && (
-                <Box
-                    sx={{ flexShrink: 0, ml: 0.25 }}
-                    onClick={(event) => event.stopPropagation()}
-                >
+            <Box
+                sx={{
+                    flexShrink: 0,
+                    mr: 1.5,
+                    width: 44,
+                    height: 24,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                {(onShare || onLeave || onRename || onDelete) && (
                     <CollectionContextMenu
                         ariaID={`collection-context-menu-${collection.id}`}
                         onShare={onShare}
@@ -2230,8 +2235,8 @@ const CollectionCard: React.FC<{
                         onRename={onRename}
                         onDelete={onDelete}
                     />
-                </Box>
-            )}
+                )}
+            </Box>
         </ButtonBase>
     );
 };
@@ -2241,20 +2246,21 @@ const SharedCollectionBadge: React.FC = () => {
         <Box
             sx={(theme) => ({
                 position: "absolute",
-                right: -2,
-                bottom: -2,
+                right: -4,
+                bottom: -4,
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 16,
-                height: 16,
-                borderRadius: "999px",
-                backgroundColor: "#1071FF",
-                border: `1.5px solid ${theme.vars.palette.background.paper}`,
-                boxShadow: "0 2px 6px rgba(0, 66, 173, 0.24)",
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    color: "primary",
+                }),
             })}
         >
-            <ShareOutlinedIcon sx={{ fontSize: 10, color: "#FFFFFF" }} />
+            <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={2} />
         </Box>
     );
 };
@@ -2268,12 +2274,7 @@ const CollectionContextMenu: React.FC<{
 }> = ({ ariaID, onShare, onLeave, onRename, onDelete }) => (
     <OverflowMenu
         ariaID={ariaID}
-        triggerButtonSxProps={{
-            p: 0.25,
-            color: "text.faint",
-            opacity: 0,
-            ".MuiButtonBase-root:hover &": { opacity: 1 },
-        }}
+        triggerButtonSxProps={{ p: 0.25, color: "text.muted" }}
     >
         {onShare && (
             <OverflowMenuOption
