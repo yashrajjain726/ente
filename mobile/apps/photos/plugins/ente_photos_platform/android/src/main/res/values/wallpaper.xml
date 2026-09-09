@@ -1,0 +1,17 @@
+<resources>
+    <string name="wallpaper">Wallpaper</string>
+    <string name="wallpaper_set">Set wallpaper</string>
+    <string name="wallpaper_home">Home screen</string>
+    <string name="wallpaper_lock">Lock screen</string>
+    <string name="wallpaper_both">Home and lock screens</string>
+    <string name="wallpaper_done">Wallpaper set</string>
+    <string name="wallpaper_failed">Could not set wallpaper</string>
+    <string name="wallpaper_unavailable">Wallpaper changes are not allowed on this device</string>
+    <style name="WallpaperTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:colorAccent">#08C225</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
