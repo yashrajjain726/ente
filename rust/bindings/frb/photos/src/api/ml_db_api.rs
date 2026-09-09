@@ -269,8 +269,8 @@ impl MlDb {
         Ok(self.inner.get_errored_face_count()?)
     }
 
-    pub fn get_errored_file_ids(&self) -> Result<HashSet<i64>, MlDbError> {
-        Ok(self.inner.get_errored_file_ids()?)
+    pub fn get_errored_file_ids(&self) -> Result<Vec<i64>, MlDbError> {
+        Ok(self.inner.get_errored_file_ids()?.into_iter().collect())
     }
 
     pub fn prune_resolved_face_error_results(&self, file_ids: Vec<i64>) -> Result<(), MlDbError> {
@@ -280,8 +280,12 @@ impl MlDb {
     pub fn get_file_ids_with_error_results(
         &self,
         file_ids: Vec<i64>,
-    ) -> Result<HashSet<i64>, MlDbError> {
-        Ok(self.inner.get_file_ids_with_error_results(&file_ids)?)
+    ) -> Result<Vec<i64>, MlDbError> {
+        Ok(self
+            .inner
+            .get_file_ids_with_error_results(&file_ids)?
+            .into_iter()
+            .collect())
     }
 
     pub fn delete_face_index_for_files(&self, file_ids: Vec<i64>) -> Result<(), MlDbError> {
@@ -305,28 +309,31 @@ impl MlDb {
         Ok(self.inner.get_unclustered_face_count()?)
     }
 
-    pub fn get_all_file_ids_of_face_ids_not_in_any_cluster(
-        &self,
-    ) -> Result<HashSet<i64>, MlDbError> {
+    pub fn get_all_file_ids_of_face_ids_not_in_any_cluster(&self) -> Result<Vec<i64>, MlDbError> {
         Ok(self
             .inner
-            .get_all_file_ids_of_face_ids_not_in_any_cluster()?)
+            .get_all_file_ids_of_face_ids_not_in_any_cluster()?
+            .into_iter()
+            .collect())
     }
 
     pub fn get_all_files_associated_with_all_clusters(
         &self,
         except_clusters: Option<Vec<String>>,
-    ) -> Result<HashSet<i64>, MlDbError> {
+    ) -> Result<Vec<i64>, MlDbError> {
         Ok(self
             .inner
-            .get_all_files_associated_with_all_clusters(except_clusters.as_deref())?)
+            .get_all_files_associated_with_all_clusters(except_clusters.as_deref())?
+            .into_iter()
+            .collect())
     }
 
-    pub fn get_fully_indexed_file_ids(
-        &self,
-        include_pets: bool,
-    ) -> Result<HashSet<i64>, MlDbError> {
-        Ok(self.inner.get_fully_indexed_file_ids(include_pets)?)
+    pub fn get_fully_indexed_file_ids(&self, include_pets: bool) -> Result<Vec<i64>, MlDbError> {
+        Ok(self
+            .inner
+            .get_fully_indexed_file_ids(include_pets)?
+            .into_iter()
+            .collect())
     }
 
     pub fn update_face_id_to_cluster_id(
@@ -832,7 +839,11 @@ impl MlDb {
     pub fn get_file_ids_with_fd_data(
         &self,
         data_type: Option<String>,
-    ) -> Result<HashSet<i64>, MlDbError> {
-        Ok(self.inner.get_file_ids_with_fd_data(data_type.as_deref())?)
+    ) -> Result<Vec<i64>, MlDbError> {
+        Ok(self
+            .inner
+            .get_file_ids_with_fd_data(data_type.as_deref())?
+            .into_iter()
+            .collect())
     }
 }

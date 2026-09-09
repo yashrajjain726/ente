@@ -373,7 +373,11 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
   Future<int> getErroredFaceCount() async => (await _db).getErroredFaceCount();
 
   @override
-  Future<Set<int>> getErroredFileIDs() async => (await _db).getErroredFileIds();
+  Future<Set<int>> getErroredFileIDs() async {
+    final db = await _db;
+    final fileIDs = await db.getErroredFileIds();
+    return fileIDs.inner.toSet();
+  }
 
   @override
   Future<void> pruneResolvedFaceErrorResults(List<int> fileIDs) async =>
@@ -382,10 +386,13 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
       );
 
   @override
-  Future<Set<int>> getFileIDsWithErrorResults(List<int> fileIDs) async =>
-      (await _db).getFileIdsWithErrorResults(
-        fileIds: Int64List.fromList(fileIDs),
-      );
+  Future<Set<int>> getFileIDsWithErrorResults(List<int> fileIDs) async {
+    final db = await _db;
+    final result = await db.getFileIdsWithErrorResults(
+      fileIds: Int64List.fromList(fileIDs),
+    );
+    return result.inner.toSet();
+  }
 
   @override
   Future<void> deleteFaceIndexForFiles(List<int> fileIDs) async =>
@@ -563,15 +570,22 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
   }
 
   @override
-  Future<Set<int>> getAllFileIDsOfFaceIDsNotInAnyCluster() async =>
-      (await _db).getAllFileIdsOfFaceIdsNotInAnyCluster();
+  Future<Set<int>> getAllFileIDsOfFaceIDsNotInAnyCluster() async {
+    final db = await _db;
+    final fileIDs = await db.getAllFileIdsOfFaceIdsNotInAnyCluster();
+    return fileIDs.inner.toSet();
+  }
 
   @override
   Future<Set<int>> getAllFilesAssociatedWithAllClusters({
     List<String>? exceptClusters,
-  }) async => (await _db).getAllFilesAssociatedWithAllClusters(
-    exceptClusters: exceptClusters,
-  );
+  }) async {
+    final db = await _db;
+    final fileIDs = await db.getAllFilesAssociatedWithAllClusters(
+      exceptClusters: exceptClusters,
+    );
+    return fileIDs.inner.toSet();
+  }
 
   @override
   Future<List<EmbeddingVector>> getAllClipVectors() async {
@@ -639,8 +653,11 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
       (await _db).getPetIndexedFileCount(minimumMlVersion: minimumMlVersion);
 
   @override
-  Future<Set<int>> getFullyIndexedFileIds({required bool includePets}) async =>
-      (await _db).getFullyIndexedFileIds(includePets: includePets);
+  Future<Set<int>> getFullyIndexedFileIds({required bool includePets}) async {
+    final db = await _db;
+    final fileIDs = await db.getFullyIndexedFileIds(includePets: includePets);
+    return fileIDs.inner.toSet();
+  }
 
   @override
   Future<(List<(String, int?, int)>, List<(String, int?, int)>)>
@@ -737,8 +754,11 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
   }
 
   @override
-  Future<Set<int>> getFileIDsWithFDData({DataType? type}) async =>
-      (await _db).getFileIdsWithFdData(dataType: type?.toJson());
+  Future<Set<int>> getFileIDsWithFDData({DataType? type}) async {
+    final db = await _db;
+    final fileIDs = await db.getFileIdsWithFdData(dataType: type?.toJson());
+    return fileIDs.inner.toSet();
+  }
 }
 
 rust.FaceRow _toFaceRow(Face face) {
