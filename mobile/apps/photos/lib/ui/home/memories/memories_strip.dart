@@ -407,16 +407,20 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _memoryLanePersonName = personName;
   }
 
-  void _onMLConsentChanged(MLConsentChangedEvent event) {
-    if (event.enabled || !mounted) {
-      return;
-    }
+  void _hideMemoryLane() {
     setState(() {
       _memoryLane = null;
       _oldestMemoryLaneFile = null;
       _newestMemoryLaneFace = null;
       _memoryLanePersonName = null;
     });
+  }
+
+  void _onMLConsentChanged(MLConsentChangedEvent event) {
+    if (event.enabled || !mounted) {
+      return;
+    }
+    _hideMemoryLane();
   }
 
   Future<void> _onPeopleChanged(PeopleChangedEvent event) async {
@@ -431,31 +435,25 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       return;
     }
     var shouldHide = false;
+    var personName = _memoryLanePersonName;
     if (memoryLane.isCluster) {
       if (!isLocalGalleryMode) {
-        final personClusterIDs = event.person?.data.assigned.map(
-          (cluster) => cluster.id,
-        );
-        final peopleClusterIDs = event.persons
-            ?.expand((person) => person.data.assigned)
-            .map((cluster) => cluster.id);
-        final assignedClusterIDs = <String>{};
-        assignedClusterIDs.addAll(event.newClusterIDs ?? []);
-        assignedClusterIDs.addAll(personClusterIDs ?? []);
-        assignedClusterIDs.addAll(peopleClusterIDs ?? []);
-        if (event.type == PeopleEventType.addedClusterToPerson) {
-          assignedClusterIDs.add(event.source);
-        }
+        final assignedClusterIDs = <String>{
+          ...?event.newClusterIDs,
+          ...?event.person?.data.assigned.map((cluster) => cluster.id),
+          ...?event.persons
+              ?.expand((person) => person.data.assigned)
+              .map((cluster) => cluster.id),
+          if (event.type == PeopleEventType.addedClusterToPerson) event.source,
+        };
         shouldHide = assignedClusterIDs.contains(memoryLane.personId);
       }
     } else {
       final person = await PersonService.instance.getPerson(
         memoryLane.personId,
       );
-      shouldHide =
-          person == null ||
-          person.data.hideFromMemories ||
-          person.data.name != _memoryLanePersonName;
+      shouldHide = person == null || person.data.hideFromMemories;
+      personName = person?.data.name;
     }
     if (!shouldHide) {
       final mlDataDB = isLocalGalleryMode
@@ -468,15 +466,18 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         (entry) => !faceIDs.contains(entry.faceId),
       );
     }
-    if (!mounted || _memoryLane == null || !shouldHide) {
+    if (!mounted || _memoryLane != memoryLane) {
       return;
     }
-    setState(() {
-      _memoryLane = null;
-      _oldestMemoryLaneFile = null;
-      _newestMemoryLaneFace = null;
-      _memoryLanePersonName = null;
-    });
+    if (!shouldHide) {
+      if (_memoryLanePersonName != personName) {
+        setState(() {
+          _memoryLanePersonName = personName;
+        });
+      }
+      return;
+    }
+    _hideMemoryLane();
   }
 
   Future<void> _onLocalPhotosUpdated(LocalPhotosUpdatedEvent event) async {
@@ -514,12 +515,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         )) {
       return;
     }
-    setState(() {
-      _memoryLane = null;
-      _oldestMemoryLaneFile = null;
-      _newestMemoryLaneFace = null;
-      _memoryLanePersonName = null;
-    });
+    _hideMemoryLane();
   }
 
   // TODO: Recompute the timeline instead of hiding the card.
@@ -541,12 +537,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     if (!mounted || _memoryLane == null || !hasMissingFiles) {
       return;
     }
-    setState(() {
-      _memoryLane = null;
-      _oldestMemoryLaneFile = null;
-      _newestMemoryLaneFace = null;
-      _memoryLanePersonName = null;
-    });
+    _hideMemoryLane();
   }
 
   void _onMemoryLaneReadyTimelinesChanged() {
@@ -560,11 +551,6 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _memoryLane = null;
-      _oldestMemoryLaneFile = null;
-      _newestMemoryLaneFace = null;
-      _memoryLanePersonName = null;
-    });
+    _hideMemoryLane();
   }
 }
