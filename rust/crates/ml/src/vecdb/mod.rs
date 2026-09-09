@@ -27,6 +27,13 @@ impl StorageKind {
         }
     }
 
+    pub(crate) fn max_dims(self) -> usize {
+        match self {
+            Self::F32 => u32::MAX as usize,
+            Self::I8 => kernel::MAX_DIMS_I8,
+        }
+    }
+
     pub(crate) fn header_tag(self) -> u8 {
         match self {
             Self::F32 => 0,
@@ -110,7 +117,7 @@ pub enum VecDbError {
     InvalidAttributes(String),
     #[error("dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch { expected: usize, actual: usize },
-    #[error("invalid dimensions {dims}: {storage} storage needs a nonzero multiple of {}", .storage.lane_width())]
+    #[error("invalid dimensions {dims}: {storage} storage needs a nonzero multiple of {} no larger than {}", .storage.lane_width(), .storage.max_dims())]
     InvalidDimensions { dims: usize, storage: StorageKind },
     #[error("storage mismatch: expected {expected}, found {actual}")]
     StorageMismatch {

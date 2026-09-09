@@ -3,6 +3,8 @@ use super::{StorageKind, VecDbError};
 pub(crate) const LANE_WIDTH: usize = 8;
 pub(crate) const LANE_WIDTH_I8: usize = 32;
 const I8_LIMIT: f32 = 127.0;
+pub(crate) const MAX_DIMS_I8: usize =
+    (i32::MAX / ((I8_LIMIT as i32) * (I8_LIMIT as i32))) as usize / LANE_WIDTH_I8 * LANE_WIDTH_I8;
 
 #[repr(C, align(32))]
 #[derive(Clone, Copy)]
@@ -115,7 +117,11 @@ pub(crate) fn dequantize(scale: f32, values: &[i8]) -> Vec<f32> {
 }
 
 pub(crate) fn validate_dims(dims: usize, storage: StorageKind) -> Result<(), VecDbError> {
-    if dims == 0 || !dims.is_multiple_of(storage.lane_width()) || u32::try_from(dims).is_err() {
+    if dims == 0
+        || !dims.is_multiple_of(storage.lane_width())
+        || u32::try_from(dims).is_err()
+        || dims > storage.max_dims()
+    {
         return Err(VecDbError::InvalidDimensions { dims, storage });
     }
     Ok(())
@@ -343,6 +349,28 @@ mod tests {
                 -(dims as i32) * 127 * 127
             );
         }
+    }
+
+    #[test]
+    fn i8_dims_are_capped_where_a_saturated_dot_still_fits_i32() {
+        assert!(validate_dims(MAX_DIMS_I8, StorageKind::I8).is_ok());
+        assert!(validate_dims(MAX_DIMS_I8 + LANE_WIDTH_I8, StorageKind::F32).is_ok());
+        assert!(matches!(
+            validate_dims(MAX_DIMS_I8 + LANE_WIDTH_I8, StorageKind::I8),
+            Err(VecDbError::InvalidDimensions {
+                dims,
+                storage: StorageKind::I8
+            }) if dims == MAX_DIMS_I8 + LANE_WIDTH_I8
+        ));
+        let saturated_product = i64::from(I8_LIMIT as i32) * i64::from(I8_LIMIT as i32);
+        assert!(MAX_DIMS_I8 as i64 * saturated_product <= i64::from(i32::MAX));
+        assert!((MAX_DIMS_I8 + LANE_WIDTH_I8) as i64 * saturated_product > i64::from(i32::MAX));
+        let saturated = vec![127i8; MAX_DIMS_I8];
+        let packed = pack_lanes_i8(&saturated);
+        assert_eq!(
+            i64::from(I8Kernel::dot(&packed, &packed)),
+            MAX_DIMS_I8 as i64 * saturated_product
+        );
     }
 
     #[test]
