@@ -1,5 +1,6 @@
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/models/gallery/justified_layout_strategy.dart";
+import "package:photos/models/gallery/justified_layout_tuning.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
@@ -27,18 +28,239 @@ void main() {
     );
   });
 
-  test("justified strategy defaults to Comfort and persists Flex", () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
-    final settings = LocalSettings(preferences);
-    expect(
-      settings.getJustifiedLayoutStrategy(),
-      JustifiedLayoutStrategy.comfort,
-    );
-    await settings.setJustifiedLayoutStrategy(JustifiedLayoutStrategy.flex);
-    expect(
-      LocalSettings(preferences).getJustifiedLayoutStrategy(),
-      JustifiedLayoutStrategy.flex,
-    );
+  test(
+    "justified strategy defaults to Comfort and persists alternatives",
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final settings = LocalSettings(preferences);
+      expect(
+        settings.getJustifiedLayoutStrategy(),
+        JustifiedLayoutStrategy.comfort,
+      );
+      for (final strategy in [
+        JustifiedLayoutStrategy.comfortLarge,
+        JustifiedLayoutStrategy.flex,
+      ]) {
+        await settings.setJustifiedLayoutStrategy(strategy);
+        expect(
+          LocalSettings(preferences).getJustifiedLayoutStrategy(),
+          strategy,
+        );
+      }
+    },
+  );
+
+  group("justified layout tuning", () {
+    test("uses defaults when tuning values are absent", () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = LocalSettings(await SharedPreferences.getInstance());
+
+      final flex = settings.getFlexLayoutTuning();
+      for (final field in FlexLayoutTuningField.values) {
+        expect(flex.valueFor(field), FlexLayoutTuning.defaults.valueFor(field));
+      }
+
+      final comfortLarge = settings.getComfortLargeLayoutTuning();
+      for (final field in ComfortLargeLayoutTuningField.values) {
+        expect(
+          comfortLarge.valueFor(field),
+          ComfortLargeLayoutTuning.defaults.valueFor(field),
+        );
+      }
+    });
+
+    test("persists arbitrary valid decimal values", () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final settings = LocalSettings(preferences);
+      const flexValues = <FlexLayoutTuningField, double>{
+        FlexLayoutTuningField.targetHeightScale: 2.718281828,
+        FlexLayoutTuningField.maximumHeightFactor: 9.125,
+      };
+      const comfortLargeValues = <ComfortLargeLayoutTuningField, double>{
+        ComfortLargeLayoutTuningField.targetHeightScale: 0.123456789,
+        ComfortLargeLayoutTuningField.maximumHeightFactor: 8.75,
+        ComfortLargeLayoutTuningField.wideFinalMaximumHeightFactor: 3.14159,
+        ComfortLargeLayoutTuningField.minimumLandscapeHeightFactor: 5.625,
+      };
+
+      for (final entry in flexValues.entries) {
+        await settings.setFlexLayoutTuningValue(entry.key, entry.value);
+      }
+      for (final entry in comfortLargeValues.entries) {
+        await settings.setComfortLargeLayoutTuningValue(entry.key, entry.value);
+      }
+
+      final reloadedSettings = LocalSettings(preferences);
+      final flex = reloadedSettings.getFlexLayoutTuning();
+      for (final entry in flexValues.entries) {
+        expect(flex.valueFor(entry.key), entry.value);
+      }
+      final comfortLarge = reloadedSettings.getComfortLargeLayoutTuning();
+      for (final entry in comfortLargeValues.entries) {
+        expect(comfortLarge.valueFor(entry.key), entry.value);
+      }
+    });
+
+    test("falls back independently for corrupt tuning values", () async {
+      SharedPreferences.setMockInitialValues({
+        LocalSettings.kFlexLayoutTuningTargetHeightScale: "invalid",
+        LocalSettings.kFlexLayoutTuningMaximumHeightFactor: double.nan,
+        LocalSettings.kComfortLargeLayoutTuningTargetHeightScale: 0.0,
+        LocalSettings.kComfortLargeLayoutTuningMaximumHeightFactor: 0.99,
+        LocalSettings.kComfortLargeLayoutTuningWideFinalMaximumHeightFactor:
+            double.infinity,
+        LocalSettings.kComfortLargeLayoutTuningMinimumLandscapeHeightFactor:
+            10.5,
+      });
+      final settings = LocalSettings(await SharedPreferences.getInstance());
+
+      final flex = settings.getFlexLayoutTuning();
+      for (final field in FlexLayoutTuningField.values) {
+        expect(flex.valueFor(field), FlexLayoutTuning.defaults.valueFor(field));
+      }
+      final comfortLarge = settings.getComfortLargeLayoutTuning();
+      for (final field in ComfortLargeLayoutTuningField.values) {
+        expect(
+          comfortLarge.valueFor(field),
+          ComfortLargeLayoutTuning.defaults.valueFor(field),
+        );
+      }
+    });
+
+    test("keeps Flex and Comfort Large tuning isolated", () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = LocalSettings(await SharedPreferences.getInstance());
+
+      await settings.setFlexLayoutTuningValue(
+        FlexLayoutTuningField.targetHeightScale,
+        1.91,
+      );
+      expect(
+        settings.getComfortLargeLayoutTuning().valueFor(
+          ComfortLargeLayoutTuningField.targetHeightScale,
+        ),
+        ComfortLargeLayoutTuning.defaults.targetHeightScale,
+      );
+
+      await settings.setComfortLargeLayoutTuningValue(
+        ComfortLargeLayoutTuningField.targetHeightScale,
+        2.73,
+      );
+      expect(
+        settings.getFlexLayoutTuning().valueFor(
+          FlexLayoutTuningField.targetHeightScale,
+        ),
+        1.91,
+      );
+    });
+
+    test("resets one field without changing its siblings", () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = LocalSettings(await SharedPreferences.getInstance());
+      await settings.setFlexLayoutTuningValue(
+        FlexLayoutTuningField.targetHeightScale,
+        1.91,
+      );
+      await settings.setFlexLayoutTuningValue(
+        FlexLayoutTuningField.maximumHeightFactor,
+        2.73,
+      );
+      await settings.setComfortLargeLayoutTuningValue(
+        ComfortLargeLayoutTuningField.targetHeightScale,
+        1.41,
+      );
+      await settings.setComfortLargeLayoutTuningValue(
+        ComfortLargeLayoutTuningField.maximumHeightFactor,
+        3.41,
+      );
+
+      await settings.resetFlexLayoutTuningValue(
+        FlexLayoutTuningField.targetHeightScale,
+      );
+      await settings.resetComfortLargeLayoutTuningValue(
+        ComfortLargeLayoutTuningField.targetHeightScale,
+      );
+
+      final flex = settings.getFlexLayoutTuning();
+      expect(
+        flex.targetHeightScale,
+        FlexLayoutTuning.defaults.targetHeightScale,
+      );
+      expect(flex.maximumHeightFactor, 2.73);
+      final comfortLarge = settings.getComfortLargeLayoutTuning();
+      expect(
+        comfortLarge.targetHeightScale,
+        ComfortLargeLayoutTuning.defaults.targetHeightScale,
+      );
+      expect(comfortLarge.maximumHeightFactor, 3.41);
+    });
+
+    test("reset all removes only the selected strategy keys", () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final settings = LocalSettings(preferences);
+      for (final field in FlexLayoutTuningField.values) {
+        await settings.setFlexLayoutTuningValue(
+          field,
+          field == FlexLayoutTuningField.maximumHeightFactor ? 2.0 : 1.5,
+        );
+      }
+      for (final field in ComfortLargeLayoutTuningField.values) {
+        await settings.setComfortLargeLayoutTuningValue(field, switch (field) {
+          ComfortLargeLayoutTuningField.maximumHeightFactor ||
+          ComfortLargeLayoutTuningField.wideFinalMaximumHeightFactor => 2.0,
+          _ => 1.5,
+        });
+      }
+
+      await settings.resetFlexLayoutTuning();
+
+      expect(
+        preferences.getKeys().where((key) => key.contains(".flex.")),
+        isEmpty,
+      );
+      expect(
+        preferences.getKeys().where((key) => key.contains(".comfort_large.")),
+        isNotEmpty,
+      );
+
+      await settings.resetComfortLargeLayoutTuning();
+
+      expect(
+        preferences.getKeys().where((key) => key.contains(".comfort_large.")),
+        isEmpty,
+      );
+    });
+
+    test("rejects invalid values without persisting them", () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = LocalSettings(await SharedPreferences.getInstance());
+
+      await expectLater(
+        settings.setFlexLayoutTuningValue(
+          FlexLayoutTuningField.targetHeightScale,
+          0,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        settings.setComfortLargeLayoutTuningValue(
+          ComfortLargeLayoutTuningField.maximumHeightFactor,
+          0.999,
+        ),
+        throwsArgumentError,
+      );
+
+      expect(
+        settings.getFlexLayoutTuning().targetHeightScale,
+        FlexLayoutTuning.defaults.targetHeightScale,
+      );
+      expect(
+        settings.getComfortLargeLayoutTuning().maximumHeightFactor,
+        ComfortLargeLayoutTuning.defaults.maximumHeightFactor,
+      );
+    });
   });
 }

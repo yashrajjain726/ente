@@ -13,6 +13,7 @@ import "package:photos/models/gallery/gallery_groups.dart";
 import "package:photos/models/gallery/justified_grid_row.dart";
 import "package:photos/models/gallery/justified_layout.dart";
 import "package:photos/models/gallery/justified_layout_strategy.dart";
+import "package:photos/models/gallery/justified_layout_tuning.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
@@ -51,6 +52,8 @@ void main() {
     await localSettings.setJustifiedLayoutStrategy(
       JustifiedLayoutStrategy.comfort,
     );
+    await localSettings.resetFlexLayoutTuning();
+    await localSettings.resetComfortLargeLayoutTuning();
     await localSettings.setPhotoGridSize(4);
   });
 
@@ -157,6 +160,56 @@ void main() {
     );
     final flex = groups().groupLayouts.single as JustifiedSectionLayout;
     expect(flex.rows.single.itemWidths, hasLength(4));
+  });
+
+  test("keeps layout tuning separate for Flex and Comfort Large", () async {
+    final file = _file(
+      index: 0,
+      creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+      width: 1,
+      height: 1,
+    );
+    await localSettings.setPhotoGridSize(2);
+    double rowHeight() {
+      final section =
+          _galleryGroups(
+                files: [file],
+                groupType: GroupType.none,
+                groupHeaderExtent: GalleryGroups.spacing,
+                widthAvailable: 1024,
+              ).groupLayouts.single
+              as JustifiedSectionLayout;
+      return section.rows.single.height;
+    }
+
+    expect(rowHeight(), 320);
+
+    await localSettings.setJustifiedLayoutStrategy(
+      JustifiedLayoutStrategy.comfortLarge,
+    );
+    expect(
+      rowHeight(),
+      320 * ComfortLargeLayoutTuning.defaults.targetHeightScale,
+    );
+    await localSettings.setComfortLargeLayoutTuningValue(
+      ComfortLargeLayoutTuningField.targetHeightScale,
+      1.5,
+    );
+    expect(rowHeight(), 480);
+
+    await localSettings.setJustifiedLayoutStrategy(
+      JustifiedLayoutStrategy.flex,
+    );
+    final defaultFlexHeight =
+        320 *
+        FlexLayoutTuning.defaults.targetHeightScale *
+        FlexLayoutTuning.defaults.maximumHeightFactor;
+    expect(rowHeight(), defaultFlexHeight);
+    await localSettings.setFlexLayoutTuningValue(
+      FlexLayoutTuningField.maximumHeightFactor,
+      2,
+    );
+    expect(rowHeight(), 320 * FlexLayoutTuning.defaults.targetHeightScale * 2);
   });
 
   test(

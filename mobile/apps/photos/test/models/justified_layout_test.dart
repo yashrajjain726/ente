@@ -232,10 +232,11 @@ void main() {
           spacing: 2,
         );
 
-        expect(rows.map((row) => row.itemWidths.length), [
-          testCase.maximumItems,
-          testCase.maximumItems,
-        ], reason: "available width ${testCase.width}");
+        expect(
+          rows.map((row) => row.itemWidths.length),
+          [testCase.maximumItems, testCase.maximumItems],
+          reason: "available width ${testCase.width}",
+        );
         expect(
           rows.first.height,
           closeTo(3 * targetHeight, 1e-9),
@@ -281,6 +282,35 @@ void main() {
         );
         expect(rows.last.height, testCase.targetHeight);
       }
+    });
+
+    test("applies configurable Comfort row-height policies", () {
+      final wideTail = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [0.75, 0.75],
+        availableWidth: 1024,
+        targetRowHeight: 320,
+        spacing: 2,
+        wideFinalMaximumRowHeightFactor: 2,
+      ).single;
+      expect(wideTail.height, 640);
+
+      final landscapes = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [4 / 3, 4 / 3, 4 / 3],
+        availableWidth: 393,
+        targetRowHeight: (393 - 4) / 3,
+        spacing: 2,
+        minimumLandscapeRowHeightFactor: 0.5,
+      );
+      expect(landscapes.single.itemWidths, hasLength(3));
+
+      final portrait = JustifiedLayoutCalculator.computeRows(
+        aspectRatios: const [1 / 3],
+        availableWidth: 393,
+        targetRowHeight: 130,
+        spacing: 2,
+        maximumRowHeightFactor: 3,
+      ).single;
+      expect(portrait.height, 390);
     });
 
     test("merges a final portrait with a tappable two-item row", () {

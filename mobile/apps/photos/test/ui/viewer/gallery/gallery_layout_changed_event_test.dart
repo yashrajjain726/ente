@@ -13,10 +13,12 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/gallery/justified_layout_strategy.dart";
+import "package:photos/models/gallery/justified_layout_tuning.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/settings/gallery_settings_screen.dart";
+import "package:photos/ui/settings/justified_layout_tuning_screen.dart";
 import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
@@ -61,6 +63,8 @@ void main() {
     await localSettings.setJustifiedLayoutStrategy(
       JustifiedLayoutStrategy.comfort,
     );
+    await localSettings.resetFlexLayoutTuning();
+    await localSettings.resetComfortLargeLayoutTuning();
   });
 
   tearDown(() async {
@@ -126,6 +130,44 @@ void main() {
       }
     },
   );
+
+  testWidgets("Flex tuning accepts arbitrary decimals and resets one field", (
+    tester,
+  ) async {
+    var events = 0;
+    final subscription = Bus.instance.on<GalleryLayoutChangedEvent>().listen(
+      (_) => events++,
+    );
+    addTearDown(subscription.cancel);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightThemeData,
+        localizationsDelegates: StringsLocalizations.localizationsDelegates,
+        supportedLocales: StringsLocalizations.supportedLocales,
+        home: const JustifiedLayoutTuningScreen(),
+      ),
+    );
+
+    await tester.tap(find.text("Target height scale").first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), "1.1375");
+    await tester.tap(find.text("Save"));
+    await tester.pumpAndSettle();
+
+    expect(localSettings.getFlexLayoutTuning().targetHeightScale, 1.1375);
+    expect(events, 1);
+
+    await tester.tap(find.text("Target height scale").first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Reset to default"));
+    await tester.pumpAndSettle();
+
+    expect(
+      localSettings.getFlexLayoutTuning().targetHeightScale,
+      FlexLayoutTuning.defaults.targetHeightScale,
+    );
+    expect(events, 2);
+  });
 
   testWidgets(
     "layout changes rebuild every mounted gallery without loading files",
