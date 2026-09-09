@@ -61,7 +61,6 @@ class MemoryLaneCardWidget extends StatelessWidget {
                 width: size.width,
                 child: ClipPath(
                   clipper: const _MemoryLaneBackgroundClipper(),
-                  clipBehavior: Clip.antiAlias,
                   child: Container(
                     foregroundDecoration: const BoxDecoration(
                       gradient: LinearGradient(
