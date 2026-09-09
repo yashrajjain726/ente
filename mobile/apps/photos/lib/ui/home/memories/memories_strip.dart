@@ -7,6 +7,7 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_animate/flutter_animate.dart";
 import "package:photos/core/event_bus.dart";
+import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
@@ -533,14 +534,27 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
 
   // TODO: Recompute the timeline instead of hiding the card.
   Future<void> _onCollectionUpdated(CollectionUpdatedEvent event) async {
-    if (!mounted ||
-        _memoryLane == null ||
-        isLocalGalleryMode ||
-        event.type != EventType.deletedFromRemote ||
-        event.updatedFiles.isNotEmpty) {
+    final memoryLane = _memoryLane;
+    if (!mounted || memoryLane == null || isLocalGalleryMode) {
       return;
     }
-    await _hideMemoryLaneIfFilesMissing();
+    if (event.type == EventType.hide && event.collectionID != null) {
+      final files = await FilesDB.instance.getAllFilesFromCollections({
+        event.collectionID!,
+      });
+      final hiddenFileIds = files.map((file) => file.uploadedFileID).toSet();
+      if (!mounted || _memoryLane != memoryLane) {
+        return;
+      }
+      if (memoryLane.entries.any(
+        (entry) => hiddenFileIds.contains(entry.fileId),
+      )) {
+        _hideMemoryLane();
+      }
+    } else if (event.type == EventType.deletedFromRemote &&
+        event.updatedFiles.isEmpty) {
+      await _hideMemoryLaneIfFilesMissing();
+    }
   }
 
   Future<void> _hideMemoryLaneIfFilesMissing() async {
