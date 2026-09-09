@@ -5,9 +5,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use crate::cv::image::ImageU8;
 use crate::error::{MlError, MlResult};
 
-pub(crate) fn prepare_crop_tensor(
-    prepare: impl FnOnce() -> MlResult<Vec<f32>> + Send,
-) -> MlResult<Vec<f32>> {
+pub(crate) fn prepare_crops<T: Send>(prepare: impl FnOnce() -> MlResult<T> + Send) -> MlResult<T> {
     static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
     let pool = POOL.get_or_init(|| {
         ThreadPoolBuilder::new()
@@ -89,11 +87,17 @@ mod tests {
     fn preparation_keeps_the_callers_worker_pool_unchanged() {
         let caller = ThreadPoolBuilder::new().num_threads(4).build().unwrap();
         caller.install(|| {
-            let values =
-                prepare_crop_tensor(|| Ok(vec![rayon::current_num_threads() as f32])).unwrap();
+            let values = prepare_crops(|| Ok(vec![rayon::current_num_threads() as f32])).unwrap();
             assert_eq!(values, [1.0]);
             assert_eq!(rayon::current_num_threads(), 4);
         });
+    }
+
+    #[test]
+    fn preparation_reuses_the_worker_across_return_types() {
+        let first = prepare_crops(|| Ok(std::thread::current().id())).unwrap();
+        let second = prepare_crops(|| Ok(vec![std::thread::current().id()])).unwrap();
+        assert_eq!(second, [first]);
     }
 
     #[test]

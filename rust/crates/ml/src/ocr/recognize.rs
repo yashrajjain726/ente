@@ -4,7 +4,7 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use super::OcrError;
 use super::cancel::RequestGuard;
 use super::dictionary::load_dictionary;
-use super::tensor::{BgrNormalization, prepare_crop_tensor, write_bgr_planes};
+use super::tensor::{BgrNormalization, prepare_crops, write_bgr_planes};
 use crate::cv;
 use crate::cv::image::ImageU8;
 use crate::error::{MlError, MlResult};
@@ -89,7 +89,7 @@ impl TextRecognizer {
 
     fn infer_batch(&self, batch: &[&ImageU8], dictionary: &[String]) -> MlResult<Vec<Recognition>> {
         let layout = BatchLayout::new(batch);
-        let input = PreparedF32Input::new(prepare_crop_tensor(|| layout.tensor(batch))?);
+        let input = PreparedF32Input::new(prepare_crops(|| layout.tensor(batch))?);
         let count = batch.len();
         let input_shape = [
             count as i64,
@@ -300,18 +300,33 @@ where
     logits.chunks_exact(vocabulary).map(argmax).collect()
 }
 
-fn argmax(step: impl FloatTensorData) -> StepBest {
-    let mut best = StepBest {
-        index: 0,
-        probability: f32::NEG_INFINITY,
-    };
-    for index in 0..step.len() {
-        let probability = step.value(index);
-        if probability > best.probability {
-            best = StepBest { index, probability };
+fn argmax<'a, T>(step: &'a [T]) -> StepBest
+where
+    &'a [T]: FloatTensorData,
+{
+    let mut maxima = [f32::NEG_INFINITY; 8];
+    let (chunks, remainder) = step.as_chunks::<8>();
+    for chunk in chunks {
+        for (lane, maximum) in maxima.iter_mut().enumerate() {
+            *maximum = maximum.max(chunk.as_slice().value(lane));
         }
     }
-    best
+    let mut maximum = maxima.into_iter().fold(f32::NEG_INFINITY, f32::max);
+    for index in 0..remainder.len() {
+        maximum = maximum.max(remainder.value(index));
+    }
+    if maximum > f32::NEG_INFINITY {
+        for index in 0..step.len() {
+            let probability = step.value(index);
+            if probability == maximum {
+                return StepBest { index, probability };
+            }
+        }
+    }
+    StepBest {
+        index: 0,
+        probability: f32::NEG_INFINITY,
+    }
 }
 
 struct CharacterRun {
@@ -554,8 +569,69 @@ mod tests {
             .build()
             .unwrap();
         let expected = parallel.install(|| layout.tensor(&batch)).unwrap();
-        let prepared = prepare_crop_tensor(|| layout.tensor(&batch)).unwrap();
+        let prepared = prepare_crops(|| layout.tensor(&batch)).unwrap();
         assert_eq!(prepared, expected);
+    }
+
+    #[test]
+    fn argmax_matches_scalar_for_lane_boundaries_ties_and_both_precisions() {
+        fn reference(values: impl FloatTensorData) -> StepBest {
+            let mut best = StepBest {
+                index: 0,
+                probability: f32::NEG_INFINITY,
+            };
+            for index in 0..values.len() {
+                let probability = values.value(index);
+                if probability > best.probability {
+                    best = StepBest { index, probability };
+                }
+            }
+            best
+        }
+
+        fn check<'a, T>(values: &'a [T])
+        where
+            &'a [T]: FloatTensorData,
+        {
+            let expected = reference(values);
+            let actual = argmax(values);
+            assert_eq!(actual.index, expected.index);
+            assert_eq!(actual.probability.to_bits(), expected.probability.to_bits());
+        }
+
+        let mut state = 37u32;
+        for len in (0..40).chain([191, 320, REC_VOCABULARY_SIZE]) {
+            let mut values: Vec<f32> = (0..len)
+                .map(|_| {
+                    state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                    (state >> 16) as f32 / 65536.0 - 0.5
+                })
+                .collect();
+            for first in 0..len.min(17) {
+                for last in [first, len / 2, len - 1] {
+                    values[first] = 1.0;
+                    values[last] = 1.0;
+                    check(values.as_slice());
+                    let half_values: Vec<_> =
+                        values.iter().map(|&v| half::f16::from_f32(v)).collect();
+                    check(half_values.as_slice());
+                    values[first] = -0.25;
+                    values[last] = -0.25;
+                }
+            }
+            check(values.as_slice());
+        }
+        for values in [
+            vec![],
+            vec![-0.0, 0.0, -0.0, 0.0, -0.0, 0.0, -0.0, 0.0, 0.0],
+            vec![f32::NEG_INFINITY; 19],
+            vec![f32::NAN; 19],
+            vec![f32::NAN, 0.25, f32::INFINITY, f32::INFINITY],
+        ] {
+            check(values.as_slice());
+            let half_values: Vec<_> = values.iter().map(|&v| half::f16::from_f32(v)).collect();
+            check(half_values.as_slice());
+        }
     }
 
     #[test]

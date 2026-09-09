@@ -1,6 +1,6 @@
 use std::sync::{Mutex, PoisonError};
 
-use super::tensor::{BgrNormalization, prepare_crop_tensor, write_bgr_planes};
+use super::tensor::{BgrNormalization, prepare_crops, write_bgr_planes};
 use crate::cv;
 use crate::cv::image::ImageU8;
 use crate::error::{MlError, MlResult};
@@ -51,7 +51,7 @@ impl AngleClassifier {
     }
 
     fn score_batch(&self, batch: &[ImageU8]) -> MlResult<Vec<AngleScores>> {
-        let input = PreparedF32Input::new(prepare_crop_tensor(|| batch_tensor(batch))?);
+        let input = PreparedF32Input::new(prepare_crops(|| batch_tensor(batch))?);
         let count = batch.len() as i64;
         let expected_shape = [count, CLASS_COUNT as i64];
         let mut session = self.session.lock().unwrap_or_else(PoisonError::into_inner);
@@ -196,7 +196,7 @@ mod tests {
             .build()
             .unwrap();
         let expected = parallel.install(|| batch_tensor(&batch)).unwrap();
-        let prepared = prepare_crop_tensor(|| batch_tensor(&batch)).unwrap();
+        let prepared = prepare_crops(|| batch_tensor(&batch)).unwrap();
         assert_eq!(prepared, expected);
     }
 
