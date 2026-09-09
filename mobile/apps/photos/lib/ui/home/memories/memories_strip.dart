@@ -460,7 +460,10 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       final person = await PersonService.instance.getPerson(
         memoryLane.personId,
       );
-      shouldHide = person == null || person.data.hideFromMemories;
+      shouldHide =
+          person == null ||
+          person.data.isIgnored ||
+          person.data.hideFromMemories;
       personName = person?.data.name;
     }
     if (!shouldHide) {
