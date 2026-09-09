@@ -43,6 +43,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Trans } from "react-i18next";
 import { filterNonEmptyUploadItems } from "../createItemDialog/file-upload-helpers";
 import type { CreateItemDialogEditItem } from "../createItemDialog/use-create-item-dialog-state";
+import type { EmptyTrashDialogState } from "./EmptyTrashDialog";
 
 type DragDataTransferItem = DataTransferItem & {
     webkitGetAsEntry?: () => FileSystemEntry | null;
@@ -328,6 +329,9 @@ export const useLockerActions = ({
         useState<DeleteCollectionDialogState | null>(null);
     const deleteCollectionDialogRef =
         useRef<DeleteCollectionDialogState | null>(null);
+    const [emptyTrashDialog, setEmptyTrashDialog] =
+        useState<EmptyTrashDialogState | null>(null);
+    const emptyTrashDialogRef = useRef<EmptyTrashDialogState | null>(null);
     const [toast, setToast] = useState<string | null>(null);
     const [shareCollectionID, setShareCollectionID] = useState<number | null>(
         null,
@@ -344,6 +348,12 @@ export const useLockerActions = ({
             deleteCollectionDialogRef.current = deleteCollectionDialog;
         }
     }, [deleteCollectionDialog]);
+
+    useEffect(() => {
+        if (emptyTrashDialog) {
+            emptyTrashDialogRef.current = emptyTrashDialog;
+        }
+    }, [emptyTrashDialog]);
 
     useEffect(() => {
         shareCollectionIDRef.current = shareCollectionID;
@@ -399,6 +409,9 @@ export const useLockerActions = ({
 
     const visibleDeleteCollectionDialog =
         deleteCollectionDialog ?? deleteCollectionDialogRef.current;
+
+    const visibleEmptyTrashDialog =
+        emptyTrashDialog ?? emptyTrashDialogRef.current;
 
     const uploadPreflightFailureMessage = useCallback(
         (
@@ -705,20 +718,39 @@ export const useLockerActions = ({
     );
 
     const handleEmptyTrash = useCallback(() => {
-        showMiniDialog({
-            title: t("empty_trash_title"),
-            message: t("empty_trash_message"),
-            continue: {
-                text: t("empty_trash"),
-                color: "critical",
-                action: async () => {
-                    await emptyTrashAPI(trashLastUpdatedAt);
-                    await refreshData();
-                    setToast(t("trashClearedSuccessfully"));
-                },
-            },
-        });
-    }, [refreshData, showMiniDialog, trashLastUpdatedAt]);
+        setEmptyTrashDialog({ loading: false });
+    }, []);
+
+    const handleConfirmEmptyTrash = useCallback(async () => {
+        if (!emptyTrashDialog || emptyTrashDialog.loading) {
+            return;
+        }
+
+        setEmptyTrashDialog({ loading: true });
+        try {
+            await emptyTrashAPI(trashLastUpdatedAt);
+            await refreshData();
+            setToast(t("trashClearedSuccessfully"));
+            setEmptyTrashDialog(null);
+        } catch (error) {
+            log.error("Failed to empty Locker trash", error);
+            setEmptyTrashDialog((current) =>
+                current
+                    ? {
+                          ...current,
+                          error:
+                              error instanceof Error
+                                  ? error.message
+                                  : t("generic_error"),
+                      }
+                    : current,
+            );
+        } finally {
+            setEmptyTrashDialog((current) =>
+                current ? { ...current, loading: false } : current,
+            );
+        }
+    }, [emptyTrashDialog, refreshData, trashLastUpdatedAt]);
 
     const handleCreateCollection = useCallback(
         async (name: string): Promise<number> => {
@@ -1107,8 +1139,10 @@ export const useLockerActions = ({
         createDialogOpen,
         deleteCollectionDialog,
         editItem,
+        emptyTrashDialog,
         ensureCollectionsExist,
         handleConfirmDeleteCollection,
+        handleConfirmEmptyTrash,
         handleCreateCollection,
         handleCreateDialogClose,
         handleCreateItem,
@@ -1138,10 +1172,12 @@ export const useLockerActions = ({
         prefilledUploadItems,
         setDeleteCollectionDialog,
         setEditItem,
+        setEmptyTrashDialog,
         setShareCollectionID,
         shareCollectionID,
         toast,
         setToast,
         visibleDeleteCollectionDialog,
+        visibleEmptyTrashDialog,
     };
 };

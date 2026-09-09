@@ -2,14 +2,17 @@ import { lockerItemIcon } from "@/components/locker-item-icons";
 import { downloadLockerFile } from "@/services/remote";
 import type { GenericFileData, LockerItem } from "@/types";
 import { getItemTitle, hasDownloadableObject } from "@/types";
-import { CircleArrowDownLeftIcon } from "@hugeicons/core-free-icons";
+import {
+    ArrowReloadHorizontalIcon,
+    CircleArrowDownLeftIcon,
+    Delete02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RadioButtonUncheckedRoundedIcon from "@mui/icons-material/RadioButtonUncheckedRounded";
-import RestoreIcon from "@mui/icons-material/Restore";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import {
     Box,
@@ -25,10 +28,16 @@ import {
     OverflowMenu,
     OverflowMenuOption,
 } from "ente-base/components/OverflowMenu";
+import { formatTimeAgo } from "ente-base/date";
 import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useState } from "react";
-import { lockerColors, lockerColorSx, lockerTextBodySx } from "./locker-tokens";
+import {
+    lockerColors,
+    lockerColorSx,
+    lockerTextBodySx,
+    lockerTextMiniSx,
+} from "./locker-tokens";
 
 interface ItemCardProps {
     item: LockerItem;
@@ -261,6 +270,20 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     <Typography variant="body" sx={lockerTextBodySx} noWrap>
                         {title}
                     </Typography>
+                    {isTrashView && item.updatedAt !== undefined && (
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextMiniSx,
+                                ...lockerColorSx(theme, { color: "textLight" }),
+                                mt: 0.5,
+                            })}
+                            noWrap
+                        >
+                            {t("deletedTimeAgo", {
+                                time: formatTimeAgo(item.updatedAt),
+                            })}
+                        </Typography>
+                    )}
                 </Box>
 
                 {selectionMode ? null : isTrashView ? (
@@ -397,9 +420,13 @@ const TrashActions: React.FC<{
                 <IconButton
                     size="small"
                     onClick={() => onRestore(item)}
-                    sx={{ color: "text.faint" }}
+                    sx={(theme) => lockerColorSx(theme, { color: "iconColor" })}
                 >
-                    <RestoreIcon sx={{ fontSize: 20 }} />
+                    <HugeiconsIcon
+                        icon={ArrowReloadHorizontalIcon}
+                        size={18}
+                        strokeWidth={1.5}
+                    />
                 </IconButton>
             </Tooltip>
         )}
@@ -408,9 +435,13 @@ const TrashActions: React.FC<{
                 <IconButton
                     size="small"
                     onClick={() => onPermanentlyDelete([item])}
-                    sx={{ color: "critical.main" }}
+                    sx={(theme) => lockerColorSx(theme, { color: "warning" })}
                 >
-                    <DeleteOutlinedIcon sx={{ fontSize: 20 }} />
+                    <HugeiconsIcon
+                        icon={Delete02Icon}
+                        size={18}
+                        strokeWidth={1.5}
+                    />
                 </IconButton>
             </Tooltip>
         )}

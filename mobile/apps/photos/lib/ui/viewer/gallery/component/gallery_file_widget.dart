@@ -103,6 +103,8 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
   }
 
   Widget _buildFileContent(BuildContext context) {
+    final disableSelection =
+        GalleryContextState.of(context)?.disableSelection ?? false;
     Color selectionColor = Colors.white;
     if (_isFileSelected &&
         widget.file.isUploaded &&
@@ -137,11 +139,13 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
       shouldShowVideoDuration: true,
     );
     return GestureDetector(
-      onTap: () {
-        widget.limitSelectionToOne
-            ? _onTapWithSelectionLimit(widget.file)
-            : _onTapNoSelectionLimit(context, widget.file);
-      },
+      onTap: disableSelection
+          ? null
+          : () {
+              widget.limitSelectionToOne
+                  ? _onTapWithSelectionLimit(widget.file)
+                  : _onTapNoSelectionLimit(context, widget.file);
+            },
       onLongPress: () {
         widget.limitSelectionToOne
             ? _onLongPressWithSelectionLimit(context, widget.file)

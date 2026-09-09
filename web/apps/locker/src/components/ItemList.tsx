@@ -18,6 +18,7 @@ import {
     visibleLockerCollections,
 } from "@/types";
 import {
+    Delete02Icon,
     Link01Icon,
     PlusSignIcon,
     StarIcon,
@@ -30,7 +31,6 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import DeleteSweepOutlinedIcon from "@mui/icons-material/DeleteSweepOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
@@ -1018,9 +1018,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                                 </Box>
                             ) : (
                                 <EmptyState
-                                    image={{
-                                        src: "/images/empty_state.png",
-                                    }}
+                                    image={{ src: "/images/empty_state.png" }}
                                     title={t("noCollections")}
                                 />
                             )}
@@ -1107,9 +1105,13 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         : (selectedCollection?.name ??
                                           t("allItems"))
                                 }
-                                countLabel={t("lockerItemsCount", {
-                                    count: sortedItems.length,
-                                })}
+                                countLabel={
+                                    isTrashView && sortedItems.length === 0
+                                        ? undefined
+                                        : t("lockerItemsCount", {
+                                              count: sortedItems.length,
+                                          })
+                                }
                                 onBack={onNavigateBack}
                                 action={
                                     <Stack
@@ -1119,15 +1121,46 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         {isTrashView &&
                                             sortedItems.length > 0 &&
                                             onEmptyTrash && (
-                                                <Button
-                                                    color="critical"
-                                                    startIcon={
-                                                        <DeleteSweepOutlinedIcon />
-                                                    }
-                                                    onClick={onEmptyTrash}
+                                                <Tooltip
+                                                    title={t("empty_trash")}
                                                 >
-                                                    {t("empty_trash")}
-                                                </Button>
+                                                    <IconButton
+                                                        aria-label={t(
+                                                            "empty_trash",
+                                                        )}
+                                                        onClick={onEmptyTrash}
+                                                        sx={(theme) => ({
+                                                            width: 36,
+                                                            height: 36,
+                                                            borderRadius:
+                                                                "12px",
+                                                            padding: 0,
+                                                            ...lockerColorSx(
+                                                                theme,
+                                                                {
+                                                                    backgroundColor:
+                                                                        "fillLight",
+                                                                    color: "warning",
+                                                                },
+                                                            ),
+                                                            "&:hover": {
+                                                                ...lockerColorSx(
+                                                                    theme,
+                                                                    {
+                                                                        backgroundColor:
+                                                                            "fillDark",
+                                                                    },
+                                                                ),
+                                                            },
+                                                        })}
+                                                    >
+                                                        <HugeiconsIcon
+                                                            icon={Delete02Icon}
+                                                            size={18}
+                                                            strokeWidth={1.5}
+                                                        />
+                                                    </IconButton>
+                                                </Tooltip>
                                             )}
                                         {selectedCollection &&
                                             canShareSelectedCollection &&
@@ -1222,8 +1255,10 @@ export const ItemList: React.FC<ItemListProps> = ({
                                 emptyState={
                                     isTrashView ? (
                                         <EmptyState
-                                            title={t("trashIsEmpty")}
-                                            subtitle={t("yourTrashIsEmpty")}
+                                            image={{
+                                                src: "/images/empty_state.png",
+                                            }}
+                                            title={t("yourTrashIsEmpty")}
                                         />
                                     ) : (
                                         <EmptyState

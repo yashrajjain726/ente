@@ -5,6 +5,7 @@ import { LockerNavbar } from "@/components/LockerNavbar";
 import { LockerSidebar } from "@/components/LockerSidebar";
 import { lockerColorSx } from "@/components/locker-tokens";
 import { DeleteCollectionDialog } from "@/components/lockerPage/DeleteCollectionDialog";
+import { EmptyTrashDialog } from "@/components/lockerPage/EmptyTrashDialog";
 import { LockerDragOverlay } from "@/components/lockerPage/LockerDragOverlay";
 import { useLockerActions } from "@/components/lockerPage/use-locker-actions";
 import { useLockerData } from "@/components/lockerPage/use-locker-data";
@@ -61,8 +62,10 @@ export const LockerPage: React.FC = () => {
         createDialogOpen,
         deleteCollectionDialog,
         editItem,
+        emptyTrashDialog,
         ensureCollectionsExist,
         handleConfirmDeleteCollection,
+        handleConfirmEmptyTrash,
         handleCreateCollection,
         handleCreateDialogClose,
         handleCreateItem,
@@ -91,11 +94,13 @@ export const LockerPage: React.FC = () => {
         prefilledUploadItems,
         setDeleteCollectionDialog,
         setEditItem,
+        setEmptyTrashDialog,
         setShareCollectionID,
         shareCollectionID,
         setToast,
         toast,
         visibleDeleteCollectionDialog,
+        visibleEmptyTrashDialog,
     } = useLockerActions({
         collections,
         ensureUploadLimitState,
@@ -229,6 +234,12 @@ export const LockerPage: React.FC = () => {
                 onLeaveCollection={handleLeaveCollection}
                 onRefreshSharees={fetchCollectionSharees}
                 warmContacts={warmContacts}
+            />
+            <EmptyTrashDialog
+                dialogState={emptyTrashDialog}
+                visibleDialogState={visibleEmptyTrashDialog}
+                onClose={() => setEmptyTrashDialog(null)}
+                onConfirm={handleConfirmEmptyTrash}
             />
             <DeleteCollectionDialog
                 dialogState={deleteCollectionDialog}
