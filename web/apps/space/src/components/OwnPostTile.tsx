@@ -393,7 +393,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         border: 0,
                         borderRadius: "50%",
                         bottom: spaceTileCircleInset(actionSize),
-                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.16)",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.32)",
                         color: "#FFFFFF",
                         cursor: isNewPostDisabled ? "default" : "pointer",
                         display: "flex",
