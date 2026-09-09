@@ -112,7 +112,11 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 },
             }}
         >
-            <HugeiconsIcon icon={Menu01Icon} size={24} strokeWidth={2.4} />
+            <HugeiconsIcon
+                icon={Menu01Icon}
+                size={headerIconSize}
+                strokeWidth={2.5}
+            />
         </Box>
         <Box
             sx={{
