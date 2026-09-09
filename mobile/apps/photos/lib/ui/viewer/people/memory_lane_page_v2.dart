@@ -579,20 +579,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                       index++
                                     ) ...[
                                       if (index > 0)
-                                        AnimatedDigitComponent(
-                                          value: age,
-                                          formatter:
-                                              NumberFormat.decimalPattern(
-                                                context.strings.localeName,
-                                              ).format,
-                                          style: darkTheme.textTheme.h2
-                                              .copyWith(
-                                                fontWeight: .w600,
-                                                color: darkTheme
-                                                    .colorScheme
-                                                    .textBase,
-                                              ),
-                                        ),
+                                        _MemoryLaneAnimatedDigit(value: age),
                                       Flexible(
                                         child: Text(
                                           ageCaptionParts[index],
@@ -824,5 +811,124 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
         unawaited(_play(i));
       }
     }
+  }
+}
+
+class _MemoryLaneAnimatedDigit extends StatefulWidget {
+  const _MemoryLaneAnimatedDigit({required this.value}) : assert(value >= 0);
+
+  final int value;
+
+  @override
+  State<_MemoryLaneAnimatedDigit> createState() =>
+      _MemoryLaneAnimatedDigitState();
+}
+
+class _MemoryLaneAnimatedDigitState extends State<_MemoryLaneAnimatedDigit>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late int _previousValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousValue = widget.value;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+      value: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_MemoryLaneAnimatedDigit oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value) {
+      _previousValue = oldWidget.value;
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final direction = widget.value >= _previousValue ? 1 : -1;
+    final formatter = NumberFormat.decimalPattern(context.strings.localeName);
+    final current = formatter.format(widget.value);
+    final previous = formatter.format(_previousValue);
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return Semantics(
+      label: current,
+      excludeSemantics: true,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final progress = disableAnimations
+              ? 1.0
+              : Curves.easeOutCubic.transform(_controller.value);
+          final length = progress == 1
+              ? current.length
+              : math.max(current.length, previous.length);
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            textDirection: TextDirection.ltr,
+            children: [
+              for (var place = length - 1; place >= 0; place--)
+                Builder(
+                  key: ValueKey(place),
+                  builder: (context) {
+                    final nextDigit = place < current.length
+                        ? current[current.length - place - 1]
+                        : null;
+                    final oldDigit = place < previous.length
+                        ? previous[previous.length - place - 1]
+                        : null;
+                    if (progress == 1 || oldDigit == nextDigit) {
+                      return Text(
+                        nextDigit ?? "",
+                        style: darkTheme.textTheme.h2Bold,
+                      );
+                    }
+                    return ClipRect(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (oldDigit != null)
+                            FractionalTranslation(
+                              translation: Offset(0, -direction * progress),
+                              child: Text(
+                                oldDigit,
+                                style: darkTheme.textTheme.h2Bold,
+                              ),
+                            ),
+                          if (nextDigit != null)
+                            FractionalTranslation(
+                              translation: Offset(
+                                0,
+                                direction * (1 - progress),
+                              ),
+                              child: Text(
+                                nextDigit,
+                                style: darkTheme.textTheme.h2Bold,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
