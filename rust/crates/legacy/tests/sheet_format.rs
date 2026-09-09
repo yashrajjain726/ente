@@ -10,7 +10,8 @@ struct MobileSheet {
 }
 
 fn mobile_sheets() -> Vec<MobileSheet> {
-    serde_json::from_str(include_str!("fixtures/mobile-sheets.json")).unwrap()
+    serde_json::from_str(include_str!("fixtures/mobile-sheets.json"))
+        .expect("mobile sheet fixtures should be valid JSON")
 }
 
 #[test]
