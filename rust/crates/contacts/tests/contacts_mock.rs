@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use std::sync::RwLock;
 
 use ente_contacts::{

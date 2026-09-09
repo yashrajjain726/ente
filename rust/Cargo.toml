@@ -140,6 +140,7 @@ uninlined_format_args = "deny"
 unused_async = "deny"
 unused_peekable = "deny"
 unused_rounding = "deny"
+unwrap_used = "deny"
 
 # Unoptimized Argon2 makes production-strength derivations dominate test runtime.
 [profile.dev.package.argon2]
