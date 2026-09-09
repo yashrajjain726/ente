@@ -296,10 +296,10 @@ class MemoryLaneService {
       return null;
     }
 
-    if (!await areFullFaceCropsCached({
-      timeline.entries.first.faceId,
-      timeline.entries.last.faceId,
-    }, useTempCache: false)) {
+    if (!await areFullFaceCropsCached(
+      timeline.entries.map((entry) => entry.faceId),
+      useTempCache: false,
+    )) {
       return null;
     }
     return timeline;
