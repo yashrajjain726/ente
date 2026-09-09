@@ -281,12 +281,19 @@ const mockFetch = (
 const sessionKeyAttributes = async (masterKey: string) => {
     const { publicKey, privateKey } = await generateKeyPair();
     const encryptedSecretKey = await encryptBox(privateKey, masterKey);
+    const encryptedRecoveryKey = await encryptBox(
+        await generateKey(),
+        masterKey,
+    );
     return {
         userID: 42,
         keyAttributes: {
             publicKey,
             encryptedSecretKey: encryptedSecretKey.encryptedData,
             secretKeyDecryptionNonce: encryptedSecretKey.nonce,
+            recoveryKeyEncryptedWithMasterKey:
+                encryptedRecoveryKey.encryptedData,
+            recoveryKeyDecryptionNonce: encryptedRecoveryKey.nonce,
         },
     };
 };

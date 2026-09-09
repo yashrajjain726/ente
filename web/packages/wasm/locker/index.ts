@@ -15,6 +15,12 @@ export type { OpenSessionInput, Session } from "./pkg/ente_locker_wasm";
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
 
+export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
+    readAndFree(session.encryptWithRecoveryKey(dataB64), (box) => ({
+        encryptedData: box.encryptedData,
+        nonce: box.nonce,
+    }));
+
 export const openCollectionKey = async (
     session: Session,
     ownerID: number,

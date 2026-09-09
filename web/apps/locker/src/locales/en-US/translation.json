@@ -1,4 +1,5 @@
 {
+    "refresh": "Refresh",
     "saveToLocker": "Save to Locker",
     "informationDescription": "Save and share information with loved ones.",
     "saveDocumentTitle": "Document",
@@ -227,5 +228,24 @@
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
     "filesSelected": "{{count, number}} items selected",
-    "filesSelected_one": "1 item selected"
+    "filesSelected_one": "1 item selected",
+    "legacy": "Legacy",
+    "get_in_touch": "Get in touch",
+    "ask_a_question": "Ask a question",
+    "request_a_feature": "Request a feature",
+    "report_an_issue": "Report an issue",
+    "export_logs": "Export logs",
+    "browse_help_pages": "Browse help pages",
+    "getting_started": "Getting started",
+    "getting_started_desc": "Install Locker, create an account, and save your first item",
+    "information_types": "Information types",
+    "information_types_desc": "Documents, notes, cards, passwords, and other item types",
+    "organization": "Organization",
+    "organization_desc": "Collections, favorites, search, and ways to keep items organized",
+    "legacy_desc": "Trusted contacts, Legacy kit, and account recovery planning",
+    "security_desc": "Encryption, recovery keys, app lock, and account protection",
+    "troubleshooting": "Troubleshooting",
+    "troubleshooting_desc": "Common issues and their solutions",
+    "view_all_help_topics": "View all help topics",
+    "legacy_intro": "Legacy allows trusted contacts to access your account in your absence."
 }
