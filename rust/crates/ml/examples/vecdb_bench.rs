@@ -173,10 +173,11 @@ fn run_scale(scale: usize, dims: usize, attrs: bool, storage: StorageKind, temp_
         "=== scale {scale}  dims {dims}  storage {}  clusters {clusters} ===",
         storage_name(storage)
     );
-    eprintln!("[scale {scale}] generating data");
-    let data = generate_data(scale, dims, clusters);
     let dir = temp_root.join(format!("scale-{scale}-{dims}"));
     std::fs::create_dir_all(&dir).expect("create bench dir");
+    drop(VecDb::open_with_storage(&dir.join("bench.vecdb"), dims, storage).expect("open vecdb"));
+    eprintln!("[scale {scale}] generating data");
+    let data = generate_data(scale, dims, clusters);
     let vecdb = run_vecdb(&data, dims, attrs, storage, &dir, scale);
     print_vecdb_report(&vecdb);
     let _ = std::fs::remove_dir_all(&dir);

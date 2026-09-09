@@ -1251,12 +1251,16 @@ fn build_writer(
     storage: Option<StorageKind>,
 ) -> Result<BuiltWriter, VecDbError> {
     let lock = WriterLock::acquire(path)?;
-    let mut log = match Log::create(path, dims, storage.unwrap_or(StorageKind::F32)) {
-        Ok(created) => created,
-        Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
-            reopen_log(path, dims, storage)?
+    let mut log = if std::fs::metadata(path).is_ok() {
+        reopen_log(path, dims, storage)?
+    } else {
+        match Log::create(path, dims, storage.unwrap_or(StorageKind::F32)) {
+            Ok(created) => created,
+            Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
+                reopen_log(path, dims, storage)?
+            }
+            Err(error) => return Err(error),
         }
-        Err(error) => return Err(error),
     };
     let storage = log.storage();
     remove_stale_temp_sibling(path)?;
@@ -4985,6 +4989,61 @@ mod tests {
             }
         }
         records
+    }
+
+    #[test]
+    fn existing_index_reports_storage_mismatch_before_its_dimensions_are_judged() {
+        let dir = TempDir::new().unwrap();
+        let narrow = dir.path().join("narrow");
+        let wide = dir.path().join("wide");
+        let live = VecDb::open(&narrow, 8).unwrap();
+        live.add("n", &seeded_unit_vector(1, 8)).unwrap();
+        assert!(matches!(
+            VecDb::open_with_storage(&narrow, 8, StorageKind::I8),
+            Err(VecDbError::StorageMismatch {
+                expected: StorageKind::I8,
+                actual: StorageKind::F32
+            })
+        ));
+        drop(live);
+        assert!(matches!(
+            VecDb::open_with_storage(&narrow, 8, StorageKind::I8),
+            Err(VecDbError::StorageMismatch {
+                expected: StorageKind::I8,
+                actual: StorageKind::F32
+            })
+        ));
+        drop(VecDb::open(&wide, I8_DIMS).unwrap());
+        assert!(matches!(
+            VecDb::open_with_storage(&wide, 8, StorageKind::I8),
+            Err(VecDbError::StorageMismatch {
+                expected: StorageKind::I8,
+                actual: StorageKind::F32
+            })
+        ));
+        assert!(matches!(
+            VecDb::open(&wide, 8),
+            Err(VecDbError::DimensionMismatch {
+                expected: 8,
+                actual: I8_DIMS
+            })
+        ));
+        drop(open_i8(&dir.path().join("i8")));
+        assert!(matches!(
+            VecDb::open_read_only(&dir.path().join("i8"), 8),
+            Err(VecDbError::DimensionMismatch {
+                expected: 8,
+                actual: I8_DIMS
+            })
+        ));
+        assert!(matches!(
+            VecDb::open_with_storage(&dir.path().join("fresh"), 8, StorageKind::I8),
+            Err(VecDbError::InvalidDimensions {
+                dims: 8,
+                storage: StorageKind::I8
+            })
+        ));
+        assert!(!dir.path().join("fresh").exists());
     }
 
     #[test]

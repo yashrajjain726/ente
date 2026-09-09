@@ -90,7 +90,6 @@ impl Log {
         requested: Option<StorageKind>,
     ) -> Result<Self, VecDbError> {
         let fallback = requested.unwrap_or(StorageKind::F32);
-        validate_dims(expected_dims, fallback)?;
         let file_len = file
             .metadata()
             .map_err(|source| VecDbError::io(path, source))?
@@ -100,6 +99,7 @@ impl Log {
                 "reinitializing {} whose {file_len}-byte header was never completed",
                 path.display()
             );
+            validate_dims(expected_dims, fallback)?;
             return Self::initialize(file, path, expected_dims, fallback);
         }
         file.seek(SeekFrom::Start(0))
@@ -107,15 +107,7 @@ impl Log {
         let mut header = [0u8; HEADER_LEN];
         file.read_exact(&mut header)
             .map_err(|source| VecDbError::io(path, source))?;
-        let (generation, storage) = decode_header(&header, expected_dims)?;
-        if let Some(requested) = requested
-            && requested != storage
-        {
-            return Err(VecDbError::StorageMismatch {
-                expected: requested,
-                actual: storage,
-            });
-        }
+        let (generation, storage) = decode_header(&header, expected_dims, requested)?;
         validate_dims(expected_dims, storage)?;
         Ok(Self {
             file,
@@ -701,12 +693,13 @@ fn encode_header(dims: u32, generation: &[u8; 16], storage: StorageKind) -> [u8;
 
 pub(crate) fn header_generation(bytes: &[u8; HEADER_LEN]) -> Result<[u8; 16], VecDbError> {
     let dims = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
-    decode_header(bytes, dims).map(|(generation, _)| generation)
+    decode_header(bytes, dims, None).map(|(generation, _)| generation)
 }
 
 fn decode_header(
     bytes: &[u8; HEADER_LEN],
     expected_dims: usize,
+    requested: Option<StorageKind>,
 ) -> Result<([u8; 16], StorageKind), VecDbError> {
     if bytes[0..4] != MAGIC {
         return Err(VecDbError::Corrupt(format!(
@@ -730,6 +723,14 @@ fn decode_header(
     let storage = StorageKind::from_header_tag(bytes[STORAGE_TAG_OFFSET]).ok_or_else(|| {
         VecDbError::Corrupt(format!("unknown scalar tag {}", bytes[STORAGE_TAG_OFFSET]))
     })?;
+    if let Some(requested) = requested
+        && requested != storage
+    {
+        return Err(VecDbError::StorageMismatch {
+            expected: requested,
+            actual: storage,
+        });
+    }
     if bytes[7] != METRIC_TAG_INNER_PRODUCT {
         return Err(VecDbError::Corrupt(format!(
             "unknown metric tag {}",
@@ -1192,7 +1193,10 @@ mod tests {
         let file = File::options().read(true).write(true).open(&path).unwrap();
         assert!(matches!(
             Log::open(file, &path, 12, None),
-            Err(VecDbError::InvalidDimensions { dims: 12, .. })
+            Err(VecDbError::DimensionMismatch {
+                expected: 12,
+                actual: 8
+            })
         ));
     }
 
@@ -2633,7 +2637,7 @@ mod tests {
         let header = encode_header(8, &[7u8; 16], StorageKind::F32);
         assert_eq!(header[STORAGE_TAG_OFFSET], 0);
         assert_eq!(
-            decode_header(&header, 8).unwrap(),
+            decode_header(&header, 8, None).unwrap(),
             ([7u8; 16], StorageKind::F32)
         );
     }
@@ -2736,9 +2740,9 @@ mod tests {
         let file = File::options().read(true).write(true).open(&path).unwrap();
         assert!(matches!(
             Log::open(file, &path, 8, Some(StorageKind::I8)),
-            Err(VecDbError::InvalidDimensions {
-                dims: 8,
-                storage: StorageKind::I8
+            Err(VecDbError::DimensionMismatch {
+                expected: 8,
+                actual: 32
             })
         ));
         let mut forged = encode_header(8, &[3u8; 16], StorageKind::I8);
