@@ -47,10 +47,15 @@ func (c *FileCountInitializer) ProcessBatch() {
 	}
 
 	initialized, deferred, ineligible, contended := 0, 0, 0, 0
+	var retryAfterUserID int64
 	for _, userID := range userIDs {
+		previousUserID := c.afterUserID
 		c.afterUserID = userID
 		lockID := fileCountInitializationLock + ":" + strconv.FormatInt(userID, 10)
 		if !c.LockController.TryLock(lockID, timeUtil.MicrosecondsAfterHours(3)) {
+			if contended == 0 {
+				retryAfterUserID = previousUserID
+			}
 			contended++
 			continue
 		}
@@ -65,6 +70,9 @@ func (c *FileCountInitializer) ProcessBatch() {
 		}
 		if err != nil {
 			log.WithError(err).WithField("user_id", userID).Error("Failed to initialize file counts")
+			if contended > 0 {
+				c.afterUserID = retryAfterUserID
+			}
 			return
 		}
 		if updated {
@@ -73,7 +81,9 @@ func (c *FileCountInitializer) ProcessBatch() {
 			deferred++
 		}
 	}
-	if len(userIDs) < fileCountInitializationBatchSize {
+	if contended > 0 {
+		c.afterUserID = retryAfterUserID
+	} else if len(userIDs) < fileCountInitializationBatchSize {
 		c.afterUserID = 0
 		c.resumeAt = time.Now().Add(24 * time.Hour)
 	}
