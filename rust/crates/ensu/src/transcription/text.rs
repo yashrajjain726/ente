@@ -39,7 +39,7 @@ fn collapse_stutters(text: &str) -> String {
         let word = words[i];
         let word_lower = word.to_lowercase();
 
-        if word_lower.len() <= 2 && word_lower.chars().all(|c| c.is_alphabetic()) {
+        if word_lower.len() <= 2 && word_lower.chars().all(char::is_alphabetic) {
             let mut count = 1;
             while i + count < words.len() && words[i + count].to_lowercase() == word_lower {
                 count += 1;

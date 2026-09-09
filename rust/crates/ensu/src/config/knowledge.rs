@@ -27,7 +27,7 @@ const MAX_HITS: u32 = 2;
 const MAX_CONTEXT_UTF8_BYTES: u32 = 6_000;
 const MODIFICATION_NOTICE: &str = "Adapted by Ente";
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnowledgeEmbeddingConfig {
     pub model_url: String,
     pub model_size: u64,
@@ -43,7 +43,7 @@ pub struct KnowledgeEmbeddingConfig {
     pub max_context_utf8_bytes: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttributionConfig {
     pub credit: String,
     pub license_label: String,

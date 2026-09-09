@@ -883,6 +883,10 @@ fn invalid(reason: &'static str) -> Error {
     Error::invalid(SECTION, reason)
 }
 
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "Iterator::min_by passes references to borrowed candidates"
+)]
 fn compare_candidates(left: &&Candidate, right: &&Candidate) -> Ordering {
     right
         .rank

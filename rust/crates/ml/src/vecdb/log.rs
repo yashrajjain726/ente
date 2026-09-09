@@ -2250,7 +2250,7 @@ mod tests {
         *crc_flipped_tombstone.last_mut().unwrap() ^= 0x01;
         let mut oversized_key_payload = payload.clone();
         oversized_key_payload.push(0);
-        let mut over_counted_attrs = payload.clone();
+        let mut over_counted_attrs = payload;
         over_counted_attrs.push(17);
         let mut truncated = good.clone();
         truncated.pop();

@@ -73,8 +73,7 @@ impl<'a> AccountStore<'a> {
 
         if rows_affected == 0 {
             return Err(crate::Error::NotFound(format!(
-                "Account not found: {} (app: {:?})",
-                email, app
+                "Account not found: {email} (app: {app:?})"
             )));
         }
 
@@ -89,8 +88,7 @@ impl<'a> AccountStore<'a> {
 
         if rows_affected == 0 {
             return Err(crate::Error::NotFound(format!(
-                "Account not found: user_id={} (app: {:?})",
-                user_id, app
+                "Account not found: user_id={user_id} (app: {app:?})"
             )));
         }
 

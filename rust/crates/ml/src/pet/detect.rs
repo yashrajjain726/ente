@@ -93,8 +93,7 @@ fn postprocess_pet_face_tensor<T: onnx::FloatTensorData>(
             11
         } else {
             return Err(MlError::Postprocess(format!(
-                "unexpected pet face detector output size: {} (shape: {:?})",
-                total, output_shape
+                "unexpected pet face detector output size: {total} (shape: {output_shape:?})"
             )));
         }
     } else {

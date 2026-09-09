@@ -171,7 +171,7 @@ impl<'a> SyncStore<'a> {
                 .and_then(|s| s.strip_suffix("_files"))
                 .and_then(|s| s.parse::<i64>().ok())
                 .ok_or_else(|| {
-                    crate::Error::InvalidInput(format!("Invalid sync type: {}", sync_type))
+                    crate::Error::InvalidInput(format!("Invalid sync type: {sync_type}"))
                 })?;
 
             let now = chrono::Utc::now().timestamp_micros();
@@ -208,7 +208,7 @@ impl<'a> SyncStore<'a> {
                 .and_then(|s| s.strip_suffix("_files"))
                 .and_then(|s| s.parse::<i64>().ok())
                 .ok_or_else(|| {
-                    crate::Error::InvalidInput(format!("Invalid sync type: {}", sync_type))
+                    crate::Error::InvalidInput(format!("Invalid sync type: {sync_type}"))
                 })?;
 
             let timestamp = self

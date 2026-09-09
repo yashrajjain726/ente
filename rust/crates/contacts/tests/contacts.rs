@@ -600,12 +600,11 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
             .iter()
             .all(|kit| kit.id != waiting_kit.kit.id)
     );
-    let inactive_error = match recovery_client
+    let Err(inactive_error) = recovery_client
         .open_from_shares(&waiting_kit.shares[0..2], None)
         .await
-    {
-        Ok(_) => panic!("deleted legacy kit recovery unexpectedly opened"),
-        Err(error) => error,
+    else {
+        panic!("deleted legacy kit recovery unexpectedly opened")
     };
     assert!(matches!(
         inactive_error,

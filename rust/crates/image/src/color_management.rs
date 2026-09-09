@@ -5,7 +5,7 @@ use moxcms::{
 };
 use std::{
     collections::VecDeque,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock, PoisonError},
 };
 
 static SRGB_PROFILE: OnceLock<ColorProfile> = OnceLock::new();
@@ -326,7 +326,7 @@ fn lock_profile_cache() -> std::sync::MutexGuard<'static, VecDeque<CachedIccProf
     ICC_PROFILE_CACHE
         .get_or_init(|| Mutex::new(VecDeque::with_capacity(ICC_PROFILE_CACHE_CAPACITY)))
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(PoisonError::into_inner)
 }
 
 fn transform_options() -> TransformOptions {

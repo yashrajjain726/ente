@@ -75,7 +75,7 @@ pub fn install_panic_hook() {
 
         let thread = std::thread::current()
             .name()
-            .map(|name| name.to_string())
+            .map(ToString::to_string)
             .unwrap_or_else(|| "unnamed".to_string());
 
         log(
