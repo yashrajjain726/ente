@@ -25,7 +25,6 @@ bool shouldShowGalleryFileViewerFilmstrip({
   required int itemCount,
 }) => isEnabled && !isMinimalistic && !isGuestView && itemCount > 1;
 
-/// This widget returns [Positioned.fill], so its parent must be a [Stack].
 class GalleryFileViewerFilmstripPreviewLayer extends StatelessWidget {
   final List<EnteFile> files;
   final ValueListenable<int?> previewIndex;
@@ -74,7 +73,6 @@ class GalleryFileViewerFilmstripPreviewLayer extends StatelessWidget {
   }
 }
 
-/// This widget returns [Positioned], so its parent must be a [Stack].
 class GalleryFileViewerFilmstripOverlay extends StatelessWidget {
   final List<EnteFile> files;
   final int selectedIndex;

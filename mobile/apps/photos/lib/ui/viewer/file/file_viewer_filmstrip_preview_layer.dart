@@ -8,7 +8,6 @@ const fileViewerFilmstripPreviewKey = ValueKey<String>(
 typedef FileViewerFilmstripPreviewBuilder =
     Widget Function(BuildContext context, int index);
 
-/// This widget returns [Positioned.fill], so its parent must be a [Stack].
 class FileViewerFilmstripPreviewLayer extends StatelessWidget {
   final ValueListenable<int?> previewIndex;
   final FileViewerFilmstripPreviewBuilder itemBuilder;

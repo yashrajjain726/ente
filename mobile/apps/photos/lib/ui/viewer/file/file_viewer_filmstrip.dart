@@ -2,6 +2,7 @@ import "dart:async";
 import "dart:math";
 
 import "package:flutter/material.dart";
+import "package:flutter/rendering.dart" show ScrollCacheExtent;
 import "package:flutter/services.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_physics.dart";
@@ -127,7 +128,9 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
                     padding: EdgeInsets.symmetric(
                       horizontal: horizontalPadding,
                     ),
-                    cacheExtent: _itemExtent * _cacheExtentInItems,
+                    scrollCacheExtent: ScrollCacheExtent.pixels(
+                      _itemExtent * _cacheExtentInItems,
+                    ),
                     addAutomaticKeepAlives: false,
                     addSemanticIndexes: false,
                     itemBuilder: (context, index) => _buildItem(context, index),

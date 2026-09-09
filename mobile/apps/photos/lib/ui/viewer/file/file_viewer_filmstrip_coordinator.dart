@@ -8,15 +8,15 @@ typedef FileViewerFilmstripIdentityAt = Object? Function(int index);
 
 typedef FileViewerFilmstripImmediatePageJump = bool Function(int index);
 
-/// Runs [callback] after a guaranteed future frame's paint phase.
+// Runs [callback] after a guaranteed future frame's paint phase.
 typedef FileViewerFilmstripPaintScheduler =
     void Function(VoidCallback callback);
 
-/// A user scroll session starts with the drag and remains active through any
-/// ballistic coast. During that session, [previewIndex] exposes the centered
-/// thumbnail when it differs from the committed page. On commit, the preview
-/// stays visible until the destination page has had a guaranteed future paint
-/// opportunity.
+// A user scroll session starts with the drag and remains active through any
+// ballistic coast. During that session, [previewIndex] exposes the centered
+// thumbnail when it differs from the committed page. On commit, the preview
+// stays visible until the destination page has had a guaranteed future paint
+// opportunity.
 class FileViewerFilmstripCoordinator {
   final FileViewerFilmstripCurrentIndex _currentIndex;
   final FileViewerFilmstripIdentityAt _identityAt;

@@ -32,10 +32,10 @@ class VideoStreamChangeState {
   }
 }
 
-/// Publishes the stream action owned by the video player to viewer chrome.
-///
-/// The owner token prevents a retiring player from clearing a newer player's
-/// action when Flutter replaces a page during navigation or file removal.
+// Publishes the stream action owned by the video player to viewer chrome.
+//
+// The owner token prevents a retiring player from clearing a newer player's
+// action when Flutter replaces a page during navigation or file removal.
 class VideoStreamChangeController
     extends ValueNotifier<VideoStreamChangeState?> {
   VideoStreamChangeController() : super(null);
