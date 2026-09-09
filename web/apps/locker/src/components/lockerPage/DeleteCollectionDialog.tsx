@@ -1,14 +1,22 @@
 import { lockerDialogPaperSx } from "@/components/locker-dialog-styles";
 import {
+    lockerColorSx,
+    lockerTextBodyBoldSx,
+    lockerTextBodySx,
+    lockerTextH2Sx,
+    lockerTextMiniSx,
+} from "@/components/locker-tokens";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    Box,
     Checkbox,
     Dialog,
-    DialogContent,
-    DialogTitle,
     FormControlLabel,
+    IconButton,
     Stack,
     Typography,
 } from "@mui/material";
-import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { t } from "i18next";
 import React from "react";
@@ -40,20 +48,79 @@ export const DeleteCollectionDialog: React.FC<DeleteCollectionDialogProps> = ({
         maxWidth="xs"
         slotProps={{
             paper: {
-                sx: { ...lockerDialogPaperSx, width: "min(100%, 420px)" },
+                sx: (theme) => ({
+                    ...lockerDialogPaperSx,
+                    borderRadius: "24px",
+                    width: "min(100%, 440px)",
+                    padding: "20px",
+                    ...lockerColorSx(theme, {
+                        backgroundColor: "backgroundBase",
+                    }),
+                }),
             },
         }}
     >
-        <DialogTitle sx={{ pb: 1 }}>{t("deleteCollectionTitle")}</DialogTitle>
-        <DialogContent>
-            <Stack sx={{ gap: 2.25 }}>
-                <Typography sx={{ color: "text.muted" }}>
-                    {t("deleteCollectionDialogBody", {
-                        collectionName:
-                            visibleDialogState?.collectionName ?? "",
+        <Stack>
+            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                <IconButton
+                    aria-label={t("cancel")}
+                    onClick={onClose}
+                    disabled={visibleDialogState?.loading}
+                    sx={(theme) => ({
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        padding: 0,
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "fillLight",
+                            color: "iconColor",
+                        }),
+                        "&:hover": {
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "fillDark",
+                            }),
+                        },
                     })}
-                </Typography>
-                {visibleDialogState?.hasItems && (
+                >
+                    <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={18}
+                        strokeWidth={1.5}
+                    />
+                </IconButton>
+            </Box>
+            <img
+                src="/images/collection_delete_icon.png"
+                alt=""
+                style={{
+                    width: 120,
+                    height: 120,
+                    objectFit: "contain",
+                    display: "block",
+                    margin: "4px auto 0",
+                }}
+            />
+            <Typography
+                sx={{ ...lockerTextH2Sx, textAlign: "center", mt: 2.5 }}
+            >
+                {t("deleteCollectionTitle")}
+            </Typography>
+            <Typography
+                sx={(theme) => ({
+                    ...lockerTextBodySx,
+                    textAlign: "center",
+                    mt: 1.5,
+                    ...lockerColorSx(theme, { color: "textLight" }),
+                })}
+            >
+                {t("deleteCollectionDialogBody", {
+                    collectionName: visibleDialogState?.collectionName ?? "",
+                })}
+            </Typography>
+            {visibleDialogState?.hasItems && (
+                <Box
+                    sx={{ display: "flex", mt: 2.5, justifyContent: "center" }}
+                >
                     <FormControlLabel
                         control={
                             <Checkbox
@@ -69,33 +136,56 @@ export const DeleteCollectionDialog: React.FC<DeleteCollectionDialogProps> = ({
                             />
                         }
                         label={t("deleteCollectionFromEverywhere")}
-                        sx={{ alignItems: "center", m: 0 }}
+                        sx={{
+                            alignItems: "center",
+                            m: 0,
+                            "& .MuiFormControlLabel-label": lockerTextBodySx,
+                        }}
                     />
-                )}
-                {visibleDialogState?.error && (
-                    <Typography variant="small" sx={{ color: "critical.main" }}>
-                        {visibleDialogState.error}
-                    </Typography>
-                )}
-                <Stack direction="row" sx={{ gap: 1 }}>
-                    <FocusVisibleButton
-                        fullWidth
-                        color="secondary"
-                        disabled={visibleDialogState?.loading}
-                        onClick={onClose}
-                    >
-                        {t("cancel")}
-                    </FocusVisibleButton>
-                    <LoadingButton
-                        fullWidth
-                        color="critical"
-                        loading={visibleDialogState?.loading}
-                        onClick={onConfirm}
-                    >
-                        {t("delete")}
-                    </LoadingButton>
-                </Stack>
-            </Stack>
-        </DialogContent>
+                </Box>
+            )}
+            {visibleDialogState?.error && (
+                <Typography
+                    sx={(theme) => ({
+                        ...lockerTextMiniSx,
+                        textAlign: "center",
+                        mt: 1.5,
+                        ...lockerColorSx(theme, { color: "warning" }),
+                    })}
+                >
+                    {visibleDialogState.error}
+                </Typography>
+            )}
+            <LoadingButton
+                fullWidth
+                color="critical"
+                loading={visibleDialogState?.loading}
+                onClick={onConfirm}
+                sx={(theme) => ({
+                    ...lockerTextBodyBoldSx,
+                    mt: 3,
+                    minHeight: 52,
+                    borderRadius: "20px",
+                    textTransform: "none",
+                    ...lockerColorSx(theme, {
+                        backgroundColor: "warning",
+                        color: "specialWhite",
+                    }),
+                    "&:hover": {
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "warningDark",
+                        }),
+                    },
+                    "&.Mui-disabled": {
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "warning",
+                            color: "specialWhite",
+                        }),
+                    },
+                })}
+            >
+                {t("delete")}
+            </LoadingButton>
+        </Stack>
     </Dialog>
 );

@@ -6,6 +6,7 @@ import { ChatDialogs } from "@/components/chat/ChatDialogs";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { useFileInput } from "@/components/utils/use-file-input";
+import { useNotesCollections } from "@/hooks/use-notes-collections";
 import { handleManualAppUpdateCheck } from "@/services/app-update";
 import {
     buildSelectedPath,
@@ -44,8 +45,8 @@ import {
     loadKnowledgeCatalog,
     retrieveKnowledge,
     saveEnabledKnowledgePacks,
+    type GroundedSource,
     type KnowledgePack,
-    type SourceCitation,
 } from "@/services/knowledge";
 import {
     DEFAULT_MODEL,
@@ -61,6 +62,7 @@ import type {
     ModelInfo,
     ModelSettings,
 } from "@/services/llm/types";
+import { tauriCommandError } from "@/services/tauri-error";
 import { isTauriRuntime as detectTauriAppRuntime } from "@/services/tauri-runtime";
 import { Menu01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -106,20 +108,6 @@ const DEFAULT_WEB_CONTEXT_SIZE = 4096;
 const ADVANCED_SETTINGS_UNLOCK_KEY = "ensu.advancedSettingsUnlocked";
 const MODEL_SETTINGS_STORAGE_KEY = "ensu.modelSettings";
 const SYSTEM_PROMPT_STORAGE_KEY = "ensu.systemPrompt";
-
-interface TauriCommandError {
-    name?: string;
-    message?: string;
-}
-
-const tauriCommandError = (error: unknown): TauriCommandError => {
-    if (!error || typeof error != "object") return {};
-    const record = error as Record<string, unknown>;
-    return {
-        name: typeof record.name == "string" ? record.name : undefined,
-        message: typeof record.message == "string" ? record.message : undefined,
-    };
-};
 
 const formatImageProcessingErrorForLog = (error: unknown) => {
     const { name, message } = tauriCommandError(error);
@@ -262,7 +250,6 @@ const SESSION_TITLE_PROMPT =
 
 const REPEAT_PENALTY = 1.18;
 const STREAMING_OUTRO_DURATION_MS = 520;
-
 interface DocumentAttachment {
     id: string;
     name: string;
@@ -558,7 +545,6 @@ const Page: React.FC = () => {
     const [knowledgeErrors, setKnowledgeErrors] = useState<
         Record<string, string | undefined>
     >({});
-
     const [modelSettingsLoaded, setModelSettingsLoaded] = useState(false);
     const [resolvedDefaultModel, setResolvedDefaultModel] =
         useState<ModelInfo>(DEFAULT_MODEL);
@@ -586,6 +572,8 @@ const Page: React.FC = () => {
     >(undefined);
     const [chatNotificationOpen, setChatNotificationOpen] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSessionSummaryGenerating, setIsSessionSummaryGenerating] =
+        useState(false);
     const [isStreamingOutro, setIsStreamingOutro] = useState(false);
     const [loadingPhrase, setLoadingPhrase] = useState<string | null>(null);
     const [loadingDots, setLoadingDots] = useState(1);
@@ -625,7 +613,7 @@ const Page: React.FC = () => {
 
     const providerRef = useRef<LlmProvider | null>(null);
     const currentJobIdRef = useRef<number | null>(null);
-    const activeKnowledgeCitationsRef = useRef<SourceCitation[]>([]);
+    const activeKnowledgeSourcesRef = useRef<GroundedSource[]>([]);
     const activeKnowledgeDownloadsRef = useRef(new Set<string>());
     const knowledgeCatalogPromiseRef = useRef<Promise<KnowledgePack[]> | null>(
         null,
@@ -634,6 +622,7 @@ const Page: React.FC = () => {
         KnowledgePack[]
     > | null>(null);
     const generationStartingRef = useRef(false);
+    const generationActiveRef = useRef(false);
     const generationStoppingRef = useRef(false);
     const pendingGenerationStopsRef = useRef(0);
     const modelGateRequestRef = useRef(0);
@@ -643,6 +632,7 @@ const Page: React.FC = () => {
         previousSelection?: string | null;
     } | null>(null);
     const sessionSummaryPromiseRef = useRef<Promise<void> | null>(null);
+    const sessionSummaryActiveRef = useRef(false);
     const sessionSummaryEpochRef = useRef(0);
     const manuallyRenamedSessionIdsRef = useRef(new Set<string>());
     const pendingSessionRenamesRef = useRef(new Set<string>());
@@ -1426,7 +1416,8 @@ const Page: React.FC = () => {
         beginGenerationStop();
         const jobId = currentJobIdRef.current;
         currentJobIdRef.current = null;
-        activeKnowledgeCitationsRef.current = [];
+        activeKnowledgeSourcesRef.current = [];
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         setIsDownloading(false);
@@ -1491,6 +1482,7 @@ const Page: React.FC = () => {
         streamingBufferRef.current = "";
         streamingChunksRef.current = [];
         streamingCreatedAtRef.current = null;
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         resetPendingImages();
@@ -1800,6 +1792,50 @@ const Page: React.FC = () => {
         return providerRef.current;
     }, []);
 
+    const isNotesGenerationActive = useCallback(
+        () => generationActiveRef.current || sessionSummaryActiveRef.current,
+        [],
+    );
+    const cancelNotesIndexing = useCallback(() => {
+        const provider = providerRef.current;
+        if (provider?.getBackendKind() === "tauri") {
+            void provider
+                .cancelGeneration(-1)
+                .catch((error: unknown) =>
+                    log.warn("Failed to cancel Notes indexing", error),
+                );
+        }
+    }, []);
+    const confirmNotesRemoval = useCallback(
+        (label: string, remove: () => Promise<void>) => {
+            showMiniDialog({
+                title: "Remove notes folder?",
+                message: `Remove “${label}” from Your Notes? Source files will not be changed.`,
+                continue: { text: "Remove", color: "critical", action: remove },
+                cancel: "Cancel",
+                buttonDirection: "row",
+            });
+        },
+        [showMiniDialog],
+    );
+    const {
+        collections: notesCollections,
+        loading: notesCollectionsLoading,
+        error: notesCollectionsError,
+        retry: retryNotesCollections,
+        addFolder: handleAddNotesFolder,
+        removeCollection: handleRemoveNotesCollection,
+        runIndex: runNotesIndex,
+    } = useNotesCollections({
+        isTauriRuntime,
+        isGenerating: isGenerating || isSessionSummaryGenerating,
+        isGenerationActive: isNotesGenerationActive,
+        modelReady: modelGateStatus === "ready",
+        ensureProvider,
+        cancelIndexing: cancelNotesIndexing,
+        confirmRemoval: confirmNotesRemoval,
+    });
+
     const getModelSettings = useCallback((): ModelSettings => {
         return {
             modelId: selectedModelId || undefined,
@@ -1885,41 +1921,48 @@ const Page: React.FC = () => {
 
     const generateSessionSummary = useCallback(
         async (input: string) => {
-            const provider = await ensureProvider();
-            const settings = getModelSettings();
-            const availability =
-                await provider.checkModelAvailability(settings);
-            const mmprojReady =
-                availability.mmprojAvailable === undefined ||
-                availability.mmprojAvailable;
+            sessionSummaryActiveRef.current = true;
+            setIsSessionSummaryGenerating(true);
+            try {
+                const provider = await ensureProvider();
+                const settings = getModelSettings();
+                const availability =
+                    await provider.checkModelAvailability(settings);
+                const mmprojReady =
+                    availability.mmprojAvailable === undefined ||
+                    availability.mmprojAvailable;
 
-            if (!availability.modelAvailable || !mmprojReady) {
-                return null;
+                if (!availability.modelAvailable || !mmprojReady) {
+                    return null;
+                }
+
+                await provider.ensureModelReady(settings);
+
+                let summary = "";
+
+                await provider.generateChatStream(
+                    {
+                        messages: [
+                            { role: "system", content: SESSION_TITLE_PROMPT },
+                            { role: "user", content: input },
+                        ],
+                        maxTokens: 64,
+                        temperature: 0.2,
+                        topP: 0.9,
+                        repeatPenalty: REPEAT_PENALTY,
+                    },
+                    (event) => {
+                        if (event.type === "text") {
+                            summary += event.text;
+                        }
+                    },
+                );
+
+                return summary;
+            } finally {
+                sessionSummaryActiveRef.current = false;
+                setIsSessionSummaryGenerating(false);
             }
-
-            await provider.ensureModelReady(settings);
-
-            let summary = "";
-
-            await provider.generateChatStream(
-                {
-                    messages: [
-                        { role: "system", content: SESSION_TITLE_PROMPT },
-                        { role: "user", content: input },
-                    ],
-                    maxTokens: 64,
-                    temperature: 0.2,
-                    topP: 0.9,
-                    repeatPenalty: REPEAT_PENALTY,
-                },
-                (event) => {
-                    if (event.type === "text") {
-                        summary += event.text;
-                    }
-                },
-            );
-
-            return summary;
         },
         [ensureProvider, getModelSettings],
     );
@@ -2397,6 +2440,7 @@ const Page: React.FC = () => {
         streamingBufferRef.current = "";
         streamingChunksRef.current = [];
         streamingCreatedAtRef.current = null;
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         setIsDraftSession(true);
@@ -2750,12 +2794,13 @@ const Page: React.FC = () => {
         const trimmedText = finalText.trim();
         const parentMessageUuid = streamingParentId;
         const activeSessionId = currentSessionIdRef.current ?? currentSessionId;
-        const activeKnowledgeCitations = activeKnowledgeCitationsRef.current;
-        activeKnowledgeCitationsRef.current = [];
+        const activeKnowledgeSources = activeKnowledgeSourcesRef.current;
+        activeKnowledgeSourcesRef.current = [];
 
         const last = lastGenerationRef.current;
         lastGenerationRef.current = null;
 
+        generationActiveRef.current = false;
         setIsGenerating(false);
         setIsStreamingOutro(false);
         setIsDownloading(false);
@@ -2784,7 +2829,7 @@ const Page: React.FC = () => {
                         chatKey,
                         parentMessageUuid,
                         [],
-                        activeKnowledgeCitations,
+                        activeKnowledgeSources,
                     );
 
                     await updateBranchSelectionState(
@@ -2891,6 +2936,7 @@ const Page: React.FC = () => {
                 return;
             }
             generationStartingRef.current = true;
+            generationActiveRef.current = true;
             setIsGenerating(true);
             currentJobIdRef.current = null;
             lastGenerationRef.current = null;
@@ -2910,6 +2956,10 @@ const Page: React.FC = () => {
             let startupCompleted = false;
             try {
                 provider = await ensureProvider();
+                if (provider.getBackendKind() === "tauri") {
+                    await provider.cancelGeneration(-1);
+                    if (!isActiveGeneration()) return;
+                }
                 const priorSummary = sessionSummaryPromiseRef.current;
                 if (priorSummary) {
                     sessionSummaryEpochRef.current += 1;
@@ -2950,12 +3000,13 @@ const Page: React.FC = () => {
             } finally {
                 generationStartingRef.current = false;
                 if (!startupCompleted && isActiveGeneration()) {
+                    generationActiveRef.current = false;
                     setIsGenerating(false);
                 }
             }
 
             let errorMessage: string | null = null;
-            activeKnowledgeCitationsRef.current = [];
+            activeKnowledgeSourcesRef.current = [];
 
             try {
                 const normalSystemPrompt = buildChatSystemPrompt(systemPrompt);
@@ -3020,8 +3071,8 @@ const Page: React.FC = () => {
                     (inputBudget - normalPromptTokenEstimate) * 4 - 2,
                 );
                 if (
+                    isTauriRuntime &&
                     knowledgeQuery &&
-                    enabledReadyPackIds.length > 0 &&
                     remainingKnowledgeBytes > 0
                 ) {
                     try {
@@ -3046,7 +3097,7 @@ const Page: React.FC = () => {
                             throw error;
                         }
                         log.warn(
-                            "Ensu Pack retrieval failed; continuing without pack context",
+                            "Knowledge retrieval failed; continuing without source context",
                             error,
                         );
                     }
@@ -3068,7 +3119,7 @@ const Page: React.FC = () => {
                 }
 
                 let messages = normalMessages;
-                let activeCitations: SourceCitation[] = [];
+                let activeSources: GroundedSource[] = [];
                 if (knowledgeContext) {
                     const candidateMessages: LlmMessage[] = [
                         {
@@ -3086,10 +3137,10 @@ const Page: React.FC = () => {
                         ) <= inputBudget
                     ) {
                         messages = candidateMessages;
-                        activeCitations = knowledgeContext.citations;
+                        activeSources = knowledgeContext.sources;
                     }
                 }
-                activeKnowledgeCitationsRef.current = activeCitations;
+                activeKnowledgeSourcesRef.current = activeSources;
                 const nativeImagePaths =
                     imagePaths?.length && provider.getBackendKind() === "tauri"
                         ? imagePaths
@@ -3143,10 +3194,10 @@ const Page: React.FC = () => {
                         name === "prompt_too_long" &&
                         !streamingBufferRef.current &&
                         streamingChunksRef.current.length === 0 &&
-                        activeCitations.length > 0
+                        activeSources.length > 0
                     ) {
-                        activeCitations = [];
-                        activeKnowledgeCitationsRef.current = [];
+                        activeSources = [];
+                        activeKnowledgeSourcesRef.current = [];
                         messages = normalMessages;
                         try {
                             await generate();
@@ -3198,7 +3249,7 @@ const Page: React.FC = () => {
                     return;
                 }
 
-                activeKnowledgeCitationsRef.current = [];
+                activeKnowledgeSourcesRef.current = [];
 
                 const assistantMessage = await addMessage(
                     activeSessionId,
@@ -3207,7 +3258,7 @@ const Page: React.FC = () => {
                     chatKey,
                     parentMessageUuid,
                     [],
-                    activeCitations,
+                    activeSources,
                 );
 
                 void updateBranchSelectionState(
@@ -3247,7 +3298,8 @@ const Page: React.FC = () => {
                 }
             } finally {
                 if (isActiveGeneration()) {
-                    activeKnowledgeCitationsRef.current = [];
+                    activeKnowledgeSourcesRef.current = [];
+                    generationActiveRef.current = false;
                     setIsGenerating(false);
                     setIsStreamingOutro(false);
                     setIsDownloading(false);
@@ -4677,6 +4729,13 @@ const Page: React.FC = () => {
                     handleCancelKnowledgePackDownload
                 }
                 handleSetKnowledgePackEnabled={handleSetKnowledgePackEnabled}
+                notesCollections={notesCollections}
+                notesCollectionsLoading={notesCollectionsLoading}
+                notesCollectionsError={notesCollectionsError}
+                retryNotesCollections={retryNotesCollections}
+                handleAddNotesFolder={handleAddNotesFolder}
+                handleRemoveNotesCollection={handleRemoveNotesCollection}
+                handleIndexNotesCollection={runNotesIndex}
                 chatNotificationOpen={chatNotificationOpen}
                 setChatNotificationOpen={setChatNotificationOpen}
                 chatNotification={chatNotification}

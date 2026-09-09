@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/ente/museum/ente"
 	"github.com/ente/stacktrace"
 	"github.com/lib/pq"
 )
@@ -42,8 +43,26 @@ func (repo *UsageRepository) GetUsage(userID int64) (int64, error) {
 	return usage, stacktrace.Propagate(err, "")
 }
 
+func (repo *UsageRepository) GetStoredFileCounts(ctx context.Context, userID int64) (int64, int64, int64, error) {
+	var photos, locker sql.NullInt64
+	var storageConsumed int64
+	err := repo.DB.QueryRowContext(ctx, `SELECT storage_consumed, photos_file_count, locker_file_count
+		FROM usage WHERE user_id = $1`, userID).Scan(&storageConsumed, &photos, &locker)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, -1, -1, nil
+	}
+	if err != nil {
+		return 0, 0, 0, stacktrace.Propagate(err, "")
+	}
+	if !photos.Valid || !locker.Valid {
+		return storageConsumed, -1, -1, nil
+	}
+	return storageConsumed, photos.Int64, locker.Int64, nil
+}
+
 func (repo *UsageRepository) CreateTx(ctx context.Context, tx *sql.Tx, userID int64) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO usage(user_id, storage_consumed) VALUES ($1, 0)`, userID)
+	_, err := tx.ExecContext(ctx, `INSERT INTO usage(user_id, storage_consumed, photos_file_count, locker_file_count)
+		VALUES ($1, 0, 0, 0)`, userID)
 	return stacktrace.Propagate(err, "failed to insert usage")
 }
 
@@ -115,16 +134,21 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 	}
 
 	countQuery := `
-      SELECT 
-         c.owner_id,
-         COUNT(DISTINCT cf.file_id) AS file_count
-      FROM collections c
-      JOIN collection_files cf ON c.collection_id = cf.collection_id
-      WHERE c.app = 'locker'
-         AND c.owner_id = ANY($1)
-         AND cf.f_owner_id = c.owner_id
-         AND cf.is_deleted = false
-      GROUP BY c.owner_id;
+      WITH counts AS (
+         SELECT c.owner_id, COUNT(DISTINCT cf.file_id) AS file_count
+         FROM collections c
+         JOIN collection_files cf ON c.collection_id = cf.collection_id
+         WHERE c.app = 'locker'
+            AND c.owner_id = ANY($1)
+            AND cf.f_owner_id = c.owner_id
+            AND cf.is_deleted = false
+         GROUP BY c.owner_id
+      )
+      SELECT requested.user_id, COALESCE(counts.file_count, 0),
+         u.photos_file_count, u.locker_file_count, u.file_count_source_version
+      FROM unnest($1::bigint[]) AS requested(user_id)
+      LEFT JOIN counts ON counts.owner_id = requested.user_id
+      LEFT JOIN usage u ON u.user_id = requested.user_id;
    `
 
 	sizeQuery := `
@@ -151,12 +175,17 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 
 	for rows.Next() {
 		var ownerID, fileCount int64
-		if scanErr := rows.Scan(&ownerID, &fileCount); scanErr != nil {
+		var counts fileCountSnapshot
+		if scanErr := rows.Scan(&ownerID, &fileCount, &counts.photos, &counts.locker, &counts.version); scanErr != nil {
 			return nil, stacktrace.Propagate(scanErr, "")
 		}
+		counts.observe("locker_usage", ownerID, ente.Locker, fileCount)
 		if user, exists := userMap[ownerID]; exists {
 			user.FileCount = fileCount
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
 	}
 	rows.Close()
 

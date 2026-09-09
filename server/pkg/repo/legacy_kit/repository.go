@@ -430,7 +430,7 @@ func (r *Repository) UpdateRecoveryNotice(ctx context.Context, userID int64, kit
 		return false, err
 	}
 	if session != nil {
-		return false, stacktrace.Propagate(ente.NewBadRequestWithMessage("cannot update recovery notice while there is an active recovery session"), "")
+		return false, stacktrace.Propagate(&ente.ErrActiveRecoverySession, "")
 	}
 	result, err := tx.ExecContext(ctx, `
 		UPDATE legacy_kit

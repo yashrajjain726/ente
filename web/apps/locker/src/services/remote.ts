@@ -4,26 +4,22 @@ import type {
     LockerItem,
     LockerItemType,
 } from "@/types";
-import { deriveInteractiveKey } from "ente-accounts/services/crypto";
-import {
-    ensureLocalUser,
-    ensureUserKeyPair,
-} from "ente-accounts/services/user";
+import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
 import {
-    b64ToBytes,
-    boxSeal,
-    boxSealOpen,
     decryptBox,
     decryptMetadataJSON,
     encryptBlob,
     encryptBox,
     generateKey,
+    openFileLinkSecret,
+    prepareFileLink,
     stringToB64,
-} from "ente-core-wasm";
+} from "ente-locker-wasm";
 import { z } from "zod";
+import { ensureAuthenticatedSession } from "./authenticated-session";
 import {
     clearLockerCache,
     findCollectionByType,
@@ -74,8 +70,6 @@ export {
     syncLockerState,
 };
 
-const utf8Decoder = new TextDecoder();
-
 const RemoteFileShareLink = z.object({
     linkID: z.union([z.string(), z.number().transform(String)]),
     url: z.string(),
@@ -114,66 +108,6 @@ export interface LockerFileShareLinkSummary {
     enableDownload: boolean;
     passwordEnabled: boolean;
 }
-
-const decodeUTF8B64 = (b64: string) => utf8Decoder.decode(b64ToBytes(b64));
-
-const generateBase62Secret = (length: number) => {
-    const charset =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    const charsetLength = charset.length;
-    const maxUnbiasedValue = 256 - (256 % charsetLength);
-    let secret = "";
-
-    while (secret.length < length) {
-        const randomValues = crypto.getRandomValues(
-            new Uint8Array(length - secret.length),
-        );
-        for (const value of randomValues) {
-            if (value >= maxUnbiasedValue) continue;
-            secret += charset[value % charsetLength]!;
-        }
-    }
-
-    return secret;
-};
-
-const prepareFileLinkSecretPayload = async (fileKey: string) => {
-    const secret = generateBase62Secret(12);
-    const secretB64 = stringToB64(secret);
-    const derivedKey = await deriveInteractiveKey(secret);
-    const encryptedFileKey = await encryptBox(fileKey, derivedKey.key);
-    const keyPair = await ensureUserKeyPair();
-    const encryptedShareKey = await boxSeal(
-        stringToB64(secretB64),
-        keyPair.publicKey,
-    );
-
-    return {
-        secret,
-        metadata: {
-            encryptedFileKey: encryptedFileKey.encryptedData,
-            encryptedFileKeyNonce: encryptedFileKey.nonce,
-            kdfNonce: derivedKey.salt,
-            kdfMemLimit: derivedKey.memLimit,
-            kdfOpsLimit: derivedKey.opsLimit,
-            encryptedShareKey,
-        },
-    };
-};
-
-const resolveFileLinkSecret = async (
-    link: z.infer<typeof RemoteFileShareLink>,
-    generatedSecret: string,
-) => {
-    if (!link.encryptedShareKey) {
-        return generatedSecret;
-    }
-
-    const decryptedSecretB64 = decodeUTF8B64(
-        await boxSealOpen(link.encryptedShareKey, await ensureUserKeyPair()),
-    );
-    return decodeUTF8B64(decryptedSecretB64);
-};
 
 const infoItemTitle = (
     infoType: LockerItemType,
@@ -217,15 +151,15 @@ export const fetchLockerFileShareLinks = (): Promise<
 
 export const getOrCreateLockerFileShareLink = async (
     fileID: number,
-    masterKey: string,
 ): Promise<LockerFileShareLink> => {
     const fileRecord = getEncryptedFileRecord(fileID);
     if (!fileRecord) {
         throw new Error(`File ${fileID} not found in cache`);
     }
 
-    const fileKey = await decryptFileKeyForRecord(fileRecord, masterKey);
-    const payload = await prepareFileLinkSecretPayload(fileKey);
+    const fileKey = await decryptFileKeyForRecord(fileRecord);
+    const session = await ensureAuthenticatedSession();
+    const payload = await prepareFileLink(session, fileKey);
 
     const res = await fetch(await apiURL("/files/share-url"), {
         method: "POST",
@@ -238,7 +172,9 @@ export const getOrCreateLockerFileShareLink = async (
     ensureOk(res);
 
     const link = RemoteFileShareLink.parse(await res.json());
-    const secret = await resolveFileLinkSecret(link, payload.secret);
+    const secret = link.encryptedShareKey
+        ? await openFileLinkSecret(session, link.encryptedShareKey)
+        : payload.secret;
 
     return {
         linkID: link.linkID,
@@ -297,10 +233,7 @@ export const createInfoItem = async (
     if (!collectionRecord)
         throw new Error(`Collection ${collectionID} not in cache`);
 
-    const collectionKey = await decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await decryptCollectionKey(collectionRecord);
 
     const fileKey = await generateKey();
 
@@ -359,7 +292,6 @@ export const createInfoItem = async (
             created.id,
             fileKey,
             additionalCollectionIDs,
-            masterKey,
         );
     }
 };
@@ -368,7 +300,6 @@ export const updateInfoItem = async (
     fileID: number,
     infoType: LockerItemType,
     infoData: Record<string, unknown>,
-    masterKey: string,
 ): Promise<void> => {
     const fileRecord = getEncryptedFileRecord(fileID);
     if (!fileRecord) throw new Error(`File ${fileID} not in cache`);
@@ -377,10 +308,7 @@ export const updateInfoItem = async (
     if (!collectionRecord)
         throw new Error(`Collection ${fileRecord.collectionID} not in cache`);
 
-    const collectionKey = await decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     const fileKey = await decryptBox(
         {
             encryptedData: fileRecord.encryptedKey,
@@ -444,7 +372,6 @@ export const updateInfoItem = async (
 export const updateFileItem = async (
     fileID: number,
     title: string,
-    masterKey: string,
 ): Promise<void> => {
     const fileRecord = getEncryptedFileRecord(fileID);
     if (!fileRecord) throw new Error(`File ${fileID} not in cache`);
@@ -453,10 +380,7 @@ export const updateFileItem = async (
     if (!collectionRecord)
         throw new Error(`Collection ${fileRecord.collectionID} not in cache`);
 
-    const collectionKey = await decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     const fileKey = await decryptBox(
         {
             encryptedData: fileRecord.encryptedKey,
@@ -573,7 +497,6 @@ const addFileToCollections = async (
     fileID: number,
     fileKey: string,
     targetCollectionIDs: number[],
-    masterKey: string,
 ): Promise<void> => {
     for (const targetCollectionID of targetCollectionIDs) {
         const collectionRecord = getCollectionRecord(targetCollectionID);
@@ -581,10 +504,7 @@ const addFileToCollections = async (
             throw new Error(`Collection ${targetCollectionID} not in cache`);
         }
 
-        const collectionKey = await decryptCollectionKey(
-            collectionRecord,
-            masterKey,
-        );
+        const collectionKey = await decryptCollectionKey(collectionRecord);
         const encryptedFileKey = await encryptBox(fileKey, collectionKey);
 
         const res = await fetch(await apiURL("/collections/add-files"), {
@@ -624,7 +544,6 @@ const batchValues = <T>(
 const decryptFileKeyForCollection = async (
     fileID: number,
     collectionID: number,
-    masterKey: string,
 ): Promise<string> => {
     const fileRecord = getEncryptedFileRecord(fileID, collectionID);
     if (!fileRecord) {
@@ -638,10 +557,7 @@ const decryptFileKeyForCollection = async (
         throw new Error(`Collection ${collectionID} not in cache`);
     }
 
-    const collectionKey = await decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     return await decryptBox(
         {
             encryptedData: fileRecord.encryptedKey,
@@ -655,20 +571,14 @@ const buildEncryptedFileMoveItem = async (
     fileID: number,
     fromCollectionID: number,
     toCollectionID: number,
-    masterKey: string,
 ): Promise<EncryptedCollectionFileItem> => {
-    const fileKey = await decryptFileKeyForCollection(
-        fileID,
-        fromCollectionID,
-        masterKey,
-    );
+    const fileKey = await decryptFileKeyForCollection(fileID, fromCollectionID);
     const targetCollectionRecord = getCollectionRecord(toCollectionID);
     if (!targetCollectionRecord) {
         throw new Error(`Collection ${toCollectionID} not in cache`);
     }
     const targetCollectionKey = await decryptCollectionKey(
         targetCollectionRecord,
-        masterKey,
     );
     const encryptedFileKey = await encryptBox(fileKey, targetCollectionKey);
 
@@ -740,16 +650,12 @@ const createCollectionMutationDeps = () => ({
 export const restoreFromTrash = async (
     items: Pick<LockerItem, "id" | "collectionID">[],
     targetCollectionID: number,
-    masterKey: string,
 ): Promise<void> => {
     const collectionRecord = getCollectionRecord(targetCollectionID);
     if (!collectionRecord)
         throw new Error(`Collection ${targetCollectionID} not in cache`);
 
-    const collectionKey = await decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await decryptCollectionKey(collectionRecord);
 
     const buildRestorePayload = async (
         candidateItems: Pick<LockerItem, "id" | "collectionID">[],
@@ -779,10 +685,8 @@ export const restoreFromTrash = async (
                 continue;
             }
 
-            const origCollectionKey = await decryptCollectionKey(
-                origCollectionRecord,
-                masterKey,
-            );
+            const origCollectionKey =
+                await decryptCollectionKey(origCollectionRecord);
             const fileKey = await decryptBox(
                 {
                     encryptedData: fileRecord.encryptedKey,
@@ -804,7 +708,7 @@ export const restoreFromTrash = async (
 
     let { files, skippedFileIDs } = await buildRestorePayload(items);
     if (files.length === 0 && skippedFileIDs.length > 0) {
-        await fetchLockerTrash(masterKey);
+        await fetchLockerTrash();
         ({ files, skippedFileIDs } = await buildRestorePayload(items));
     }
 
@@ -844,8 +748,8 @@ const ensureUncategorizedCollection = async (masterKey: string) => {
     return ensureUncategorizedCollectionWithDeps(masterKey, {
         findCollectionByType: (type) =>
             findCollectionByType(type, currentUserID),
-        refetchCollections: async (masterKey) => {
-            await fetchLockerData(masterKey);
+        refetchCollections: async () => {
+            await fetchLockerData();
         },
     });
 };
@@ -855,8 +759,8 @@ const ensureFavoritesCollection = async (masterKey: string) => {
     return ensureFavoritesCollectionWithDeps(masterKey, {
         findCollectionByType: (type) =>
             findCollectionByType(type, currentUserID),
-        refetchCollections: async (resolvedMasterKey) => {
-            await fetchLockerData(resolvedMasterKey);
+        refetchCollections: async () => {
+            await fetchLockerData();
         },
     });
 };
@@ -864,9 +768,8 @@ const ensureFavoritesCollection = async (masterKey: string) => {
 export const renameCollection = async (
     collectionID: number,
     newName: string,
-    masterKey: string,
 ): Promise<void> => {
-    await renameCollectionWithDeps(collectionID, newName, masterKey, {
+    await renameCollectionWithDeps(collectionID, newName, {
         getCollectionRecord,
         decryptCollectionKey,
     });
@@ -904,9 +807,8 @@ export const fetchCollectionSharees = async (
 export const shareCollection = async (
     collectionID: number,
     email: string,
-    masterKey: string,
 ): Promise<LockerCollectionParticipant[]> => {
-    return shareCollectionWithDeps(collectionID, email, masterKey, {
+    return shareCollectionWithDeps(collectionID, email, {
         getCollectionRecord,
         decryptCollectionKey,
         updateCollectionShareesInCache,
@@ -993,7 +895,6 @@ export const uploadLockerFile = async (
     return uploadLockerFileWithDeps(
         file,
         targetCollectionIDs,
-        masterKey,
         { getCollectionRecord, decryptCollectionKey, addFileToCollections },
         onProgress,
     );

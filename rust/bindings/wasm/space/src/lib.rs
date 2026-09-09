@@ -1,3 +1,3 @@
-use ente_wasm_log as _;
+use ente_wasm_lib as _;
 
 mod space;

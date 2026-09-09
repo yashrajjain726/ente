@@ -424,9 +424,7 @@
   },
   "developerSettingsWarning": "Biztos vagy benne, hogy módosítani szeretnéd a fejlesztői beállításokat?",
   "deviceInfo": "Eszköz információ",
-  "deviceLockExplanation": "Kapcsold ki az eszköz képernyőzárolását, amikor az Ente az előtérben van, és mentés folyamatban van. Ez általában nem szükséges, de segíthet abban, hogy a nagy feltöltések és a nagy könyvtárak kezdeti importjai gyorsabban teljesítsenek.",
   "digits": "Számjegyek",
-  "disableAutoLock": "Automatikus zár letiltása",
   "disableDownloadWarningBody": "A nézők továbbra is készíthetnek képernyőképeket, vagy menthetnek másolatot a fotóidról külső eszközök segítségével",
   "disableDownloadWarningTitle": "Kérjük, vedd figyelembe",
   "disableLinkMessage": "Ez eltávolítja a(z) \"{albumName}\" eléréséhez szükséges nyilvános linket.",
@@ -519,7 +517,6 @@
     }
   },
   "earned": "megszerezve",
-  "earnFreeStorage": "Szerezz ingyen tárhelyet",
   "earnMoreSpace": "Szerezz több tárhelyet!",
   "edit": "Szerkesztés",
   "editCodeAuthMessage": "Hitelesítés a kód szerkesztéséhez",
@@ -1225,14 +1222,6 @@
   "referrals": "Ajánlások",
   "referralsAreCurrentlyPaused": "Az ajánlások jelenleg szünetelnek",
   "referralStats": "Ajánlási statisztikák",
-  "referralStep1": "1. Szabd testre és oszd meg a kódod.",
-  "referralStep2": "2. Regisztrálnak az Entére a kódoddal.",
-  "referralStep3": "3. {storageInGB} GB ingyen nekik + {storageInGB} GB ingyen neked, amikor előfizetnek.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB nekik + {storageAmountInGB} GB neked, amikor előfizetnek.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -1307,8 +1296,6 @@
     "description": "Label for save button"
   },
   "saveCode": "Kód mentése",
-  "saveDocumentDescription": "Toltse fel fontos dokumentumait.",
-  "saveDocumentTitle": "Dokumentum",
   "saveKey": "Kulcs mentése",
   "@saveKey": {
     "description": "Save key button label"
@@ -1446,7 +1433,6 @@
   "setupFirstAccount": "Állítsd be az első fiókodat",
   "share": "Megosztás",
   "shareALink": "Hivatkozás megosztása",
-  "shareCodeEarnStorage": "Oszd meg a kódod, és szerezz tárhelyet.",
   "shareCodes": "Kódok megosztása",
   "shareCodesDuration": "Válaszd ki a kódok megosztásának időtartamát.",
   "sharedAlbumSectionDescription": "Hozzon létre megosztott és együttműködő albumokat más Ente-felhasználókkal, beleértve az ingyenes csomagokat használó felhasználókat is.",
@@ -1635,7 +1621,6 @@
   "@unarchive": {
     "description": "Action of 'Unarchiving' an element"
   },
-  "unavailableReferralCode": "Sajnáljuk, ez a kód nem érhető el.",
   "uncategorized": "Kategorizálatlan",
   "uncategorizedItemsWillShowUpHere": "A nem kategorizált elemek itt fognak megjelenni",
   "unhide": "Felfedés",

@@ -19,11 +19,7 @@ export const lockerLogout = async () => {
         ignoreError("Authenticated session", error);
     }
 
-    try {
-        clearLockerCache();
-    } catch (error) {
-        ignoreError("Locker in-memory cache", error);
-    }
+    await accountLogout();
 
     try {
         if (userID !== undefined) {
@@ -33,5 +29,9 @@ export const lockerLogout = async () => {
         ignoreError("Locker DB", error);
     }
 
-    await accountLogout();
+    try {
+        clearLockerCache();
+    } catch (error) {
+        ignoreError("Locker in-memory cache", error);
+    }
 };

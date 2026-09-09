@@ -2,7 +2,7 @@ use crate::{
     error::{MlError, MlResult},
     models::Model,
     onnx,
-    postprocess::{NmsDetection, greedy_non_max_suppression},
+    postprocess::{NmsDetection, YoloOutputRow, greedy_non_max_suppression},
     preprocess::{YOLO_INPUT_SIZE, YoloInput},
     runtime::MlRuntimeView,
     types::FaceDetection,
@@ -60,47 +60,19 @@ fn postprocess_face_tensor<T: onnx::FloatTensorData>(
     let mut detections = Vec::new();
     for i in 0..detection_rows {
         let start = i * row_len;
-        let score = output_data.value(start + 4);
+        let row = YoloOutputRow::new(output_data, start);
+        let score = row.confidence();
         if score < MIN_SCORE_THRESHOLD {
             continue;
         }
 
-        let x = output_data.value(start);
-        let y = output_data.value(start + 1);
-        let width = output_data.value(start + 2);
-        let height = output_data.value(start + 3);
-        let x_min_abs = x - width / 2.0;
-        let y_min_abs = y - height / 2.0;
-        let x_max_abs = x + width / 2.0;
-        let y_max_abs = y + height / 2.0;
-
-        let mut box_xyxy = [
-            x_min_abs / YOLO_INPUT_SIZE as f32,
-            y_min_abs / YOLO_INPUT_SIZE as f32,
-            x_max_abs / YOLO_INPUT_SIZE as f32,
-            y_max_abs / YOLO_INPUT_SIZE as f32,
-        ];
+        let mut box_xyxy = row.box_xyxy();
         let mut keypoints = [
-            [
-                output_data.value(start + 5) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 6) / YOLO_INPUT_SIZE as f32,
-            ],
-            [
-                output_data.value(start + 7) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 8) / YOLO_INPUT_SIZE as f32,
-            ],
-            [
-                output_data.value(start + 9) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 10) / YOLO_INPUT_SIZE as f32,
-            ],
-            [
-                output_data.value(start + 11) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 12) / YOLO_INPUT_SIZE as f32,
-            ],
-            [
-                output_data.value(start + 13) / YOLO_INPUT_SIZE as f32,
-                output_data.value(start + 14) / YOLO_INPUT_SIZE as f32,
-            ],
+            row.keypoint(5),
+            row.keypoint(7),
+            row.keypoint(9),
+            row.keypoint(11),
+            row.keypoint(13),
         ];
 
         input.correct_box_and_keypoints(&mut box_xyxy, &mut keypoints);

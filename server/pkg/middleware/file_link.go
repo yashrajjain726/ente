@@ -60,12 +60,12 @@ func (m *FileLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context) stri
 				return
 			}
 			if fileLinkRow.IsDisabled {
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "disabled token"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkDisabled, "error": "disabled token"})
 				return
 			}
 			if fileLinkRow.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
 				fileLinkRow.ValidTill < time.Microseconds() {
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 				return
 			}
 			if fileLinkRow.PassHash != nil && *fileLinkRow.PassHash != "" {
@@ -100,7 +100,7 @@ func (m *FileLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context) stri
 
 		if fileLinkRow.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
 			fileLinkRow.ValidTill < time.Microseconds() {
-			c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+			c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 			return
 		}
 

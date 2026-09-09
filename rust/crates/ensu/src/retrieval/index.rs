@@ -162,7 +162,15 @@ impl RetrievalIndex {
         validate_offsets(&offsets, metadata_len)?;
 
         // Native callers prevent file swaps or deletion while mapped.
+        #[expect(
+            unsafe_code,
+            reason = "File-backed memory mapping requires an unsafe call"
+        )]
         let vectors = unsafe { MmapOptions::new().map(&vector_file)? };
+        #[expect(
+            unsafe_code,
+            reason = "File-backed memory mapping requires an unsafe call"
+        )]
         let metadata = unsafe { MmapOptions::new().map(&metadata_file)? };
 
         Ok(Self {

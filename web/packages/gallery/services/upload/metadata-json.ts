@@ -2,14 +2,21 @@ import { ensureElectron } from "ente-base/electron";
 import { nameAndExtension } from "ente-base/file-name";
 import log from "ente-base/log";
 import type { Location } from "ente-base/types";
+import {
+    extractRawExif,
+    parseExif,
+    type RawExifTags,
+} from "ente-gallery/services/exif";
 import type {
     UploadItem,
     UploadPathPrefix,
 } from "ente-gallery/services/upload";
 import { readStream } from "ente-gallery/utils/native-stream";
+import type { ParsedMetadataDate } from "ente-media/file-metadata";
 
 export interface ParsedMetadataJSON {
     creationTime?: number;
+    creationDate?: ParsedMetadataDate;
     modificationTime?: number;
     location?: Location;
     description?: string;
@@ -26,6 +33,17 @@ export const metadataJSONMapKeyForJSON = (
         pathPrefix,
         collectionID,
         jsonFileName.slice(0, -1 * ".json".length),
+    );
+
+export const metadataJSONMapKeyForXMP = (
+    pathPrefix: UploadPathPrefix | undefined,
+    collectionID: number,
+    xmpFileName: string,
+) =>
+    makeKey3(
+        pathPrefix,
+        collectionID,
+        `${nameAndExtension(xmpFileName)[0]}.xmp`,
     );
 
 const makeKey3 = (
@@ -78,7 +96,7 @@ export const matchJSONMetadata = (
     takeoutMetadata = parsedMetadataJSONMap.get(key);
     if (takeoutMetadata) return takeoutMetadata;
 
-    // Newer exports append this suffix before clipping.
+    // Newer exports append this suffix, sometimes without clipping.
     const supplSuffix = ".supplemental-metadata";
     baseFileName = `${name}${extension}${supplSuffix}`;
     key = makeKey(
@@ -93,9 +111,64 @@ export const matchJSONMetadata = (
         const originalBaseFileName = `${originalName}${extension}${supplSuffix}`;
         key = makeKey(originalBaseFileName.slice(0, maxGoogleFileNameLength));
         takeoutMetadata = parsedMetadataJSONMap.get(key);
+        if (takeoutMetadata) return takeoutMetadata;
     }
 
-    return takeoutMetadata;
+    // Prefer existing clipped matches before trying untruncated sidecars.
+    key = makeKey(`${baseFileName}${numberedSuffix}`);
+    takeoutMetadata = parsedMetadataJSONMap.get(key);
+    if (takeoutMetadata) return takeoutMetadata;
+
+    if (numberedSuffix) {
+        key = makeKey(`${originalName}${extension}${supplSuffix}`);
+        takeoutMetadata = parsedMetadataJSONMap.get(key);
+        if (takeoutMetadata) return takeoutMetadata;
+    }
+
+    // XMP sidecars use a source-specific suffix.
+    return parsedMetadataJSONMap.get(makeKey(`${originalName}.xmp`));
+};
+
+export const parseXMPSidecarTags = (
+    tags: RawExifTags,
+): ParsedMetadataJSON | undefined => {
+    const { creationDate, description } = parseExif(tags);
+    const parseCoordinate = (
+        value: string | undefined,
+        reference: string | undefined,
+    ) => {
+        const match = /^(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?([NSEW])?$/.exec(
+            value ?? "",
+        );
+        if (!match) return undefined;
+
+        const direction = match[3] ?? reference?.trim().toUpperCase();
+        if (!direction || !/^[NSEW]$/.test(direction)) return undefined;
+
+        const coordinate = Number(match[1]) + Number(match[2] ?? 0) / 60;
+        return direction == "S" || direction == "W" ? -coordinate : coordinate;
+    };
+    const latitude = parseCoordinate(
+        tags.xmp?.GPSLatitude?.description,
+        tags.xmp?.GPSLatitudeRef?.description,
+    );
+    const longitude = parseCoordinate(
+        tags.xmp?.GPSLongitude?.description,
+        tags.xmp?.GPSLongitudeRef?.description,
+    );
+    const location =
+        latitude != undefined && longitude != undefined
+            ? { latitude, longitude }
+            : undefined;
+
+    if (!creationDate && !location && !description) return undefined;
+
+    return {
+        creationDate,
+        creationTime: creationDate?.timestamp,
+        location,
+        description,
+    };
 };
 
 export const tryParseTakeoutMetadataJSON = async (
@@ -107,6 +180,28 @@ export const tryParseTakeoutMetadataJSON = async (
         log.error("Failed to parse takeout metadata JSON", e);
         return undefined;
     }
+};
+
+export const tryParseXMPSidecar = async (
+    uploadItem: UploadItem,
+): Promise<ParsedMetadataJSON | undefined> => {
+    try {
+        const text = normalizeXMPSidecarText(await uploadItemText(uploadItem));
+        return parseXMPSidecarTags(await extractRawExif(new Blob([text])));
+    } catch (e) {
+        log.error("Failed to parse XMP sidecar", e);
+        return undefined;
+    }
+};
+
+const normalizeXMPSidecarText = (text: string) => {
+    const source = text
+        .replace(/^\uFEFF/, "")
+        .trimStart()
+        .replace(/^<\?xml\s+[^>]*\?>\s*/i, "");
+    return source.startsWith("<?xpacket begin")
+        ? source
+        : `<?xpacket begin=""?>\n${source}`;
 };
 
 export const tryParseTakeoutAlbumNameMetadataJSON = async (

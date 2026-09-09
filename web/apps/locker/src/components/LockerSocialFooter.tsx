@@ -8,6 +8,7 @@ import log from "ente-base/log";
 import { getRemoteFlag } from "ente-new/photos/services/remote-store";
 import { t } from "i18next";
 import React from "react";
+import { iconColorSx, miniSx, textLightSx } from "./locker-sidebar-styles";
 
 const openExternal = (url: string) => window.open(url, "_blank", "noopener");
 
@@ -16,38 +17,20 @@ const socialLinks = [
         icon: DiscordBrandIcon,
         label: "Discord",
         url: "https://ente.com/discord",
-        buttonSize: 48,
     },
     {
         icon: YouTubeIcon,
         label: "YouTube",
         url: "https://www.youtube.com/@entestudio",
-        buttonSize: 36,
     },
-    {
-        icon: GitHubIcon,
-        label: "GitHub",
-        url: "https://github.com/ente",
-        buttonSize: 36,
-    },
-    {
-        icon: XIcon,
-        label: "X",
-        url: "https://twitter.com/enteio",
-        buttonSize: 36,
-    },
+    { icon: GitHubIcon, label: "GitHub", url: "https://github.com/ente" },
+    { icon: XIcon, label: "X", url: "https://twitter.com/enteio" },
     {
         icon: MastodonBrandIcon,
         label: "Mastodon",
         url: "https://fosstodon.org/@ente",
-        buttonSize: 48,
     },
-    {
-        icon: RedditIcon,
-        label: "Reddit",
-        url: "https://reddit.com/r/enteio",
-        buttonSize: 36,
-    },
+    { icon: RedditIcon, label: "Reddit", url: "https://reddit.com/r/enteio" },
 ] as const;
 
 const buildLabel = () => {
@@ -70,7 +53,7 @@ export const LockerSocialFooter: React.FC = () => {
     const build = isInternalUser ? buildLabel() : undefined;
 
     return (
-        <Stack sx={{ alignItems: "center", gap: 1, px: 1, pb: 1 }}>
+        <Stack sx={{ alignItems: "center" }}>
             <Stack
                 direction="row"
                 sx={{
@@ -80,34 +63,35 @@ export const LockerSocialFooter: React.FC = () => {
                     alignItems: "center",
                 }}
             >
-                {socialLinks.map(({ icon: Icon, label, url, buttonSize }) => (
+                {socialLinks.map(({ icon: Icon, label, url }) => (
                     <IconButton
                         key={label}
                         color="secondary"
                         aria-label={label}
                         onClick={() => openExternal(url)}
-                        sx={{
-                            width: buttonSize,
-                            height: buttonSize,
-                            color: "text.muted",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            p: 0,
-                        }}
+                        sx={[
+                            iconColorSx,
+                            {
+                                width: 36,
+                                height: 36,
+                                borderRadius: "12px",
+                                p: 0,
+                                "& svg": { width: 18, height: 18 },
+                            },
+                        ]}
                     >
-                        {label === "YouTube" ? (
-                            <Icon sx={{ fontSize: 24 }} />
-                        ) : label === "Reddit" ? (
-                            <Icon sx={{ fontSize: 22 }} />
-                        ) : (
-                            <Icon fontSize="small" />
-                        )}
+                        <Icon />
                     </IconButton>
                 ))}
             </Stack>
             {build && (
-                <Typography variant="mini" sx={{ color: "text.muted" }}>
+                <Typography
+                    sx={[
+                        miniSx,
+                        textLightSx,
+                        { textAlign: "center", py: "20px" },
+                    ]}
+                >
                     {build}
                 </Typography>
             )}
@@ -115,12 +99,11 @@ export const LockerSocialFooter: React.FC = () => {
     );
 };
 
-function DiscordBrandIcon(props: { fontSize?: "small" | "medium" }) {
-    const size = props.fontSize === "small" ? 20 : 20;
+function DiscordBrandIcon() {
     return (
         <svg
-            width={size}
-            height={size}
+            width={18}
+            height={18}
             viewBox="0 0 24 24"
             fill="currentColor"
             aria-hidden="true"
@@ -130,12 +113,11 @@ function DiscordBrandIcon(props: { fontSize?: "small" | "medium" }) {
     );
 }
 
-function MastodonBrandIcon(props: { fontSize?: "small" | "medium" }) {
-    const size = props.fontSize === "small" ? 20 : 20;
+function MastodonBrandIcon() {
     return (
         <svg
-            width={size}
-            height={size}
+            width={18}
+            height={18}
             viewBox="0 0 24 24"
             fill="currentColor"
             aria-hidden="true"

@@ -27,22 +27,25 @@ pub(crate) fn llm_asset(preset: &ModelPreset) -> Result<Asset, InvalidPreset> {
     let mut files = vec![AssetFile {
         name: LLM_MODEL_FILE.to_string(),
         url: preset.url.clone(),
+        size: preset.size,
         sha256: preset.sha256.clone(),
     }];
     match (
         trimmed(preset.mmproj_url.as_deref()),
+        preset.mmproj_size,
         trimmed(preset.mmproj_sha256.as_deref()),
     ) {
-        (Some(url), Some(sha256)) => files.push(AssetFile {
+        (Some(url), Some(size), Some(sha256)) => files.push(AssetFile {
             name: LLM_MMPROJ_FILE.to_string(),
             url: url.to_string(),
+            size,
             sha256: sha256.to_string(),
         }),
-        (None, None) => {}
+        (None, None, None) => {}
         _ => {
             return Err(invalid_preset(
                 preset,
-                "mmproj URL and checksum must be paired",
+                "mmproj URL, size, and checksum must be paired",
             ));
         }
     }
@@ -68,8 +71,13 @@ pub fn desktop_llm_asset(model_id: &str) -> Result<Asset, InvalidPreset> {
 
 pub fn transcription_model_asset() -> Asset {
     let preset = config::defaults().transcription_model;
-    Asset::tar_gz(model_key(&preset.id), preset.url, preset.sha256)
-        .expect("transcription asset config")
+    Asset::tar_gz(
+        model_key(&preset.id),
+        preset.url,
+        preset.size,
+        preset.sha256,
+    )
+    .expect("transcription asset config")
 }
 
 pub fn voice_activity_model_asset() -> Asset {
@@ -79,6 +87,7 @@ pub fn voice_activity_model_asset() -> Asset {
         vec![AssetFile {
             name: VOICE_ACTIVITY_MODEL_FILE.to_string(),
             url: preset.url,
+            size: preset.size,
             sha256: preset.sha256,
         }],
     )
@@ -92,6 +101,7 @@ pub fn knowledge_embedding_model_asset() -> Asset {
         vec![AssetFile {
             name: LLM_MODEL_FILE.to_string(),
             url: embedding.model_url,
+            size: embedding.model_size,
             sha256: embedding.model_sha256,
         }],
     )
@@ -188,8 +198,10 @@ mod tests {
             id: "qwen-2b-q8".to_string(),
             title: "Qwen".to_string(),
             url: "https://example.org/main.gguf".to_string(),
+            size: 1,
             sha256: "0".repeat(64),
             mmproj_url: mmproj_url.map(Into::into),
+            mmproj_size: mmproj_url.map(|_| 1),
             mmproj_sha256: mmproj_sha256.map(Into::into),
         }
     }

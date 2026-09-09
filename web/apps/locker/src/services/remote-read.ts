@@ -3,24 +3,21 @@ import type {
     LockerCollectionParticipant,
     LockerItem,
 } from "@/types";
-import {
-    ensureLocalUser,
-    ensureUserKeyPair,
-} from "ente-accounts/services/user";
 import { fetchFile } from "ente-base/file-download";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL, customAPIOrigin } from "ente-base/origins";
 import {
-    boxSealOpen,
     createStreamDecryptor,
     decryptBox,
     decryptBoxBytes,
     decryptMetadataJSON,
     encryptBox,
+    openCollectionKey,
     stringToB64,
-} from "ente-core-wasm";
+} from "ente-locker-wasm";
 import { z } from "zod";
+import { ensureAuthenticatedSession } from "./authenticated-session";
 import { fromInfoTypeWireValue } from "./info-type-wire";
 import {
     type StoredTrashFileRecord,
@@ -348,7 +345,6 @@ const encryptCollectionPayload = async (
 
 const toEncryptedCollectionRecord = (
     collection: RemoteCollection,
-    masterKey: string,
 ): Promise<EncryptedCollectionRecord> => {
     const record: EncryptedCollectionRecord = {
         id: collection.id,
@@ -363,7 +359,7 @@ const toEncryptedCollectionRecord = (
     };
 
     const buildEncryptedRecord = async () => {
-        const collectionKey = await decryptCollectionKey(record, masterKey);
+        const collectionKey = await decryptCollectionKey(record);
         const payload: LockerCollectionPayload = {
             owner: {
                 ...toLockerCollectionParticipant(collection.owner),
@@ -482,7 +478,6 @@ const fetchEncryptedFilesForCollection = async (
 };
 
 const decryptStoredTrash = async (
-    masterKey: string,
     cache: LockerEncryptedCache,
     trashFiles: StoredTrashFileRecord[],
     lastUpdatedAt: number,
@@ -498,10 +493,7 @@ const decryptStoredTrash = async (
         }
 
         try {
-            const collectionKey = await decryptCollectionKey(
-                collectionRecord,
-                masterKey,
-            );
+            const collectionKey = await decryptCollectionKey(collectionRecord);
             const item = await decryptFileToLockerItem(
                 record,
                 collectionKey,
@@ -533,25 +525,16 @@ const buildStoredTrashFileRecord = (
 
 export const decryptCollectionKey = async (
     record: EncryptedCollectionRecord,
-    masterKey: string,
-): Promise<string> => {
-    const currentUserID = ensureLocalUser().id;
-    if (record.ownerID === currentUserID) {
-        return decryptBox(
-            {
-                encryptedData: record.encryptedKey,
-                nonce: record.keyDecryptionNonce!,
-            },
-            masterKey,
-        );
-    }
-
-    return boxSealOpen(record.encryptedKey, await ensureUserKeyPair());
-};
+): Promise<string> =>
+    openCollectionKey(
+        await ensureAuthenticatedSession(),
+        record.ownerID,
+        record.encryptedKey,
+        record.keyDecryptionNonce,
+    );
 
 const decryptFileKeyForRecordFromCollections = async (
     record: EncryptedFileRecord,
-    masterKey: string,
     collections: Map<number, EncryptedCollectionRecord>,
 ): Promise<string> => {
     const collectionRecord = collections.get(record.collectionID);
@@ -559,10 +542,7 @@ const decryptFileKeyForRecordFromCollections = async (
         throw new Error(`Collection ${record.collectionID} not found in cache`);
     }
 
-    const collectionKey = await decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     return decryptBox(
         {
             encryptedData: record.encryptedKey,
@@ -574,12 +554,10 @@ const decryptFileKeyForRecordFromCollections = async (
 
 export const decryptFileKeyForRecord = async (
     record: EncryptedFileRecord,
-    masterKey: string,
 ): Promise<string> => {
     const cacheSnapshot = getLockerCacheSnapshot();
     return decryptFileKeyForRecordFromCollections(
         record,
-        masterKey,
         cacheSnapshot.collections,
     );
 };
@@ -673,7 +651,6 @@ const decryptFileToLockerItem = async (
 };
 
 const decryptAllData = async (
-    masterKey: string,
     cache: LockerEncryptedCache,
 ): Promise<DecryptAllDataResult> => {
     const activeCollectionRecords = [...cache.collections.values()].filter(
@@ -697,10 +674,7 @@ const decryptAllData = async (
 
     for (const collectionRecord of activeCollectionRecords) {
         try {
-            const collectionKey = await decryptCollectionKey(
-                collectionRecord,
-                masterKey,
-            );
+            const collectionKey = await decryptCollectionKey(collectionRecord);
             const collectionDetails = await decryptCollectionDetails(
                 collectionRecord,
                 collectionKey,
@@ -784,7 +758,6 @@ const withoutFailedCollections = (
 };
 
 const hydrateLockerState = async (
-    masterKey: string,
     collections: Map<number, EncryptedCollectionRecord>,
     files: EncryptedFileRecord[],
     trashFiles: StoredTrashFileRecord[],
@@ -792,7 +765,7 @@ const hydrateLockerState = async (
 ): Promise<LockerHydratedState> => {
     const activeCache = buildLockerCache(collections, files, []);
 
-    const decrypted = await decryptAllData(masterKey, activeCache);
+    const decrypted = await decryptAllData(activeCache);
     if (
         decrypted.totalCollectionCount > 0 &&
         decrypted.collections.length === 0
@@ -815,7 +788,6 @@ const hydrateLockerState = async (
     }
 
     const trash = await decryptStoredTrash(
-        masterKey,
         hydratedCache,
         trashFiles,
         trashLastUpdatedAt,
@@ -830,29 +802,25 @@ const hydrateLockerState = async (
     };
 };
 
-export const loadPersistedLockerState = async (
-    masterKey: string,
-): Promise<LockerPersistedState> => {
-    const snapshot = await loadLockerSnapshotFromDB();
-    const hydrated = await hydrateLockerState(
-        masterKey,
-        snapshot.collections,
-        snapshot.files,
-        snapshot.trashFiles,
-        snapshot.trashSinceTime,
-    );
+export const loadPersistedLockerState =
+    async (): Promise<LockerPersistedState> => {
+        const snapshot = await loadLockerSnapshotFromDB();
+        const hydrated = await hydrateLockerState(
+            snapshot.collections,
+            snapshot.files,
+            snapshot.trashFiles,
+            snapshot.trashSinceTime,
+        );
 
-    return {
-        ...hydrated,
-        collectionsSinceTime: snapshot.collectionsSinceTime,
-        trashSinceTime: snapshot.trashSinceTime,
-        hasPersistedState: snapshot.hasPersistedState,
+        return {
+            ...hydrated,
+            collectionsSinceTime: snapshot.collectionsSinceTime,
+            trashSinceTime: snapshot.trashSinceTime,
+            hasPersistedState: snapshot.hasPersistedState,
+        };
     };
-};
 
-export const syncLockerState = async (
-    masterKey: string,
-): Promise<LockerHydratedState> => {
+export const syncLockerState = async (): Promise<LockerHydratedState> => {
     const snapshot = await loadLockerSnapshotFromDB();
     const collectionChanges = await fetchEncryptedCollections(
         snapshot.collectionsSinceTime,
@@ -867,7 +835,7 @@ export const syncLockerState = async (
             latestCollectionsSinceTime,
             change.updationTime,
         );
-        const record = await toEncryptedCollectionRecord(change, masterKey);
+        const record = await toEncryptedCollectionRecord(change);
         changedCollections.push(record);
         if (record.isDeleted) {
             deletedCollectionIDs.push(record.id);
@@ -948,7 +916,6 @@ export const syncLockerState = async (
 
     const nextSnapshot = await loadLockerSnapshotFromDB();
     const hydrated = await hydrateLockerState(
-        masterKey,
         nextSnapshot.collections,
         nextSnapshot.files,
         nextSnapshot.trashFiles,
@@ -962,22 +929,17 @@ export const syncLockerState = async (
     };
 };
 
-export const fetchLockerData = async (
-    masterKey: string,
-): Promise<LockerCollection[]> =>
-    (await syncLockerState(masterKey)).collections;
+export const fetchLockerData = async (): Promise<LockerCollection[]> =>
+    (await syncLockerState()).collections;
 
-export const fetchLockerTrash = async (
-    masterKey: string,
-): Promise<LockerTrashData> => {
-    const state = await syncLockerState(masterKey);
+export const fetchLockerTrash = async (): Promise<LockerTrashData> => {
+    const state = await syncLockerState();
     return { items: state.trashItems, lastUpdatedAt: state.trashLastUpdatedAt };
 };
 
 export const downloadLockerFile = async (
     fileID: number,
     fileName: string,
-    masterKey: string,
     onProgress?: (progress: { loaded: number; total?: number }) => void,
 ): Promise<void> => {
     const fileRecord = getEncryptedFileRecord(fileID);
@@ -1005,10 +967,7 @@ export const downloadLockerFile = async (
 
     let fileKey: string;
     try {
-        const collectionKey = await decryptCollectionKey(
-            collectionRecord,
-            masterKey,
-        );
+        const collectionKey = await decryptCollectionKey(collectionRecord);
         fileKey = await decryptBox(
             {
                 encryptedData: fileRecord.encryptedKey,
@@ -1095,13 +1054,9 @@ export const downloadLockerFile = async (
                     }
 
                     while (data.length >= streamDecryptor.decryptionChunkSize) {
-                        const decryptedChunk =
-                            await streamDecryptor.decryptChunk(
-                                data.slice(
-                                    0,
-                                    streamDecryptor.decryptionChunkSize,
-                                ),
-                            );
+                        const decryptedChunk = streamDecryptor.decryptChunk(
+                            data.slice(0, streamDecryptor.decryptionChunkSize),
+                        );
                         controller.enqueue(decryptedChunk);
                         didEnqueue = true;
                         data = data.slice(streamDecryptor.decryptionChunkSize);
@@ -1110,7 +1065,7 @@ export const downloadLockerFile = async (
                     if (done) {
                         if (data.length > 0) {
                             const decryptedChunk =
-                                await streamDecryptor.decryptChunk(data);
+                                streamDecryptor.decryptChunk(data);
                             controller.enqueue(decryptedChunk);
                         }
                         if (!streamDecryptor.isFinalized()) {

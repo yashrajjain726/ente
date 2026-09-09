@@ -1,4 +1,7 @@
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "Golden generation uses only part of the shared ML helpers"
+)]
 #[path = "../tests/support/mod.rs"]
 mod support;
 

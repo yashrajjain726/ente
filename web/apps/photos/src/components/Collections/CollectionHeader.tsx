@@ -421,9 +421,6 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
     // MUI rejects fragments here, so return keyed arrays.
     switch (collectionSummaryType) {
         case "trash":
-            menuOptions = fileCount
-                ? [<EmptyTrashOption key="trash" onClick={confirmEmptyTrash} />]
-                : [];
             break;
 
         case "userFavorites":
@@ -718,6 +715,7 @@ const CollectionHeaderOptions: React.FC<CollectionHeaderProps> = ({
 };
 
 interface OptionProps {
+    disabled?: boolean;
     onClick: () => void;
 }
 
@@ -748,7 +746,10 @@ const QuickOptions: React.FC<QuickOptionsProps> = ({
 }) => (
     <Stack direction="row" sx={{ alignItems: "center", gap: "16px" }}>
         {showEmptyTrashQuickOption(collectionSummary) && (
-            <EmptyTrashQuickOption onClick={onEmptyTrashClick} />
+            <EmptyTrashQuickOption
+                disabled={hasActiveFileSelection}
+                onClick={onEmptyTrashClick}
+            />
         )}
         {showDownloadQuickOption(collectionSummary) &&
             collectionSummary.fileCount > 0 &&
@@ -785,11 +786,20 @@ const QuickOptions: React.FC<QuickOptionsProps> = ({
 const showEmptyTrashQuickOption = ({ type, fileCount }: CollectionSummary) =>
     type == "trash" && fileCount > 0;
 
-const EmptyTrashQuickOption: React.FC<OptionProps> = ({ onClick }) => (
+const EmptyTrashQuickOption: React.FC<OptionProps> = ({
+    disabled,
+    onClick,
+}) => (
     <Tooltip title={t("empty_trash")}>
-        <IconButton onClick={onClick}>
-            <HugeiconsIcon icon={Delete02Icon} size={22} strokeWidth={1.5} />
-        </IconButton>
+        <span>
+            <IconButton disabled={disabled} onClick={onClick}>
+                <HugeiconsIcon
+                    icon={Delete02Icon}
+                    size={22}
+                    strokeWidth={1.5}
+                />
+            </IconButton>
+        </span>
     </Tooltip>
 );
 
@@ -845,7 +855,6 @@ const shouldShowMapOption = ({ type, fileCount }: CollectionSummary) =>
 
 type DownloadQuickOptionProps = OptionProps & {
     collectionSummary: CollectionSummary;
-    disabled?: boolean;
 };
 
 const DownloadIcon: React.FC = () => (
@@ -999,18 +1008,6 @@ const CastQuickOption: React.FC<OptionProps> = ({ onClick }) => (
             </Box>
         </IconButton>
     </Tooltip>
-);
-
-const EmptyTrashOption: React.FC<OptionProps> = ({ onClick }) => (
-    <OverflowMenuOption
-        color="critical"
-        startIcon={
-            <HugeiconsIcon icon={Delete02Icon} size={20} strokeWidth={1.5} />
-        }
-        onClick={onClick}
-    >
-        {t("empty_trash")}
-    </OverflowMenuOption>
 );
 
 type DownloadOptionProps = OptionProps & {

@@ -1,18 +1,18 @@
-import {
-    lockerItemIcon,
-    lockerItemIconConfig,
-} from "@/components/locker-item-icons";
+import { lockerItemIcon } from "@/components/locker-item-icons";
 import { downloadLockerFile } from "@/services/remote";
 import type { GenericFileData, LockerItem } from "@/types";
 import { getItemTitle, hasDownloadableObject } from "@/types";
-import { CircleArrowDownLeftIcon } from "@hugeicons/core-free-icons";
+import {
+    ArrowReloadHorizontalIcon,
+    CircleArrowDownLeftIcon,
+    Delete02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RadioButtonUncheckedRoundedIcon from "@mui/icons-material/RadioButtonUncheckedRounded";
-import RestoreIcon from "@mui/icons-material/Restore";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import {
     Box,
@@ -28,13 +28,19 @@ import {
     OverflowMenu,
     OverflowMenuOption,
 } from "ente-base/components/OverflowMenu";
+import { formatTimeAgo } from "ente-base/date";
 import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useState } from "react";
+import {
+    lockerColors,
+    lockerColorSx,
+    lockerTextBodySx,
+    lockerTextMiniSx,
+} from "./locker-tokens";
 
 interface ItemCardProps {
     item: LockerItem;
-    masterKey?: string;
     onClick: () => void;
     isTrashView?: boolean;
     isIncomingShared?: boolean;
@@ -53,7 +59,6 @@ interface ItemCardProps {
 
 export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
     item,
-    masterKey,
     onClick,
     isTrashView,
     isIncomingShared,
@@ -78,23 +83,18 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
     const longPressTriggeredRef = React.useRef(false);
 
     const handleDownload = useCallback(async () => {
-        if (!masterKey || downloading || !hasDownloadableObject(item)) return;
+        if (downloading || !hasDownloadableObject(item)) return;
         setDownloading(true);
         setDownloadProgress(null);
         try {
             const fileName = getItemTitle(item);
-            await downloadLockerFile(
-                item.id,
-                fileName,
-                masterKey,
-                ({ loaded, total }) => {
-                    if (total && total > 0) {
-                        setDownloadProgress(
-                            Math.min(100, Math.round((loaded / total) * 100)),
-                        );
-                    }
-                },
-            );
+            await downloadLockerFile(item.id, fileName, ({ loaded, total }) => {
+                if (total && total > 0) {
+                    setDownloadProgress(
+                        Math.min(100, Math.round((loaded / total) * 100)),
+                    );
+                }
+            });
         } catch (e) {
             log.error(`Failed to download file ${item.id}`, e);
             setDownloadError(true);
@@ -102,7 +102,7 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
             setDownloading(false);
             setDownloadProgress(null);
         }
-    }, [item, masterKey, downloading]);
+    }, [item, downloading]);
 
     const title = getItemTitle(item);
     const downloadable = hasDownloadableObject(item);
@@ -175,12 +175,7 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                         }
                         return;
                     }
-                    if (
-                        !isTrashView &&
-                        item.type === "file" &&
-                        masterKey &&
-                        downloadable
-                    ) {
+                    if (!isTrashView && item.type === "file" && downloadable) {
                         void handleDownload();
                         return;
                     }
@@ -190,22 +185,19 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     display: "flex",
                     width: "100%",
                     textAlign: "left",
-                    borderRadius: "18px",
+                    borderRadius: "20px",
                     overflow: "hidden",
-                    px: 1.5,
-                    py: 1.25,
-                    gap: 1.25,
+                    p: 1.5,
+                    gap: 1.5,
                     alignItems: "center",
-                    backgroundColor: theme.vars.palette.fill.faint,
+                    ...lockerColorSx(theme, { backgroundColor: "fillLight" }),
                     transition: "background-color 0.15s",
                     opacity: selectionMode && !selectable ? 0.58 : 1,
                     "&:hover": {
-                        backgroundColor: theme.vars.palette.fill.faintHover,
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "fillDark",
+                        }),
                     },
-                    ...theme.applyStyles("light", {
-                        backgroundColor: "#FFFFFF",
-                        "&:hover": { backgroundColor: "#FFFFFF" },
-                    }),
                 })}
             >
                 {selectionMode && (
@@ -232,66 +224,66 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                 )}
 
                 <Box
-                    sx={{
+                    sx={(theme) => ({
                         position: "relative",
-                        width: 52,
-                        height: 52,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 40,
+                        height: 40,
                         flexShrink: 0,
-                    }}
+                        borderRadius: "12px",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
+                        }),
+                    })}
                 >
-                    <Box
-                        sx={{
-                            position: "relative",
-                            zIndex: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 40,
-                            height: 40,
-                            m: "6px",
-                            borderRadius:
-                                item.type === "file" ? "12px" : "10px",
-                            backgroundColor: iconBgColor(item),
-                        }}
-                    >
-                        {itemIcon(item)}
-                    </Box>
+                    {itemIcon(item)}
                     {isIncomingShared && !selectionMode && (
                         <Box
                             sx={(theme) => ({
                                 position: "absolute",
-                                right: 1,
-                                bottom: 6,
+                                right: -4,
+                                bottom: -4,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 width: 18,
                                 height: 18,
                                 borderRadius: "50%",
-                                backgroundColor: theme.vars.palette.fill.faint,
-                                p: "1px",
-                                zIndex: 2,
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "fillLight",
+                                }),
                             })}
                         >
                             <HugeiconsIcon
                                 icon={CircleArrowDownLeftIcon}
                                 size={16}
                                 strokeWidth={2}
-                                color="rgba(16, 113, 255, 1)"
-                                style={{ zIndex: 3 }}
+                                color={lockerColors.primary.dark}
                             />
                         </Box>
                     )}
                 </Box>
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
-                        variant="body"
-                        sx={{ fontWeight: "regular", lineHeight: 1.45 }}
-                        noWrap
-                    >
+                    <Typography variant="body" sx={lockerTextBodySx} noWrap>
                         {title}
                     </Typography>
+                    {isTrashView && item.updatedAt !== undefined && (
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextMiniSx,
+                                ...lockerColorSx(theme, { color: "textLight" }),
+                                mt: 0.5,
+                            })}
+                            noWrap
+                        >
+                            {t("deletedTimeAgo", {
+                                time: formatTimeAgo(item.updatedAt),
+                            })}
+                        </Typography>
+                    )}
                 </Box>
 
                 {selectionMode ? null : isTrashView ? (
@@ -367,7 +359,12 @@ const ItemOverflowMenu: React.FC<{
     <OverflowMenu
         ariaID={`item-menu-${item.id}`}
         triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
-        triggerButtonSxProps={{ color: "text.faint", p: 0.5 }}
+        triggerButtonSxProps={(theme) => ({
+            width: 24,
+            height: 24,
+            p: 0,
+            ...lockerColorSx(theme, { color: "textLight" }),
+        })}
     >
         {onEdit && (
             <OverflowMenuOption
@@ -423,9 +420,13 @@ const TrashActions: React.FC<{
                 <IconButton
                     size="small"
                     onClick={() => onRestore(item)}
-                    sx={{ color: "text.faint" }}
+                    sx={(theme) => lockerColorSx(theme, { color: "iconColor" })}
                 >
-                    <RestoreIcon sx={{ fontSize: 20 }} />
+                    <HugeiconsIcon
+                        icon={ArrowReloadHorizontalIcon}
+                        size={18}
+                        strokeWidth={1.5}
+                    />
                 </IconButton>
             </Tooltip>
         )}
@@ -434,21 +435,18 @@ const TrashActions: React.FC<{
                 <IconButton
                     size="small"
                     onClick={() => onPermanentlyDelete([item])}
-                    sx={{ color: "critical.main" }}
+                    sx={(theme) => lockerColorSx(theme, { color: "warning" })}
                 >
-                    <DeleteOutlinedIcon sx={{ fontSize: 20 }} />
+                    <HugeiconsIcon
+                        icon={Delete02Icon}
+                        size={18}
+                        strokeWidth={1.5}
+                    />
                 </IconButton>
             </Tooltip>
         )}
     </Stack>
 );
-
-const iconBgColor = (item: LockerItem): string => {
-    return lockerItemIconConfig(
-        item.type,
-        item.type === "file" ? (item.data as GenericFileData).name : undefined,
-    ).backgroundColor;
-};
 
 const itemIcon = (item: LockerItem) => {
     return lockerItemIcon(item.type, {
@@ -456,7 +454,7 @@ const itemIcon = (item: LockerItem) => {
             item.type === "file"
                 ? (item.data as GenericFileData).name
                 : undefined,
-        size: item.type === "file" ? 24 : 20,
-        strokeWidth: 1.9,
+        size: 24,
+        strokeWidth: 1.5,
     });
 };

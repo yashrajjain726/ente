@@ -298,6 +298,7 @@ func main() {
 		FileRepo:          fileRepo,
 		UploadResultCache: make(map[int64]bool),
 	}
+	fileCountInitializer := &controller.FileCountInitializer{UsageRepo: usageRepo, LockController: lockController}
 
 	accessCtrl := access.NewAccessController(accessCollectionRepo, accessFileRepo)
 	commentsRepo := &socialrepo.CommentsRepository{DB: db}
@@ -482,10 +483,9 @@ func main() {
 		UserRepo: userRepo,
 	}
 	legacyKitController := &legacykitctrl.Controller{
-		Repo:              legacyKitRepository,
-		UserRepo:          userRepo,
-		UserCtrl:          userController,
-		PasskeyController: passkeyCtrl,
+		Repo:     legacyKitRepository,
+		UserRepo: userRepo,
+		UserCtrl: userController,
 	}
 
 	authMiddleware := middleware.AuthMiddleware{UserAuthRepo: userAuthRepo, Cache: authCache, UserController: userController}
@@ -673,12 +673,11 @@ func main() {
 	storageAPI.GET("/comments-reactions/updated-at", socialHandler.LatestUpdates)
 
 	emergencyCtrl := &emergency.Controller{
-		Repo:              emergencyContactRepository,
-		UserRepo:          userRepo,
-		UserLookup:        userLookupController,
-		UserCtrl:          userController,
-		PasskeyController: passkeyCtrl,
-		LockCtrl:          lockController,
+		Repo:       emergencyContactRepository,
+		UserRepo:   userRepo,
+		UserLookup: userLookupController,
+		UserCtrl:   userController,
+		LockCtrl:   lockController,
 	}
 	userHandler := &api.UserHandler{
 		UserController:      userController,
@@ -962,6 +961,7 @@ func main() {
 		EmergencyController:    emergencyCtrl,
 		RemoteStoreController:  remoteStoreController,
 		FileRepo:               fileRepo,
+		UsageRepo:              usageRepo,
 		StorageBonusRepo:       storagBonusRepo,
 		BillingRepo:            billingRepo,
 		BillingController:      billingController,
@@ -994,6 +994,7 @@ func main() {
 	adminAPI.POST("/emails-from-hashes", adminHandler.GetEmailsFromHashes)
 	adminAPI.PUT("/user/subscription", adminHandler.UpdateSubscription)
 	adminAPI.POST("/queue/re-queue", adminHandler.ReQueueItem)
+	adminAPI.POST("/user/init-file-counts", adminHandler.InitializeFileCounts)
 	adminAPI.POST("/user/bonus", adminHandler.UpdateBonus)
 
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
@@ -1097,11 +1098,17 @@ func main() {
 		if err := remoteStoreRepository.MigrateCustomDomainCanonicalValues(context.Background()); err != nil {
 			log.WithError(err).Error("Failed to backfill custom domain canonical values")
 		}
+		migrated, err := userAuthRepo.MigratePlaintextTokens(context.Background())
+		if err != nil {
+			log.WithError(err).Error("Failed to clear plaintext tokens")
+		} else if migrated > 0 {
+			log.WithField("tokens", migrated).Info("Cleared plaintext tokens")
+		}
 	})
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
-		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController)
+		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController, fileCountInitializer)
 
 	primaryDBCollector := sqlstats.NewStatsCollector("prod_db", db)
 	latencySensitiveDBCollector := sqlstats.NewStatsCollector("latency_sensitive_db", latencySensitiveDB)
@@ -1291,7 +1298,8 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	healthCheckHandler *api.HealthCheckHandler,
 	castDb castRepo.Repository,
 	inactiveUserOrchestrator *user.InactiveUserOrchestrator,
-	spaceDripController *spacecontroller.SpaceDripController) {
+	spaceDripController *spacecontroller.SpaceDripController,
+	fileCountInitializer *controller.FileCountInitializer) {
 	if viper.GetBool("jobs.cron.skip") {
 		log.Info("Skipping cron jobs")
 		return
@@ -1416,6 +1424,8 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	schedule(c, "@every 24h", func() {
 		pushController.ClearExpiredTokens()
 	})
+
+	schedule(c, "@every 1m", fileCountInitializer.ProcessBatch)
 
 	c.Start()
 }

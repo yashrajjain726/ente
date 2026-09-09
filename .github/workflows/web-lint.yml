@@ -1,25 +1,10 @@
 name: "Lint (Web)"
 
 on:
-    pull_request:
-        paths:
-            - "web/**"
-            - "rust/bindings/wasm/**"
-            - "rust/crates/cast/**"
-            - "rust/crates/paste/**"
-            - "rust/crates/space/**"
-            - "rust/crates/contacts/**"
-            - "rust/crates/core/**"
-            - "rust/Cargo.lock"
-            - "rust/Cargo.toml"
-            - ".github/workflows/web-lint.yml"
+    workflow_call:
 
 permissions:
     contents: read
-
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
 
 jobs:
     lint:
@@ -54,6 +39,6 @@ jobs:
 
             - run: npm run build:wasm
 
-            - run: npm run lint
+            - run: node scripts/lint.mjs
 
             - run: npm test

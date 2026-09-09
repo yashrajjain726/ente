@@ -7,9 +7,9 @@ import {
     EditProfilePhotoScreen,
 } from "screens/EditProfilePhotoScreen";
 import { ProfileImageViewerScreen } from "screens/ProfileImageViewerScreen";
-import { profileBackground } from "screens/ProfileScreen";
 import { saveSpaceProfile, spaceProfileErrorMessage } from "services/profile";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import {
     type ProfileImageFlowSource,
@@ -61,7 +61,7 @@ export const SpaceProfileImageViewerPage: React.FC<{
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -69,7 +69,7 @@ export const SpaceProfileImageViewerPage: React.FC<{
 
     return (
         <>
-            <SpacePageMeta themeColor={profileBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileImageViewerScreen
                 profile={profile}
                 variant={variant}
@@ -124,7 +124,7 @@ export const SpaceProfileImageEditPage: React.FC<{
     if (profileLoadStatus != "ready" || !profile || !pendingFile) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -166,7 +166,7 @@ export const SpaceProfileImageEditPage: React.FC<{
 
     return (
         <>
-            <SpacePageMeta themeColor={profileBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             {variant == "cover" ? (
                 <EditProfileCoverScreen
                     coverFile={pendingFile}

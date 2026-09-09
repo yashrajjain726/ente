@@ -7,10 +7,18 @@ import type {
 } from "screens/SetupProfileScreen";
 import type { PendingSpacePasskeyVerification } from "services/passkey-verification";
 import type { SpacePost } from "services/space";
+import type { SpaceDraftPostImage } from "utils/post-image";
 import type { CreateProfileSource } from "utils/routes";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
+export type SpacePostPublishPhase = "failed" | "posted" | "posting";
+export interface SpacePostPublication {
+    phase: SpacePostPublishPhase;
+    post: SpacePost;
+    previewUrl: string;
+    statusExpiresAtMs?: number;
+}
 export type PendingCreateProfile = SetupProfileDetails & {
     source: CreateProfileSource;
 };
@@ -19,47 +27,10 @@ export interface RefreshSpaceProfileOptions {
     throwOnError?: boolean;
 }
 
-export interface PendingSpaceFeedPost {
-    avatarUrl?: string | null;
-    caption?: string;
-    friendID: string;
-    height?: number;
-    id: string;
-    imageUrl: string;
-    name: string;
-    spaceId: string;
-    status: "pending";
-    timestampMs: number;
-    width?: number;
-}
-
-export type FailedSpaceFeedPost = Omit<PendingSpaceFeedPost, "status"> & {
-    reason?: "post-limit";
-    status: "failed";
-};
-
-export interface PostedSpaceFeedPost {
-    id: string;
-    post: SpacePost;
-    status: "posted";
-}
-
-export interface ReadySpaceFeedPost {
-    id: string;
-    post: SpacePost;
-    status: "ready";
-}
-
-export type LocalSpaceFeedPost =
-    | FailedSpaceFeedPost
-    | PendingSpaceFeedPost
-    | PostedSpaceFeedPost
-    | ReadySpaceFeedPost;
-
 export interface SpaceAppState {
+    cachedProfileAvatarUrl?: string;
     friends: FriendProfile[];
     isLiveSignupVerification: boolean;
-    localFeedPosts: LocalSpaceFeedPost[];
     onboardingEntrySource: OnboardingEntrySource;
     pendingLoginCredentials: SpaceLoginCredentials | null;
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
@@ -70,17 +41,21 @@ export interface SpaceAppState {
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
-    skipNextHomeFeedSkeleton: boolean;
+    postPublication: SpacePostPublication | null;
     signupEmail: string;
+    setPostPublication: React.Dispatch<
+        React.SetStateAction<SpacePostPublication | null>
+    >;
+    publishPost: (
+        image: SpaceDraftPostImage,
+        caption: string,
+    ) => Promise<SpacePost>;
     refreshProfile: (
         options?: RefreshSpaceProfileOptions,
     ) => Promise<SetupProfile | null>;
     resetAfterLogout: () => void;
     setFriends: React.Dispatch<React.SetStateAction<FriendProfile[]>>;
     setIsLiveSignupVerification: React.Dispatch<React.SetStateAction<boolean>>;
-    setLocalFeedPosts: React.Dispatch<
-        React.SetStateAction<LocalSpaceFeedPost[]>
-    >;
     setOnboardingEntrySource: React.Dispatch<
         React.SetStateAction<OnboardingEntrySource>
     >;
@@ -101,7 +76,6 @@ export interface SpaceAppState {
         React.SetStateAction<PendingCreateProfile | null>
     >;
     setProfile: (profile: SetupProfile | null) => void;
-    setSkipNextHomeFeedSkeleton: React.Dispatch<React.SetStateAction<boolean>>;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;
 }
 

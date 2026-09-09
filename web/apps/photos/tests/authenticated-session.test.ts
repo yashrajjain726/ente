@@ -1,9 +1,39 @@
 import type { Session } from "ente-photos-wasm";
 import { beforeEach, expect, test, vi } from "vitest";
 
-const { apiOrigin, openSession } = vi.hoisted(() => ({
+const {
+    apiOrigin,
+    bindCollectionKeyOpener,
+    encryptBoxWithRecoveryKey,
+    generateKey,
+    keyAttributes,
+    masterKeyFromSession,
+    openCollectionKey,
+    openSession,
+    savedAuthToken,
+    unbindCollectionKeyOpener,
+} = vi.hoisted(() => ({
     apiOrigin: vi.fn<() => Promise<string>>(),
+    bindCollectionKeyOpener:
+        vi.fn<
+            typeof import("ente-new/photos/services/collection").bindCollectionKeyOpener
+        >(),
+    encryptBoxWithRecoveryKey:
+        vi.fn<typeof import("ente-photos-wasm").encryptBoxWithRecoveryKey>(),
+    generateKey: vi.fn<typeof import("ente-photos-wasm").generateKey>(),
+    keyAttributes: {
+        publicKey: "public-key",
+        encryptedSecretKey: "encrypted-secret-key",
+        secretKeyDecryptionNonce: "secret-key-nonce",
+        recoveryKeyEncryptedWithMasterKey: "encrypted-recovery-key",
+        recoveryKeyDecryptionNonce: "recovery-key-nonce",
+    },
+    masterKeyFromSession: vi.fn<() => Promise<string | undefined>>(),
+    openCollectionKey:
+        vi.fn<typeof import("ente-photos-wasm").openCollectionKey>(),
     openSession: vi.fn<typeof import("ente-photos-wasm").openSession>(),
+    savedAuthToken: vi.fn<() => Promise<string | undefined>>(),
+    unbindCollectionKeyOpener: vi.fn(),
 }));
 
 vi.mock("ente-base/app", () => ({
@@ -12,7 +42,22 @@ vi.mock("ente-base/app", () => ({
     isDesktop: false,
 }));
 vi.mock("ente-base/origins", () => ({ apiOrigin }));
-vi.mock("ente-photos-wasm", () => ({ openSession }));
+vi.mock("ente-accounts/services/user", () => ({
+    ensureLocalUser: () => ({ id: 1 }),
+    ensureSavedKeyAttributes: () => keyAttributes,
+}));
+vi.mock("ente-base/session", () => ({ masterKeyFromSession }));
+vi.mock("ente-base/token", () => ({ savedAuthToken }));
+vi.mock("ente-new/photos/services/collection", () => ({
+    bindCollectionKeyOpener,
+    unbindCollectionKeyOpener,
+}));
+vi.mock("ente-photos-wasm", () => ({
+    encryptBoxWithRecoveryKey,
+    generateKey,
+    openCollectionKey,
+    openSession,
+}));
 
 let sessions: typeof import("../src/services/authenticated-session");
 
@@ -20,12 +65,16 @@ beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();
     apiOrigin.mockResolvedValue("http://localhost:8080");
+    masterKeyFromSession.mockResolvedValue("key");
+    savedAuthToken.mockResolvedValue("token");
     sessions = await import("../src/services/authenticated-session");
 });
 
 const mockSession = () =>
     ({
+        encryptWithRecoveryKey: vi.fn(),
         free: vi.fn(),
+        recoveryKeyMnemonic: vi.fn(),
         updateAuthToken: vi.fn(),
         [Symbol.dispose]: vi.fn(),
     }) satisfies Session;
@@ -60,18 +109,31 @@ test("concurrent opens share a session and retain the latest token", async () =>
     expect(openSession).toHaveBeenCalledTimes(2);
 });
 
-test("failed initialization can be retried", async () => {
+test("the bound collection opener retries a failed initialization", async () => {
     const error = new Error("WASM download failed");
     const session = mockSession();
     openSession.mockRejectedValueOnce(error).mockResolvedValueOnce(session);
 
+    const opening = sessions.openAuthenticatedSession(1, "token", "key");
+    await Promise.resolve();
+    const opener = bindCollectionKeyOpener.mock.calls[0]![0];
+    await expect(opening).rejects.toBe(error);
+
+    openCollectionKey.mockResolvedValue("collection-key");
     await expect(
-        sessions.openAuthenticatedSession(1, "token", "key"),
-    ).rejects.toBe(error);
-    expect(await sessions.openAuthenticatedSession(1, "token", "key")).toBe(
-        session,
-    );
+        opener({
+            ownerID: 1,
+            encryptedKey: "encrypted-key",
+            keyDecryptionNonce: "nonce",
+        }),
+    ).resolves.toBe("collection-key");
     expect(openSession).toHaveBeenCalledTimes(2);
+    expect(openCollectionKey).toHaveBeenCalledWith(
+        session,
+        1,
+        "encrypted-key",
+        "nonce",
+    );
 });
 
 test.each(["account", "origin"])(
@@ -113,6 +175,7 @@ test("clearing during initialization disposes its eventual handle", async () => 
     await Promise.resolve();
 
     sessions.clearAuthenticatedSession();
+    expect(unbindCollectionKeyOpener).toHaveBeenCalledOnce();
     ready.resolve(session);
     await expect(opening).rejects.toThrow("Authenticated session was cleared");
     expect(session.free).toHaveBeenCalledTimes(1);

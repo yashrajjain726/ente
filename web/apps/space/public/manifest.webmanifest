@@ -1,13 +1,13 @@
 {
     "name": "Ente Space",
     "short_name": "Ente Space",
-    "description": "Share everyday moments with friends and family, privately.",
+    "description": "Share everyday photos with friends and family, privately.",
     "id": "/app",
     "start_url": "/app",
     "scope": "/",
     "display": "standalone",
     "background_color": "#08C225",
-    "theme_color": "#FFFFFF",
+    "theme_color": "#1C1C1E",
     "icons": [
         {
             "src": "/images/pwa-icon-192.png",

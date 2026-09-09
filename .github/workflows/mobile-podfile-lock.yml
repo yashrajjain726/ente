@@ -1,23 +1,11 @@
 name: "Verify Podfile.lock (Mobile)"
 
 on:
-    pull_request:
-        paths:
-            - ".github/workflows/mobile-podfile-lock.yml"
-            - "apple/packages/EnteOnnxRuntime/EnteOnnxRuntime.podspec"
-            - "mobile/**/pubspec.yaml"
-            - "mobile/**/pubspec.lock"
-            - "mobile/**/Podfile"
-            - "mobile/**/Podfile.lock"
-            - "mobile/**/*.podspec"
+    workflow_call:
     workflow_dispatch:
 
 permissions:
     contents: read
-
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
 
 jobs:
     pod-check:

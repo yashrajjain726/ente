@@ -1,3 +1,4 @@
+#![cfg(test)]
 #![cfg(feature = "museum")]
 
 mod support;
@@ -296,14 +297,9 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
 
     let previous_password = pair.owner.password.clone();
     let new_password = support::unique_password("LegacyRecovered");
-    ente_legacy::change_password(
-        &pair.trusted_session,
-        &recovery.id,
-        &pair.trusted.key_attributes,
-        &new_password,
-    )
-    .await
-    .unwrap();
+    ente_legacy::change_password(&pair.trusted_session, &recovery.id, &new_password)
+        .await
+        .unwrap();
 
     match auth::login_without_totp(endpoint, &pair.owner.email, &previous_password).await {
         Err(ente_accounts::Error::IncorrectPassword) => {}
@@ -350,10 +346,10 @@ async fn run_legacy_reset_stage(endpoint: &str, pair: &mut legacy::LegacyPair) {
 
 async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitOwner) {
     let recovery_client = LegacyKitRecoveryClient::new(endpoint).expect("legacy kit client");
-    let public_client = reqwest::Client::new();
+    let public_client = http::Http::new().expect("HTTP client");
     let missing_notice_period = public_client
-        .post(format!("{endpoint}/legacy-kits"))
-        .header("X-Auth-Token", owner.owner.auth_token.clone())
+        .post(&format!("{endpoint}/legacy-kits"))
+        .header("X-Auth-Token", &owner.owner.auth_token)
         .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&json!({
             "id": Uuid::new_v4().to_string(),
@@ -365,14 +361,11 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .send()
         .await
         .expect("legacy kit missing notice period request failed");
-    assert_eq!(
-        missing_notice_period.status(),
-        reqwest::StatusCode::BAD_REQUEST
-    );
+    assert_eq!(missing_notice_period.status(), 400);
 
     let invalid_create = public_client
-        .post(format!("{endpoint}/legacy-kits"))
-        .header("X-Auth-Token", owner.owner.auth_token.clone())
+        .post(&format!("{endpoint}/legacy-kits"))
+        .header("X-Auth-Token", &owner.owner.auth_token)
         .header("X-Client-Package", CLIENT_PACKAGE)
         .json(&CreateLegacyKitRequest {
             id: Uuid::new_v4().to_string(),
@@ -385,7 +378,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .send()
         .await
         .expect("legacy kit invalid create request failed");
-    assert_eq!(invalid_create.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert_eq!(invalid_create.status(), 400);
 
     let waiting_kit = ente_legacy::create_kit(
         &owner.owner_session,
@@ -420,25 +413,21 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         waiting_kit.shares[1].checksum
     );
 
-    let invalid_challenge = public_client
-        .post(format!("{endpoint}/legacy-kits/recovery/challenge"))
+    let invalid_challenge: LegacyKitChallengeResponse = public_client
+        .post(&format!("{endpoint}/legacy-kits/recovery/challenge"))
         .json(&LegacyKitChallengeRequest {
             kit_id: waiting_kit.kit.id.clone(),
         })
         .send()
         .await
-        .expect("legacy kit challenge request failed");
-    assert!(
-        invalid_challenge.status().is_success(),
-        "challenge request should succeed, got {}",
-        invalid_challenge.status()
-    );
-    let invalid_challenge: LegacyKitChallengeResponse = invalid_challenge
+        .expect("legacy kit challenge request failed")
+        .error_for_status()
+        .expect("legacy kit challenge should succeed")
         .json()
         .await
         .expect("legacy kit challenge response decode failed");
     let invalid_open = public_client
-        .post(format!("{endpoint}/legacy-kits/recovery/open"))
+        .post(&format!("{endpoint}/legacy-kits/recovery/open"))
         .json(&LegacyKitOpenRecoveryRequest {
             kit_id: waiting_kit.kit.id.clone(),
             challenge: invalid_challenge.encrypted_challenge,
@@ -448,7 +437,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         .send()
         .await
         .expect("legacy kit invalid recovery open request failed");
-    assert_eq!(invalid_open.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert_eq!(invalid_open.status(), 400);
 
     let listed_after_invalid_open = ente_legacy::kits(&owner.owner_session)
         .await
@@ -464,38 +453,30 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         "invalid challenge must not create a recovery session"
     );
 
-    let first_waiting_challenge = public_client
-        .post(format!("{endpoint}/legacy-kits/recovery/challenge"))
+    let first_waiting_challenge: LegacyKitChallengeResponse = public_client
+        .post(&format!("{endpoint}/legacy-kits/recovery/challenge"))
         .json(&LegacyKitChallengeRequest {
             kit_id: waiting_kit.kit.id.clone(),
         })
         .send()
         .await
-        .expect("first waiting legacy kit challenge request failed");
-    assert!(
-        first_waiting_challenge.status().is_success(),
-        "first waiting challenge request should succeed, got {}",
-        first_waiting_challenge.status()
-    );
-    let first_waiting_challenge: LegacyKitChallengeResponse = first_waiting_challenge
+        .expect("first waiting legacy kit challenge request failed")
+        .error_for_status()
+        .expect("first waiting challenge should succeed")
         .json()
         .await
         .expect("first waiting challenge response decode failed");
 
-    let second_waiting_challenge = public_client
-        .post(format!("{endpoint}/legacy-kits/recovery/challenge"))
+    let second_waiting_challenge: LegacyKitChallengeResponse = public_client
+        .post(&format!("{endpoint}/legacy-kits/recovery/challenge"))
         .json(&LegacyKitChallengeRequest {
             kit_id: waiting_kit.kit.id.clone(),
         })
         .send()
         .await
-        .expect("second waiting legacy kit challenge request failed");
-    assert!(
-        second_waiting_challenge.status().is_success(),
-        "second waiting challenge request should succeed, got {}",
-        second_waiting_challenge.status()
-    );
-    let second_waiting_challenge: LegacyKitChallengeResponse = second_waiting_challenge
+        .expect("second waiting legacy kit challenge request failed")
+        .error_for_status()
+        .expect("second waiting challenge should succeed")
         .json()
         .await
         .expect("second waiting challenge response decode failed");
@@ -512,6 +493,11 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
         waiting_handle.session().status,
         LegacyKitRecoveryStatus::Waiting
     );
+    assert!(matches!(
+        ente_legacy::update_kit_recovery_notice(&owner.owner_session, &waiting_kit.kit.id, 168)
+            .await,
+        Err(ente_legacy::Error::ActiveRecoverySession)
+    ));
     assert!(
         waiting_handle.session().wait_till > 0,
         "legacy kit waitTill should be remaining wait duration"
@@ -615,12 +601,11 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
             .iter()
             .all(|kit| kit.id != waiting_kit.kit.id)
     );
-    let inactive_error = match recovery_client
+    let Err(inactive_error) = recovery_client
         .open_from_shares(&waiting_kit.shares[0..2], None)
         .await
-    {
-        Ok(_) => panic!("deleted legacy kit recovery unexpectedly opened"),
-        Err(error) => error,
+    else {
+        panic!("deleted legacy kit recovery unexpectedly opened")
     };
     assert!(matches!(
         inactive_error,

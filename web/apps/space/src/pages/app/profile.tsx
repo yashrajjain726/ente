@@ -2,17 +2,10 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useMemo, useState } from "react";
-import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
-import {
-    patchCachedSpaceFeedPost,
-    prependCachedSpaceFeedPost,
-    removeCachedSpaceFeedPost,
-} from "services/feed-cache";
+import { ProfileScreen } from "screens/ProfileScreen";
 import { spaceInviteURL } from "services/invite";
 import {
-    createCurrentPhotoPost,
     deleteCurrentPost,
-    isSpacePostLimitReachedError,
     loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfilePostsPage,
@@ -21,13 +14,8 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
-import {
-    confirmLocalFeedPost,
-    createLocalFeedPostID,
-    failLocalFeedPost,
-} from "utils/local-feed-post";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
-import { prepareSpacePostImageFromEdit } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -35,8 +23,13 @@ const initialPostLoadingIndicatorDelayMs = 350;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
-    const { profile, profileLoadError, profileLoadStatus, setLocalFeedPosts } =
-        useSpaceAppState();
+    const {
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        publishPost,
+        setPostPublication,
+    } = useSpaceAppState();
     const [friendsCount, setFriendsCount] = useState(0);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
@@ -106,7 +99,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -115,7 +108,7 @@ const Page: React.FC = () => {
     if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
-                background={profileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -123,7 +116,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={profileBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileScreen
                 friendsCount={friendsCount}
                 isPostsLoading={isPostsLoading}
@@ -132,76 +125,16 @@ const Page: React.FC = () => {
                 profile={profile}
                 showPostLoadingIndicator={showInitialPostLoadingIndicator}
                 onBack={() => void router.push(spaceRoutes.home)}
+                onPostSubmitted={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
-                    const spaceId = profile.spaceId;
-                    if (!spaceId) throw new Error("Missing space.");
-
-                    const localPostId = createLocalFeedPostID();
-                    const displayName =
-                        profile.fullName.trim() || profile.username.trim();
-                    setLocalFeedPosts((currentPosts) => [
-                        {
-                            avatarUrl: profile.avatarUrl,
-                            caption: caption.trim() || undefined,
-                            friendID: spaceId,
-                            height: image.height,
-                            id: localPostId,
-                            imageUrl:
-                                image.previewUrl ||
-                                URL.createObjectURL(image.file),
-                            name: displayName || "You",
-                            spaceId,
-                            status: "pending",
-                            timestampMs: Date.now(),
-                            width: image.width,
-                        },
-                        ...currentPosts,
-                    ]);
-                    try {
-                        const preparedImage =
-                            await prepareSpacePostImageFromEdit(
-                                image.file,
-                                image.cropArea,
-                                image.rotationDegrees,
-                            );
-                        const post = await createCurrentPhotoPost({
-                            caption,
-                            file: preparedImage.file,
-                            height: preparedImage.height,
-                            spaceId,
-                            thumbHash: preparedImage.thumbHash,
-                            width: preparedImage.width,
-                        });
-                        confirmLocalFeedPost(
-                            setLocalFeedPosts,
-                            localPostId,
-                            post,
-                        );
-                        void prependCachedSpaceFeedPost(spaceId, post);
-                    } catch (error) {
-                        failLocalFeedPost(
-                            setLocalFeedPosts,
-                            localPostId,
-                            isSpacePostLimitReachedError(error)
-                                ? "post-limit"
-                                : undefined,
-                        );
-                        throw error;
-                    }
+                    await publishPost(image, caption);
                 }}
-                onDraftPostPublished={() => void router.push(spaceRoutes.home)}
                 onDeletePost={async (postId) => {
                     const spaceId = profile.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
-                    void removeCachedSpaceFeedPost(spaceId, postId);
-                    setLocalFeedPosts((currentPosts) =>
-                        currentPosts.filter(
-                            (item) =>
-                                item.status == "pending" ||
-                                item.status == "failed" ||
-                                item.post.postId != postId,
-                        ),
+                    setPostPublication((current) =>
+                        current?.post.postId == postId ? null : current,
                     );
                     setPosts((currentPosts) =>
                         currentPosts.filter((post) => post.postId != postId),
@@ -213,23 +146,16 @@ const Page: React.FC = () => {
 
                     await updateCurrentPostCaption(spaceId, postId, caption);
                     const normalizedCaption = caption.trim() || undefined;
-                    void patchCachedSpaceFeedPost(spaceId, postId, {
-                        caption: normalizedCaption,
-                    });
-                    setLocalFeedPosts((currentPosts) =>
-                        currentPosts.map((item) =>
-                            (item.status == "posted" ||
-                                item.status == "ready") &&
-                            item.post.postId == postId
-                                ? {
-                                      ...item,
-                                      post: {
-                                          ...item.post,
-                                          caption: normalizedCaption,
-                                      },
-                                  }
-                                : item,
-                        ),
+                    setPostPublication((current) =>
+                        current?.post.postId == postId
+                            ? {
+                                  ...current,
+                                  post: {
+                                      ...current.post,
+                                      caption: normalizedCaption,
+                                  },
+                              }
+                            : current,
                     );
                     setPosts((currentPosts) =>
                         currentPosts.map((post) =>
@@ -246,13 +172,9 @@ const Page: React.FC = () => {
                 onOpenProfilePhoto={() =>
                     void router.push(spaceRoutes.profilePhoto)
                 }
-                onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onSetPostLiked={async (postId, liked) => {
                     await setCurrentPostLiked(actorSpaceId, postId, liked);
-                    void patchCachedSpaceFeedPost(actorSpaceId, postId, {
-                        viewerLiked: liked,
-                    });
                 }}
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,

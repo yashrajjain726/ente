@@ -2,5 +2,5 @@ export {
     deriveInteractiveKey,
     deriveKey,
     deriveSensitiveKey,
-} from "ente-core-wasm";
-export type { DerivedKey } from "ente-core-wasm";
+} from "ente-prelogin-wasm";
+export type { DerivedKey } from "ente-prelogin-wasm";

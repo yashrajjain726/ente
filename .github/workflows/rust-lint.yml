@@ -1,17 +1,10 @@
 name: "Lint (Rust)"
 
 on:
-    pull_request:
-        paths:
-            - ".github/workflows/rust-lint.yml"
-            - "rust/**"
+    workflow_call:
 
 permissions:
     contents: read
-
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
 
 env:
     RUSTFLAGS: -D warnings
@@ -43,10 +36,6 @@ jobs:
                   save-if: false
                   cache-directories: rust/.cache
 
-            - run: cargo fmt --check
-
-            - run: cargo clippy --locked --all-targets --features museum,ente-ml/ml-assets
-
             - run: cargo install cargo-audit --version 0.22.2 --locked
 
-            - run: cargo audit
+            - run: ./scripts/lint.sh

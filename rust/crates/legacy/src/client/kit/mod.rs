@@ -1,13 +1,12 @@
 mod owner_blob;
 
 use ente_accounts::auth::KeyAttributes;
-use ente_core::crypto::{self, SecretVec, secretbox};
-use ente_core::http;
+use ente_core::crypto::{self, Key, SecretVec, secretbox};
 use ente_core::{Session, b64};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::current_recovery_key;
+use super::{current_recovery_key, map_recovery_notice_error};
 use crate::kit::{
     LEGACY_KIT_PAYLOAD_VERSION, LegacyKit, LegacyKitCreateResult, LegacyKitOwnerRecoverySession,
     LegacyKitRecoveryInitiator, LegacyKitRecoverySession, LegacyKitShare, LegacyKitVariant,
@@ -98,28 +97,18 @@ pub async fn update_kit_recovery_notice(
     notice_period_in_hours: i32,
 ) -> Result<()> {
     validate_notice_period(notice_period_in_hours)?;
-    let path = "/legacy-kits/update-recovery-notice";
-    let response = session
+    session
         .api
-        .post(path)
+        .post("/legacy-kits/update-recovery-notice")
         .json(&LegacyKitUpdateRecoveryNoticeRequest {
             kit_id: kit_id.to_string(),
             notice_period_in_hours,
         })
         .send()
-        .await?;
-    if response.status() == 400 {
-        return if response.text().await?.contains("active recovery session") {
-            Err(Error::ActiveRecoverySession)
-        } else {
-            Err(http::Error::Http {
-                status: 400,
-                path: path.into(),
-            }
-            .into())
-        };
-    }
-    response.error_for_status()?;
+        .await?
+        .error_for_code()
+        .await
+        .map_err(map_recovery_notice_error)?;
     Ok(())
 }
 
@@ -148,7 +137,7 @@ pub async fn delete_kit(session: &Session, kit_id: &str) -> Result<()> {
 
 fn create_kit_request(
     recovery_key: &[u8],
-    master_key: &[u8],
+    master_key: &Key,
     part_names: [String; 3],
     notice_period_in_hours: i32,
 ) -> Result<(CreateLegacyKitRequest, Vec<LegacyKitShare>)> {
@@ -198,7 +187,7 @@ fn create_kit_request(
     ))
 }
 
-fn decode_kit_record(response: LegacyKitRecordResponse, master_key: &[u8]) -> Result<LegacyKit> {
+fn decode_kit_record(response: LegacyKitRecordResponse, master_key: &Key) -> Result<LegacyKit> {
     let owner_blob = decrypt_owner_blob(&response.encrypted_owner_blob, master_key)?;
     Ok(LegacyKit {
         id: response.id,
@@ -214,7 +203,7 @@ fn decode_kit_record(response: LegacyKitRecordResponse, master_key: &[u8]) -> Re
 
 fn decode_download_content(
     response: LegacyKitDownloadContentResponse,
-    master_key: &[u8],
+    master_key: &Key,
 ) -> Result<Vec<LegacyKitShare>> {
     let owner_blob = decrypt_owner_blob(&response.encrypted_owner_blob, master_key)?;
     Ok(owner_blob

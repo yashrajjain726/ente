@@ -32,6 +32,15 @@ export interface SpaceImageCropArea {
     y: number;
 }
 
+export interface SpaceDraftPostImage {
+    cropArea?: SpaceImageCropArea;
+    file: File;
+    height?: number;
+    previewUrl: string;
+    rotationDegrees?: number;
+    width?: number;
+}
+
 export const spaceAvatarImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 export const spaceCoverImageInputAccept = spaceAvatarImageInputAccept;

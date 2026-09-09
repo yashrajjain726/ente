@@ -8,6 +8,7 @@ class ChangeLogStrings {
   static ChangeLogStrings? maybeForLocale(
     Locale locale, {
     bool isLocalGallery = false,
+    required bool isAndroid,
   }) {
     final key = locale.countryCode != null && locale.countryCode!.isNotEmpty
         ? '${locale.languageCode}_${locale.countryCode}'
@@ -22,6 +23,7 @@ class ChangeLogStrings {
     }
 
     final entries = strings.entries
+        .where((entry) => !entry.isAndroidOnly || isAndroid)
         .where(
           (entry) =>
               isLocalGallery ? !entry.isOnlineOnly : !entry.isLocalGalleryOnly,
@@ -33,45 +35,68 @@ class ChangeLogStrings {
   static bool hasContentForLocale(
     Locale locale, {
     bool isLocalGallery = false,
+    required bool isAndroid,
   }) {
-    return maybeForLocale(locale, isLocalGallery: isLocalGallery) != null;
+    return maybeForLocale(
+          locale,
+          isLocalGallery: isLocalGallery,
+          isAndroid: isAndroid,
+        ) !=
+        null;
   }
 
   static const Map<String, ChangeLogStrings> _translations = {
     'en': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Library Sharing',
+          title: 'Library sharing',
           description:
-              'Share your current and future albums with family members automatically. Head to Settings → Family, pick a member, and tap Share albums. New albums are included as you create them.',
+              'Share your current and future albums with family members automatically. Head to Settings → Family, pick a member, and tap Share albums.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Faster, everywhere',
+          description:
+              'Search, the map, and gallery scrolling are faster on large libraries.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Location search',
+          description:
+              'You can now search by country and cities, with improved accuracy.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'System trash',
+          description:
+              'On Android 11 and newer, device photos deleted through Ente Photos move to the system trash and can be recovered from the app.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Album descriptions',
           description:
-              'Give an album a description alongside its name and cover photo. Descriptions travel with your shared links, so anyone opening one sees the context you added.',
+              'You can now add descriptions to albums that will reflect on shared links as well.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Faster on big libraries',
+          title: 'Album slideshows',
           description:
-              'Search, Smart Memories, the map, and timeline scrolling are all substantially quicker if you have a large library. Map clustering alone is 2–3x faster.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backups you can watch',
-          description:
-              'Backup Status now shows per-file progress, and large multipart uploads are more reliable.',
+              'Convert your old tablet into a photo frame with album slideshows.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Selecting text in photos',
+          title: 'Edits that keep more',
           description:
-              'Controls stay reachable while you select, and tapping selected text clears it.',
+              'Edited photos now keep key camera, date, and location details. JPEGs also retain their original quality when you only rotate or flip them.',
         ),
         ChangeLogEntryStrings(
-          title: 'A tidier selection menu',
+          title: 'Better video playback',
           description:
-              'The actions in the selection bar are ordered by how often you reach for them, and the share icon now matches your platform.',
+              'Double-tap either side of a video to seek five seconds. You can also choose a playback speed.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'and more!',
+          description:
+              "We've added some music to memories that we composed. Also, smart albums work better, freeing up space is more reliable, and backup status shows progress for each file.",
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -80,35 +105,51 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Compartició de la biblioteca',
           description:
-              "Comparteix automàticament els àlbums actuals i futurs amb els membres de la família. Ves a Configuració → Família, tria un membre i toca Comparteix àlbums. Els àlbums nous s'hi inclouran a mesura que els creïs.",
+              "Comparteix automàticament els àlbums actuals i futurs amb els membres de la família. Ves a Configuració → Família, tria un membre i toca Comparteix àlbums.",
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Més ràpid, a tot arreu',
+          description:
+              'La cerca, el mapa i el desplaçament per la galeria són més ràpids en biblioteques grans.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Cerca per ubicació',
+          description: 'Ara pots cercar per països i ciutats amb més precisió.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Paperera del sistema',
+          description:
+              "A Android 11 i versions posteriors, les fotos del dispositiu que suprimeixes amb Ente Photos es mouen a la paperera del sistema i es poden recuperar des de l'aplicació.",
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descripcions dels àlbums',
           description:
-              "Dona context a un àlbum amb una descripció, a més del nom i la foto de portada. Les descripcions s'inclouen als enllaços compartits perquè tothom qui n'obri un vegi el context que hi has afegit.",
+              'Ara pots afegir descripcions als àlbums, que també es mostraran als enllaços compartits.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Més ràpid amb biblioteques grans',
+          title: "Presentacions d'àlbums",
           description:
-              "La cerca, els Records intel·ligents, el mapa i el desplaçament per la línia de temps són molt més ràpids si tens una biblioteca gran. Només l'agrupació del mapa és entre 2 i 3 vegades més ràpida.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'Còpies de seguretat que pots seguir',
-          description:
-              "L'Estat de la còpia de seguretat ara mostra el progrés de cada fitxer, i les pujades grans en diverses parts són més fiables.",
+              "Converteix la teva tauleta antiga en un marc de fotos amb les presentacions d'àlbums.",
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Selecció de text a les fotos',
+          title: 'Edicions que conserven més',
           description:
-              'Els controls continuen accessibles mentre selecciones text, i tocar el text seleccionat en suprimeix la selecció.',
+              'Les fotos editades ara conserven les dades clau de la càmera, la data i la ubicació. Els JPEG també mantenen la qualitat original quan només els rotes o els gires.',
         ),
         ChangeLogEntryStrings(
-          title: 'Un menú de selecció més ordenat',
+          title: 'Millor reproducció de vídeo',
           description:
-              'Les accions de la barra de selecció s’ordenen segons la freqüència amb què les utilitzes, i la icona de compartir ara coincideix amb la de la teva plataforma.',
+              "Toca dues vegades qualsevol costat d'un vídeo per avançar o retrocedir cinc segons. També pots triar la velocitat de reproducció.",
+        ),
+        ChangeLogEntryStrings(
+          title: 'I més coses!',
+          description:
+              "Hem afegit als Records música composta per nosaltres. A més, els Àlbums intel·ligents funcionen millor, Allibera espai és més fiable i l'Estat de la còpia de seguretat mostra el progrés de cada fitxer.",
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -117,35 +158,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Sdílení knihovny',
           description:
-              'Automaticky sdílejte svá současná i budoucí alba s členy rodiny. Přejděte do Nastavení → Rodina, vyberte člena a klepněte na Sdílet alba. Nová alba se zahrnou hned, jak je vytvoříte.',
+              'Automaticky sdílejte svá současná i budoucí alba s členy rodiny. Přejděte do Nastavení → Rodina, vyberte člena a klepněte na Sdílet alba.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Rychlejší všude',
+          description:
+              'Vyhledávání, mapa a posouvání v galerii jsou u velkých knihoven rychlejší.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Vyhledávání podle polohy',
+          description:
+              'Nově můžete s vyšší přesností vyhledávat podle zemí a měst.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Systémový koš',
+          description:
+              'V systému Android 11 a novějším se fotografie v zařízení smazané prostřednictvím Ente Photos přesunou do systémového koše a lze je obnovit v aplikaci.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Popisy alb',
           description:
-              'K názvu a titulní fotce alba teď můžete přidat i popis. Popisy se přenášejí do sdílených odkazů, takže každý, kdo je otevře, uvidí kontext, který jste přidali.',
+              'Nyní můžete k albům přidávat popisy, které se zobrazí také ve sdílených odkazech.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Rychlejší u velkých knihoven',
+          title: 'Prezentace alb',
           description:
-              'Vyhledávání, Chytré vzpomínky, mapa i posouvání časové osy jsou u velkých knihoven výrazně rychlejší. Samotné seskupování na mapě je 2–3× rychlejší.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Zálohování pod dohledem',
-          description:
-              'Stav zálohování teď zobrazuje průběh jednotlivých souborů a velká vícedílná nahrávání jsou spolehlivější.',
+              'Proměňte starý tablet ve fotorámeček pomocí prezentací alb.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Výběr textu ve fotkách',
+          title: 'Úpravy, které zachovají více',
           description:
-              'Ovládací prvky zůstávají při výběru textu dostupné a klepnutí na vybraný text výběr zruší.',
+              'Upravené fotografie si nyní zachovají klíčové údaje o fotoaparátu, datu a poloze. Soubory JPEG si také zachovají původní kvalitu, pokud je pouze otočíte nebo překlopíte.',
         ),
         ChangeLogEntryStrings(
-          title: 'Přehlednější nabídka výběru',
+          title: 'Lepší přehrávání videa',
           description:
-              'Akce na liště výběru jsou seřazené podle toho, jak často je používáte, a ikona sdílení teď odpovídá vaší platformě.',
+              'Poklepáním na kteroukoli stranu videa se posunete o pět sekund vpřed nebo vzad. Můžete také zvolit rychlost přehrávání.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'A mnohem více!',
+          description:
+              'Do Vzpomínek jsme přidali hudbu, kterou jsme sami složili. Chytrá alba navíc fungují lépe, funkce Uvolnit místo je spolehlivější a Stav zálohování zobrazuje průběh každého souboru.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -154,35 +212,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Bibliothek teilen',
           description:
-              'Teile deine aktuellen und zukünftigen Alben automatisch mit Familienmitgliedern. Gehe zu Einstellungen → Familie, wähle ein Mitglied aus und tippe auf Alben teilen. Neue Alben werden beim Erstellen automatisch einbezogen.',
+              'Teile deine aktuellen und zukünftigen Alben automatisch mit Familienmitgliedern. Gehe zu Einstellungen → Familie, wähle ein Mitglied aus und tippe auf Alben teilen.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Schneller, überall',
+          description:
+              'Suche, Karte und Scrollen in der Galerie sind bei großen Bibliotheken schneller.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ortssuche',
+          description:
+              'Du kannst jetzt mit verbesserter Genauigkeit nach Ländern und Städten suchen.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Systempapierkorb',
+          description:
+              'Unter Android 11 und neuer werden Gerätefotos, die über Ente Photos gelöscht werden, in den Systempapierkorb verschoben und können in der App wiederhergestellt werden.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Albumbeschreibungen',
           description:
-              'Gib einem Album zusätzlich zu Name und Titelbild eine Beschreibung. Beschreibungen werden über deine geteilten Links mitgegeben, sodass alle, die einen Link öffnen, den von dir hinzugefügten Kontext sehen.',
+              'Du kannst Alben jetzt Beschreibungen hinzufügen, die auch in geteilten Links angezeigt werden.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Schneller bei großen Bibliotheken',
+          title: 'Album-Diashows',
           description:
-              'Suche, Smarte Erinnerungen, Karte und Scrollen in der Zeitleiste sind bei großen Bibliotheken deutlich schneller. Allein die Gruppierung auf der Karte ist 2–3-mal schneller.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backups mit sichtbarem Fortschritt',
-          description:
-              'Der Sicherungsstatus zeigt jetzt den Fortschritt für jede Datei an, und große mehrteilige Uploads sind zuverlässiger.',
+              'Verwandle dein altes Tablet mit Album-Diashows in einen digitalen Bilderrahmen.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Text in Fotos auswählen',
+          title: 'Bearbeitungen, die mehr bewahren',
           description:
-              'Die Bedienelemente bleiben während der Auswahl erreichbar, und durch Tippen auf ausgewählten Text wird die Auswahl aufgehoben.',
+              'Bearbeitete Fotos behalten jetzt wichtige Kamera-, Datums- und Standortinformationen. JPEGs behalten außerdem ihre Originalqualität, wenn du sie nur drehst oder spiegelst.',
         ),
         ChangeLogEntryStrings(
-          title: 'Ein aufgeräumteres Auswahlmenü',
+          title: 'Bessere Videowiedergabe',
           description:
-              'Die Aktionen in der Auswahlleiste sind danach sortiert, wie oft du sie verwendest, und das Teilen-Symbol entspricht jetzt deiner Plattform.',
+              'Tippe doppelt auf eine der beiden Seiten eines Videos, um fünf Sekunden vor- oder zurückzuspringen. Du kannst auch die Wiedergabegeschwindigkeit wählen.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Und mehr!',
+          description:
+              'Wir haben den Erinnerungen von uns komponierte Musik hinzugefügt. Außerdem funktionieren Smart-Alben besser, Speicherplatz freigeben ist zuverlässiger und der Sicherungsstatus zeigt den Fortschritt jeder Datei an.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -191,35 +266,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Uso compartido de la biblioteca',
           description:
-              'Comparte automáticamente tus álbumes actuales y futuros con tus familiares. Ve a Configuración → Familia, elige a un miembro y toca Compartir álbumes. Los álbumes nuevos se incluyen a medida que los creas.',
+              'Comparte automáticamente tus álbumes actuales y futuros con tus familiares. Ve a Configuración → Familia, elige a un miembro y toca Compartir álbumes.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Más rápido, en todas partes',
+          description:
+              'La búsqueda, el mapa y el desplazamiento por la galería son más rápidos en bibliotecas grandes.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Búsqueda por ubicación',
+          description:
+              'Ahora puedes buscar por países y ciudades con mayor precisión.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Papelera del sistema',
+          description:
+              'En Android 11 y versiones posteriores, las fotos del dispositivo que elimines mediante Ente Photos se mueven a la papelera del sistema y pueden recuperarse desde la aplicación.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descripciones de álbumes',
           description:
-              'Añade una descripción a un álbum junto con su nombre y foto de portada. Las descripciones se incluyen en tus enlaces compartidos, para que cualquiera que abra uno vea el contexto que añadiste.',
+              'Ahora puedes añadir descripciones a los álbumes, que también se mostrarán en los enlaces compartidos.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Más rapidez en bibliotecas grandes',
+          title: 'Presentaciones de álbumes',
           description:
-              'La búsqueda, los Recuerdos inteligentes, el mapa y el desplazamiento por la cronología son mucho más rápidos si tienes una biblioteca grande. Solo la agrupación del mapa es entre 2 y 3 veces más rápida.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Copias de seguridad que puedes seguir',
-          description:
-              'El Estado de la copia de seguridad ahora muestra el progreso de cada archivo, y las cargas grandes de varias partes son más fiables.',
+              'Convierte tu antigua tableta en un marco de fotos con las presentaciones de álbumes.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Seleccionar texto en fotos',
+          title: 'Ediciones que conservan más',
           description:
-              'Los controles permanecen accesibles mientras seleccionas texto, y tocar el texto seleccionado borra la selección.',
+              'Las fotos editadas ahora conservan datos clave de la cámara, la fecha y la ubicación. Los archivos JPEG también mantienen su calidad original cuando solo los giras o volteas.',
         ),
         ChangeLogEntryStrings(
-          title: 'Un menú de selección más ordenado',
+          title: 'Mejor reproducción de vídeo',
           description:
-              'Las acciones de la barra de selección se ordenan según la frecuencia con la que las usas, y el icono de compartir ahora coincide con el de tu plataforma.',
+              'Toca dos veces cualquiera de los lados de un vídeo para avanzar o retroceder cinco segundos. También puedes elegir la velocidad de reproducción.',
+        ),
+        ChangeLogEntryStrings(
+          title: '¡Y mucho más!',
+          description:
+              'Hemos añadido a Recuerdos música compuesta por nosotros. Además, los Álbumes inteligentes funcionan mejor, Liberar espacio es más fiable y el Estado de la copia de seguridad muestra el progreso de cada archivo.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -228,35 +320,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Partage de la photothèque',
           description:
-              'Partagez automatiquement vos albums actuels et futurs avec les membres de votre famille. Accédez à Paramètres → Famille, choisissez un membre et touchez Partager les albums. Les nouveaux albums sont inclus dès leur création.',
+              'Partagez automatiquement vos albums actuels et futurs avec les membres de votre famille. Accédez à Paramètres → Famille, choisissez un membre et touchez Partager les albums.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Plus rapide, partout',
+          description:
+              'La recherche, la carte et le défilement dans la galerie sont plus rapides avec les grandes photothèques.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Recherche par lieu',
+          description:
+              'Vous pouvez désormais rechercher par pays et par ville avec une meilleure précision.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Corbeille du système',
+          description:
+              'Sous Android 11 et les versions ultérieures, les photos de l’appareil supprimées via Ente Photos sont placées dans la corbeille du système et peuvent être récupérées depuis l’application.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descriptions d’albums',
           description:
-              'Ajoutez une description à un album en plus de son nom et de sa photo de couverture. Les descriptions accompagnent vos liens partagés, afin que toute personne qui en ouvre un voie le contexte que vous avez ajouté.',
+              'Vous pouvez désormais ajouter des descriptions aux albums. Elles apparaîtront également dans les liens partagés.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Plus rapide avec les grandes photothèques',
+          title: 'Diaporamas d’albums',
           description:
-              'La recherche, les Souvenirs intelligents, la carte et le défilement de la chronologie sont nettement plus rapides si votre photothèque est volumineuse. Le regroupement sur la carte est à lui seul 2 à 3 fois plus rapide.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Des sauvegardes à suivre en direct',
-          description:
-              'L’état de la sauvegarde affiche désormais la progression de chaque fichier, et les envois volumineux en plusieurs parties sont plus fiables.',
+              'Transformez votre ancienne tablette en cadre photo grâce aux diaporamas d’albums.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Sélection de texte dans les photos',
+          title: 'Des modifications qui préservent davantage',
           description:
-              'Les commandes restent accessibles pendant la sélection, et toucher le texte sélectionné efface la sélection.',
+              'Les photos modifiées conservent désormais les principales informations relatives à l’appareil photo, à la date et au lieu. Les JPEG conservent également leur qualité d’origine lorsque vous les faites uniquement pivoter ou retourner.',
         ),
         ChangeLogEntryStrings(
-          title: 'Un menu de sélection mieux ordonné',
+          title: 'Meilleure lecture vidéo',
           description:
-              'Les actions de la barre de sélection sont classées selon leur fréquence d’utilisation, et l’icône de partage correspond désormais à votre plateforme.',
+              'Touchez deux fois l’un des côtés d’une vidéo pour avancer ou reculer de cinq secondes. Vous pouvez également choisir la vitesse de lecture.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Et plus encore !',
+          description:
+              'Nous avons ajouté aux Souvenirs de la musique composée par nos soins. De plus, les Albums intelligents fonctionnent mieux, Libérer de l’espace est plus fiable et l’État de la sauvegarde affiche la progression de chaque fichier.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -265,35 +374,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Condivisione della libreria',
           description:
-              'Condividi automaticamente gli album attuali e futuri con i membri della famiglia. Vai su Impostazioni → Famiglia, scegli un membro e tocca Condividi album. I nuovi album vengono inclusi man mano che li crei.',
+              'Condividi automaticamente gli album attuali e futuri con i membri della famiglia. Vai su Impostazioni → Famiglia, scegli un membro e tocca Condividi album.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Più veloce, ovunque',
+          description:
+              'La ricerca, la mappa e lo scorrimento della galleria sono più veloci nelle librerie di grandi dimensioni.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ricerca per località',
+          description:
+              'Ora puoi effettuare ricerche per Paese e città con maggiore precisione.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Cestino di sistema',
+          description:
+              "Su Android 11 e versioni successive, le foto del dispositivo eliminate tramite Ente Photos vengono spostate nel cestino di sistema e possono essere recuperate dall'app.",
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descrizioni degli album',
           description:
-              'Aggiungi a un album una descrizione oltre al nome e alla foto di copertina. Le descrizioni accompagnano i link condivisi, così chiunque ne apra uno vedrà il contesto che hai aggiunto.',
+              'Ora puoi aggiungere descrizioni agli album, che verranno visualizzate anche nei link condivisi.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Più veloce con le librerie grandi',
+          title: 'Presentazioni degli album',
           description:
-              'La ricerca, i Ricordi intelligenti, la mappa e lo scorrimento della sequenza temporale sono molto più veloci se hai una libreria grande. Il solo raggruppamento sulla mappa è da 2 a 3 volte più veloce.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backup da seguire in tempo reale',
-          description:
-              'Lo Stato backup ora mostra l’avanzamento di ogni file e i caricamenti multipart di grandi dimensioni sono più affidabili.',
+              'Trasforma il tuo vecchio tablet in una cornice digitale con le presentazioni degli album.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Selezione del testo nelle foto',
+          title: 'Modifiche che conservano di più',
           description:
-              'I controlli restano accessibili durante la selezione e toccando il testo selezionato la selezione viene annullata.',
+              'Le foto modificate ora conservano i dati principali su fotocamera, data e luogo. Anche i JPEG mantengono la qualità originale quando li ruoti o li capovolgi soltanto.',
         ),
         ChangeLogEntryStrings(
-          title: 'Un menu di selezione più ordinato',
+          title: 'Migliore riproduzione video',
           description:
-              'Le azioni nella barra di selezione sono ordinate in base alla frequenza con cui le usi e l’icona di condivisione ora corrisponde alla tua piattaforma.',
+              'Tocca due volte uno dei lati di un video per spostarti avanti o indietro di cinque secondi. Puoi anche scegliere la velocità di riproduzione.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'E non è tutto!',
+          description:
+              "Abbiamo aggiunto ai Ricordi un po' di musica composta da noi. Inoltre, gli Album intelligenti funzionano meglio, Libera spazio è più affidabile e Stato backup mostra l'avanzamento di ogni file.",
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -302,33 +428,47 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'ライブラリ共有',
           description:
-              '現在および今後作成するアルバムを家族と自動的に共有できます。［設定］→［ファミリー］でメンバーを選び、［アルバムを共有］をタップしてください。新しいアルバムも作成時に自動で含まれます。',
+              '現在および今後作成するアルバムを家族と自動的に共有できます。［設定］→［ファミリー］でメンバーを選び、［アルバムを共有］をタップしてください。',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'どこでも、より高速に',
+          description: '大規模なライブラリで、検索、地図、ギャラリーのスクロールが高速になりました。',
+        ),
+        ChangeLogEntryStrings(
+          title: '位置情報検索',
+          description: '国や都市で検索できるようになり、精度も向上しました。',
+        ),
+        ChangeLogEntryStrings(
+          title: 'システムのゴミ箱',
+          description:
+              'Android 11 以降では、Ente Photos から削除した端末上の写真はシステムのゴミ箱に移動し、アプリから復元できます。',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'アルバムの説明',
-          description:
-              'アルバムに名前やカバー写真とあわせて説明を追加できます。説明は共有リンクにも表示されるため、リンクを開いた人に追加した背景が伝わります。',
+          description: 'アルバムに説明を追加できるようになりました。説明は共有リンクにも表示されます。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '大規模ライブラリでも高速に',
-          description:
-              '大規模なライブラリで、検索、スマートメモリー、マップ、タイムラインのスクロールが大幅に高速化しました。マップのクラスタリングだけでも2～3倍高速です。',
-        ),
-        ChangeLogEntryStrings(
-          title: '進捗が見えるバックアップ',
-          description:
-              'バックアップの状態にファイルごとの進捗が表示されるようになり、大容量のマルチパートアップロードの信頼性も向上しました。',
+          title: 'アルバムのスライドショー',
+          description: 'アルバムのスライドショーを使えば、古いタブレットをフォトフレームとして活用できます。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '写真内のテキスト選択',
-          description: 'テキストを選択中も操作ボタンにアクセスでき、選択したテキストをタップすると選択が解除されます。',
+          title: 'より多くの情報を残す編集',
+          description:
+              '編集した写真で、カメラ、撮影日、場所の重要な情報が保持されるようになりました。JPEGは、回転または反転のみを行った場合、元の画質も維持されます。',
         ),
         ChangeLogEntryStrings(
-          title: 'すっきりした選択メニュー',
-          description: '選択バーの操作を使用頻度順に並べ替え、共有アイコンもお使いのプラットフォームに合うものになりました。',
+          title: '動画再生の改善',
+          description: '動画の左右どちらかをダブルタップすると、5秒早送りまたは巻き戻しできます。再生速度も選べます。',
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description:
+              'Enteが作曲した音楽を思い出に追加しました。また、スマートアルバムの機能が向上し、「スペースを解放する」の信頼性が高まり、「バックアップの状態」でファイルごとの進捗を確認できるようになりました。',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -337,35 +477,51 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Bibliotheek delen',
           description:
-              'Deel je huidige en toekomstige albums automatisch met gezinsleden. Ga naar Instellingen → Familie, kies een lid en tik op Albums delen. Nieuwe albums worden toegevoegd zodra je ze maakt.',
+              'Deel je huidige en toekomstige albums automatisch met gezinsleden. Ga naar Instellingen → Familie, kies een lid en tik op Albums delen.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sneller, overal',
+          description:
+              'Zoeken, de kaart en scrollen door de galerij zijn sneller bij grote bibliotheken.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Zoeken op locatie',
+          description: 'Je kunt nu nauwkeuriger zoeken op landen en steden.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Systeemprullenbak',
+          description:
+              "Op Android 11 en nieuwer worden apparaatfoto's die je via Ente Photos verwijdert naar de systeemprullenbak verplaatst en kun je ze vanuit de app herstellen.",
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Albumbeschrijvingen',
           description:
-              'Geef een album naast een naam en omslagfoto ook een beschrijving. Beschrijvingen gaan mee met je gedeelde links, zodat iedereen die een link opent de context ziet die je hebt toegevoegd.',
+              'Je kunt nu beschrijvingen aan albums toevoegen. Deze worden ook in gedeelde links weergegeven.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Sneller bij grote bibliotheken',
+          title: 'Diavoorstellingen van albums',
           description:
-              'Zoeken, Slimme herinneringen, de kaart en scrollen door de tijdlijn zijn allemaal aanzienlijk sneller als je een grote bibliotheek hebt. Alleen al het clusteren op de kaart is 2–3 keer sneller.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Back-ups die je kunt volgen',
-          description:
-              'Back-up status toont nu de voortgang per bestand en grote meerdelige uploads zijn betrouwbaarder.',
+              'Verander je oude tablet in een fotolijst met diavoorstellingen van albums.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: "Tekst selecteren in foto's",
+          title: 'Bewerkingen die meer behouden',
           description:
-              'De bediening blijft bereikbaar terwijl je tekst selecteert en door op geselecteerde tekst te tikken wis je de selectie.',
+              "Bewerkte foto's behouden nu belangrijke camera-, datum- en locatiegegevens. JPEG's behouden ook hun oorspronkelijke kwaliteit als je ze alleen roteert of omdraait.",
         ),
         ChangeLogEntryStrings(
-          title: 'Een overzichtelijker selectiemenu',
+          title: 'Betere videoweergave',
           description:
-              'De acties in de selectiebalk zijn gerangschikt op hoe vaak je ze gebruikt en het deelpictogram past nu bij je platform.',
+              'Dubbeltik aan een van beide kanten van een video om vijf seconden vooruit of terug te springen. Je kunt ook een afspeelsnelheid kiezen.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'En meer!',
+          description:
+              'We hebben muziek die we zelf hebben gecomponeerd aan Herinneringen toegevoegd. Ook werken Slimme albums beter, is Ruimte vrijmaken betrouwbaarder en toont Back-up status de voortgang per bestand.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -374,35 +530,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Deling av bibliotek',
           description:
-              'Del nåværende og fremtidige album automatisk med familiemedlemmer. Gå til Innstillinger → Familie, velg et medlem og trykk på Del album. Nye album tas med etter hvert som du oppretter dem.',
+              'Del nåværende og fremtidige album automatisk med familiemedlemmer. Gå til Innstillinger → Familie, velg et medlem og trykk på Del album.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Raskere, overalt',
+          description:
+              'Søk, kartet og rulling i galleriet er raskere for store biblioteker.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Stedssøk',
+          description:
+              'Du kan nå søke etter land og byer med bedre nøyaktighet.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Systemets papirkurv',
+          description:
+              'På Android 11 og nyere flyttes enhetsbilder som slettes gjennom Ente Photos, til systemets papirkurv og kan gjenopprettes fra appen.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Albumbeskrivelser',
           description:
-              'Gi et album en beskrivelse i tillegg til navn og forsidebilde. Beskrivelsene følger de delte lenkene, slik at alle som åpner en, ser konteksten du la til.',
+              'Du kan nå legge til beskrivelser i album. De vises også i delte lenker.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Raskere med store biblioteker',
+          title: 'Lysbildefremvisning av album',
           description:
-              'Søk, Smarte minner, kartet og rulling på tidslinjen er betydelig raskere hvis du har et stort bibliotek. Gruppering på kartet alene er 2–3 ganger raskere.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Sikkerhetskopiering du kan følge',
-          description:
-              'Status for sikkerhetskopi viser nå fremdrift per fil, og store opplastinger i flere deler er mer pålitelige.',
+              'Gjør det gamle nettbrettet ditt om til en fotoramme med lysbildefremvisninger av album.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Velge tekst i bilder',
+          title: 'Redigeringer som beholder mer',
           description:
-              'Kontrollene er fortsatt tilgjengelige mens du velger tekst, og et trykk på valgt tekst fjerner markeringen.',
+              'Redigerte bilder beholder nå viktige kamera-, dato- og plasseringsdetaljer. JPEG-filer beholder også originalkvaliteten når du bare roterer eller speilvender dem.',
         ),
         ChangeLogEntryStrings(
-          title: 'En ryddigere valgmeny',
+          title: 'Bedre videoavspilling',
           description:
-              'Handlingene i valglinjen er sortert etter hvor ofte du bruker dem, og deleikonet samsvarer nå med plattformen din.',
+              'Dobbelttrykk på en av sidene i en video for å hoppe fem sekunder frem eller tilbake. Du kan også velge avspillingshastighet.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Og mer!',
+          description:
+              'Vi har lagt til musikk vi har komponert i Minner. Dessuten fungerer Smarte album bedre, Frigjør lagringsplass er mer pålitelig, og Status for sikkerhetskopi viser fremdriften for hver fil.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -411,35 +584,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Udostępnianie biblioteki',
           description:
-              'Automatycznie udostępniaj rodzinie swoje obecne i przyszłe albumy. Przejdź do Ustawienia → Rodzina, wybierz osobę i stuknij Udostępnij albumy. Nowe albumy będą dodawane w chwili ich utworzenia.',
+              'Automatycznie udostępniaj rodzinie swoje obecne i przyszłe albumy. Przejdź do Ustawienia → Rodzina, wybierz osobę i stuknij Udostępnij albumy.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Szybciej wszędzie',
+          description:
+              'Wyszukiwanie, mapa i przewijanie galerii działają szybciej przy dużych bibliotekach.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Wyszukiwanie według lokalizacji',
+          description:
+              'Teraz możesz wyszukiwać według krajów i miast z większą dokładnością.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Kosz systemowy',
+          description:
+              'W systemie Android 11 i nowszym zdjęcia z urządzenia usunięte za pośrednictwem Ente Photos trafiają do kosza systemowego i można je przywrócić w aplikacji.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Opisy albumów',
           description:
-              'Dodaj do albumu opis obok nazwy i zdjęcia na okładkę. Opisy są dołączane do udostępnionych linków, więc każda osoba, która otworzy link, zobaczy dodany przez Ciebie kontekst.',
+              'Teraz możesz dodawać opisy do albumów. Będą one również widoczne w udostępnionych linkach.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Szybciej przy dużych bibliotekach',
+          title: 'Pokazy slajdów z albumów',
           description:
-              'Wyszukiwanie, Inteligentne wspomnienia, mapa i przewijanie osi czasu działają znacznie szybciej, jeśli masz dużą bibliotekę. Samo grupowanie na mapie jest 2–3 razy szybsze.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Kopie zapasowe z widocznym postępem',
-          description:
-              'Status kopii zapasowej pokazuje teraz postęp dla każdego pliku, a duże przesyłania wieloczęściowe są bardziej niezawodne.',
+              'Zmień swój stary tablet w ramkę cyfrową dzięki pokazom slajdów z albumów.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Zaznaczanie tekstu na zdjęciach',
+          title: 'Edycje, które zachowują więcej',
           description:
-              'Elementy sterujące pozostają dostępne podczas zaznaczania, a stuknięcie zaznaczonego tekstu usuwa zaznaczenie.',
+              'Edytowane zdjęcia zachowują teraz kluczowe informacje o aparacie, dacie i lokalizacji. Pliki JPEG zachowują również oryginalną jakość, gdy jedyną zmianą jest ich obrócenie lub odwrócenie.',
         ),
         ChangeLogEntryStrings(
-          title: 'Uporządkowane menu zaznaczenia',
+          title: 'Lepsze odtwarzanie filmów',
           description:
-              'Działania na pasku zaznaczenia są uporządkowane według częstotliwości użycia, a ikona udostępniania jest teraz zgodna z Twoją platformą.',
+              'Stuknij dwukrotnie po dowolnej stronie filmu, aby przewinąć o pięć sekund do przodu lub do tyłu. Możesz też wybrać szybkość odtwarzania.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'I jeszcze więcej!',
+          description:
+              'Do Wspomnień dodaliśmy skomponowaną przez nas muzykę. Ponadto Inteligentne albumy działają lepiej, funkcja Zwolnij miejsce jest bardziej niezawodna, a Status kopii zapasowej pokazuje postęp każdego pliku.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -448,35 +638,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Compartilhamento da biblioteca',
           description:
-              'Compartilhe automaticamente seus álbuns atuais e futuros com familiares. Acesse Opções → Família, escolha uma pessoa e toque em Compartilhar álbuns. Novos álbuns são incluídos conforme você os cria.',
+              'Compartilhe automaticamente seus álbuns atuais e futuros com familiares. Acesse Opções → Família, escolha uma pessoa e toque em Compartilhar álbuns.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Mais rápido em todos os lugares',
+          description:
+              'A pesquisa, o mapa e a rolagem da galeria estão mais rápidos em bibliotecas grandes.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Pesquisa por localização',
+          description:
+              'Agora você pode buscar por países e cidades com mais precisão.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Lixeira do sistema',
+          description:
+              'No Android 11 e versões mais recentes, as fotos do dispositivo excluídas por meio do Ente Photos são movidas para a lixeira do sistema e podem ser recuperadas no aplicativo.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descrições de álbuns',
           description:
-              'Adicione uma descrição ao álbum, além do nome e da foto de capa. As descrições acompanham os links compartilhados, para que qualquer pessoa que abrir um deles veja o contexto que você adicionou.',
+              'Agora você pode adicionar descrições aos álbuns, que também serão exibidas nos links compartilhados.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mais rapidez em bibliotecas grandes',
+          title: 'Apresentações de slides dos álbuns',
           description:
-              'A pesquisa, as Memórias inteligentes, o mapa e a rolagem da linha do tempo ficaram muito mais rápidos para bibliotecas grandes. Só o agrupamento no mapa está de 2 a 3 vezes mais rápido.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backups que você pode acompanhar',
-          description:
-              'O Estado do backup agora mostra o progresso de cada arquivo, e uploads grandes em várias partes estão mais confiáveis.',
+              'Transforme seu tablet antigo em um porta-retrato com apresentações de slides dos álbuns.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Seleção de texto em fotos',
+          title: 'Edições que preservam mais',
           description:
-              'Os controles continuam acessíveis durante a seleção, e tocar no texto selecionado desfaz a seleção.',
+              'As fotos editadas agora preservam detalhes importantes da câmera, da data e da localização. Os JPEGs também mantêm a qualidade original quando você apenas os gira ou inverte.',
         ),
         ChangeLogEntryStrings(
-          title: 'Um menu de seleção mais organizado',
+          title: 'Melhor reprodução de vídeo',
           description:
-              'As ações na barra de seleção são ordenadas pela frequência de uso, e o ícone de compartilhamento agora corresponde à sua plataforma.',
+              'Toque duas vezes em um dos lados do vídeo para avançar ou voltar cinco segundos. Você também pode escolher a velocidade de reprodução.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Adicionamos às Memórias músicas que compusemos. Além disso, os Álbuns inteligentes funcionam melhor, Liberar espaço está mais confiável e o Estado do backup mostra o progresso de cada arquivo.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -485,35 +692,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Partilha da biblioteca',
           description:
-              'Partilhe automaticamente os seus álbuns atuais e futuros com familiares. Aceda a Definições → Família, escolha um membro e toque em Partilhar álbuns. Os novos álbuns são incluídos à medida que os cria.',
+              'Partilhe automaticamente os seus álbuns atuais e futuros com familiares. Aceda a Definições → Família, escolha um membro e toque em Partilhar álbuns.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Mais rápido em todo o lado',
+          description:
+              'A pesquisa, o mapa e o deslocamento na galeria são mais rápidos em bibliotecas grandes.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Pesquisa por localização',
+          description:
+              'Agora pode pesquisar por países e cidades com maior precisão.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Lixo do sistema',
+          description:
+              'No Android 11 e versões posteriores, as fotografias do dispositivo eliminadas através do Ente Photos são movidas para o lixo do sistema e podem ser recuperadas a partir da aplicação.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descrições de álbuns',
           description:
-              'Adicione uma descrição a um álbum, além do nome e da fotografia de capa. As descrições acompanham as ligações partilhadas, para que qualquer pessoa que abra uma veja o contexto que adicionou.',
+              'Agora pode adicionar descrições aos álbuns, que também serão apresentadas nas ligações partilhadas.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mais rápido com bibliotecas grandes',
+          title: 'Apresentações de diapositivos dos álbuns',
           description:
-              'A pesquisa, as Memórias inteligentes, o mapa e o deslocamento na cronologia são substancialmente mais rápidos se tiver uma biblioteca grande. Só o agrupamento no mapa é 2 a 3 vezes mais rápido.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Cópias de segurança que pode acompanhar',
-          description:
-              'O Status da cópia de segurança mostra agora o progresso de cada ficheiro e os carregamentos multipartes grandes são mais fiáveis.',
+              'Transforme o seu tablet antigo numa moldura digital com apresentações de diapositivos dos álbuns.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Selecionar texto em fotografias',
+          title: 'Edições que preservam mais',
           description:
-              'Os controlos continuam acessíveis durante a seleção e tocar no texto selecionado limpa a seleção.',
+              'As fotografias editadas preservam agora detalhes importantes da câmara, da data e da localização. Os ficheiros JPEG também mantêm a qualidade original quando apenas os roda ou inverte.',
         ),
         ChangeLogEntryStrings(
-          title: 'Um menu de seleção mais organizado',
+          title: 'Melhor reprodução de vídeo',
           description:
-              'As ações na barra de seleção são ordenadas pela frequência de utilização e o ícone de partilha corresponde agora à sua plataforma.',
+              'Toque duas vezes num dos lados do vídeo para avançar ou recuar cinco segundos. Também pode escolher a velocidade de reprodução.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Adicionámos às Memórias música composta por nós. Além disso, os Álbuns inteligentes funcionam melhor, Libertar espaço é mais fiável e o Status da cópia de segurança mostra o progresso de cada ficheiro.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -522,35 +746,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Partajarea bibliotecii',
           description:
-              'Partajează automat albumele actuale și viitoare cu membrii familiei. Accesează Setări → Familie, alege un membru și atinge Partajează albumele. Albumele noi sunt incluse pe măsură ce le creezi.',
+              'Partajează automat albumele actuale și viitoare cu membrii familiei. Accesează Setări → Familie, alege un membru și atinge Partajează albumele.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Mai rapid, oriunde',
+          description:
+              'Căutarea, harta și derularea galeriei sunt mai rapide pentru bibliotecile mari.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Căutare după locație',
+          description:
+              'Acum poți căuta după țări și orașe cu o precizie mai bună.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Coșul de gunoi al sistemului',
+          description:
+              'Pe Android 11 și versiunile ulterioare, fotografiile de pe dispozitiv șterse prin Ente Photos sunt mutate în coșul de gunoi al sistemului și pot fi recuperate din aplicație.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Descrieri pentru albume',
           description:
-              'Adaugă unui album o descriere, pe lângă nume și fotografia de copertă. Descrierile însoțesc linkurile partajate, astfel încât oricine deschide unul vede contextul adăugat de tine.',
+              'Acum poți adăuga descrieri albumelor, care vor apărea și în linkurile partajate.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mai rapid pentru biblioteci mari',
+          title: 'Prezentări de diapozitive ale albumelor',
           description:
-              'Căutarea, Amintirile inteligente, harta și derularea cronologiei sunt mult mai rapide dacă ai o bibliotecă mare. Numai gruparea pe hartă este de 2–3 ori mai rapidă.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Copii de siguranță pe care le poți urmări',
-          description:
-              'Stare copie de rezervă afișează acum progresul pentru fiecare fișier, iar încărcările multipart mari sunt mai fiabile.',
+              'Transformă vechea tabletă într-o ramă foto cu prezentările de diapozitive ale albumelor.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Selectarea textului din fotografii',
+          title: 'Editări care păstrează mai mult',
           description:
-              'Comenzile rămân accesibile în timpul selectării, iar atingerea textului selectat șterge selecția.',
+              'Fotografiile editate păstrează acum detaliile esențiale despre cameră, dată și locație. Fișierele JPEG își păstrează și calitatea originală atunci când doar le rotești sau le răstorni.',
         ),
         ChangeLogEntryStrings(
-          title: 'Un meniu de selecție mai ordonat',
+          title: 'Redare video îmbunătățită',
           description:
-              'Acțiunile din bara de selecție sunt ordonate după frecvența utilizării, iar pictograma de partajare corespunde acum platformei tale.',
+              'Atinge de două ori oricare dintre laturile unui videoclip pentru a derula înainte sau înapoi cu cinci secunde. De asemenea, poți alege viteza de redare.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Și altele!',
+          description:
+              'Am adăugat în Amintiri muzică pe care am compus-o. În plus, Albumele inteligente funcționează mai bine, funcția „Eliberați spațiu” este mai fiabilă, iar „Stare copie de rezervă” afișează progresul fiecărui fișier.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -559,35 +800,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Общий доступ к библиотеке',
           description:
-              'Автоматически делитесь текущими и будущими альбомами с членами семьи. Откройте Настройки → Семья, выберите участника и нажмите Поделиться альбомами. Новые альбомы будут добавляться по мере их создания.',
+              'Автоматически делитесь текущими и будущими альбомами с членами семьи. Откройте Настройки → Семья, выберите участника и нажмите Поделиться альбомами.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Быстрее повсюду',
+          description:
+              'Поиск, карта и прокрутка галереи стали быстрее для больших библиотек.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Поиск по местоположению',
+          description:
+              'Теперь можно с большей точностью искать по странам и городам.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Системная корзина',
+          description:
+              'На Android 11 и новее фотографии с устройства, удалённые через Ente Photos, перемещаются в системную корзину, и их можно восстановить в приложении.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Описания альбомов',
           description:
-              'Добавляйте к альбому описание вместе с названием и фотографией обложки. Описания передаются по общим ссылкам, поэтому каждый, кто откроет ссылку, увидит добавленный вами контекст.',
+              'Теперь к альбомам можно добавлять описания, которые также будут отображаться в общих ссылках.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Быстрее для больших библиотек',
+          title: 'Слайд-шоу альбомов',
           description:
-              'Поиск, Умные воспоминания, карта и прокрутка временной шкалы стали значительно быстрее для больших библиотек. Одна только группировка на карте работает в 2–3 раза быстрее.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Резервное копирование с видимым прогрессом',
-          description:
-              'Статус резервного копирования теперь показывает прогресс для каждого файла, а большие многочастные загрузки стали надёжнее.',
+              'Превратите старый планшет в цифровую фоторамку с помощью слайд-шоу альбомов.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Выделение текста на фотографиях',
+          title: 'Больше данных после редактирования',
           description:
-              'Элементы управления остаются доступными во время выделения, а нажатие на выделенный текст снимает выделение.',
+              'Отредактированные фотографии теперь сохраняют важные данные о камере, дате и местоположении. Файлы JPEG также сохраняют исходное качество, если вы только поворачиваете или отражаете их.',
         ),
         ChangeLogEntryStrings(
-          title: 'Более аккуратное меню выбора',
+          title: 'Улучшенное воспроизведение видео',
           description:
-              'Действия на панели выбора упорядочены по частоте использования, а значок «Поделиться» теперь соответствует вашей платформе.',
+              'Дважды коснитесь любой стороны видео, чтобы перемотать на пять секунд вперёд или назад. Также можно выбрать скорость воспроизведения.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'И многое другое!',
+          description:
+              'Мы добавили во Воспоминания музыку, которую сочинили сами. Кроме того, Умные альбомы работают лучше, функция «Освободить место» стала надёжнее, а Статус резервного копирования показывает прогресс для каждого файла.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -596,35 +854,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Kütüphane paylaşımı',
           description:
-              'Mevcut ve gelecekteki albümlerinizi aile üyeleriyle otomatik olarak paylaşın. Ayarlar → Aile bölümüne gidin, bir üye seçin ve Albümleri paylaş seçeneğine dokunun. Yeni albümler oluşturuldukça otomatik olarak eklenir.',
+              'Mevcut ve gelecekteki albümlerinizi aile üyeleriyle otomatik olarak paylaşın. Ayarlar → Aile bölümüne gidin, bir üye seçin ve Albümleri paylaş seçeneğine dokunun.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Her yerde daha hızlı',
+          description:
+              'Büyük kütüphanelerde arama, harita ve galeride kaydırma artık daha hızlı.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Konum arama',
+          description:
+              'Artık ülke ve şehirlere göre daha yüksek doğrulukla arama yapabilirsiniz.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sistem çöp kutusu',
+          description:
+              'Android 11 ve sonraki sürümlerde, Ente Photos üzerinden silinen cihaz fotoğrafları sistem çöp kutusuna taşınır ve uygulamadan kurtarılabilir.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Albüm açıklamaları',
           description:
-              'Bir albüme adı ve kapak fotoğrafının yanında bir açıklama ekleyin. Açıklamalar paylaşılan bağlantılarınızla birlikte gider; böylece bağlantıyı açan herkes eklediğiniz bağlamı görür.',
+              'Artık albümlere açıklama ekleyebilirsiniz; bu açıklamalar paylaşılan bağlantılarda da gösterilir.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Büyük kütüphanelerde daha hızlı',
+          title: 'Albüm slayt gösterileri',
           description:
-              'Büyük bir kütüphaneniz varsa arama, Akıllı anılar, harita ve zaman çizelgesinde kaydırma çok daha hızlıdır. Yalnızca harita kümeleme bile 2–3 kat daha hızlıdır.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Takip edebileceğiniz yedeklemeler',
-          description:
-              'Yedekleme durumu artık her dosyanın ilerlemesini gösteriyor ve büyük, çok parçalı yüklemeler daha güvenilir.',
+              'Albüm slayt gösterileriyle eski tabletinizi bir dijital fotoğraf çerçevesine dönüştürün.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Fotoğraflarda metin seçme',
+          title: 'Daha fazlasını koruyan düzenlemeler',
           description:
-              'Metin seçerken kontroller erişilebilir kalır ve seçili metne dokunmak seçimi temizler.',
+              "Düzenlenen fotoğraflar artık temel kamera, tarih ve konum ayrıntılarını koruyor. JPEG'ler de yalnızca döndürdüğünüzde veya çevirdiğinizde özgün kalitesini koruyor.",
         ),
         ChangeLogEntryStrings(
-          title: 'Daha düzenli bir seçim menüsü',
+          title: 'Daha iyi video oynatma',
           description:
-              'Seçim çubuğundaki işlemler kullanım sıklığına göre sıralanıyor ve paylaşım simgesi artık platformunuzla eşleşiyor.',
+              'Beş saniye ileri veya geri atlamak için videonun iki yanından birine çift dokunun. Ayrıca oynatma hızını da seçebilirsiniz.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ve daha fazlası!',
+          description:
+              'Anılar’a bestesini bizim yaptığımız müzikler ekledik. Ayrıca Akıllı Albümler daha iyi çalışıyor, Boş alan açma daha güvenilir ve Yedekleme durumu her dosyanın ilerlemesini gösteriyor.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -633,35 +908,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Спільний доступ до бібліотеки',
           description:
-              'Автоматично діліться поточними й майбутніми альбомами з членами родини. Відкрийте Налаштування → Сім’я, виберіть учасника й натисніть Поділитися альбомами. Нові альбоми додаватимуться під час створення.',
+              'Автоматично діліться поточними й майбутніми альбомами з членами родини. Відкрийте Налаштування → Сім’я, виберіть учасника й натисніть Поділитися альбомами.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Швидше всюди',
+          description:
+              'Пошук, мапа й прокручування галереї стали швидшими для великих бібліотек.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Пошук за розташуванням',
+          description:
+              'Тепер можна з більшою точністю шукати за країнами й містами.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Системний смітник',
+          description:
+              'На Android 11 і новіших версіях фотографії з пристрою, видалені через Ente Photos, переміщуються до системного смітника, і їх можна відновити в застосунку.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Описи альбомів',
           description:
-              'Додавайте до альбому опис разом із назвою та фотографією обкладинки. Описи передаються за спільними посиланнями, тож кожен, хто відкриє посилання, побачить доданий вами контекст.',
+              'Тепер до альбомів можна додавати описи, які також відображатимуться в спільних посиланнях.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Швидше для великих бібліотек',
+          title: 'Слайд-шоу альбомів',
           description:
-              'Пошук, Розумні спогади, карта й прокручування часової шкали стали значно швидшими для великих бібліотек. Саме групування на карті працює у 2–3 рази швидше.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Резервне копіювання з видимим перебігом',
-          description:
-              'Стан резервного копіювання тепер показує перебіг для кожного файлу, а великі багатокомпонентні завантаження стали надійнішими.',
+              'Перетворіть старий планшет на цифрову фоторамку за допомогою слайд-шоу альбомів.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Виділення тексту на фотографіях',
+          title: 'Редагування, що зберігають більше',
           description:
-              'Елементи керування залишаються доступними під час виділення, а натискання на виділений текст скасовує виділення.',
+              'Відредаговані фотографії тепер зберігають ключові дані про камеру, дату й розташування. Файли JPEG також зберігають початкову якість, якщо ви лише обертаєте або віддзеркалюєте їх.',
         ),
         ChangeLogEntryStrings(
-          title: 'Охайніше меню вибору',
+          title: 'Покращене відтворення відео',
           description:
-              'Дії на панелі вибору впорядковано за частотою використання, а піктограма поширення тепер відповідає вашій платформі.',
+              'Двічі торкніться будь-якого боку відео, щоб перейти на п’ять секунд уперед або назад. Також можна вибрати швидкість відтворення.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'І не тільки!',
+          description:
+              'Ми додали до Спогадів музику, яку створили самі. Крім того, Розумні альбоми працюють краще, функція «Звільнити місце» стала надійнішою, а Стан резервного копіювання показує перебіг для кожного файлу.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -670,35 +962,52 @@ class ChangeLogStrings {
         ChangeLogEntryStrings(
           title: 'Chia sẻ thư viện',
           description:
-              'Tự động chia sẻ các album hiện tại và trong tương lai với thành viên gia đình. Vào Cài đặt → Gia đình, chọn một thành viên rồi nhấn Chia sẻ album. Album mới sẽ được thêm vào ngay khi bạn tạo.',
+              'Tự động chia sẻ các album hiện tại và trong tương lai với thành viên gia đình. Vào Cài đặt → Gia đình, chọn một thành viên rồi nhấn Chia sẻ album.',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Nhanh hơn ở mọi nơi',
+          description:
+              'Tìm kiếm, bản đồ và cuộn thư viện nhanh hơn trên các thư viện lớn.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Tìm kiếm vị trí',
+          description:
+              'Giờ đây, bạn có thể tìm kiếm theo quốc gia và thành phố với độ chính xác cao hơn.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Thùng rác hệ thống',
+          description:
+              'Trên Android 11 trở lên, ảnh trên thiết bị bị xóa qua Ente Photos sẽ được chuyển vào thùng rác hệ thống và có thể khôi phục trong ứng dụng.',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: 'Mô tả album',
           description:
-              'Thêm mô tả cho album bên cạnh tên và ảnh bìa. Mô tả được hiển thị cùng liên kết chia sẻ, để bất kỳ ai mở liên kết đều thấy ngữ cảnh bạn đã thêm.',
+              'Giờ đây, bạn có thể thêm mô tả cho album. Mô tả cũng sẽ hiển thị trên các liên kết chia sẻ.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Nhanh hơn với thư viện lớn',
+          title: 'Trình chiếu album',
           description:
-              'Tìm kiếm, Gợi nhớ kỷ niệm, bản đồ và cuộn dòng thời gian đều nhanh hơn đáng kể nếu bạn có thư viện lớn. Riêng việc nhóm trên bản đồ đã nhanh hơn 2–3 lần.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Theo dõi tiến trình sao lưu',
-          description:
-              'Trạng thái sao lưu giờ hiển thị tiến trình của từng tệp, và các lượt tải lên nhiều phần dung lượng lớn đáng tin cậy hơn.',
+              'Biến chiếc máy tính bảng cũ thành khung ảnh với trình chiếu album.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Chọn văn bản trong ảnh',
+          title: 'Chỉnh sửa giữ lại nhiều hơn',
           description:
-              'Các nút điều khiển vẫn trong tầm với khi bạn chọn văn bản, và nhấn vào văn bản đã chọn sẽ xóa lựa chọn.',
+              'Ảnh đã chỉnh sửa giờ đây giữ lại các chi tiết quan trọng về máy ảnh, ngày chụp và vị trí. Tệp JPEG cũng giữ nguyên chất lượng gốc khi bạn chỉ xoay hoặc lật ảnh.',
         ),
         ChangeLogEntryStrings(
-          title: 'Menu lựa chọn gọn gàng hơn',
+          title: 'Phát video tốt hơn',
           description:
-              'Các thao tác trên thanh lựa chọn được sắp xếp theo tần suất bạn sử dụng, và biểu tượng chia sẻ giờ phù hợp với nền tảng của bạn.',
+              'Nhấn đúp vào một trong hai bên video để tua tiến hoặc lùi năm giây. Bạn cũng có thể chọn tốc độ phát.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Và còn nhiều hơn thế!',
+          description:
+              'Chúng tôi đã thêm vào Kỷ niệm một số bản nhạc do chính mình sáng tác. Ngoài ra, Album thông minh hoạt động tốt hơn, Giải phóng dung lượng đáng tin cậy hơn và Trạng thái sao lưu hiển thị tiến trình của từng tệp.',
+          isOnlineOnly: true,
         ),
       ],
     ),
@@ -706,32 +1015,46 @@ class ChangeLogStrings {
       entries: [
         ChangeLogEntryStrings(
           title: '图库共享',
-          description:
-              '自动与家人共享你当前和今后创建的相册。前往“设置”→“家庭”，选择一位成员，然后轻点“共享相册”。新建相册会在创建时自动包含在内。',
+          description: '自动与家人共享你当前和今后创建的相册。前往“设置”→“家庭”，选择一位成员，然后轻点“共享相册”。',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '处处更快',
+          description: '在大型图库中，搜索、地图和图库滚动都变得更快。',
+        ),
+        ChangeLogEntryStrings(
+          title: '位置搜索',
+          description: '现在可以按国家和城市搜索，准确度也有所提升。',
+        ),
+        ChangeLogEntryStrings(
+          title: '系统回收站',
+          description:
+              '在 Android 11 及更高版本中，通过 Ente Photos 删除的设备照片会移至系统回收站，并可在应用内恢复。',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: '相册描述',
+          description: '现在可以为相册添加描述，描述也会显示在共享链接中。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '相册幻灯片',
+          description: '利用相册幻灯片，把你的旧平板变成电子相框。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '编辑后保留更多信息',
+          description: '编辑后的照片现在会保留相机、日期和位置等关键信息。仅旋转或翻转 JPEG 时，还会保留其原始画质。',
+        ),
+        ChangeLogEntryStrings(
+          title: '视频播放体验升级',
+          description: '双击视频任一侧，可前进或后退五秒。你还可以选择播放速度。',
+        ),
+        ChangeLogEntryStrings(
+          title: '还有更多！',
           description:
-              '除了名称和封面照片外，现在还可以为相册添加描述。描述会随共享链接一起显示，让打开链接的任何人都能看到你添加的背景信息。',
+              '我们为“回忆”加入了一些由我们创作的音乐。此外，智能相册更加好用，“释放空间”更加可靠，“备份状态”会显示每个文件的进度。',
           isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '大型图库更流畅',
-          description: '如果你的图库规模较大，搜索、智能回忆、地图和时间线滚动现在都会快得多。仅地图聚类速度就提升了 2–3 倍。',
-        ),
-        ChangeLogEntryStrings(
-          title: '看得见进度的备份',
-          description: '“备份状态”现在会显示每个文件的进度，大型分片上传也更加可靠。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '选择照片中的文字',
-          description: '选择文字时，控件会始终保持可用；轻点已选文字即可清除选择。',
-        ),
-        ChangeLogEntryStrings(
-          title: '更整洁的选择菜单',
-          description: '选择栏中的操作会按使用频率排序，共享图标现在也会与所用平台保持一致。',
         ),
       ],
     ),
@@ -739,32 +1062,46 @@ class ChangeLogStrings {
       entries: [
         ChangeLogEntryStrings(
           title: '圖庫共享',
-          description:
-              '自動與家人共享您目前和未來建立的相簿。前往「設定」→「家庭」，選擇一位成員，然後點一下「共享相簿」。新相簿會在建立時自動包含在內。',
+          description: '自動與家人共享您目前和未來建立的相簿。前往「設定」→「家庭」，選擇一位成員，然後點一下「共享相簿」。',
           isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '處處更快速',
+          description: '在大型圖庫中，搜尋、地圖與圖庫捲動速度都變得更快。',
+        ),
+        ChangeLogEntryStrings(
+          title: '位置搜尋',
+          description: '現在可以依國家和城市搜尋，準確度也有所提升。',
+        ),
+        ChangeLogEntryStrings(
+          title: '系統垃圾桶',
+          description:
+              '在 Android 11 及更新版本中，透過 Ente Photos 刪除的裝置照片會移至系統垃圾桶，並可在應用程式中復原。',
+          isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
           title: '相簿描述',
+          description: '現在可以為相簿新增描述，描述也會顯示在共享連結中。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '相簿幻燈片',
+          description: '利用相簿幻燈片，將您的舊平板變成數位相框。',
+          isOnlineOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '編輯後保留更多資訊',
+          description: '編輯過的照片現在會保留相機、日期和位置等重要資訊。若只旋轉或翻轉 JPEG，還會保留原始畫質。',
+        ),
+        ChangeLogEntryStrings(
+          title: '更好的影片播放體驗',
+          description: '點兩下影片任一側，即可快轉或倒轉五秒。您也可以選擇播放速度。',
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
           description:
-              '除了名稱和封面照片外，現在還可以為相簿新增描述。描述會隨共享連結一併顯示，讓開啟連結的任何人都能看到您新增的背景資訊。',
+              '我們為「回憶」加入了一些由我們創作的音樂。此外，智慧相簿更加好用，「釋放空間」更加可靠，「備份狀態」會顯示每個檔案的進度。',
           isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '大型圖庫更流暢',
-          description: '如果您的圖庫較大，搜尋、自動分類回憶、地圖和時間軸捲動現在都快得多。僅地圖分群速度就提升了 2–3 倍。',
-        ),
-        ChangeLogEntryStrings(
-          title: '看得見進度的備份',
-          description: '「備份狀態」現在會顯示每個檔案的進度，大型分段上傳也更加可靠。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '選取照片中的文字',
-          description: '選取文字時，控制項會保持可用；點一下已選取的文字即可清除選取。',
-        ),
-        ChangeLogEntryStrings(
-          title: '更整潔的選取選單',
-          description: '選取列中的操作會按使用頻率排序，共享圖示現在也會與您使用的平台一致。',
         ),
       ],
     ),
@@ -776,11 +1113,13 @@ class ChangeLogEntryStrings {
   final String description;
   final bool isOnlineOnly;
   final bool isLocalGalleryOnly;
+  final bool isAndroidOnly;
 
   const ChangeLogEntryStrings({
     required this.title,
     required this.description,
     this.isOnlineOnly = false,
     this.isLocalGalleryOnly = false,
+    this.isAndroidOnly = false,
   }) : assert(!(isOnlineOnly && isLocalGalleryOnly));
 }

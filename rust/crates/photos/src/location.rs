@@ -74,28 +74,33 @@ fn asset() -> Result<Asset, ente_assets::download::Error> {
         vec![
             file(
                 CITY_FILE,
+                2_809_615,
                 "898dca892a71fd601ae8e75e5c55fd6d4591e4c98de335d9b33e7f076aa668f5",
             ),
             file(
                 URBAN_CENTER_FILE,
+                1_825_064,
                 "e981b0383e6502ede56b52d5be96cda66f53d7352492e677d8978467c106dab0",
             ),
             file(
                 COUNTRY_FILE,
+                2_504_017,
                 "3ead1ef2bb03b4ffa95813df4316cf149d37c82d16a322352bd6e3b19218c796",
             ),
             file(
                 DISPUTE_FILE,
+                61_543,
                 "c44d0af6ad40a3b195bc10cb87512c16998a20e837af190ff1a46b00170dfd7b",
             ),
         ],
     )
 }
 
-fn file(name: &str, sha256: &str) -> AssetFile {
+fn file(name: &str, size: u64, sha256: &str) -> AssetFile {
     AssetFile {
         name: name.into(),
         url: format!("{ASSET_URL}/{name}"),
+        size,
         sha256: sha256.into(),
     }
 }

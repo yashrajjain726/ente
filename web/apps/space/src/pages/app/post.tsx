@@ -4,18 +4,24 @@ import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
-import log from "ente-base/log";
 import React from "react";
 import { useSpaceAppState } from "state/app-state";
+import { spaceEmptyStateButtonSx } from "styles/buttons";
+import {
+    spaceAppBackground,
+    spaceAppBackgroundColor,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { spacePostImageInputAccept } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
-const background = "#F5F5F7";
+const background = spaceAppBackgroundColor;
 const green = "#08C225";
-const textBase = "#000000";
-const textSecondary = "#6B6B6B";
+const textBase = spaceText;
+const textSecondary = spaceTextMuted;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
@@ -23,11 +29,11 @@ const Page: React.FC = () => {
         profile,
         profileLoadError,
         profileLoadStatus,
+        pendingPostPhotoFile,
         setPendingPostPhotoFile,
-        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const inputRef = React.useRef<HTMLInputElement | null>(null);
-    const [isOpeningPost, setIsOpeningPost] = React.useState(false);
+    const isOpeningPost = Boolean(pendingPostPhotoFile);
 
     React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -51,14 +57,7 @@ const Page: React.FC = () => {
         event.target.value = "";
         if (!file) return;
 
-        setIsOpeningPost(true);
         setPendingPostPhotoFile(file);
-        setSkipNextHomeFeedSkeleton(true);
-        void router.push(spaceRoutes.home).catch((error: unknown) => {
-            log.error("Failed to open post photo draft", error);
-            setPendingPostPhotoFile(null);
-            setIsOpeningPost(false);
-        });
     };
 
     return (
@@ -67,7 +66,7 @@ const Page: React.FC = () => {
             <Box
                 component="main"
                 sx={{
-                    bgcolor: background,
+                    background: spaceAppBackground,
                     color: textBase,
                     display: "grid",
                     minHeight: "100svh",
@@ -151,7 +150,7 @@ const Page: React.FC = () => {
                                 color: textSecondary,
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
+                                fontSize: 14,
                                 fontWeight: 500,
                                 lineHeight: "22px",
                                 m: 0,
@@ -159,7 +158,7 @@ const Page: React.FC = () => {
                                 maxWidth: 280,
                             }}
                         >
-                            Post a moment, big or small.
+                            Post a photo from your day.
                         </Box>
                         <Box
                             ref={inputRef}
@@ -175,36 +174,11 @@ const Page: React.FC = () => {
                             type="button"
                             disabled={isOpeningPost}
                             onClick={() => inputRef.current?.click()}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: green,
-                                border: 0,
-                                borderRadius: "22px",
-                                color: "#FFFFFF",
-                                cursor: isOpeningPost ? "default" : "pointer",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
-                                fontWeight: 700,
-                                gap: "8px",
-                                height: 48,
-                                justifyContent: "center",
-                                mt: "28px",
-                                opacity: isOpeningPost ? 0.65 : 1,
-                                px: "22px",
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 3,
-                                },
-                                "&:hover": isOpeningPost
-                                    ? undefined
-                                    : { bgcolor: "#07AE22" },
-                            }}
+                            sx={{ ...spaceEmptyStateButtonSx, mt: "28px" }}
                         >
                             <HugeiconsIcon
                                 icon={AddSquareIcon}
-                                size={20}
+                                size={18}
                                 strokeWidth={1.8}
                             />
                             Post

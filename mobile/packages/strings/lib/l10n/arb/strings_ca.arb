@@ -532,11 +532,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Desactiva el bloqueig de pantalla del dispositiu quan Ente està en primer pla i hi ha una còpia de seguretat en curs. Això normalment no és necessari, però pot ajudar a completar més ràpidament les pujades grans i les importacions inicials de biblioteques grans.",
   "deviceNotFound": "Dispositiu no trobat",
   "didYouKnow": "Sabies que?",
   "digits": "Dígits",
-  "disableAutoLock": "Desactiva bloqueig automàtic",
   "disableDownloadWarningBody": "Els visualitzadors encara poden fer captures de pantalla o guardar una còpia de les teves fotos utilitzant eines externes",
   "disableDownloadWarningTitle": "Si us plau, tingues en compte",
   "disableLinkMessage": "Això eliminarà l'enllaç públic per accedir a \"{albumName}\".",
@@ -625,7 +623,6 @@
     }
   },
   "earned": "guanyat",
-  "earnFreeStorage": "Guanya emmagatzematge gratuït",
   "earnMoreSpace": "Guanya més espai!",
   "edit": "Edita",
   "editAutoAddPeople": "Edita persones d'afegit automàtic",
@@ -1596,14 +1593,6 @@
   "referrals": "Referències",
   "referralsAreCurrentlyPaused": "Les referències estan actualment en pausa",
   "referralStats": "Estadístiques de referències",
-  "referralStep1": "1. Personalitza i comparteix el teu codi.",
-  "referralStep2": "2. Es registren a Ente utilitzant el teu codi.",
-  "referralStep3": "3. {storageInGB}GB gratis per a ells + {storageInGB}GB gratis per a tu quan millorin el pla.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB per a ells + {storageAmountInGB} GB per a tu quan millorin el pla.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -1992,7 +1981,6 @@
   "setupFirstAccount": "Configura el teu\nprimer compte",
   "share": "Comparteix",
   "shareALink": "Comparteix un enllaç",
-  "shareCodeEarnStorage": "Comparteix el teu codi, guanya emmagatzematge.",
   "shareCodes": "Comparteix codis",
   "shareCodesDuration": "Selecciona la durada per a la qual vols compartir els codis.",
   "sharedAlbumSectionDescription": "Crea àlbums compartits i col·laboratius amb altres usuaris d'Ente, inclosos els usuaris de plans gratuïts.",
@@ -2247,7 +2235,6 @@
   },
   "unarchiveAlbum": "Desarxiva àlbum",
   "unarchiving": "Desarxivant...",
-  "unavailableReferralCode": "Ho sentim, aquest codi no està disponible.",
   "uncategorized": "Sense categoria",
   "undo": "Desfés",
   "unhide": "Mostra",

@@ -67,7 +67,15 @@ pub struct Context {
 
 pub type ContextRef = Arc<Context>;
 
+#[expect(
+    unsafe_code,
+    reason = "Retained LLM threading exception; review deferred"
+)]
 unsafe impl Send for Context {}
+#[expect(
+    unsafe_code,
+    reason = "Retained LLM threading exception; review deferred"
+)]
 unsafe impl Sync for Context {}
 
 impl Context {

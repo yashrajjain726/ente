@@ -18,7 +18,7 @@ Clone the repository. Change into the `server/config` directory of the repositor
 Run the following command for the same:
 
 ```sh
-git clone https://github.com/ente/ente
+git clone --depth 1 https://github.com/ente/ente
 cd ente/server/config
 ```
 

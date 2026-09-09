@@ -6,11 +6,10 @@ use ente_wasm_lib::session::Session;
 use serde_wasm_bindgen as swb;
 use tsify::Tsify;
 use types::{
-    KeyAttributes, LegacyContactState, LegacyInfo, LegacyKitRecoverySession, OpenKitRecoveryInput,
+    KeyAttributes, LegacyContactState, LegacyInfo, LegacyKitRecoverySession, LegacyKitShare,
+    OpenKitRecoveryInput,
 };
 use wasm_bindgen::prelude::*;
-
-use ente_wasm_log as _;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -25,6 +24,10 @@ pub enum Error {
 impl Error {
     fn name(&self) -> Option<&'static str> {
         match self {
+            Self::Legacy(ente_legacy::Error::DifferentLegacyKits) => Some("different_legacy_kits"),
+            Self::Legacy(ente_legacy::Error::DuplicateLegacyKitShare) => {
+                Some("duplicate_legacy_kit_share")
+            }
             Self::Legacy(ente_legacy::Error::LegacyKitInactive) => Some("legacy_kit_inactive"),
             Self::Legacy(ente_legacy::Error::ContactNotOnEnte) => Some("contact_not_on_ente"),
             Self::Legacy(ente_legacy::Error::ActiveRecoverySession) => {
@@ -153,17 +156,29 @@ pub async fn legacy_reject_recovery(
 pub async fn legacy_change_password(
     session: &Session,
     recovery_id: String,
-    current_user_key_attrs: <KeyAttributes as Tsify>::JsType,
     new_password: String,
 ) -> Result<(), Error> {
-    let current_user_key_attrs = KeyAttributes::from_js(current_user_key_attrs)?;
-    ente_legacy::change_password(
-        session.inner(),
-        &recovery_id,
-        &current_user_key_attrs.into(),
-        &new_password,
+    ente_legacy::change_password(session.inner(), &recovery_id, &new_password)
+        .await
+        .map_err(Into::into)
+}
+
+#[wasm_bindgen(js_name = parseLegacyKitShare)]
+pub fn parse_legacy_kit_share(input: &str) -> Result<<LegacyKitShare as Tsify>::JsType, Error> {
+    LegacyKitShare::from(ente_legacy::LegacyKitShare::parse(input)?)
+        .into_js()
+        .map_err(Into::into)
+}
+
+#[wasm_bindgen(js_name = validateLegacyKitSharePair)]
+pub fn validate_legacy_kit_share_pair(
+    first: <LegacyKitShare as Tsify>::JsType,
+    second: <LegacyKitShare as Tsify>::JsType,
+) -> Result<(), Error> {
+    ente_legacy::validate_share_pair(
+        &LegacyKitShare::from_js(first)?.into(),
+        &LegacyKitShare::from_js(second)?.into(),
     )
-    .await
     .map_err(Into::into)
 }
 

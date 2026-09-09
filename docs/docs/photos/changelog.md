@@ -7,6 +7,51 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.7.29 (desktop) - Sep 2026
+
+- New accounts now select storage plan before entering their gallery.
+- Fixed invalid aperture values appearing as NaN in file info.
+- Added support for moving photos between hidden albums.
+- Fix hidden album quick link visibility.
+- Improved desktop title bars to follow the selected theme on Windows and Linux.
+- Fixed Home and End key navigation in the search bar.
+- Improved video streaming security by keeping auth tokens out of stream URLs.
+- Added a processed percentage under Streamable videos in Preferences.
+- Fixed the duplicate Empty Trash action and disabled it while photos are selected.
+
+## v1.3.63 (mobile) - Sep 2026
+
+- Added Library Sharing for automatically sharing current and future albums with family members.
+- Added album descriptions, including on shared links. The “Ente” album filter now includes albums shared with you, and shared and received albums can be archived and restored.
+- Added album slideshows, with controls for slide duration, photo order, and background style.
+- On Android 11 and newer, device photos deleted through Ente now move to the system trash and can be recovered from the app.
+- Edited photos now retain key camera, date, and location details. JPEGs also retain their original quality when only rotated or flipped.
+- Added music and audio controls to memories.
+- Improved Search with country names in the app language and each country’s native languages, more accurate city matching, better result ordering, and faster performance on large libraries.
+- Added a “You” uploader filter and fixed duplicate “Someone” entries in the Uploaded by filter.
+- Backup Status now shows per-file progress, large multipart uploads are more reliable, and large uploads use less memory.
+- Added Backup mode on iOS to keep Ente awake and dim the display during large backups.
+- Made Free Up Space more reliable on Android.
+- Improved performance across Map, timeline loading, and Smart Memories for large libraries. Also fixed week grouping and reduced memory spikes when Search and Gallery load very large libraries.
+- Improved timeline scrolling performance for large galleries. (@r4khul)
+- Improved processing of large on-device photo libraries on Android and reduced unnecessary home-gallery reloads.
+- Fixed smart albums not automatically adding newly recognized people and improved the reliability of People changes after startup.
+- Fixed downloading images without file extensions, newly captured photos failing to open on Android, and incorrectly rotated photos in Android home screen widgets.
+- Fixed edited photos sometimes not syncing after their originals were fetched.
+- Added five-second double-tap seeking for videos. (@r4khul)
+- Added a menu option to control video playback speed. (@r4khul)
+- Improved video-editing reliability, including exports with mismatched audio and video durations.
+- Double tapping to zoom will zoom into the tapped area now rather than towards the center of the photo.
+- Fixed multiple photos animating when closing the full-screen viewer. (@r4khul)
+- Reordered the selection menu and updated the share icon. (@r4khul)
+- Prevented page swiping while albums are selected. (@r4khul)
+- Fixed the image-editor tune slider showing an active track at the neutral position. (@r4khul)
+- Made the support email easier to find and copy when reporting an issue.
+- Redesigned the referral screen.
+- Improved handling of network disconnections in the payment screen. (@r4khul)
+- Fixed clipping and error handling in the billing questions widget. (@r4khul)
+- Improved coordination between foreground and background machine-learning processing and fixed cleanup of downloaded machine-learning models.
+
 ## v1.7.28 (desktop) - Sep 2026
 
 - Improved the account deletion flow with clearer steps and a summary of the data that will be deleted.

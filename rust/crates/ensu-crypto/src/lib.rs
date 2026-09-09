@@ -3,7 +3,7 @@ use ente_core::{
     crypto::{self, Header, Key, blob},
 };
 use hkdf::Hkdf;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 const ATTACHMENT_KEY_INFO: &[u8] = b"llmchat_attachment_v1";
@@ -31,6 +31,10 @@ pub enum Error {
 pub struct EncryptedChatPayload {
     pub encrypted_data: String,
     pub header: String,
+}
+
+pub fn sha256(bytes: &[u8]) -> [u8; 32] {
+    Sha256::digest(bytes).into()
 }
 
 pub fn generate_chat_key() -> String {

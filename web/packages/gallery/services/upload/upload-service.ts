@@ -879,14 +879,19 @@ const extractImageOrVideoMetadata = async (
     const modificationTime =
         parsedMetadataJSON?.modificationTime ?? lastModifiedMs * 1000;
 
+    const creationDate =
+        parsedMetadataJSON?.creationDate ??
+        (parsedMetadataJSON?.creationTime
+            ? undefined
+            : parsedMetadata?.creationDate);
     let creationTime: number;
-    if (parsedMetadataJSON?.creationTime) {
-        creationTime = parsedMetadataJSON.creationTime;
-    } else if (parsedMetadata?.creationDate) {
-        const { dateTime, offset, timestamp } = parsedMetadata.creationDate;
+    if (creationDate) {
+        const { dateTime, offset, timestamp } = creationDate;
         creationTime = timestamp;
         publicMagicMetadata.dateTime = dateTime;
         if (offset) publicMagicMetadata.offsetTime = offset;
+    } else if (parsedMetadataJSON?.creationTime) {
+        creationTime = parsedMetadataJSON.creationTime;
     } else if (parsedMetadata?.creationTime) {
         creationTime = parsedMetadata.creationTime;
     } else {

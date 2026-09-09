@@ -1,13 +1,12 @@
-import {
-    boxSealOpen,
-    encryptBlob,
-    encryptBox,
-    generateKey,
-    generateKeyPair,
-} from "ente-core-wasm";
 import * as legacy from "ente-legacy-wasm/authenticated";
 import * as locker from "ente-locker-wasm";
 import * as photos from "ente-photos-wasm";
+import {
+    boxSealOpen,
+    encryptBox,
+    generateKey,
+    generateKeyPair,
+} from "ente-prelogin-wasm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -45,6 +44,7 @@ for (const [name, api] of [
                 baseUrl: "http://localhost",
                 authToken: "test-token",
                 masterKeyB64: fixture.masterKey,
+                ...(await sessionKeyAttributes(fixture.masterKey)),
             });
             try {
                 const diff = await api.contactsGetDiff(
@@ -91,10 +91,12 @@ for (const [name, api] of [
             };
             mockFetch(() => Response.json({ diff: [contact] }));
 
+            const masterKey = await generateKey();
             const session = await api.openSession({
                 baseUrl: "http://localhost",
                 authToken: "test-token",
-                masterKeyB64: await generateKey(),
+                masterKeyB64: masterKey,
+                ...(await sessionKeyAttributes(masterKey)),
             });
             try {
                 expect(
@@ -155,6 +157,7 @@ describe("Legacy", () => {
             othersRecoverySession: [{ ...recovery, status: "READY" }],
         };
         let updateBody: unknown;
+        let recoveryErrorBody: object = { code: "ACTIVE_RECOVERY_SESSION" };
         mockFetch(async (request) => {
             switch (new URL(request.url).pathname) {
                 case "/emergency-contacts/info":
@@ -166,18 +169,17 @@ describe("Legacy", () => {
                     updateBody = await request.json();
                     return new Response(null, { status: 204 });
                 case "/emergency-contacts/update-recovery-notice":
-                    return new Response(
-                        "Cannot update during an active recovery session",
-                        { status: 400 },
-                    );
+                    return Response.json(recoveryErrorBody, { status: 400 });
                 default:
                     throw new Error(`Unexpected request: ${request.url}`);
             }
         });
+        const masterKey = await generateKey();
         const session = await legacy.openSession({
             baseUrl: "http://localhost",
             authToken: "token",
-            masterKeyB64: await generateKey(),
+            masterKeyB64: masterKey,
+            ...(await sessionKeyAttributes(masterKey)),
         });
         try {
             expect(await legacy.getInfo(session)).toStrictEqual(info);
@@ -191,6 +193,13 @@ describe("Legacy", () => {
             await expect(
                 legacy.updateRecoveryNotice(session, 43, 30),
             ).rejects.toMatchObject({ name: "active_recovery_session" });
+            recoveryErrorBody = {
+                code: "BAD_REQUEST",
+                message: "Cannot update during an active recovery session",
+            };
+            await expect(
+                legacy.updateRecoveryNotice(session, 43, 30),
+            ).rejects.not.toMatchObject({ name: "active_recovery_session" });
             recovery.createdAt = Number.MAX_SAFE_INTEGER + 1;
             await expect(legacy.getInfo(session)).rejects.toBeInstanceOf(Error);
         } finally {
@@ -243,6 +252,7 @@ describe("Legacy", () => {
             baseUrl: "http://localhost",
             authToken: "token",
             masterKeyB64: masterKey,
+            ...(await sessionKeyAttributes(masterKey)),
         });
         try {
             await legacy.addContact(
@@ -268,20 +278,40 @@ const mockFetch = (
         return response;
     });
 
+const sessionKeyAttributes = async (masterKey: string) => {
+    const { publicKey, privateKey } = await generateKeyPair();
+    const encryptedSecretKey = await encryptBox(privateKey, masterKey);
+    const encryptedRecoveryKey = await encryptBox(
+        await generateKey(),
+        masterKey,
+    );
+    return {
+        userID: 42,
+        keyAttributes: {
+            publicKey,
+            encryptedSecretKey: encryptedSecretKey.encryptedData,
+            secretKeyDecryptionNonce: encryptedSecretKey.nonce,
+            recoveryKeyEncryptedWithMasterKey:
+                encryptedRecoveryKey.encryptedData,
+            recoveryKeyDecryptionNonce: encryptedRecoveryKey.nonce,
+        },
+    };
+};
+
 const encryptedContact = async () => {
     const masterKey = await generateKey();
     const rootKey = await generateKey();
     const contactKey = await generateKey();
     const wrappedRootKey = await encryptBox(rootKey, masterKey);
     const wrappedContactKey = await encryptBox(contactKey, rootKey);
-    const data = await encryptBlob(
+    const data = await locker.encryptBlob(
         Buffer.from(
             JSON.stringify({ contactUserId: 42, name: "Zoë 🦋" }),
         ).toString("base64"),
         contactKey,
     );
     const picture = Uint8Array.from({ length: 4096 }, (_, i) => i % 256);
-    const encryptedPicture = await encryptBlob(
+    const encryptedPicture = await locker.encryptBlob(
         Buffer.from(picture).toString("base64"),
         contactKey,
     );

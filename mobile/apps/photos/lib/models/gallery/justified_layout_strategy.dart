@@ -1,0 +1,1 @@
+enum JustifiedLayoutStrategy { comfort, flex }

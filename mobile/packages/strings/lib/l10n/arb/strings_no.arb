@@ -349,10 +349,8 @@
   "@deviceLock": {
     "description": "Device lock option title"
   },
-  "deviceLockExplanation": "Deaktiver enhetens skjermlås når Ente er i forgrunnen og det er en sikkerhetskopi som pågår. Dette trengs normalt ikke, men kan hjelpe store opplastinger og førstegangsimport av store biblioteker med å fullføre raskere.",
   "deviceNotFound": "Enhet ikke funnet",
   "didYouKnow": "Visste du at?",
-  "disableAutoLock": "Deaktiver autolås",
   "disableDownloadWarningBody": "Seere kan fremdeles ta skjermbilder eller lagre en kopi av bildene dine ved bruk av eksterne verktøy",
   "disableDownloadWarningTitle": "Vær oppmerksom på",
   "disableLinkMessage": "Dette fjerner den offentlige lenken for tilgang til \"{albumName}\".",
@@ -1625,7 +1623,6 @@
   },
   "unarchiveAlbum": "Gjenopprett album",
   "unarchiving": "Fjerner fra arkivet...",
-  "unavailableReferralCode": "Beklager, denne koden er utilgjengelig.",
   "uncategorized": "Ukategorisert",
   "unhide": "Gjør synligjort",
   "unhideToAlbum": "Gjør synlig i album",

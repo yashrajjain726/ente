@@ -8,6 +8,10 @@ import { ReferralSettings } from "@/components/sidebar/ReferralSettings";
 import { SessionsSettings } from "@/components/sidebar/SessionsSettings";
 import { TwoFactorSettings } from "@/components/sidebar/TwoFactorSettings";
 import { downloadAppDialogAttributes } from "@/components/utils/download";
+import {
+    generatePasskeyRecovery,
+    recoveryKeyMnemonic,
+} from "@/services/authenticated-session";
 import exportService from "@/services/export";
 import { performSidebarAction as performSidebarRegistryAction } from "@/services/search/sidebar-search-registry";
 import {
@@ -1011,7 +1015,7 @@ const Account: React.FC<AccountProps> = ({
         if (isDesktop) {
             suppressAutoLockOnBlurForTrustedPrompt();
         }
-        await openAccountsManagePasskeysPage();
+        await openAccountsManagePasskeysPage(generatePasskeyRecovery);
     }, [onRootClose]);
 
     const handleActiveSessions = useCallback(async () => {
@@ -1127,6 +1131,7 @@ const Account: React.FC<AccountProps> = ({
             </Stack>
             <RecoveryKey
                 {...recoveryKeyVisibilityProps}
+                getRecoveryKeyMnemonic={recoveryKeyMnemonic}
                 {...{ showMiniDialog }}
             />
             {isNonAdminFamilyMember && userDetails && (
@@ -1215,6 +1220,9 @@ const Preferences: React.FC<PreferencesProps> = ({
 
     const hlsGenStatusSnapshot = useHLSGenerationStatusSnapshot();
     const isHLSGenerationEnabled = !!hlsGenStatusSnapshot?.enabled;
+    const hlsProcessedFraction = hlsGenStatusSnapshot?.enabled
+        ? hlsGenStatusSnapshot.processedFraction
+        : undefined;
 
     useEffect(() => {
         if (open) void pullSettings();
@@ -1299,13 +1307,42 @@ const Preferences: React.FC<PreferencesProps> = ({
                     />
                 )}
                 {isHLSGenerationSupported && (
-                    <RowButtonGroup>
-                        <RowSwitch
-                            label={t("streamable_videos")}
-                            checked={isHLSGenerationEnabled}
-                            onClick={() => void toggleHLSGeneration()}
-                        />
-                    </RowButtonGroup>
+                    <Stack>
+                        <RowButtonGroup>
+                            <RowSwitch
+                                label={t("streamable_videos")}
+                                checked={isHLSGenerationEnabled}
+                                onClick={() => void toggleHLSGeneration()}
+                            />
+                        </RowButtonGroup>
+                        {isHLSGenerationEnabled && (
+                            <SpacedRow sx={{ gap: 2, px: 2, pt: 2, pb: 1 }}>
+                                <Typography sx={{ color: "text.faint" }}>
+                                    {t("processed")}
+                                </Typography>
+                                {hlsProcessedFraction == undefined ? (
+                                    <RowButtonEndActivityIndicator />
+                                ) : (
+                                    <Typography sx={{ textAlign: "right" }}>
+                                        {t("percent_complete", {
+                                            percent: hlsProcessedFraction * 100,
+                                            formatParams: {
+                                                percent: {
+                                                    minimumFractionDigits:
+                                                        hlsProcessedFraction ==
+                                                        0
+                                                            ? 0
+                                                            : 2,
+                                                    maximumFractionDigits: 2,
+                                                    roundingMode: "trunc",
+                                                },
+                                            },
+                                        })}
+                                    </Typography>
+                                )}
+                            </SpacedRow>
+                        )}
+                    </Stack>
                 )}
             </Stack>
             <DomainSettings

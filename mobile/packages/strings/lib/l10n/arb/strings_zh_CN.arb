@@ -574,11 +574,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "当 Ente 置于前台且正在进行备份时将禁用设备屏幕锁定。这通常是不需要的，但可能有助于更快地完成大型上传和大型库的初始导入。",
   "deviceNotFound": "未发现设备",
   "didYouKnow": "您知道吗？",
   "digits": "数字",
-  "disableAutoLock": "禁用自动锁定",
   "disableDownloadWarningBody": "查看者仍然可以使用外部工具截图或保存您的照片副本",
   "disableDownloadWarningTitle": "请注意",
   "disableLinkMessage": "这将删除用于访问\"{albumName}\"的公开链接。",
@@ -675,7 +673,6 @@
     }
   },
   "earned": "已获得",
-  "earnFreeStorage": "获得免费空间",
   "earnMoreSpace": "获取更多空间！",
   "edit": "编辑",
   "editAutoAddPeople": "编辑自动添加人物",
@@ -1804,14 +1801,6 @@
   "referrals": "推荐",
   "referralsAreCurrentlyPaused": "推荐已暂停",
   "referralStats": "推荐状态",
-  "referralStep1": "1.\t自定义并分享你的邀请码。",
-  "referralStep2": "2.\t对方使用你的邀请码注册 Ente。",
-  "referralStep3": "3.\t对方升级后：他们可免费获得 {storageInGB}GB，你也可免费获得 {storageInGB}GB。",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "对方升级后：他们可获得 {storageAmountInGB} GB，你也可获得 {storageAmountInGB} GB。",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -1970,8 +1959,6 @@
   "saveCode": "保存代码",
   "saveCollage": "保存拼贴",
   "saveCopy": "保存副本",
-  "saveDocumentDescription": "上传重要文档。",
-  "saveDocumentTitle": "文档",
   "saveKey": "保存密钥",
   "@saveKey": {
     "description": "Save key button label"
@@ -2210,7 +2197,6 @@
   },
   "setupYourLegacy": "设置您的数字遗产",
   "share": "分享",
-  "shareCodeEarnStorage": "分享您的代码来获得免费空间。",
   "shareCodes": "分享代码",
   "shareCodesDuration": "选择您要分享代码的期限。",
   "sharedAlbumSectionDescription": "与其他 Ente 用户（包括免费计划用户）创建共享和协作相册。",
@@ -2516,7 +2502,6 @@
   },
   "unarchiveAlbum": "取消存档相册",
   "unarchiving": "正在取消存档...",
-  "unavailableReferralCode": "抱歉，此代码不可用。",
   "undo": "撤销",
   "unhide": "取消隐藏",
   "unhideToAlbum": "取消隐藏到相册",

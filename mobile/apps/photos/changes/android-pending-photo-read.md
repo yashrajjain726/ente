@@ -1,1 +1,0 @@
-- Fixed an issue that could prevent newly captured photos from opening in Ente on Android.

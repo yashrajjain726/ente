@@ -15,10 +15,12 @@ pub fn knowledge_asset(expected_pack: &KnowledgeDatasetConfig) -> Result<Asset, 
     let files = KNOWLEDGE_ARTIFACT_FILENAMES
         .into_iter()
         .zip(urls)
+        .zip(expected_pack.artifact_sizes.iter().copied())
         .zip(expected_pack.artifact_sha256.iter().cloned())
-        .map(|((filename, url), sha256)| AssetFile {
+        .map(|(((filename, url), size), sha256)| AssetFile {
             name: filename.to_owned(),
             url,
+            size,
             sha256,
         })
         .collect();
@@ -69,13 +71,9 @@ pub fn reconcile_knowledge_pack(
     let mut valid = Vec::<(String, PathBuf)>::new();
     let mut invalid = Vec::<PathBuf>::new();
     for entry in fs::read_dir(pack_root)? {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_) => continue,
-        };
-        let file_type = match entry.file_type() {
-            Ok(file_type) => file_type,
-            Err(_) => continue,
+        let Ok(entry) = entry else { continue };
+        let Ok(file_type) = entry.file_type() else {
+            continue;
         };
         if !file_type.is_dir() {
             continue;

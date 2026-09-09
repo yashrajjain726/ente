@@ -35,6 +35,7 @@ import {
     computeThumbnailGridLayoutParams,
     type ThumbnailGridLayoutParams,
 } from "ente-new/photos/components/utils/thumbnail-grid-layout";
+import { usePhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import React, {
@@ -54,6 +55,7 @@ import {
 
 const Page: React.FC = () => {
     const { showMiniDialog, onGenericError } = useBaseContext();
+    const { setIsFileViewerOpen } = usePhotosAppContext();
 
     const [state, dispatch] = useReducer(
         largeFilesReducer,
@@ -112,14 +114,21 @@ const Page: React.FC = () => {
         });
     }, [showMiniDialog, onGenericError, state.largeFiles]);
 
-    const handleOpenViewer = useCallback((index: number) => {
-        setCurrentIndex(index);
-        setOpenFileViewer(true);
-    }, []);
+    const handleOpenViewer = useCallback(
+        (index: number) => {
+            setCurrentIndex(index);
+            setOpenFileViewer(true);
+            setIsFileViewerOpen?.(true);
+        },
+        [setIsFileViewerOpen],
+    );
 
     const handleCloseViewer = useCallback(() => {
         setOpenFileViewer(false);
-    }, []);
+        setIsFileViewerOpen?.(false);
+    }, [setIsFileViewerOpen]);
+
+    useEffect(() => () => setIsFileViewerOpen?.(false), [setIsFileViewerOpen]);
 
     const files = useMemo(
         () => state.largeFiles.map((item) => item.file),

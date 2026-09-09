@@ -3,14 +3,17 @@ import { ItemList } from "@/components/ItemList";
 import { LockerCollectionShareDrawer } from "@/components/LockerCollectionShareDrawer";
 import { LockerNavbar } from "@/components/LockerNavbar";
 import { LockerSidebar } from "@/components/LockerSidebar";
+import { lockerColorSx } from "@/components/locker-tokens";
 import { DeleteCollectionDialog } from "@/components/lockerPage/DeleteCollectionDialog";
+import { EmptyTrashDialog } from "@/components/lockerPage/EmptyTrashDialog";
 import { LockerDragOverlay } from "@/components/lockerPage/LockerDragOverlay";
 import { useLockerActions } from "@/components/lockerPage/use-locker-actions";
 import { useLockerData } from "@/components/lockerPage/use-locker-data";
 import { useLockerNavigation } from "@/components/lockerPage/use-locker-navigation";
 import { useSetupLockerI18n } from "@/i18n/locker";
 import { fetchCollectionSharees } from "@/services/remote";
-import AddIcon from "@mui/icons-material/Add";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Button, Fab, Snackbar, Stack, Typography } from "@mui/material";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import { useBaseContext } from "ente-base/context";
@@ -36,7 +39,6 @@ export const LockerPage: React.FC = () => {
         handleSelectTrash,
         isCollectionRoutePending,
         isCollectionsView,
-        isHomeView,
         isTrashView,
         navigateHome,
         selectedCollectionID,
@@ -60,8 +62,10 @@ export const LockerPage: React.FC = () => {
         createDialogOpen,
         deleteCollectionDialog,
         editItem,
+        emptyTrashDialog,
         ensureCollectionsExist,
         handleConfirmDeleteCollection,
+        handleConfirmEmptyTrash,
         handleCreateCollection,
         handleCreateDialogClose,
         handleCreateItem,
@@ -90,11 +94,13 @@ export const LockerPage: React.FC = () => {
         prefilledUploadItems,
         setDeleteCollectionDialog,
         setEditItem,
+        setEmptyTrashDialog,
         setShareCollectionID,
         shareCollectionID,
         setToast,
         toast,
         visibleDeleteCollectionDialog,
+        visibleEmptyTrashDialog,
     } = useLockerActions({
         collections,
         ensureUploadLimitState,
@@ -189,7 +195,6 @@ export const LockerPage: React.FC = () => {
             >
                 <ItemList
                     collections={collections}
-                    masterKey={masterKey}
                     trashItems={isTrashView ? trashItems : undefined}
                     isTrashView={isTrashView}
                     isCollectionsView={isCollectionsView}
@@ -214,11 +219,8 @@ export const LockerPage: React.FC = () => {
                 open={sidebarOpen}
                 onClose={closeSidebar}
                 collections={collections}
-                trashItemCount={trashItems.length}
-                onSelectHome={() => handleSelectCollection(null)}
                 onSelectCollections={handleSelectCollections}
                 onSelectTrash={handleSelectTrash}
-                isHomeView={isHomeView}
                 isTrashView={isTrashView}
                 isCollectionsView={isCollectionsView}
                 userDetails={userDetails}
@@ -232,6 +234,12 @@ export const LockerPage: React.FC = () => {
                 onLeaveCollection={handleLeaveCollection}
                 onRefreshSharees={fetchCollectionSharees}
                 warmContacts={warmContacts}
+            />
+            <EmptyTrashDialog
+                dialogState={emptyTrashDialog}
+                visibleDialogState={visibleEmptyTrashDialog}
+                onClose={() => setEmptyTrashDialog(null)}
+                onConfirm={handleConfirmEmptyTrash}
             />
             <DeleteCollectionDialog
                 dialogState={deleteCollectionDialog}
@@ -252,26 +260,32 @@ export const LockerPage: React.FC = () => {
                     color="primary"
                     aria-label={t("saveToLocker")}
                     onClick={openCreateDialog}
-                    sx={{
+                    sx={(theme) => ({
                         position: "fixed",
-                        right: "max(24px, env(safe-area-inset-right))",
-                        bottom: "max(24px, env(safe-area-inset-bottom))",
-                        width: 72,
-                        height: 72,
-                        minHeight: 72,
-                        color: "#FFFFFF",
-                        background:
-                            "linear-gradient(135deg, #1071FF 0%, #0056CC 100%)",
-                        boxShadow: "0 16px 40px rgba(0, 66, 173, 0.32)",
+                        right: "max(16px, env(safe-area-inset-right))",
+                        bottom: "max(16px, env(safe-area-inset-bottom))",
+                        width: 56,
+                        height: 56,
+                        minHeight: 56,
+                        ...lockerColorSx(theme, {
+                            color: "specialWhite",
+                            backgroundColor: "primary",
+                        }),
+                        boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.08)",
                         zIndex: 1200,
                         "&:hover": {
-                            background:
-                                "linear-gradient(135deg, #1A7AFF 0%, #004DB8 100%)",
-                            boxShadow: "0 18px 44px rgba(0, 66, 173, 0.36)",
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "primaryDark",
+                            }),
+                            boxShadow: "0px 12px 24px rgba(0, 0, 0, 0.14)",
                         },
-                    }}
+                    })}
                 >
-                    <AddIcon sx={{ fontSize: 36 }} />
+                    <HugeiconsIcon
+                        icon={PlusSignIcon}
+                        size={24}
+                        strokeWidth={1.5}
+                    />
                 </Fab>
             )}
 

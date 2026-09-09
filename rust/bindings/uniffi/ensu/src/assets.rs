@@ -22,7 +22,7 @@ pub enum AssetDownloadError {
     #[error("{detail}")]
     Validation { detail: String },
     #[error("HTTP {status}")]
-    Http { status: u16 },
+    Http { status: u16, retryable: bool },
     #[error("network: {detail}")]
     Network { detail: String },
     #[error("{detail}")]
@@ -35,12 +35,13 @@ pub enum AssetDownloadError {
 
 impl From<download::Error> for AssetDownloadError {
     fn from(value: download::Error) -> Self {
+        let retryable = value.is_retryable();
         match value {
             download::Error::Cancelled => Self::Cancelled,
             download::Error::Target { source, .. } => Self::from(*source),
             download::Error::Fallback { single, .. } => Self::from(*single),
             download::Error::Validation(detail) => Self::Validation { detail },
-            download::Error::Http(status) => Self::Http { status },
+            download::Error::Http(status) => Self::Http { status, retryable },
             download::Error::Network(detail) => Self::Network { detail },
             download::Error::SizeMismatch { expected, actual } => Self::InvalidDownload {
                 detail: format!("size mismatch: expected {expected} bytes, got {actual}"),

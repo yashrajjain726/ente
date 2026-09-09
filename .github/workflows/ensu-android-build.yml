@@ -1,25 +1,10 @@
 name: "Build (Ensu Android)"
 
 on:
-    pull_request:
-        paths:
-            - "android/apps/ensu/**"
-            - "android/apps/ensu/rust/**"
-            - "rust/apps/codegen/**"
-            - "rust/crates/core/**"
-            - "rust/crates/ensu/**"
-            - "rust/bindings/uniffi/**"
-            - "rust/.cargo/config.toml"
-            - "rust/Cargo.toml"
-            - "rust/Cargo.lock"
-            - ".github/workflows/ensu-android-build.yml"
+    workflow_call:
 
 permissions:
     contents: read
-
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
 
 jobs:
     build:

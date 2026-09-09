@@ -22,15 +22,35 @@ Session authenticatedSession() {
     return current;
   }
 
+  final keyAttributes = config.getKeyAttributes();
+  if (keyAttributes == null) {
+    throw StateError('Authenticated session is not available');
+  }
+  final encryptedRecoveryKey = keyAttributes.recoveryKeyEncryptedWithMasterKey;
+  final recoveryKeyNonce = keyAttributes.recoveryKeyDecryptionNonce;
+  if (encryptedRecoveryKey.isEmpty || recoveryKeyNonce.isEmpty) {
+    throw StateError('Recovery key is not available');
+  }
   final services = ServiceLocator.instance;
   final opened = openSession(
-    baseUrl: baseUrl,
-    authToken: authToken,
-    masterKey: config.getKey()!,
-    userAgent:
-        services.enteDio.options.headers[HttpHeaders.userAgentHeader] as String,
-    clientPackage: services.packageInfo.packageName,
-    clientVersion: services.packageInfo.version,
+    input: OpenSessionInput(
+      baseUrl: baseUrl,
+      authToken: authToken,
+      userId: userId,
+      masterKey: config.getKey()!,
+      keyAttributes: SessionKeyAttributes(
+        publicKey: keyAttributes.publicKey,
+        encryptedSecretKey: keyAttributes.encryptedSecretKey,
+        secretKeyDecryptionNonce: keyAttributes.secretKeyDecryptionNonce,
+        recoveryKeyEncryptedWithMasterKey: encryptedRecoveryKey,
+        recoveryKeyDecryptionNonce: recoveryKeyNonce,
+      ),
+      userAgent:
+          services.enteDio.options.headers[HttpHeaders.userAgentHeader]
+              as String,
+      clientPackage: services.packageInfo.packageName,
+      clientVersion: services.packageInfo.version,
+    ),
   );
   clearAuthenticatedSession();
   _session = opened;

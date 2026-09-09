@@ -39,6 +39,21 @@ pub enum Error {
     #[error("space post limit reached")]
     PostLimitReached,
 
+    #[error("space friend limit reached")]
+    FriendLimitReached,
+
+    #[error("space profile not found")]
+    ProfileNotFound,
+
+    #[error("cannot add yourself as a friend")]
+    SelfFriendship,
+
+    #[error("space friend request limit reached")]
+    FriendRequestLimitReached,
+
+    #[error("friend request is no longer available")]
+    FriendRequestUnavailable,
+
     #[error("space session is unauthorized")]
     SessionUnauthorized,
 

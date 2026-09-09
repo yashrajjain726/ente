@@ -26,6 +26,7 @@ type recordedSpaceActivity struct {
 	actorUserID  int64
 	actorSpaceID string
 	actorSlug    string
+	postID       int64
 	recipientIDs []int64
 }
 
@@ -37,8 +38,14 @@ func newRecordingSpaceActivityNotifier() *recordingSpaceActivityNotifier {
 	return &recordingSpaceActivityNotifier{events: make(chan recordedSpaceActivity, 8)}
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actor SpaceActivityActor) {
-	n.record(spaceActivityPostCreated, actor)
+func (n *recordingSpaceActivityNotifier) OnSpacePostCreated(actor SpaceActivityActor, postID int64) {
+	n.events <- recordedSpaceActivity{
+		event:        spaceActivityPostCreated,
+		actorUserID:  actor.UserID,
+		actorSpaceID: actor.SpaceID,
+		actorSlug:    actor.Slug,
+		postID:       postID,
+	}
 }
 
 func (n *recordingSpaceActivityNotifier) OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64) {
@@ -53,8 +60,8 @@ func (n *recordingSpaceActivityNotifier) OnSpaceMessageSent(actor SpaceActivityA
 	n.record(spaceActivityMessageSent, actor, recipientUserID)
 }
 
-func (n *recordingSpaceActivityNotifier) OnSpaceWaveSent(actor SpaceActivityActor, recipientUserID int64) {
-	n.record(spaceActivityWaveSent, actor, recipientUserID)
+func (n *recordingSpaceActivityNotifier) OnSpacePokeSent(actor SpaceActivityActor, recipientUserID int64) {
+	n.record(spaceActivityPokeSent, actor, recipientUserID)
 }
 
 func (n *recordingSpaceActivityNotifier) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {
@@ -182,13 +189,14 @@ func TestNewPostNotifiesWithNoAccountFriends(t *testing.T) {
 	notifier := newRecordingSpaceActivityNotifier()
 	posts := NewModule(repos, nil, notifier, nil).Posts
 
-	posts.notifyFriendsOfNewPost(SpaceActivityActor{UserID: 1, SpaceID: "space_id", Slug: "alice"})
+	posts.notifyFriendsOfNewPost(SpaceActivityActor{UserID: 1, SpaceID: "space_id", Slug: "alice"}, 42)
 
 	require.Equal(t, recordedSpaceActivity{
 		event:        spaceActivityPostCreated,
 		actorUserID:  1,
 		actorSpaceID: "space_id",
 		actorSlug:    "alice",
+		postID:       42,
 	}, requireSpaceActivity(t, notifier))
 }
 
@@ -251,12 +259,12 @@ func TestMessageActivitiesAndLikeTransition(t *testing.T) {
 		recipientIDs: []int64{bobID},
 	}, requireSpaceActivity(t, notifier))
 
-	waveRequest := request
-	waveRequest.NotificationKind = spaceMessageNotificationKindWave
-	_, err = messages.Create(ctx, aliceSpace, bobSpace.SpaceID, waveRequest)
+	pokeRequest := request
+	pokeRequest.NotificationKind = spaceMessageNotificationKindPoke
+	_, err = messages.Create(ctx, aliceSpace, bobSpace.SpaceID, pokeRequest)
 	require.NoError(t, err)
 	require.Equal(t, recordedSpaceActivity{
-		event:        spaceActivityWaveSent,
+		event:        spaceActivityPokeSent,
 		actorUserID:  aliceID,
 		actorSpaceID: aliceSpace.SpaceID,
 		actorSlug:    aliceSpace.SpaceSlug,
@@ -339,7 +347,7 @@ func TestFriendActivitiesOnlyOnRelationshipTransitions(t *testing.T) {
 	}, requireSpaceActivity(t, notifier))
 }
 
-func TestSpaceWebPushSenderUsesWavePayloadAndPrunesDeadEndpoint(t *testing.T) {
+func TestSpaceWebPushSenderUsesPokePayloadAndPrunesDeadEndpoint(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	recipientID := insertSpaceControllerUser(t, repos, "space-push-recipient@example.com", "recipient-public")
 	sessionHash := []byte("space-push-session-hash")
@@ -363,11 +371,11 @@ func TestSpaceWebPushSenderUsesWavePayloadAndPrunesDeadEndpoint(t *testing.T) {
 	}
 
 	sender := NewSpaceWebPushSender(repos.WebPush, config)
-	sender.OnSpaceWaveSent(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
+	sender.OnSpacePokeSent(SpaceActivityActor{UserID: 1, SpaceID: "alice_space", Slug: "alice"}, recipientID)
 	require.Equal(t, spaceWebPushPayload{
 		Title:  "Ente Space",
-		Body:   "@alice waved at you 👋",
-		Action: "Post something",
+		Body:   "@alice poked you",
+		Action: "Post a photo",
 		URL:    "/app/post",
 	}, payload)
 	var count int

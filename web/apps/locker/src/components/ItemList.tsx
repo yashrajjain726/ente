@@ -17,20 +17,25 @@ import {
     sortLockerCollections,
     visibleLockerCollections,
 } from "@/types";
-import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import {
+    Delete02Icon,
+    Link01Icon,
+    PlusSignIcon,
+    StarIcon,
+    Wallet05Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import DeleteSweepOutlinedIcon from "@mui/icons-material/DeleteSweepOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
-import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
-import StarIcon from "@mui/icons-material/Star";
 import {
     Box,
     Button,
@@ -58,6 +63,15 @@ import React, {
 import { ItemCard } from "./ItemCard";
 import { ItemDetailView } from "./ItemDetailView";
 import { ItemListDialogs } from "./itemList/ItemListDialogs";
+import {
+    lockerColors,
+    lockerColorSx,
+    lockerContentMaxWidth,
+    lockerTextBodySx,
+    lockerTextDisplay2Sx,
+    lockerTextLargeSx,
+    lockerTextMiniSx,
+} from "./locker-tokens";
 
 const uniqueCollectionsByID = (collections: LockerCollection[]) => {
     const seen = new Set<number>();
@@ -72,7 +86,6 @@ const uniqueCollectionsByID = (collections: LockerCollection[]) => {
 
 interface ItemListProps {
     collections: LockerCollection[];
-    masterKey?: string;
     trashItems?: LockerItem[];
     isTrashView: boolean;
     isCollectionsView: boolean;
@@ -99,11 +112,8 @@ interface ItemListProps {
     onNavigateBack?: () => void;
 }
 
-const contentMaxWidth = 560;
-
 export const ItemList: React.FC<ItemListProps> = ({
     collections,
-    masterKey,
     trashItems,
     isTrashView,
     isCollectionsView,
@@ -236,6 +246,18 @@ export const ItemList: React.FC<ItemListProps> = ({
             null
         );
     }, [allItemsByID, selectedItemID, trashItemsByID]);
+    const selectedItemCollectionNames = useMemo(
+        () =>
+            (isTrashView ? [] : (selectedItem?.collectionIDs ?? [])).flatMap(
+                (id) => {
+                    const collection = collections.find(
+                        (collection) => collection.id === id,
+                    );
+                    return collection ? [collection.name] : [];
+                },
+            ),
+        [collections, isTrashView, selectedItem],
+    );
     const restoreItem = useMemo(
         () =>
             restoreItemID === null
@@ -609,9 +631,6 @@ export const ItemList: React.FC<ItemListProps> = ({
     }, [isCreatingFileLink, isDeleteFileLinkConfirmOpen, isDeletingFileLink]);
     const openFileLinkDialog = useCallback(
         async (item: LockerItem) => {
-            if (!masterKey) {
-                return;
-            }
             if (!canShareLockerFileLink(item, currentUserID)) {
                 setFeedbackMessage(t("shareNotSupportedForSharedFiles"));
                 return;
@@ -621,10 +640,7 @@ export const ItemList: React.FC<ItemListProps> = ({
             setActiveFileLink(null);
             setIsCreatingFileLink(true);
             try {
-                const link = await getOrCreateLockerFileShareLink(
-                    item.id,
-                    masterKey,
-                );
+                const link = await getOrCreateLockerFileShareLink(item.id);
                 setActiveFileLink(link);
             } catch (error) {
                 log.error(
@@ -641,7 +657,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                 setIsCreatingFileLink(false);
             }
         },
-        [currentUserID, masterKey],
+        [currentUserID],
     );
     const copyActiveFileLink = useCallback(async () => {
         if (!activeFileLink?.url) {
@@ -703,11 +719,7 @@ export const ItemList: React.FC<ItemListProps> = ({
         }
     }, [activeFileLink?.linkID, activeFileLinkItem]);
     const downloadSelectedFiles = useCallback(async () => {
-        if (
-            !masterKey ||
-            bulkDownloading ||
-            selectedDownloadableItems.length === 0
-        ) {
+        if (bulkDownloading || selectedDownloadableItems.length === 0) {
             return;
         }
 
@@ -718,11 +730,7 @@ export const ItemList: React.FC<ItemListProps> = ({
         });
         try {
             for (const [index, item] of selectedDownloadableItems.entries()) {
-                await downloadLockerFile(
-                    item.id,
-                    getItemTitle(item),
-                    masterKey,
-                );
+                await downloadLockerFile(item.id, getItemTitle(item));
                 setBulkDownloadProgress({
                     completed: index + 1,
                     total: selectedDownloadableItems.length,
@@ -745,7 +753,6 @@ export const ItemList: React.FC<ItemListProps> = ({
         }
     }, [
         bulkDownloading,
-        masterKey,
         selectedDownloadableItems,
         skippedDownloadSelectionCount,
         stopSelectionMode,
@@ -817,44 +824,35 @@ export const ItemList: React.FC<ItemListProps> = ({
                     overflowY: "auto",
                     overscrollBehavior: "contain",
                     WebkitOverflowScrolling: "touch",
-                    backgroundColor: "#08090A",
-                    ...theme.applyStyles("light", {
-                        backgroundColor: "#F3F4F6",
+                    ...lockerColorSx(theme, {
+                        backgroundColor: "backgroundBase",
                     }),
                 })}
             >
                 <Box
                     sx={(theme) => ({
-                        px: { xs: 2, sm: 3 },
+                        px: 2,
+                        pt: 2,
                         pb: isTrashView
                             ? 3
                             : "calc(env(safe-area-inset-bottom) + 120px)",
-                        backgroundColor: "#08090A",
-                        ...theme.applyStyles("light", {
-                            backgroundColor: "#F3F4F6",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
                         }),
                     })}
                 >
                     {isHomeView && (
                         <>
-                            <SectionHeader
-                                title={t("recents")}
-                                countLabel={t("lockerItemsCount", {
-                                    count: homeFilteredItems.length,
-                                })}
-                            />
-
                             {displayCollections.length > 0 && (
                                 <Stack
                                     direction="row"
                                     sx={{
                                         width: "100%",
-                                        maxWidth: contentMaxWidth,
+                                        maxWidth: lockerContentMaxWidth,
                                         mx: "auto",
                                         alignItems: "center",
-                                        gap: 0.75,
-                                        mt: -0.25,
-                                        mb: 1.75,
+                                        gap: 1,
+                                        mb: 2,
                                         minWidth: 0,
                                     }}
                                 >
@@ -901,7 +899,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
                             <ItemsSection
                                 items={homeFilteredItems}
-                                masterKey={masterKey}
                                 isTrashView={false}
                                 onEditItem={onEditItem}
                                 onDeleteItem={onDeleteItem}
@@ -969,23 +966,31 @@ export const ItemList: React.FC<ItemListProps> = ({
                                                         true,
                                                     );
                                                 }}
-                                                sx={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    color: "#FFFFFF",
-                                                    background: "#0E6BFF",
-                                                    border: "1px solid rgba(160, 199, 255, 0.18)",
-                                                    boxShadow:
-                                                        "0 10px 24px rgba(0, 66, 173, 0.20)",
+                                                sx={(theme) => ({
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: "12px",
+                                                    padding: 0,
+                                                    ...lockerColorSx(theme, {
+                                                        backgroundColor:
+                                                            "fillLight",
+                                                        color: "iconColor",
+                                                    }),
                                                     "&:hover": {
-                                                        background: "#1A7AFF",
-                                                        boxShadow:
-                                                            "0 12px 28px rgba(0, 66, 173, 0.24)",
+                                                        ...lockerColorSx(
+                                                            theme,
+                                                            {
+                                                                backgroundColor:
+                                                                    "fillDark",
+                                                            },
+                                                        ),
                                                     },
-                                                }}
+                                                })}
                                             >
-                                                <AddOutlinedIcon
-                                                    sx={{ fontSize: 24 }}
+                                                <HugeiconsIcon
+                                                    icon={PlusSignIcon}
+                                                    size={18}
+                                                    strokeWidth={1.5}
                                                 />
                                             </IconButton>
                                         </Tooltip>
@@ -1013,8 +1018,8 @@ export const ItemList: React.FC<ItemListProps> = ({
                                 </Box>
                             ) : (
                                 <EmptyState
+                                    image={{ src: "/images/empty_state.png" }}
                                     title={t("noCollections")}
-                                    subtitle={t("createCollection")}
                                 />
                             )}
                         </>
@@ -1060,7 +1065,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
                             <ItemsSection
                                 items={sortedItems}
-                                masterKey={masterKey}
                                 isTrashView={isTrashView}
                                 onEditItem={onEditItem}
                                 onDeleteItem={onDeleteItem}
@@ -1101,9 +1105,13 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         : (selectedCollection?.name ??
                                           t("allItems"))
                                 }
-                                countLabel={t("lockerItemsCount", {
-                                    count: sortedItems.length,
-                                })}
+                                countLabel={
+                                    isTrashView && sortedItems.length === 0
+                                        ? undefined
+                                        : t("lockerItemsCount", {
+                                              count: sortedItems.length,
+                                          })
+                                }
                                 onBack={onNavigateBack}
                                 action={
                                     <Stack
@@ -1113,15 +1121,46 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         {isTrashView &&
                                             sortedItems.length > 0 &&
                                             onEmptyTrash && (
-                                                <Button
-                                                    color="critical"
-                                                    startIcon={
-                                                        <DeleteSweepOutlinedIcon />
-                                                    }
-                                                    onClick={onEmptyTrash}
+                                                <Tooltip
+                                                    title={t("empty_trash")}
                                                 >
-                                                    {t("empty_trash")}
-                                                </Button>
+                                                    <IconButton
+                                                        aria-label={t(
+                                                            "empty_trash",
+                                                        )}
+                                                        onClick={onEmptyTrash}
+                                                        sx={(theme) => ({
+                                                            width: 36,
+                                                            height: 36,
+                                                            borderRadius:
+                                                                "12px",
+                                                            padding: 0,
+                                                            ...lockerColorSx(
+                                                                theme,
+                                                                {
+                                                                    backgroundColor:
+                                                                        "fillLight",
+                                                                    color: "warning",
+                                                                },
+                                                            ),
+                                                            "&:hover": {
+                                                                ...lockerColorSx(
+                                                                    theme,
+                                                                    {
+                                                                        backgroundColor:
+                                                                            "fillDark",
+                                                                    },
+                                                                ),
+                                                            },
+                                                        })}
+                                                    >
+                                                        <HugeiconsIcon
+                                                            icon={Delete02Icon}
+                                                            size={18}
+                                                            strokeWidth={1.5}
+                                                        />
+                                                    </IconButton>
+                                                </Tooltip>
                                             )}
                                         {selectedCollection &&
                                             canShareSelectedCollection &&
@@ -1190,7 +1229,6 @@ export const ItemList: React.FC<ItemListProps> = ({
 
                             <ItemsSection
                                 items={sortedItems}
-                                masterKey={masterKey}
                                 isTrashView={isTrashView}
                                 onEditItem={onEditItem}
                                 onDeleteItem={onDeleteItem}
@@ -1217,8 +1255,10 @@ export const ItemList: React.FC<ItemListProps> = ({
                                 emptyState={
                                     isTrashView ? (
                                         <EmptyState
-                                            title={t("trashIsEmpty")}
-                                            subtitle={t("yourTrashIsEmpty")}
+                                            image={{
+                                                src: "/images/empty_state.png",
+                                            }}
+                                            title={t("yourTrashIsEmpty")}
                                         />
                                     ) : (
                                         <EmptyState
@@ -1243,9 +1283,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                     allSelected={allVisibleItemsSelected}
                     bulkDownloading={bulkDownloading}
                     bulkDownloadProgress={bulkDownloadProgress}
-                    canDownload={
-                        !!masterKey && selectedDownloadableItems.length > 0
-                    }
+                    canDownload={selectedDownloadableItems.length > 0}
                     canDelete={
                         !!onDeleteItems && selectedVisibleItems.length > 0
                     }
@@ -1258,7 +1296,7 @@ export const ItemList: React.FC<ItemListProps> = ({
 
             <ItemDetailView
                 item={selectedItem}
-                masterKey={masterKey}
+                collectionNames={selectedItemCollectionNames}
                 onClose={() => setSelectedItemID(null)}
                 onEdit={
                     onEditItem &&
@@ -1380,46 +1418,83 @@ export const ItemList: React.FC<ItemListProps> = ({
 
 const SectionHeader: React.FC<{
     title: string;
-    countLabel: string;
+    countLabel?: string;
     action?: React.ReactNode;
     onBack?: () => void;
-}> = ({ title, countLabel, action, onBack }) => (
-    <Stack
-        direction="row"
-        sx={{
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
-            maxWidth: contentMaxWidth,
-            mx: "auto",
-            mt: 3,
-            mb: 2.25,
-        }}
-    >
+}> = ({ title, countLabel, action, onBack }) =>
+    onBack ? (
+        <Stack
+            sx={{
+                gap: 2,
+                maxWidth: lockerContentMaxWidth,
+                mx: "auto",
+                mt: 1,
+                mb: 2.25,
+            }}
+        >
+            <IconButton
+                aria-label="Back"
+                onClick={onBack}
+                sx={(theme) => ({
+                    alignSelf: "flex-start",
+                    width: 36,
+                    height: 36,
+                    flexShrink: 0,
+                    borderRadius: "12px",
+                    padding: 0,
+                    ...lockerColorSx(theme, {
+                        color: "iconColor",
+                        backgroundColor: "fillLight",
+                    }),
+                    "&:hover": {
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "fillDark",
+                        }),
+                    },
+                })}
+            >
+                <ArrowBackRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+            <Stack
+                direction="row"
+                sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 2,
+                }}
+            >
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ ...lockerTextDisplay2Sx, minWidth: 0 }}>
+                        {title}
+                    </Typography>
+                    {countLabel && (
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextMiniSx,
+                                mt: 1,
+                                ...lockerColorSx(theme, { color: "textLight" }),
+                            })}
+                        >
+                            {countLabel}
+                        </Typography>
+                    )}
+                </Box>
+                {action}
+            </Stack>
+        </Stack>
+    ) : (
         <Stack
             direction="row"
-            sx={{ minWidth: 0, gap: 1.5, alignItems: "center" }}
+            sx={{
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 2,
+                maxWidth: lockerContentMaxWidth,
+                mx: "auto",
+                mt: 1,
+                mb: 2.25,
+            }}
         >
-            {onBack && (
-                <IconButton
-                    aria-label="Back"
-                    onClick={onBack}
-                    sx={{
-                        alignSelf: "center",
-                        width: 44,
-                        height: 44,
-                        flexShrink: 0,
-                        color: "text.secondary",
-                        border: "1px solid rgba(255, 255, 255, 0.10)",
-                        backgroundColor: "rgba(255, 255, 255, 0.03)",
-                        "&:hover": {
-                            backgroundColor: "rgba(255, 255, 255, 0.08)",
-                        },
-                    }}
-                >
-                    <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
-                </IconButton>
-            )}
             <Box sx={{ minWidth: 0 }}>
                 <Typography
                     variant="h3"
@@ -1427,18 +1502,21 @@ const SectionHeader: React.FC<{
                 >
                     {title}
                 </Typography>
-                <Typography variant="small" sx={{ color: "text.muted", mt: 1 }}>
-                    {countLabel}
-                </Typography>
+                {countLabel && (
+                    <Typography
+                        variant="small"
+                        sx={{ color: "text.muted", mt: 1 }}
+                    >
+                        {countLabel}
+                    </Typography>
+                )}
             </Box>
+            {action}
         </Stack>
-        {action}
-    </Stack>
-);
+    );
 
 const ItemsSection: React.FC<{
     items: LockerItem[];
-    masterKey?: string;
     isTrashView: boolean;
     onEditItem?: (item: LockerItem) => void;
     onDeleteItem?: (item: LockerItem) => void;
@@ -1454,7 +1532,6 @@ const ItemsSection: React.FC<{
     emptyState: React.ReactNode;
 }> = ({
     items,
-    masterKey,
     isTrashView,
     onEditItem,
     onDeleteItem,
@@ -1471,7 +1548,7 @@ const ItemsSection: React.FC<{
 }) =>
     items.length > 0 ? (
         <Stack
-            sx={{ maxWidth: contentMaxWidth, mx: "auto", gap: 1.1, mt: 1.25 }}
+            sx={{ maxWidth: lockerContentMaxWidth, mx: "auto", gap: 1, mt: 0 }}
         >
             {items.map((item) => {
                 const isOwnedByCurrentUser = isLockerItemOwner(
@@ -1482,7 +1559,6 @@ const ItemsSection: React.FC<{
                     <ItemCard
                         key={item.id}
                         item={item}
-                        masterKey={masterKey}
                         isTrashView={isTrashView}
                         isIncomingShared={!isOwnedByCurrentUser}
                         onClick={() => onSelectItem(item)}
@@ -1527,7 +1603,9 @@ const ItemsSection: React.FC<{
             })}
         </Stack>
     ) : (
-        <Box sx={{ maxWidth: contentMaxWidth, mx: "auto" }}>{emptyState}</Box>
+        <Box sx={{ maxWidth: lockerContentMaxWidth, mx: "auto" }}>
+            {emptyState}
+        </Box>
     );
 
 const SelectionActionBar: React.FC<{
@@ -1722,10 +1800,10 @@ const CollectionGrid: React.FC<{
         <Box
             sx={{
                 width: "100%",
-                maxWidth: contentMaxWidth,
+                maxWidth: lockerContentMaxWidth,
                 mx: "auto",
                 display: "grid",
-                gap: 2,
+                gap: 1,
             }}
         >
             {collections.map((collection) => (
@@ -1772,6 +1850,18 @@ const CollectionChipFilters: React.FC<{
     const [showLeftScrollHint, setShowLeftScrollHint] = useState(false);
     const [showRightScrollHint, setShowRightScrollHint] = useState(false);
 
+    const scrollLeft = () => {
+        const container = scrollContainerRef.current;
+        if (!container) {
+            return;
+        }
+
+        container.scrollBy({
+            left: -Math.max(container.clientWidth * 0.6, 160),
+            behavior: "smooth",
+        });
+    };
+
     const scrollRight = () => {
         const container = scrollContainerRef.current;
         if (!container) {
@@ -1813,14 +1903,32 @@ const CollectionChipFilters: React.FC<{
 
     return (
         <Box
-            sx={{
-                width: "100%",
-                maxWidth: contentMaxWidth,
-                mx: "auto",
-                mt: 0.5,
-            }}
+            sx={{ width: "100%", maxWidth: lockerContentMaxWidth, mx: "auto" }}
         >
             <Stack direction="row" sx={{ alignItems: "stretch", gap: 0 }}>
+                {showLeftScrollHint && (
+                    <Box
+                        sx={{
+                            width: 28,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <ButtonBase
+                            onClick={scrollLeft}
+                            sx={(theme) => ({
+                                width: 28,
+                                height: "100%",
+                                borderRadius: "999px",
+                                ...lockerColorSx(theme, { color: "iconColor" }),
+                            })}
+                        >
+                            <ChevronLeftRoundedIcon sx={{ fontSize: 28 }} />
+                        </ButtonBase>
+                    </Box>
+                )}
                 <Box sx={{ position: "relative", flex: 1, minWidth: 0 }}>
                     <Stack
                         ref={scrollContainerRef}
@@ -1849,28 +1957,25 @@ const CollectionChipFilters: React.FC<{
                                         onToggleCollection(collection.id)
                                     }
                                     sx={(theme) => ({
-                                        borderRadius: "999px",
-                                        px: 1.5,
-                                        py: 0.875,
+                                        minHeight: 44,
+                                        padding: "12px 20px",
+                                        borderRadius: "16px",
                                         whiteSpace: "nowrap",
                                         flexShrink: 0,
-                                        backgroundColor: isSelected
-                                            ? "#1071FF"
-                                            : theme.vars.palette.fill.faint,
-                                        color: isSelected
-                                            ? "#FFFFFF"
-                                            : theme.vars.palette.text.base,
-                                        ...theme.applyStyles("light", {
+                                        ...lockerColorSx(theme, {
                                             backgroundColor: isSelected
-                                                ? "#1071FF"
-                                                : "#FFFFFF",
-                                            border: isSelected
-                                                ? "none"
-                                                : "1px solid rgba(17, 24, 39, 0.06)",
+                                                ? "primary"
+                                                : "fillLight",
+                                            color: isSelected
+                                                ? "specialWhite"
+                                                : "textLight",
                                         }),
                                     })}
                                 >
-                                    <Typography variant="small">
+                                    <Typography
+                                        variant="small"
+                                        sx={lockerTextBodySx}
+                                    >
                                         {collection.name}
                                     </Typography>
                                 </ButtonBase>
@@ -1886,11 +1991,9 @@ const CollectionChipFilters: React.FC<{
                                 bottom: 0,
                                 width: 40,
                                 pointerEvents: "none",
-                                background:
-                                    "linear-gradient(90deg, #08090A 0%, rgba(8, 9, 10, 0) 100%)",
+                                background: `linear-gradient(90deg, ${lockerColors.backgroundBase.dark} 0%, ${lockerColors.backgroundBase.dark}00 100%)`,
                                 ...theme.applyStyles("light", {
-                                    background:
-                                        "linear-gradient(90deg, #F3F4F6 0%, rgba(243, 244, 246, 0) 100%)",
+                                    background: `linear-gradient(90deg, ${lockerColors.backgroundBase.light} 0%, ${lockerColors.backgroundBase.light}00 100%)`,
                                 }),
                             })}
                         />
@@ -1904,42 +2007,37 @@ const CollectionChipFilters: React.FC<{
                                 bottom: 0,
                                 width: 72,
                                 pointerEvents: "none",
-                                background:
-                                    "linear-gradient(90deg, rgba(8, 9, 10, 0) 0%, #08090A 100%)",
+                                background: `linear-gradient(90deg, ${lockerColors.backgroundBase.dark}00 0%, ${lockerColors.backgroundBase.dark} 100%)`,
                                 ...theme.applyStyles("light", {
-                                    background:
-                                        "linear-gradient(90deg, rgba(243, 244, 246, 0) 0%, #F3F4F6 100%)",
+                                    background: `linear-gradient(90deg, ${lockerColors.backgroundBase.light}00 0%, ${lockerColors.backgroundBase.light} 100%)`,
                                 }),
                             })}
                         />
                     )}
                 </Box>
-                <Box
-                    sx={{
-                        width: 28,
-                        flexShrink: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                    }}
-                >
-                    {showRightScrollHint && (
+                {showRightScrollHint && (
+                    <Box
+                        sx={{
+                            width: 28,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
                         <ButtonBase
                             onClick={scrollRight}
                             sx={(theme) => ({
                                 width: 28,
                                 height: "100%",
-                                color: "#4A4A4A",
                                 borderRadius: "999px",
-                                ...theme.applyStyles("dark", {
-                                    color: "#FFFFFF",
-                                }),
+                                ...lockerColorSx(theme, { color: "iconColor" }),
                             })}
                         >
                             <ChevronRightRoundedIcon sx={{ fontSize: 28 }} />
                         </ButtonBase>
-                    )}
-                </Box>
+                    </Box>
+                )}
             </Stack>
         </Box>
     );
@@ -1953,29 +2051,23 @@ const CollectionFilterChip: React.FC<{
         <ButtonBase
             onClick={onClick}
             sx={(theme) => ({
-                borderRadius: "999px",
-                px: 1.25,
-                py: 0.875,
+                width: 36,
+                height: 36,
+                borderRadius: "12px",
                 flexShrink: 0,
-                minWidth: 44,
-                color: selected ? "#FFFFFF" : theme.vars.palette.text.base,
-                backgroundColor: selected
-                    ? "#1071FF"
-                    : theme.vars.palette.fill.faint,
-                "&:hover": {
-                    backgroundColor: selected
-                        ? "#1071FF"
-                        : theme.vars.palette.fill.faintHover,
-                },
-                ...theme.applyStyles("light", {
-                    backgroundColor: selected ? "#1071FF" : "#FFFFFF",
-                    border: selected
-                        ? "none"
-                        : "1px solid rgba(17, 24, 39, 0.06)",
-                    "&:hover": {
-                        backgroundColor: selected ? "#1071FF" : "#F8FAFC",
-                    },
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                ...lockerColorSx(theme, {
+                    backgroundColor: selected ? "primary" : "fillLight",
+                    color: selected ? "specialWhite" : "iconColor",
                 }),
+                "&:hover": {
+                    ...lockerColorSx(theme, {
+                        backgroundColor: selected ? "primary" : "fillDark",
+                    }),
+                },
             })}
         >
             <FilterListRoundedIcon sx={{ fontSize: 18 }} />
@@ -1983,17 +2075,38 @@ const CollectionFilterChip: React.FC<{
     </Tooltip>
 );
 
-const EmptyState: React.FC<{ title: string; subtitle: string }> = ({
-    title,
-    subtitle,
-}) => (
+const EmptyState: React.FC<{
+    title: string;
+    subtitle?: string;
+    image?: { src: string; alt?: string };
+}> = ({ title, subtitle, image }) => (
     <Box sx={{ textAlign: "center", py: 8 }}>
-        <Typography variant="h4" sx={{ mb: 0.5 }}>
-            {title}
-        </Typography>
-        <Typography variant="body" sx={{ color: "text.muted" }}>
-            {subtitle}
-        </Typography>
+        {image && (
+            <img
+                src={image.src}
+                alt={image.alt ?? ""}
+                style={{
+                    height: 112,
+                    width: "auto",
+                    display: "block",
+                    margin: "0 auto",
+                }}
+            />
+        )}
+        {image ? (
+            <Typography sx={{ ...lockerTextLargeSx, mt: 2.5, mb: 0.5 }}>
+                {title}
+            </Typography>
+        ) : (
+            <Typography variant="h4" sx={{ mb: 0.5 }}>
+                {title}
+            </Typography>
+        )}
+        {subtitle && (
+            <Typography variant="body" sx={{ color: "text.muted" }}>
+                {subtitle}
+            </Typography>
+        )}
     </Box>
 );
 
@@ -2014,42 +2127,20 @@ const CollectionCard: React.FC<{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                gap: 1.25,
-                px: 1.5,
-                py: 1.25,
-                minHeight: 84,
-                borderRadius: "18px",
-                backgroundColor:
-                    collection.items.length > 0
-                        ? theme.vars.palette.fill.faint
-                        : "rgba(255, 255, 255, 0.03)",
-                border: 1,
-                borderStyle: "solid",
-                borderColor:
-                    collection.items.length > 0
-                        ? "rgba(255, 255, 255, 0.08)"
-                        : "rgba(255, 255, 255, 0.08)",
+                gap: 1.5,
+                pl: 1.5,
+                pr: 0,
+                py: 1.5,
+                borderRadius: "20px",
+                border: "1.5px solid",
                 transition: "background-color 0.15s, border-color 0.15s",
-                "&:hover": {
-                    backgroundColor:
-                        collection.items.length > 0
-                            ? theme.vars.palette.fill.faintHover
-                            : "rgba(255, 255, 255, 0.05)",
-                    borderColor: "rgba(255, 255, 255, 0.13)",
-                },
-                ...theme.applyStyles("light", {
-                    backgroundColor:
-                        collection.items.length > 0 ? "#FFFFFF" : "#F8FAFC",
-                    borderColor:
-                        collection.items.length > 0
-                            ? "rgba(17, 24, 39, 0.08)"
-                            : "rgba(17, 24, 39, 0.06)",
-                    "&:hover": {
-                        backgroundColor:
-                            collection.items.length > 0 ? "#FFFFFF" : "#F1F5F9",
-                        borderColor: "rgba(17, 24, 39, 0.12)",
-                    },
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    borderColor: "fillLight",
                 }),
+                "&:hover": {
+                    ...lockerColorSx(theme, { backgroundColor: "fillDark" }),
+                },
             })}
         >
             <Stack
@@ -2057,58 +2148,66 @@ const CollectionCard: React.FC<{
                 sx={{ flex: 1, minWidth: 0, alignItems: "center", gap: 1.25 }}
             >
                 <Box
-                    sx={{
+                    sx={(theme) => ({
                         position: "relative",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: 52,
-                        height: 52,
+                        width: 40,
+                        height: 40,
                         flexShrink: 0,
-                    }}
+                        borderRadius: "12px",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
+                        }),
+                    })}
                 >
-                    <Box
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 40,
-                            height: 40,
-                            m: "6px",
-                            borderRadius: "12px",
-                            backgroundColor: isImportantCollection(collection)
-                                ? "rgba(16, 113, 255, 0.16)"
-                                : "rgba(18, 36, 63, 0.96)",
-                            border: isImportantCollection(collection)
-                                ? "none"
-                                : "1px solid rgba(159, 193, 255, 0.12)",
-                        }}
-                    >
-                        {isImportantCollection(collection) ? (
-                            <StarIcon sx={{ fontSize: 20, color: "#1071FF" }} />
-                        ) : (
-                            <FolderOutlinedIcon
-                                sx={{ fontSize: 20, color: "#D6E5FF" }}
+                    {isImportantCollection(collection) ? (
+                        <Box
+                            sx={(theme) => ({
+                                display: "flex",
+                                ...lockerColorSx(theme, { color: "primary" }),
+                            })}
+                        >
+                            <HugeiconsIcon
+                                icon={StarIcon}
+                                size={24}
+                                strokeWidth={1.5}
                             />
-                        )}
-                    </Box>
+                        </Box>
+                    ) : (
+                        <Box
+                            sx={(theme) => ({
+                                display: "flex",
+                                ...lockerColorSx(theme, { color: "textBase" }),
+                            })}
+                        >
+                            <HugeiconsIcon
+                                icon={Wallet05Icon}
+                                size={24}
+                                strokeWidth={1.5}
+                            />
+                        </Box>
+                    )}
                     {collection.isShared && <SharedCollectionBadge />}
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
-                        variant="body"
-                        sx={{
+                        sx={(theme) => ({
+                            ...lockerTextBodySx,
                             minWidth: 0,
-                            fontWeight: "regular",
-                            lineHeight: 1.45,
-                        }}
+                            ...lockerColorSx(theme, { color: "textBase" }),
+                        })}
                         noWrap
                     >
                         {collection.name}
                     </Typography>
                     <Typography
-                        variant="small"
-                        sx={{ color: "text.muted", mt: 0.25 }}
+                        sx={(theme) => ({
+                            ...lockerTextMiniSx,
+                            mt: "4px",
+                            ...lockerColorSx(theme, { color: "textLight" }),
+                        })}
                     >
                         {t("lockerItemsCount", {
                             count: collection.items.length,
@@ -2116,11 +2215,19 @@ const CollectionCard: React.FC<{
                     </Typography>
                 </Box>
             </Stack>
-            {(onShare || onLeave || onRename || onDelete) && (
-                <Box
-                    sx={{ flexShrink: 0, ml: 0.25 }}
-                    onClick={(event) => event.stopPropagation()}
-                >
+            <Box
+                sx={{
+                    flexShrink: 0,
+                    mr: 1.5,
+                    width: 44,
+                    height: 24,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                {(onShare || onLeave || onRename || onDelete) && (
                     <CollectionContextMenu
                         ariaID={`collection-context-menu-${collection.id}`}
                         onShare={onShare}
@@ -2128,8 +2235,8 @@ const CollectionCard: React.FC<{
                         onRename={onRename}
                         onDelete={onDelete}
                     />
-                </Box>
-            )}
+                )}
+            </Box>
         </ButtonBase>
     );
 };
@@ -2139,20 +2246,21 @@ const SharedCollectionBadge: React.FC = () => {
         <Box
             sx={(theme) => ({
                 position: "absolute",
-                right: -2,
-                bottom: -2,
+                right: -4,
+                bottom: -4,
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 16,
-                height: 16,
-                borderRadius: "999px",
-                backgroundColor: "#1071FF",
-                border: `1.5px solid ${theme.vars.palette.background.paper}`,
-                boxShadow: "0 2px 6px rgba(0, 66, 173, 0.24)",
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    color: "primary",
+                }),
             })}
         >
-            <ShareOutlinedIcon sx={{ fontSize: 10, color: "#FFFFFF" }} />
+            <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={2} />
         </Box>
     );
 };
@@ -2166,12 +2274,7 @@ const CollectionContextMenu: React.FC<{
 }> = ({ ariaID, onShare, onLeave, onRename, onDelete }) => (
     <OverflowMenu
         ariaID={ariaID}
-        triggerButtonSxProps={{
-            p: 0.25,
-            color: "text.faint",
-            opacity: 0,
-            ".MuiButtonBase-root:hover &": { opacity: 1 },
-        }}
+        triggerButtonSxProps={{ p: 0.25, color: "text.muted" }}
     >
         {onShare && (
             <OverflowMenuOption

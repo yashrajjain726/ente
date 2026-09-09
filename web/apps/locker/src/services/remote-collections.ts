@@ -1,6 +1,6 @@
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { encryptBox, generateKey, stringToB64 } from "ente-core-wasm";
+import { encryptBox, generateKey, stringToB64 } from "ente-locker-wasm";
 import { RemoteCollectionCreateResponseSchema } from "./remote-types";
 
 interface CollectionRecordLike {
@@ -14,13 +14,12 @@ interface RenameCollectionDeps<TCollectionRecord> {
     ) => TCollectionRecord | undefined;
     decryptCollectionKey: (
         collectionRecord: TCollectionRecord,
-        masterKey: string,
     ) => Promise<string>;
 }
 
 interface EnsureUncategorizedDeps<TCollectionRecord> {
     findCollectionByType: (type: string) => TCollectionRecord | undefined;
-    refetchCollections: (masterKey: string) => Promise<void>;
+    refetchCollections: () => Promise<void>;
 }
 
 const ensureCollectionWithTypeWithDeps = async <
@@ -37,7 +36,7 @@ const ensureCollectionWithTypeWithDeps = async <
     }
 
     await createCollectionWithDeps(name, masterKey, type);
-    await deps.refetchCollections(masterKey);
+    await deps.refetchCollections();
 
     collection = deps.findCollectionByType(type);
     if (!collection) {
@@ -100,7 +99,6 @@ export const ensureFavoritesCollectionWithDeps = async <
 export const renameCollectionWithDeps = async <TCollectionRecord>(
     collectionID: number,
     newName: string,
-    masterKey: string,
     deps: RenameCollectionDeps<TCollectionRecord>,
 ): Promise<void> => {
     const collectionRecord = deps.getCollectionRecord(collectionID);
@@ -108,10 +106,7 @@ export const renameCollectionWithDeps = async <TCollectionRecord>(
         throw new Error(`Collection ${collectionID} not in cache`);
     }
 
-    const collectionKey = await deps.decryptCollectionKey(
-        collectionRecord,
-        masterKey,
-    );
+    const collectionKey = await deps.decryptCollectionKey(collectionRecord);
     const nameB64 = stringToB64(newName);
     const encryptedName = await encryptBox(nameB64, collectionKey);
 

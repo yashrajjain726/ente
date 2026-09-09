@@ -54,10 +54,13 @@ pub(crate) enum ExecutionMode {
 // Identifies the successful attempt's preferred provider, not its registered
 // fallback providers, for result attribution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)] // Accelerated variants are constructed only on their target OS.
 pub(super) enum ExecutionProvider {
     CoreMl,
     WebGpu,
+    #[cfg_attr(
+        not(any(test, target_os = "android")),
+        expect(dead_code, reason = "XNNPACK is only selected on Android")
+    )]
     Xnnpack,
     Cpu,
 }
@@ -191,7 +194,6 @@ pub(super) fn provider_attempt(
         },
         #[cfg(target_os = "android")]
         ExecutionProvider::Xnnpack => xnnpack_attempt(),
-        #[allow(unreachable_patterns)]
         _ => unreachable!("provider is not available on this platform"),
     }
 }

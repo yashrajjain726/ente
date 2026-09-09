@@ -39,7 +39,6 @@ import {
 import {
     findCollectionCreatingIfNeeded,
     performCollectionOp,
-    validateKey,
 } from "@/components/gallery/helpers";
 import {
     useGalleryReducer,
@@ -80,6 +79,7 @@ import { useIsSmallWidth } from "ente-base/components/utils/hooks";
 import { useModalVisibility } from "ente-base/components/utils/modal";
 import { useBaseContext } from "ente-base/context";
 import { subscribeMainWindowFocus } from "ente-base/electron";
+import { isNamedError } from "ente-base/error";
 import { hasPendingAlbumToJoin } from "ente-base/join-album";
 import log from "ente-base/log";
 import {
@@ -133,7 +133,7 @@ import {
 } from "ente-new/photos/services/ml";
 import { contactsGetDiff, contactsGetProfilePicture } from "ente-photos-wasm";
 
-import { openAuthenticatedSession } from "@/services/authenticated-session";
+import { ensureAuthenticatedSession } from "@/services/authenticated-session";
 import { postPullFiles, prePullFiles, pullFiles } from "@/services/pull";
 import { uploadManager } from "@/services/upload-manager";
 import watcher from "@/services/watch";
@@ -501,8 +501,15 @@ const Page: React.FC = () => {
                 return;
             }
 
-            if (!(await validateKey())) {
-                logout();
+            let session;
+            try {
+                session = await ensureAuthenticatedSession();
+            } catch (e) {
+                if (isNamedError(e, "missing_recovery_key")) {
+                    showMiniDialog(sessionExpiredDialogAttributes(logout));
+                } else {
+                    onGenericError(e);
+                }
                 return;
             }
 
@@ -515,24 +522,17 @@ const Page: React.FC = () => {
             setIsFirstLoad(getAndClearIsFirstLogin());
 
             const user = ensureLocalUser();
-            const masterKey = await masterKeyFromSession();
-            if (masterKey) {
-                void openAuthenticatedSession(user.id, authToken, masterKey)
-                    .then((session) =>
-                        ensureContactsReady(
-                            user.id,
-                            session,
-                            contactsGetDiff,
-                            contactsGetProfilePicture,
-                        ),
-                    )
-                    .catch((error: unknown) => {
-                        log.warn(
-                            "[gallery] Failed to warm contacts display cache",
-                            error,
-                        );
-                    });
-            }
+            void ensureContactsReady(
+                user.id,
+                session,
+                contactsGetDiff,
+                contactsGetProfilePicture,
+            ).catch((error: unknown) => {
+                log.warn(
+                    "[gallery] Failed to warm contacts display cache",
+                    error,
+                );
+            });
             const userDetails = await savedUserDetailsOrTriggerPull();
             dispatch({
                 type: "mount",
@@ -556,10 +556,7 @@ const Page: React.FC = () => {
                     log.error("Failed to join album", error);
                     showMiniDialog({
                         title: t("error"),
-                        message:
-                            t("album_join_failed") +
-                            ": " +
-                            (error as Error).message,
+                        message: t("album_join_failed"),
                     });
                 }
             }

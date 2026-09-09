@@ -1178,6 +1178,10 @@
   "doubleTapToViewHiddenCode": "You can double tap on an entry to view code",
   "download": "Download",
   "downloadApplicationUpdate": "Download update",
+  "downloadDecryptionFailedMessage": "This item could not be downloaded. Please reach out to us so we can help.",
+  "@downloadDecryptionFailedMessage": {
+    "description": "Message shown in the viewer when a downloaded item cannot be decrypted"
+  },
   "downloadFailed": "Download failed",
   "downloading": "Downloading...",
   "downloadingProgress": "Downloading... {percentage}%",
@@ -2101,6 +2105,8 @@
   "layout": "Layout",
   "layoutGrouped": "Grouped",
   "layoutJustified": "Justified",
+  "layoutJustifiedComfort": "Justified · Comfort",
+  "layoutJustifiedFlex": "Justified · Flex",
   "layoutMasonry": "Masonry",
   "layoutTrip": "Trip",
   "leave": "Leave",
@@ -2506,6 +2512,16 @@
       "formattedCount": {
         "type": "String",
         "example": "11.513, 11,511"
+      }
+    }
+  },
+  "memoryLaneCardTitle": "{name}’s memory lane",
+  "@memoryLaneCardTitle": {
+    "description": "Title for the Memory Lane card on the home screen",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "Person's name"
       }
     }
   },
@@ -4927,5 +4943,17 @@
       }
     }
   },
-  "grantAccess": "Grant access"
+  "grantAccess": "Grant access",
+  "sharePhotos": "Share photos",
+  "sharePersonPhotos": "Share {name}’s photos",
+  "@sharePersonPhotos": {"placeholders": {"name": {"type": "String"}}},
+  "unnamedPersonAlbumName": "Portrait - {date}",
+  "@unnamedPersonAlbumName": {"placeholders": {"date": {"type": "String"}}},
+  "shareAllPersonPhotos": "Share all photos",
+  "shareAllPersonPhotosDescription": "All photos of {name} including future ones",
+  "@shareAllPersonPhotosDescription": {"placeholders": {"name": {"type": "String"}}},
+  "personShareFailedTitle": "Could not share photos",
+  "personShareFailedBody": "The shared album could not be created. Your photos and selection are unchanged. Please try again.",
+  "personShareRollbackFailed": "The share did not finish, and the album “{name}” could not be removed. It remains in Albums and may have an active public link. Review or delete it there before trying again. Your original photos are safe.",
+  "@personShareRollbackFailed": {"placeholders": {"name": {"type": "String"}}}
 }

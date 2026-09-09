@@ -313,7 +313,7 @@ func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	_, err = repo.updateUsage(ctx, tx, file.OwnerID, usageDiff, 0, 0)
+	_, err = applyUsageChange(ctx, tx, file.OwnerID, usageChange{StorageDelta: usageDiff})
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -450,7 +450,7 @@ func (repo *FileRepository) UpdateThumbnail(ctx context.Context, fileID int64, u
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	_, err = repo.updateUsage(ctx, tx, userID, usageDiff, 0, 0)
+	_, err = applyUsageChange(ctx, tx, userID, usageChange{StorageDelta: usageDiff})
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -579,18 +579,23 @@ func (repo *FileRepository) GetSize(userID int64, fileIDs []int64) (int64, error
 }
 
 func (repo *FileRepository) GetFileCountForUser(userID int64, app ente.App) (int64, error) {
-	row := repo.DB.QueryRow(`SELECT count(distinct files.file_id)  
+	row := repo.DB.QueryRow(`SELECT source.file_count,
+			u.photos_file_count, u.locker_file_count, u.file_count_source_version
+		FROM (SELECT count(distinct files.file_id) AS file_count
 			FROM collection_files
 			JOIN collections c on c.owner_id = $1 and c.collection_id = collection_files.collection_id 
 			JOIN files ON 
 			files.owner_id = $1 AND files.file_id = collection_files.file_id
-			WHERE (c.app = $2 AND collection_files.is_deleted = false);`, userID, app)
+			WHERE (c.app = $2 AND collection_files.is_deleted = false)) AS source
+		LEFT JOIN usage u ON u.user_id = $1`, userID, app)
 
 	var fileCount int64
-	err := row.Scan(&fileCount)
+	var counts fileCountSnapshot
+	err := row.Scan(&fileCount, &counts.photos, &counts.locker, &counts.version)
 	if err != nil {
 		return -1, stacktrace.Propagate(err, "")
 	}
+	counts.observe("file_count", userID, app, fileCount)
 	return fileCount, nil
 }
 
@@ -775,39 +780,18 @@ func (repo *FileRepository) scheduleDeletion(ctx context.Context, tx *sql.Tx, fi
 		totalObjectSize += object.FileSize
 	}
 	diff = diff - (totalObjectSize)
-	_, err = repo.updateUsage(ctx, tx, userID, diff, 0, 0)
+	_, err = applyUsageChange(ctx, tx, userID, usageChange{StorageDelta: diff})
 	return stacktrace.Propagate(err, "")
 }
 
 func (repo *FileRepository) updateUsageForFileCreation(ctx context.Context, tx *sql.Tx, userID, storageDiff int64, app ente.App) (int64, error) {
-	switch app {
-	case ente.Photos:
-		return repo.updateUsage(ctx, tx, userID, storageDiff, 1, 0)
-	case ente.Locker:
-		return repo.updateUsage(ctx, tx, userID, storageDiff, 0, 1)
-	default:
+	photosFileCountDiff, lockerFileCountDiff, ok := fileCountDelta(app, 1)
+	if !ok {
 		return -1, stacktrace.Propagate(ente.ErrInvalidApp, "")
 	}
-}
-
-func (repo *FileRepository) updateUsage(ctx context.Context, tx *sql.Tx, userID, storageDiff, photosFileCountDiff, lockerFileCountDiff int64) (int64, error) {
-	fileCountSourceVersionDiff := int64(0)
-	if photosFileCountDiff != 0 || lockerFileCountDiff != 0 {
-		fileCountSourceVersionDiff = 1
-	}
-	var usage int64
-	err := tx.QueryRowContext(ctx, `INSERT INTO usage
-			(user_id, storage_consumed, file_count_source_version)
-			VALUES ($1, $2, $5)
-			ON CONFLICT (user_id) DO UPDATE SET
-				storage_consumed = usage.storage_consumed + EXCLUDED.storage_consumed,
-				photos_file_count = usage.photos_file_count + $3,
-				locker_file_count = usage.locker_file_count + $4,
-				file_count_source_version = usage.file_count_source_version + EXCLUDED.file_count_source_version
-			RETURNING storage_consumed`,
-		userID, storageDiff, photosFileCountDiff, lockerFileCountDiff, fileCountSourceVersionDiff).Scan(&usage)
-	if err != nil {
-		return -1, stacktrace.Propagate(err, "")
-	}
-	return usage, nil
+	return applyUsageChange(ctx, tx, userID, usageChange{
+		StorageDelta:    storageDiff,
+		PhotosFileDelta: photosFileCountDiff,
+		LockerFileDelta: lockerFileCountDiff,
+	})
 }

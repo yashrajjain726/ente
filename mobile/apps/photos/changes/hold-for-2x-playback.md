@@ -1,0 +1,1 @@
+- Added press and hold 2x playback for videos (@fosszil)

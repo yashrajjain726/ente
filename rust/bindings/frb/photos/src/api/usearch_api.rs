@@ -7,10 +7,18 @@ type BulkSearchByKeyMatch = (Vec<u64>, Vec<Vec<u64>>, Vec<Vec<f32>>);
 
 // USearch already vendors and links SimSIMD. Call that single exported symbol
 // directly to avoid pulling a second copy of SimSIMD into the final app binary.
+#[expect(
+    unsafe_code,
+    reason = "Declare the SimSIMD symbol already linked by USearch"
+)]
 unsafe extern "C" {
     fn simsimd_dot_f32(a: *const f32, b: *const f32, n: u64, d: *mut f64);
 }
 
+#[expect(
+    unsafe_code,
+    reason = "Call the SimSIMD symbol already linked by USearch"
+)]
 fn simsimd_dot_product(a: &[f32], b: &[f32]) -> f64 {
     debug_assert_eq!(a.len(), b.len());
     let mut score = 0.0_f64;

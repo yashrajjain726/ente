@@ -1,18 +1,10 @@
 name: "Test (Rust)"
 
 on:
-    pull_request:
-        paths:
-            - ".github/workflows/rust-test.yml"
-            - "rust/**"
-            - "server/**"
+    workflow_call:
 
 permissions:
     contents: read
-
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
 
 env:
     RUSTFLAGS: -D warnings

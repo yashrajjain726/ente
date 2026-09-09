@@ -28,11 +28,11 @@ use crate::crypto::{
 };
 use crate::error::{Error, Result};
 use crate::models::{
-    CreatedSpace, DecryptedFriendShare, DecryptedSpaceProfile, FeedItem, MessagePayload,
+    CreatedSpace, DecryptedFriendShare, DecryptedSpaceProfile, MessagePayload,
     OpenAccountSpaceCtxInput, PostObjectMetadata,
 };
 use crate::transport::{
-    CreateSpaceRequest, FriendShareResponse, PostObjectPayload, PostResponse, SpaceKeyResponse,
+    CreateSpaceRequest, FriendShareResponse, PostObjectPayload, SpaceKeyResponse,
     SpaceKeyVersionResponse, SpaceLookupResponse, SpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::{
@@ -43,6 +43,7 @@ use ente_core::{
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
+const MESSAGE_KIND_POKE: &str = "poke";
 const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
 const ONLY_PHOTOS_UPLOAD_MESSAGE: &str = "only photos can be uploaded";
 pub const MAX_SPACE_POST_UPLOAD_BYTES: usize = 5 * 1024 * 1024;
@@ -138,11 +139,11 @@ impl AccountSpaceCtx {
         &self.space_root_key
     }
 
-    pub async fn get_space_root_key(&self) -> Result<Option<Vec<u8>>> {
+    pub fn get_space_root_key(&self) -> Result<Option<Vec<u8>>> {
         Ok(Some(self.space_root_key.to_vec()))
     }
 
-    pub async fn get_or_create_space_root_key(&self) -> Result<Vec<u8>> {
+    pub fn get_or_create_space_root_key(&self) -> Result<Vec<u8>> {
         Ok(self.space_root_key.to_vec())
     }
 
@@ -242,8 +243,7 @@ impl AccountSpaceCtx {
         space_id: &str,
     ) -> Result<(SpaceKeyResponse, Vec<u8>)> {
         let space_root_key = self
-            .get_space_root_key()
-            .await?
+            .get_space_root_key()?
             .ok_or_else(|| Error::InvalidInput("space root key is missing".into()))?;
         let space_id = space_id.trim();
         if space_id.is_empty() {
@@ -314,7 +314,7 @@ impl AccountSpaceCtx {
         profile: &[u8],
         referred_by_space_id: Option<&str>,
     ) -> Result<CreatedSpace> {
-        let space_root_key = self.get_or_create_space_root_key().await?;
+        let space_root_key = self.get_or_create_space_root_key()?;
         let root_wrapped_space_key =
             b64::encode(&encrypt_secretbox_payload(&space_root_key, space_key)?);
         let (public_key, secret_key) = generate_keypair()?;
@@ -372,7 +372,11 @@ impl AccountSpaceCtx {
             .get(&path)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_status()
+            .map_err(|error| match error.status_code() {
+                Some(404) => Error::ProfileNotFound,
+                _ => error.into(),
+            })?
             .json()
             .await?)
     }
@@ -418,9 +422,8 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedOwnedSpaceAccess>> {
-        let space_root_key = match self.get_space_root_key().await? {
-            Some(value) => value,
-            None => return Ok(None),
+        let Some(space_root_key) = self.get_space_root_key()? else {
+            return Ok(None);
         };
         let spaces = self.list_owned_spaces_cached().await?;
         let Some(record) = spaces.into_iter().find(|value| value.space_id == space_id) else {
@@ -492,9 +495,8 @@ impl AccountSpaceCtx {
         space_id: &str,
         version: Option<i32>,
     ) -> Result<Option<Vec<u8>>> {
-        let mut access = match self.resolve_space_access(space_id).await? {
-            Some(value) => value,
-            None => return Ok(None),
+        let Some(mut access) = self.resolve_space_access(space_id).await? else {
+            return Ok(None);
         };
         let target_version = version.unwrap_or(access.key_version);
         access = self
@@ -520,9 +522,8 @@ impl AccountSpaceCtx {
             }
             None => self.resolve_space_access(space_id).await?,
         };
-        let mut access = match access {
-            Some(value) => value,
-            None => return Ok(None),
+        let Some(mut access) = access else {
+            return Ok(None);
         };
         let target_version = version.unwrap_or(access.key_version);
         access = self
@@ -706,21 +707,6 @@ fn validate_message_payload(payload: &MessagePayload, plaintext_len: usize) -> R
         )));
     }
     Ok(())
-}
-
-fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
-    PostResponse {
-        post_id: item.post_id,
-        space_id: item.space_id.clone(),
-        space_slug: item.space_slug.clone(),
-        author: item.author.clone(),
-        encrypted_post_key: item.encrypted_post_key.clone(),
-        caption_cipher: item.caption_cipher.clone(),
-        key_version: item.key_version,
-        objects: item.objects.clone(),
-        created_at: item.created_at.clone(),
-        viewer_liked: item.viewer_liked,
-    }
 }
 
 pub(super) fn build_api(

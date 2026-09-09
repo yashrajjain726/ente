@@ -2,13 +2,18 @@ import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
+import {
+    spaceAppBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
-export const loginBackground = "#FAFAFA";
-
 const green = "#08C225";
-const textBase = "#000";
-const textLight = "#969696";
+const textBase = spaceText;
+const textLight = spaceTextMuted;
 const warning = "#F63A3A";
 const loginFormID = "space-login-form";
 
@@ -124,7 +129,7 @@ const TextInput: React.FC<TextInputProps> = ({
             <Box
                 sx={{
                     alignItems: "center",
-                    bgcolor: readOnly ? "#F5F5F5" : "white",
+                    bgcolor: spaceSurface,
                     borderRadius: "16px",
                     display: "flex",
                     height: 52,
@@ -212,7 +217,7 @@ const FooterLinkButton: React.FC<{
             alignItems: "center",
             bgcolor: "transparent",
             border: 0,
-            color: "#666",
+            color: textLight,
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -306,7 +311,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: loginBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -315,7 +320,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: loginBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -435,7 +440,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <Box
                     sx={{
-                        bgcolor: loginBackground,
+                        bgcolor: "transparent",
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
@@ -459,10 +464,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         onPointerDown={handleContinuePointerDown}
                         sx={{
                             alignItems: "center",
-                            bgcolor: isContinueButtonActive ? green : "#F5F5F5",
+                            bgcolor: isContinueButtonActive
+                                ? green
+                                : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: isContinueButtonActive ? "white" : textLight,
+                            color: isContinueButtonActive
+                                ? spaceOnAccent
+                                : textLight,
                             cursor: canContinue ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

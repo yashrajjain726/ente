@@ -23,13 +23,11 @@ interface CollectionMutationDeps {
     decryptFileKeyForCollection: (
         fileID: number,
         collectionID: number,
-        masterKey: string,
     ) => Promise<string>;
     buildEncryptedFileMoveItem: (
         fileID: number,
         fromCollectionID: number,
         toCollectionID: number,
-        masterKey: string,
     ) => Promise<EncryptedCollectionFileItem>;
     removeFilesFromCollection: (
         collectionID: number,
@@ -44,7 +42,6 @@ interface CollectionMutationDeps {
         fileID: number,
         fileKey: string,
         targetCollectionIDs: number[],
-        masterKey: string,
     ) => Promise<void>;
 }
 
@@ -171,11 +168,7 @@ export const updateItemCollectionsWithDeps = async (
               ) ?? currentCollectionIDs[0])
             : undefined;
     const sourceFileKeyForAdd = sourceCollectionIDForAdd
-        ? await decryptFileKeyForCollection(
-              fileID,
-              sourceCollectionIDForAdd,
-              masterKey,
-          )
+        ? await decryptFileKeyForCollection(fileID, sourceCollectionIDForAdd)
         : null;
 
     // Add the new memberships before removing existing ones so the file
@@ -188,7 +181,6 @@ export const updateItemCollectionsWithDeps = async (
             fileID,
             sourceFileKeyForAdd,
             collectionIDsToAdd,
-            masterKey,
         );
     }
 
@@ -218,7 +210,6 @@ export const updateItemCollectionsWithDeps = async (
                 fileID,
                 collectionID,
                 targetCollectionID,
-                masterKey,
             ),
         ]);
     }
@@ -272,7 +263,6 @@ export const deleteCollectionKeepingFilesWithDeps = async (
                 item.id,
                 collectionID,
                 targetCollectionID,
-                masterKey,
             ),
         );
     }

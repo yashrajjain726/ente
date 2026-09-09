@@ -188,11 +188,7 @@ impl MlIndexingTestContext {
         let golden_results = load_golden_results(&golden_path)?;
         let fixture_paths = fetch_fixtures(&store, &asset_lock.fixture_base_url, &manifest).await?;
 
-        let onnx_runtime_library =
-            resolve_onnx_runtime_library(&store, &asset_lock.onnx_runtime).await?;
-        let _ = ort::init_from(&onnx_runtime_library)
-            .context("load ONNX Runtime dynamic library")?
-            .commit();
+        init_onnx_runtime(&store, &asset_lock).await?;
 
         let model_paths = resolve_model_paths(&store, &asset_lock.models).await?;
 
@@ -392,13 +388,11 @@ impl MlIndexingTestContext {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) struct GoldenModelAsset {
     pub(crate) path: PathBuf,
     pub(crate) sha256: String,
 }
 
-#[allow(dead_code)]
 pub(crate) struct GoldenTestAssets {
     pub(crate) face_detection: GoldenModelAsset,
     pub(crate) face_embedding: GoldenModelAsset,
@@ -407,7 +401,6 @@ pub(crate) struct GoldenTestAssets {
     pub(crate) clip_text_vocab: PathBuf,
 }
 
-#[allow(dead_code)]
 impl GoldenTestAssets {
     pub(crate) async fn load() -> Result<Self> {
         let repo_root = repo_root()?;
@@ -415,11 +408,7 @@ impl GoldenTestAssets {
         let cache_dir = cache_dir(&repo_root);
         let store = AssetStore::new(&cache_dir);
 
-        let onnx_runtime_library =
-            resolve_onnx_runtime_library(&store, &asset_lock.onnx_runtime).await?;
-        let _ = ort::init_from(&onnx_runtime_library)
-            .context("load ONNX Runtime dynamic library")?
-            .commit();
+        init_onnx_runtime(&store, &asset_lock).await?;
 
         let models = &asset_lock.models;
         Ok(Self {
@@ -472,6 +461,7 @@ struct AssetLock {
 struct DocumentAsset {
     path: String,
     url: String,
+    size: u64,
     sha256: String,
 }
 
@@ -483,6 +473,7 @@ struct OnnxRuntimeAssets {
 #[derive(Debug, Deserialize)]
 struct OnnxRuntimeArchive {
     url: String,
+    size: u64,
     sha256: String,
     library_path: String,
     library_sha256: String,
@@ -493,9 +484,7 @@ struct ModelAssets {
     face_detection: ModelAsset,
     face_embedding: ModelAsset,
     clip_image: ModelAsset,
-    #[allow(dead_code)]
     clip_text: ModelAsset,
-    #[allow(dead_code)]
     clip_text_vocab: ModelAsset,
 }
 
@@ -503,6 +492,7 @@ struct ModelAssets {
 struct ModelAsset {
     file_name: String,
     url: String,
+    size: u64,
     sha256: String,
 }
 
@@ -527,6 +517,7 @@ struct FixtureManifest {
 #[derive(Debug, Deserialize)]
 struct FixtureFile {
     path: String,
+    size: u64,
     sha256: String,
 }
 
@@ -549,6 +540,26 @@ struct ComparableFace {
     landmarks: Vec<[f64; 2]>,
     score: f64,
     embedding: Vec<f64>,
+}
+
+pub(crate) async fn load_onnx_runtime() -> Result<()> {
+    let repo_root = repo_root()?;
+    let asset_lock = load_asset_lock(&repo_root)?;
+    let store = AssetStore::new(cache_dir(&repo_root));
+    init_onnx_runtime(&store, &asset_lock).await
+}
+
+pub(crate) fn asset_cache_dir() -> Result<PathBuf> {
+    Ok(cache_dir(&repo_root()?))
+}
+
+async fn init_onnx_runtime(store: &AssetStore, asset_lock: &AssetLock) -> Result<()> {
+    let onnx_runtime_library =
+        resolve_onnx_runtime_library(store, &asset_lock.onnx_runtime).await?;
+    let _ = ort::init_from(&onnx_runtime_library)
+        .context("load ONNX Runtime dynamic library")?
+        .commit();
+    Ok(())
 }
 
 fn repo_root() -> Result<PathBuf> {
@@ -625,6 +636,7 @@ async fn resolve_document_asset(
         label,
         &file_id_for_manifest_path(&asset.path)?,
         &asset.url,
+        asset.size,
         &asset.sha256,
     )
     .await
@@ -653,6 +665,7 @@ async fn fetch_fixtures(
                 &label,
                 &label,
                 &fixture_url(fixture_base_url, &fixture.path)?,
+                fixture.size,
                 &fixture.sha256,
             )
             .await?,
@@ -685,6 +698,7 @@ async fn resolve_onnx_runtime_library(
         &target_key,
         &archive_name,
         &archive.url,
+        archive.size,
         &archive.sha256,
     )
     .await?;
@@ -830,6 +844,7 @@ async fn golden_model(
             label,
             &model.file_name,
             &model.url,
+            model.size,
             &model.sha256,
         )
         .await?,
@@ -848,6 +863,7 @@ async fn resolve_model_asset(
         label,
         &asset.file_name,
         &asset.url,
+        asset.size,
         &asset.sha256,
     )
     .await
@@ -859,6 +875,7 @@ async fn download_file(
     key: &str,
     name: &str,
     url: &str,
+    size: u64,
     expected_sha256: &str,
 ) -> Result<PathBuf> {
     let sha256 = normalize_sha256(expected_sha256);
@@ -867,6 +884,7 @@ async fn download_file(
         AssetFile {
             name: name.to_string(),
             url: url.to_string(),
+            size,
             sha256,
         },
     )

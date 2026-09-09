@@ -5,8 +5,8 @@ on:
         branches: [main]
         paths:
             - ".github/workflows/web-crowdin-sync.yml"
-            - "web/packages/base/locales/en-US/translation.json"
             - "web/crowdin.yml"
+            - "web/packages/base/locales/en-US/translation.json"
     schedule:
         # Mondays at ~6:00 AM IST
         - cron: "20 0 * * 1"

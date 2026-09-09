@@ -1,7 +1,12 @@
 import { z } from "zod";
-import { decryptBox, encryptBox, generateKey } from "./crypto";
 
 export const clearSessionStorage = () => sessionStorage.clear();
+
+export const haveMasterKeyInSession = () =>
+    !!sessionStorage.getItem("encryptionKey");
+
+export const clearStashedKeyEncryptionKeyFromSession = () =>
+    sessionStorage.removeItem("keyEncryptionKey");
 
 const SessionKeyData = z.object({
     encryptedData: z.string(),
@@ -11,75 +16,96 @@ const SessionKeyData = z.object({
 
 type SessionKeyData = z.infer<typeof SessionKeyData>;
 
-const sessionKeyData = async (keyData: string): Promise<SessionKeyData> => {
-    const key = await generateKey();
-    const box = await encryptBox(keyData, key);
-    return { key, ...box };
-};
+interface SessionStorageCrypto {
+    decryptBox: (
+        box: { encryptedData: string; nonce: string },
+        key: string,
+    ) => Promise<string>;
+    encryptBox: (
+        data: string,
+        key: string,
+    ) => Promise<{ encryptedData: string; nonce: string }>;
+    generateKey: () => Promise<string>;
+}
 
-export const ensureMasterKeyFromSession = async () => {
-    const key = await masterKeyFromSession();
-    if (!key) throw new Error("Master key not found in session");
-    return key;
-};
+export const createSessionStorage = ({
+    decryptBox,
+    encryptBox,
+    generateKey,
+}: SessionStorageCrypto) => {
+    const sessionKeyData = async (keyData: string): Promise<SessionKeyData> => {
+        const key = await generateKey();
+        const box = await encryptBox(keyData, key);
+        return { key, ...box };
+    };
 
-export const haveMasterKeyInSession = () =>
-    !!sessionStorage.getItem("encryptionKey");
+    const saveKeyInSessionStore = async (keyName: string, keyData: string) => {
+        sessionStorage.setItem(
+            keyName,
+            JSON.stringify(await sessionKeyData(keyData)),
+        );
+    };
 
-export const masterKeyFromSession = async () => {
-    const value = sessionStorage.getItem("encryptionKey");
-    if (!value) return undefined;
+    const masterKeyFromSession = async () => {
+        const value = sessionStorage.getItem("encryptionKey");
+        if (!value) return undefined;
 
-    const { encryptedData, key, nonce } = SessionKeyData.parse(
-        JSON.parse(value),
-    );
-    return decryptBox({ encryptedData, nonce }, key);
-};
+        const { encryptedData, key, nonce } = SessionKeyData.parse(
+            JSON.parse(value),
+        );
+        return decryptBox({ encryptedData, nonce }, key);
+    };
 
-export const saveMasterKeyInSessionAndSafeStore = async (masterKey: string) => {
-    await saveKeyInSessionStore("encryptionKey", masterKey);
-    try {
-        await globalThis.electron?.saveMasterKeyInSafeStorage(masterKey);
-    } catch {
-        // Best effort, matching the current accounts package behaviour.
-    }
-};
+    const ensureMasterKeyFromSession = async () => {
+        const key = await masterKeyFromSession();
+        if (!key) throw new Error("Master key not found in session");
+        return key;
+    };
 
-const saveKeyInSessionStore = async (keyName: string, keyData: string) => {
-    sessionStorage.setItem(
-        keyName,
-        JSON.stringify(await sessionKeyData(keyData)),
-    );
-};
+    const saveMasterKeyInSessionAndSafeStore = async (masterKey: string) => {
+        await saveKeyInSessionStore("encryptionKey", masterKey);
+        try {
+            await globalThis.electron?.saveMasterKeyInSafeStorage(masterKey);
+        } catch {
+            // Best effort, matching the current accounts package behaviour.
+        }
+    };
 
-export const updateSessionFromElectronSafeStorageIfNeeded = async () => {
-    const electron = globalThis.electron;
-    if (!electron || haveMasterKeyInSession()) return;
+    const updateSessionFromElectronSafeStorageIfNeeded = async () => {
+        const electron = globalThis.electron;
+        if (!electron || haveMasterKeyInSession()) return;
 
-    let masterKey: string | undefined;
-    try {
-        masterKey = await electron.masterKeyFromSafeStorage();
-    } catch {
-        masterKey = undefined;
-    }
+        let masterKey: string | undefined;
+        try {
+            masterKey = await electron.masterKeyFromSafeStorage();
+        } catch {
+            masterKey = undefined;
+        }
 
-    if (masterKey) await saveKeyInSessionStore("encryptionKey", masterKey);
-};
+        if (masterKey) await saveKeyInSessionStore("encryptionKey", masterKey);
+    };
 
-export const stashKeyEncryptionKeyInSessionStore = (kek: string) =>
-    saveKeyInSessionStore("keyEncryptionKey", kek);
+    const stashKeyEncryptionKeyInSessionStore = (kek: string) =>
+        saveKeyInSessionStore("keyEncryptionKey", kek);
 
-export const clearStashedKeyEncryptionKeyFromSession = () =>
-    sessionStorage.removeItem("keyEncryptionKey");
+    const unstashKeyEncryptionKeyFromSession = async () => {
+        const value = sessionStorage.getItem("keyEncryptionKey");
+        if (!value) return undefined;
 
-export const unstashKeyEncryptionKeyFromSession = async () => {
-    const value = sessionStorage.getItem("keyEncryptionKey");
-    if (!value) return undefined;
+        clearStashedKeyEncryptionKeyFromSession();
 
-    clearStashedKeyEncryptionKeyFromSession();
+        const { encryptedData, key, nonce } = SessionKeyData.parse(
+            JSON.parse(value),
+        );
+        return decryptBox({ encryptedData, nonce }, key);
+    };
 
-    const { encryptedData, key, nonce } = SessionKeyData.parse(
-        JSON.parse(value),
-    );
-    return decryptBox({ encryptedData, nonce }, key);
+    return {
+        ensureMasterKeyFromSession,
+        masterKeyFromSession,
+        saveMasterKeyInSessionAndSafeStore,
+        stashKeyEncryptionKeyInSessionStore,
+        unstashKeyEncryptionKeyFromSession,
+        updateSessionFromElectronSafeStorageIfNeeded,
+    };
 };

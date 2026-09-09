@@ -1,4 +1,5 @@
 import "dart:core";
+import "dart:math" as math;
 
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
@@ -8,9 +9,11 @@ import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/gallery/fixed_extent_grid_row.dart";
 import "package:photos/models/gallery/fixed_extent_section_layout.dart";
+import "package:photos/models/gallery/flex_layout.dart";
 import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/models/gallery/justified_grid_row.dart";
 import "package:photos/models/gallery/justified_layout.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
 import "package:photos/models/gallery/section_layout.dart";
 import "package:photos/models/selected_files.dart";
 import "package:photos/service_locator.dart";
@@ -61,6 +64,9 @@ class GalleryGroups {
   }
 
   static const double spacing = 2.0;
+  // Product decision: limit how tall the preferred justified row can grow as
+  // the gallery widens.
+  static const double _maximumJustifiedTargetRowHeight = 320.0;
 
   late final int crossAxisCount;
   late final GalleryLayoutType layoutType;
@@ -440,15 +446,22 @@ class GalleryGroups {
 
   List<SectionLayout> _computeJustifiedGroupLayouts() {
     final stopwatch = Stopwatch()..start();
-    final targetRowHeight =
+    final gridTargetRowHeight =
         (widthAvailable - (crossAxisCount - 1) * spacing) / crossAxisCount;
+    final targetRowHeight = gridTargetRowHeight.isFinite
+        ? math.min(gridTargetRowHeight, _maximumJustifiedTargetRowHeight)
+        : gridTargetRowHeight;
+    final computeRows = switch (localSettings.getJustifiedLayoutStrategy()) {
+      JustifiedLayoutStrategy.comfort => JustifiedLayoutCalculator.computeRows,
+      JustifiedLayoutStrategy.flex => FlexLayoutCalculator.computeRows,
+    };
     final groupLayouts = <SectionLayout>[];
     var currentIndex = 0;
     var currentOffset = 0.0;
 
     for (final groupID in _groupIdToFilesMap.keys) {
       final filesInGroup = _groupIdToFilesMap[groupID]!;
-      final rows = JustifiedLayoutCalculator.computeRows(
+      final rows = computeRows(
         aspectRatios: filesInGroup.map(
           (file) => JustifiedLayoutCalculator.aspectRatioForDimensions(
             file.width,

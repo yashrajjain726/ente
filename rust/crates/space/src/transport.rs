@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "Serde skip_serializing_if predicates receive references"
+)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
@@ -254,6 +258,15 @@ pub struct PostPage {
     pub items: Vec<PostResponse>,
     #[serde(default)]
     pub next_cursor: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HomePostPage {
+    pub items: Vec<PostResponse>,
+    #[serde(default)]
+    pub next_cursor: String,
+    pub sync_cursor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]

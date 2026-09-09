@@ -1,43 +1,22 @@
 import type {
     KeyAttributes,
     LegacyContactState,
+    OpenSessionInput,
     Session,
 } from "./pkg/ente_legacy_wasm";
 
 export type {
     LegacyContactRecord,
-    LegacyContactState,
     LegacyInfo,
     LegacyRecoverySession,
-    LegacyRecoveryStatus,
-    LegacyUser,
+    OpenSessionInput,
     Session,
 } from "./pkg/ente_legacy_wasm";
 
-interface OpenSessionInput {
-    baseUrl: string;
-    authToken: string;
-    masterKeyB64: string;
-    clientPackage?: string;
-    clientVersion?: string;
-}
-
 const wasm = () => import("./pkg/ente_legacy_wasm");
 
-export const openSession = async ({
-    baseUrl,
-    authToken,
-    masterKeyB64,
-    clientPackage,
-    clientVersion,
-}: OpenSessionInput): Promise<Session> =>
-    (await wasm()).openSession(
-        baseUrl,
-        authToken,
-        masterKeyB64,
-        clientPackage,
-        clientVersion,
-    );
+export const openSession = async (input: OpenSessionInput): Promise<Session> =>
+    (await wasm()).openSession(input);
 
 export const getInfo = async (session: Session) =>
     (await wasm()).legacyGetInfo(session);
@@ -125,12 +104,5 @@ export const rejectRecovery = async (
 export const changePassword = async (
     session: Session,
     recoveryID: string,
-    currentUserKeyAttributes: KeyAttributes,
     newPassword: string,
-) =>
-    (await wasm()).legacyChangePassword(
-        session,
-        recoveryID,
-        currentUserKeyAttributes,
-        newPassword,
-    );
+) => (await wasm()).legacyChangePassword(session, recoveryID, newPassword);

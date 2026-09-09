@@ -47,6 +47,7 @@ class _VideoWidgetState extends State<VideoWidget> {
   late final VideoSeekController _seekController;
   bool _isSeekInteractionActive = false;
   late final StreamSubscription<bool> _isPlayingStreamSubscription;
+  OverlayEntry? _longPressSpeedIndicatorEntry;
   late final StreamSubscription<bool> _completedStreamSubscription;
 
   @override
@@ -90,6 +91,7 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   @override
   void dispose() {
+    _longPressSpeedIndicatorEntry?.remove();
     widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     showControlsNotifier.dispose();
     _isPlayingStreamSubscription.cancel();
@@ -113,6 +115,19 @@ class _VideoWidgetState extends State<VideoWidget> {
 
   void _onPlaybackSpeedChanged() {
     widget.controller.player.setRate(widget.playbackSpeed.value);
+  }
+
+  void _startLongPressSpeed() {
+    if (_longPressSpeedIndicatorEntry != null) return;
+    _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
+    widget.controller.player.setRate(kVideoLongPressPlaybackSpeed).ignore();
+  }
+
+  void _restorePlaybackSpeed() {
+    if (_longPressSpeedIndicatorEntry == null) return;
+    _longPressSpeedIndicatorEntry?.remove();
+    _longPressSpeedIndicatorEntry = null;
+    widget.controller.player.setRate(widget.playbackSpeed.value).ignore();
   }
 
   void _onSeekInteractionChanged() {
@@ -170,28 +185,35 @@ class _VideoWidgetState extends State<VideoWidget> {
                     );
                   }
                 },
-          onLongPress: widget.isFromMemories
-              ? () {
-                  widget.playbackCallback?.call(
-                    false,
-                    FullScreenRequestReason.userInteraction,
-                  );
-                  if (widget.controller.player.state.playing) {
-                    widget.controller.player.pause();
-                  }
-                }
-              : null,
-          onLongPressUp: widget.isFromMemories
-              ? () {
-                  widget.playbackCallback?.call(
-                    true,
-                    FullScreenRequestReason.userInteraction,
-                  );
-                  if (!widget.controller.player.state.playing) {
-                    widget.controller.player.play();
-                  }
-                }
-              : null,
+          onLongPress: () {
+            if (widget.isFromMemories) {
+              widget.playbackCallback?.call(
+                false,
+                FullScreenRequestReason.userInteraction,
+              );
+              if (widget.controller.player.state.playing) {
+                widget.controller.player.pause();
+              }
+            } else {
+              _startLongPressSpeed();
+            }
+          },
+          onLongPressUp: () {
+            if (widget.isFromMemories) {
+              widget.playbackCallback?.call(
+                true,
+                FullScreenRequestReason.userInteraction,
+              );
+              if (!widget.controller.player.state.playing) {
+                widget.controller.player.play();
+              }
+            } else {
+              _restorePlaybackSpeed();
+            }
+          },
+          onLongPressCancel: widget.isFromMemories
+              ? null
+              : _restorePlaybackSpeed,
         ),
         ValueListenableBuilder(
           valueListenable: showControlsNotifier,

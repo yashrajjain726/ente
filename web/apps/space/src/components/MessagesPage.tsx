@@ -1,16 +1,16 @@
+import { SpaceFriendLimitToast } from "components/FriendLimitToast";
 import { SpaceFriendRequestCanceledToast } from "components/FriendRequestCanceledToast";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
-import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
+import { MessagesScreen } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { spaceInviteURL } from "services/invite";
 import {
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
-    isFriendRequestCanceledError,
     loadCurrentMessageActivityPostPreview,
     loadCurrentMessageConversationAvatar,
     loadCurrentMessageConversations,
@@ -19,12 +19,18 @@ import {
     markCurrentMessagesRead,
     replyToCurrentMessage,
     sendCurrentMessage,
+    sendCurrentPoke,
     setCurrentMessageLiked,
     shouldAutoReadMessageActivities,
     type SpaceMessage,
     type SpaceMessageConversation,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
+import {
+    isFriendRequestCanceledError,
+    isSpaceFriendLimitError,
+} from "utils/friend-errors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -81,11 +87,13 @@ const currentProfileMessageActor = (
 });
 
 const createLocalMessage = ({
+    kind,
     profile,
     recipient,
     replyMessageId,
     text,
 }: {
+    kind: SpaceMessage["kind"];
     profile: SetupProfile;
     recipient: SpaceMessageConversation["friend"];
     replyMessageId?: string;
@@ -96,7 +104,7 @@ const createLocalMessage = ({
         createdAtMs,
         id: createLocalMessageID(),
         isDeleted: false,
-        kind: "regular",
+        kind,
         liked: false,
         recipient,
         replyMessageId,
@@ -112,12 +120,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 }) => {
     const router = useSpaceRouter();
     const {
+        postPublication,
         profile,
         profileLoadError,
         profileLoadStatus,
         setFriends,
         setPendingPostPhotoFile,
-        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const [conversations, setConversations] = React.useState<
         SpaceMessageConversation[]
@@ -129,6 +137,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         React.useState(true);
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
+        React.useState(false);
+    const [showFriendLimitToast, setShowFriendLimitToast] =
         React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
     const [selectedFriendProfile, setSelectedFriendProfile] =
@@ -397,6 +407,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     friendRequestIdFromConversation(conversation),
                 );
             } catch (error: unknown) {
+                if (isSpaceFriendLimitError(error)) {
+                    setShowFriendLimitToast(true);
+                    return;
+                }
                 if (!isFriendRequestCanceledError(error)) throw error;
                 setConversations((currentConversations) =>
                     currentConversations.filter(
@@ -509,6 +523,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         if (!profile?.spaceId) return;
         void refreshConversations();
     }, [profile?.spaceId, refreshConversations]);
+
+    React.useEffect(() => {
+        if (postPublication?.phase == "posted") void refreshConversations();
+    }, [postPublication?.phase, refreshConversations]);
 
     React.useEffect(() => {
         const previousSelectedSpaceId = previousSelectedSpaceIdRef.current;
@@ -642,7 +660,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={messagesBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -651,7 +669,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
-                background={messagesBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -659,7 +677,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     return (
         <>
-            <SpacePageMeta themeColor={messagesBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <MessagesScreen
                 conversations={conversations}
                 friendsCount={conversationFriends.length}
@@ -690,22 +708,48 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 onOpenThread={openConversation}
                 onPostPhotoSelect={(file) => {
                     setPendingPostPhotoFile(file);
-                    setSkipNextHomeFeedSkeleton(true);
-                    void router
-                        .push(spaceRoutes.home)
-                        .catch((error: unknown) => {
-                            log.error("Failed to open post photo draft", error);
-                            setPendingPostPhotoFile(null);
-                        });
                 }}
                 onLoadActivityPost={(post) =>
                     loadCurrentMessageActivityPostPreview(post, actorSpaceId)
                 }
+                onSendPoke={async (spaceId) => {
+                    const sender = currentProfileMessageActor(profile);
+                    const recipient =
+                        selectedFriend ?? placeholderFriend(spaceId);
+                    const optimisticMessage = createLocalMessage({
+                        kind: "poke",
+                        profile,
+                        recipient,
+                        text: "Poked",
+                    });
+                    appendMessageIfThreadIsCurrent(spaceId, optimisticMessage);
+                    try {
+                        const message = await sendCurrentPoke(
+                            actorSpaceId,
+                            spaceId,
+                            sender,
+                            recipient,
+                        );
+                        replaceMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                            message,
+                        );
+                    } catch (error) {
+                        removeMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                        );
+                        throw error;
+                    }
+                    void refreshConversations();
+                }}
                 onSendMessage={async (spaceId, text) => {
                     const sender = currentProfileMessageActor(profile);
                     const recipient =
                         selectedFriend ?? placeholderFriend(spaceId);
                     const optimisticMessage = createLocalMessage({
+                        kind: "regular",
                         profile,
                         recipient,
                         text,
@@ -738,6 +782,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     const recipient =
                         selectedFriend ?? placeholderFriend(spaceId);
                     const optimisticMessage = createLocalMessage({
+                        kind: "regular",
                         profile,
                         recipient,
                         replyMessageId: messageId,
@@ -800,6 +845,11 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             {showFriendRequestCanceledToast && (
                 <SpaceFriendRequestCanceledToast
                     onClose={() => setShowFriendRequestCanceledToast(false)}
+                />
+            )}
+            {showFriendLimitToast && (
+                <SpaceFriendLimitToast
+                    onClose={() => setShowFriendLimitToast(false)}
                 />
             )}
         </>

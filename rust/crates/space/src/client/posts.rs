@@ -1,13 +1,11 @@
-use super::{
-    AccountSpaceCtx, decrypt_post_object_metadata, ensure_post_objects_are_photos,
-    post_response_from_feed_item,
-};
+use super::{AccountSpaceCtx, decrypt_post_object_metadata, ensure_post_objects_are_photos};
 use crate::crypto::{decrypt_secretbox_payload, encrypt_secretbox_payload, generate_key};
 use crate::error::{Error, Result};
-use crate::models::{DecryptedPost, FeedItem, FeedPage, HydratedKeys, PostObjectMetadata};
+use crate::models::{DecryptedPost, HydratedKeys, PostObjectMetadata};
 use crate::transport::{
-    CreatePostRequest, CreatePostResponse, LikePostResponse, PostObjectPayload, PostPage,
-    PostResponse, SpaceActorResponse, SpaceUnreadStatusResponse, UpdatePostCaptionRequest,
+    CreatePostRequest, CreatePostResponse, HomePostPage, LikePostResponse, PostObjectPayload,
+    PostPage, PostResponse, SpaceActorResponse, SpaceUnreadStatusResponse,
+    UpdatePostCaptionRequest,
 };
 use ente_core::{b64, http};
 
@@ -94,21 +92,25 @@ impl AccountSpaceCtx {
             .await?)
     }
 
-    pub async fn list_feed(
+    pub async fn list_home_posts(
         &self,
         space_id: &str,
+        after: Option<String>,
         cursor: Option<String>,
         limit: Option<i32>,
-    ) -> Result<FeedPage> {
+    ) -> Result<HomePostPage> {
         let mut query = Vec::new();
+        if let Some(value) = after.filter(|value| !value.trim().is_empty()) {
+            query.push(("after", value));
+        }
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
-        let path = format!("/spaces/{space_id}/feed");
-        let fetch_feed = async {
+        let path = format!("/spaces/{space_id}/home-posts");
+        let fetch_home_posts = async {
             Ok(self
                 .api()
                 .get(&path)
@@ -120,7 +122,7 @@ impl AccountSpaceCtx {
                 .await?)
         };
         let (page, _) = futures_util::try_join!(
-            fetch_feed,
+            fetch_home_posts,
             self.list_decrypted_friend_shares_cached(space_id)
         )?;
         Ok(page)
@@ -232,7 +234,7 @@ impl AccountSpaceCtx {
     }
 
     pub async fn hydrate_space_keys(&self) -> Result<HydratedKeys> {
-        let space_root_key = self.get_space_root_key().await?;
+        let space_root_key = self.get_space_root_key()?;
         let owned_records = self.list_owned_spaces().await?;
         let mut owned = Vec::with_capacity(owned_records.len());
         if let Some(space_root_key) = space_root_key {
@@ -343,11 +345,6 @@ impl AccountSpaceCtx {
             &space_key,
             &b64::decode(&actor.encrypted_profile)?,
         )?))
-    }
-
-    pub async fn decrypt_feed_item(&self, item: &FeedItem) -> Result<DecryptedPost> {
-        let post = post_response_from_feed_item(item);
-        self.decrypt_post_for_space(&item.space_id, &post).await
     }
 
     pub async fn update_post_caption(

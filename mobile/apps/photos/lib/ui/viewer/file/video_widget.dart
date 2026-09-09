@@ -5,6 +5,7 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
+import "package:flutter/services.dart";
 import "package:fluttertoast/fluttertoast.dart";
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
@@ -220,8 +221,9 @@ class _VideoWidgetState extends State<VideoWidget> {
   @override
   Widget build(BuildContext context) {
     final playPreview = isPreviewLoadable && selectPreviewForPlay;
+    final Widget child;
     if (playPreview && playlistData == null) {
-      return Center(
+      child = Center(
         child: Container(
           width: 48,
           height: 48,
@@ -238,42 +240,46 @@ class _VideoWidgetState extends State<VideoWidget> {
           ),
         ),
       );
+    } else {
+      final shouldUseNativeVideoPlayer =
+          useNativeVideoPlayer &&
+          !widget.file.isDeviceTrash &&
+          (!playPreview || Platform.isAndroid);
+
+      child = shouldUseNativeVideoPlayer
+          ? VideoWidgetNative(
+              widget.file,
+              key: nativePlayerKey,
+              tagPrefix: widget.tagPrefix,
+              playbackCallback: widget.playbackCallback,
+              shouldDisableScroll: widget.shouldDisableScroll,
+              playlistData: playlistData,
+              selectedPreview: playPreview,
+              playbackSpeed: _playbackSpeed,
+              isFromMemories: widget.isFromMemories,
+              isActive: _isActive,
+              isAudioMutedOverride: widget.isAudioMutedOverride,
+              onFinalFileLoad: widget.onFinalFileLoad,
+            )
+          : VideoWidgetMediaKit(
+              widget.file,
+              key: mediaKitKey,
+              tagPrefix: widget.tagPrefix,
+              playbackCallback: widget.playbackCallback,
+              shouldDisableScroll: widget.shouldDisableScroll,
+              preview: playlistData?.preview,
+              selectedPreview: playPreview,
+              playbackSpeed: _playbackSpeed,
+              isFromMemories: widget.isFromMemories,
+              isActive: _isActive,
+              isAudioMutedOverride: widget.isAudioMutedOverride,
+              onFinalFileLoad: widget.onFinalFileLoad,
+            );
     }
 
-    final shouldUseNativeVideoPlayer =
-        useNativeVideoPlayer &&
-        !widget.file.isDeviceTrash &&
-        (!playPreview || Platform.isAndroid);
-
-    if (shouldUseNativeVideoPlayer) {
-      return VideoWidgetNative(
-        widget.file,
-        key: nativePlayerKey,
-        tagPrefix: widget.tagPrefix,
-        playbackCallback: widget.playbackCallback,
-        shouldDisableScroll: widget.shouldDisableScroll,
-        playlistData: playlistData,
-        selectedPreview: playPreview,
-        playbackSpeed: _playbackSpeed,
-        isFromMemories: widget.isFromMemories,
-        isActive: _isActive,
-        isAudioMutedOverride: widget.isAudioMutedOverride,
-        onFinalFileLoad: widget.onFinalFileLoad,
-      );
-    }
-    return VideoWidgetMediaKit(
-      widget.file,
-      key: mediaKitKey,
-      tagPrefix: widget.tagPrefix,
-      playbackCallback: widget.playbackCallback,
-      shouldDisableScroll: widget.shouldDisableScroll,
-      preview: playlistData?.preview,
-      selectedPreview: playPreview,
-      playbackSpeed: _playbackSpeed,
-      isFromMemories: widget.isFromMemories,
-      isActive: _isActive,
-      isAudioMutedOverride: widget.isAudioMutedOverride,
-      onFinalFileLoad: widget.onFinalFileLoad,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: child,
     );
   }
 

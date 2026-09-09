@@ -1,17 +1,20 @@
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
-import CloseIcon from "@mui/icons-material/Close";
 import {
     Box,
     Drawer,
     IconButton,
     Stack,
-    styled,
     Typography,
     type DrawerProps,
 } from "@mui/material";
-import { isDesktop } from "ente-base/app";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
+import { t } from "i18next";
 import React from "react";
+import {
+    display2Sx,
+    sidebarBackgroundSx,
+    textBaseSx,
+} from "./locker-sidebar-styles";
 
 export const LockerSidebarDrawer: React.FC<DrawerProps> = ({
     slotProps,
@@ -24,44 +27,34 @@ export const LockerSidebarDrawer: React.FC<DrawerProps> = ({
     return (
         <Drawer
             {...rest}
+            closeAfterTransition={false}
             slotProps={{
+                backdrop: {
+                    sx: (theme) => ({
+                        [theme.breakpoints.down("sm")]: {
+                            "&&&": { backgroundColor: "transparent" },
+                        },
+                    }),
+                },
                 ...(slotProps ?? {}),
                 paper: {
                     ...(paperSlotProps ?? {}),
                     sx: [
                         {
-                            maxWidth: "375px",
-                            width: "100%",
+                            width: { xs: "100%", sm: 375 },
                             scrollbarWidth: "thin",
-                            backgroundColor: "background.default",
                             "&&": { padding: 0 },
                         },
-                        (theme) =>
-                            theme.applyStyles("dark", {
-                                backgroundColor:
-                                    theme.vars.palette.background.paper,
-                            }),
+                        sidebarBackgroundSx,
                         paperSlotProps?.sx as never,
                     ],
                 },
             }}
         >
-            {isDesktop && <LockerTitlebarBackdrop />}
-            <Box sx={{ p: 1 }}>{children}</Box>
+            {children}
         </Drawer>
     );
 };
-
-const LockerTitlebarBackdrop = styled("div")(({ theme }) => ({
-    position: "sticky",
-    top: 0,
-    left: 0,
-    width: "100%",
-    minHeight: "env(titlebar-area-height, 30px)",
-    zIndex: 1,
-    backgroundColor: theme.vars.palette.backdrop.muted,
-    backdropFilter: "blur(12px)",
-}));
 
 export type LockerNestedSidebarDrawerVisibilityProps = ModalVisibilityProps & {
     onRootClose: () => void;
@@ -91,53 +84,60 @@ export const LockerNestedSidebarDrawer: React.FC<
     );
 };
 
-type LockerSidebarTitlebarProps = Pick<
-    LockerNestedSidebarDrawerVisibilityProps,
-    "onClose" | "onRootClose"
-> & {
+interface LockerSidebarTitlebarProps {
+    onClose: () => void;
     title: string;
-    caption?: string;
     actionButton?: React.ReactNode;
-    hideRootCloseButton?: boolean;
-};
+    closeLabel?: string;
+    tooltip?: string;
+}
 
-const LockerSidebarTitlebar: React.FC<LockerSidebarTitlebarProps> = ({
+export const LockerSidebarTitlebar: React.FC<LockerSidebarTitlebarProps> = ({
     title,
-    caption,
     onClose,
-    onRootClose,
     actionButton,
-    hideRootCloseButton,
+    closeLabel,
+    tooltip,
 }) => (
-    <Stack sx={{ gap: "4px" }}>
-        <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-            <IconButton onClick={onClose} color="primary">
-                <ArrowBackOutlinedIcon />
-            </IconButton>
-            <Stack direction="row" sx={{ gap: "4px" }}>
-                {actionButton && actionButton}
-                {!hideRootCloseButton && (
-                    <IconButton onClick={onRootClose} color="secondary">
-                        <CloseIcon />
-                    </IconButton>
-                )}
-            </Stack>
-        </Stack>
-        <Stack sx={{ px: "16px", gap: "4px" }}>
-            <Typography variant="h3">{title}</Typography>
-            <Typography
-                variant="small"
-                sx={{
-                    color: "text.muted",
-                    wordBreak: "break-all",
-                    px: "1px",
-                    minHeight: "17px",
-                }}
-            >
-                {caption}
-            </Typography>
-        </Stack>
-    </Stack>
+    <Box sx={{ position: "relative", height: 92, flexShrink: 0 }}>
+        <IconButton
+            aria-label={closeLabel ?? t("go_back")}
+            onClick={onClose}
+            sx={[
+                textBaseSx,
+                {
+                    position: "absolute",
+                    left: 8,
+                    top: 8,
+                    p: 1,
+                    borderRadius: "12px",
+                },
+            ]}
+        >
+            <ArrowBackOutlinedIcon sx={{ fontSize: 24 }} />
+        </IconButton>
+        <Typography
+            noWrap
+            title={tooltip}
+            sx={[
+                display2Sx,
+                textBaseSx,
+                {
+                    position: "absolute",
+                    left: 16,
+                    right: actionButton ? 70 : 16,
+                    top: 48,
+                },
+            ]}
+        >
+            {title}
+        </Typography>
+        {actionButton && (
+            <Box sx={{ position: "absolute", right: 16, top: 45 }}>
+                {actionButton}
+            </Box>
+        )}
+    </Box>
 );
 
 type LockerTitledNestedSidebarDrawerProps = React.PropsWithChildren<
@@ -152,9 +152,7 @@ export const LockerTitledNestedSidebarDrawer: React.FC<
     <LockerNestedSidebarDrawer
         {...{ open, onClose, onRootClose, anchor, slotProps }}
     >
-        <Stack sx={{ gap: "4px", py: "12px" }}>
-            <LockerSidebarTitlebar {...{ onClose, onRootClose }} {...rest} />
-            {children}
-        </Stack>
+        <LockerSidebarTitlebar onClose={onClose} {...rest} />
+        <Stack sx={{ flex: 1, p: "0 16px 16px", gap: 1 }}>{children}</Stack>
     </LockerNestedSidebarDrawer>
 );

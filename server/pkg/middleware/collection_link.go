@@ -76,13 +76,13 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 				return
 			}
 			if publicCollectionSummary.IsDisabled {
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "disabled token"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkDisabled, "error": "disabled token"})
 				return
 			}
 			isFreeUser, err := m.validateOwnersSubscription(c, publicCollectionSummary.CollectionID)
 			if err != nil {
 				logrus.WithError(err).Warn("failed to verify active paid subscription")
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "no active subscription"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkUnavailable, "error": "no active subscription"})
 				return
 			}
 			if isFreeUser {
@@ -91,7 +91,7 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 
 			if publicCollectionSummary.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
 				publicCollectionSummary.ValidTill < time.Microseconds() {
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 				return
 			}
 			if publicCollectionSummary.PassHash != nil && *publicCollectionSummary.PassHash != "" {
@@ -127,7 +127,7 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 
 		if publicCollectionSummary.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
 			publicCollectionSummary.ValidTill < time.Microseconds() {
-			c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+			c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 			return
 		}
 
