@@ -377,28 +377,15 @@ class LegacyKitPdfService {
                 fit: pw.BoxFit.scaleDown,
                 child: pw.SizedBox(
                   width: 207,
-                  child: pw.Column(
-                    mainAxisSize: pw.MainAxisSize.min,
-                    children: _displayCopyCodeLines(copyCode)
-                        .map(
-                          (line) => pw.SizedBox(
-                            height: 22,
-                            child: pw.Center(
-                              child: pw.Text(
-                                line,
-                                textAlign: pw.TextAlign.center,
-                                softWrap: false,
-                                maxLines: 1,
-                                style: pw.TextStyle(
-                                  color: _black,
-                                  fontSize: 12,
-                                  font: assets.outfitMedium,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(growable: false),
+                  child: pw.Text(
+                    copyCode,
+                    textAlign: pw.TextAlign.center,
+                    style: pw.TextStyle(
+                      color: _black,
+                      fontSize: 12,
+                      font: assets.outfitMedium,
+                      lineSpacing: 6,
+                    ),
                   ),
                 ),
               ),
@@ -615,19 +602,6 @@ class LegacyKitPdfService {
         ],
       ),
     );
-  }
-
-  List<String> _displayCopyCodeLines(String copyCode) {
-    const chunkSize = 28;
-    return [
-      for (var index = 0; index < copyCode.length; index += chunkSize)
-        copyCode.substring(
-          index,
-          index + chunkSize > copyCode.length
-              ? copyCode.length
-              : index + chunkSize,
-        ),
-    ];
   }
 
   List<LegacyKitShare> _sortedShares(List<LegacyKitShare> shares) {
