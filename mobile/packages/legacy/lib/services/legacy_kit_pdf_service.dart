@@ -150,7 +150,7 @@ class LegacyKitPdfService {
     required _SheetAssets assets,
     required StringsLocalizations strings,
   }) {
-    final qrPayload = share.toQrPayload();
+    final qrPayload = share.qrPayload;
     return pw.SizedBox(
       width: _sheetPageFormat.width,
       height: _sheetPageFormat.height,
@@ -255,7 +255,7 @@ class LegacyKitPdfService {
             pw.Positioned(
               left: 360,
               top: 533,
-              child: _recoveryKeyCard(share.toCopyCode(), assets),
+              child: _recoveryKeyCard(share.copyCode, assets),
             ),
             pw.Positioned(
               left: 0,
