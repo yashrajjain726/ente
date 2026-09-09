@@ -9,10 +9,13 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
+import android.view.Surface
 import android.view.View
+import android.window.OnBackInvokedDispatcher
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -25,10 +28,11 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
 @android.annotation.TargetApi(24)
-class WallpaperActivity : Activity() {
+open class WallpaperActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var preview: WallpaperCropView
     private lateinit var applyButton: Button
+    private lateinit var closeButton: ImageButton
     private lateinit var progress: ProgressBar
     private lateinit var service: WallpaperService
     private lateinit var imageUri: Uri
@@ -57,6 +61,11 @@ class WallpaperActivity : Activity() {
         val displaySize = Point()
         @Suppress("DEPRECATION")
         windowManager.defaultDisplay.getRealSize(displaySize)
+        @Suppress("DEPRECATION")
+        val rotation = windowManager.defaultDisplay.rotation
+        if (rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270) {
+            displaySize.set(displaySize.y, displaySize.x)
+        }
         preview = WallpaperCropView(this, displaySize)
         preview.restoreCrop(savedInstanceState?.getFloatArray("crop"))
         val content = LinearLayout(this).apply {
@@ -77,12 +86,13 @@ class WallpaperActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(8), dp(4), dp(20), dp(4))
         }
-        header.addView(ImageButton(this).apply {
+        closeButton = ImageButton(this).apply {
             setImageResource(R.drawable.wallpaper_close)
             contentDescription = getString(android.R.string.cancel)
             background = RippleDrawable(ColorStateList.valueOf(0x29FFFFFF), null, null)
-            setOnClickListener { finish() }
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            setOnClickListener { close() }
+        }
+        header.addView(closeButton, LinearLayout.LayoutParams(dp(48), dp(48)))
         header.addView(TextView(this).apply {
             setText(R.string.wallpaper)
             typeface = semibold
@@ -123,6 +133,9 @@ class WallpaperActivity : Activity() {
         })
         setBusy(true)
         setContentView(content)
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { close() }
+        }
         retained?.let(::observeApply)
         executor.execute {
             try {
@@ -153,7 +166,6 @@ class WallpaperActivity : Activity() {
 
     private fun applyWallpaper(destination: Destination) {
         if (pendingApply != null) return
-        setBusy(true)
         val crop = preview.selection()
         val task = CompletableFuture.supplyAsync({
             val bitmap = service.render(imageUri, crop)
@@ -164,6 +176,7 @@ class WallpaperActivity : Activity() {
             }
         }, executor)
         pendingApply = task
+        setBusy(true)
         observeApply(task)
     }
 
@@ -185,6 +198,8 @@ class WallpaperActivity : Activity() {
     }
 
     private fun setBusy(busy: Boolean) {
+        closeButton.isEnabled = pendingApply == null
+        closeButton.alpha = if (closeButton.isEnabled) 1f else 0.4f
         applyButton.isEnabled = !busy
         applyButton.alpha = if (busy) 0.4f else 1f
         applyButton.setTextColor(if (busy) Color.TRANSPARENT else Color.WHITE)
@@ -193,6 +208,13 @@ class WallpaperActivity : Activity() {
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private fun close() {
+        if (pendingApply == null) finish()
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onBackPressed() = close()
 
     private fun showFailure(error: Throwable) {
         Log.e("Wallpaper", "Wallpaper operation failed", error)

@@ -5,6 +5,7 @@ on:
         branches: [main]
         paths:
             - ".github/workflows/mobile-crowdin-push-sources.yml"
+            - "mobile/packages/strings/android/values/*.xml"
             - "mobile/packages/strings/crowdin.yml"
             - "mobile/packages/strings/lib/l10n/arb/strings_en.arb"
 

@@ -39,6 +39,7 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
+        main.res.srcDir '../../../../../packages/strings/android'
         main.assets.srcDir layout.buildDirectory.dir('generated/wallpaperAssets')
     }
 

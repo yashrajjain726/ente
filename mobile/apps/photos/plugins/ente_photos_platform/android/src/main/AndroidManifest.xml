@@ -1,9 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
-    <application>
+    <application android:supportsRtl="true">
         <activity
-            android:name="io.ente.photos.platform.wallpaper.WallpaperActivity"
+            android:name="io.ente.photos.platform.flutter.WallpaperActivity"
             android:exported="true"
+            android:enableOnBackInvokedCallback="true"
             android:label="@string/wallpaper"
             android:theme="@style/WallpaperTheme">
             <intent-filter>

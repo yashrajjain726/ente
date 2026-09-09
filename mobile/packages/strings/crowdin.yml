@@ -77,3 +77,6 @@ files:
         ur-IN: ur
         zh-CN: zh_CN
         zh-TW: zh_TW
+  - source: /android/values/wallpaper.xml
+    translation: /android/values-%android_code%/wallpaper.xml
+    type: android
