@@ -46,7 +46,6 @@ internal class WallpaperService(context: Context) {
                 requireNotNull(BitmapRegionDecoder.newInstance(it, false))
             }
         } catch (_: IOException) {
-            // Formats without a region decoder (for example GIF) keep the preview path.
             val image = decode(uri, crop.size)
             return try { crop.render(image) } finally { image.recycle() }
         }
@@ -57,7 +56,7 @@ internal class WallpaperService(context: Context) {
             transform.postTranslate(-unit.left, -unit.top)
             val inverse = Matrix()
             transform.invert(inverse)
-            val storageRegion = RectF(crop.region)
+            val storageRegion = RectF(crop.normalizedRegion)
             inverse.mapRect(storageRegion)
             storageRegion.set(
                 storageRegion.left * decoder.width, storageRegion.top * decoder.height,
@@ -82,10 +81,10 @@ internal class WallpaperService(context: Context) {
             )
             transform.mapRect(available)
             val region = RectF(
-                (crop.region.left - available.left) / available.width(),
-                (crop.region.top - available.top) / available.height(),
-                (crop.region.right - available.left) / available.width(),
-                (crop.region.bottom - available.top) / available.height(),
+                (crop.normalizedRegion.left - available.left) / available.width(),
+                (crop.normalizedRegion.top - available.top) / available.height(),
+                (crop.normalizedRegion.right - available.left) / available.width(),
+                (crop.normalizedRegion.bottom - available.top) / available.height(),
             )
             return try { Crop(region, crop.size).render(image) } finally { image.recycle() }
         } finally {
@@ -94,7 +93,6 @@ internal class WallpaperService(context: Context) {
     }
 
     fun decode(uri: Uri, displaySize: Point): Bitmap {
-        // Keep two screen lengths of detail for zooming, without decoding full-resolution photos.
         val maxSize = 2 * max(displaySize.x, displaySize.y)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             return ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->

@@ -28,7 +28,6 @@ internal class DestinationSheet(context: Context, onSelected: (Destination) -> U
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(20), dp(20), dp(20))
-            // Matches ente_components' dark backgroundBase and bottomSheet radius.
             background = GradientDrawable().apply {
                 setColor(0xFF161616.toInt())
                 cornerRadii = floatArrayOf(dp(20).toFloat(), dp(20).toFloat(), dp(20).toFloat(), dp(20).toFloat(), 0f, 0f, 0f, 0f)
