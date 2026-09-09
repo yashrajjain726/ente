@@ -204,6 +204,36 @@ func TestStaleCleanupInvalidatesOnlyRemovedOwnedMemberships(t *testing.T) {
 	}
 }
 
+func TestGetStaleDeletedFileIDs(t *testing.T) {
+	repository, db, userID := setupCollectionMembershipTest(t)
+	otherUserID := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 2, Email: "other@ente.com", CreationTime: 1})
+	collectionID := insertObjectTestCollection(t, db, userID)
+	eligibleFileID := insertObjectTestFile(t, db, userID)
+	liveObjectFileID := insertObjectTestFile(t, db, userID)
+	activeTrashFileID := insertObjectTestFile(t, db, userID)
+	wrongTrashOwnerFileID := insertObjectTestFile(t, db, userID)
+	noTrashFileID := insertObjectTestFile(t, db, userID)
+	for _, fileID := range []int64{eligibleFileID, liveObjectFileID, activeTrashFileID, wrongTrashOwnerFileID, noTrashFileID} {
+		linkObjectTestFileToCollection(t, db, collectionID, fileID, userID)
+	}
+	insertObjectTestKey(t, db, liveObjectFileID, ente.FILE, "live-zero-byte-object", 0, []string{"b2-eu-cen"})
+	if _, err := db.Exec(`INSERT INTO trash(file_id, collection_id, user_id, delete_by, updated_at, is_deleted)
+		VALUES ($1, $5, $6, 1, 1, TRUE), ($2, $5, $6, 1, 1, TRUE),
+			($3, $5, $6, 1, 1, FALSE), ($4, $5, $7, 1, 1, TRUE)`,
+		eligibleFileID, liveObjectFileID, activeTrashFileID, wrongTrashOwnerFileID,
+		collectionID, userID, otherUserID); err != nil {
+		t.Fatal(err)
+	}
+
+	fileIDs, err := repository.TrashRepo.GetStaleDeletedFileIDs(t.Context(), userID, TrashBatchSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fileIDs) != 1 || fileIDs[0] != eligibleFileID {
+		t.Fatalf("GetStaleDeletedFileIDs() = %v, want [%d]", fileIDs, eligibleFileID)
+	}
+}
+
 func setupTrashTest(t *testing.T) (*TrashRepository, *sql.DB) {
 	t.Helper()
 

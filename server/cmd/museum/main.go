@@ -298,7 +298,7 @@ func main() {
 		FileRepo:          fileRepo,
 		UploadResultCache: make(map[int64]bool),
 	}
-	fileCountInitializer := &controller.FileCountInitializer{UsageRepo: usageRepo, LockController: lockController}
+	fileCountInitializer := &controller.FileCountInitializer{UsageRepo: usageRepo, TrashRepo: trashRepo, LockController: lockController}
 
 	accessCtrl := access.NewAccessController(accessCollectionRepo, accessFileRepo)
 	commentsRepo := &socialrepo.CommentsRepository{DB: db}

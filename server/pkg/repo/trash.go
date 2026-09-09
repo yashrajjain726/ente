@@ -239,6 +239,25 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 	return nil
 }
 
+func (t *TrashRepository) GetStaleDeletedFileIDs(ctx context.Context, userID int64, limit int) ([]int64, error) {
+	rows, err := t.DB.QueryContext(ctx, `SELECT DISTINCT cf.file_id
+		FROM collections c
+		JOIN collection_files cf ON cf.collection_id = c.collection_id AND cf.is_deleted = FALSE
+		JOIN files f ON f.file_id = cf.file_id AND f.owner_id = $1
+		JOIN trash t ON t.file_id = cf.file_id AND t.user_id = $1
+			AND t.is_deleted = TRUE AND t.is_restored = FALSE
+		WHERE c.owner_id = $1
+			AND NOT EXISTS (
+				SELECT 1 FROM object_keys ok
+				WHERE ok.file_id = cf.file_id AND ok.is_deleted = FALSE
+			)
+		LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return convertRowsToFileId(rows)
+}
+
 func (t *TrashRepository) Delete(ctx context.Context, userID int64, fileIDs []int64) error {
 	if len(fileIDs) > TrashDiffLimit {
 		return fmt.Errorf("can not delete more than %d in one go", TrashDiffLimit)
