@@ -1023,11 +1023,15 @@ class MLService {
               faceScore: pf.detection.score,
               imageHeight: result.decodedImageSize.height,
               imageWidth: result.decodedImageSize.width,
-              mlVersion: -1,
+              mlVersion: petMlVersion,
             );
           }).toList();
           await mlDataDB.bulkInsertPetFaces(dbPetFaces);
           await mlDataDB.storePetFaceEmbeddings(dbPetFaces, result.petFaces!);
+        } else if (instruction.shouldRunPets) {
+          // No pet faces detected; insert empty marker so the file is
+          // considered pet-indexed (mirrors Face.empty for human faces).
+          await mlDataDB.bulkInsertPetFaces([DBPetFace.empty(result.fileId)]);
         }
 
         if (result.petBodies != null && result.petBodies!.isNotEmpty) {
@@ -1056,11 +1060,6 @@ class MLService {
           }).toList();
           await mlDataDB.bulkInsertPetBodies(dbPetBodies);
           await mlDataDB.storePetBodyEmbeddings(dbPetBodies, result.petBodies!);
-        }
-        if (result.petFaces?.isNotEmpty ?? false) {
-          await mlDataDB.markPetFileIndexed(result.fileId, petMlVersion);
-        } else if (instruction.shouldRunPets) {
-          await mlDataDB.bulkInsertPetFaces([DBPetFace.empty(result.fileId)]);
         }
       }
       _logger.info("ML result for fileID ${result.fileId} stored remote+local");
