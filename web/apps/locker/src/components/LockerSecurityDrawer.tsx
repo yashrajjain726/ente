@@ -1,3 +1,4 @@
+import { generatePasskeyRecovery } from "@/services/authenticated-session";
 import {
     ComputerPhoneSyncIcon,
     Key01Icon,
@@ -52,7 +53,7 @@ export const LockerSecurityDrawer: React.FC<
     const handleOpenPasskeys = async () => {
         handleRootClose();
         try {
-            await openAccountsManagePasskeysPage();
+            await openAccountsManagePasskeysPage(generatePasskeyRecovery);
         } catch (e) {
             onGenericError(e);
         }

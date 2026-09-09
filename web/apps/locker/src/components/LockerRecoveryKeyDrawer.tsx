@@ -1,3 +1,4 @@
+import { recoveryKeyMnemonic } from "@/services/authenticated-session";
 import {
     Box,
     Button,
@@ -37,6 +38,7 @@ export function LockerRecoveryKeyDrawer({
         >
             <RecoveryKeyContents
                 {...{ open, onClose, showMiniDialog }}
+                getRecoveryKeyMnemonic={recoveryKeyMnemonic}
                 presentation={LockerRecoveryKeyPresentation}
             />
         </LockerTitledNestedSidebarDrawer>
