@@ -1246,7 +1246,6 @@ export const ItemList: React.FC<ItemListProps> = ({
                                         <EmptyState
                                             image={{
                                                 src: "/images/empty_state.png",
-                                                srcSet: "/images/empty_state@2x.png 2x, /images/empty_state@3x.png 3x",
                                             }}
                                             title={t("yourTrashIsEmpty")}
                                         />
@@ -2068,13 +2067,12 @@ const CollectionFilterChip: React.FC<{
 const EmptyState: React.FC<{
     title: string;
     subtitle?: string;
-    image?: { src: string; srcSet?: string; alt?: string };
+    image?: { src: string; alt?: string };
 }> = ({ title, subtitle, image }) => (
     <Box sx={{ textAlign: "center", py: 8 }}>
         {image && (
             <img
                 src={image.src}
-                srcSet={image.srcSet}
                 alt={image.alt ?? ""}
                 style={{
                     height: 112,
