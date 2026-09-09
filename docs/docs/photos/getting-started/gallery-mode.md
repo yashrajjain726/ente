@@ -20,35 +20,38 @@ Ente scans your device for photos and videos and groups them by their native alb
 
 ## Feature comparison: gallery mode vs signed-in mode {#feature-comparison}
 
-| Feature                                            | Gallery mode | Signed-in mode |
-| -------------------------------------------------- | :----------: | :------------: |
-| Browse device photos and videos                    |     Yes      |      Yes       |
-| Device folder browsing (Camera, Screenshots, etc.) |     Yes      |      Yes       |
-| Full-screen photo and video viewer                 |     Yes      |      Yes       |
-| Face recognition (on-device)                       |     Yes      |      Yes       |
-| Magic search / natural language search (on-device) |     Yes      |      Yes       |
-| Map view (requires location data in photos)        |     Yes      |      Yes       |
-| Memories                                           |     Yes      |      Yes       |
-| App lock                                           |     Yes      |      Yes       |
-| Theme and appearance settings                      |     Yes      |      Yes       |
-| Cloud backup and sync                              |      --      |      Yes       |
-| Cross-device sync                                  |      --      |      Yes       |
-| Ente albums (create, organize)                     |      --      |      Yes       |
-| Favorites                                          |      --      |      Yes       |
-| Uncategorized album                                |      --      |      Yes       |
-| Archive and Hide                                   |      --      |      Yes       |
-| Sharing and collaborative albums                   |      --      |      Yes       |
-| Public links and embed                             |      --      |      Yes       |
-| Comments and likes                                 |      --      |      Yes       |
-| Rituals                                            |      --      |      Yes       |
-| Free up device space                               |      --      |      Yes       |
-| Storage plan management                            |      --      |      Yes       |
-| Cross-device ML sync (face names, etc.)            |      --      |      Yes       |
-| Home widgets (albums, people)                      |      --      |      Yes       |
+| Feature                                              | Gallery mode | Signed-in mode |
+| ---------------------------------------------------- | :----------: | :------------: |
+| Browse device photos and videos                      |     Yes      |      Yes       |
+| Device folder browsing (Camera, Screenshots, etc.)   |     Yes      |      Yes       |
+| Full-screen photo and video viewer                   |     Yes      |      Yes       |
+| Restore deleted device photos (Android 11 and newer) |     Yes      |      Yes       |
+| Face recognition (on-device)                         |     Yes      |      Yes       |
+| Magic search / natural language search (on-device)   |     Yes      |      Yes       |
+| Map view (requires location data in photos)          |     Yes      |      Yes       |
+| Memories                                             |     Yes      |      Yes       |
+| App lock                                             |     Yes      |      Yes       |
+| Theme and appearance settings                        |     Yes      |      Yes       |
+| Cloud backup and sync                                |      --      |      Yes       |
+| Cross-device sync                                    |      --      |      Yes       |
+| Ente albums (create, organize)                       |      --      |      Yes       |
+| Favorites                                            |      --      |      Yes       |
+| Uncategorized album                                  |      --      |      Yes       |
+| Archive and Hide                                     |      --      |      Yes       |
+| Sharing and collaborative albums                     |      --      |      Yes       |
+| Public links and embed                               |      --      |      Yes       |
+| Comments and likes                                   |      --      |      Yes       |
+| Rituals                                              |      --      |      Yes       |
+| Free up device space                                 |      --      |      Yes       |
+| Storage plan management                              |      --      |      Yes       |
+| Cross-device ML sync (face names, etc.)              |      --      |      Yes       |
+| Home widgets (albums, people)                        |      --      |      Yes       |
 
 ### What works in gallery mode
 
 **Gallery and viewing** -- The full photo and video viewer works, including pinch-to-zoom, swiping between photos, and sharing to other apps. Photos appear in the home timeline sorted by date and in the Albums tab grouped by device folder.
+
+**Recover deleted photos** -- On Android 11 and newer, photos and videos deleted through Ente move to Android's system trash. Tap the trash icon in **Albums** to restore them before they are permanently deleted. Learn more about [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash).
 
 **On-device ML** -- Face recognition and magic search (natural language search) run entirely on your device. Enable these from the banner that appears on the Search tab or from `Settings > Machine learning`. Processing happens locally and no data leaves your phone.
 

@@ -25,13 +25,19 @@ Open `Settings > Free up space > Free up device space`, review how much space wi
 
 The app will delete all photos and videos that have been successfully backed up to Ente, leaving only photos that haven't been backed up yet.
 
+**On Android:**
+
+**Free up device space** permanently removes backed-up photos from your device without moving them to trash. Your photos remain in Ente.
+
+When you delete photos from the gallery on Android 11 and newer, they move to Android's system trash and continue to use device storage until permanently deleted. Learn more about [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash).
+
 ### Important notes
 
 **After freeing up space:**
 
 - Your photos remain in Ente and can be viewed anytime
 - Photos are automatically cached when you view them in the app
-- You may need to clear your device's trash/recently deleted folder to fully reclaim the space
+- On iOS, empty Apple Photos' **Recently Deleted** album to fully reclaim the space
 
 **What gets deleted:**
 
@@ -237,11 +243,13 @@ Learn more about [suggest deletion](/photos/features/sharing-and-collaboration/c
 - Use "Free up space" to reclaim device storage
 - Photos remain in Ente and can be re-downloaded anytime
 
-**Trash:**
+**Ente Trash:**
 
 - Items in trash count against your cloud storage quota
 - Permanently delete items or empty trash to free up space
 - Items are automatically deleted after 30 days
+
+Photos in Android's system trash use storage on your device, not your Ente storage quota. On Android 11 and newer, select **Device** in Trash to review or permanently delete them.
 
 Learn more in [deletion feature guide](/photos/features/albums-and-organization/deleting).
 

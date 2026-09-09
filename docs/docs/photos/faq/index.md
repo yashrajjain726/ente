@@ -106,6 +106,7 @@ Jump to a category:
 
 - [How do I delete photos in Ente?](/photos/faq/albums-and-organization#delete-photos)
 - [How do I restore deleted photos?](/photos/faq/albums-and-organization#restore-photos)
+- [Can I recover photos deleted from my Android device?](/photos/faq/albums-and-organization#android-device-trash-recovery)
 - [How do I permanently delete photos or empty trash?](/photos/faq/albums-and-organization#empty-trash)
 - [Can I recover files after 30 days in trash?](/photos/faq/albums-and-organization#recover-after-30-days)
 - [Does trash count against my storage?](/photos/faq/albums-and-organization#trash-storage)
