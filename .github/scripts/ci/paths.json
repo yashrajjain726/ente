@@ -51,6 +51,7 @@
         "infra/staff/**"
     ],
     "mobile-lint": [
+        ".github/actions/setup-flutter/**",
         ".github/workflows/mobile-lint.yml",
         "mobile/**",
         "rust/Cargo.lock",
@@ -66,6 +67,7 @@
         "rust/tools/codegen/**"
     ],
     "mobile-podfile-lock": [
+        ".github/actions/setup-flutter/**",
         ".github/workflows/mobile-podfile-lock.yml",
         "apple/packages/EnteOnnxRuntime/EnteOnnxRuntime.podspec",
         "mobile/**/*.podspec",

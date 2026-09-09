@@ -16,7 +16,12 @@ test("docs changes do not wait for unrelated workflows", (t) => {
     checkResult(results(selected));
 });
 
-test("shared Rust changes select their consumers", (t) => {
+test("shared build inputs select their consumers", (t) => {
+    assert.deepEqual(select(t, [".github/actions/setup-flutter/action.yml"]), [
+        "mobile-lint",
+        "mobile-podfile-lock",
+        "repo-lint",
+    ]);
     assert.deepEqual(select(t, ["rust/crates/core/src/lib.rs"]), [
         "ensu-android-build",
         "ensu-ios-build",
