@@ -31,6 +31,7 @@ pub fn open_session(endpoint: &str, account: &TestAccount) -> Session {
         },
         account.user_id,
         Key::try_from_slice(&account.master_key).unwrap(),
+        Key::try_from_slice(&account.recovery_key).unwrap(),
         SecretKey::try_from_slice(&account.secret_key).unwrap(),
     )
     .unwrap()

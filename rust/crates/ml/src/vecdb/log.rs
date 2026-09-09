@@ -2616,10 +2616,7 @@ mod tests {
                 (
                     LogRecord::Add {
                         key: "k1".to_string(),
-                        vector: StoredVector::I8 {
-                            scale,
-                            values: values.clone()
-                        },
+                        vector: StoredVector::I8 { scale, values },
                         attrs: Vec::new()
                     },
                     32

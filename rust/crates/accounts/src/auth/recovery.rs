@@ -64,16 +64,12 @@ pub fn recovery_key_from_mnemonic_or_hex(recovery_key_mnemonic_or_hex: &str) -> 
     Ok(recovery_key)
 }
 
-pub fn recovery_key_to_mnemonic(recovery_key_b64: &str) -> Result<String> {
-    let recovery_key = SecretVec::new(
-        b64::decode(recovery_key_b64).map_err(|e| Error::Decode(format!("recovery_key: {e}")))?,
-    );
-
+pub fn recovery_key_to_mnemonic(recovery_key: &[u8]) -> Result<String> {
     if recovery_key.len() != 32 {
         return Err(Error::IncorrectRecoveryKey);
     }
 
-    Mnemonic::from_entropy_in(Language::English, &recovery_key)
+    Mnemonic::from_entropy_in(Language::English, recovery_key)
         .map(|mnemonic| mnemonic.to_string())
         .map_err(|e| Error::InvalidKey(format!("recovery_key: {e}")))
 }
@@ -108,9 +104,9 @@ mod tests {
             Key::try_from_slice(&b64::decode(&gen_result.private_key_attributes.key).unwrap())
                 .unwrap();
         let recovery_key_hex = get_recovery_key(&master_key, &gen_result.key_attributes).unwrap();
-        let recovery_key_b64 = b64::encode(&hex::decode(&recovery_key_hex).unwrap());
+        let recovery_key = hex::decode(&recovery_key_hex).unwrap();
 
-        let mnemonic = recovery_key_to_mnemonic(&recovery_key_b64).unwrap();
+        let mnemonic = recovery_key_to_mnemonic(&recovery_key).unwrap();
         let decoded = recovery_key_from_mnemonic_or_hex(&mnemonic).unwrap();
 
         assert_eq!(
