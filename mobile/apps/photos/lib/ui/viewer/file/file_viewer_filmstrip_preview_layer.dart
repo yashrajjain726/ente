@@ -8,11 +8,6 @@ const fileViewerFilmstripPreviewKey = ValueKey<String>(
 typedef FileViewerFilmstripPreviewBuilder =
     Widget Function(BuildContext context, int index);
 
-/// Opaque preview shown above the page viewer while the filmstrip is scrubbed.
-///
-/// A non-null preview index always produces an absorbing, opaque layer; the
-/// builder supplies only its content.
-///
 /// This widget returns [Positioned.fill], so its parent must be a [Stack].
 class FileViewerFilmstripPreviewLayer extends StatelessWidget {
   final ValueListenable<int?> previewIndex;

@@ -1,6 +1,5 @@
 import "package:flutter/widgets.dart";
 
-/// The capped, Android-style scroll behavior used by the file-viewer filmstrip.
 const ScrollPhysics fileViewerFilmstripPhysics = _FilmstripScrollPhysics();
 
 const _maxFlingVelocity = 800.0;

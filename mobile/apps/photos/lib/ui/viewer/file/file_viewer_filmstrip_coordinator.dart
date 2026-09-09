@@ -2,22 +2,16 @@ import "package:flutter/foundation.dart";
 import "package:flutter/widgets.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
 
-/// Returns the viewer's currently committed page index.
 typedef FileViewerFilmstripCurrentIndex = int Function();
 
-/// Returns the stable identity currently stored at [index], or null if absent.
 typedef FileViewerFilmstripIdentityAt = Object? Function(int index);
 
-/// Requests an animation-free page jump and reports whether it was dispatched.
 typedef FileViewerFilmstripImmediatePageJump = bool Function(int index);
 
 /// Runs [callback] after a guaranteed future frame's paint phase.
 typedef FileViewerFilmstripPaintScheduler =
     void Function(VoidCallback callback);
 
-/// Coordinates the filmstrip's interaction lifecycle with the full-page
-/// viewer without depending on media, navigation, or application services.
-///
 /// A user scroll session starts with the drag and remains active through any
 /// ballistic coast. During that session, [previewIndex] exposes the centered
 /// thumbnail when it differs from the committed page. On commit, the preview
@@ -32,7 +26,6 @@ class FileViewerFilmstripCoordinator {
 
   final ValueNotifier<int?> _previewIndexNotifier = ValueNotifier(null);
 
-  // The session is the source of truth; previewIndex is its UI-facing mirror.
   _FilmstripSession _session = const _IdleFilmstripSession();
   bool _isDisposed = false;
 

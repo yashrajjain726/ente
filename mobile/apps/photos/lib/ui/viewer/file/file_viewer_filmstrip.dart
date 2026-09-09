@@ -350,10 +350,8 @@ class _FilmstripInteractionState {
   // strip can end its ballistic activity before the replacement drag starts.
   final Set<int> _activePointerIds = {};
 
-  // A user session spans both the direct drag and its ballistic coast.
   bool _userScrollSessionActive = false;
 
-  // A deferred request is retried when both the session and all pointers end.
   _CenteringRequestState _centeringState = _CenteringRequestState.idle;
 
   bool get isUserScrollSessionActive => _userScrollSessionActive;

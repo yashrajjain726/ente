@@ -13,7 +13,6 @@ import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_preview_layer.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 
-/// Spacing contributed by the filmstrip to the gallery viewer's chrome.
 abstract final class GalleryFileViewerFilmstripLayout {
   static const upperContentGap = 6.0;
   static const additionalBottomInset =
@@ -23,7 +22,6 @@ abstract final class GalleryFileViewerFilmstripLayout {
 /// Keeps the filmstrip limited to internal users while it is being evaluated.
 bool get isGalleryFileViewerFilmstripEnabled => flagService.internalUser;
 
-/// Whether the gallery-specific viewer may expose its neighboring files.
 bool shouldShowGalleryFileViewerFilmstrip({
   required bool isFeatureEnabled,
   required bool isEnabled,
@@ -37,8 +35,6 @@ bool shouldShowGalleryFileViewerFilmstrip({
     !isGuestView &&
     itemCount > 1;
 
-/// Renders the opaque, lightweight gallery thumbnail used while scrubbing.
-///
 /// This widget returns [Positioned.fill], so its parent must be a [Stack].
 class GalleryFileViewerFilmstripPreviewLayer extends StatelessWidget {
   final List<EnteFile> files;
@@ -88,8 +84,6 @@ class GalleryFileViewerFilmstripPreviewLayer extends StatelessWidget {
   }
 }
 
-/// Positions and presents the filmstrip above the gallery viewer's controls.
-///
 /// This widget returns [Positioned], so its parent must be a [Stack].
 class GalleryFileViewerFilmstripOverlay extends StatelessWidget {
   final List<EnteFile> files;
