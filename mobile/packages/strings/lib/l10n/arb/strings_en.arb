@@ -4927,5 +4927,17 @@
       }
     }
   },
-  "grantAccess": "Grant access"
+  "grantAccess": "Grant access",
+  "sharePhotos": "Share photos",
+  "sharePersonPhotos": "Share {name}’s photos",
+  "@sharePersonPhotos": {"placeholders": {"name": {"type": "String"}}},
+  "unnamedPersonAlbumName": "Portrait - {date}",
+  "@unnamedPersonAlbumName": {"placeholders": {"date": {"type": "String"}}},
+  "shareAllPersonPhotos": "Share all photos",
+  "shareAllPersonPhotosDescription": "All photos of {name} including future ones",
+  "@shareAllPersonPhotosDescription": {"placeholders": {"name": {"type": "String"}}},
+  "personShareFailedTitle": "Could not share photos",
+  "personShareFailedBody": "The shared album could not be created. Your photos and selection are unchanged. Please try again.",
+  "personShareRollbackFailed": "The share did not finish, and the album “{name}” could not be removed. It remains in Albums and may have an active public link. Review or delete it there before trying again. Your original photos are safe.",
+  "@personShareRollbackFailed": {"placeholders": {"name": {"type": "String"}}}
 }
