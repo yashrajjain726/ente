@@ -302,6 +302,9 @@ Future<void> _runMinimally(
       NetworkClient.instance.downloadDio,
       packageInfo,
     );
+    MLDataDB.initialize(
+      preferRust: flagService.rustMlDb || localSettings.rustMlDbOverride,
+    );
     NotificationService.instance.init(prefs);
 
     _logger.info("(for debugging) Configuration init $tlog");
@@ -451,6 +454,10 @@ Future<void> _init(
       NetworkClient.instance.getDio(),
       NetworkClient.instance.downloadDio,
       packageInfo,
+    );
+
+    MLDataDB.initialize(
+      preferRust: flagService.rustMlDb || localSettings.rustMlDbOverride,
     );
 
     _logger.info("Configuration init $tlog");
