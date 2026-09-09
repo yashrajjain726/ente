@@ -154,7 +154,7 @@ fn migrate_transcription(store: &AssetStore, legacy_dir: &Path) {
     }
 
     let vad = model::voice_activity_model_asset();
-    let vad_destination = model::voice_activity_model_path(store, &vad);
+    let vad_destination = model::voice_activity_model_path(store);
     if defaults.voice_activity_model.id == LEGACY_VAD_ID && !store.is_downloaded(&vad) {
         let source = legacy_dir.join(LEGACY_VAD_FILE);
         if is_non_empty_file(&source) {

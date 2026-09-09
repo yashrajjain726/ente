@@ -116,10 +116,10 @@ pub fn llm_mmproj_path(store: &AssetStore, asset: &Asset) -> Option<PathBuf> {
     store.file_path(asset, LLM_MMPROJ_FILE)
 }
 
-pub fn voice_activity_model_path(store: &AssetStore, asset: &Asset) -> PathBuf {
+pub fn voice_activity_model_path(store: &AssetStore) -> PathBuf {
     store
-        .file_path(asset, VOICE_ACTIVITY_MODEL_FILE)
-        .expect("voice activity model file")
+        .asset_dir(&voice_activity_model_asset())
+        .join(VOICE_ACTIVITY_MODEL_FILE)
 }
 
 pub(crate) fn model_key(id: &str) -> Vec<String> {

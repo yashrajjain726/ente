@@ -175,8 +175,8 @@ impl AssetStoreCore {
             .map(|path| path.display().to_string())
     }
 
-    pub fn voice_activity_model_path(&self, asset: Arc<Asset>) -> String {
-        ente_ensu::model::voice_activity_model_path(&self.inner, &asset.inner)
+    pub fn voice_activity_model_path(&self) -> String {
+        ente_ensu::model::voice_activity_model_path(&self.inner)
             .display()
             .to_string()
     }
