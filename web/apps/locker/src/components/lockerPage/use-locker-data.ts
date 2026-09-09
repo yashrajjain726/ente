@@ -16,6 +16,7 @@ import {
 import { stashRedirect } from "ente-accounts/services/redirect";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
+import { isNamedError } from "ente-base/error";
 import {
     authenticatedRequestHeaders,
     ensureOk,
@@ -322,6 +323,8 @@ export const useLockerData = ({
                     );
                     return;
                 }
+
+                await openAuthenticatedSession(ensureLocalUser().id, token, mk);
                 if (!canApplyState()) {
                     return;
                 }
@@ -350,6 +353,10 @@ export const useLockerData = ({
                 }
             } catch (error) {
                 log.error("Failed to fetch locker data", error);
+                if (isNamedError(error, "missing_recovery_key")) {
+                    showMiniDialog(sessionExpiredDialogAttributes(logout));
+                    return;
+                }
                 if (isHTTP401Error(error)) {
                     showMiniDialog(sessionExpiredDialogAttributes(logout));
                 }

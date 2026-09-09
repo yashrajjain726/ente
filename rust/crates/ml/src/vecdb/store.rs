@@ -5207,8 +5207,8 @@ mod tests {
             ..SearchParams::default()
         };
         let stored_keys: Vec<String> = ["key-1", "key-50", "key-100", "key-299"]
-            .iter()
-            .map(|key| key.to_string())
+            .into_iter()
+            .map(String::from)
             .collect();
         let exact_before = db.search(&query, &exact).unwrap();
         assert_eq!(exact_before.len(), 80);
