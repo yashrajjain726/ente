@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
 use crate::db::{Row, SqliteResult, bind_placeholders, pair, params_from_iter};
 
@@ -89,7 +90,7 @@ impl MlDb {
         self.db
             .write_batches_committing_each(
                 UPSERT_PET_FACE,
-                500,
+                const { NonZeroUsize::new(500).unwrap() },
                 pet_faces.iter().map(|pet_face| {
                     (
                         pet_face.file_id,
@@ -111,7 +112,7 @@ impl MlDb {
         self.db
             .write_batches_committing_each(
                 UPSERT_PET_BODY,
-                500,
+                const { NonZeroUsize::new(500).unwrap() },
                 pet_bodies.iter().map(|pet_body| {
                     (
                         pet_body.file_id,
@@ -139,7 +140,7 @@ impl MlDb {
         self.db
             .write_batches_committing_each(
                 "UPDATE pet_faces SET face_vector_id = ? WHERE pet_face_id = ?",
-                500,
+                const { NonZeroUsize::new(500).unwrap() },
                 pet_face_id_to_vector_id
                     .iter()
                     .map(|(pet_face_id, vector_id)| (vector_id, pet_face_id)),
@@ -157,7 +158,7 @@ impl MlDb {
         self.db
             .write_batches_committing_each(
                 "UPDATE pet_bodies SET body_vector_id = ? WHERE pet_body_id = ?",
-                500,
+                const { NonZeroUsize::new(500).unwrap() },
                 pet_body_id_to_vector_id
                     .iter()
                     .map(|(pet_body_id, vector_id)| (vector_id, pet_body_id)),
@@ -332,7 +333,12 @@ impl MlDb {
         }
         let select_sql = select_prefix.to_owned() + " ({})";
         self.db
-            .read_chunked_in(&select_sql, &unique_ids, 800, pair)
+            .read_chunked_in(
+                &select_sql,
+                &unique_ids,
+                const { NonZeroUsize::new(800).unwrap() },
+                pair,
+            )
             .map_err(Into::into)
     }
 }

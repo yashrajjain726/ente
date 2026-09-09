@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
@@ -163,11 +164,11 @@ impl Database {
         &self,
         sql: &str,
         ids: &[I],
-        chunk_size: usize,
+        chunk_size: NonZeroUsize,
         mut map: impl FnMut(&Row<'_>) -> SqliteResult<T>,
     ) -> Result<C> {
         let mut rows = Vec::new();
-        for chunk in ids.chunks(chunk_size) {
+        for chunk in ids.chunks(chunk_size.get()) {
             let sql = expand_in_clause(sql, chunk.len());
             let chunk_rows: Vec<T> = self.read_all(&sql, params_from_iter(chunk), &mut map)?;
             rows.extend(chunk_rows);
@@ -248,7 +249,7 @@ impl Database {
     pub fn write_batches_committing_each<P: Params>(
         &self,
         sql: &str,
-        batch_size: usize,
+        batch_size: NonZeroUsize,
         parameter_sets: impl IntoIterator<Item = P>,
     ) -> Result<()> {
         self.pool.write(|connection| {
@@ -258,7 +259,7 @@ impl Database {
                     connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
                 {
                     let mut statement = transaction.prepare_cached(sql)?;
-                    for parameters in parameter_sets.by_ref().take(batch_size) {
+                    for parameters in parameter_sets.by_ref().take(batch_size.get()) {
                         statement.execute(parameters)?;
                     }
                 }
@@ -389,6 +390,7 @@ pub(crate) fn group_into<K: Eq + Hash, V, C: FromIterator<V>>(
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
+    use std::num::NonZeroUsize;
     use std::panic::{AssertUnwindSafe, catch_unwind};
     use std::sync::mpsc::{self, RecvTimeoutError};
     use std::thread;
@@ -719,14 +721,14 @@ mod tests {
         let (_directory, db) = open();
         db.write_batches_committing_each(
             "INSERT INTO missing_table VALUES (?)",
-            2,
+            const { NonZeroUsize::new(2).unwrap() },
             Vec::<[i64; 1]>::new(),
         )
         .unwrap();
         assert!(
             db.write_batches_committing_each(
                 "INSERT INTO items (id) VALUES (?)",
-                2,
+                const { NonZeroUsize::new(2).unwrap() },
                 [[1], [2], [3], [4], [1]]
             )
             .is_err()
@@ -739,7 +741,7 @@ mod tests {
         assert!(
             db.write_batches_committing_each(
                 "INSERT INTO items (id) VALUES (?)",
-                2,
+                const { NonZeroUsize::new(2).unwrap() },
                 [[5], [6], [7], [5], [8]]
             )
             .is_err()
@@ -749,12 +751,29 @@ mod tests {
                 .unwrap(),
             [1, 2, 3, 4, 5, 6]
         );
-        db.write_batches_committing_each("INSERT INTO items (id) VALUES (?)", 2, [[7], [8], [9]])
-            .unwrap();
+        db.write_batches_committing_each(
+            "INSERT INTO items (id) VALUES (?)",
+            const { NonZeroUsize::new(2).unwrap() },
+            [[7], [8], [9]],
+        )
+        .unwrap();
         assert_eq!(
             db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
                 .unwrap(),
             [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        );
+        assert!(
+            db.write_batches_committing_each(
+                "INSERT INTO items (id) VALUES (?)",
+                NonZeroUsize::MIN,
+                [[10], [11], [10]],
+            )
+            .is_err()
+        );
+        assert_eq!(
+            db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
+                .unwrap(),
+            (1..=11).collect::<Vec<_>>()
         );
     }
 
@@ -764,11 +783,20 @@ mod tests {
         db.write_batch_atomic("INSERT INTO items (id) VALUES (?)", (1..=7).map(|id| [id]))
             .unwrap();
         let ids: Vec<i64> = (1..=7).collect();
+        let one_at_a_time: Vec<i64> = db
+            .read_chunked_in(
+                "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
+                &ids,
+                NonZeroUsize::MIN,
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(one_at_a_time, ids);
         let by_chunk: Vec<i64> = db
             .read_chunked_in(
                 "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
                 &ids,
-                3,
+                const { NonZeroUsize::new(3).unwrap() },
                 |row| row.get(0),
             )
             .unwrap();
@@ -777,7 +805,7 @@ mod tests {
             .read_chunked_in(
                 "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
                 &ids,
-                10,
+                const { NonZeroUsize::new(10).unwrap() },
                 |row| row.get(0),
             )
             .unwrap();
@@ -786,7 +814,7 @@ mod tests {
             .read_chunked_in(
                 "SELECT id FROM missing_table WHERE id IN ({})",
                 &Vec::<i64>::new(),
-                3,
+                const { NonZeroUsize::new(3).unwrap() },
                 |row| row.get(0),
             )
             .unwrap();
@@ -796,7 +824,7 @@ mod tests {
             .read_chunked_in(
                 "SELECT id FROM items WHERE id IN ({})",
                 &many,
-                MAX_SQL_BIND_PARAMS_PER_QUERY,
+                const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
                 |row| row.get(0),
             )
             .unwrap();

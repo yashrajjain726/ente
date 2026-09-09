@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 
 use crate::db::{
     MAX_SQL_BIND_PARAMS_PER_QUERY, Row, SqliteResult, ToSql, bind_placeholders, group_into,
@@ -77,7 +78,7 @@ impl MlDb {
         self.db
             .write_batches_committing_each(
                 UPSERT_FACE,
-                500,
+                const { NonZeroUsize::new(500).unwrap() },
                 faces.iter().map(|face| {
                     (
                         face.file_id,

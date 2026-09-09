@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 
 use crate::db::{
     MAX_SQL_BIND_PARAMS_PER_QUERY, Row, SqliteResult, bind_placeholders, group_into,
@@ -48,7 +49,11 @@ impl MlDb {
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.db
-            .write_batches_committing_each(UPSERT_FACE_CLUSTER, 500, face_id_to_cluster_id.iter())
+            .write_batches_committing_each(
+                UPSERT_FACE_CLUSTER,
+                const { NonZeroUsize::new(500).unwrap() },
+                face_id_to_cluster_id.iter(),
+            )
             .map_err(Into::into)
     }
 
@@ -100,7 +105,7 @@ impl MlDb {
         let rows: Vec<(String, String)> = self.db.read_chunked_in(
             "SELECT cluster_id, face_id FROM face_clusters WHERE cluster_id IN ({})",
             &cluster_id_list,
-            MAX_SQL_BIND_PARAMS_PER_QUERY,
+            const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
             pair,
         )?;
         Ok(group_into(rows))
@@ -177,7 +182,7 @@ impl MlDb {
             .read_chunked_in(
                 "SELECT face_id, cluster_id FROM face_clusters where face_id IN ({})",
                 face_ids,
-                MAX_SQL_BIND_PARAMS_PER_QUERY,
+                const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
                 pair,
             )
             .map_err(Into::into)
@@ -263,7 +268,7 @@ impl MlDb {
                 WHERE cluster_id IN ({})
                 "#,
                 &unique_cluster_ids,
-                800,
+                const { NonZeroUsize::new(800).unwrap() },
                 pair,
             )
             .map_err(Into::into)
@@ -290,7 +295,7 @@ impl MlDb {
         self.db
             .write_batches_committing_each(
                 UPSERT_CLUSTER_SUMMARY,
-                400,
+                const { NonZeroUsize::new(400).unwrap() },
                 summary
                     .iter()
                     .map(|(cluster_id, summary)| (cluster_id, &summary.avg, summary.count)),

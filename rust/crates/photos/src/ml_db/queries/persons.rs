@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 
 use crate::db::{MAX_SQL_BIND_PARAMS_PER_QUERY, pair};
 
@@ -75,7 +76,7 @@ impl MlDb {
             .read_chunked_in(
                 "SELECT cluster_id FROM cluster_person WHERE person_id IN ({})",
                 person_ids,
-                MAX_SQL_BIND_PARAMS_PER_QUERY,
+                const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
                 |row| row.get(0),
             )
             .map_err(Into::into)
@@ -124,7 +125,7 @@ impl MlDb {
                 WHERE face_id IN ({})
                 "#,
                 face_ids,
-                MAX_SQL_BIND_PARAMS_PER_QUERY,
+                const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
                 pair,
             )
             .map_err(Into::into)
