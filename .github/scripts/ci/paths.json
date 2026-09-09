@@ -21,10 +21,7 @@
         "rust/crates/ml/**",
         "rust/tools/codegen/**"
     ],
-    "docs-verify-build": [
-        ".github/workflows/docs-verify-build.yml",
-        "docs/**"
-    ],
+    "docs-verify-build": [".github/workflows/docs-verify-build.yml", "docs/**"],
     "ensu-android-build": [
         ".github/workflows/ensu-android-build.yml",
         "android/apps/ensu/**",
@@ -78,19 +75,9 @@
         "mobile/**/pubspec.yaml"
     ],
     "repo-lint": null,
-    "rust-lint": [
-        ".github/workflows/rust-lint.yml",
-        "rust/**"
-    ],
-    "rust-test": [
-        ".github/workflows/rust-test.yml",
-        "rust/**",
-        "server/**"
-    ],
-    "server-lint": [
-        ".github/workflows/server-lint.yml",
-        "server/**"
-    ],
+    "rust-lint": [".github/workflows/rust-lint.yml", "rust/**"],
+    "rust-test": [".github/workflows/rust-test.yml", "rust/**", "server/**"],
+    "server-lint": [".github/workflows/server-lint.yml", "server/**"],
     "web-lint": [
         ".github/workflows/web-lint.yml",
         "rust/Cargo.lock",
