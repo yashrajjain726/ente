@@ -52,23 +52,19 @@ func TestInitializeFileCountsIncludesLegacyMembershipsInDeletedCollections(t *te
 
 func TestInitializeFileCountsRejectsInconsistentHistory(t *testing.T) {
 	for _, tt := range []struct {
-		name               string
-		sql                string
-		staleDeletedFileID int64
+		name string
+		sql  string
 	}{
 		{"cross_app", `INSERT INTO collection_files(collection_id, file_id, encrypted_key, key_decryption_nonce, updation_time)
-			VALUES (102, 201, 'key', 'nonce', 1)`, 0},
+			VALUES (102, 201, 'key', 'nonce', 1)`},
 		{"cross_app_shared", `UPDATE collections SET owner_id = 2 WHERE collection_id = 102;
 			INSERT INTO collection_files(collection_id, file_id, encrypted_key, key_decryption_nonce, updation_time)
-			VALUES (102, 201, 'key', 'nonce', 1)`, 0},
-		{"active_trash", `INSERT INTO trash(file_id, user_id, collection_id, delete_by) VALUES (201, 1, 101, 1)`, 0},
-		{"deleted_trash", `INSERT INTO trash(file_id, user_id, collection_id, delete_by, is_deleted)
-			VALUES (201, 1, 101, 1, TRUE)`, 201},
-		{"wrong_trash_owner", `INSERT INTO trash(file_id, user_id, collection_id, delete_by, is_deleted)
-			VALUES (201, 2, 101, 1, TRUE)`, 0},
-		{"locker_null_owner", `UPDATE collection_files SET f_owner_id = NULL WHERE file_id = 201`, 0},
+			VALUES (102, 201, 'key', 'nonce', 1)`},
+		{"active_trash", `INSERT INTO trash(file_id, user_id, collection_id, delete_by) VALUES (201, 1, 101, 1)`},
+		{"wrong_trash_owner", `INSERT INTO trash(file_id, user_id, collection_id, delete_by) VALUES (201, 2, 101, 1)`},
+		{"locker_null_owner", `UPDATE collection_files SET f_owner_id = NULL WHERE file_id = 201`},
 		{"locker_equal_counts_different_files", `UPDATE collection_files
-			SET f_owner_id = CASE WHEN file_id = 201 THEN NULL ELSE 1 END WHERE collection_id = 101`, 0},
+			SET f_owner_id = CASE WHEN file_id = 201 THEN NULL ELSE 1 END WHERE collection_id = 101`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, db, userID := setupCollectionMembershipTest(t)
@@ -94,13 +90,6 @@ func TestInitializeFileCountsRejectsInconsistentHistory(t *testing.T) {
 			initialized, err := (&UsageRepository{DB: db}).InitializeFileCounts(t.Context(), userID)
 			if initialized || !errors.Is(err, ErrFileCountIneligible) {
 				t.Fatalf("InitializeFileCounts() = (%t, %v), want ineligible", initialized, err)
-			}
-			var ineligibleErr *FileCountIneligibleError
-			if !errors.As(err, &ineligibleErr) {
-				t.Fatalf("error = %v, want FileCountIneligibleError", err)
-			}
-			if ineligibleErr.StaleDeletedFileID != tt.staleDeletedFileID {
-				t.Fatalf("stale deleted file = %d, want %d", ineligibleErr.StaleDeletedFileID, tt.staleDeletedFileID)
 			}
 			photos, locker, version := readFileCountState(t, db, userID)
 			if photos.Valid || locker.Valid || version != 0 {

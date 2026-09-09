@@ -8,17 +8,6 @@ import (
 
 var ErrFileCountIneligible = errors.New("file counts are ineligible")
 
-type FileCountIneligibleError struct {
-	reason             string
-	StaleDeletedFileID int64
-}
-
-func (e *FileCountIneligibleError) Error() string {
-	return fmt.Sprintf("%s: %s", ErrFileCountIneligible, e.reason)
-}
-
-func (e *FileCountIneligibleError) Unwrap() error { return ErrFileCountIneligible }
-
 func (repo *UsageRepository) InitializeFileCounts(ctx context.Context, userID int64) (bool, error) {
 	_, photos, _, err := repo.GetStoredFileCounts(ctx, userID)
 	if err != nil || photos != -1 {
@@ -32,7 +21,7 @@ func (repo *UsageRepository) InitializeFileCounts(ctx context.Context, userID in
 		return false, nil
 	}
 	if counts.ineligibilityReason != "" {
-		return false, &FileCountIneligibleError{counts.ineligibilityReason, counts.staleDeletedFileID}
+		return false, fmt.Errorf("%w: %s", ErrFileCountIneligible, counts.ineligibilityReason)
 	}
 	return repo.publishInitialFileCounts(ctx, userID, counts)
 }
@@ -61,7 +50,6 @@ func (repo *UsageRepository) GetFileCountInitializationCandidates(ctx context.Co
 
 type fileCountInitSnapshot struct {
 	photos, locker, version int64
-	staleDeletedFileID      int64
 	uninitialized           bool
 	ineligibilityReason     string
 }
@@ -83,11 +71,6 @@ func (repo *UsageRepository) readFileCountInitSnapshot(ctx context.Context, user
 			COUNT(DISTINCT file_id) FILTER (WHERE owner_id = $1 AND app = 'locker') AS locker,
 			BOOL_OR(app = 'locker' AND (f_owner_id IS NOT DISTINCT FROM $1) <> (owner_id = $1)) AS locker_mismatch
 		FROM memberships
-	), trash_conflict AS (
-		SELECT f.file_id, t.user_id, t.is_deleted
-		FROM owned_files AS f
-		JOIN trash AS t ON t.file_id = f.file_id AND t.is_restored = FALSE
-		LIMIT 1
 	)
 	SELECT u.file_count_source_version,
 		u.photos_file_count IS NULL AND u.locker_file_count IS NULL,
@@ -101,17 +84,16 @@ func (repo *UsageRepository) readFileCountInitSnapshot(ctx context.Context, user
 				GROUP BY f.file_id
 				HAVING COUNT(DISTINCT c.app) > 1 OR BOOL_OR(c.app NOT IN ('photos', 'locker'))
 			) THEN 'cross-app or unsupported app memberships'
-			WHEN trash_conflict.file_id IS NOT NULL THEN 'active membership or wrong owner in Trash'
+			WHEN EXISTS (
+				SELECT 1 FROM owned_files AS f
+				JOIN trash AS t ON t.file_id = f.file_id AND t.is_restored = FALSE
+			) THEN 'active membership or wrong owner in Trash'
 			WHEN source.locker_mismatch THEN 'Locker ownership predicates disagree'
 			ELSE ''
-		END,
-		COALESCE(CASE WHEN trash_conflict.user_id = $1 AND trash_conflict.is_deleted
-			THEN trash_conflict.file_id END, 0)
+		END
 	FROM usage AS u CROSS JOIN source
-	LEFT JOIN trash_conflict ON TRUE
 	WHERE u.user_id = $1`, userID).Scan(
-		&counts.version, &counts.uninitialized, &counts.photos, &counts.locker,
-		&counts.ineligibilityReason, &counts.staleDeletedFileID)
+		&counts.version, &counts.uninitialized, &counts.photos, &counts.locker, &counts.ineligibilityReason)
 	return counts, err
 }
 

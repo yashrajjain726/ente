@@ -204,7 +204,7 @@ func TestStaleCleanupInvalidatesOnlyRemovedOwnedMemberships(t *testing.T) {
 	}
 }
 
-func TestStaleCleanupRejectsLiveZeroByteObject(t *testing.T) {
+func TestStaleDeletedFileCleanupRejectsLiveObject(t *testing.T) {
 	repository, db, userID := setupCollectionMembershipTest(t)
 	collectionID := insertObjectTestCollection(t, db, userID)
 	fileID := insertObjectTestFile(t, db, userID)
@@ -215,7 +215,14 @@ func TestStaleCleanupRejectsLiveZeroByteObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := repository.TrashRepo.CleanUpDeletedFilesFromCollection(t.Context(), []int64{fileID}, userID); err == nil {
+	fileIDs, err := repository.TrashRepo.GetStaleDeletedFileIDs(t.Context(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fileIDs) != 1 || fileIDs[0] != fileID {
+		t.Fatalf("GetStaleDeletedFileIDs() = %v, want [%d]", fileIDs, fileID)
+	}
+	if err := repository.TrashRepo.CleanUpDeletedFilesFromCollection(t.Context(), fileIDs, userID); err == nil {
 		t.Fatal("CleanUpDeletedFilesFromCollection() succeeded with a live object")
 	}
 	var deleted bool

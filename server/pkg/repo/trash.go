@@ -19,7 +19,8 @@ const (
 	TrashDurationInDays = 30
 	TrashDiffLimit      = 2500
 
-	TrashBatchSize = 1000
+	TrashBatchSize        = 1000
+	staleDeletedFileLimit = 10
 
 	EmptyTrashQueueItemSeparator = "::"
 )
@@ -237,6 +238,21 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 		}).Info("cleaned stale owned file memberships")
 	}
 	return nil
+}
+
+func (t *TrashRepository) GetStaleDeletedFileIDs(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := t.DB.QueryContext(ctx, `SELECT DISTINCT f.file_id
+		FROM collections c
+		JOIN collection_files cf ON cf.collection_id = c.collection_id AND cf.is_deleted = FALSE
+		JOIN files f ON f.file_id = cf.file_id
+		JOIN trash t ON t.file_id = f.file_id
+		WHERE c.owner_id = $1 AND f.owner_id = $1 AND t.user_id = $1
+			AND t.is_deleted = TRUE AND t.is_restored = FALSE
+		LIMIT $2`, userID, staleDeletedFileLimit)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return convertRowsToFileId(rows)
 }
 
 func (t *TrashRepository) Delete(ctx context.Context, userID int64, fileIDs []int64) error {

@@ -64,14 +64,18 @@ func (c *FileCountInitializer) ProcessBatch() {
 		updated, err := func() (bool, error) {
 			defer c.LockController.ReleaseLock(lockID)
 			updated, err := c.UsageRepo.InitializeFileCounts(ctx, userID)
-			var ineligibleErr *repo.FileCountIneligibleError
-			if errors.As(err, &ineligibleErr) && ineligibleErr.StaleDeletedFileID != 0 {
-				cleanupErr := c.TrashRepo.CleanUpDeletedFilesFromCollection(ctx, []int64{ineligibleErr.StaleDeletedFileID}, userID)
+			if errors.Is(err, repo.ErrFileCountIneligible) {
+				fileIDs, cleanupErr := c.TrashRepo.GetStaleDeletedFileIDs(ctx, userID)
 				if cleanupErr != nil {
-					log.WithError(cleanupErr).WithFields(log.Fields{
-						"user_id": userID,
-						"file_id": ineligibleErr.StaleDeletedFileID,
-					}).Error("Failed to clean stale deleted file membership")
+					log.WithError(cleanupErr).WithField("user_id", userID).Error("Failed to find stale deleted file memberships")
+				}
+				for _, fileID := range fileIDs {
+					if cleanupErr := c.TrashRepo.CleanUpDeletedFilesFromCollection(ctx, []int64{fileID}, userID); cleanupErr != nil {
+						log.WithError(cleanupErr).WithFields(log.Fields{
+							"user_id": userID,
+							"file_id": fileID,
+						}).Error("Failed to clean stale deleted file membership")
+					}
 				}
 			}
 			return updated, err
