@@ -13,16 +13,19 @@ import "package:photos/db/ml/cluster_centroid_vector_db.dart";
 import "package:photos/db/ml/db_model_mappers.dart";
 import "package:photos/db/ml/db_pet_model_mappers.dart";
 import "package:photos/db/ml/ml_data_db_orchestration.dart";
+import "package:photos/db/ml/rust_db.dart";
 import 'package:photos/db/ml/schema.dart';
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/ml_versions.dart";
 import "package:photos/models/ml/vector.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/services/filedata/model/file_data.dart";
 import "package:photos/services/machine_learning/face_ml/face_clustering/face_db_info_for_clustering.dart";
 import 'package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart';
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/src/rust/api/ml_db_api.dart" show decideMlDbBackend;
 import "package:photos/utils/ml_util.dart";
 import 'package:sqlite_async/sqlite_async.dart';
 
@@ -2187,7 +2190,24 @@ class DartMLDataDB
 class MLDataDB {
   MLDataDB._();
 
-  static final IMLDataDB<int> instance = DartMLDataDB.instance;
-  static final IMLDataDB<int> localGalleryInstance =
-      DartMLDataDB.localGalleryInstance;
+  static final Logger _logger = Logger("MLDataDB");
+  static final bool _useRust = _decideBackend();
+
+  static final IMLDataDB<int> instance = _useRust
+      ? RustMLDataDB.instance
+      : DartMLDataDB.instance;
+  static final IMLDataDB<int> localGalleryInstance = _useRust
+      ? RustMLDataDB.localGalleryInstance
+      : DartMLDataDB.localGalleryInstance;
+
+  static bool get isRustBackend => _useRust;
+
+  static bool _decideBackend() {
+    final wantsRust = flagService.rustMlDb || localSettings.rustMlDbOverride;
+    final useRust = decideMlDbBackend(preferRust: wantsRust);
+    _logger.info(
+      "ML DB backend: ${useRust ? "rust" : "dart"} (wantsRust: $wantsRust)",
+    );
+    return useRust;
+  }
 }

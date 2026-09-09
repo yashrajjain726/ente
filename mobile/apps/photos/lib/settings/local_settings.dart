@@ -110,6 +110,7 @@ class LocalSettings {
       "ml_debug.run_ml_during_interaction";
   static const _kSemanticSearchExactInRustEnabled =
       "ml_debug.semantic_search_exact_in_rust";
+  static const _kRustMlDbOverride = "ls.rust_ml_db_override";
   static const _kAppMode = "ls.app_mode";
   static const _kShowLocalGalleryModeOption = "ls.show_offline_mode_option";
   static const _kDeletePreference = "delete_preference";
@@ -406,6 +407,12 @@ class LocalSettings {
 
   Future<void> setSemanticSearchExactInRustEnabled(bool value) async {
     await _prefs.setBool(_kSemanticSearchExactInRustEnabled, value);
+  }
+
+  bool get rustMlDbOverride => _prefs.getBool(_kRustMlDbOverride) ?? false;
+
+  Future<void> setRustMlDbOverride(bool value) async {
+    await _prefs.setBool(_kRustMlDbOverride, value);
   }
 
   Future<bool> setSmartMemories(bool value) async {
