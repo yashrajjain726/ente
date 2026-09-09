@@ -837,6 +837,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     onAddFriend={onAddFriend}
                     onClose={() => setIsAddFriendOpen(false)}
                     open={isAddFriendOpen}
+                    profileLink={profileLink}
                     username={username}
                 />
 
