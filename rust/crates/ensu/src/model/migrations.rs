@@ -204,12 +204,12 @@ fn adopt_flat_targets(store: &AssetStore, targets: &[LlmMigration], flat_dir: &P
                     _ => None,
                 }
             })
-            .collect::<Vec<_>>();
-        if sources.iter().any(Option::is_none) {
+            .collect::<Option<Vec<_>>>();
+        let Some(sources) = sources else {
             continue;
-        }
+        };
         for (file, source) in target.files.iter().zip(sources) {
-            if let Some(Some(source)) = source {
+            if let Some(source) = source {
                 complete &= move_file(&source, &destination.join(file.name));
             }
         }
