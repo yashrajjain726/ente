@@ -239,25 +239,6 @@ func (t *TrashRepository) CleanUpDeletedFilesFromCollection(ctx context.Context,
 	return nil
 }
 
-func (t *TrashRepository) GetStaleDeletedFileIDs(ctx context.Context, userID int64, limit int) ([]int64, error) {
-	rows, err := t.DB.QueryContext(ctx, `SELECT DISTINCT cf.file_id
-		FROM collections c
-		JOIN collection_files cf ON cf.collection_id = c.collection_id AND cf.is_deleted = FALSE
-		JOIN files f ON f.file_id = cf.file_id AND f.owner_id = $1
-		JOIN trash t ON t.file_id = cf.file_id AND t.user_id = $1
-			AND t.is_deleted = TRUE AND t.is_restored = FALSE
-		WHERE c.owner_id = $1
-			AND NOT EXISTS (
-				SELECT 1 FROM object_keys ok
-				WHERE ok.file_id = cf.file_id AND ok.is_deleted = FALSE
-			)
-		LIMIT $2`, userID, limit)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	return convertRowsToFileId(rows)
-}
-
 func (t *TrashRepository) Delete(ctx context.Context, userID int64, fileIDs []int64) error {
 	if len(fileIDs) > TrashDiffLimit {
 		return fmt.Errorf("can not delete more than %d in one go", TrashDiffLimit)
@@ -347,23 +328,19 @@ func (t *TrashRepository) verifyFilesAreDeleted(ctx context.Context, userID int6
 		return stacktrace.NewError("all file ids are not deleted from trash")
 	}
 
-	row := t.DB.QueryRowContext(ctx, `SELECT coalesce(sum(size),0) FROM object_keys WHERE file_id = ANY($1) and is_deleted = FALSE`,
-		pq.Array(fileIDs))
-	var totalUsage int64
-	err = row.Scan(&totalUsage)
+	row := t.DB.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM object_keys WHERE file_id = ANY($1) AND is_deleted = FALSE
+	)`, pq.Array(fileIDs))
+	var hasLiveObjects bool
+	err = row.Scan(&hasLiveObjects)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			totalUsage = 0
-		} else {
-			return stacktrace.Propagate(err, "failed to get total usage for fileIDs")
-		}
+		return stacktrace.Propagate(err, "failed to find live objects for fileIDs")
 	}
-	if totalUsage != 0 {
+	if hasLiveObjects {
 		logrus.WithFields(logrus.Fields{
 			"user_id":       userID,
 			"input_fileIds": fileIDs,
 			"trash_fileIds": filesDeleted,
-			"total_usage":   totalUsage,
 		}).Error("object_keys table still has entries for deleted files")
 		return stacktrace.NewError("object_keys table still has entries for deleted files")
 	}

@@ -204,33 +204,26 @@ func TestStaleCleanupInvalidatesOnlyRemovedOwnedMemberships(t *testing.T) {
 	}
 }
 
-func TestGetStaleDeletedFileIDs(t *testing.T) {
+func TestStaleCleanupRejectsLiveZeroByteObject(t *testing.T) {
 	repository, db, userID := setupCollectionMembershipTest(t)
-	otherUserID := testutil.InsertUser(t, db, testutil.UserFixture{UserID: 2, Email: "other@ente.com", CreationTime: 1})
 	collectionID := insertObjectTestCollection(t, db, userID)
-	eligibleFileID := insertObjectTestFile(t, db, userID)
-	liveObjectFileID := insertObjectTestFile(t, db, userID)
-	activeTrashFileID := insertObjectTestFile(t, db, userID)
-	wrongTrashOwnerFileID := insertObjectTestFile(t, db, userID)
-	noTrashFileID := insertObjectTestFile(t, db, userID)
-	for _, fileID := range []int64{eligibleFileID, liveObjectFileID, activeTrashFileID, wrongTrashOwnerFileID, noTrashFileID} {
-		linkObjectTestFileToCollection(t, db, collectionID, fileID, userID)
-	}
-	insertObjectTestKey(t, db, liveObjectFileID, ente.FILE, "live-zero-byte-object", 0, []string{"b2-eu-cen"})
+	fileID := insertObjectTestFile(t, db, userID)
+	linkObjectTestFileToCollection(t, db, collectionID, fileID, userID)
+	insertObjectTestKey(t, db, fileID, ente.FILE, "live-zero-byte-object", 0, []string{"b2-eu-cen"})
 	if _, err := db.Exec(`INSERT INTO trash(file_id, collection_id, user_id, delete_by, updated_at, is_deleted)
-		VALUES ($1, $5, $6, 1, 1, TRUE), ($2, $5, $6, 1, 1, TRUE),
-			($3, $5, $6, 1, 1, FALSE), ($4, $5, $7, 1, 1, TRUE)`,
-		eligibleFileID, liveObjectFileID, activeTrashFileID, wrongTrashOwnerFileID,
-		collectionID, userID, otherUserID); err != nil {
+		VALUES ($1, $2, $3, 1, 1, TRUE)`, fileID, collectionID, userID); err != nil {
 		t.Fatal(err)
 	}
 
-	fileIDs, err := repository.TrashRepo.GetStaleDeletedFileIDs(t.Context(), userID, TrashBatchSize)
-	if err != nil {
+	if err := repository.TrashRepo.CleanUpDeletedFilesFromCollection(t.Context(), []int64{fileID}, userID); err == nil {
+		t.Fatal("CleanUpDeletedFilesFromCollection() succeeded with a live object")
+	}
+	var deleted bool
+	if err := db.QueryRow(`SELECT is_deleted FROM collection_files WHERE file_id = $1`, fileID).Scan(&deleted); err != nil {
 		t.Fatal(err)
 	}
-	if len(fileIDs) != 1 || fileIDs[0] != eligibleFileID {
-		t.Fatalf("GetStaleDeletedFileIDs() = %v, want [%d]", fileIDs, eligibleFileID)
+	if deleted {
+		t.Fatal("collection membership was deleted")
 	}
 }
 
