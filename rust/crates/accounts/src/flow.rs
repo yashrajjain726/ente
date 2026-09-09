@@ -155,9 +155,12 @@ impl fmt::Debug for CheckSessionValidityParams {
 }
 
 #[derive(Debug)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "A single session-check result does not need a separate allocation"
+#[cfg_attr(
+    target_pointer_width = "64",
+    expect(
+        clippy::large_enum_variant,
+        reason = "A single session-check result does not need a separate allocation"
+    )
 )]
 pub enum SessionValidity {
     Invalid,
