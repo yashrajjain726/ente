@@ -21,7 +21,7 @@ type FormFieldProps = Omit<TextFieldProps, "label"> & {
     multilineMinHeight?: number;
 };
 
-function FormField({
+export function FormField({
     label,
     required,
     multiline,

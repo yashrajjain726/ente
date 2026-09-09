@@ -1,4 +1,17 @@
+import {
+    lockerHeaderIconButtonSx,
+    lockerPrimaryButtonSx,
+} from "@/components/createItemDialog/create-item-dialog-styles";
+import { FormField } from "@/components/createItemDialog/ItemFormFields";
+import {
+    lockerColorSx,
+    lockerTextBodyBoldSx,
+    lockerTextH2Sx,
+    lockerTextMiniSx,
+} from "@/components/locker-tokens";
 import type { LockerCollection } from "@/types";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import {
     Box,
@@ -7,18 +20,18 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    IconButton,
     Menu,
     MenuItem,
     Snackbar,
     Stack,
-    TextField,
     Typography,
 } from "@mui/material";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { t } from "i18next";
 import React from "react";
-import { LockerFileLinkDialog } from "../LockerFileLinkDialog";
 import { lockerDialogPaperSx } from "../locker-dialog-styles";
+import { LockerFileLinkDialog } from "../LockerFileLinkDialog";
 
 interface ItemListDialogsProps {
     activeFileLinkItemTitle: string;
@@ -228,7 +241,19 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
         </Dialog>
 
         <Dialog
-            slotProps={{ paper: { sx: lockerDialogPaperSx } }}
+            slotProps={{
+                paper: {
+                    sx: (theme) => ({
+                        ...lockerDialogPaperSx,
+                        borderRadius: "24px",
+                        width: "min(100%, 440px)",
+                        padding: "20px",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
+                        }),
+                    }),
+                },
+            }}
             open={renameCollectionOpen}
             onClose={() => {
                 if (!renamingCollection) {
@@ -238,14 +263,35 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
             fullWidth
             maxWidth="xs"
         >
-            <DialogTitle>{t("renameCollection")}</DialogTitle>
-            <DialogContent>
-                <Stack sx={{ gap: 2, pt: 0.25, pb: 1 }}>
-                    <TextField
+            <Stack>
+                <Stack
+                    direction="row"
+                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
+                >
+                    <Typography
+                        sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+                    >
+                        {t("renameCollection")}
+                    </Typography>
+                    <IconButton
+                        aria-label={t("close")}
+                        onClick={onCloseRenameDialog}
+                        disabled={renamingCollection}
+                        sx={lockerHeaderIconButtonSx}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={18}
+                            strokeWidth={1.5}
+                        />
+                    </IconButton>
+                </Stack>
+                <Box sx={{ mt: 2.5 }}>
+                    <FormField
                         value={renameValue}
                         onChange={(event) => setRenameValue(event.target.value)}
                         label={t("enterCollectionName")}
-                        fullWidth
+                        required
                         autoFocus
                         disabled={renamingCollection}
                         onKeyDown={(event) => {
@@ -254,28 +300,62 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
                             }
                         }}
                     />
-                    {renameError && (
-                        <Typography
-                            variant="small"
-                            sx={{ color: "critical.main" }}
-                        >
-                            {renameError}
-                        </Typography>
-                    )}
-                    <LoadingButton
-                        variant="contained"
-                        loading={renamingCollection}
-                        disabled={!renameValue.trim()}
-                        onClick={onConfirmRename}
+                </Box>
+                {renameError && (
+                    <Typography
+                        sx={(theme) => ({
+                            ...lockerTextMiniSx,
+                            mt: 1.5,
+                            ...lockerColorSx(theme, { color: "warning" }),
+                        })}
                     >
-                        {t("save")}
-                    </LoadingButton>
-                </Stack>
-            </DialogContent>
+                        {renameError}
+                    </Typography>
+                )}
+                <LoadingButton
+                    fullWidth
+                    color="primary"
+                    loading={renamingCollection}
+                    disabled={!renameValue.trim()}
+                    onClick={onConfirmRename}
+                    sx={(theme) => ({
+                        ...lockerTextBodyBoldSx,
+                        mt: 3,
+                        borderRadius: "20px",
+                        textTransform: "none",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "primary",
+                            color: "specialWhite",
+                        }),
+                        "&:hover": {
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "primaryDark",
+                            }),
+                        },
+                        ...lockerPrimaryButtonSx(theme, {
+                            loading: renamingCollection,
+                        }),
+                    })}
+                >
+                    {t("save")}
+                </LoadingButton>
+            </Stack>
         </Dialog>
 
         <Dialog
-            slotProps={{ paper: { sx: lockerDialogPaperSx } }}
+            slotProps={{
+                paper: {
+                    sx: (theme) => ({
+                        ...lockerDialogPaperSx,
+                        borderRadius: "24px",
+                        width: "min(100%, 440px)",
+                        padding: "20px",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "backgroundBase",
+                        }),
+                    }),
+                },
+            }}
             open={createCollectionOpen}
             onClose={() => {
                 if (!creatingCollection) {
@@ -285,16 +365,37 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
             fullWidth
             maxWidth="xs"
         >
-            <DialogTitle>{t("createCollection")}</DialogTitle>
-            <DialogContent>
-                <Stack sx={{ gap: 2, pt: 0.25, pb: 1 }}>
-                    <TextField
+            <Stack>
+                <Stack
+                    direction="row"
+                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
+                >
+                    <Typography
+                        sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+                    >
+                        {t("createCollection")}
+                    </Typography>
+                    <IconButton
+                        aria-label={t("close")}
+                        onClick={onCloseCreateCollectionDialog}
+                        disabled={creatingCollection}
+                        sx={lockerHeaderIconButtonSx}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={18}
+                            strokeWidth={1.5}
+                        />
+                    </IconButton>
+                </Stack>
+                <Box sx={{ mt: 2.5 }}>
+                    <FormField
                         value={createCollectionName}
                         onChange={(event) =>
                             setCreateCollectionName(event.target.value)
                         }
                         label={t("enterCollectionName")}
-                        fullWidth
+                        required
                         autoFocus
                         disabled={creatingCollection}
                         onKeyDown={(event) => {
@@ -303,35 +404,46 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
                             }
                         }}
                     />
-                    {createCollectionError && (
-                        <Typography
-                            variant="small"
-                            sx={{ color: "critical.main" }}
-                        >
-                            {createCollectionError}
-                        </Typography>
-                    )}
-                    <Stack direction="row" sx={{ gap: 1 }}>
-                        <Button
-                            fullWidth
-                            color="secondary"
-                            onClick={onCloseCreateCollectionDialog}
-                            disabled={creatingCollection}
-                        >
-                            {t("cancel")}
-                        </Button>
-                        <LoadingButton
-                            fullWidth
-                            color="primary"
-                            loading={creatingCollection}
-                            onClick={onConfirmCreateCollection}
-                            disabled={!createCollectionName.trim()}
-                        >
-                            {t("createCollectionButton")}
-                        </LoadingButton>
-                    </Stack>
-                </Stack>
-            </DialogContent>
+                </Box>
+                {createCollectionError && (
+                    <Typography
+                        sx={(theme) => ({
+                            ...lockerTextMiniSx,
+                            mt: 1.5,
+                            ...lockerColorSx(theme, { color: "warning" }),
+                        })}
+                    >
+                        {createCollectionError}
+                    </Typography>
+                )}
+                <LoadingButton
+                    fullWidth
+                    color="primary"
+                    loading={creatingCollection}
+                    disabled={!createCollectionName.trim()}
+                    onClick={onConfirmCreateCollection}
+                    sx={(theme) => ({
+                        ...lockerTextBodyBoldSx,
+                        mt: 3,
+                        borderRadius: "20px",
+                        textTransform: "none",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "primary",
+                            color: "specialWhite",
+                        }),
+                        "&:hover": {
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "primaryDark",
+                            }),
+                        },
+                        ...lockerPrimaryButtonSx(theme, {
+                            loading: creatingCollection,
+                        }),
+                    })}
+                >
+                    {t("createCollectionButton")}
+                </LoadingButton>
+            </Stack>
         </Dialog>
 
         <Menu
