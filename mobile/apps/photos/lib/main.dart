@@ -89,6 +89,7 @@ const kBGProcessingTaskMLSelfStopIOS = Duration(minutes: 3, seconds: 45);
 // opens; it drains its latched stop within seconds once the process is woken.
 const kBGProcessingTaskMLLockWaitIOS = Duration(seconds: 60);
 const kBGTaskMLSelfStopAndroid = Duration(minutes: 9);
+const kBGProcessingTaskMLSelfStopAndroid = Duration(minutes: 8);
 bool isProcessBg = true;
 bool _stopHearBeat = false;
 bool _isSyncInitialized = false;
@@ -244,11 +245,18 @@ Future<void> runBackgroundTask(
   // Created at task start so a stop that fires before ML begins stays
   // latched for the whole task.
   final mlRunControl = MlRunControl();
-  final mlSelfStopTimer = Timer(
-    mlSelfStop ??
-        (Platform.isIOS ? kBGTaskMLSelfStopIOS : kBGTaskMLSelfStopAndroid),
-    () => mlRunControl.requestStop(MlStopReason.backgroundDeadline),
-  );
+  final mlBudget =
+      mlSelfStop ??
+      (Platform.isIOS ? kBGTaskMLSelfStopIOS : kBGTaskMLSelfStopAndroid);
+  if (mlBudget <= Duration.zero) {
+    mlRunControl.requestStop(MlStopReason.backgroundDeadline);
+  }
+  final mlSelfStopTimer = mlBudget > Duration.zero
+      ? Timer(
+          mlBudget,
+          () => mlRunControl.requestStop(MlStopReason.backgroundDeadline),
+        )
+      : null;
   final mlForegroundWatchTimer = Timer.periodic(
     const Duration(milliseconds: 500),
     (_) async {
@@ -274,7 +282,7 @@ Future<void> runBackgroundTask(
 
     await _runMinimally(taskId, tlog, mlRunControl, mlLockWait);
   } finally {
-    mlSelfStopTimer.cancel();
+    mlSelfStopTimer?.cancel();
     mlForegroundWatchTimer.cancel();
   }
 }
@@ -380,9 +388,7 @@ Future<void> _runMinimally(
           await MLService.instance.init();
           final disposition = await MLService.instance.runAllML(
             force: false,
-            allowImageIndexing:
-                !Platform.isIOS ||
-                taskId == BgTaskUtils.iOSBackgroundProcessingTask,
+            allowImageIndexing: BgTaskUtils.allowsImageIndexing(taskId),
             control: mlRunControl,
             lockWait: mlLockWait,
           );
