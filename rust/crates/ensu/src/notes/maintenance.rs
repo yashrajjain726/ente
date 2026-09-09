@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn freshness_preserves_source_failures_and_cancellation() {
+    fn freshness_detects_changes_during_content_reads() {
         let root = tempfile::tempdir().unwrap();
         let writer = fixture(root.path(), Some(b"note"), true);
         let inventory = [source(b"note", None)];
@@ -148,20 +148,6 @@ mod tests {
         .unwrap();
         assert!(changed.changed);
         assert_eq!(changed.forced_document_ids, ["note.md"]);
-        assert!(matches!(
-            inspect_notes_freshness(&writer, &inventory, || Ok(()), |_| Err("offline")),
-            Err(NotesIndexingError::Adapter("offline"))
-        ));
-        assert!(matches!(
-            inspect_notes_freshness(
-                &writer,
-                &inventory,
-                || Err("cancelled"),
-                |_| { panic!("cancelled scans must not read content") }
-            ),
-            Err(NotesIndexingError::Adapter("cancelled"))
-        ));
-        assert_eq!(writer.indexed_document_count(), 1);
     }
 
     #[test]

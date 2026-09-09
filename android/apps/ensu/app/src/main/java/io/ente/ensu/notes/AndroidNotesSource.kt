@@ -94,10 +94,11 @@ internal class AndroidNotesSource(
 
     private fun queryChildren(id: String): Map<String, Entry> {
         val entries = query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, id))
-        if (entries.map { it.name }.toSet().size != entries.size) {
+        val children = entries.associateBy { it.name }
+        if (children.size != entries.size) {
             throw NotesException.SourceRead("The folder contains duplicate document names")
         }
-        return entries.associateBy { it.name }
+        return children
     }
 
     fun sameRoot(other: AndroidNotesSource): Boolean =

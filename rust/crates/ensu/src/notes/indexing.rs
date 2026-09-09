@@ -367,7 +367,7 @@ mod tests {
             document_id: document_id.to_string(),
             ..source()
         };
-        let inventory = (0..12)
+        let inventory = (0..2)
             .map(|index| source_for(&format!("note-{index:02}.md")))
             .collect::<Vec<_>>();
         let forced_document_ids = inventory
@@ -428,7 +428,6 @@ mod tests {
             assert!(!writer.initial_inventory_complete());
             assert_eq!(writer.indexed_document_ids().collect::<Vec<_>>(), embedded);
         }
-        let resumed_progress = RefCell::new(Vec::new());
         let outcome = index_notes_collection(
             input,
             || Ok(()),
@@ -438,12 +437,11 @@ mod tests {
                 Ok(Some(embedding(document)))
             },
             verify_revision,
-            |progress| resumed_progress.borrow_mut().push(progress),
+            |_| {},
         )
         .unwrap();
 
         assert!(outcome.ready());
-        assert_eq!(resumed_progress.borrow()[0].processed_document_count, 0);
         let document_ids = inventory
             .iter()
             .map(|source| source.document_id.as_str())

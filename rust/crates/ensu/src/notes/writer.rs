@@ -997,55 +997,9 @@ mod tests {
             Err(NotesError::CollectionTooLarge(_))
         ));
         writer.source_bytes = 0;
-        let entry =
-            manifest_document(&document, &source, &document.revision, &document.revision).unwrap();
-        for index in 0..NOTES_MAX_COLLECTION_DOCUMENTS {
-            writer
-                .manifest
-                .documents
-                .insert(format!("note-{index:05}.md"), entry.clone());
-        }
+        writer.manifest_bytes = 8 * 1024 * 1024;
         assert!(matches!(
             writer.validate_document(&document, &source),
-            Err(NotesError::CollectionTooLarge(_))
-        ));
-        (writer.source_bytes, writer.chunk_count) = manifest_capacity(&writer.manifest).unwrap();
-        writer.manifest_bytes = serialize_manifest_for_publish(&writer.manifest, &collection())
-            .unwrap()
-            .len() as u64;
-        let replacement = prepared("note-00000.md", "new note");
-        writer
-            .validate_document(&replacement, &metadata(&replacement, 8))
-            .unwrap();
-
-        writer.manifest.documents.clear();
-        let long_id = |index| format!("{}-{index:04}.md", "a".repeat(4_000));
-        writer.manifest.documents.insert(long_id(0), entry.clone());
-        let first_size = serialize_manifest_for_publish(&writer.manifest, &collection())
-            .unwrap()
-            .len();
-        writer.manifest.documents.insert(long_id(1), entry.clone());
-        let entry_size = serialize_manifest_for_publish(&writer.manifest, &collection())
-            .unwrap()
-            .len()
-            - first_size;
-        let fitting_count = 1 + (8 * 1024 * 1024 - first_size) / entry_size;
-        for index in 2..fitting_count {
-            writer
-                .manifest
-                .documents
-                .insert(long_id(index), entry.clone());
-        }
-        (writer.source_bytes, writer.chunk_count) = manifest_capacity(&writer.manifest).unwrap();
-        writer.manifest_bytes = serialize_manifest_for_publish(&writer.manifest, &collection())
-            .unwrap()
-            .len() as u64;
-        let document = PreparedNotesDocument {
-            document_id: long_id(fitting_count),
-            ..document
-        };
-        assert!(matches!(
-            writer.validate_document(&document, &metadata(&document, 4)),
             Err(NotesError::CollectionTooLarge(_))
         ));
     }

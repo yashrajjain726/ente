@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum NotesStatus: String {
+enum NotesStatus {
     case pending, indexing, updating, ready, unavailable, error
 }
 
@@ -412,12 +412,13 @@ final class NotesStore: ObservableObject, ModelMaintenance {
     }
     private static func state(_ record: NotesCollectionInfo, _ summary: NotesSummary, progress: UInt8? = nil) -> NoteCollectionState {
         let ready = summary.initialComplete && summary.documentCount > 0
+        let empty = summary.initialComplete && !ready
         return NoteCollectionState(id: record.id, label: record.label,
             status: ready ? .ready : summary.initialComplete ? .error : .pending,
             documentCount: summary.documentCount, lastUpdatedAtMs: summary.lastUpdatedAtMs, indexAvailable: ready,
             progress: summary.initialComplete ? nil : progress,
-            error: summary.initialComplete && !ready ? emptyNotes : nil,
-            completedEmpty: summary.initialComplete && !ready)
+            error: empty ? emptyNotes : nil,
+            completedEmpty: empty)
     }
 }
 

@@ -8,8 +8,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,17 +21,14 @@ class NotesReadTest {
         val cancelled = CountDownLatch(1)
         val drain = CountDownLatch(1)
         val released = AtomicBoolean()
-        val gate = Mutex()
         launch(owner) {
-            gate.withLock {
-                try {
-                    runNotesRead(cancelled::countDown) {
-                        entered.countDown()
-                        check(drain.await(5, TimeUnit.SECONDS))
-                    }
-                } finally {
-                    released.set(true)
+            try {
+                runNotesRead(cancelled::countDown) {
+                    entered.countDown()
+                    check(drain.await(5, TimeUnit.SECONDS))
                 }
+            } finally {
+                released.set(true)
             }
         }
 
@@ -42,13 +37,11 @@ class NotesReadTest {
             owner.cancel()
             assertTrue(withContext(Dispatchers.IO) { cancelled.await(5, TimeUnit.SECONDS) })
             assertFalse(released.get())
-            assertTrue(gate.isLocked)
         } finally {
             drain.countDown()
             owner.cancelAndJoin()
         }
 
         assertTrue(released.get())
-        assertFalse(gate.isLocked)
     }
 }

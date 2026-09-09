@@ -313,7 +313,18 @@ struct AssistantMessageBubbleView: View {
 
     private func sourceChips(_ labels: [String]) -> some View {
         ForEach(Array(labels.enumerated()), id: \.offset) { _, label in
-            SourceChip(label: label) { showSources = true }
+            Button { showSources = true } label: {
+                Text(label)
+                    .font(EnsuTypography.small)
+                    .foregroundStyle(EnsuColor.textPrimary)
+                    .padding(.horizontal, EnsuSpacing.md)
+                    .padding(.vertical, EnsuSpacing.sm)
+                    .frame(minHeight: 44)
+                    .background(EnsuColor.fillFaint)
+                    .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.button))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("View sources used in this response")
         }
     }
 }

@@ -224,10 +224,8 @@ actor NotesProvider {
         ) {
             return url.standardizedFileURL.resolvingSymlinksInPath().path
         }
-        if let path = record.canonicalPath {
-            return path
-        }
-        return NSURL.resourceValues(forKeys: [.pathKey], fromBookmarkData: record.bookmark)?[.pathKey] as? String
+        return record.canonicalPath ??
+            (NSURL.resourceValues(forKeys: [.pathKey], fromBookmarkData: record.bookmark)?[.pathKey] as? String)
     }
 
     private static func handle(_ root: URL, _ id: String) throws -> NotesCollection {

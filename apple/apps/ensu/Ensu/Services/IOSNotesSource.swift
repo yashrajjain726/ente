@@ -183,7 +183,7 @@ final class IOSNotesSource: NotesSource, @unchecked Sendable {
         return NSError(domain: NSPOSIXErrorDomain, code: Int(code))
     }
 
-    static func documentReadError(_ error: Error, root: URL) -> Error {
+    private static func documentReadError(_ error: Error, root: URL) -> Error {
         guard isMissingFile(error) else { return accessError(error) }
         let fd = Darwin.open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
         guard fd >= 0 else {

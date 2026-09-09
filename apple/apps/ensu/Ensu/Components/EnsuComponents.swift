@@ -14,26 +14,6 @@ struct EnsuCard<Content: View>: View {
     }
 }
 
-struct SourceChip: View {
-    let label: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(label)
-                .font(EnsuTypography.small)
-                .foregroundStyle(EnsuColor.textPrimary)
-                .padding(.horizontal, EnsuSpacing.md)
-                .padding(.vertical, EnsuSpacing.sm)
-                .frame(minHeight: 44)
-                .background(EnsuColor.fillFaint)
-                .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.button))
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("View sources used in this response")
-    }
-}
-
 struct AttributionSheet<Content: View>: View {
     let title: String
     @ViewBuilder var content: () -> Content
