@@ -1,4 +1,3 @@
-import "dart:convert";
 import "dart:typed_data" hide Int64List;
 
 import "package:flutter_rust_bridge/flutter_rust_bridge.dart" show Int64List;
@@ -11,8 +10,8 @@ import "package:photos/db/ml/clip_vector_db.dart";
 import "package:photos/db/ml/cluster_centroid_vector_db.dart";
 import "package:photos/db/ml/db_pet_model_mappers.dart";
 import "package:photos/db/ml/ml_data_db_orchestration.dart";
+import "package:photos/db/ml/rust_db_model_mappers.dart" as mappers;
 import "package:photos/models/ml/clip.dart";
-import "package:photos/models/ml/face/detection.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/ml_versions.dart";
@@ -90,16 +89,18 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
 
   @override
   Future<void> bulkInsertFaces(List<Face> faces) async =>
-      (await _db).bulkInsertFaces(faces: faces.map(_toFaceRow).toList());
+      (await _db).bulkInsertFaces(faces: faces.map(mappers.toFaceRow).toList());
 
   @override
-  Future<void> bulkInsertPetFaces(List<DBPetFace> petFaces) async => (await _db)
-      .bulkInsertPetFaces(petFaces: petFaces.map(_toPetFaceRow).toList());
+  Future<void> bulkInsertPetFaces(List<DBPetFace> petFaces) async =>
+      (await _db).bulkInsertPetFaces(
+        petFaces: petFaces.map(mappers.toPetFaceRow).toList(),
+      );
 
   @override
   Future<void> bulkInsertPetBodies(List<DBPetBody> petBodies) async =>
       (await _db).bulkInsertPetBodies(
-        petBodies: petBodies.map(_toPetBodyRow).toList(),
+        petBodies: petBodies.map(mappers.toPetBodyRow).toList(),
       );
 
   @override
@@ -218,28 +219,28 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
       avatarFaceId: avatarFaceId,
       clusterId: clusterID,
     );
-    return row == null ? null : _toFace(row);
+    return row == null ? null : mappers.toFace(row);
   }
 
   @override
   Future<List<Face>?> getFacesForGivenFileID(int fileUploadID) async {
     final db = await _db;
     final rows = await db.getFacesForGivenFileId(fileUploadId: fileUploadID);
-    return rows.isEmpty ? null : rows.map(_toFace).toList();
+    return rows.isEmpty ? null : rows.map(mappers.toFace).toList();
   }
 
   @override
   Future<List<DBPetFace>?> getPetFacesForFileID(int fileUploadID) async {
     final db = await _db;
     final rows = await db.getPetFacesForFileId(fileUploadId: fileUploadID);
-    return rows.isEmpty ? null : rows.map(_toDBPetFace).toList();
+    return rows.isEmpty ? null : rows.map(mappers.toDBPetFace).toList();
   }
 
   @override
   Future<List<DBPetBody>?> getPetBodiesForFileID(int fileUploadID) async {
     final db = await _db;
     final rows = await db.getPetBodiesForFileId(fileUploadId: fileUploadID);
-    return rows.isEmpty ? null : rows.map(_toDBPetBody).toList();
+    return rows.isEmpty ? null : rows.map(mappers.toDBPetBody).toList();
   }
 
   @override
@@ -249,7 +250,7 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
     final rows = await db.getFileIdsToFacesWithoutEmbedding();
     return rows.map(
       (fileID, faces) =>
-          MapEntry(fileID, faces.map(_toFaceWithoutEmbedding).toList()),
+          MapEntry(fileID, faces.map(mappers.toFaceWithoutEmbedding).toList()),
     );
   }
 
@@ -352,7 +353,7 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
       offset: offset,
       batchSize: batchSize,
     );
-    return rows.map(_toFaceDbInfoForClustering).toList();
+    return rows.map(mappers.toFaceDbInfoForClustering).toList();
   }
 
   @override
@@ -503,7 +504,8 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
     Map<String, (Uint8List, int)> summary,
   ) async => (await _db).upsertClusterSummaryRows(
     summary: summary.map(
-      (clusterID, value) => MapEntry(clusterID, _toClusterSummaryRow(value)),
+      (clusterID, value) =>
+          MapEntry(clusterID, mappers.toClusterSummaryRow(value)),
     ),
   );
 
@@ -519,7 +521,7 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
     final rows = await db.getAllClusterSummary(minClusterSize: minClusterSize);
     return rows.map(
       (clusterID, summary) =>
-          MapEntry(clusterID, _toClusterSummaryRecord(summary)),
+          MapEntry(clusterID, mappers.toClusterSummaryRecord(summary)),
     );
   }
 
@@ -533,7 +535,7 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
     );
     return rows.map(
       (clusterID, summary) =>
-          MapEntry(clusterID, _toClusterSummaryRecord(summary)),
+          MapEntry(clusterID, mappers.toClusterSummaryRecord(summary)),
     );
   }
 
@@ -591,7 +593,7 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
   Future<List<EmbeddingVector>> getAllClipVectors() async {
     final db = await _db;
     final rows = await db.getAllClipVectors();
-    return rows.map(_toEmbeddingVector).toList();
+    return rows.map(mappers.toEmbeddingVector).toList();
   }
 
   @override
@@ -692,7 +694,7 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
   @override
   Future<void> insertClipRows(List<ClipEmbedding> embeddings) async =>
       (await _db).insertClipRows(
-        embeddings: embeddings.map(_toClipEmbeddingRow).toList(),
+        embeddings: embeddings.map(mappers.toClipEmbeddingRow).toList(),
       );
 
   @override
@@ -743,14 +745,18 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
       (await _db).getClustersForMemoryLane(assigned: assigned);
 
   @override
-  Future<void> putFDStatus(List<FDStatus> fdStatusList) async => (await _db)
-      .putFdStatus(fdStatusList: fdStatusList.map(_toFdStatusRow).toList());
+  Future<void> putFDStatus(List<FDStatus> fdStatusList) async =>
+      (await _db).putFdStatus(
+        fdStatusList: fdStatusList.map(mappers.toFdStatusRow).toList(),
+      );
 
   @override
   Future<Map<int, PreviewInfo>> getFileIDsVidPreview() async {
     final db = await _db;
     final rows = await db.getFileIdsVidPreview();
-    return rows.map((fileID, info) => MapEntry(fileID, _toPreviewInfo(info)));
+    return rows.map(
+      (fileID, info) => MapEntry(fileID, mappers.toPreviewInfo(info)),
+    );
   }
 
   @override
@@ -759,149 +765,4 @@ class RustMLDataDB with MLDataDBOrchestration implements IMLDataDB<int> {
     final fileIDs = await db.getFileIdsWithFdData(dataType: type?.toJson());
     return fileIDs.inner.toSet();
   }
-}
-
-rust.FaceRow _toFaceRow(Face face) {
-  return rust.FaceRow(
-    fileId: face.fileID,
-    faceId: face.faceID,
-    detectionJson: json.encode(face.detection.toJson()),
-    embedding: Float64List.fromList(face.embedding),
-    score: face.score,
-    blur: face.blur,
-    isSideways: face.detection.faceIsSideways(),
-    imageHeight: face.fileInfo?.imageHeight ?? 0,
-    imageWidth: face.fileInfo?.imageWidth ?? 0,
-    mlVersion: faceMlVersion,
-  );
-}
-
-Face _toFace(rust.FaceRow row) {
-  return Face(
-    row.faceId,
-    row.fileId,
-    row.embedding,
-    row.score,
-    Detection.fromJson(json.decode(row.detectionJson) as Map<String, dynamic>),
-    row.blur,
-    fileInfo: FileInfo(
-      imageWidth: row.imageWidth,
-      imageHeight: row.imageHeight,
-    ),
-  );
-}
-
-FaceWithoutEmbedding _toFaceWithoutEmbedding(rust.FaceWithoutEmbedding row) {
-  return FaceWithoutEmbedding(
-    row.faceId,
-    row.fileId,
-    row.score,
-    Detection.fromJson(json.decode(row.detectionJson) as Map<String, dynamic>),
-    row.blur,
-  );
-}
-
-FaceDbInfoForClustering _toFaceDbInfoForClustering(
-  rust.FaceDbInfoForClustering row,
-) {
-  return FaceDbInfoForClustering(
-    faceID: row.faceId,
-    clusterId: row.clusterId,
-    embeddingBytes: row.embeddingBytes,
-    faceScore: row.faceScore,
-    blurValue: row.blurValue,
-    isSideways: row.isSideways,
-  );
-}
-
-rust.PetFaceRow _toPetFaceRow(DBPetFace petFace) {
-  return rust.PetFaceRow(
-    fileId: petFace.fileId,
-    petFaceId: petFace.petFaceId,
-    detectionJson: petFace.detection,
-    faceVectorId: petFace.faceVectorId,
-    species: petFace.species,
-    faceScore: petFace.faceScore,
-    imageHeight: petFace.imageHeight,
-    imageWidth: petFace.imageWidth,
-    mlVersion: petFace.mlVersion,
-  );
-}
-
-DBPetFace _toDBPetFace(rust.PetFaceRow row) {
-  return DBPetFace(
-    fileId: row.fileId,
-    petFaceId: row.petFaceId,
-    detection: row.detectionJson,
-    faceVectorId: row.faceVectorId,
-    species: row.species,
-    faceScore: row.faceScore,
-    imageHeight: row.imageHeight,
-    imageWidth: row.imageWidth,
-    mlVersion: row.mlVersion,
-  );
-}
-
-rust.PetBodyRow _toPetBodyRow(DBPetBody petBody) {
-  return rust.PetBodyRow(
-    fileId: petBody.fileId,
-    petBodyId: petBody.petBodyId,
-    detectionJson: petBody.detection,
-    bodyVectorId: petBody.bodyVectorId,
-    species: petBody.species,
-    score: petBody.score,
-    imageHeight: petBody.imageHeight,
-    imageWidth: petBody.imageWidth,
-    mlVersion: petBody.mlVersion,
-  );
-}
-
-DBPetBody _toDBPetBody(rust.PetBodyRow row) {
-  return DBPetBody(
-    fileId: row.fileId,
-    petBodyId: row.petBodyId,
-    detection: row.detectionJson,
-    bodyVectorId: row.bodyVectorId,
-    species: row.species,
-    score: row.score,
-    imageHeight: row.imageHeight,
-    imageWidth: row.imageWidth,
-    mlVersion: row.mlVersion,
-  );
-}
-
-rust.ClipEmbedding _toClipEmbeddingRow(ClipEmbedding embedding) {
-  return rust.ClipEmbedding(
-    fileId: embedding.fileID,
-    embedding: Float64List.fromList(embedding.embedding),
-    version: embedding.version,
-  );
-}
-
-EmbeddingVector _toEmbeddingVector(rust.EmbeddingVector vector) {
-  return EmbeddingVector(fileID: vector.fileId, embedding: vector.embedding);
-}
-
-rust.ClusterSummary _toClusterSummaryRow((Uint8List, int) summary) {
-  return rust.ClusterSummary(avg: summary.$1, count: summary.$2);
-}
-
-(Uint8List, int) _toClusterSummaryRecord(rust.ClusterSummary summary) {
-  return (summary.avg, summary.count);
-}
-
-rust.FdStatus _toFdStatusRow(FDStatus status) {
-  return rust.FdStatus(
-    fileId: status.fileID,
-    userId: status.userID,
-    dataType: status.type,
-    size: status.size,
-    objectId: status.objectID,
-    objectNonce: status.objectNonce,
-    updatedAt: status.updatedAt,
-  );
-}
-
-PreviewInfo _toPreviewInfo(rust.PreviewInfo info) {
-  return PreviewInfo(objectId: info.objectId, objectSize: info.objectSize);
 }
