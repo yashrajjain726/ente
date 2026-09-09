@@ -9,7 +9,7 @@ import (
 var ErrFileCountIneligible = errors.New("file counts are ineligible")
 
 func (repo *UsageRepository) InitializeFileCounts(ctx context.Context, userID int64) (bool, error) {
-	photos, _, err := repo.GetStoredFileCounts(ctx, userID)
+	_, photos, _, err := repo.GetStoredFileCounts(ctx, userID)
 	if err != nil || photos != -1 {
 		return false, err
 	}
