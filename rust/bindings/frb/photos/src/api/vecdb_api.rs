@@ -565,7 +565,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(empty_allowed.len(), 3);
-        assert!(empty_allowed.iter().all(|matches| matches.is_empty()));
+        assert!(empty_allowed.iter().all(Vec::is_empty));
         for degenerate_distance in [f32::NAN, f32::INFINITY, -0.5] {
             let degenerate = db
                 .bulk_approx_filtered_search_vectors_within_distance(
@@ -576,7 +576,7 @@ mod tests {
                 )
                 .unwrap();
             assert_eq!(degenerate.len(), 3);
-            assert!(degenerate.iter().all(|matches| matches.is_empty()));
+            assert!(degenerate.iter().all(Vec::is_empty));
         }
         let unfiltered = db.search(basis(0), Some(3), None, false, None).unwrap();
         assert_eq!(unfiltered.len(), 3);
@@ -646,8 +646,7 @@ mod tests {
                 value: VecDbAttrValue::F64(0.75),
             },
         ];
-        db.add_vector_with_attrs(key("a"), basis(0), attrs.clone())
-            .unwrap();
+        db.add_vector_with_attrs(key("a"), basis(0), attrs).unwrap();
         let fetched = db.get_attrs(key("a")).unwrap();
         assert_eq!(fetched.len(), 4);
         assert!(matches!(

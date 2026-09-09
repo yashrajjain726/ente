@@ -249,7 +249,7 @@ struct StreamDecoder {
 
 impl StreamDecoder {
     fn new(stop_sequences: &[String]) -> Self {
-        let max_stop_len = stop_sequences.iter().map(|s| s.len()).max().unwrap_or(0);
+        let max_stop_len = stop_sequences.iter().map(String::len).max().unwrap_or(0);
         Self {
             generated_text: String::new(),
             pending_bytes: Vec::new(),

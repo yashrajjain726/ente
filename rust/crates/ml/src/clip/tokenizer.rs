@@ -371,9 +371,8 @@ mod tests {
     #[test]
     fn rejects_incomplete_bpe_vocabulary_file() {
         let truncated_vocab = "#version: 0.2\na b";
-        let err = match ClipTextTokenizer::from_vocabulary(truncated_vocab) {
-            Ok(_) => panic!("expected incomplete vocab to fail"),
-            Err(err) => err,
+        let Err(err) = ClipTextTokenizer::from_vocabulary(truncated_vocab) else {
+            panic!("expected incomplete vocab to fail")
         };
         assert!(
             err.to_string().contains("invalid clip vocab"),

@@ -69,7 +69,7 @@ fn main() {
         config
             .scales
             .iter()
-            .map(|scale| scale.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ")
     );
@@ -409,10 +409,7 @@ fn search_phase(db: &VecDb, data: &BenchData, scale: usize) -> SearchTimings {
     };
     warm(db, &data.queries, &threshold_params);
     let (threshold_total, threshold_results) = timed_searches(db, &data.queries, &threshold_params);
-    let threshold_avg_hits = threshold_results
-        .iter()
-        .map(|found| found.len())
-        .sum::<usize>() as f64
+    let threshold_avg_hits = threshold_results.iter().map(Vec::len).sum::<usize>() as f64
         / threshold_results.len().max(1) as f64;
     let filtered_params = SearchParams {
         limit: Some(SEARCH_K),

@@ -912,9 +912,8 @@ fn registry_holds_live(key: &Path) -> bool {
 }
 
 fn open_cost_from_files(path: &Path) -> OpenCost {
-    let mut file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => return OpenCost::Absent,
+    let Ok(mut file) = File::open(path) else {
+        return OpenCost::Absent;
     };
     let log_len = match file.metadata() {
         Ok(meta) => meta.len(),
@@ -2618,6 +2617,10 @@ mod tests {
         let key = registry_key_for(&stalled_path).unwrap();
         let slot = path_slot(&key);
         let build_in_progress = lock_slot(&slot);
+        #[expect(
+            clippy::needless_collect,
+            reason = "Start both worker threads before releasing the slot lock"
+        )]
         let stalled_openers: Vec<_> = (0..2)
             .map(|_| {
                 let path = stalled_path.clone();
@@ -3249,7 +3252,7 @@ mod tests {
         assert_eq!(
             db.bulk_search(std::slice::from_ref(&query), &approx)
                 .unwrap(),
-            vec![expected.clone()]
+            vec![expected]
         );
         assert_eq!(
             db.bulk_search_stored(&stored_keys, 5, None, false, false)
@@ -4778,7 +4781,7 @@ mod tests {
         db.add("seed", &vector).unwrap();
         let log_bytes = db.stats().unwrap().log_bytes;
         let keys = vec!["x".to_string(), "y".to_string()];
-        let vectors = vec![vector.clone(), vector.clone()];
+        let vectors = vec![vector.clone(), vector];
         assert!(matches!(
             db.bulk_add_with_attrs(&keys, &vectors, &[None]),
             Err(VecDbError::LengthMismatch {
