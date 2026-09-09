@@ -239,6 +239,18 @@ export const ItemList: React.FC<ItemListProps> = ({
             null
         );
     }, [allItemsByID, selectedItemID, trashItemsByID]);
+    const selectedItemCollectionNames = useMemo(
+        () =>
+            (isTrashView ? [] : (selectedItem?.collectionIDs ?? [])).flatMap(
+                (id) => {
+                    const collection = collections.find(
+                        (collection) => collection.id === id,
+                    );
+                    return collection ? [collection.name] : [];
+                },
+            ),
+        [collections, isTrashView, selectedItem],
+    );
     const restoreItem = useMemo(
         () =>
             restoreItemID === null
@@ -1232,6 +1244,7 @@ export const ItemList: React.FC<ItemListProps> = ({
 
             <ItemDetailView
                 item={selectedItem}
+                collectionNames={selectedItemCollectionNames}
                 onClose={() => setSelectedItemID(null)}
                 onEdit={
                     onEditItem &&
