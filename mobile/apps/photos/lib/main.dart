@@ -64,6 +64,7 @@ import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/video_preview_service.dart";
 import "package:photos/src/rust/api/log.dart" as photos_rust_log;
 import "package:photos/src/rust/frb_generated.dart";
+import 'package:photos/ui/wallpaper/wallpaper_page.dart';
 import "package:photos/utils/bg_task_utils.dart";
 import "package:photos/utils/device_info.dart";
 import "package:photos/utils/email_util.dart";
@@ -98,6 +99,9 @@ Future<void>? _rustInitFuture;
 late final photos_rust_log.LogSinkGuard _photosRustLogSinkGuard;
 
 enum ForegroundStartupMode { normal, picker }
+
+@pragma('vm:entry-point')
+Future<void> wallpaperMain() => runWallpaperApp();
 
 void main() async {
   debugRepaintRainbowEnabled = false;
