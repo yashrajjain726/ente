@@ -128,7 +128,7 @@ class _FileViewerFilmstripState extends State<FileViewerFilmstrip> {
                     padding: EdgeInsets.symmetric(
                       horizontal: horizontalPadding,
                     ),
-                    scrollCacheExtent: ScrollCacheExtent.pixels(
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(
                       _itemExtent * _cacheExtentInItems,
                     ),
                     addAutomaticKeepAlives: false,
