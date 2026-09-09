@@ -155,27 +155,42 @@ fn recognize_in_batches(
         request.check()?;
         let batch: Vec<&ImageU8> = indices.iter().map(|&index| crops[index]).collect();
         let layout = BatchLayout::new(&batch)?;
-        let batch_size = (REC_BATCH_COLUMNS / layout.target_width as usize).min(REC_BATCH_SIZE);
-        for (offset, batch) in batch.chunks(batch_size).enumerate() {
+        let initial_width = if batch.len() * layout.target_width as usize <= REC_BATCH_COLUMNS {
+            layout.target_width
+        } else {
+            REC_BASE_WIDTH
+        };
+        let mut start = 0;
+        while start < batch.len() {
             request.check()?;
-            let start = offset * batch_size;
-            let end = start + batch.len();
-            let layout = BatchLayout {
-                target_width: layout.target_width,
+            let mut end = start;
+            let mut target_width = initial_width;
+            for &content_width in &layout.content_widths[start..] {
+                let next_width = target_width.max(content_width);
+                if (end - start + 1) * next_width as usize > REC_BATCH_COLUMNS {
+                    break;
+                }
+                target_width = next_width;
+                end += 1;
+            }
+            let split = &batch[start..end];
+            let split_layout = BatchLayout {
+                target_width,
                 content_widths: layout.content_widths[start..end].to_vec(),
             };
-            let recognized = infer_batch(batch, &layout)?;
-            if recognized.len() != batch.len() {
+            let recognized = infer_batch(split, &split_layout)?;
+            if recognized.len() != split.len() {
                 return Err(MlError::CorruptModel(format!(
                     "text recognizer decoded {} crops out of {}",
                     recognized.len(),
-                    batch.len()
+                    split.len()
                 ))
                 .into());
             }
             for (&index, recognition) in indices[start..end].iter().zip(recognized) {
                 results[index] = Some(recognition);
             }
+            start = end;
         }
     }
     results
@@ -792,18 +807,35 @@ mod tests {
     }
 
     #[test]
-    fn bounded_batches_preserve_ordinary_pixels_padding_and_input_order() {
-        for sizes in [
-            vec![(79, 11), (12, 160), (611, 53)],
-            vec![
-                (1381, 48),
-                (1200, 48),
-                (287, 10),
-                (1300, 48),
-                (1100, 48),
-                (1350, 48),
-            ],
-            vec![(7167, 48), (7168, 48), (6281, 48)],
+    fn bounded_batches_preserve_resized_pixels_and_input_order() {
+        for (sizes, expected_shapes) in [
+            (vec![(79, 11), (12, 160), (611, 53)], vec![(3, 553)]),
+            (
+                vec![
+                    (1381, 48),
+                    (1200, 48),
+                    (287, 10),
+                    (1300, 48),
+                    (1100, 48),
+                    (1350, 48),
+                ],
+                vec![(5, 1378), (1, 1381)],
+            ),
+            (
+                vec![(7167, 48), (7168, 48), (6281, 48)],
+                vec![(1, 6281), (1, 7167), (1, 7168)],
+            ),
+            (
+                vec![
+                    (7168, 48),
+                    (79, 13),
+                    (99, 20),
+                    (320, 48),
+                    (200, 50),
+                    (120, 30),
+                ],
+                vec![(5, 320), (1, 7168)],
+            ),
         ] {
             let crops: Vec<_> = sizes
                 .into_iter()
@@ -823,15 +855,22 @@ mod tests {
             let order = ascending_aspect_order(&references);
             let sorted: Vec<_> = order.iter().map(|&index| references[index]).collect();
             let expected = legacy_tensor(&sorted);
+            let original_layout = BatchLayout::new(&sorted).unwrap();
+            let original_width = original_layout.target_width as usize;
+            let mut expected_rows = expected.chunks_exact(original_width);
             let registry = RequestRegistry::default();
             let request = registry.begin(None);
-            let mut actual = Vec::new();
-            let mut counts = Vec::new();
+            let mut shapes = Vec::new();
             let results = recognize_in_batches(&references, &request, |batch, layout| {
                 assert!(batch.len() <= REC_BATCH_SIZE);
                 assert!(batch.len() * layout.target_width as usize <= REC_BATCH_COLUMNS);
-                counts.push(batch.len());
-                actual.extend(layout.tensor(batch)?);
+                shapes.push((batch.len(), layout.target_width));
+                let tensor = layout.tensor(batch)?;
+                for row in tensor.chunks_exact(layout.target_width as usize) {
+                    let expected = expected_rows.next().unwrap();
+                    assert_eq!(row, &expected[..row.len()]);
+                    assert!(expected[row.len()..].iter().all(|&value| value == 0.0));
+                }
                 Ok(batch
                     .iter()
                     .map(|crop| Recognition {
@@ -841,7 +880,8 @@ mod tests {
                     .collect())
             })
             .unwrap();
-            assert_eq!(actual, expected);
+            assert!(expected_rows.next().is_none());
+            assert_eq!(shapes, expected_shapes);
             assert_eq!(
                 results
                     .iter()
@@ -852,10 +892,35 @@ mod tests {
                     .map(|crop| crop.width.to_string())
                     .collect::<Vec<_>>()
             );
-            match crops.len() {
-                6 => assert_eq!(counts, [5, 1]),
-                _ if crops[0].width == 7167 => assert_eq!(counts, [1, 1, 1]),
-                _ => assert_eq!(counts, [3]),
+        }
+    }
+
+    #[test]
+    fn oversized_outlier_does_not_expand_narrow_crops_or_delay_cancellation() {
+        let narrow = solid(320, 48, [127; 3]);
+        let outlier = solid(4096, 1, [0; 3]);
+        let crops = [&outlier, &narrow, &narrow, &narrow, &narrow, &narrow];
+        for cancel in [false, true] {
+            let registry = RequestRegistry::default();
+            let request = registry.begin(Some("mixed"));
+            let mut shapes = Vec::new();
+            let result = recognize_in_batches(&crops, &request, |batch, layout| {
+                shapes.push((batch.len(), layout.target_width));
+                assert_eq!(
+                    layout.tensor(batch)?.len(),
+                    batch.len() * 3 * 48 * layout.target_width as usize
+                );
+                if cancel {
+                    registry.cancel("mixed");
+                }
+                Ok(vec![Recognition::default(); batch.len()])
+            });
+            if cancel {
+                assert!(matches!(result, Err(OcrError::Cancelled)));
+                assert_eq!(shapes, [(5, 320)]);
+            } else {
+                assert_eq!(result.unwrap().len(), crops.len());
+                assert_eq!(shapes, [(5, 320), (1, 7168)]);
             }
         }
     }
