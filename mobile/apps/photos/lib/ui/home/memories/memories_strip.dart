@@ -24,6 +24,7 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/models/memory_lane/memory_lane_models.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/services/collections_service.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/memory_lane/memory_lane_service.dart";
 import "package:photos/ui/home/memories/crafting_memories_card.dart";
@@ -112,7 +113,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         .listen(_onCollectionUpdated);
     _diffSyncCompleteSubscription = Bus.instance
         .on<DiffSyncCompleteEvent>()
-        .listen((_) => _hideMemoryLaneIfFilesMissing());
+        .listen((_) => _hideMemoryLaneIfFilesMissingOrHidden());
     _memoryLaneLoaded = _loadScheduledMemoryLane();
     MemoryLaneService.instance.readyPersonIds.addListener(
       _onMemoryLaneReadyTimelinesChanged,
@@ -503,7 +504,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     if (event.type != EventType.hide) {
       if (event.type != EventType.deletedFromRemote ||
           event.source != "syncDeleteFromRemote") {
-        await _hideMemoryLaneIfFilesMissing();
+        await _hideMemoryLaneIfFilesMissingOrHidden();
       }
       return;
     }
@@ -539,25 +540,23 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       return;
     }
     if (event.type == EventType.hide && event.collectionID != null) {
-      final files = await FilesDB.instance.getAllFilesFromCollections({
-        event.collectionID!,
-      });
-      final hiddenFileIds = files.map((file) => file.uploadedFileID).toSet();
+      final filesByCollection = await FilesDB.instance
+          .getAllFilesGroupByCollectionID(
+            memoryLane.entries.map((entry) => entry.fileId).toList(),
+          );
       if (!mounted || _memoryLane != memoryLane) {
         return;
       }
-      if (memoryLane.entries.any(
-        (entry) => hiddenFileIds.contains(entry.fileId),
-      )) {
+      if (filesByCollection.containsKey(event.collectionID)) {
         _hideMemoryLane();
       }
     } else if (event.type == EventType.deletedFromRemote &&
         event.updatedFiles.isEmpty) {
-      await _hideMemoryLaneIfFilesMissing();
+      await _hideMemoryLaneIfFilesMissingOrHidden();
     }
   }
 
-  Future<void> _hideMemoryLaneIfFilesMissing() async {
+  Future<void> _hideMemoryLaneIfFilesMissingOrHidden() async {
     final memoryLane = _memoryLane;
     if (!mounted || memoryLane == null) {
       return;
@@ -565,10 +564,21 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     final files = await MemoryLaneService.instance.getTimelineFiles(
       memoryLane.entries.map((entry) => entry.fileId),
     );
-    final hasMissingFiles = memoryLane.entries.any(
+    var shouldHide = memoryLane.entries.any(
       (entry) => !files.containsKey(entry.fileId),
     );
-    if (!mounted || _memoryLane != memoryLane || !hasMissingFiles) {
+    if (!shouldHide && !isLocalGalleryMode) {
+      final hiddenCollectionIds = CollectionsService.instance
+          .getHiddenCollectionIds();
+      if (hiddenCollectionIds.isNotEmpty) {
+        final filesByCollection = await FilesDB.instance
+            .getAllFilesGroupByCollectionID(
+              memoryLane.entries.map((entry) => entry.fileId).toList(),
+            );
+        shouldHide = filesByCollection.keys.any(hiddenCollectionIds.contains);
+      }
+    }
+    if (!mounted || _memoryLane != memoryLane || !shouldHide) {
       return;
     }
     _hideMemoryLane();
