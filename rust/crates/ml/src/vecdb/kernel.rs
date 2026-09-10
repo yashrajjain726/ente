@@ -167,13 +167,15 @@ pub(crate) struct I8Kernel;
 impl I8Kernel {
     pub(crate) fn dot(a: &[LaneI8], b: &[LaneI8]) -> i32 {
         debug_assert_eq!(a.len(), b.len());
-        let mut partials = [0i32; LANE_WIDTH_I8];
-        for (x, y) in a.iter().zip(b.iter()) {
-            for (partial, (left, right)) in partials.iter_mut().zip(x.0.iter().zip(&y.0)) {
-                *partial += i32::from(*left) * i32::from(*right);
+        let mut total = 0i32;
+        for (x, y) in a.iter().zip(b) {
+            let mut lane = 0i32;
+            for (left, right) in x.0.iter().zip(&y.0) {
+                lane += i32::from(*left) * i32::from(*right);
             }
+            total += lane;
         }
-        partials.iter().sum()
+        total
     }
 
     pub(crate) fn distance(a: &[LaneI8], scale_a: f32, b: &[LaneI8], scale_b: f32) -> f32 {
