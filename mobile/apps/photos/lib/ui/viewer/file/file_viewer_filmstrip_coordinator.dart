@@ -8,6 +8,8 @@ typedef FileViewerFilmstripIdentityAt = Object? Function(int index);
 
 typedef FileViewerFilmstripImmediatePageJump = bool Function(int index);
 
+typedef FileViewerFilmstripWaitsForImageFrame = bool Function(Object identity);
+
 // Runs [callback] after a guaranteed future frame's paint phase.
 typedef FileViewerFilmstripPaintScheduler =
     void Function(VoidCallback callback);
@@ -23,8 +25,10 @@ class FileViewerFilmstripCoordinator {
   final FileViewerFilmstripImmediatePageJump _jumpToPageImmediately;
   final VoidCallback _requestPauseCurrentMedia;
   final FileViewerFilmstripPaintScheduler _scheduleAfterNextFramePaint;
+  final FileViewerFilmstripWaitsForImageFrame _waitsForImageFrame;
 
   final ValueNotifier<int?> _previewIndexNotifier = ValueNotifier(null);
+  final Map<Object, _ActiveImagePage> _activeImagePages = Map.identity();
 
   _FilmstripSession _session = const _IdleFilmstripSession();
   bool _isDisposed = false;
@@ -34,11 +38,13 @@ class FileViewerFilmstripCoordinator {
     required FileViewerFilmstripIdentityAt identityAt,
     required FileViewerFilmstripImmediatePageJump jumpToPageImmediately,
     required VoidCallback requestPauseCurrentMedia,
+    FileViewerFilmstripWaitsForImageFrame? waitsForImageFrame,
     FileViewerFilmstripPaintScheduler? scheduleAfterNextFramePaint,
   }) : _currentIndex = currentIndex,
        _identityAt = identityAt,
        _jumpToPageImmediately = jumpToPageImmediately,
        _requestPauseCurrentMedia = requestPauseCurrentMedia,
+       _waitsForImageFrame = waitsForImageFrame ?? ((_) => false),
        _scheduleAfterNextFramePaint =
            scheduleAfterNextFramePaint ?? _afterNextFramePaint;
 
@@ -92,22 +98,93 @@ class FileViewerFilmstripCoordinator {
   void handlePageChanged(int index, Object fileIdentity) {
     if (_isDisposed) return;
     final pendingSession = _session;
-    if (pendingSession is! _AwaitingPagePaintFilmstripSession ||
-        pendingSession.hasScheduledPaintBarrier ||
-        !_matchesAwaitingSession(pendingSession, index, fileIdentity)) {
+    if (pendingSession is! _PendingFilmstripHandoffSession ||
+        pendingSession.previewRemovalScheduled ||
+        !_matchesPendingHandoff(pendingSession, index, fileIdentity)) {
       return;
     }
-    final session = _AwaitingPagePaintFilmstripSession(
-      index,
-      fileIdentity,
-      hasScheduledPaintBarrier: true,
+    final session = pendingSession.copyWith(destinationPageSelected: true);
+    _setSession(session);
+    _schedulePreviewRemovalIfReady(session);
+  }
+
+  void attachImagePage(Object fileIdentity, ValueListenable<bool> readiness) {
+    if (_isDisposed) return;
+    final currentPage = _activeImagePages[fileIdentity];
+    if (currentPage != null) {
+      if (identical(currentPage.readiness, readiness)) return;
+      currentPage.readiness.removeListener(currentPage.listener);
+    }
+
+    void listener() =>
+        _handleImagePageReadinessChanged(fileIdentity, readiness);
+
+    _activeImagePages[fileIdentity] = (
+      readiness: readiness,
+      listener: listener,
     );
+    readiness.addListener(listener);
+    _handleImagePageReadinessChanged(fileIdentity, readiness);
+  }
+
+  void detachImagePage(Object fileIdentity, ValueListenable<bool> readiness) {
+    if (_isDisposed) return;
+    final currentPage = _activeImagePages[fileIdentity];
+    if (currentPage == null || !identical(currentPage.readiness, readiness)) {
+      return;
+    }
+    readiness.removeListener(currentPage.listener);
+    _activeImagePages.remove(fileIdentity);
+    _invalidateScheduledRemovalFor(fileIdentity);
+  }
+
+  void _handleImagePageReadinessChanged(
+    Object fileIdentity,
+    ValueListenable<bool> readiness,
+  ) {
+    final currentPage = _activeImagePages[fileIdentity];
+    if (currentPage == null || !identical(currentPage.readiness, readiness)) {
+      return;
+    }
+    if (!readiness.value) {
+      _invalidateScheduledRemovalFor(fileIdentity);
+      return;
+    }
+    final session = _session;
+    if (session is _PendingFilmstripHandoffSession &&
+        identical(session.identity, fileIdentity)) {
+      _schedulePreviewRemovalIfReady(session);
+    }
+  }
+
+  void _invalidateScheduledRemovalFor(Object fileIdentity) {
+    final session = _session;
+    if (session is! _PendingFilmstripHandoffSession ||
+        !session.previewRemovalScheduled ||
+        !identical(session.identity, fileIdentity)) {
+      return;
+    }
+    _setSession(session.copyWith(previewRemovalScheduled: false));
+  }
+
+  void _schedulePreviewRemovalIfReady(
+    _PendingFilmstripHandoffSession pendingSession,
+  ) {
+    if (pendingSession.previewRemovalScheduled ||
+        !pendingSession.destinationPageSelected) {
+      return;
+    }
+    if (_waitsForImageFrame(pendingSession.identity)) {
+      final imagePage = _activeImagePages[pendingSession.identity];
+      if (imagePage == null || !imagePage.readiness.value) return;
+    }
+    final session = pendingSession.copyWith(previewRemovalScheduled: true);
     _setSession(session);
     _scheduleAfterNextFramePaint(() {
       if (_isDisposed ||
           !identical(_session, session) ||
-          _currentIndex() != index ||
-          !identical(_identityAt(index), fileIdentity)) {
+          _currentIndex() != session.index ||
+          !identical(_identityAt(session.index), session.identity)) {
         return;
       }
       reset();
@@ -122,14 +199,14 @@ class FileViewerFilmstripCoordinator {
   void _commit(int index, Object targetIdentity) {
     if (index == _currentIndex()) {
       final session = _session;
-      if (session is! _AwaitingPagePaintFilmstripSession ||
-          !_matchesAwaitingSession(session, index, targetIdentity)) {
+      if (session is! _PendingFilmstripHandoffSession ||
+          !_matchesPendingHandoff(session, index, targetIdentity)) {
         reset();
       }
       return;
     }
 
-    final session = _AwaitingPagePaintFilmstripSession(index, targetIdentity);
+    final session = _PendingFilmstripHandoffSession(index, targetIdentity);
     _setSession(session);
     if (!identical(_session, session)) return;
     if (!_jumpToPageImmediately(index)) {
@@ -137,8 +214,8 @@ class FileViewerFilmstripCoordinator {
     }
   }
 
-  bool _matchesAwaitingSession(
-    _AwaitingPagePaintFilmstripSession session,
+  bool _matchesPendingHandoff(
+    _PendingFilmstripHandoffSession session,
     int index,
     Object identity,
   ) => session.index == index && identical(session.identity, identity);
@@ -151,6 +228,10 @@ class FileViewerFilmstripCoordinator {
   void dispose() {
     _isDisposed = true;
     _session = const _IdleFilmstripSession();
+    for (final page in _activeImagePages.values) {
+      page.readiness.removeListener(page.listener);
+    }
+    _activeImagePages.clear();
     _previewIndexNotifier.dispose();
   }
 }
@@ -179,20 +260,39 @@ final class _ScrubbingFilmstripSession extends _FilmstripSession {
   });
 }
 
-final class _AwaitingPagePaintFilmstripSession extends _FilmstripSession {
+final class _PendingFilmstripHandoffSession extends _FilmstripSession {
   final int index;
   final Object identity;
-  final bool hasScheduledPaintBarrier;
+  final bool destinationPageSelected;
+  final bool previewRemovalScheduled;
 
   @override
   int get previewIndex => index;
 
-  const _AwaitingPagePaintFilmstripSession(
+  const _PendingFilmstripHandoffSession(
     this.index,
     this.identity, {
-    this.hasScheduledPaintBarrier = false,
+    this.destinationPageSelected = false,
+    this.previewRemovalScheduled = false,
   });
+
+  _PendingFilmstripHandoffSession copyWith({
+    bool? destinationPageSelected,
+    bool? previewRemovalScheduled,
+  }) => _PendingFilmstripHandoffSession(
+    index,
+    identity,
+    destinationPageSelected:
+        destinationPageSelected ?? this.destinationPageSelected,
+    previewRemovalScheduled:
+        previewRemovalScheduled ?? this.previewRemovalScheduled,
+  );
 }
+
+typedef _ActiveImagePage = ({
+  ValueListenable<bool> readiness,
+  VoidCallback listener,
+});
 
 void _afterNextFramePaint(VoidCallback callback) {
   WidgetsBinding.instance.scheduleFrameCallback((_) {
