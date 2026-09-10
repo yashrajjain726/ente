@@ -1,11 +1,11 @@
+import { updateItemCollections } from "@/services/collection-membership";
 import {
     createInfoItem,
     setItemImportant,
-    trashFiles,
     updateFileItem,
     updateInfoItem,
-    updateItemCollections,
-} from "@/services/remote";
+} from "@/services/items";
+import { trashFiles } from "@/services/trash";
 import type { LockerCollection, LockerItem, LockerItemType } from "@/types";
 import { getItemTitle } from "@/types";
 import { t } from "i18next";

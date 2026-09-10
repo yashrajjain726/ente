@@ -2,7 +2,7 @@ import { CollectionChipRow } from "@/components/create-item/CollectionChipRow";
 import { lockerScrollAreaSx } from "@/components/create-item/create-item-dialog-styles";
 import { CreateCollectionRow } from "@/components/create-item/CreateCollectionRow";
 import { lockerItemIcon } from "@/components/items/locker-item-icons";
-import type { LockerUploadProgress } from "@/services/remote";
+import type { LockerUploadProgress } from "@/services/uploads";
 import { lockerPrimaryButtonSx } from "@/styles/fields";
 import type { LockerCollection, LockerUploadCandidate } from "@/types";
 import { Cancel01Icon, FileUploadIcon } from "@hugeicons/core-free-icons";

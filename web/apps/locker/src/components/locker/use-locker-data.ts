@@ -1,11 +1,11 @@
 import { masterKeyFromSession } from "@/services/account-keys";
 import { openAuthenticatedSession } from "@/services/authenticated-session";
+import type { LockerUploadLimitState } from "@/services/locker-limits";
 import {
-    LOCKER_FILE_LIMIT_FREE,
-    LOCKER_FILE_LIMIT_PAID,
-    type LockerUploadLimitState,
-} from "@/services/locker-limits";
-import { loadPersistedLockerState, syncLockerState } from "@/services/remote";
+    loadPersistedLockerState,
+    syncLockerState,
+} from "@/services/sync/sync";
+import { loadLockerUsage, loadUserEmail } from "@/services/user-details";
 import type { LockerCollection, LockerItem } from "@/types";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import {
@@ -17,36 +17,14 @@ import { stashRedirect } from "ente-accounts/services/redirect";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import { isNamedError } from "ente-base/error";
-import {
-    authenticatedRequestHeaders,
-    ensureOk,
-    isHTTP401Error,
-} from "ente-base/http";
+import { authenticatedRequestHeaders, isHTTP401Error } from "ente-base/http";
 import log from "ente-base/log";
-import { apiURL } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
 import { ensureContactsReady } from "ente-contacts";
 import { contactsGetDiff, contactsGetProfilePicture } from "ente-locker-wasm";
 import { t } from "i18next";
 import type { NextRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-interface LockerUserProfileResponse {
-    email?: string;
-}
-
-interface LockerUsageResponse {
-    isPaid?: boolean;
-    isFamily?: boolean;
-    usedFileCount?: number;
-    fileLimit?: number;
-    remainingFileCount?: number;
-    usedStorage?: number;
-    storageLimit?: number;
-    remainingStorage?: number;
-    userFileCount?: number;
-    userStorage?: number;
-}
 
 interface UserDetails extends LockerUploadLimitState {
     email: string;
@@ -124,61 +102,6 @@ export const useLockerData = ({
         );
     }, []);
 
-    const loadLockerUsage = useCallback(
-        async (
-            headers?: Awaited<ReturnType<typeof authenticatedRequestHeaders>>,
-        ) => {
-            const requestHeaders =
-                headers ?? (await authenticatedRequestHeaders());
-            const lockerUsageRes = await fetch(
-                await apiURL("/users/locker-usage"),
-                { headers: requestHeaders },
-            );
-            ensureOk(lockerUsageRes);
-            const lockerUsage =
-                (await lockerUsageRes.json()) as LockerUsageResponse;
-
-            const isFamily = !!lockerUsage.isFamily;
-            return {
-                userDetails: {
-                    usage: lockerUsage.usedStorage ?? 0,
-                    storageLimit: lockerUsage.storageLimit ?? 0,
-                    fileCount: isFamily
-                        ? (lockerUsage.userFileCount ?? 0)
-                        : (lockerUsage.usedFileCount ?? 0),
-                    lockerFileLimit:
-                        lockerUsage.fileLimit ??
-                        (lockerUsage.isPaid
-                            ? LOCKER_FILE_LIMIT_PAID
-                            : LOCKER_FILE_LIMIT_FREE),
-                    isPartOfFamily: isFamily,
-                    lockerFamilyFileCount: isFamily
-                        ? (lockerUsage.usedFileCount ?? 0)
-                        : undefined,
-                },
-            };
-        },
-        [],
-    );
-
-    const loadUserEmail = useCallback(
-        async (
-            headers?: Awaited<ReturnType<typeof authenticatedRequestHeaders>>,
-        ) => {
-            const requestHeaders =
-                headers ?? (await authenticatedRequestHeaders());
-            const userProfileRes = await fetch(
-                await apiURL("/users/details/v2", { memoryCount: false }),
-                { headers: requestHeaders },
-            );
-            ensureOk(userProfileRes);
-            const userProfile =
-                (await userProfileRes.json()) as LockerUserProfileResponse;
-            return userProfile.email ?? savedLocalUser()?.email ?? "";
-        },
-        [],
-    );
-
     const loadUserDetails = useCallback(async (): Promise<boolean> => {
         const requestID = ++latestUserDetailsRequestRef.current;
         try {
@@ -201,7 +124,7 @@ export const useLockerData = ({
             log.error("Failed to fetch user details", error);
             return false;
         }
-    }, [loadLockerUsage, loadUserEmail]);
+    }, []);
 
     const refreshUserDetailsForSyncState = useCallback(
         async (trigger: UserDetailsRefreshTrigger) => {
@@ -258,7 +181,7 @@ export const useLockerData = ({
             log.error("Failed to fetch locker upload limit state", error);
             return undefined;
         }
-    }, [loadLockerUsage]);
+    }, []);
 
     const fetchAndStoreLockerData = useCallback(async () => {
         const requestID = ++latestDataRequestRef.current;

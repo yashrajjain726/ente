@@ -1,12 +1,14 @@
+import { deleteCollectionKeepingFiles } from "@/services/collection-membership";
+import {
+    leaveCollection as leaveCollectionAPI,
+    shareCollection as shareCollectionAPI,
+    unshareCollection as unshareCollectionAPI,
+} from "@/services/collection-sharing";
 import {
     createCollection as createCollectionAPI,
     deleteCollection as deleteCollectionAPI,
-    deleteCollectionKeepingFiles,
-    leaveCollection as leaveCollectionAPI,
     renameCollection as renameCollectionAPI,
-    shareCollection as shareCollectionAPI,
-    unshareCollection as unshareCollectionAPI,
-} from "@/services/remote";
+} from "@/services/collections";
 import type { LockerCollection } from "@/types";
 import { isCollectionOwner } from "@/types";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";

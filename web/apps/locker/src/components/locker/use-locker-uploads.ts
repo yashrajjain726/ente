@@ -5,7 +5,10 @@ import {
     type LockerUploadLimitState,
     type LockerUploadPreflightFailure,
 } from "@/services/locker-limits";
-import { uploadLockerFile, type LockerUploadProgress } from "@/services/remote";
+import {
+    uploadLockerFile,
+    type LockerUploadProgress,
+} from "@/services/uploads";
 import type { LockerUploadCandidate } from "@/types";
 import log from "ente-base/log";
 import { t } from "i18next";

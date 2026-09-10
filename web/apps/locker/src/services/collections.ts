@@ -110,3 +110,11 @@ export const deleteCollection = async (
     );
     ensureOk(res);
 };
+
+export const resolveCollectionIDsWithUncategorizedFallback = async (
+    collectionIDs: number[],
+    masterKey: string,
+) =>
+    collectionIDs.length > 0
+        ? Array.from(new Set(collectionIDs))
+        : [(await ensureUncategorizedCollection(masterKey)).id];

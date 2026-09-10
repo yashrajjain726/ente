@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { updateFileItem, updateInfoItem } from "../src/services/items";
 import {
     getEncryptedFileRecord,
     replaceLockerCache,
     type EncryptedFileRecord,
 } from "../src/services/locker-cache";
-import { updateFileItem, updateInfoItem } from "../src/services/remote";
 
 const { encryptBlob, decryptMetadataJSON } = vi.hoisted(() => ({
     encryptBlob: vi.fn(),

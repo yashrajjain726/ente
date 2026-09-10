@@ -13,10 +13,14 @@ import {
     md5Base64,
 } from "ente-locker-wasm";
 import { z } from "zod";
+import { addFileToCollections } from "./collection-membership";
+import { resolveCollectionIDsWithUncategorizedFallback } from "./collections";
+import { getCollectionRecord } from "./locker-cache";
 import {
     RemoteIDResponseSchema,
     RemoteUploadURLResponseSchema,
 } from "./remote-types";
+import { decryptCollectionKey } from "./sync/decrypt";
 
 // The server requires every file to have a thumbnail, so Locker uploads this
 // placeholder, a 1x1 black JPEG generated via PIL:
@@ -503,4 +507,23 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
         );
     }
     return created.id;
+};
+
+export const uploadLockerFile = async (
+    file: File,
+    collectionIDs: number[],
+    masterKey: string,
+    onProgress?: (progress: LockerUploadProgress) => void,
+): Promise<number> => {
+    const targetCollectionIDs =
+        await resolveCollectionIDsWithUncategorizedFallback(
+            collectionIDs,
+            masterKey,
+        );
+    return uploadLockerFileWithDeps(
+        file,
+        targetCollectionIDs,
+        { getCollectionRecord, decryptCollectionKey, addFileToCollections },
+        onProgress,
+    );
 };
