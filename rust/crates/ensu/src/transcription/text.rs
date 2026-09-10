@@ -6,8 +6,16 @@ const FILLER_WORDS: &[&str] = &[
     "ehh",
 ];
 
+#[expect(
+    clippy::expect_used,
+    reason = "The whitespace regex is a fixed valid literal"
+)]
 static MULTI_SPACE_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s{2,}").expect("valid whitespace regex"));
+#[expect(
+    clippy::expect_used,
+    reason = "Filler words are escaped before insertion into the fixed regex"
+)]
 static FILLER_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     FILLER_WORDS
         .iter()

@@ -392,6 +392,10 @@ fn decode_geopackage_geometry(bytes: &[u8]) -> Result<MultiPolygon<f64>> {
     if flags & 1 == 0 || flags & 0x10 != 0 {
         return Err(invalid("unsupported GHSL GeoPackage geometry flags"));
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "The header length is checked before taking its four-byte SRS field"
+    )]
     let srs = i32::from_le_bytes(bytes[4..8].try_into().expect("eight-byte header"));
     if srs != 54_009 {
         return Err(invalid(format!("unexpected GHSL spatial reference {srs}")));
@@ -510,6 +514,7 @@ impl<'a> WkbReader<'a> {
             .position
             .checked_add(N)
             .ok_or_else(|| invalid("truncated GHSL WKB geometry"))?;
+        #[expect(clippy::expect_used, reason = "The checked slice has exactly N bytes")]
         let bytes = self
             .bytes
             .get(self.position..end)

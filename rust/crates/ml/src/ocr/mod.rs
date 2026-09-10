@@ -397,6 +397,10 @@ fn crop_candidates(
             "OCR crop source buffer mismatch".to_string(),
         ));
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "RGB dimensions and exact buffer length are checked before conversion"
+    )]
     let source = image::RgbImage::from_raw(
         working.width as u32,
         working.height as u32,

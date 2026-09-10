@@ -93,6 +93,10 @@ impl DisputeIndex {
         })
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "Index construction checks every geometry code against the territory catalog"
+    )]
     pub(crate) fn lookup_prepared(
         &self,
         location: PreparedCell,
@@ -189,6 +193,10 @@ impl<'a> DisputeMatch<'a> {
         self.index.layout.territories + self.territory * TERRITORY_LEN
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "Index construction validates the string table as UTF-8"
+    )]
     fn string(self, start: u16, length: usize) -> &'a str {
         let start = self.index.layout.strings + usize::from(start);
         str::from_utf8(&self.index.bytes[start..start + length]).expect("validated UTF-8")

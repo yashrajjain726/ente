@@ -425,6 +425,10 @@ impl LogScanner<'_> {
     }
 
     fn read_attr_bytes(&mut self, body_budget: u64) -> Result<bool, VecDbError> {
+        #[expect(
+            clippy::expect_used,
+            reason = "The add-record header includes an attribute count byte"
+        )]
         let attr_count = *self
             .scratch
             .last()
@@ -437,6 +441,10 @@ impl LogScanner<'_> {
             if !self.extend_within(body_budget, 1)? {
                 return Ok(false);
             }
+            #[expect(
+                clippy::expect_used,
+                reason = "extend_within just appended the name length byte"
+            )]
             let name_len = *self.scratch.last().expect("attribute name length was read") as usize;
             if name_len == 0 || name_len > MAX_ATTR_NAME_BYTES {
                 return Ok(false);
@@ -444,6 +452,10 @@ impl LogScanner<'_> {
             if !self.extend_within(body_budget, name_len + 1)? {
                 return Ok(false);
             }
+            #[expect(
+                clippy::expect_used,
+                reason = "extend_within just appended the value tag byte"
+            )]
             let value_len = match *self.scratch.last().expect("attribute value tag was read") {
                 ATTR_TAG_STR => {
                     if !self.extend_within(body_budget, 2)? {

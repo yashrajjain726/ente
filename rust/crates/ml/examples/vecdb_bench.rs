@@ -1,3 +1,8 @@
+#![expect(
+    clippy::expect_used,
+    reason = "Benchmark failures should abort the run"
+)]
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

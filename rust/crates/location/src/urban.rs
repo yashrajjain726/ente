@@ -168,6 +168,10 @@ impl UrbanCenterIndex {
             &self.bytes[feature.geometry_start..feature.geometry_end],
             SECTION,
         );
+        #[expect(
+            clippy::expect_used,
+            reason = "Index construction validates all polygon and ring records"
+        )]
         for _ in 0..reader.u16().expect("validated polygon count") {
             let ring_count = reader.u16().expect("validated ring count");
             let mut inside = reader.ring_contains(point).expect("validated ring");
@@ -214,6 +218,10 @@ impl UrbanCenterIndex {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "Index construction validates terminated UTF-8 names"
+    )]
     fn name(&self, offset: usize) -> &str {
         let end = self.bytes[offset..self.layout.geometry]
             .iter()
@@ -223,6 +231,10 @@ impl UrbanCenterIndex {
         std::str::from_utf8(&self.bytes[offset..end]).expect("validated name")
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "Index construction validates the country string table as UTF-8"
+    )]
     fn country(&self, index: usize) -> &str {
         let mut reader = ByteReader::at(&self.bytes, self.layout.country_offsets + index * 4);
         let start = reader.u32() as usize;

@@ -351,6 +351,10 @@ impl MlIndexingTestContext {
         let mut model_paths = self.model_paths.clone();
         model_paths.face_detection = model_path.clone();
 
+        #[expect(
+            clippy::expect_used,
+            reason = "The invalid-model fixture must fail analysis"
+        )]
         let error = analyze_image(AnalyzeImageRequest {
             file_id: -1,
             source: ImageSource::Path(image_path.to_string_lossy().into_owned()),

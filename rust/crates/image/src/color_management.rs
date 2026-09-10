@@ -110,6 +110,10 @@ fn apply_profile_to_image(
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "Color transforms preserve the source buffer length and dimensions"
+)]
 fn transform_buffer<P>(
     mut buffer: ImageBuffer<P, Vec<P::Subpixel>>,
     source_profile: &ColorProfile,
@@ -216,6 +220,10 @@ fn cached_color_profile(encoded: &[u8]) -> Result<Arc<ColorProfile>, String> {
             .iter()
             .position(|entry| entry.encoded.as_ref() == encoded)
         {
+            #[expect(
+                clippy::expect_used,
+                reason = "The index comes from this cache while its lock is held"
+            )]
             let entry = cache
                 .remove(index)
                 .expect("cache index came from iteration");

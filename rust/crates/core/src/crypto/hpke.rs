@@ -29,6 +29,10 @@ impl PublicKey {
         &self.0
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "PublicKey construction validates these bytes"
+    )]
     fn hpke_key(&self) -> <Kem as HpkeKem>::PublicKey {
         <Kem as HpkeKem>::PublicKey::from_bytes(&self.0)
             .expect("PublicKey is validated when constructed")
@@ -62,13 +66,17 @@ impl SecretKey {
 
     pub fn public_key(&self) -> PublicKey {
         let bytes = Kem::sk_to_pk(&self.hpke_key()).to_bytes();
-        PublicKey(bytes.as_slice().try_into().expect("X-Wing public key size"))
+        PublicKey(bytes.into())
     }
 
     pub fn as_bytes(&self) -> &[u8; Self::BYTES] {
         &self.0
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "X-Wing accepts every 32-byte private key"
+    )]
     fn hpke_key(&self) -> <Kem as HpkeKem>::PrivateKey {
         <Kem as HpkeKem>::PrivateKey::from_bytes(&self.0)
             .expect("X-Wing accepts every 32-byte private key")

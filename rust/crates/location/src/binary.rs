@@ -13,6 +13,10 @@ impl<'a> ByteReader<'a> {
     }
 
     fn array<const N: usize>(&mut self) -> [u8; N] {
+        #[expect(
+            clippy::expect_used,
+            reason = "Index validators check field ranges before ByteReader is used"
+        )]
         let (value, rest) = self
             .bytes
             .split_first_chunk::<N>()

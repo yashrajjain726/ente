@@ -289,6 +289,10 @@ fn item_info<R: Read + Seek>(
         }
         let id = c.number(if version == 2 { 2 } else { 4 })? as u32;
         let protection = c.number(2)?;
+        #[expect(
+            clippy::expect_used,
+            reason = "take returns exactly the requested four bytes"
+        )]
         let kind: [u8; 4] = c.take(4)?.try_into().expect("item type is four bytes");
         c.string()?;
         let mime = if &kind == b"mime" {

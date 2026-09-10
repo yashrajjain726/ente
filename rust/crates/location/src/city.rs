@@ -278,6 +278,10 @@ impl CityIndex {
                 continue;
             };
             let prominence_window = (0.5 + nearest * 0.25).min(2.0);
+            #[expect(
+                clippy::expect_used,
+                reason = "The nearest candidate is included in the prominence window"
+            )]
             let best = eligible
                 .iter()
                 .filter(|candidate| candidate.distance_km <= nearest + prominence_window)
@@ -857,6 +861,10 @@ fn string_offset(bytes: &[u8], offset: usize, length: usize) -> crate::Result<us
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "Index construction validates the string table as UTF-8"
+)]
 fn table_entry_u24(bytes: &[u8], offsets: usize, blob: usize, index: usize) -> &str {
     let mut reader = ByteReader::at(bytes, offsets + index * NAME_OFFSET_LEN);
     let start = reader.u24() as usize;
@@ -864,6 +872,10 @@ fn table_entry_u24(bytes: &[u8], offsets: usize, blob: usize, index: usize) -> &
     std::str::from_utf8(&bytes[blob + start..blob + end]).expect("validated UTF-8")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "Index construction validates the string table as UTF-8"
+)]
 fn table_entry_u32(bytes: &[u8], offsets: usize, blob: usize, index: usize) -> &str {
     let mut reader = ByteReader::at(bytes, offsets + index * 4);
     let start = reader.u32() as usize;

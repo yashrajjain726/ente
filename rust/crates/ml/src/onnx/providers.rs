@@ -339,6 +339,7 @@ fn webgpu_attempt_providers() -> Vec<ExecutionProviderDispatch> {
 }
 
 #[cfg(target_os = "android")]
+#[expect(clippy::expect_used, reason = "The fixed thread count is nonzero")]
 fn xnnpack_provider() -> ExecutionProviderDispatch {
     XNNPACK::default()
         .with_intra_op_num_threads(NonZeroUsize::new(4).expect("four is non-zero"))

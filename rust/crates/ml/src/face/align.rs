@@ -72,6 +72,10 @@ pub(crate) fn run_face_alignment(
     result
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "RGB dimensions and exact buffer length are checked before conversion"
+)]
 fn take_rgb_image(decoded: &mut DecodedImage) -> MlResult<RgbImage> {
     let expected_len = (decoded.dimensions.width as usize)
         .checked_mul(decoded.dimensions.height as usize)
