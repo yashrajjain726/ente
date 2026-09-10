@@ -1849,7 +1849,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                       void clearSelectedPhotoHistory(
                                           "back",
                                       ).finally(() => {
-                                          closeSelectedPhoto();
                                           onOpenProfile();
                                       });
                                   }
@@ -1858,7 +1857,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         void clearSelectedPhotoHistory(
                                             "back",
                                         ).finally(() => {
-                                            closeSelectedPhoto();
                                             onOpenFriend(
                                                 selectedPhotoFriendID,
                                                 selectedViewer.photo.username,
