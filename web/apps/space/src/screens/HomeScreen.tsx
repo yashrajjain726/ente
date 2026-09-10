@@ -31,7 +31,6 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import { markSpaceHomePostRead } from "services/home-posts";
 import {
     isSpaceContentError,
-    loadCurrentSpaceProfilePostsPage,
     type SpaceFriendRequest,
     type SpacePost,
     type SpacePostAssetURLLoader,
@@ -140,16 +139,13 @@ interface SelectedHomeViewer {
     draftImageError?: string;
     focusReplyOnOpen?: boolean;
     friend?: FriendProfile;
-    hasOlderPosts?: boolean;
     isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
-    nextCursor?: string;
     photo: SpaceViewerPhoto;
     postIndex?: number;
     postActionMode?: SpaceViewerPostActionMode;
     posts?: SpacePost[];
     sessionId?: symbol;
-    showSequenceProgress?: boolean;
 }
 
 interface AddedFriendToastProps {
@@ -1163,7 +1159,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         friend: FriendProfile,
         posts: SpacePost[],
         photo: SpaceViewerPhoto,
-        hasOlderPosts = false,
     ) => {
         if (photo.postId) {
             markPostRead({
@@ -1176,13 +1171,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setSelectedViewer({
             avatarUrl: photo.avatarUrl,
             friend,
-            hasOlderPosts,
             photo,
             postIndex: 0,
             postActionMode: isOwnPost ? "hidden" : "like-only",
             posts,
             sessionId: Symbol(),
-            showSequenceProgress: !hasOlderPosts && posts.length > 1,
         });
     };
     const closeSelectedPhoto = () => {
@@ -1295,70 +1288,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
     const selectedViewerPostIndex = selectedViewer?.postIndex;
     const selectedViewerPosts = selectedViewer?.posts;
-    const selectedViewerSpaceId = selectedViewer?.photo.spaceId;
-    const selectedViewerSessionId = selectedViewer?.sessionId;
-    const selectedViewerNextCursor = selectedViewer?.nextCursor;
-    const shouldLoadOlderPosts = Boolean(
-        selectedViewer?.hasOlderPosts &&
-        selectedViewerPostIndex != undefined &&
-        selectedViewerPostIndex >= (selectedViewerPosts?.length ?? 0) - 3,
-    );
-
-    React.useEffect(() => {
-        if (!shouldLoadOlderPosts || !selectedViewerSpaceId || !viewerSpaceId)
-            return;
-
-        let cancelled = false;
-        void loadCurrentSpaceProfilePostsPage(
-            selectedViewerSpaceId,
-            viewerSpaceId,
-            selectedViewerNextCursor,
-        )
-            .then((page) => {
-                if (cancelled) return;
-                setSelectedViewer((viewer) => {
-                    if (
-                        viewer?.sessionId !== selectedViewerSessionId ||
-                        !viewer?.posts?.length
-                    )
-                        return viewer;
-
-                    const oldestPost = viewer.posts[viewer.posts.length - 1]!;
-                    const olderPosts = page.items.filter(
-                        (post) =>
-                            !post.isUnavailable &&
-                            (post.timestampMs < oldestPost.timestampMs ||
-                                (post.timestampMs == oldestPost.timestampMs &&
-                                    post.postId < oldestPost.postId)),
-                    );
-                    return {
-                        ...viewer,
-                        hasOlderPosts: Boolean(page.nextCursor),
-                        nextCursor: page.nextCursor,
-                        posts: [...viewer.posts, ...olderPosts],
-                    };
-                });
-            })
-            .catch((error: unknown) => {
-                log.warn("Failed to load older friend posts", error);
-                if (cancelled) return;
-                setSelectedViewer((viewer) =>
-                    viewer && viewer.sessionId === selectedViewerSessionId
-                        ? { ...viewer, hasOlderPosts: false }
-                        : viewer,
-                );
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        selectedViewerNextCursor,
-        selectedViewerSessionId,
-        selectedViewerSpaceId,
-        shouldLoadOlderPosts,
-        viewerSpaceId,
-    ]);
 
     const selectedViewerPhotos = React.useMemo(() => {
         const friend = selectedViewer?.friend;
@@ -1537,9 +1466,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onOpenAvatar={(anchorRect) =>
                     setSelectedContact({ anchorRect, friend, avatarUrl })
                 }
-                onOpenPosts={(friend, posts, photo) =>
-                    openPostPhotos(friend, posts, photo, isRead)
-                }
+                onOpenPosts={openPostPhotos}
                 placement={placement}
                 posts={posts}
             />
@@ -1893,9 +1820,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             selectedViewer.isDraftImagePreviewPending
                         }
                         postActionMode={selectedViewer.postActionMode}
-                        showSequenceProgress={
-                            selectedViewer.showSequenceProgress
-                        }
+                        showSequenceProgress={Boolean(
+                            selectedViewerPosts &&
+                            selectedViewerPosts.length > 1,
+                        )}
                         onPhotoIndexChange={
                             selectedViewerPosts
                                 ? handleSelectedViewerPostIndexChange
@@ -1938,9 +1866,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         onSwipeLeft={
                             !selectedViewerPosts ||
-                            (!selectedViewer.hasOlderPosts &&
-                                selectedViewerPostIndex ==
-                                    selectedViewerPosts.length - 1)
+                            selectedViewerPostIndex ==
+                                selectedViewerPosts.length - 1
                                 ? closeSelectedPhoto
                                 : undefined
                         }
