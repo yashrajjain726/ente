@@ -3,6 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+node .github/checks/format-js/check.mjs
+node --test .github/checks/format-js/test.mjs
 node .github/checks/documentation-comments/check.mjs
 node .github/checks/documentation-comments/test.mjs
 ruby .github/checks/workflow-paths/check.rb
