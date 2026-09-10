@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (c *Controller) GetUserFileCountWithCache(ctx context.Context, userID int64, app ente.App) (int64, error) {
-	_, photos, locker, err := c.UsageRepo.GetStoredFileCounts(ctx, userID)
+func (c *Controller) GetUserFileCountWithCache(userID int64, app ente.App) (int64, error) {
+	_, photos, locker, err := c.UsageRepo.GetStoredFileCounts(context.Background(), userID)
 	if err != nil {
 		return 0, stacktrace.Propagate(err, "")
 	}
@@ -24,8 +24,8 @@ func (c *Controller) GetUserFileCountWithCache(ctx context.Context, userID int64
 	if count >= 0 {
 		return count, nil
 	}
-	if (app == ente.Photos || app == ente.Locker) && c.QueueFileCountInitialization != nil {
-		c.QueueFileCountInitialization(userID)
+	if (app == ente.Photos || app == ente.Locker) && c.UsageRepo.QueueFileCountInitialization != nil {
+		c.UsageRepo.QueueFileCountInitialization(userID)
 	}
 	if count, ok := c.UserCache.GetFileCount(userID, app); ok {
 		// Cache hit, update the cache asynchronously

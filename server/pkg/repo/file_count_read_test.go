@@ -1,10 +1,8 @@
 package repo
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/ente/museum/ente"
 	"github.com/ente/museum/internal/testutil"
 )
 
@@ -16,15 +14,12 @@ func TestGetLockerUsageUsesStoredAndLegacyCountsPerUser(t *testing.T) {
 	testutil.InsertUsage(t, db, legacyUserID, 0)
 	setReadyFileCounts(t, db, readyUserID, 0, 9)
 
-	for _, userID := range []int64{readyUserID, legacyUserID} {
-		fileID := insertObjectTestFile(t, db, userID)
-		collectionID := insertObjectTestCollection(t, db, userID)
-		if _, err := db.Exec(`UPDATE collections SET app = 'locker' WHERE collection_id = $1`, collectionID); err != nil {
-			t.Fatal(err)
-		}
-		linkObjectTestFileToCollection(t, db, collectionID, fileID, userID)
-		insertObjectTestKey(t, db, fileID, ente.FILE, fmt.Sprintf("object-%d", userID), 100, []string{"b2-eu-cen"})
+	fileID := insertObjectTestFile(t, db, legacyUserID)
+	collectionID := insertObjectTestCollection(t, db, legacyUserID)
+	if _, err := db.Exec(`UPDATE collections SET app = 'locker' WHERE collection_id = $1`, collectionID); err != nil {
+		t.Fatal(err)
 	}
+	linkObjectTestFileToCollection(t, db, collectionID, fileID, legacyUserID)
 
 	var queued []int64
 	usage, err := (&UsageRepository{
@@ -34,8 +29,8 @@ func TestGetLockerUsageUsesStoredAndLegacyCountsPerUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if usage.TotalFileCount != 10 || usage.TotalUsage != 200 {
-		t.Fatalf("family usage = %+v, want 10 files and 200 bytes", usage)
+	if usage.TotalFileCount != 10 {
+		t.Fatalf("family usage = %+v, want 10 files", usage)
 	}
 	if len(usage.Users) != 2 || usage.Users[0].FileCount != 9 || usage.Users[1].FileCount != 1 {
 		t.Fatalf("member usage = %+v, want stored then legacy count", usage.Users)

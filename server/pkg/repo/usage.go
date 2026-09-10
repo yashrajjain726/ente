@@ -126,11 +126,7 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 
 	userMap := make(map[int64]*UserLockerUsage)
 	for _, userID := range userIDs {
-		userMap[userID] = &UserLockerUsage{
-			UserID:    userID,
-			FileCount: 0,
-			Usage:     0,
-		}
+		userMap[userID] = &UserLockerUsage{UserID: userID}
 	}
 
 	rows, err := repo.DB.QueryContext(ctx, `SELECT requested.user_id, u.locker_file_count
@@ -139,12 +135,12 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
+	defer rows.Close()
 	var uninitializedUserIDs []int64
 	for rows.Next() {
 		var userID int64
 		var fileCount sql.NullInt64
 		if err := rows.Scan(&userID, &fileCount); err != nil {
-			rows.Close()
 			return nil, stacktrace.Propagate(err, "")
 		}
 		if fileCount.Valid {
@@ -152,9 +148,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		} else {
 			uninitializedUserIDs = append(uninitializedUserIDs, userID)
 		}
-	}
-	if err := rows.Close(); err != nil {
-		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := rows.Err(); err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -175,16 +168,13 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
+		defer rows.Close()
 		for rows.Next() {
 			var userID, fileCount int64
 			if err := rows.Scan(&userID, &fileCount); err != nil {
-				rows.Close()
 				return nil, stacktrace.Propagate(err, "")
 			}
 			userMap[userID].FileCount = fileCount
-		}
-		if err := rows.Close(); err != nil {
-			return nil, stacktrace.Propagate(err, "")
 		}
 		if err := rows.Err(); err != nil {
 			return nil, stacktrace.Propagate(err, "")

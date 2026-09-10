@@ -11,12 +11,11 @@ import (
 
 // Avoid adding any direct dependencies to the other controller.
 type Controller struct {
-	FileRepo                     *repo.FileRepository
-	UsageRepo                    *repo.UsageRepository
-	TrashRepo                    *repo.TrashRepository
-	StoreBonusRepo               *storagebonus.Repository
-	UserCache                    *cache.UserCache
-	QueueFileCountInitialization func(int64)
+	FileRepo       *repo.FileRepository
+	UsageRepo      *repo.UsageRepository
+	TrashRepo      *repo.TrashRepository
+	StoreBonusRepo *storagebonus.Repository
+	UserCache      *cache.UserCache
 }
 
 func (c *Controller) GetActiveStorageBonus(ctx context.Context, userID int64) (*bonus.ActiveStorageBonus, error) {
