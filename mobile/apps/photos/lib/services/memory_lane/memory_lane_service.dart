@@ -988,18 +988,28 @@ class MemoryLaneService {
     );
   }
 
-  Future<Uint8List?> getNewestFaceCrop(
+  Future<({Uint8List oldest, Uint8List newest})?> getOldestAndNewestFaceCrops(
     MemoryLanePersonTimeline timeline,
   ) async {
-    final newest = timeline.entries.last;
-    final newestFile = (await getTimelineFiles([newest.fileId]))[newest.fileId];
-    if (newestFile == null) return null;
-    final faces = await _mlDataDB.getFacesForGivenFileID(newest.fileId);
-    final face = faces?.firstWhereOrNull((f) => f.faceID == newest.faceId);
-    if (face == null) return null;
-    return (await getCachedFaceCrops(newestFile, [
-      face,
-    ], useTempCache: false))?[newest.faceId];
+    if (timeline.entries.isEmpty) return null;
+    final entries = [timeline.entries.first, timeline.entries.last];
+    final files = await getTimelineFiles(
+      entries.map((entry) => entry.fileId).toList(),
+    );
+    final crops = <Uint8List>[];
+    for (final entry in entries) {
+      final file = files[entry.fileId];
+      if (file == null) return null;
+      final faces = await _mlDataDB.getFacesForGivenFileID(entry.fileId);
+      final face = faces?.firstWhereOrNull((f) => f.faceID == entry.faceId);
+      if (face == null) return null;
+      final crop = (await getCachedFaceCrops(file, [
+        face,
+      ], useTempCache: false))?[entry.faceId];
+      if (crop == null) return null;
+      crops.add(crop);
+    }
+    return (oldest: crops.first, newest: crops.last);
   }
 
   Future<void> _scheduleTimelinesForMemoriesStrip(

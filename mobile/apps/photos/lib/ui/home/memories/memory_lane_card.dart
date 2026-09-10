@@ -3,14 +3,11 @@ import "dart:typed_data";
 import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
-import "package:photos/core/constants.dart";
-import "package:photos/models/file/file.dart";
 import "package:photos/ui/home/memories/memory_card_constants.dart";
-import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 
 class MemoryLaneCardWidget extends StatelessWidget {
   final String id;
-  final EnteFile oldestFile;
+  final Uint8List oldestFace;
   final Uint8List face;
   final String personName;
   final Size size;
@@ -18,7 +15,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
 
   const MemoryLaneCardWidget({
     required this.id,
-    required this.oldestFile,
+    required this.oldestFace,
     required this.face,
     required this.personName,
     required this.size,
@@ -75,11 +72,10 @@ class MemoryLaneCardWidget extends StatelessWidget {
                         stops: [0.53663, 0.89955],
                       ),
                     ),
-                    child: ThumbnailWidget(
-                      oldestFile,
-                      rawThumbnail: true,
-                      shouldShowSyncStatus: false,
-                      thumbnailSize: thumbnailLargeSize,
+                    child: Image.memory(
+                      oldestFace,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
                     ),
                   ),
                 ),
