@@ -11,7 +11,6 @@ import 'package:photos/models/collection/collection.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/ui/actions/collection/collection_sharing_actions.dart';
 import 'package:photos/ui/sharing/add_people_sheet.dart';
-import 'package:photos/ui/sharing/album_participants_page.dart';
 import 'package:photos/ui/sharing/manage_links_widget.dart';
 import 'package:photos/ui/sharing/public_link_enabled_actions_widget.dart';
 import 'package:photos/ui/sharing/share_components.dart';
@@ -34,7 +33,6 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
     CollectionsService.instance,
   );
   final GlobalKey sendLinkButtonKey = GlobalKey();
-  bool _redirectedToParticipants = false;
 
   @override
   void initState() {
@@ -68,22 +66,6 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
   @override
   Widget build(BuildContext context) {
     final int userID = Configuration.instance.getUserID() ?? -1;
-
-    if (!_redirectedToParticipants) {
-      final bool isOwner = _collection.owner.id == userID;
-      if (!isOwner) {
-        _redirectedToParticipants = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
-          replacePage(context, AlbumParticipantsPage(_collection));
-        });
-      } else {
-        _redirectedToParticipants = true;
-      }
-    }
-
     final bool hasUrl = _collection.hasLink;
     final bool isOwner = _collection.owner.id == userID;
     if (isOwner && _collection.owner.email.isEmpty) {
