@@ -38,6 +38,7 @@ import log from "ente-base/log";
 import { t } from "i18next";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Trans } from "react-i18next";
 import { filterNonEmptyUploadItems } from "../createItemDialog/file-upload-helpers";
 import type { CreateItemDialogEditItem } from "../createItemDialog/use-create-item-dialog-state";
 import type { EmptyTrashDialogState } from "./EmptyTrashDialog";
@@ -586,7 +587,14 @@ export const useLockerActions = ({
             setConfirmDialog({
                 illustration: "/images/file_delete_icon.png",
                 title: t("areYouSure"),
-                body: t("deleteMultipleFilesDialogBody", { count: 1 }),
+                body: (
+                    <Trans
+                        i18nKey="deleteFileConfirmation"
+                        components={{
+                            fileName: <strong>{getItemTitle(item)}</strong>,
+                        }}
+                    />
+                ),
                 confirmLabel: t("yesDeleteFiles", { count: 1 }),
                 tone: "critical",
                 action: async () => {
