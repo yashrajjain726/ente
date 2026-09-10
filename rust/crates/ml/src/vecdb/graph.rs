@@ -23,6 +23,17 @@ const LEVEL_SEED: u64 = 0x9E37_79B9_7F4A_7C15;
 const NEIGHBOR_BATCH: usize = LEVEL_ZERO_NEIGHBOR_CAP;
 const ABSENT_LEVEL: u16 = u16::MAX;
 const ABSENT_DENSE: u32 = u32::MAX;
+const MIN_GROWTH_SPARE: usize = 1024;
+
+fn grow_amortized<T: Clone>(values: &mut Vec<T>, len: usize, fill: T) {
+    debug_assert!(len >= values.len());
+    if values.capacity() < len {
+        let spare = (values.len() / 8).max(MIN_GROWTH_SPARE);
+        let target = len.max(values.len() + spare);
+        values.reserve_exact(target - values.len());
+    }
+    values.resize(len, fill);
+}
 
 fn neighbor_cap(level: usize) -> usize {
     if level == 0 {
@@ -401,15 +412,13 @@ impl Graph {
         if self.node_levels.len() >= capacity {
             return;
         }
-        let extra = capacity - self.node_levels.len();
-        self.node_levels.reserve_exact(extra);
-        self.node_levels.resize(capacity, ABSENT_LEVEL);
-        self.zero_lengths.reserve_exact(extra);
-        self.zero_lengths.resize(capacity, 0);
-        let blocks = capacity * LEVEL_ZERO_NEIGHBOR_CAP;
-        self.zero_neighbors
-            .reserve_exact(blocks - self.zero_neighbors.len());
-        self.zero_neighbors.resize(blocks, 0);
+        grow_amortized(&mut self.node_levels, capacity, ABSENT_LEVEL);
+        grow_amortized(&mut self.zero_lengths, capacity, 0);
+        grow_amortized(
+            &mut self.zero_neighbors,
+            capacity * LEVEL_ZERO_NEIGHBOR_CAP,
+            0,
+        );
     }
 
     fn attach_empty_node(&mut self, slot: u32, level: usize) {
@@ -429,10 +438,7 @@ impl Graph {
         let span = self.node_levels.len();
         let upper = &mut self.upper[layer - 1];
         if upper.dense_of_slot.len() < span {
-            upper
-                .dense_of_slot
-                .reserve_exact(span - upper.dense_of_slot.len());
-            upper.dense_of_slot.resize(span, ABSENT_DENSE);
+            grow_amortized(&mut upper.dense_of_slot, span, ABSENT_DENSE);
         }
         let dense = match upper.free.pop() {
             Some(dense) => dense,
@@ -1937,6 +1943,55 @@ mod tests {
             .map(|&(_, slot)| arena.key_of_slot(slot).unwrap())
             .collect();
         assert_eq!(keys(&found), expected);
+    }
+
+    #[test]
+    fn reserve_slots_grows_the_slot_arrays_a_bounded_number_of_times() {
+        let mut graph = Graph::new();
+        let mut reallocations = 0;
+        let mut capacity = graph.zero_neighbors.capacity();
+        for slots in 1..=20_000 {
+            graph.reserve_slots(slots);
+            if graph.zero_neighbors.capacity() != capacity {
+                capacity = graph.zero_neighbors.capacity();
+                reallocations += 1;
+            }
+        }
+        assert!(reallocations < 64, "{reallocations} reallocations");
+        assert_eq!(graph.node_levels.len(), 20_000);
+        for (len, capacity) in [
+            (graph.node_levels.len(), graph.node_levels.capacity()),
+            (graph.zero_lengths.len(), graph.zero_lengths.capacity()),
+            (graph.zero_neighbors.len(), graph.zero_neighbors.capacity()),
+        ] {
+            assert!(
+                capacity <= len + len / 8 + MIN_GROWTH_SPARE,
+                "{capacity} reserved for {len}"
+            );
+        }
+    }
+
+    #[test]
+    fn from_parts_reserves_the_slot_arrays_exactly() {
+        let (arena, graph) = build_fixture(1500, 16, 0x8100_0000);
+        let slots = arena.slot_count();
+        assert!(slots >= 1024);
+        let rebuilt = Graph::from_parts(
+            graph.entry_point(),
+            graph_parts(&graph),
+            slots,
+            graph.insert_ordinal(),
+        )
+        .unwrap();
+        assert_eq!(rebuilt.node_levels.capacity(), slots);
+        assert_eq!(rebuilt.zero_lengths.capacity(), slots);
+        assert_eq!(
+            rebuilt.zero_neighbors.capacity(),
+            slots * LEVEL_ZERO_NEIGHBOR_CAP
+        );
+        for upper in &rebuilt.upper {
+            assert_eq!(upper.dense_of_slot.capacity(), slots);
+        }
     }
 
     #[test]
