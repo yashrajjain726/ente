@@ -9,6 +9,7 @@ import React, { useCallback, useState } from "react";
 import { CollectionChipFilters } from "./CollectionChipFilters";
 
 interface CollectionFiltersProps {
+    showFilters: boolean;
     orderedHomeCollections: LockerCollection[];
     dropdownHomeCollections: LockerCollection[];
     homeSelectedCollectionIDs: number[];
@@ -16,6 +17,7 @@ interface CollectionFiltersProps {
     clearHomeCollectionSelection: () => void;
 }
 export function CollectionFilters({
+    showFilters,
     orderedHomeCollections,
     dropdownHomeCollections,
     homeSelectedCollectionIDs,
@@ -35,46 +37,51 @@ export function CollectionFilters({
     }, []);
     return (
         <>
-            <Stack
-                direction="row"
-                sx={{
-                    width: "100%",
-                    maxWidth: lockerContentMaxWidth,
-                    mx: "auto",
-                    alignItems: "center",
-                    gap: 1,
-                    mb: 2,
-                    minWidth: 0,
-                }}
-            >
-                <CollectionFilterChip
-                    selected={homeSelectedCollectionIDs.length > 0}
-                    onClick={openCollectionFilterMenu}
-                />
-                <Box
-                    key={orderedHomeCollections
-                        .map((collection) => collection.id)
-                        .join("-")}
+            {showFilters && (
+                <Stack
+                    direction="row"
                     sx={{
-                        flex: 1,
+                        width: "100%",
+                        maxWidth: lockerContentMaxWidth,
+                        mx: "auto",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 2,
                         minWidth: 0,
-                        "@keyframes chipBarRefresh": {
-                            "0%": {
-                                opacity: 0.7,
-                                transform: "translateY(2px)",
-                            },
-                            "100%": { opacity: 1, transform: "translateY(0)" },
-                        },
-                        animation: "chipBarRefresh 220ms ease-out",
                     }}
                 >
-                    <CollectionChipFilters
-                        collections={orderedHomeCollections}
-                        selectedCollectionIDs={homeSelectedCollectionIDs}
-                        onToggleCollection={toggleHomeCollection}
+                    <CollectionFilterChip
+                        selected={homeSelectedCollectionIDs.length > 0}
+                        onClick={openCollectionFilterMenu}
                     />
-                </Box>
-            </Stack>
+                    <Box
+                        key={orderedHomeCollections
+                            .map((collection) => collection.id)
+                            .join("-")}
+                        sx={{
+                            flex: 1,
+                            minWidth: 0,
+                            "@keyframes chipBarRefresh": {
+                                "0%": {
+                                    opacity: 0.7,
+                                    transform: "translateY(2px)",
+                                },
+                                "100%": {
+                                    opacity: 1,
+                                    transform: "translateY(0)",
+                                },
+                            },
+                            animation: "chipBarRefresh 220ms ease-out",
+                        }}
+                    >
+                        <CollectionChipFilters
+                            collections={orderedHomeCollections}
+                            selectedCollectionIDs={homeSelectedCollectionIDs}
+                            onToggleCollection={toggleHomeCollection}
+                        />
+                    </Box>
+                </Stack>
+            )}
             <Menu
                 anchorEl={collectionFilterAnchorEl}
                 open={!!collectionFilterAnchorEl}

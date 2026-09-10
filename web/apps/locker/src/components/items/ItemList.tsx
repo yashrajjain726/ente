@@ -496,26 +496,20 @@ export const ItemList: React.FC<ItemListProps> = ({
                         }),
                     })}
                 >
+                    <CollectionFilters
+                        showFilters={
+                            isHomeView && displayCollections.length > 0
+                        }
+                        orderedHomeCollections={orderedHomeCollections}
+                        dropdownHomeCollections={dropdownHomeCollections}
+                        homeSelectedCollectionIDs={homeSelectedCollectionIDs}
+                        toggleHomeCollection={toggleHomeCollection}
+                        clearHomeCollectionSelection={
+                            clearHomeCollectionSelection
+                        }
+                    />
                     {isHomeView && (
                         <>
-                            {displayCollections.length > 0 && (
-                                <CollectionFilters
-                                    orderedHomeCollections={
-                                        orderedHomeCollections
-                                    }
-                                    dropdownHomeCollections={
-                                        dropdownHomeCollections
-                                    }
-                                    homeSelectedCollectionIDs={
-                                        homeSelectedCollectionIDs
-                                    }
-                                    toggleHomeCollection={toggleHomeCollection}
-                                    clearHomeCollectionSelection={
-                                        clearHomeCollectionSelection
-                                    }
-                                />
-                            )}
-
                             <ItemsSection
                                 items={homeFilteredItems}
                                 isTrashView={false}
