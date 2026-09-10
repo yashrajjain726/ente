@@ -2,11 +2,9 @@ import type { Theme } from "@mui/material";
 import { lockerColorSx, lockerShadowFloating } from "./locker-tokens";
 
 export const lockerMenuPaperSx = (theme: Theme) => ({
-    "& .MuiMenuItem-root:last-of-type": { borderBottomColor: "transparent" },
-    width: 196,
-    borderRadius: "20px",
-    overflowX: "hidden" as const,
-    overflowY: "auto" as const,
+    width: 180,
+    borderRadius: "16px",
+    padding: "6px",
     boxShadow: lockerShadowFloating,
     border: "1px solid",
     ...lockerColorSx(theme, {

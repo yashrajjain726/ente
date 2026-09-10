@@ -10,7 +10,11 @@ import {
 import Menu, { type MenuProps } from "@mui/material/Menu";
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { lockerMenuPaperSx } from "./locker-dialog-styles";
-import { lockerColorSx, lockerTextMiniSx } from "./locker-tokens";
+import {
+    lockerColorSx,
+    lockerTextBodySx,
+    lockerTextMiniSx,
+} from "./locker-tokens";
 
 const LockerMenuContext = createContext<{ close: () => void } | undefined>(
     undefined,
@@ -87,33 +91,29 @@ export const LockerMenuOption: React.FC<
             disabled={disabled}
             selected={selected}
             sx={(theme) => ({
-                height: 52,
-                minHeight: 52,
-                px: "16px",
-                gap: "6px",
+                height: 44,
+                minHeight: 44,
+                px: "10px",
+                gap: "10px",
+                borderRadius: "10px",
                 alignItems: "center",
-                borderBottom: "1px solid",
-                ...lockerColorSx(theme, { borderColor: "strokeFaint" }),
                 "&.Mui-disabled": { opacity: 0.5 },
                 "&.Mui-selected": lockerColorSx(theme, {
                     backgroundColor: "primaryLight",
                 }),
                 "&:hover, &.Mui-selected:hover": lockerColorSx(theme, {
-                    backgroundColor: "fillDark",
+                    backgroundColor: critical ? "warningLight" : "fillDark",
                 }),
             })}
         >
             {startIcon && (
                 <Box
                     sx={(theme) => ({
-                        width: 24,
-                        height: 24,
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
                         flexShrink: 0,
                         ...lockerColorSx(theme, {
-                            color: critical ? "warning" : "textBase",
+                            color: critical ? "warning" : "textLight",
                         }),
                         "& .MuiSvgIcon-root": { fontSize: 18 },
                     })}
@@ -124,7 +124,7 @@ export const LockerMenuOption: React.FC<
             <Typography
                 noWrap
                 sx={(theme) => ({
-                    ...lockerTextMiniSx,
+                    ...lockerTextBodySx,
                     flex: 1,
                     minWidth: 0,
                     ...lockerColorSx(theme, {
@@ -167,12 +167,17 @@ export const LockerMenuFooter: React.FC<
             ...lockerTextMiniSx,
             height: 44,
             minHeight: 44,
+            borderRadius: "10px",
+            borderTop: "1px solid",
             width: "100%",
             justifyContent: "center",
             textDecoration: "underline",
             textUnderlineOffset: "3px",
             textTransform: "none",
-            ...lockerColorSx(theme, { color: "textLight" }),
+            ...lockerColorSx(theme, {
+                color: "textLight",
+                borderColor: "strokeFaint",
+            }),
             "&:hover": lockerColorSx(theme, { backgroundColor: "fillDark" }),
         })}
     >
