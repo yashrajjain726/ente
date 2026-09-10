@@ -81,7 +81,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   Timer? _playbackTimer;
   Object? _playbackToken;
   bool _wasPlayingBeforeSeek = false;
-  bool _isSeeking = false;
+  bool _useFastTransition = false;
   late final Future<void> _memoryLaneLoaded;
   Key _currentEntryKey = UniqueKey();
   MemoryLanePersonTimeline? _timeline;
@@ -172,12 +172,12 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     }
   }
 
-  Future<void> _play(int index) async {
+  Future<void> _play(int index, {bool fastTransition = false}) async {
     if (!widget.isActive || _entries.isEmpty) return;
     final token = Object();
     setState(() {
       _playbackTimer?.cancel();
-      _selectEntry(index);
+      _selectEntry(index, fastTransition: fastTransition);
       _playbackToken =
           index < _entries.length - 1 || widget.onNextMemory != null
           ? token
@@ -210,10 +210,9 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
       _entries.length - 1,
     );
     setState(() {
-      _isSeeking = true;
       _playbackTimer?.cancel();
       _playbackToken = null;
-      _selectEntry(index);
+      _selectEntry(index, fastTransition: true);
     });
   }
 
@@ -230,7 +229,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   void _onSeekEnd() {
     final wasPlaying = _wasPlayingBeforeSeek;
     _wasPlayingBeforeSeek = false;
-    setState(() => _isSeeking = false);
     if (wasPlaying) unawaited(_play(i));
   }
 
@@ -293,8 +291,11 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     );
   }
 
-  void _selectEntry(int index) {
-    if (i != index) _currentEntryKey = UniqueKey();
+  void _selectEntry(int index, {bool fastTransition = false}) {
+    if (i != index) {
+      _currentEntryKey = UniqueKey();
+      _useFastTransition = fastTransition;
+    }
     i = index;
     if (index != _entries.length - 1) return;
     final entryKey = _currentEntryKey;
@@ -401,7 +402,9 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
               child: ColoredBox(
                 color: Colors.black,
                 child: AnimatedSwitcher(
-                  duration: Duration(milliseconds: _isSeeking ? 100 : 750),
+                  duration: Duration(
+                    milliseconds: _useFastTransition ? 100 : 750,
+                  ),
                   switchInCurve: Curves.easeOutExpo,
                   switchOutCurve: Curves.easeInExpo,
                   child: FutureBuilder<(Uint8List, int)?>(
@@ -544,9 +547,12 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                   onMemory();
                                 }
                               } else if (_playbackToken != null) {
-                                unawaited(_play(index));
+                                unawaited(_play(index, fastTransition: true));
                               } else {
-                                setState(() => _selectEntry(index));
+                                setState(
+                                  () =>
+                                      _selectEntry(index, fastTransition: true),
+                                );
                               }
                             },
                       child: Padding(
@@ -561,7 +567,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                               borderRadius: BorderRadius.circular(24),
                               child: AnimatedSwitcher(
                                 duration: Duration(
-                                  milliseconds: _isSeeking ? 100 : 1000,
+                                  milliseconds: _useFastTransition ? 100 : 1000,
                                 ),
                                 switchInCurve: Curves.easeOutCubic,
                                 switchOutCurve: Curves.easeInCubic,
