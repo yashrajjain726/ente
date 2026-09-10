@@ -3,7 +3,6 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
-import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/sharing/share_components.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/ui/sharing/widgets/selected_person_chip.dart";
@@ -74,35 +73,17 @@ class _ChooseAccessSheetState extends State<_ChooseAccessSheet> {
                 ShareSectionTitle(context.strings.permissions),
                 ShareMenuGroup(
                   items: [
-                    _PermissionRow(
-                      label: context.strings.viewer,
-                      description: context.strings.viewerRoleDescription,
-                      icon: sharingRoleIcon(CollectionParticipantRole.viewer),
-                      selected: _role == CollectionParticipantRole.viewer,
-                      onTap: () => setState(
-                        () => _role = CollectionParticipantRole.viewer,
+                    for (final role in shareableCollectionRoles)
+                      ShareMenuItem(
+                        title: shareableRoleLabel(context, role),
+                        subtitle: shareableRoleDescription(context, role),
+                        icon: albumSharingRoleIcon(role),
+                        trailing: RadioComponent(
+                          selected: _role == role,
+                          onChanged: (_) => _selectRole(role),
+                        ),
+                        onTap: () => _selectRole(role),
                       ),
-                    ),
-                    _PermissionRow(
-                      label: context.strings.collaborator,
-                      description: context.strings.collaboratorRoleDescription,
-                      icon: sharingRoleIcon(
-                        CollectionParticipantRole.collaborator,
-                      ),
-                      selected: _role == CollectionParticipantRole.collaborator,
-                      onTap: () => setState(
-                        () => _role = CollectionParticipantRole.collaborator,
-                      ),
-                    ),
-                    _PermissionRow(
-                      label: context.strings.admin,
-                      description: context.strings.adminRoleDescription,
-                      icon: sharingRoleIcon(CollectionParticipantRole.admin),
-                      selected: _role == CollectionParticipantRole.admin,
-                      onTap: () => setState(
-                        () => _role = CollectionParticipantRole.admin,
-                      ),
-                    ),
                   ],
                 ),
               ],
@@ -126,10 +107,14 @@ class _ChooseAccessSheetState extends State<_ChooseAccessSheet> {
     setState(() {
       widget.selected.removeWhere(
         (selected) =>
-            selected.email.trim().toLowerCase() ==
-            suggestion.email.trim().toLowerCase(),
+            normalizedSharingEmail(selected.email) ==
+            normalizedSharingEmail(suggestion.email),
       );
     });
+  }
+
+  void _selectRole(CollectionParticipantRole role) {
+    setState(() => _role = role);
   }
 
   String _buttonLabel(BuildContext context) {
@@ -145,42 +130,5 @@ class _ChooseAccessSheetState extends State<_ChooseAccessSheet> {
       CollectionParticipantRole.unknown || CollectionParticipantRole.owner =>
         context.strings.addAsViewers(count: widget.selected.length),
     };
-  }
-}
-
-class _PermissionRow extends StatelessWidget {
-  const _PermissionRow({
-    required this.label,
-    required this.description,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String description;
-  final List<List<dynamic>> icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ShareMenuItem(
-      title: label,
-      subtitle: description,
-      icon: icon,
-      trailing: selected
-          ? const CollectionSelectedBadge()
-          : SizedBox.square(
-              dimension: IconSizes.small,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: context.componentColors.strokeDark),
-                ),
-              ),
-            ),
-      onTap: onTap,
-    );
   }
 }

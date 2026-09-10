@@ -34,17 +34,36 @@ class _ScrollableParticipantRosterState
   @override
   Widget build(BuildContext context) {
     const maxVisibleRows = 3;
+    final rowExtent = _rowExtent(context);
+    final hasMultipleRows = widget.rows.length > 1;
+    final itemSpacing = hasMultipleRows ? Spacing.xs : 0.0;
+    final groupPadding = hasMultipleRows ? Spacing.sm : 0.0;
     final visibleRows = math.min(widget.rows.length, maxVisibleRows);
-    final viewportHeight = _groupHeight(context, visibleRows);
+    final viewportHeight =
+        visibleRows * rowExtent +
+        groupPadding * 2 +
+        math.max(0, visibleRows - 1) * itemSpacing;
     final showScrollbar = widget.rows.length > maxVisibleRows;
     final roster = ClipRRect(
       key: const ValueKey("participant-roster-clip"),
       borderRadius: BorderRadius.circular(Radii.button),
-      child: SingleChildScrollView(
-        key: const ValueKey("participant-roster-scroll"),
-        controller: _scrollController,
-        primary: false,
-        child: ShareMenuGroup(items: widget.rows),
+      child: ColoredBox(
+        color: context.componentColors.fillLight,
+        child: ListView.builder(
+          key: const ValueKey("participant-roster-scroll"),
+          controller: _scrollController,
+          primary: false,
+          padding: EdgeInsets.only(
+            top: groupPadding,
+            bottom: groupPadding - itemSpacing,
+          ),
+          itemCount: widget.rows.length,
+          itemExtent: rowExtent + itemSpacing,
+          itemBuilder: (context, index) => Padding(
+            padding: EdgeInsets.only(bottom: itemSpacing),
+            child: widget.rows[index],
+          ),
+        ),
       ),
     );
     return SizedBox(
@@ -63,15 +82,12 @@ class _ScrollableParticipantRosterState
     );
   }
 
-  double _groupHeight(BuildContext context, int itemCount) {
+  double _rowExtent(BuildContext context) {
     const textStyle = TextStyles.body;
     final textExtent =
         MediaQuery.textScalerOf(context).scale(textStyle.fontSize!) *
         textStyle.height!;
-    final rowExtent = math.max(60.0, textExtent + 20.0);
-    return itemCount * rowExtent +
-        (itemCount > 1 ? Spacing.sm * 2 : 0) +
-        math.max(0, itemCount - 1) * Spacing.xs;
+    return math.max(kMinInteractiveDimension, textExtent) + 20.0;
   }
 }
 
@@ -101,7 +117,7 @@ class ParticipantRow extends StatelessWidget {
       trailing:
           trailing ??
           HugeIcon(
-            icon: sharingRoleIcon(role),
+            icon: albumSharingRoleIcon(role),
             color: colors.textLightest,
             size: IconSizes.small,
             strokeWidth: 1.6,

@@ -64,11 +64,16 @@ class _ParticipantRoleRowState extends State<ParticipantRoleRow> {
               onSelected: (action) => action == _ParticipantRoleAction.remove
                   ? _removeParticipant()
                   : _changeRole(action.role!),
-              child: HugeIcon(
-                icon: sharingRoleIcon(role),
-                color: context.componentColors.textBase,
-                size: IconSizes.small,
-                strokeWidth: 1.6,
+              child: SizedBox.square(
+                dimension: kMinInteractiveDimension,
+                child: Center(
+                  child: HugeIcon(
+                    icon: albumSharingRoleIcon(role),
+                    color: context.componentColors.textBase,
+                    size: IconSizes.small,
+                    strokeWidth: 1.6,
+                  ),
+                ),
               ),
             ),
     );
@@ -78,31 +83,23 @@ class _ParticipantRoleRowState extends State<ParticipantRoleRow> {
     BuildContext context,
   ) {
     final colors = context.componentColors;
+    final activeRole = widget.collection.getRole(widget.user.id);
     return [
-      EntePopupMenuOption(
-        value: _ParticipantRoleAction.viewer,
-        label: context.strings.viewer,
-        leadingWidget: HugeIcon(
-          icon: sharingRoleIcon(CollectionParticipantRole.viewer),
-          size: IconSizes.small,
-        ),
-      ),
-      EntePopupMenuOption(
-        value: _ParticipantRoleAction.collaborator,
-        label: context.strings.collaborator,
-        leadingWidget: HugeIcon(
-          icon: sharingRoleIcon(CollectionParticipantRole.collaborator),
-          size: IconSizes.small,
-        ),
-      ),
-      EntePopupMenuOption(
-        value: _ParticipantRoleAction.admin,
-        label: context.strings.admin,
-        leadingWidget: HugeIcon(
-          icon: sharingRoleIcon(CollectionParticipantRole.admin),
-          size: IconSizes.small,
-        ),
-      ),
+      for (final action in _ParticipantRoleAction.values)
+        if (action.role case final role?)
+          EntePopupMenuOption(
+            value: action,
+            label: shareableRoleLabel(context, role),
+            leadingWidget: HugeIcon(
+              icon: albumSharingRoleIcon(role),
+              size: IconSizes.small,
+            ),
+            isActive: role == activeRole,
+            activeTrailingWidget: const HugeIcon(
+              icon: HugeIcons.strokeRoundedTick02,
+              size: IconSizes.small,
+            ),
+          ),
       EntePopupMenuOption(
         value: _ParticipantRoleAction.remove,
         label: context.strings.remove,
