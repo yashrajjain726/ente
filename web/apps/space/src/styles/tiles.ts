@@ -1,4 +1,5 @@
 export const spacePostTileRadius = 28;
+export const spaceProfilePostRadius = 16;
 
 export const spaceTileAvatarSize = (tile: { width: number; height: number }) =>
     Math.min(36, Math.min(tile.width, tile.height) * 0.22);

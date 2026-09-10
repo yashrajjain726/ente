@@ -23,7 +23,7 @@ const controlBackground = "#36363A";
 const controlBackgroundHover = "#404044";
 const controlBackgroundActive = "#48484D";
 const controlIcon = "#D8D8D8";
-const replyInputMinHeight = 48;
+export const spacePostReplyInputMinHeight = 48;
 const replyInputPadding = 14;
 const replyInputPaddingLeft = 18;
 const captionInputMaxHeight = 112;
@@ -82,8 +82,8 @@ export const SpacePostReplyControls: React.FC<SpacePostReplyControlsProps> = ({
     React.useLayoutEffect(() => {
         const input = replyInputRef.current;
         if (!input) return;
-        input.style.height = `${replyInputMinHeight}px`;
-        input.style.height = `${Math.max(replyInputMinHeight, Math.min(input.scrollHeight, captionInputMaxHeight))}px`;
+        input.style.height = `${spacePostReplyInputMinHeight}px`;
+        input.style.height = `${Math.max(spacePostReplyInputMinHeight, Math.min(input.scrollHeight, captionInputMaxHeight))}px`;
         input.style.overflowY =
             input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
     }, [replyInputRef, replyInputProps?.value]);
@@ -109,7 +109,7 @@ export const SpacePostReplyControls: React.FC<SpacePostReplyControlsProps> = ({
                     sx={{
                         bgcolor: controlBackground,
                         border: 0,
-                        borderRadius: "24px",
+                        borderRadius: `${spacePostReplyInputMinHeight / 2}px`,
                         boxSizing: "border-box",
                         color: textBase,
                         flex: "1 1 auto",
@@ -118,7 +118,7 @@ export const SpacePostReplyControls: React.FC<SpacePostReplyControlsProps> = ({
                         fontWeight: 500,
                         lineHeight: "20px",
                         maxHeight: captionInputMaxHeight,
-                        minHeight: replyInputMinHeight,
+                        minHeight: spacePostReplyInputMinHeight,
                         minWidth: 0,
                         outline: 0,
                         overflow: "hidden",

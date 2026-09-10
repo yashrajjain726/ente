@@ -1,10 +1,18 @@
 import { Box } from "@mui/material";
 import type { SpaceActionPhase } from "components/ActionFeedback";
 import { spacePostLikePopDurationMs } from "components/post-like-animation";
-import { SpacePostReplyControls } from "components/PostReplyControls";
+import {
+    SpacePostReplyControls,
+    spacePostReplyInputMinHeight,
+} from "components/PostReplyControls";
 import log from "ente-base/log";
 import React from "react";
 import { spaceSurface, spaceTextMuted } from "styles/colors";
+import {
+    spaceProfilePostRadius,
+    spaceTileCornerStyles,
+    spaceTilePillInset,
+} from "styles/tiles";
 import { clampSpaceMessageText } from "utils/message-limits";
 
 interface ProfileLatestPostProps {
@@ -93,8 +101,8 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
             component="article"
             aria-label="Latest post"
             sx={{
+                ...spaceTileCornerStyles(spaceProfilePostRadius),
                 bgcolor: spaceSurface,
-                borderRadius: "16px",
                 minWidth: 0,
                 overflow: "hidden",
                 width: "100%",
@@ -102,7 +110,7 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
         >
             <Box
                 sx={{
-                    borderRadius: "16px",
+                    borderRadius: "var(--space-tile-radius)",
                     display: "flex",
                     overflow: "hidden",
                     position: "relative",
@@ -114,6 +122,7 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
                         title={caption}
                         sx={{
                             bottom: 20,
+                            clipPath: "inset(-2px -7px 0)",
                             color: "#FFFFFF",
                             display: "-webkit-box",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -122,7 +131,6 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
                             left: "50%",
                             lineHeight: "19px",
                             maxWidth: "78%",
-                            overflow: "hidden",
                             overflowWrap: "anywhere",
                             pointerEvents: "none",
                             position: "absolute",
@@ -152,7 +160,9 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
                 )}
             </Box>
             {(onReply || onSetLiked) && (
-                <Box sx={{ p: "12px" }}>
+                <Box
+                    sx={{ p: spaceTilePillInset(spacePostReplyInputMinHeight) }}
+                >
                     <SpacePostReplyControls
                         canSendReply={canSendReply}
                         disabled={disabled}

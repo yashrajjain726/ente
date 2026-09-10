@@ -46,8 +46,9 @@ import {
     spaceText,
     spaceTextMuted,
 } from "styles/colors";
+import { spaceProfilePostRadius } from "styles/tiles";
 import { spaceTouchTargetSize } from "styles/touch-targets";
-import { firstNameFrom } from "utils/display";
+import { firstNameFrom, formatSpaceDate } from "utils/display";
 import { createLoadedLocalPostPhoto } from "utils/local-post-photo";
 import {
     canPreviewSpaceImageFile,
@@ -79,7 +80,7 @@ const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = `${profilePhotoGap}px`;
 const photoMasonryPlaceholderBackground = spaceSurface;
-const photoMasonryRadius = "16px";
+const photoMasonryRadius = `${spaceProfilePostRadius}px`;
 const profileCoverRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
 const publicPhotoMasonryLoadRootMargin = "400px 0px";
@@ -1135,7 +1136,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         return (
             <ProfileLatestPost
                 key={item.id}
-                caption={isFriendProfile ? item.caption : undefined}
+                caption={item.caption}
                 disabled={isUnavailable}
                 liked={item.viewerLiked ?? false}
                 onReply={
@@ -1898,17 +1899,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     <Box
                                         component="h2"
                                         sx={{
+                                            alignItems: "baseline",
                                             color: textSoft,
+                                            display: "flex",
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
                                             fontSize: 13,
                                             fontWeight: 700,
+                                            gap: "4px",
                                             lineHeight: "18px",
                                             m: 0,
                                             pb: "8px",
                                         }}
                                     >
                                         {title}
+                                        {title == "Latest" && (
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    color: "#85858D",
+                                                    display: "inline-flex",
+                                                    fontSize: 12,
+                                                    fontWeight: 500,
+                                                    gap: "4px",
+                                                }}
+                                            >
+                                                <span aria-hidden>·</span>
+                                                {formatSpaceDate(
+                                                    rows[0]!.tiles[0]!.item
+                                                        .timestampMs,
+                                                )}
+                                            </Box>
+                                        )}
                                     </Box>
                                     <Box
                                         sx={{
