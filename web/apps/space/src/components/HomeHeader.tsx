@@ -29,6 +29,7 @@ export const spaceHomeHeaderHeight = 64;
 
 interface SpaceHomeHeaderProps {
     children?: React.ReactNode;
+    logoActions?: React.ReactNode;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
     profile: SetupProfile | null;
@@ -37,6 +38,7 @@ interface SpaceHomeHeaderProps {
 
 export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
     children,
+    logoActions,
     onOpenMessages,
     onOpenProfile,
     profile,
@@ -143,12 +145,26 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 zIndex: 1,
             }}
         >
-            <Box
-                component="img"
-                alt="Space"
-                src="/images/space.svg"
-                sx={{ display: "block", height: 19, width: "auto" }}
-            />
+            <Box sx={{ position: "relative" }}>
+                <Box
+                    component="img"
+                    alt="Space"
+                    src="/images/space.svg"
+                    sx={{ display: "block", height: 19, width: "auto" }}
+                />
+                {logoActions && (
+                    <Box
+                        sx={{
+                            left: "calc(100% + 4px)",
+                            position: "absolute",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                        }}
+                    >
+                        {logoActions}
+                    </Box>
+                )}
+            </Box>
         </Box>
         <Box
             component="button"

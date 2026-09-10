@@ -1,8 +1,14 @@
 export const spacePostTileRadius = 28;
 export const spaceProfilePostRadius = 16;
 
-export const spaceTileAvatarSize = (tile: { width: number; height: number }) =>
-    Math.min(36, Math.min(tile.width, tile.height) * 0.22);
+export const spaceTileAvatarSize = (
+    tile: { width: number; height: number },
+    isNineTileLayout = false,
+) =>
+    Math.max(
+        isNineTileLayout ? 28 : 0,
+        Math.min(36, Math.min(tile.width, tile.height) * 0.22),
+    );
 
 export const spaceTileCornerStyles = (radius: number) => ({
     "--space-tile-radius": `${radius}px`,

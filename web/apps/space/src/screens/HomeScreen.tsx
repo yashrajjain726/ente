@@ -282,6 +282,7 @@ interface FriendPostTileProps {
         posts: SpacePost[],
         photo: SpaceViewerPhoto,
     ) => void;
+    isNineTileLayout?: boolean;
     isTwoTileLayout?: boolean;
     placement: HomeTilePlacement;
     posts: SpacePost[];
@@ -305,6 +306,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     onOpenAvatar,
     onOpenFriendRequest,
     onOpenPosts,
+    isNineTileLayout = false,
     isTwoTileLayout = false,
     placement,
     posts,
@@ -352,7 +354,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         Boolean(post && !isRead && !postUnavailable && !isPhotoReady);
     const tileSize = Math.min(placement.width, placement.height);
     const tileRadius = Math.min(spacePostTileRadius, tileSize * 0.2);
-    const avatarSize = spaceTileAvatarSize(placement);
+    const avatarSize = spaceTileAvatarSize(placement, isNineTileLayout);
     const requestActionSize = showFriendRequestDetails
         ? Math.min(44, Math.max(40, tileSize * 0.13))
         : Math.min(40, Math.max(26, tileSize * 0.14));
@@ -943,8 +945,8 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 p: 0,
                                 pointerEvents: "auto",
                                 position: "absolute",
-                                right: spaceTileCircleInset(requestActionSize),
-                                top: spaceTileCircleInset(requestActionSize),
+                                right: "calc(var(--space-tile-padding) / 2)",
+                                top: "calc(var(--space-tile-padding) / 2)",
                                 width: requestActionSize,
                                 "&:disabled": { opacity: 0.55 },
                                 "&:focus-visible": {
@@ -1477,6 +1479,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     setSelectedContact({ anchorRect, friend, avatarUrl })
                 }
                 onOpenPosts={openPostPhotos}
+                isNineTileLayout={
+                    orderedHomeItems.length == maximumHomeTileCount
+                }
                 placement={placement}
                 posts={posts}
             />
@@ -1526,6 +1531,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         : undefined
                 }
                 onOpenPosts={openPostPhotos}
+                isNineTileLayout={
+                    orderedHomeItems.length == maximumHomeTileCount
+                }
                 isTwoTileLayout={orderedHomeItems.length == 2}
                 placement={postLayout!.friends[index]!}
                 posts={[]}
@@ -1771,7 +1779,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         post={ownLatestPost}
                         avatarSize={
                             firstFriendTile
-                                ? spaceTileAvatarSize(firstFriendTile)
+                                ? spaceTileAvatarSize(
+                                      firstFriendTile,
+                                      orderedHomeItems.length ==
+                                          maximumHomeTileCount,
+                                  )
                                 : undefined
                         }
                         isLoading={isOwnLatestPostLoading}

@@ -12,12 +12,7 @@ import { FriendPostTile } from "screens/HomeScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { spaceInviteURL } from "services/invite";
 import type { SpacePost } from "services/space";
-import { spaceAppBackground, spaceSurface, spaceText } from "styles/colors";
-import {
-    spacePostTileRadius,
-    spaceTileCircleInset,
-    spaceTileCornerStyles,
-} from "styles/tiles";
+import { spaceAppBackground, spaceText } from "styles/colors";
 import {
     homeTileGap,
     homeTileLayout,
@@ -29,7 +24,6 @@ import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
-const controlButtonColor = spaceSurface;
 const demoProfile: SetupProfile = {
     avatarUrl: null,
     fullName: "Alex Morgan",
@@ -137,6 +131,7 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
                 friendRequestDirection ? () => undefined : undefined
             }
             onOpenPosts={() => undefined}
+            isNineTileLayout={count == maximumHomeTileCount}
             isTwoTileLayout={count == 2}
             placement={placement}
             posts={post ? [post] : []}
@@ -246,6 +241,75 @@ const LayoutDemoPage: React.FC = () => {
                 }}
             >
                 <SpaceHomeHeader
+                    logoActions={
+                        <Box sx={{ display: "flex" }}>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Show one fewer friend"
+                                disabled={friendCount == 0}
+                                onClick={() => changeFriendCount(-1)}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: spaceText,
+                                    cursor:
+                                        friendCount == 0
+                                            ? "default"
+                                            : "pointer",
+                                    display: "flex",
+                                    height: 24,
+                                    justifyContent: "center",
+                                    opacity: friendCount == 0 ? 0.3 : 1,
+                                    p: 0,
+                                    width: 24,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={ArrowLeft02Icon}
+                                    size={16}
+                                    strokeWidth={2.2}
+                                />
+                            </Box>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Show one more friend"
+                                disabled={friendCount == maximumHomeTileCount}
+                                onClick={() => changeFriendCount(1)}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: spaceText,
+                                    cursor:
+                                        friendCount == maximumHomeTileCount
+                                            ? "default"
+                                            : "pointer",
+                                    display: "flex",
+                                    height: 24,
+                                    justifyContent: "center",
+                                    opacity:
+                                        friendCount == maximumHomeTileCount
+                                            ? 0.3
+                                            : 1,
+                                    p: 0,
+                                    width: 24,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={ArrowRight02Icon}
+                                    size={16}
+                                    strokeWidth={2.2}
+                                />
+                            </Box>
+                        </Box>
+                    }
                     profile={demoProfile}
                     onOpenProfile={() => void router.push(spaceRoutes.profile)}
                 />
@@ -304,104 +368,20 @@ const LayoutDemoPage: React.FC = () => {
                             </>
                         )}
                     </Box>
-                    <Box
-                        sx={{
-                            ...spaceTileCornerStyles(spacePostTileRadius),
-                            flexShrink: 0,
-                            position: "relative",
+                    <SpaceOwnPostTile
+                        profile={demoProfile}
+                        post={ownPosts[0]}
+                        onNewPost={() =>
+                            setDemo((current) => ({
+                                ...current,
+                                ownPosts: demoOwnPosts,
+                            }))
+                        }
+                        onOpenPost={() => {
+                            setOwnViewerPosts(ownPosts);
+                            setOwnPostIndex(0);
                         }}
-                    >
-                        <SpaceOwnPostTile
-                            profile={demoProfile}
-                            post={ownPosts[0]}
-                            onNewPost={() =>
-                                setDemo((current) => ({
-                                    ...current,
-                                    ownPosts: demoOwnPosts,
-                                }))
-                            }
-                            onOpenPost={() => {
-                                setOwnViewerPosts(ownPosts);
-                                setOwnPostIndex(0);
-                            }}
-                        />
-                        <Box
-                            sx={{
-                                display: "flex",
-                                gap: "8px",
-                                position: "absolute",
-                                right: spaceTileCircleInset(36),
-                                top: spaceTileCircleInset(36),
-                                zIndex: 5,
-                            }}
-                        >
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label="Show one fewer friend"
-                                disabled={friendCount == 0}
-                                onClick={() => changeFriendCount(-1)}
-                                sx={{
-                                    alignItems: "center",
-                                    appearance: "none",
-                                    bgcolor: controlButtonColor,
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    color: spaceText,
-                                    cursor:
-                                        friendCount == 0
-                                            ? "default"
-                                            : "pointer",
-                                    display: "flex",
-                                    height: 36,
-                                    justifyContent: "center",
-                                    opacity: friendCount == 0 ? 0.3 : 1,
-                                    p: 0,
-                                    width: 36,
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    icon={ArrowLeft02Icon}
-                                    size={22}
-                                    strokeWidth={2.2}
-                                />
-                            </Box>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label="Show one more friend"
-                                disabled={friendCount == maximumHomeTileCount}
-                                onClick={() => changeFriendCount(1)}
-                                sx={{
-                                    alignItems: "center",
-                                    appearance: "none",
-                                    bgcolor: controlButtonColor,
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    color: spaceText,
-                                    cursor:
-                                        friendCount == maximumHomeTileCount
-                                            ? "default"
-                                            : "pointer",
-                                    display: "flex",
-                                    height: 36,
-                                    justifyContent: "center",
-                                    opacity:
-                                        friendCount == maximumHomeTileCount
-                                            ? 0.3
-                                            : 1,
-                                    p: 0,
-                                    width: 36,
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    icon={ArrowRight02Icon}
-                                    size={22}
-                                    strokeWidth={2.2}
-                                />
-                            </Box>
-                        </Box>
-                    </Box>
+                    />
                 </Box>
                 <SpaceAddFriendDialog
                     friendRequests={[]}

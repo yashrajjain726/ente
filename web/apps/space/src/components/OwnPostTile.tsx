@@ -17,6 +17,7 @@ import {
     spaceTileCircleInset,
     spaceTileCornerStyles,
 } from "styles/tiles";
+import { homeTileGap } from "utils/home-tile-layout";
 import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
@@ -77,13 +78,14 @@ const PostStatus: React.FC<{
                     display: "inline-flex",
                     fontSize: 12,
                     fontWeight: 500,
-                    left: "var(--space-tile-padding)",
                     lineHeight: "16px",
                     pointerEvents: "none",
                     position: "absolute",
                     px: "10px",
                     py: "4px",
-                    top: "var(--space-tile-padding)",
+                    right: "var(--space-tile-padding)",
+                    top: "50%",
+                    transform: "translateY(-50%)",
                     whiteSpace: "nowrap",
                 }}
             >
@@ -175,157 +177,123 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     }, [onLoadPostImage, post]);
 
     return (
-        <Box
-            ref={tileRef}
-            component="section"
-            aria-label="Your latest post"
-            sx={{
-                ...spaceTileCornerStyles(spacePostTileRadius),
-                aspectRatio: "1.7",
-                bgcolor: unavailable ? spaceSurface : "transparent",
-                flexShrink: 0,
-                fontFamily: '"Inter Variable", Inter, sans-serif',
-                overflow: "hidden",
-                position: "relative",
-                width: "100%",
-                "& button:focus-visible": {
-                    outline: `2px solid ${green}`,
-                    outlineOffset: -4,
-                },
-            }}
-        >
+        <Box sx={{ display: "flex", flexShrink: 0, gap: `${homeTileGap}px` }}>
             <Box
-                component="button"
-                type="button"
-                aria-label="Open your posts"
-                disabled={!canOpenPost}
-                onClick={onOpenPost}
+                ref={tileRef}
+                component="section"
+                aria-label="Your latest post"
                 sx={{
-                    appearance: "none",
-                    bgcolor: "transparent",
-                    border: 0,
-                    borderRadius: "inherit",
-                    color: spaceTextMuted,
-                    cursor: canOpenPost ? "pointer" : "default",
-                    font: "inherit",
-                    inset: 0,
-                    p: 0,
-                    position: "absolute",
-                    width: "100%",
+                    ...spaceTileCornerStyles(spacePostTileRadius),
+                    bgcolor: unavailable ? spaceSurface : "transparent",
+                    flex: 1,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    height: actionSize,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    position: "relative",
+                    "& button:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: -4,
+                    },
                 }}
             >
-                {(coverUrl || thumbHashDataURL) && !unavailable ? (
-                    <>
-                        {thumbHashDataURL && (
-                            <Box
-                                component="img"
-                                alt=""
-                                aria-hidden
-                                src={thumbHashDataURL}
-                                sx={{
-                                    filter: "blur(14px)",
-                                    height: "100%",
-                                    inset: 0,
-                                    objectFit: "cover",
-                                    position: "absolute",
-                                    transform: "scale(1.08)",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
-                        {coverUrl && (
-                            <Box
-                                component="img"
-                                alt={
-                                    isEmpty
-                                        ? ""
-                                        : post?.caption || "Your latest post"
-                                }
-                                src={coverUrl}
-                                onError={() =>
-                                    post &&
-                                    setLoadedImage({ post, failed: true })
-                                }
-                                sx={{
-                                    display: "block",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    position: "relative",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
-                    </>
-                ) : !loading ? (
-                    <Box
-                        sx={{
-                            fontSize: 15,
-                            pb: "56px",
-                            px: "var(--space-tile-padding)",
-                        }}
-                    >
-                        Couldn&apos;t load your latest post
-                    </Box>
-                ) : null}
-                {isEmpty && (
-                    <Box
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "rgba(0, 0, 0, 0.18)",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "6px",
-                            inset: 0,
-                            justifyContent: "center",
-                            position: "absolute",
-                            px: "var(--space-tile-padding)",
-                            textAlign: "center",
-                        }}
-                    >
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label="Open your posts"
+                    disabled={!canOpenPost}
+                    onClick={onOpenPost}
+                    sx={{
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        borderRadius: "inherit",
+                        color: spaceTextMuted,
+                        cursor: canOpenPost ? "pointer" : "default",
+                        font: "inherit",
+                        inset: 0,
+                        p: 0,
+                        position: "absolute",
+                        width: "100%",
+                    }}
+                >
+                    {(coverUrl || thumbHashDataURL) && !unavailable ? (
+                        <>
+                            {thumbHashDataURL && (
+                                <Box
+                                    component="img"
+                                    alt=""
+                                    aria-hidden
+                                    src={thumbHashDataURL}
+                                    sx={{
+                                        filter: "blur(14px)",
+                                        height: "100%",
+                                        inset: 0,
+                                        objectFit: "cover",
+                                        position: "absolute",
+                                        transform: "scale(1.08)",
+                                        width: "100%",
+                                    }}
+                                />
+                            )}
+                            {coverUrl && (
+                                <Box
+                                    component="img"
+                                    alt={
+                                        isEmpty
+                                            ? ""
+                                            : post?.caption ||
+                                              "Your latest post"
+                                    }
+                                    src={coverUrl}
+                                    onError={() =>
+                                        post &&
+                                        setLoadedImage({ post, failed: true })
+                                    }
+                                    sx={{
+                                        display: "block",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        position: "relative",
+                                        width: "100%",
+                                    }}
+                                />
+                            )}
+                        </>
+                    ) : !loading ? (
                         <Box
-                            component="span"
                             sx={{
-                                bgcolor: "rgba(249, 252, 239, 0.94)",
-                                borderRadius: "999px",
-                                color: "#24351B",
                                 fontSize: 12,
-                                fontWeight: 600,
                                 lineHeight: "18px",
-                                px: "12px",
-                                py: "3px",
+                                pl: `calc(var(--space-tile-padding) * 2 + ${avatarSize}px)`,
+                                pr: "var(--space-tile-padding)",
+                                textAlign: "left",
+                            }}
+                        >
+                            Couldn&apos;t load your latest post
+                        </Box>
+                    ) : null}
+                    {isEmpty && (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "rgba(0, 0, 0, 0.4)",
+                                color: "#FFFFFF",
+                                display: "flex",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                inset: 0,
+                                lineHeight: "18px",
+                                pl: `calc(var(--space-tile-padding) * 2 + ${avatarSize}px)`,
+                                position: "absolute",
+                                pr: "var(--space-tile-padding)",
+                                textAlign: "left",
                             }}
                         >
                             Your latest post will show up here
                         </Box>
-                        <Box
-                            component="span"
-                            sx={{
-                                backdropFilter: "blur(12px)",
-                                bgcolor: "rgba(28, 28, 30, 0.48)",
-                                borderRadius: "999px",
-                                color: "#E3E7DA",
-                                fontSize: 12,
-                                fontWeight: 500,
-                                lineHeight: "18px",
-                                px: "10px",
-                                py: "3px",
-                            }}
-                        >
-                            Share a little moment from your day!
-                        </Box>
-                    </Box>
-                )}
-            </Box>
-            <Box
-                sx={{
-                    bottom: 0,
-                    height: "50%",
-                    left: 0,
-                    pointerEvents: "none",
-                    position: "absolute",
-                    right: 0,
-                }}
-            >
+                    )}
+                </Box>
                 <Box
                     component="button"
                     type="button"
@@ -337,15 +305,15 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         bgcolor: "transparent",
                         border: 0,
                         borderRadius: "50%",
-                        bottom: spaceTileCircleInset(avatarSize),
                         cursor: onOpenProfile ? "pointer" : "default",
                         display: "flex",
                         height: avatarSize,
                         justifyContent: "center",
                         left: spaceTileCircleInset(avatarSize),
                         p: 0,
-                        pointerEvents: "auto",
                         position: "absolute",
+                        top: "50%",
+                        transform: "translateY(-50%)",
                         width: avatarSize,
                     }}
                 >
@@ -376,45 +344,45 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         )}
                     </Box>
                 </Box>
-                <Box
-                    className="green-bg"
-                    component="button"
-                    type="button"
-                    aria-label="New post"
-                    disabled={isNewPostDisabled}
-                    onClick={onNewPost}
-                    sx={{
-                        alignItems: "center",
-                        appearance: "none",
-                        bgcolor: green,
-                        border: 0,
-                        borderRadius: "50%",
-                        bottom: spaceTileCircleInset(actionSize),
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.32)",
-                        color: "#FFFFFF",
-                        cursor: isNewPostDisabled ? "default" : "pointer",
-                        display: "flex",
-                        height: actionSize,
-                        justifyContent: "center",
-                        opacity: isNewPostDisabled ? 0.6 : 1,
-                        p: 0,
-                        pointerEvents: "auto",
-                        position: "absolute",
-                        right: spaceTileCircleInset(actionSize),
-                        width: actionSize,
-                        "&:hover": { bgcolor: "#07B422" },
-                        "&:focus-visible": { outlineColor: "#FFFFFF" },
-                    }}
-                >
-                    <HugeiconsIcon icon={Add01Icon} size={32} strokeWidth={2} />
-                </Box>
+                {publishPhase && (
+                    <PostStatus
+                        phase={publishPhase}
+                        expiresAtMs={postPublication?.statusExpiresAtMs}
+                    />
+                )}
             </Box>
-            {publishPhase && (
-                <PostStatus
-                    phase={publishPhase}
-                    expiresAtMs={postPublication?.statusExpiresAtMs}
-                />
-            )}
+            <Box
+                className="green-bg"
+                component="button"
+                type="button"
+                aria-label="New post"
+                disabled={isNewPostDisabled}
+                onClick={onNewPost}
+                sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: green,
+                    border: 0,
+                    borderRadius: "50%",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.32)",
+                    color: "#FFFFFF",
+                    cursor: isNewPostDisabled ? "default" : "pointer",
+                    display: "flex",
+                    flexShrink: 0,
+                    height: actionSize,
+                    justifyContent: "center",
+                    opacity: isNewPostDisabled ? 0.6 : 1,
+                    p: 0,
+                    width: actionSize,
+                    "&:hover": { bgcolor: "#07B422" },
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 3,
+                    },
+                }}
+            >
+                <HugeiconsIcon icon={Add01Icon} size={32} strokeWidth={2} />
+            </Box>
         </Box>
     );
 };
