@@ -1,3 +1,4 @@
+import { LockerMenuOption, LockerOverflowMenu } from "@/components/LockerMenu";
 import {
     canLeaveCollection,
     canManageCollectionSharing,
@@ -17,14 +18,9 @@ import {
     DialogTitle,
     IconButton,
     Stack,
-    TextField,
     Typography,
 } from "@mui/material";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
-import {
-    OverflowMenu,
-    OverflowMenuOption,
-} from "ente-base/components/OverflowMenu";
 import { SidebarDrawer } from "ente-base/components/mui/SidebarDrawer";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
@@ -35,6 +31,16 @@ import {
 } from "ente-contacts";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FormField } from "./createItemDialog/ItemFormFields";
+import {
+    lockerSheetContainerSx,
+    lockerSheetPaperSx,
+} from "./locker-dialog-styles";
+import {
+    lockerColorSx,
+    lockerTextBodyBoldSx,
+    lockerTextH2Sx,
+} from "./locker-tokens";
 
 interface LockerCollectionShareDrawerProps {
     open: boolean;
@@ -278,18 +284,18 @@ export const LockerCollectionShareDrawer: React.FC<
                 canManageParticipants &&
                 participant.id !== currentUser.id &&
                 participant.email ? (
-                    <OverflowMenu
+                    <LockerOverflowMenu
                         ariaID={`sharee-${participant.id}`}
                         triggerButtonIcon={<MoreVertIcon />}
                         triggerButtonSxProps={{ color: "text.faint" }}
                     >
-                        <OverflowMenuOption
-                            color="critical"
+                        <LockerMenuOption
+                            critical
                             onClick={() => confirmRemoveViewer(participant)}
                         >
                             {t("removeParticipant")}
-                        </OverflowMenuOption>
-                    </OverflowMenu>
+                        </LockerMenuOption>
+                    </LockerOverflowMenu>
                 ) : undefined,
         })),
     ];
@@ -419,11 +425,23 @@ export const LockerCollectionShareDrawer: React.FC<
 
                         {canLeaveSharedCollection && (
                             <Button
-                                color="critical"
-                                variant="outlined"
+                                color="primary"
+                                variant="contained"
                                 startIcon={<LogoutOutlinedIcon />}
                                 onClick={() => onLeaveCollection(collection)}
-                                sx={{ minHeight: 48, borderRadius: "14px" }}
+                                sx={(theme) => ({
+                                    ...lockerTextBodyBoldSx,
+                                    minHeight: 52,
+                                    borderRadius: "20px",
+                                    textTransform: "none",
+                                    ...lockerColorSx(theme, {
+                                        backgroundColor: "primary",
+                                        color: "specialWhite",
+                                    }),
+                                    "&:hover": lockerColorSx(theme, {
+                                        backgroundColor: "primaryDark",
+                                    }),
+                                })}
                             >
                                 {t("leaveCollection")}
                             </Button>
@@ -433,6 +451,10 @@ export const LockerCollectionShareDrawer: React.FC<
             </SidebarDrawer>
 
             <Dialog
+                slotProps={{
+                    paper: { sx: lockerSheetPaperSx },
+                    container: { sx: lockerSheetContainerSx },
+                }}
                 open={addViewerOpen}
                 onClose={handleCloseAddViewer}
                 fullWidth
@@ -440,15 +462,20 @@ export const LockerCollectionShareDrawer: React.FC<
             >
                 <DialogTitle
                     sx={(theme) => ({
-                        ...theme.applyStyles("light", {}),
-                        color: "#FFFFFF",
+                        ...lockerTextH2Sx,
+                        "&&&": { p: 0 },
+                        minHeight: 38,
+                        display: "flex",
+                        alignItems: "center",
+                        mb: 2.5,
+                        ...lockerColorSx(theme, { color: "textBase" }),
                     })}
                 >
                     {t("addEmail")}
                 </DialogTitle>
-                <DialogContent>
-                    <Stack sx={{ gap: 2, pt: 0.25, pb: 1 }}>
-                        <TextField
+                <DialogContent sx={{ "&&&": { p: 0 } }}>
+                    <Stack sx={{ gap: 3 }}>
+                        <FormField
                             type="email"
                             label={t("enterEmail")}
                             value={viewerEmail}
@@ -459,42 +486,12 @@ export const LockerCollectionShareDrawer: React.FC<
                             autoFocus
                             fullWidth
                             error={!!viewerEmailError}
-                            helperText={viewerEmailError ?? " "}
+                            helperText={viewerEmailError ?? undefined}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter") {
                                     void handleAddViewer();
                                 }
                             }}
-                            sx={(theme) => ({
-                                "& .MuiInputLabel-root": {
-                                    color: "rgba(255, 255, 255, 0.72)",
-                                },
-                                "& .MuiInputLabel-root.Mui-focused": {
-                                    color: "#FFFFFF",
-                                },
-                                "& .MuiInputBase-input": { color: "#FFFFFF" },
-                                "& .MuiFormHelperText-root": {
-                                    color: viewerEmailError
-                                        ? theme.vars.palette.critical.main
-                                        : "rgba(255, 255, 255, 0.64)",
-                                },
-                                ...theme.applyStyles("light", {
-                                    "& .MuiInputLabel-root": {
-                                        color: theme.vars.palette.text.muted,
-                                    },
-                                    "& .MuiInputLabel-root.Mui-focused": {
-                                        color: theme.vars.palette.text.base,
-                                    },
-                                    "& .MuiInputBase-input": {
-                                        color: theme.vars.palette.text.base,
-                                    },
-                                    "& .MuiFormHelperText-root": {
-                                        color: viewerEmailError
-                                            ? theme.vars.palette.critical.main
-                                            : theme.vars.palette.text.muted,
-                                    },
-                                }),
-                            })}
                         />
                         <Stack direction="row" sx={{ gap: 1 }}>
                             <Button
@@ -503,9 +500,12 @@ export const LockerCollectionShareDrawer: React.FC<
                                 onClick={handleCloseAddViewer}
                                 disabled={isSubmittingViewer}
                                 sx={(theme) => ({
-                                    color: "#FFFFFF",
-                                    ...theme.applyStyles("light", {
-                                        color: theme.vars.palette.text.base,
+                                    ...lockerTextBodyBoldSx,
+                                    minHeight: 52,
+                                    borderRadius: "20px",
+                                    ...lockerColorSx(theme, {
+                                        backgroundColor: "fillDark",
+                                        color: "textBase",
                                     }),
                                 })}
                             >
@@ -516,7 +516,22 @@ export const LockerCollectionShareDrawer: React.FC<
                                 variant="contained"
                                 onClick={() => void handleAddViewer()}
                                 disabled={isSubmittingViewer}
-                                sx={{ color: "#FFFFFF" }}
+                                sx={(theme) => ({
+                                    ...lockerTextBodyBoldSx,
+                                    minHeight: 52,
+                                    borderRadius: "20px",
+                                    ...lockerColorSx(theme, {
+                                        backgroundColor: "primary",
+                                        color: "specialWhite",
+                                    }),
+                                    "&:hover": lockerColorSx(theme, {
+                                        backgroundColor: "primaryDark",
+                                    }),
+                                    "&.Mui-disabled": lockerColorSx(theme, {
+                                        backgroundColor: "fillDarkest",
+                                        color: "textLighter",
+                                    }),
+                                })}
                             >
                                 {isSubmittingViewer
                                     ? t("sharing")

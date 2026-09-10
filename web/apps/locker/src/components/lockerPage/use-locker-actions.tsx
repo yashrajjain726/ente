@@ -33,14 +33,11 @@ import type {
     LockerUploadCandidate,
 } from "@/types";
 import { getItemTitle, isCollectionOwner } from "@/types";
-import { Box } from "@mui/material";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
-import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import log from "ente-base/log";
 import { t } from "i18next";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Trans } from "react-i18next";
 import { filterNonEmptyUploadItems } from "../createItemDialog/file-upload-helpers";
 import type { CreateItemDialogEditItem } from "../createItemDialog/use-create-item-dialog-state";
 import type { EmptyTrashDialogState } from "./EmptyTrashDialog";
@@ -66,6 +63,17 @@ interface FileSystemDirectoryReader {
 type FileSystemDirectoryEntry = FileSystemEntry & {
     createReader: () => FileSystemDirectoryReader;
 };
+
+export interface ConfirmDialogState {
+    illustration: string;
+    title: string;
+    body: React.ReactNode;
+    confirmLabel: string;
+    tone: "critical" | "primary";
+    action: () => Promise<void>;
+    loading: boolean;
+    error?: string;
+}
 
 export interface DeleteCollectionDialogState {
     collectionID: number;
@@ -301,7 +309,6 @@ interface UseLockerActionsProps {
     refreshData: (masterKey?: string) => Promise<void>;
     navigateHome: () => void;
     removeCollectionFromState: (collectionID: number) => void;
-    showMiniDialog: (attributes: MiniDialogAttributes) => void;
     trashLastUpdatedAt: number;
 }
 
@@ -314,7 +321,6 @@ export const useLockerActions = ({
     refreshData,
     navigateHome,
     removeCollectionFromState,
-    showMiniDialog,
     trashLastUpdatedAt,
 }: UseLockerActionsProps) => {
     const currentUserID = savedLocalUser()?.id;
@@ -332,6 +338,9 @@ export const useLockerActions = ({
     const [emptyTrashDialog, setEmptyTrashDialog] =
         useState<EmptyTrashDialogState | null>(null);
     const emptyTrashDialogRef = useRef<EmptyTrashDialogState | null>(null);
+    const [confirmDialog, setConfirmDialog] =
+        useState<ConfirmDialogState | null>(null);
+    const confirmDialogRef = useRef<ConfirmDialogState | null>(null);
     const [toast, setToast] = useState<string | null>(null);
     const [shareCollectionID, setShareCollectionID] = useState<number | null>(
         null,
@@ -354,6 +363,12 @@ export const useLockerActions = ({
             emptyTrashDialogRef.current = emptyTrashDialog;
         }
     }, [emptyTrashDialog]);
+
+    useEffect(() => {
+        if (confirmDialog) {
+            confirmDialogRef.current = confirmDialog;
+        }
+    }, [confirmDialog]);
 
     useEffect(() => {
         shareCollectionIDRef.current = shareCollectionID;
@@ -412,6 +427,12 @@ export const useLockerActions = ({
 
     const visibleEmptyTrashDialog =
         emptyTrashDialog ?? emptyTrashDialogRef.current;
+
+    const visibleConfirmDialog = confirmDialog ?? confirmDialogRef.current;
+
+    const closeConfirmDialog = useCallback(() => {
+        if (!confirmDialog?.loading) setConfirmDialog(null);
+    }, [confirmDialog]);
 
     const uploadPreflightFailureMessage = useCallback(
         (
@@ -562,37 +583,23 @@ export const useLockerActions = ({
                 selectedCollectionID,
             );
 
-            showMiniDialog({
-                title: t("delete"),
-                message: (
-                    <Trans
-                        i18nKey="deleteFileConfirmation"
-                        components={{
-                            fileName: (
-                                <Box
-                                    component="span"
-                                    sx={{ fontWeight: 700, color: "text.base" }}
-                                >
-                                    {getItemTitle(item)}
-                                </Box>
-                            ),
-                        }}
-                    />
-                ),
-                continue: {
-                    text: t("delete"),
-                    color: "critical",
-                    action: async () => {
-                        for (const collectionID of collectionIDs) {
-                            await trashFiles([item.id], collectionID);
-                        }
-                        await refreshData();
-                        setToast(t("fileDeletedSuccessfully"));
-                    },
+            setConfirmDialog({
+                illustration: "/images/file_delete_icon.png",
+                title: t("areYouSure"),
+                body: t("deleteMultipleFilesDialogBody", { count: 1 }),
+                confirmLabel: t("yesDeleteFiles", { count: 1 }),
+                tone: "critical",
+                action: async () => {
+                    for (const collectionID of collectionIDs) {
+                        await trashFiles([item.id], collectionID);
+                    }
+                    await refreshData();
+                    setToast(t("fileDeletedSuccessfully"));
                 },
+                loading: false,
             });
         },
-        [refreshData, selectedCollectionID, showMiniDialog],
+        [refreshData, selectedCollectionID],
     );
 
     const handleDeleteItems = useCallback(
@@ -601,51 +608,46 @@ export const useLockerActions = ({
                 return;
             }
 
-            showMiniDialog({
-                title: t("delete"),
-                message: t("deleteMultipleFilesDialogBody", {
+            setConfirmDialog({
+                illustration: "/images/file_delete_icon.png",
+                title: t("areYouSure"),
+                body: t("deleteMultipleFilesDialogBody", {
                     count: items.length,
                 }),
-                continue: {
-                    text: t("yesDeleteFiles", { count: items.length }),
-                    color: "critical",
-                    action: async () => {
-                        const fileIDsByCollection = new Map<
-                            number,
-                            Set<number>
-                        >();
-                        for (const item of items) {
-                            const collectionIDs = collectionIDsForItemMutation(
-                                item,
-                                selectedCollectionID,
-                            );
-                            for (const collectionID of collectionIDs) {
-                                const existing =
-                                    fileIDsByCollection.get(collectionID) ??
-                                    new Set<number>();
-                                existing.add(item.id);
-                                fileIDsByCollection.set(collectionID, existing);
-                            }
-                        }
-
-                        for (const [
-                            collectionID,
-                            fileIDs,
-                        ] of fileIDsByCollection.entries()) {
-                            await trashFiles([...fileIDs], collectionID);
-                        }
-
-                        await refreshData();
-                        setToast(
-                            t("filesDeletedSuccessfully", {
-                                count: items.length,
-                            }),
+                confirmLabel: t("yesDeleteFiles", { count: items.length }),
+                tone: "critical",
+                action: async () => {
+                    const fileIDsByCollection = new Map<number, Set<number>>();
+                    for (const item of items) {
+                        const collectionIDs = collectionIDsForItemMutation(
+                            item,
+                            selectedCollectionID,
                         );
-                    },
+                        for (const collectionID of collectionIDs) {
+                            const existing =
+                                fileIDsByCollection.get(collectionID) ??
+                                new Set<number>();
+                            existing.add(item.id);
+                            fileIDsByCollection.set(collectionID, existing);
+                        }
+                    }
+
+                    for (const [
+                        collectionID,
+                        fileIDs,
+                    ] of fileIDsByCollection.entries()) {
+                        await trashFiles([...fileIDs], collectionID);
+                    }
+
+                    await refreshData();
+                    setToast(
+                        t("filesDeletedSuccessfully", { count: items.length }),
+                    );
                 },
+                loading: false,
             });
         },
-        [refreshData, selectedCollectionID, showMiniDialog],
+        [refreshData, selectedCollectionID],
     );
 
     const handleEditItem = useCallback(
@@ -680,29 +682,25 @@ export const useLockerActions = ({
 
     const handlePermanentlyDelete = useCallback(
         (items: LockerItem[]) => {
-            showMiniDialog({
+            setConfirmDialog({
+                illustration: "/images/warning-red.png",
                 title: t("permanentlyDelete"),
-                message: t("permanentlyDeleteFilesBody", {
-                    count: items.length,
-                }),
-                continue: {
-                    text: t("permanentlyDelete"),
-                    color: "critical",
-                    action: async () => {
-                        await permanentlyDeleteFromTrash(
-                            items.map((item) => item.id),
-                        );
-                        await refreshData();
-                        setToast(
-                            t("filesDeletedPermanently", {
-                                count: items.length,
-                            }),
-                        );
-                    },
+                body: t("permanentlyDeleteFilesBody", { count: items.length }),
+                confirmLabel: t("permanentlyDelete"),
+                tone: "critical",
+                action: async () => {
+                    await permanentlyDeleteFromTrash(
+                        items.map((item) => item.id),
+                    );
+                    await refreshData();
+                    setToast(
+                        t("filesDeletedPermanently", { count: items.length }),
+                    );
                 },
+                loading: false,
             });
         },
-        [refreshData, showMiniDialog],
+        [refreshData],
     );
 
     const handleRestoreItem = useCallback(
@@ -751,6 +749,35 @@ export const useLockerActions = ({
             );
         }
     }, [emptyTrashDialog, refreshData, trashLastUpdatedAt]);
+
+    const handleConfirmDialogConfirm = useCallback(async () => {
+        if (!confirmDialog || confirmDialog.loading) {
+            return;
+        }
+
+        setConfirmDialog({ ...confirmDialog, loading: true, error: undefined });
+        try {
+            await confirmDialog.action();
+            setConfirmDialog(null);
+        } catch (error) {
+            log.error("Failed to confirm Locker action", error);
+            setConfirmDialog((current) =>
+                current
+                    ? {
+                          ...current,
+                          error:
+                              error instanceof Error
+                                  ? error.message
+                                  : t("generic_error"),
+                      }
+                    : current,
+            );
+        } finally {
+            setConfirmDialog((current) =>
+                current ? { ...current, loading: false } : current,
+            );
+        }
+    }, [confirmDialog]);
 
     const handleCreateCollection = useCallback(
         async (name: string): Promise<number> => {
@@ -1045,32 +1072,31 @@ export const useLockerActions = ({
 
     const handleLeaveCollection = useCallback(
         (collection: LockerCollection) => {
-            showMiniDialog({
+            setConfirmDialog({
+                illustration: "/images/warning-grey.png",
                 title: t("leaveCollection"),
-                message: t("filesAddedByYouWillBeRemovedFromTheCollection"),
-                continue: {
-                    text: t("leaveCollection"),
-                    color: "critical",
-                    action: async () => {
-                        await leaveCollectionAPI(collection.id);
-                        if (shareCollectionIDRef.current === collection.id) {
-                            setShareCollectionID(null);
-                        }
-                        if (selectedCollectionIDRef.current === collection.id) {
-                            navigateHome();
-                        }
-                        removeCollectionFromState(collection.id);
-                        setToast(t("leaveCollectionSuccessfully"));
-                        void refreshCollectionsAfterMutation();
-                    },
+                body: t("filesAddedByYouWillBeRemovedFromTheCollection"),
+                confirmLabel: t("leaveCollection"),
+                tone: "primary",
+                action: async () => {
+                    await leaveCollectionAPI(collection.id);
+                    if (shareCollectionIDRef.current === collection.id) {
+                        setShareCollectionID(null);
+                    }
+                    if (selectedCollectionIDRef.current === collection.id) {
+                        navigateHome();
+                    }
+                    removeCollectionFromState(collection.id);
+                    setToast(t("leaveCollectionSuccessfully"));
+                    void refreshCollectionsAfterMutation();
                 },
+                loading: false,
             });
         },
         [
             navigateHome,
             refreshCollectionsAfterMutation,
             removeCollectionFromState,
-            showMiniDialog,
         ],
     );
 
@@ -1136,6 +1162,10 @@ export const useLockerActions = ({
     );
 
     return {
+        confirmDialog,
+        visibleConfirmDialog,
+        closeConfirmDialog,
+        handleConfirmDialogConfirm,
         createDialogOpen,
         deleteCollectionDialog,
         editItem,

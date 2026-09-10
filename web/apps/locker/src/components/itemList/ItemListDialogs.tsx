@@ -3,26 +3,25 @@ import {
     lockerPrimaryButtonSx,
 } from "@/components/createItemDialog/create-item-dialog-styles";
 import { FormField } from "@/components/createItemDialog/ItemFormFields";
+import { lockerMenuPaperSx } from "@/components/locker-dialog-styles";
 import {
     lockerColorSx,
     lockerTextBodyBoldSx,
+    lockerTextBodySx,
     lockerTextH2Sx,
     lockerTextMiniSx,
 } from "@/components/locker-tokens";
+import { LockerMenuFooter, LockerMenuOption } from "@/components/LockerMenu";
 import type { LockerCollection } from "@/types";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import {
     Box,
-    Button,
     Chip,
     Dialog,
-    DialogContent,
-    DialogTitle,
     IconButton,
     Menu,
-    MenuItem,
     Snackbar,
     Stack,
     Typography,
@@ -30,7 +29,11 @@ import {
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { t } from "i18next";
 import React from "react";
-import { lockerDialogPaperSx } from "../locker-dialog-styles";
+import {
+    lockerSheetContainerSx,
+    lockerSheetPaperSx,
+} from "../locker-dialog-styles";
+import { LockerConfirmDialog } from "../LockerConfirmDialog";
 import { LockerFileLinkDialog } from "../LockerFileLinkDialog";
 
 interface ItemListDialogsProps {
@@ -138,49 +141,26 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
             onDelete={onRequestDeleteFileLink}
         />
 
-        <Dialog
-            slotProps={{ paper: { sx: lockerDialogPaperSx } }}
+        <LockerConfirmDialog
             open={isDeleteFileLinkConfirmOpen}
+            illustration="/images/file_delete_icon.png"
+            title={t("deleteShareLinkDialogTitle")}
+            body={t("deleteShareLinkConfirmation")}
+            confirmLabel={t("delete")}
+            loading={isDeletingFileLink}
             onClose={() => {
                 if (!isDeletingFileLink) {
                     setDeleteFileLinkConfirmOpen(false);
                 }
             }}
-            fullWidth
-            maxWidth="xs"
-        >
-            <DialogTitle>{t("deleteShareLinkDialogTitle")}</DialogTitle>
-            <DialogContent>
-                <Stack sx={{ gap: 2.25 }}>
-                    <Typography sx={{ color: "text.muted" }}>
-                        {t("deleteShareLinkConfirmation")}
-                    </Typography>
-                    <Stack direction="row" sx={{ gap: 1 }}>
-                        <Button
-                            fullWidth
-                            color="secondary"
-                            disabled={isDeletingFileLink}
-                            onClick={() => setDeleteFileLinkConfirmOpen(false)}
-                            sx={{ minHeight: 44 }}
-                        >
-                            {t("cancel")}
-                        </Button>
-                        <LoadingButton
-                            fullWidth
-                            color="critical"
-                            loading={isDeletingFileLink}
-                            onClick={deleteFileLink}
-                            sx={{ minHeight: 44 }}
-                        >
-                            {t("deleteLink")}
-                        </LoadingButton>
-                    </Stack>
-                </Stack>
-            </DialogContent>
-        </Dialog>
+            onConfirm={deleteFileLink}
+        />
 
         <Dialog
-            slotProps={{ paper: { sx: lockerDialogPaperSx } }}
+            slotProps={{
+                paper: { sx: lockerSheetPaperSx },
+                container: { sx: lockerSheetContainerSx },
+            }}
             open={restoreDialogOpen}
             onClose={() => {
                 if (!restoringItem) {
@@ -190,69 +170,177 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
             fullWidth
             maxWidth="xs"
         >
-            <DialogTitle>{t("restoreToCollection")}</DialogTitle>
-            <DialogContent>
-                <Stack sx={{ gap: 1, pt: 0.25, pb: 1 }}>
+            <Stack>
+                <Stack
+                    direction="row"
+                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
+                >
+                    <Typography
+                        noWrap
+                        sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+                    >
+                        {t("restoreToCollection")}
+                    </Typography>
+                    <IconButton
+                        aria-label={t("cancel")}
+                        disabled={restoringItem}
+                        onClick={() => {
+                            if (!restoringItem) {
+                                onCloseRestoreDialog();
+                            }
+                        }}
+                        sx={(theme) => ({
+                            width: 36,
+                            height: 36,
+                            borderRadius: "50%",
+                            p: 0,
+                            flexShrink: 0,
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "fillLight",
+                                color: "iconColor",
+                            }),
+                            "&:hover": {
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "fillDark",
+                                }),
+                            },
+                        })}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={18}
+                            strokeWidth={1.5}
+                        />
+                    </IconButton>
+                </Stack>
+                <Typography
+                    sx={(theme) => ({
+                        ...lockerTextMiniSx,
+                        mt: 2.5,
+                        mb: 1,
+                        ...lockerColorSx(theme, { color: "textLight" }),
+                    })}
+                >
+                    {t("collections")}
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                     {restoreCollections.length > 0 ? (
                         restoreCollections.map((collection) => (
                             <Chip
                                 key={collection.id}
                                 label={collection.name}
-                                variant={
-                                    restoreCollectionID === collection.id
-                                        ? "filled"
-                                        : "outlined"
-                                }
-                                color={
-                                    restoreCollectionID === collection.id
-                                        ? "primary"
-                                        : "default"
+                                icon={
+                                    restoreCollectionID === collection.id ? (
+                                        <CheckRoundedIcon
+                                            sx={{ fontSize: 14 }}
+                                        />
+                                    ) : undefined
                                 }
                                 disabled={restoringItem}
                                 onClick={() =>
                                     setRestoreCollectionID(collection.id)
                                 }
+                                sx={(theme) => ({
+                                    height: 36,
+                                    borderRadius: "9999px",
+                                    px: "14px",
+                                    border: "1px solid",
+                                    ...lockerColorSx(theme, {
+                                        backgroundColor:
+                                            restoreCollectionID ===
+                                            collection.id
+                                                ? "primaryLight"
+                                                : "fillLight",
+                                        color:
+                                            restoreCollectionID ===
+                                            collection.id
+                                                ? "primary"
+                                                : "textBase",
+                                        ...(restoreCollectionID ===
+                                        collection.id
+                                            ? {
+                                                  borderColor:
+                                                      "primaryStroke" as const,
+                                              }
+                                            : {}),
+                                    }),
+                                    ...(restoreCollectionID === collection.id
+                                        ? {}
+                                        : { borderColor: "transparent" }),
+                                    "& .MuiChip-label": {
+                                        ...lockerTextBodySx,
+                                        px: 0,
+                                    },
+                                    "& .MuiChip-icon": {
+                                        ml: 0,
+                                        mr: 0.75,
+                                        ...lockerColorSx(theme, {
+                                            color: "primary",
+                                        }),
+                                    },
+                                })}
                             />
                         ))
                     ) : (
-                        <Typography variant="body" sx={{ color: "text.muted" }}>
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextBodySx,
+                                ...lockerColorSx(theme, { color: "textLight" }),
+                            })}
+                        >
                             {t("noCollectionsAvailableForSelection")}
                         </Typography>
                     )}
-                    {restoreError && (
-                        <Typography
-                            variant="small"
-                            sx={{ color: "critical.main" }}
-                        >
-                            {restoreError}
-                        </Typography>
-                    )}
-                    <LoadingButton
-                        variant="contained"
-                        loading={restoringItem}
-                        disabled={restoreCollectionID === null}
-                        onClick={onConfirmRestore}
-                        sx={{ mt: 1 }}
+                </Box>
+                {restoreError && (
+                    <Typography
+                        sx={(theme) => ({
+                            ...lockerTextMiniSx,
+                            mt: 1.5,
+                            ...lockerColorSx(theme, { color: "warning" }),
+                        })}
                     >
-                        {t("restore")}
-                    </LoadingButton>
-                </Stack>
-            </DialogContent>
+                        {restoreError}
+                    </Typography>
+                )}
+                <LoadingButton
+                    fullWidth
+                    variant="contained"
+                    loading={restoringItem}
+                    disabled={restoreCollectionID === null}
+                    onClick={onConfirmRestore}
+                    sx={(theme) => ({
+                        ...lockerTextBodyBoldSx,
+                        mt: 3,
+                        minHeight: 52,
+                        borderRadius: "20px",
+                        textTransform: "none",
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "primary",
+                            color: "specialWhite",
+                        }),
+                        "&:hover": {
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "primaryDark",
+                            }),
+                        },
+                        "&.Mui-disabled": {
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "fillDarkest",
+                                color: "textLighter",
+                            }),
+                        },
+                    })}
+                >
+                    {t("restore")}
+                </LoadingButton>
+            </Stack>
         </Dialog>
 
         <Dialog
             slotProps={{
-                paper: {
-                    sx: (theme) => ({
-                        ...lockerDialogPaperSx,
-                        borderRadius: "24px",
-                        width: "min(100%, 440px)",
-                        padding: "20px",
-                        ...lockerColorSx(theme, {
-                            backgroundColor: "backgroundBase",
-                        }),
-                    }),
-                },
+                paper: { sx: lockerSheetPaperSx },
+                container: { sx: lockerSheetContainerSx },
             }}
             open={renameCollectionOpen}
             onClose={() => {
@@ -344,17 +432,8 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
 
         <Dialog
             slotProps={{
-                paper: {
-                    sx: (theme) => ({
-                        ...lockerDialogPaperSx,
-                        borderRadius: "24px",
-                        width: "min(100%, 440px)",
-                        padding: "20px",
-                        ...lockerColorSx(theme, {
-                            backgroundColor: "backgroundBase",
-                        }),
-                    }),
-                },
+                paper: { sx: lockerSheetPaperSx },
+                container: { sx: lockerSheetContainerSx },
             }}
             open={createCollectionOpen}
             onClose={() => {
@@ -451,147 +530,37 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
             open={!!collectionFilterAnchorEl}
             onClose={closeCollectionFilterMenu}
             slotProps={{
-                paper: {
-                    sx: {
-                        mt: 1,
-                        width: "fit-content",
-                        minWidth: 0,
-                        maxWidth: "calc(100vw - 32px)",
-                        borderRadius: "18px",
-                        overflow: "hidden",
-                    },
-                },
+                paper: { sx: [lockerMenuPaperSx, { mt: 1 }] },
+                list: { disablePadding: true },
             }}
         >
-            <Box sx={{ px: 1, pt: 0, pb: 0, width: "fit-content" }}>
-                {dropdownHomeCollections.map((collection) => {
-                    const isSelected = homeSelectedCollectionIDs.includes(
-                        collection.id,
-                    );
-
-                    return (
-                        <MenuItem
-                            key={collection.id}
-                            onClick={() =>
-                                onToggleHomeCollection(collection.id)
-                            }
-                            sx={(theme) => ({
-                                gap: 1.25,
-                                px: 1,
-                                py: 1,
-                                my: "6px",
-                                borderRadius: "14px",
-                                alignItems: "center",
-                                width: "auto",
-                                color: isSelected
-                                    ? "primary.main"
-                                    : "text.base",
-                                backgroundColor: isSelected
-                                    ? "rgba(16, 113, 255, 0.10)"
-                                    : "transparent",
-                                "&:hover": {
-                                    backgroundColor: isSelected
-                                        ? "rgba(16, 113, 255, 0.14)"
-                                        : theme.vars.palette.fill.faint,
-                                },
-                            })}
-                        >
-                            <CheckCircleRoundedIcon
-                                sx={{
-                                    fontSize: 20,
-                                    color: isSelected
-                                        ? "primary.main"
-                                        : "text.faint",
-                                    opacity: isSelected ? 1 : 0.22,
-                                    flexShrink: 0,
-                                }}
-                            />
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Typography
-                                    variant="body"
-                                    sx={{
-                                        fontWeight: isSelected ? 700 : 500,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.75,
-                                        minWidth: 0,
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                            minWidth: 0,
-                                        }}
-                                    >
-                                        {collection.name}
-                                    </Box>
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            color: "text.muted",
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        {"·"}
-                                    </Box>
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            color: "text.muted",
-                                            fontWeight: 500,
-                                            flexShrink: 0,
-                                            whiteSpace: "nowrap",
-                                        }}
-                                    >
-                                        {new Intl.NumberFormat().format(
-                                            collection.items.length,
-                                        )}
-                                    </Box>
-                                </Typography>
-                            </Box>
-                        </MenuItem>
-                    );
-                })}
-                {homeSelectedCollectionIDs.length > 0 && (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            pt: "12px",
-                            pb: 0,
-                        }}
+            {dropdownHomeCollections.map((collection) => {
+                const isSelected = homeSelectedCollectionIDs.includes(
+                    collection.id,
+                );
+                return (
+                    <LockerMenuOption
+                        key={collection.id}
+                        onClick={() => onToggleHomeCollection(collection.id)}
+                        selected={isSelected}
+                        secondary={new Intl.NumberFormat().format(
+                            collection.items.length,
+                        )}
                     >
-                        <Button
-                            color="secondary"
-                            onClick={() => {
-                                clearHomeCollectionSelection();
-                                closeCollectionFilterMenu();
-                            }}
-                            sx={{
-                                minWidth: "auto",
-                                px: 1,
-                                py: 0.5,
-                                backgroundColor: "transparent",
-                                color: "text.muted",
-                                fontSize: "0.8125rem",
-                                fontWeight: 500,
-                                textDecoration: "underline",
-                                textUnderlineOffset: "3px",
-                                "&:hover": {
-                                    backgroundColor: "transparent",
-                                    color: "text.secondary",
-                                },
-                            }}
-                        >
-                            {t("clearSelection")}
-                        </Button>
-                    </Box>
-                )}
-            </Box>
+                        {collection.name}
+                    </LockerMenuOption>
+                );
+            })}
+            {homeSelectedCollectionIDs.length > 0 && (
+                <LockerMenuFooter
+                    onClick={() => {
+                        clearHomeCollectionSelection();
+                        closeCollectionFilterMenu();
+                    }}
+                >
+                    {t("clearSelection")}
+                </LockerMenuFooter>
+            )}
         </Menu>
 
         <Snackbar

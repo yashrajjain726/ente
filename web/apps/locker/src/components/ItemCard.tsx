@@ -1,4 +1,5 @@
 import { lockerItemIcon } from "@/components/locker-item-icons";
+import { LockerMenuOption, LockerOverflowMenu } from "@/components/LockerMenu";
 import { downloadLockerFile } from "@/services/remote";
 import type { GenericFileData, LockerItem } from "@/types";
 import { getItemTitle, hasDownloadableObject } from "@/types";
@@ -18,16 +19,10 @@ import {
     Box,
     ButtonBase,
     CircularProgress,
-    IconButton,
     Snackbar,
     Stack,
-    Tooltip,
     Typography,
 } from "@mui/material";
-import {
-    OverflowMenu,
-    OverflowMenuOption,
-} from "ente-base/components/OverflowMenu";
 import { formatTimeAgo } from "ente-base/date";
 import log from "ente-base/log";
 import { t } from "i18next";
@@ -356,7 +351,7 @@ const ItemOverflowMenu: React.FC<{
     deleteDisabledHint?: string;
     onShareLink?: (item: LockerItem) => void;
 }> = ({ item, onEdit, onDelete, deleteDisabledHint, onShareLink }) => (
-    <OverflowMenu
+    <LockerOverflowMenu
         ariaID={`item-menu-${item.id}`}
         triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
         triggerButtonSxProps={(theme) => ({
@@ -367,42 +362,42 @@ const ItemOverflowMenu: React.FC<{
         })}
     >
         {onEdit && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<EditOutlinedIcon />}
                 onClick={() => onEdit(item)}
             >
                 {t("edit")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
         {onShareLink && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<ShareOutlinedIcon />}
                 onClick={() => onShareLink(item)}
             >
                 {t("share")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
         {onDelete ? (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<DeleteOutlinedIcon />}
-                color="critical"
+                critical
                 onClick={() => onDelete(item)}
             >
                 {t("delete")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         ) : (
             deleteDisabledHint && (
-                <OverflowMenuOption
+                <LockerMenuOption
                     startIcon={<DeleteOutlinedIcon />}
-                    color="critical"
+                    critical
                     disabled
                     onClick={() => undefined}
                 >
                     {t("delete")}
-                </OverflowMenuOption>
+                </LockerMenuOption>
             )
         )}
-    </OverflowMenu>
+    </LockerOverflowMenu>
 );
 
 const TrashActions: React.FC<{
@@ -413,38 +408,49 @@ const TrashActions: React.FC<{
     <Stack
         direction="row"
         sx={{ gap: 0, flexShrink: 0 }}
+        data-no-long-press="true"
         onClick={(e) => e.stopPropagation()}
     >
-        {onRestore && (
-            <Tooltip title={t("restore")}>
-                <IconButton
-                    size="small"
+        <LockerOverflowMenu
+            ariaID={`trash-item-menu-${item.id}`}
+            triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
+            triggerButtonSxProps={(theme) => ({
+                width: 24,
+                height: 24,
+                p: 0,
+                ...lockerColorSx(theme, { color: "textLight" }),
+            })}
+        >
+            {onRestore && (
+                <LockerMenuOption
                     onClick={() => onRestore(item)}
-                    sx={(theme) => lockerColorSx(theme, { color: "iconColor" })}
+                    startIcon={
+                        <HugeiconsIcon
+                            icon={ArrowReloadHorizontalIcon}
+                            size={18}
+                            strokeWidth={1.5}
+                        />
+                    }
                 >
-                    <HugeiconsIcon
-                        icon={ArrowReloadHorizontalIcon}
-                        size={18}
-                        strokeWidth={1.5}
-                    />
-                </IconButton>
-            </Tooltip>
-        )}
-        {onPermanentlyDelete && (
-            <Tooltip title={t("permanentlyDelete")}>
-                <IconButton
-                    size="small"
+                    {t("restore")}
+                </LockerMenuOption>
+            )}
+            {onPermanentlyDelete && (
+                <LockerMenuOption
                     onClick={() => onPermanentlyDelete([item])}
-                    sx={(theme) => lockerColorSx(theme, { color: "warning" })}
+                    startIcon={
+                        <HugeiconsIcon
+                            icon={Delete02Icon}
+                            size={18}
+                            strokeWidth={1.5}
+                        />
+                    }
+                    critical
                 >
-                    <HugeiconsIcon
-                        icon={Delete02Icon}
-                        size={18}
-                        strokeWidth={1.5}
-                    />
-                </IconButton>
-            </Tooltip>
-        )}
+                    {t("permanentlyDelete")}
+                </LockerMenuOption>
+            )}
+        </LockerOverflowMenu>
     </Stack>
 );
 
