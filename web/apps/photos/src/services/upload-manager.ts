@@ -161,9 +161,7 @@ export type UploadItemWithCollection = UploadAsset & {
 };
 
 class UIService {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    private progressUpdater: ProgressUpdater;
+    private progressUpdater!: ProgressUpdater;
 
     private uploadPhase: UploadPhase = "preparing";
     private filenames = new Map<number, string>();

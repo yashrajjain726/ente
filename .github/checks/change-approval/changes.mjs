@@ -97,6 +97,26 @@ export function readChanges(base, local) {
                 .filter(Boolean),
         readBefore,
         readAfter,
+        readAddedLines: (path) => {
+            if (!sizes.has(path)) return "";
+            if (!pathsBefore.has(path)) return readAfter(path);
+            return git(
+                "--literal-pathspecs",
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--unified=0",
+                "--output-indicator-new=>",
+                mergeBase,
+                ...(local ? [] : ["HEAD"]),
+                "--",
+                path,
+            )
+                .split("\n")
+                .filter((line) => line.startsWith(">"))
+                .map((line) => line.slice(1))
+                .join("\n");
+        },
         readVersions: (path) => ({
             before: pathsBefore.has(path) ? readBefore(path) : "",
             after: sizes.has(path) ? readAfter(path) : "",
