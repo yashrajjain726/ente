@@ -1,10 +1,10 @@
+import { updateItemCollections } from "@/services/collection-membership";
 import {
     createInfoItem,
     setItemImportant,
     trashFiles,
     updateFileItem,
     updateInfoItem,
-    updateItemCollections,
 } from "@/services/remote";
 import type { LockerCollection, LockerItem, LockerItemType } from "@/types";
 import { getItemTitle } from "@/types";

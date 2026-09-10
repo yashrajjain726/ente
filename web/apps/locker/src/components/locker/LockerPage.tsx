@@ -15,7 +15,7 @@ import { LockerNavbar } from "@/components/LockerNavbar";
 import { LockerSidebar } from "@/components/sidebar/LockerSidebar";
 import { LockerConfirmDialog } from "@/components/ui/LockerConfirmDialog";
 import { useSetupLockerI18n } from "@/i18n/locker";
-import { fetchCollectionSharees } from "@/services/remote";
+import { fetchCollectionSharees } from "@/services/collection-sharing";
 import { lockerColorSx } from "@/styles/tokens";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";

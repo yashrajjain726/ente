@@ -81,3 +81,11 @@ export const unshareCollection = async (
     ensureOk(res);
     return parseAndCacheSharees(collectionID, await res.json());
 };
+
+export const leaveCollection = async (collectionID: number): Promise<void> => {
+    const res = await fetch(
+        await apiURL(`/collections/leave/${collectionID}`),
+        { method: "POST", headers: await authenticatedRequestHeaders() },
+    );
+    ensureOk(res);
+};
