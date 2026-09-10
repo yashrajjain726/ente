@@ -334,7 +334,8 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
     setState(() {
       final index = widget.selected.indexWhere(
         (selected) =>
-            selected.email.toLowerCase() == suggestion.email.toLowerCase(),
+            selected.email.trim().toLowerCase() ==
+            suggestion.email.trim().toLowerCase(),
       );
       if (index == -1) {
         widget.selected.add(suggestion);
@@ -372,7 +373,8 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
 
   bool _isSelected(String email) {
     return widget.selected.any(
-      (selected) => selected.email.toLowerCase() == email.toLowerCase(),
+      (selected) =>
+          selected.email.trim().toLowerCase() == email.trim().toLowerCase(),
     );
   }
 

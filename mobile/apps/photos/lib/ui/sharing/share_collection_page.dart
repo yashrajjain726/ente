@@ -76,10 +76,12 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
 
     if (isOwner) {
       children.addAll([
-        if (sortedSharees.isEmpty)
-          ShareSectionDescription(context.strings.emptyAlbumShareMessage)
-        else
-          _participantRoster(userID, sortedSharees),
+        if (sortedSharees.isNotEmpty)
+          _participantRoster(userID, sortedSharees)
+        else if (!hasUrl) ...[
+          Center(child: Image.asset("assets/on_device.png")),
+          ShareSectionDescription(context.strings.emptyAlbumShareMessage),
+        ],
         const SizedBox(height: Spacing.sm),
         ButtonComponent(
           label: context.strings.addPerson,

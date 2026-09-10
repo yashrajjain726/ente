@@ -5138,7 +5138,7 @@
       }
     }
   },
-  "leaveAlbumBody": "{count, plural, =0{You will lose access to this album straight away.} one{They will lose access to the {count} photo you added.} other{They will lose access to the {count} photos you added.}}",
+  "leaveAlbumBody": "{count, plural, =0{You will lose access to this album straight away.} one{You will lose access to this album straight away. The {count} photo you added will be removed.} other{You will lose access to this album straight away. The {count} photos you added will be removed.}}",
   "@leaveAlbumBody": {
     "placeholders": {
       "count": {
