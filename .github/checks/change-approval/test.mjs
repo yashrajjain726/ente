@@ -824,13 +824,14 @@ test("reordering Cargo workspace selection lists needs no approval", (t) => {
     }
 });
 
-test("Rust lint declarations, reasons and conditions need approval", (t) => {
+test("Rust lint changes need approval except for removed suppressions", (t) => {
     const expect = '#[expect(dead_code, reason = "Shared helper")]';
     const body = "fn helper() {}";
-    for (const [before, after] of [
+    for (const [before, after, approval = true] of [
         [body, `${expect}\n${body}`],
-        [`${expect}\n${body}`, body],
-        [`${expect}\n${body}`, null],
+        [`${expect}\n${body}`, body, false],
+        [`${expect}\n${body}`, null, false],
+        [`#[allow(dead_code)]\n${body}`, body, false],
         [
             `${expect}\n${body}`,
             `${expect.replace("Shared helper", "New reason")}\n${body}`,
@@ -844,7 +845,11 @@ test("Rust lint declarations, reasons and conditions need approval", (t) => {
             `#[cfg_attr(unix, expect(dead_code))]\n${body}`,
             `#[cfg_attr(test, expect(dead_code))]\n${body}`,
         ],
-        [`#[cfg_attr(unix, cfg_attr(test, expect(dead_code)))]\n${body}`, body],
+        [
+            `#[cfg_attr(unix, cfg_attr(test, expect(dead_code)))]\n${body}`,
+            body,
+            false,
+        ],
         [
             `#[path = "a.rs"]\n${expect}\nmod support;`,
             `#[path = "b.rs"]\n${expect}\nmod support;`,
@@ -855,6 +860,12 @@ test("Rust lint declarations, reasons and conditions need approval", (t) => {
         ],
         [body, `#[allow(dead_code, reason = "Shared helper")]\n${body}`],
         [`#[deny(dead_code)]\nmod guarded {}`, "mod guarded {}"],
+        [`#[cfg_attr(unix, warn(dead_code))]\n${body}`, body],
+        [`#![forbid(unsafe_code)]\n${body}`, body],
+        [
+            `${expect} ${body}`,
+            `${expect} ${body} mod other { ${expect} ${body} }`,
+        ],
         [body, `#[r#expect(dead_code, reason = "Shared helper")]\n${body}`],
         [
             `${expect}\nmod support {}`,
@@ -865,10 +876,17 @@ test("Rust lint declarations, reasons and conditions need approval", (t) => {
             `${body}\n${expect}\nfn other() {}`,
         ],
     ]) {
-        assert.match(
-            scan(t, { "src/lib.rs": before }, { "src/lib.rs": after }),
-            /^1 Rust lint policy file\n/,
+        const output = scan(
+            t,
+            { "src/lib.rs": before },
+            { "src/lib.rs": after },
         );
+        if (approval)
+            assert.match(
+                output,
+                /^1 Rust lint policy file\n[\s\S]*(?:Added|Removed) or changed: #!?\[/,
+            );
+        else assert.equal(output, "");
     }
 });
 
@@ -878,6 +896,7 @@ test("ordinary code under existing lint declarations needs no approval", (t) => 
         '#![expect(dead_code, reason = "Shared helpers")] fn helper() { first(); }',
         "#![forbid(unsafe_code)] fn helper() { first(); }",
         'fn helper() { #[expect(unused_variables, reason = "Temporary binding")] let value = first(); }',
+        '#[expect(clippy::expect_used, reason = "Valid catalog")] Asset::file(AssetFile { url: first() }).expect("valid")',
     ]) {
         assert.equal(
             scan(
