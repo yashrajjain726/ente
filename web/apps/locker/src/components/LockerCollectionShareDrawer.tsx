@@ -5,9 +5,7 @@ import {
     type LockerCollection,
     type LockerCollectionParticipant,
 } from "@/types";
-import CloseIcon from "@mui/icons-material/Close";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
     Avatar,
     Box,
@@ -16,13 +14,11 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
-    IconButton,
     Stack,
     Typography,
+    type Theme,
 } from "@mui/material";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
-import { SidebarDrawer } from "ente-base/components/mui/SidebarDrawer";
-import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import {
@@ -30,7 +26,12 @@ import {
     useResolvedContactDisplay,
 } from "ente-contacts";
 import { t } from "i18next";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { LockerConfirmDialog } from "./LockerConfirmDialog";
+import {
+    LockerSidebarDrawer,
+    LockerSidebarTitlebar,
+} from "./LockerSidebarShell";
 import { FormField } from "./createItemDialog/ItemFormFields";
 import {
     lockerSheetContainerSx,
@@ -39,7 +40,9 @@ import {
 import {
     lockerColorSx,
     lockerTextBodyBoldSx,
+    lockerTextBodySx,
     lockerTextH2Sx,
+    lockerTextMiniSx,
 } from "./locker-tokens";
 
 interface LockerCollectionShareDrawerProps {
@@ -55,6 +58,17 @@ interface LockerCollectionShareDrawerProps {
     warmContacts: () => Promise<void>;
 }
 
+const primaryButtonSx = (theme: Theme) => ({
+    ...lockerTextBodyBoldSx,
+    minHeight: 52,
+    borderRadius: "20px",
+    ...lockerColorSx(theme, {
+        backgroundColor: "primary",
+        color: "specialWhite",
+    }),
+    "&:hover": lockerColorSx(theme, { backgroundColor: "primaryDark" }),
+});
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const LockerCollectionShareDrawer: React.FC<
@@ -69,7 +83,6 @@ export const LockerCollectionShareDrawer: React.FC<
     onRefreshSharees,
     warmContacts,
 }) => {
-    const { showMiniDialog } = useBaseContext();
     const currentUser = savedLocalUser() ?? { id: Number.NaN, email: "" };
     const [sharees, setSharees] = useState<LockerCollectionParticipant[]>([]);
     const [isRefreshingSharees, setIsRefreshingSharees] = useState(false);
@@ -79,6 +92,15 @@ export const LockerCollectionShareDrawer: React.FC<
         null,
     );
     const [isSubmittingViewer, setIsSubmittingViewer] = useState(false);
+    const [participantToRemove, setParticipantToRemove] =
+        useState<LockerCollectionParticipant>();
+    const [isRemovingViewer, setIsRemovingViewer] = useState(false);
+    const [removeViewerError, setRemoveViewerError] = useState<string>();
+
+    useEffect(() => {
+        setParticipantToRemove(undefined);
+        setRemoveViewerError(undefined);
+    }, [collection?.id, open]);
 
     const ownerEmail =
         collection?.owner.email?.trim() ||
@@ -164,16 +186,16 @@ export const LockerCollectionShareDrawer: React.FC<
         [currentUser.id, sharees],
     );
 
-    const handleCloseAddViewer = useCallback(() => {
+    const handleCloseAddViewer = () => {
         if (isSubmittingViewer) {
             return;
         }
         setAddViewerOpen(false);
         setViewerEmail("");
         setViewerEmailError(null);
-    }, [isSubmittingViewer]);
+    };
 
-    const handleAddViewer = useCallback(async () => {
+    const handleAddViewer = async () => {
         if (!collection) {
             return;
         }
@@ -219,47 +241,30 @@ export const LockerCollectionShareDrawer: React.FC<
         } finally {
             setIsSubmittingViewer(false);
         }
-    }, [
-        collection,
-        currentUser.email,
-        handleCloseAddViewer,
-        onShareCollection,
-        sortedSharees,
-        viewerEmail,
-    ]);
+    };
 
-    const confirmRemoveViewer = useCallback(
-        (participant: LockerCollectionParticipant) => {
-            if (!collection || !participant.email) {
-                return;
-            }
-
-            showMiniDialog({
-                title: t("removeParticipant"),
-                message: t("removeParticipantConfirmation", {
-                    email: participant.email,
-                }),
-                continue: {
-                    text: t("remove"),
-                    color: "critical",
-                    action: async () => {
-                        await onUnshareCollection(
-                            collection.id,
-                            participant.email!,
-                        );
-                        setSharees((current) =>
-                            current.filter(
-                                (sharee) =>
-                                    sharee.email?.toLowerCase() !==
-                                    participant.email!.toLowerCase(),
-                            ),
-                        );
-                    },
-                },
-            });
-        },
-        [collection, onUnshareCollection, showMiniDialog],
-    );
+    const handleRemoveViewer = async () => {
+        if (!collection || !participantToRemove?.email || isRemovingViewer)
+            return;
+        const email = participantToRemove.email;
+        setIsRemovingViewer(true);
+        setRemoveViewerError(undefined);
+        try {
+            await onUnshareCollection(collection.id, email);
+            setSharees((current) =>
+                current.filter(
+                    (sharee) =>
+                        sharee.email?.toLowerCase() !== email.toLowerCase(),
+                ),
+            );
+            setParticipantToRemove(undefined);
+        } catch (error) {
+            log.error("Failed to remove Locker collection participant", error);
+            setRemoveViewerError(t("generic_error"));
+        } finally {
+            setIsRemovingViewer(false);
+        }
+    };
 
     if (!collection) {
         return null;
@@ -286,12 +291,27 @@ export const LockerCollectionShareDrawer: React.FC<
                 participant.email ? (
                     <LockerOverflowMenu
                         ariaID={`sharee-${participant.id}`}
-                        triggerButtonIcon={<MoreVertIcon />}
-                        triggerButtonSxProps={{ color: "text.faint" }}
+                        triggerButtonSxProps={(theme) => ({
+                            "&&": {
+                                width: 36,
+                                height: 36,
+                                p: 0,
+                                borderRadius: "12px",
+                                backgroundColor: "transparent",
+                            },
+                            flexShrink: 0,
+                            ...lockerColorSx(theme, { color: "textLight" }),
+                            "&&:hover": lockerColorSx(theme, {
+                                backgroundColor: "fillDark",
+                            }),
+                        })}
                     >
                         <LockerMenuOption
                             critical
-                            onClick={() => confirmRemoveViewer(participant)}
+                            onClick={() => {
+                                setRemoveViewerError(undefined);
+                                setParticipantToRemove(participant);
+                            }}
                         >
                             {t("removeParticipant")}
                         </LockerMenuOption>
@@ -302,43 +322,18 @@ export const LockerCollectionShareDrawer: React.FC<
 
     return (
         <>
-            <SidebarDrawer anchor="right" open={open} onClose={onClose}>
-                <Stack
-                    sx={{
-                        gap: 2,
-                        py: 1,
-                        height: "calc(100dvh - env(titlebar-area-height, 0px) - 16px)",
-                        minHeight: 0,
-                    }}
-                >
-                    <Stack
-                        direction="row"
-                        sx={{
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            px: 1,
-                        }}
-                    >
-                        <Box sx={{ px: 1, pt: 1.5 }}>
-                            <Typography variant="h3">
-                                {collection.name}
-                            </Typography>
-                            <Typography
-                                variant="small"
-                                sx={{ mt: 0.5, color: "text.muted" }}
-                            >
-                                {t("sharedWith")}
-                            </Typography>
-                        </Box>
-                        <IconButton onClick={onClose} color="secondary">
-                            <CloseIcon />
-                        </IconButton>
-                    </Stack>
-
+            <LockerSidebarDrawer anchor="right" open={open} onClose={onClose}>
+                <Stack sx={{ height: "100%", minHeight: 0 }}>
+                    <LockerSidebarTitlebar
+                        title={collection.name}
+                        tooltip={collection.name}
+                        onClose={onClose}
+                        closeLabel={t("close")}
+                    />
                     <Stack
                         sx={{
-                            px: 1.5,
-                            gap: 1.5,
+                            px: 2,
+                            gap: 2,
                             flex: 1,
                             minHeight: 0,
                             overflowY: "auto",
@@ -347,6 +342,14 @@ export const LockerCollectionShareDrawer: React.FC<
                             pb: "max(16px, env(safe-area-inset-bottom))",
                         }}
                     >
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextBodySx,
+                                ...lockerColorSx(theme, { color: "textLight" }),
+                            })}
+                        >
+                            {t("sharedWith")}
+                        </Typography>
                         {isRefreshingSharees && (
                             <Stack
                                 direction="row"
@@ -360,40 +363,26 @@ export const LockerCollectionShareDrawer: React.FC<
                             </Stack>
                         )}
 
-                        <Box
-                            sx={(theme) => ({
-                                overflow: "hidden",
-                                borderRadius: "16px",
-                                backgroundColor: theme.vars.palette.fill.faint,
-                            })}
-                        >
+                        <Stack sx={{ gap: 1, flexShrink: 0 }}>
                             {participants.map((row, index) => (
-                                <Box
+                                <ParticipantRow
                                     key={`${row.participant.id}-${row.participant.email ?? index}`}
-                                    sx={(theme) => ({
-                                        borderTop:
-                                            index === 0
-                                                ? "none"
-                                                : `1px solid ${theme.vars.palette.divider}`,
-                                    })}
-                                >
-                                    <ParticipantRow
-                                        participant={row.participant}
-                                        subtitle={row.subtitle}
-                                        action={row.action}
-                                    />
-                                </Box>
+                                    participant={row.participant}
+                                    subtitle={row.subtitle}
+                                    action={row.action}
+                                />
                             ))}
-                        </Box>
+                        </Stack>
 
                         {sortedSharees.length === 0 && (
                             <Typography
                                 variant="small"
-                                sx={{
-                                    px: 0.5,
-                                    color: "text.muted",
-                                    lineHeight: 1.5,
-                                }}
+                                sx={(theme) => ({
+                                    ...lockerTextBodySx,
+                                    ...lockerColorSx(theme, {
+                                        color: "textLight",
+                                    }),
+                                })}
                             >
                                 {t("noSharedUsers")}
                             </Typography>
@@ -403,21 +392,10 @@ export const LockerCollectionShareDrawer: React.FC<
                             <Button
                                 variant="contained"
                                 onClick={() => setAddViewerOpen(true)}
-                                sx={{
-                                    minHeight: 48,
-                                    borderRadius: "14px",
-                                    color: "#FFFFFF",
-                                    background:
-                                        "linear-gradient(135deg, #1071FF 0%, #0056CC 100%)",
-                                    boxShadow:
-                                        "0 10px 24px rgba(0, 66, 173, 0.24)",
-                                    "&:hover": {
-                                        background:
-                                            "linear-gradient(135deg, #1A7AFF 0%, #004DB8 100%)",
-                                        boxShadow:
-                                            "0 12px 28px rgba(0, 66, 173, 0.28)",
-                                    },
-                                }}
+                                sx={(theme) => ({
+                                    ...primaryButtonSx(theme),
+                                    textTransform: "none",
+                                })}
                             >
                                 {t("addEmail")}
                             </Button>
@@ -430,17 +408,8 @@ export const LockerCollectionShareDrawer: React.FC<
                                 startIcon={<LogoutOutlinedIcon />}
                                 onClick={() => onLeaveCollection(collection)}
                                 sx={(theme) => ({
-                                    ...lockerTextBodyBoldSx,
-                                    minHeight: 52,
-                                    borderRadius: "20px",
+                                    ...primaryButtonSx(theme),
                                     textTransform: "none",
-                                    ...lockerColorSx(theme, {
-                                        backgroundColor: "primary",
-                                        color: "specialWhite",
-                                    }),
-                                    "&:hover": lockerColorSx(theme, {
-                                        backgroundColor: "primaryDark",
-                                    }),
                                 })}
                             >
                                 {t("leaveCollection")}
@@ -448,8 +417,21 @@ export const LockerCollectionShareDrawer: React.FC<
                         )}
                     </Stack>
                 </Stack>
-            </SidebarDrawer>
+            </LockerSidebarDrawer>
 
+            <LockerConfirmDialog
+                open={!!participantToRemove}
+                illustration="/images/warning-red.png"
+                title={t("removeParticipant")}
+                body={t("removeParticipantConfirmation", {
+                    email: participantToRemove?.email ?? "",
+                })}
+                confirmLabel={t("remove")}
+                loading={isRemovingViewer}
+                error={removeViewerError}
+                onClose={() => setParticipantToRemove(undefined)}
+                onConfirm={handleRemoveViewer}
+            />
             <Dialog
                 slotProps={{
                     paper: { sx: lockerSheetPaperSx },
@@ -517,16 +499,7 @@ export const LockerCollectionShareDrawer: React.FC<
                                 onClick={() => void handleAddViewer()}
                                 disabled={isSubmittingViewer}
                                 sx={(theme) => ({
-                                    ...lockerTextBodyBoldSx,
-                                    minHeight: 52,
-                                    borderRadius: "20px",
-                                    ...lockerColorSx(theme, {
-                                        backgroundColor: "primary",
-                                        color: "specialWhite",
-                                    }),
-                                    "&:hover": lockerColorSx(theme, {
-                                        backgroundColor: "primaryDark",
-                                    }),
+                                    ...primaryButtonSx(theme),
                                     "&.Mui-disabled": lockerColorSx(theme, {
                                         backgroundColor: "fillDarkest",
                                         color: "textLighter",
@@ -568,34 +541,50 @@ const ParticipantRow: React.FC<{
     return (
         <Stack
             direction="row"
-            sx={{
+            sx={(theme) => ({
                 alignItems: "center",
                 gap: 1.5,
-                px: 1.5,
-                py: 1.25,
+                p: 1.5,
                 minHeight: 64,
-            }}
+                borderRadius: "20px",
+                ...lockerColorSx(theme, { backgroundColor: "fillLight" }),
+            })}
         >
             <Avatar
                 sx={(theme) => ({
-                    width: 36,
-                    height: 36,
-                    fontSize: 16,
-                    bgcolor: theme.vars.palette.fill.faintHover,
-                    color: "text.base",
+                    width: 40,
+                    height: 40,
+                    borderRadius: "12px",
+                    flexShrink: 0,
+                    ...lockerTextBodyBoldSx,
+                    ...lockerColorSx(theme, {
+                        backgroundColor: "backgroundBase",
+                        color: "textLight",
+                    }),
                 })}
                 src={resolved.avatarURL}
             >
                 {initial}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body" sx={{ fontWeight: "medium" }} noWrap>
+                <Typography
+                    sx={(theme) => ({
+                        ...lockerTextBodySx,
+                        ...lockerColorSx(theme, { color: "textBase" }),
+                    })}
+                    title={label}
+                    noWrap
+                >
                     {label}
                 </Typography>
                 {subtitle && (
                     <Typography
                         variant="small"
-                        sx={{ color: "text.muted", mt: 0.25 }}
+                        sx={(theme) => ({
+                            ...lockerTextMiniSx,
+                            mt: 0.5,
+                            ...lockerColorSx(theme, { color: "textLight" }),
+                        })}
                         noWrap
                     >
                         {subtitle}

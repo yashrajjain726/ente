@@ -105,8 +105,8 @@ export function LockerConfirmDialog({
                     src={illustration}
                     alt=""
                     style={{
-                        width: 120,
-                        height: 120,
+                        width: 80,
+                        height: 80,
                         objectFit: "contain",
                         display: "block",
                         margin: "4px auto 0",
