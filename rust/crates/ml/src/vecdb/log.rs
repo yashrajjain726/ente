@@ -1,4 +1,4 @@
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{BufReader, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -75,9 +75,9 @@ pub(crate) struct LogCheckpoint {
     end_offset: u64,
 }
 
-pub(crate) fn writer_options() -> OpenOptions {
+pub(crate) fn open_writer_file(path: &Path, create_new: bool) -> Result<File, VecDbError> {
     let mut options = File::options();
-    options.read(true).write(true);
+    options.read(true).write(true).create_new(create_new);
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
@@ -86,10 +86,23 @@ pub(crate) fn writer_options() -> OpenOptions {
         const FILE_SHARE_DELETE: u32 = 0x00000004;
         options.share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE);
     }
-    options
+    let file = options
+        .open(path)
+        .map_err(|source| writer_open_error(path, source))?;
+    #[cfg(unix)]
+    {
+        use std::fs::TryLockError;
+
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(TryLockError::WouldBlock) => return Err(VecDbError::Locked(path.to_path_buf())),
+            Err(TryLockError::Error(source)) => return Err(VecDbError::io(path, source)),
+        }
+    }
+    Ok(file)
 }
 
-pub(crate) fn writer_open_error(path: &Path, source: std::io::Error) -> VecDbError {
+fn writer_open_error(path: &Path, source: std::io::Error) -> VecDbError {
     #[cfg(windows)]
     if source.raw_os_error() == Some(32) {
         return VecDbError::Locked(path.to_path_buf());
@@ -104,10 +117,7 @@ impl Log {
         storage: StorageKind,
     ) -> Result<Self, VecDbError> {
         validate_dims(dims, storage)?;
-        let file = writer_options()
-            .create_new(true)
-            .open(path)
-            .map_err(|source| writer_open_error(path, source))?;
+        let file = open_writer_file(path, true)?;
         Self::initialize(file, path, dims, storage)
     }
 
@@ -1017,7 +1027,7 @@ mod tests {
     }
 
     fn reopen(path: &Path, dims: usize) -> Log {
-        let file = writer_options().open(path).unwrap();
+        let file = open_writer_file(path, false).unwrap();
         Log::open(file, path, dims, None).unwrap()
     }
 
@@ -1126,9 +1136,9 @@ mod tests {
         assert_eq!(reopened.current_end_offset(), HEADER_LEN as u64);
     }
 
-    #[cfg(windows)]
+    #[cfg(any(unix, windows))]
     #[test]
-    fn writer_sharing_blocks_aliases_until_the_log_is_closed() {
+    fn writer_exclusion_lasts_until_the_file_is_closed() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         let alias = dir.path().join("alias");
@@ -1136,18 +1146,24 @@ mod tests {
         std::fs::hard_link(&path, &alias).unwrap();
         let reader = File::open(&alias).unwrap();
         assert_eq!(reader.metadata().unwrap().len(), HEADER_LEN as u64);
-        assert_eq!(
-            writer_options().open(&alias).unwrap_err().raw_os_error(),
-            Some(32)
-        );
-        drop(created);
+        assert!(matches!(
+            open_writer_file(&alias, false),
+            Err(VecDbError::Locked(_))
+        ));
+        drop(reader);
+        let file = created.into_file();
+        assert!(matches!(
+            open_writer_file(&alias, false),
+            Err(VecDbError::Locked(_))
+        ));
+        drop(file);
         let reopened = reopen(&alias, 8);
-        assert_eq!(
-            writer_options().open(&path).unwrap_err().raw_os_error(),
-            Some(32)
-        );
+        assert!(matches!(
+            open_writer_file(&path, false),
+            Err(VecDbError::Locked(_))
+        ));
         drop(reopened);
-        assert!(writer_options().open(&path).is_ok());
+        assert!(open_writer_file(&path, false).is_ok());
     }
 
     #[cfg(windows)]

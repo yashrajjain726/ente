@@ -14,8 +14,8 @@ use super::graph::{Graph, search as graph_search, search_stored};
 use super::kernel::{StoredVector, VectorPayload, quantize_for};
 use super::lock::WriterLock;
 use super::log::{
-    HEADER_LEN, Log, LogCheckpoint, LogEntry, LogRecord, header_generation, remove_if_present,
-    remove_stale_temp_sibling, sync_parent_dir, writer_open_error, writer_options,
+    HEADER_LEN, Log, LogCheckpoint, LogEntry, LogRecord, header_generation, open_writer_file,
+    remove_if_present, remove_stale_temp_sibling, sync_parent_dir,
 };
 use super::snapshot::{
     LoadedSnapshot, load_snapshot, remove_snapshot, snapshot_path, write_snapshot,
@@ -1190,9 +1190,7 @@ fn restore_writer_mode(
     expected_checkpoint: LogCheckpoint,
 ) -> Result<(), VecDbError> {
     let restored = (|| {
-        let file = writer_options()
-            .open(&shared.path)
-            .map_err(|source| writer_open_error(&shared.path, source))?;
+        let file = open_writer_file(&shared.path, false)?;
         if file
             .metadata()
             .map_err(|source| VecDbError::io(&shared.path, source))?
@@ -1664,28 +1662,7 @@ fn open_existing_writer_log(
     dims: usize,
     storage: Option<StorageKind>,
 ) -> Result<Log, VecDbError> {
-    let file = writer_options()
-        .open(path)
-        .map_err(|source| writer_open_error(path, source))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-
-        if file
-            .metadata()
-            .map_err(|source| VecDbError::io(path, source))?
-            .nlink()
-            > 1
-        {
-            return Err(VecDbError::io(
-                path,
-                std::io::Error::new(
-                    ErrorKind::InvalidInput,
-                    "hard-linked vector db files cannot be opened for writing",
-                ),
-            ));
-        }
-    }
+    let file = open_writer_file(path, false)?;
     Log::open(file, path, dims, storage)
 }
 
@@ -2511,7 +2488,10 @@ mod tests {
         let first = open_writer(&path);
         fs::hard_link(&path, &alias).unwrap();
         let bytes = fs::read(&path).unwrap();
-        assert!(VecDb::open(&alias, DIMS).is_err());
+        assert!(matches!(
+            VecDb::open(&alias, DIMS),
+            Err(VecDbError::Locked(_))
+        ));
         assert_eq!(fs::read(&path).unwrap(), bytes);
         let second = open_writer(&path);
         let reader = VecDb::open_read_only(&path, DIMS).unwrap();
@@ -2522,7 +2502,6 @@ mod tests {
         drop(reader);
         drop(second);
         drop(first);
-        fs::remove_file(alias).unwrap();
         let reopened = open_writer(&path);
         assert!(reopened.contains("first"));
         assert!(reopened.contains("second"));
@@ -2530,21 +2509,27 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn hard_link_refusal_preserves_incomplete_logs() {
+    fn writer_lock_contention_preserves_incomplete_logs() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let alias = dir.path().join("alias");
         let partial = b"EVDB";
         fs::write(&path, partial).unwrap();
+        let holder = File::options().read(true).write(true).open(&path).unwrap();
+        holder.try_lock().unwrap();
         fs::hard_link(&path, &alias).unwrap();
         for name in [&path, &alias] {
             assert!(matches!(
                 VecDb::open(name, DIMS),
-                Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::InvalidInput
+                Err(VecDbError::Locked(_))
             ));
         }
         assert_eq!(fs::read(&path).unwrap(), partial);
         assert!(VecDb::open_read_only(&alias, DIMS).unwrap().is_empty());
+        drop(holder);
+        let writer = open_writer(&alias);
+        assert!(writer.is_empty());
+        writer.add("first", &basis_vector(0)).unwrap();
     }
 
     #[cfg(any(unix, windows))]
@@ -2560,10 +2545,6 @@ mod tests {
         {
             "blocked" => {
                 let result = VecDb::open(&path, DIMS);
-                #[cfg(unix)]
-                assert!(matches!(result, Err(VecDbError::Io { source, .. })
-                    if source.kind() == ErrorKind::InvalidInput));
-                #[cfg(windows)]
                 assert!(matches!(result, Err(VecDbError::Locked(_))));
                 let reader = VecDb::open_read_only(&path, DIMS).unwrap();
                 assert!(reader.contains("first"));
@@ -2578,6 +2559,26 @@ mod tests {
     }
 
     #[cfg(any(unix, windows))]
+    fn run_hard_link_writer_process(path: &Path, action: &str) {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .arg("--exact")
+            .arg(format!(
+                "{}::hard_link_writer_process",
+                module_path!().split_once("::").unwrap().1
+            ))
+            .arg("--nocapture")
+            .env("VECDB_HARD_LINK_TEST_PATH", path)
+            .env("VECDB_HARD_LINK_TEST_ACTION", action)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+            "{output:?}"
+        );
+    }
+
+    #[cfg(any(unix, windows))]
     #[test]
     fn hard_link_exclusion_and_writer_handoff_work_across_processes() {
         let dir = TempDir::new().unwrap();
@@ -2586,34 +2587,57 @@ mod tests {
         let first = open_writer(&path);
         first.add("first", &basis_vector(0)).unwrap();
         fs::hard_link(&path, &alias).unwrap();
-        let run = |action: &str| {
-            let output = std::process::Command::new(std::env::current_exe().unwrap())
-                .arg("--exact")
-                .arg(format!(
-                    "{}::hard_link_writer_process",
-                    module_path!().split_once("::").unwrap().1
-                ))
-                .arg("--nocapture")
-                .env("VECDB_HARD_LINK_TEST_PATH", &alias)
-                .env("VECDB_HARD_LINK_TEST_ACTION", action)
-                .output()
-                .unwrap();
-            assert!(output.status.success(), "{output:?}");
-            assert!(
-                String::from_utf8_lossy(&output.stdout).contains("1 passed"),
-                "{output:?}"
-            );
-        };
-        run("blocked");
+        run_hard_link_writer_process(&alias, "blocked");
         assert_eq!(first.len(), 1);
         drop(first);
-        #[cfg(unix)]
-        fs::remove_file(&path).unwrap();
-        run("write");
+        run_hard_link_writer_process(&alias, "write");
         let reader = VecDb::open_read_only(&alias, DIMS).unwrap();
         assert_eq!(reader.len(), 2);
         assert!(reader.contains("first"));
         assert!(reader.contains("next"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn writer_exclusion_survives_removing_or_renaming_the_original_name() {
+        use std::os::unix::fs::MetadataExt;
+
+        for reopen in [false, true] {
+            for unlink in [false, true] {
+                let dir = TempDir::new().unwrap();
+                let path = dir.path().join("db");
+                let alias = dir.path().join("alias");
+                let mut first = open_writer(&path);
+                first.add("first", &basis_vector(0)).unwrap();
+                if reopen {
+                    drop(first);
+                    first = open_writer(&path);
+                }
+                if unlink {
+                    fs::hard_link(&path, &alias).unwrap();
+                    fs::remove_file(&path).unwrap();
+                } else {
+                    fs::rename(&path, &alias).unwrap();
+                }
+                assert_eq!(fs::metadata(&alias).unwrap().nlink(), 1);
+                assert!(matches!(
+                    VecDb::open(&alias, DIMS),
+                    Err(VecDbError::Locked(_))
+                ));
+                let reader = VecDb::open_read_only(&alias, DIMS).unwrap();
+                assert!(reader.contains("first"));
+                drop(reader);
+                run_hard_link_writer_process(&alias, "blocked");
+                first.add("after", &basis_vector(2)).unwrap();
+                drop(first);
+                run_hard_link_writer_process(&alias, "write");
+                let reopened = open_writer(&alias);
+                assert_eq!(reopened.len(), 3);
+                assert!(reopened.contains("first"));
+                assert!(reopened.contains("after"));
+                assert!(reopened.contains("next"));
+            }
+        }
     }
 
     #[cfg(any(unix, windows))]
@@ -2631,8 +2655,18 @@ mod tests {
         assert_eq!(db.len(), 10);
         fs::remove_file(&alias).unwrap();
         fs::hard_link(&path, &alias).unwrap();
+        assert!(matches!(
+            VecDb::open(&alias, DIMS),
+            Err(VecDbError::Locked(_))
+        ));
         db.reset().unwrap();
         db.add("after", &basis_vector(0)).unwrap();
+        fs::remove_file(&alias).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        assert!(matches!(
+            VecDb::open(&alias, DIMS),
+            Err(VecDbError::Locked(_))
+        ));
         assert_eq!(db.len(), 1);
         assert_eq!(observer.len(), 10);
     }
@@ -3739,7 +3773,7 @@ mod tests {
         assert_own_nearest(&reopened, "other", &basis_vector(1));
     }
 
-    #[cfg(windows)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn restore_writer_mode_cannot_rejoin_an_alias_writer() {
         let dir = TempDir::new().unwrap();
