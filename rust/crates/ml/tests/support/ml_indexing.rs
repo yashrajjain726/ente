@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fs,
-    io::Write,
     path::{Component, Path, PathBuf},
 };
 
@@ -333,7 +332,10 @@ impl MlIndexingTestContext {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(crate) fn verify_corrupt_model(&self) -> Result<()> {
+        use std::io::Write;
+
         let mut model = tempfile::NamedTempFile::new()?;
         model.write_all(b"not an ONNX protobuf")?;
         let model_path = model.path().to_string_lossy().into_owned();
@@ -351,10 +353,6 @@ impl MlIndexingTestContext {
         let mut model_paths = self.model_paths.clone();
         model_paths.face_detection = model_path.clone();
 
-        #[expect(
-            clippy::expect_used,
-            reason = "The invalid-model fixture must fail analysis"
-        )]
         let error = analyze_image(AnalyzeImageRequest {
             file_id: -1,
             source: ImageSource::Path(image_path.to_string_lossy().into_owned()),
