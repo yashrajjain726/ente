@@ -30,11 +30,14 @@ test("JS checks share web formatting across repository directories", (t) => {
         ".github/scripts/nested/example.cjs",
         "rust/checks/example/check.js",
         "nested/project/checks/example/test.mjs",
+        "rust/apps/example/scripts/nested/build.mjs",
+        "nested/project/scripts/example/test.mjs",
     ];
     const ignored = [
         "node_modules/example/checks/test.js",
         "web/apps/example.js",
         "rust/checks/example/test.py",
+        "infra/ml/test/tools/parity.js",
     ];
     const source = "function example(){return true}\n";
     for (const path of [...checked, ...ignored]) {

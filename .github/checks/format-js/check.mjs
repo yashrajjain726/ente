@@ -27,7 +27,7 @@ try {
             config,
             write ? "--write" : "--check",
             ".github/{checks,scripts}/**/*.{js,cjs,mjs}",
-            "**/checks/**/*.{js,cjs,mjs}",
+            "**/{checks,scripts}/**/*.{js,cjs,mjs}",
         ],
         { cwd: root, stdio: "inherit" },
     );
