@@ -148,7 +148,7 @@ interface ProgressUpdater {
     setFinishedUploads: React.Dispatch<
         React.SetStateAction<SegregatedFinishedUploads>
     >;
-    setUploadFilenames: (filenames: UploadFileNames) => void;
+    setUploadFileNames: (filenames: UploadFileNames) => void;
     setHasLivePhotos: React.Dispatch<React.SetStateAction<boolean>>;
     setUploadProgressView: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -179,7 +179,7 @@ class UIService {
     init(progressUpdater: ProgressUpdater) {
         this.progressUpdater = progressUpdater;
         this.progressUpdater.setUploadPhase(this.uploadPhase);
-        this.progressUpdater.setUploadFilenames(this.filenames);
+        this.progressUpdater.setUploadFileNames(this.filenames);
         this.progressUpdater.setHasLivePhotos(this.hasLivePhoto);
         this.progressUpdater.setUploadProgressView(this.uploadProgressView);
         this.progressUpdater.setUploadCounter({
@@ -224,7 +224,7 @@ class UIService {
     setFiles(files: { localID: number; fileName: string }[]) {
         const filenames = new Map(files.map((f) => [f.localID, f.fileName]));
         this.filenames = filenames;
-        this.progressUpdater.setUploadFilenames(filenames);
+        this.progressUpdater.setUploadFileNames(filenames);
     }
 
     setHasLivePhoto(hasLivePhoto: boolean) {
