@@ -34,7 +34,7 @@ const scan = (
         gitlink,
         symlink,
         ci = false,
-        archive = false,
+        workflow = false,
         directory = ".",
     } = {},
 ) => {
@@ -66,28 +66,44 @@ const scan = (
     };
     git("init", "-q", "-b", "main");
     const checkerDir = ".github/checks/change-approval";
-    if (archive)
+    if (workflow)
         cpSync(import.meta.dirname, join(repo, checkerDir), {
             recursive: true,
         });
     write(base);
     const sha = commit(1);
+    if (workflow) {
+        git("remote", "add", "origin", repo);
+        git("checkout", "-qb", "pr");
+    }
     write(change);
     if (symlink) symlinkSync("missing-target", join(repo, symlink));
     if (committed) commit(2);
-    let entry = script;
-    if (archive) {
-        const extracted = mkdtempSync(
+    let command = process.execPath;
+    let args = [script, sha];
+    const runner = {};
+    if (workflow) {
+        git("checkout", "-q", "--detach", sha);
+        git("merge", "--no-ff", "--no-edit", "pr");
+        runner.RUNNER_TEMP = mkdtempSync(
             join(tmpdir(), "change-approval-trusted-"),
         );
-        t.after(() => rmSync(extracted, { recursive: true }));
-        execFileSync("tar", ["-x", "-C", extracted], {
-            input: execFileSync("git", ["archive", sha, checkerDir], {
-                cwd: repo,
-                env,
-            }),
-        });
-        entry = join(extracted, checkerDir, "check.mjs");
+        t.after(() => rmSync(runner.RUNNER_TEMP, { recursive: true }));
+        const step = execFileSync(
+            "ruby",
+            [
+                "-ryaml",
+                "-e",
+                'puts YAML.safe_load(File.read(ARGV[0]), aliases: true).fetch("jobs").fetch("detect").fetch("steps").find { |step| step["id"] == "scan" }.fetch("run")',
+                join(
+                    import.meta.dirname,
+                    "../../workflows/change-approval.yml",
+                ),
+            ],
+            { encoding: "utf8" },
+        );
+        command = "bash";
+        args = ["-e", "-c", step];
     }
     const outputs = ci
         ? {
@@ -95,9 +111,9 @@ const scan = (
               GITHUB_STEP_SUMMARY: join(repo, ".summary"),
           }
         : {};
-    const stdout = execFileSync(process.execPath, [entry, sha], {
+    const stdout = execFileSync(command, args, {
         cwd: join(repo, directory),
-        env: { ...env, ...outputs },
+        env: { ...env, ...outputs, ...runner },
         encoding: "utf8",
     });
     const read = (file) => (existsSync(file) ? readFileSync(file, "utf8") : "");
@@ -990,16 +1006,24 @@ test("checks started in a subdirectory inspect repository-wide changes", (t) => 
     }
 });
 
-test("archived checker imports trusted modules while inspecting changed files", (t) => {
+test("workflow scans PR changes with the complete checker from main", (t) => {
+    const checkerDir = ".github/checks/change-approval";
     const { output, summary } = scan(
         t,
-        {},
         {
-            ".github/checks/change-approval/rust.mjs":
-                'throw new Error("loaded an untrusted rule");',
+            [`${checkerDir}/rust.mjs`]:
+                'export { checkRust } from "./additional-rule.mjs";',
+            [`${checkerDir}/additional-rule.mjs`]: readFileSync(
+                join(import.meta.dirname, "rust.mjs"),
+                "utf8",
+            ),
+        },
+        {
+            [`${checkerDir}/additional-rule.mjs`]:
+                "export function checkRust() { return []; }",
             "src/lib.rs": "pub unsafe fn call() {}",
         },
-        { ci: true, archive: true },
+        { ci: true, workflow: true },
     );
     assert.equal(
         output,
