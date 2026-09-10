@@ -639,8 +639,7 @@ export const ImageEditorOverlay: React.FC<ImageEditorOverlayProps> = ({
                 >
                     <Tabs
                         value={currentTab}
-                        onChange={(_, value) => {
-                            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                        onChange={(_, value: OperationTab) => {
                             setCurrentTab(value);
                         }}
                     >

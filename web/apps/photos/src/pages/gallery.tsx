@@ -708,13 +708,13 @@ const Page: React.FC = () => {
             return;
         }
 
-        const selected = {
+        const selected: SelectedState = {
             ownCount: 0,
             count: 0,
             collectionID: activeCollectionID,
             context:
                 barMode == "people" && activePersonID
-                    ? { mode: "people" as const, personID: activePersonID }
+                    ? { mode: "people", personID: activePersonID }
                     : {
                           mode: barMode as
                               | "albums"
@@ -729,7 +729,6 @@ const Page: React.FC = () => {
                 selected.ownCount++;
             }
             selected.count++;
-            // @ts-expect-error Selection code needs type fixing
             selected[item.id] = true;
         });
         setSelected(selected);
@@ -738,13 +737,13 @@ const Page: React.FC = () => {
     const handleSelectAll = () => {
         if (!user || !filteredFiles.length) return;
 
-        const selected = {
+        const selected: SelectedState = {
             ownCount: 0,
             count: 0,
             collectionID: activeCollectionID,
             context:
                 barMode == "people" && activePersonID
-                    ? { mode: "people" as const, personID: activePersonID }
+                    ? { mode: "people", personID: activePersonID }
                     : {
                           mode: barMode as
                               | "albums"
@@ -759,7 +758,6 @@ const Page: React.FC = () => {
                 selected.ownCount++;
             }
             selected.count++;
-            // @ts-expect-error Selection code needs type fixing
             selected[item.id] = true;
         });
         setSelected(selected);

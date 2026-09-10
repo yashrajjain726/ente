@@ -177,8 +177,7 @@ class UIService {
             this.perFileProgress *
             (this.finishedUploads.size || this.filesUploadedCount);
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for (const [_, progress] of this.inProgressUploads) {
+        for (const progress of this.inProgressUploads.values()) {
             if (progress < 0) {
                 continue;
             }

@@ -1067,25 +1067,25 @@ const RawExif: React.FC<RawExifProps> = ({
         tags,
     )
         .map(([namespace, namespaceTags]) => {
-            return Object.entries(namespaceTags).map(([tagName, tag]) => {
-                const key = `${namespace}:${tagName}`;
-                let description = "<...>";
-                if (typeof tag == "string") {
-                    description = tag;
-                } else if (typeof tag == "number") {
-                    description = `${tag}`;
-                } else if (
-                    tag &&
-                    typeof tag == "object" &&
-                    "description" in tag &&
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                    typeof tag.description == "string"
-                ) {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-                    description = tag.description;
-                }
-                return [key, namespace, tagName, description] as const;
-            });
+            return Object.entries(namespaceTags).map(
+                ([tagName, tag]: [string, unknown]) => {
+                    const key = `${namespace}:${tagName}`;
+                    let description = "<...>";
+                    if (typeof tag == "string") {
+                        description = tag;
+                    } else if (typeof tag == "number") {
+                        description = `${tag}`;
+                    } else if (
+                        tag &&
+                        typeof tag == "object" &&
+                        "description" in tag &&
+                        typeof tag.description == "string"
+                    ) {
+                        description = tag.description;
+                    }
+                    return [key, namespace, tagName, description] as const;
+                },
+            );
         })
         .flat()
         .filter(([, , , description]) => description);
