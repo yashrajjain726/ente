@@ -1,4 +1,5 @@
 export 'components/legacy_kit_recovery_wait_time_sheet.dart';
+export 'legacy_api.dart';
 export 'models/emergency_models.dart';
 export 'models/legacy_kit_models.dart';
 export 'pages/create_legacy_kit_sheet.dart';

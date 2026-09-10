@@ -8,6 +8,9 @@ import "package:photos/emergency/emergency_service.dart";
 import "package:photos/emergency/model.dart";
 import "package:photos/emergency/recover_others_account.dart";
 import "package:photos/gateways/users/models/key_attributes.dart";
+import "package:photos/services/authenticated_session.dart";
+import "package:photos/src/rust/third_party/ente_frb_lib/legacy/contact.dart"
+    as legacy;
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
@@ -15,8 +18,8 @@ import "package:photos/ui/components/title_bar_title_widget.dart";
 import "package:photos/utils/dialog_util.dart";
 
 class OtherContactPage extends StatefulWidget {
-  final EmergencyContact contact;
-  final EmergencyInfo emergencyInfo;
+  final LegacyContactRecord contact;
+  final LegacyInfo emergencyInfo;
 
   const OtherContactPage({
     required this.contact,
@@ -30,10 +33,10 @@ class OtherContactPage extends StatefulWidget {
 
 class _OtherContactPageState extends State<OtherContactPage> {
   late String accountEmail = widget.contact.user.email;
-  RecoverySessions? recoverySession;
+  LegacyRecoverySession? recoverySession;
   String? waitTill;
   final Logger _logger = Logger("_OtherContactPageState");
-  late EmergencyInfo emergencyInfo = widget.emergencyInfo;
+  late LegacyInfo emergencyInfo = widget.emergencyInfo;
 
   @override
   void initState() {
@@ -45,7 +48,7 @@ class _OtherContactPageState extends State<OtherContactPage> {
 
   Future<void> _fetchData() async {
     try {
-      final result = await EmergencyContactService.instance.getInfo();
+      final result = await legacy.info(session: authenticatedSession());
       if (mounted) {
         setState(() {
           recoverySession = result.othersRecoverySession.firstWhereOrNull(
@@ -97,12 +100,14 @@ class _OtherContactPageState extends State<OtherContactPage> {
                 ),
                 style: textTheme.smallMuted,
               ),
-            if (recoverySession != null && recoverySession!.status == "READY")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.ready)
               Text(
                 context.strings.recoveryReady(email: accountEmail),
                 style: textTheme.smallMuted,
               ),
-            if (recoverySession != null && recoverySession!.status == "WAITING")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.waiting)
               Text(
                 context.strings.recoverAccountAfter(
                   email: accountEmail,
@@ -166,7 +171,8 @@ class _OtherContactPageState extends State<OtherContactPage> {
                         }
                       },
               ),
-            if (recoverySession != null && recoverySession!.status == "READY")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.ready)
               ButtonWidgetV2(
                 buttonType: ButtonTypeV2.primary,
                 labelText: context.strings.recoverAccount,
@@ -191,7 +197,8 @@ class _OtherContactPageState extends State<OtherContactPage> {
                   }
                 },
               ),
-            if (recoverySession != null && recoverySession!.status == "WAITING")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.waiting)
               ButtonWidgetV2(
                 buttonType: ButtonTypeV2.secondary,
                 labelText: context.strings.cancelRecovery,
@@ -201,7 +208,7 @@ class _OtherContactPageState extends State<OtherContactPage> {
                 },
               ),
             if (recoverySession != null &&
-                recoverySession!.status == "READY") ...[
+                recoverySession!.status == LegacyRecoveryStatus.ready) ...[
               const SizedBox(height: 20),
               ButtonWidgetV2(
                 buttonType: ButtonTypeV2.tertiaryCritical,
@@ -225,7 +232,7 @@ class _OtherContactPageState extends State<OtherContactPage> {
               ),
             ],
             if (recoverySession == null ||
-                recoverySession!.status != "READY") ...[
+                recoverySession!.status != LegacyRecoveryStatus.ready) ...[
               const SizedBox(height: 20),
               ButtonWidgetV2(
                 buttonType: ButtonTypeV2.tertiaryCritical,
@@ -285,9 +292,11 @@ class _OtherContactPageState extends State<OtherContactPage> {
     );
     if (confirmed == true) {
       try {
-        await EmergencyContactService.instance.updateContact(
-          widget.contact,
-          ContactState.contactLeft,
+        await legacy.updateContact(
+          session: authenticatedSession(),
+          userId: widget.contact.user.id,
+          emergencyContactId: widget.contact.emergencyContact.id,
+          state: LegacyContactState.contactLeft,
         );
         if (mounted) {
           Navigator.of(context).pop();

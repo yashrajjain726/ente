@@ -50,7 +50,6 @@ pub async fn create_accepted_pair_state(
     ente_legacy::add_contact(
         &owner_session,
         &trusted.email,
-        &owner.key_attributes,
         Some(recovery_notice_in_days),
     )
     .await
