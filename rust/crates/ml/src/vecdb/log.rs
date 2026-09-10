@@ -6,7 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::arena::{MAX_KEY_BYTES, validate_key};
 use super::crc::{Crc32, crc32};
-use super::kernel::{StoredVector, VectorPayload, splitmix64, validate_dims};
+use super::kernel::{
+    StoredVector, VectorPayload, is_within_quantized_range, splitmix64, validate_dims,
+};
 use super::{AttrValue, Attribute, StorageKind, VecDbError};
 
 pub(crate) const HEADER_LEN: usize = 32;
@@ -527,35 +529,39 @@ fn decode_body(
         return Some(LogRecord::Tombstone { key });
     }
     let (payload, attr_bytes) = rest.split_at(vector_payload_len(storage, dims));
-    let vector = decode_vector(storage, payload);
+    let vector = decode_vector(storage, payload)?;
     let attrs = decode_attrs(attr_bytes)?;
     Some(LogRecord::Add { key, vector, attrs })
 }
 
-fn decode_vector(storage: StorageKind, payload: &[u8]) -> StoredVector {
+fn decode_vector(storage: StorageKind, payload: &[u8]) -> Option<StoredVector> {
     match storage {
-        StorageKind::F32 => StoredVector::F32(
+        StorageKind::F32 => Some(StoredVector::F32(
             payload
                 .as_chunks::<4>()
                 .0
                 .iter()
                 .map(|bytes| f32::from_le_bytes(*bytes))
                 .collect(),
-        ),
+        )),
         StorageKind::I8 => {
             let (scale_bytes, values) = payload.split_at(size_of::<f32>());
-            StoredVector::I8 {
+            let values: Vec<i8> = values
+                .iter()
+                .map(|&byte| i8::from_le_bytes([byte]))
+                .collect();
+            if !values.iter().all(|&value| is_within_quantized_range(value)) {
+                return None;
+            }
+            Some(StoredVector::I8 {
                 scale: f32::from_le_bytes([
                     scale_bytes[0],
                     scale_bytes[1],
                     scale_bytes[2],
                     scale_bytes[3],
                 ]),
-                values: values
-                    .iter()
-                    .map(|&byte| i8::from_le_bytes([byte]))
-                    .collect(),
-            }
+                values,
+            })
         }
     }
 }
@@ -2542,6 +2548,39 @@ mod tests {
             },
         );
         bytes
+    }
+
+    #[test]
+    fn scanner_stops_at_an_int8_payload_outside_the_quantized_range() {
+        let dims = 32usize;
+        let scale = 0.25f32;
+        let within_range = vec![3i8; dims];
+        let mut beyond_range = vec![5i8; dims];
+        beyond_range[7] = i8::MIN;
+        let first = encoded_i8_add("first", scale, &within_range);
+        let rejected = encoded_i8_add("rejected", scale, &beyond_range);
+        let survivor = encoded_i8_add("survivor", scale, &within_range);
+        let dir = TempDir::new().unwrap();
+        let cases = [
+            ("mid-log", [rejected.clone(), survivor].concat(), true),
+            ("tail", rejected, false),
+        ];
+        for (name, after_first, intact_record_beyond) in cases {
+            let path = dir.path().join(name);
+            let mut bytes = encode_header(dims as u32, &[9u8; 16], StorageKind::I8).to_vec();
+            bytes.extend_from_slice(&first);
+            bytes.extend_from_slice(&after_first);
+            std::fs::write(&path, &bytes).unwrap();
+            let mut log = reopen(&path, dims);
+            let (records, recoverable_end) = scan_all(&mut log);
+            assert_eq!(records.len(), 1);
+            assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "first"));
+            assert_eq!(recoverable_end, HEADER_LEN as u64 + first.len() as u64);
+            assert_eq!(
+                log.tail_contains_valid_record(recoverable_end).unwrap(),
+                intact_record_beyond
+            );
+        }
     }
 
     fn write_i8_log_file(path: &Path, dims: u32, record_bytes: &[u8]) {

@@ -6,6 +6,10 @@ const I8_LIMIT: f32 = 127.0;
 pub(crate) const MAX_DIMS_I8: usize =
     (i32::MAX / ((I8_LIMIT as i32) * (I8_LIMIT as i32))) as usize / LANE_WIDTH_I8 * LANE_WIDTH_I8;
 
+pub(crate) fn is_within_quantized_range(value: i8) -> bool {
+    i32::from(value).abs() <= I8_LIMIT as i32
+}
+
 #[repr(C, align(32))]
 #[derive(Clone, Copy)]
 pub(crate) struct Lane([f32; LANE_WIDTH]);
@@ -262,6 +266,14 @@ mod tests {
         let mut values = vec![0.0; dims];
         values[axis] = 1.0;
         values
+    }
+
+    #[test]
+    fn the_quantized_range_excludes_only_the_int8_minimum() {
+        assert!(is_within_quantized_range(I8_LIMIT as i8));
+        assert!(is_within_quantized_range(-(I8_LIMIT as i8)));
+        assert!(is_within_quantized_range(0));
+        assert!(!is_within_quantized_range(i8::MIN));
     }
 
     #[test]
