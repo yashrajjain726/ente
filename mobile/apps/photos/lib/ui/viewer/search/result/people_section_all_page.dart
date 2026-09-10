@@ -986,7 +986,6 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
     final l10n = context.strings;
     final selection = await showEntePopupMenu<_PeopleMenuSelection>(
       context: buttonContext,
-      menuWidth: 264,
       options: [
         for (final key in PeopleSortKey.values) _buildSortMenuItem(key, l10n),
         _buildIgnoredPeopleMenuItem(l10n),
