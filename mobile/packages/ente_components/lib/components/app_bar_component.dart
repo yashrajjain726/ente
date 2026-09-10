@@ -548,18 +548,12 @@ class _HeaderAppBarDelegate extends SliverPersistentHeaderDelegate {
           fit: StackFit.expand,
           children: [
             if (showExpandedBackButton && backButton == null)
-              Positioned(
-                top: 0,
-                left: 0,
-                // Include the header gutter in the touch target without moving
-                // the icon or title. Keep this behind the moving content so
-                // title and leading gestures win where they overlap it.
-                child: _HeaderAppBarBackButton(
-                  onBack: onBack,
-                  width: horizontalPadding + collapsedTitleLeft,
-                  height: collapsedHeight,
-                  leftPadding: horizontalPadding,
-                ),
+              // Keep this behind the moving content so title and leading
+              // gestures win where they overlap the larger touch target.
+              _HeaderAppBarBackButton(
+                onBack: onBack,
+                chromeHeight: collapsedHeight,
+                horizontalPadding: horizontalPadding,
               ),
             Positioned.fill(
               bottom: bottomHeight + visibleCollapsibleBottomHeight,
@@ -786,38 +780,46 @@ class _PinnedHeaderChrome extends StatelessWidget {
 class _HeaderAppBarBackButton extends StatelessWidget {
   const _HeaderAppBarBackButton({
     required this.onBack,
-    required this.width,
-    required this.height,
-    required this.leftPadding,
+    required this.chromeHeight,
+    required this.horizontalPadding,
   });
 
   final VoidCallback? onBack;
-  final double width;
-  final double height;
-  final double leftPadding;
+  final double chromeHeight;
+  final double horizontalPadding;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final tooltip = MaterialLocalizations.of(context).backButtonTooltip;
+    const iconPadding = (kMinInteractiveDimension - _defaultBackIconSize) / 2;
+    final left = math.max(0.0, horizontalPadding - iconPadding);
+    final top = _centeredTop(chromeHeight, kMinInteractiveDimension);
 
-    return SizedBox(
-      width: width,
-      height: height,
-      child: Semantics(
-        button: true,
-        label: tooltip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onBack ?? () => Navigator.maybePop(context),
-          child: Padding(
-            padding: EdgeInsets.only(left: leftPadding),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Icon(
-                Icons.arrow_back,
-                color: colors.textBase,
-                size: _defaultBackIconSize,
+    return Positioned(
+      left: left,
+      top: top,
+      child: SizedBox.square(
+        dimension: kMinInteractiveDimension,
+        child: Semantics(
+          button: true,
+          label: tooltip,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onBack ?? () => Navigator.maybePop(context),
+            child: Padding(
+              // Preserve the icon position even with custom, compact headers.
+              padding: EdgeInsets.only(
+                left: horizontalPadding - left,
+                top: _centeredTop(chromeHeight, _defaultBackIconSize) - top,
+              ),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Icon(
+                  Icons.arrow_back,
+                  color: colors.textBase,
+                  size: _defaultBackIconSize,
+                ),
               ),
             ),
           ),

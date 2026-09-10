@@ -273,21 +273,22 @@ void main() {
       for (final offset in [0.0, 300.0]) {
         controller.jumpTo(offset);
         await tester.pump();
-        final back = tester.getSemantics(find.bySemanticsLabel('Back'));
-        expect(back.rect.width, greaterThanOrEqualTo(48));
-        expect(back.rect.height, greaterThanOrEqualTo(48));
+        final backButton = find.bySemanticsLabel('Back');
+        expect(tester.getSemantics(backButton).rect.size, const Size(48, 48));
+        expect(tester.getRect(backButton), const Rect.fromLTWH(4, 4, 48, 48));
         expect(
           tester.getRect(find.byIcon(Icons.arrow_back)),
           const Rect.fromLTWH(16, 16, 24, 24),
         );
         expect(tester.getTopLeft(title).dx, offset == 0 ? 16 : 52);
 
-        // All four corners are outside the arrow, including the left gutter.
-        for (final point in const [
-          Offset(1, 1),
-          Offset(47, 1),
-          Offset(1, 47),
-          Offset(47, 47),
+        // Tap near each corner outside the arrow. The expanded title starts
+        // at y=48 and retains its own taps where it overlaps the target.
+        for (final point in [
+          const Offset(5, 5),
+          const Offset(51, 5),
+          const Offset(5, 51),
+          Offset(51, offset == 0 ? 47 : 51),
         ]) {
           final previousBackTaps = backTaps;
           await tester.tapAt(point);
@@ -296,6 +297,16 @@ void main() {
 
         final previousBackTaps = backTaps;
         final previousTitleTaps = titleTaps;
+        // The area just outside each edge must no longer trigger back.
+        for (final point in const [
+          Offset(3, 28),
+          Offset(53, 5),
+          Offset(28, 3),
+          Offset(5, 53),
+        ]) {
+          await tester.tapAt(point);
+          expect(backTaps, previousBackTaps);
+        }
         await tester.tapAt(tester.getTopLeft(title) + const Offset(1, 1));
         expect(titleTaps, previousTitleTaps + 1);
         await tester.tap(find.byIcon(Icons.more_vert));
@@ -341,11 +352,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tapAt(const Offset(1, 43));
+    await tester.tapAt(const Offset(5, 43));
+    await tester.tapAt(const Offset(5, 47));
     await tester.pumpAndSettle();
     expect(find.text('Settings'), findsOneWidget);
 
-    await tester.tapAt(const Offset(1, 45));
+    await tester.tapAt(const Offset(5, 49));
     await tester.pumpAndSettle();
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Settings'), findsNothing);
@@ -760,11 +772,13 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text(title), findsOneWidget);
     expect(tester.getBottomLeft(find.text(title)).dy, lessThanOrEqualTo(128));
+    expect(tester.getSize(find.bySemanticsLabel('Back')), const Size(48, 48));
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -240));
     await tester.pump();
 
     expect(tester.takeException(), isNull);
     expect(find.text(title), findsOneWidget);
+    expect(tester.getSize(find.bySemanticsLabel('Back')), const Size(48, 48));
   });
 }
