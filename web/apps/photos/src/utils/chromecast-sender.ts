@@ -4,6 +4,7 @@
 declare global {
     interface Window {
         cast: typeof cast;
+        chrome?: unknown;
         __onGCastApiAvailable(available: boolean, reason?: string): void;
     }
 }

@@ -19,6 +19,7 @@ import { useTheme } from "@mui/material/styles";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
+import { isSxArray } from "ente-base/components/utils/sx";
 import { useBaseContext } from "ente-base/context";
 import { downloadManager } from "ente-gallery/services/download";
 import { uniqueFilesByID } from "ente-gallery/utils/file";
@@ -1850,12 +1851,7 @@ const FloatingIconButton: React.FC<IconButtonProps> = ({ sx, ...props }) => {
     };
 
     const mergedSx =
-        sx == null
-            ? baseSx
-            : Array.isArray(sx)
-              ? // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                [baseSx, ...sx]
-              : [baseSx, sx];
+        sx == null ? baseSx : isSxArray(sx) ? [baseSx, ...sx] : [baseSx, sx];
 
     return <IconButton {...props} sx={mergedSx} />;
 };
