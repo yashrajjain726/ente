@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ente_ml::vecdb;
+use ente_vecdb as vecdb;
 use flutter_rust_bridge::frb;
 
 #[derive(Clone, Debug)]
