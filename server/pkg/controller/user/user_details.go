@@ -97,7 +97,7 @@ func (c *UserController) GetDetailsV2(ctx *gin.Context, userID int64, fetchMemor
 
 	if fetchMemoryCount {
 		g.Go(func() error {
-			fCount, err := c.UserCacheController.GetUserFileCountWithCache(userID, app)
+			fCount, err := c.UserCacheController.GetUserFileCountWithCache(ctx, userID, app)
 			if err == nil {
 				fileCount = fCount
 			}

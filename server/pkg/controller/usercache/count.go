@@ -1,13 +1,32 @@
 package usercache
 
 import (
+	"context"
+
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/ente/cache"
 	"github.com/ente/stacktrace"
 	"github.com/sirupsen/logrus"
 )
 
-func (c *Controller) GetUserFileCountWithCache(userID int64, app ente.App) (int64, error) {
+func (c *Controller) GetUserFileCountWithCache(ctx context.Context, userID int64, app ente.App) (int64, error) {
+	_, photos, locker, err := c.UsageRepo.GetStoredFileCounts(ctx, userID)
+	if err != nil {
+		return 0, stacktrace.Propagate(err, "")
+	}
+	count := int64(-1)
+	switch app {
+	case ente.Photos:
+		count = photos
+	case ente.Locker:
+		count = locker
+	}
+	if count >= 0 {
+		return count, nil
+	}
+	if (app == ente.Photos || app == ente.Locker) && c.QueueFileCountInitialization != nil {
+		c.QueueFileCountInitialization(userID)
+	}
 	if count, ok := c.UserCache.GetFileCount(userID, app); ok {
 		// Cache hit, update the cache asynchronously
 		go func() {

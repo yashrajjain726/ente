@@ -5,14 +5,14 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/ente/museum/ente"
 	"github.com/ente/stacktrace"
 	"github.com/lib/pq"
 )
 
 type UsageRepository struct {
-	DB       *sql.DB
-	UserRepo *UserRepository
+	DB                           *sql.DB
+	UserRepo                     *UserRepository
+	QueueFileCountInitialization func(int64)
 }
 
 type LockerUsage struct {
@@ -133,23 +133,63 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		}
 	}
 
-	countQuery := `
-      WITH counts AS (
-         SELECT c.owner_id, COUNT(DISTINCT cf.file_id) AS file_count
-         FROM collections c
-         JOIN collection_files cf ON c.collection_id = cf.collection_id
-         WHERE c.app = 'locker'
-            AND c.owner_id = ANY($1)
-            AND cf.f_owner_id = c.owner_id
-            AND cf.is_deleted = false
-         GROUP BY c.owner_id
-      )
-      SELECT requested.user_id, COALESCE(counts.file_count, 0),
-         u.photos_file_count, u.locker_file_count, u.file_count_source_version
-      FROM unnest($1::bigint[]) AS requested(user_id)
-      LEFT JOIN counts ON counts.owner_id = requested.user_id
-      LEFT JOIN usage u ON u.user_id = requested.user_id;
-   `
+	rows, err := repo.DB.QueryContext(ctx, `SELECT requested.user_id, u.locker_file_count
+		FROM unnest($1::bigint[]) AS requested(user_id)
+		LEFT JOIN usage AS u ON u.user_id = requested.user_id`, pq.Array(userIDs))
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	var uninitializedUserIDs []int64
+	for rows.Next() {
+		var userID int64
+		var fileCount sql.NullInt64
+		if err := rows.Scan(&userID, &fileCount); err != nil {
+			rows.Close()
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if fileCount.Valid {
+			userMap[userID].FileCount = fileCount.Int64
+		} else {
+			uninitializedUserIDs = append(uninitializedUserIDs, userID)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if err := rows.Err(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if repo.QueueFileCountInitialization != nil {
+		for _, userID := range uninitializedUserIDs {
+			repo.QueueFileCountInitialization(userID)
+		}
+	}
+
+	if len(uninitializedUserIDs) > 0 {
+		rows, err = repo.DB.QueryContext(ctx, `SELECT c.owner_id, COUNT(DISTINCT cf.file_id)
+			FROM collections AS c
+			JOIN collection_files AS cf ON c.collection_id = cf.collection_id
+			WHERE c.app = 'locker' AND c.owner_id = ANY($1)
+				AND cf.f_owner_id = c.owner_id AND cf.is_deleted = FALSE
+			GROUP BY c.owner_id`, pq.Array(uninitializedUserIDs))
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		for rows.Next() {
+			var userID, fileCount int64
+			if err := rows.Scan(&userID, &fileCount); err != nil {
+				rows.Close()
+				return nil, stacktrace.Propagate(err, "")
+			}
+			userMap[userID].FileCount = fileCount
+		}
+		if err := rows.Close(); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if err := rows.Err(); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+	}
 
 	sizeQuery := `
       SELECT 
@@ -166,28 +206,6 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
       LEFT JOIN object_keys ok ON ok.file_id = unique_files.file_id AND ok.is_deleted = false
       GROUP BY unique_files.owner_id;
    `
-
-	rows, err := repo.DB.QueryContext(ctx, countQuery, pq.Array(userIDs))
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var ownerID, fileCount int64
-		var counts fileCountSnapshot
-		if scanErr := rows.Scan(&ownerID, &fileCount, &counts.photos, &counts.locker, &counts.version); scanErr != nil {
-			return nil, stacktrace.Propagate(scanErr, "")
-		}
-		counts.observe("locker_usage", ownerID, ente.Locker, fileCount)
-		if user, exists := userMap[ownerID]; exists {
-			user.FileCount = fileCount
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	rows.Close()
 
 	rows, err = repo.DB.QueryContext(ctx, sizeQuery, pq.Array(userIDs))
 	if err != nil {
