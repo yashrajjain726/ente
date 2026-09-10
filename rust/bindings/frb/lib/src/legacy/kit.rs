@@ -1,5 +1,5 @@
-use ente_frb_lib::legacy::{LegacyError, LegacyKit, LegacyKitCreateResult, LegacyKitShare};
-use ente_frb_lib::session::Session;
+use super::types::{LegacyError, LegacyKit, LegacyKitCreateResult, LegacyKitShare};
+use crate::session::Session;
 
 pub async fn kits(session: &Session) -> Result<Vec<LegacyKit>, LegacyError> {
     ente_legacy::kits(session.as_ref())

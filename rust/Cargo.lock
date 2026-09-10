@@ -2659,7 +2659,6 @@ dependencies = [
  "ente-core",
  "ente-frb-lib",
  "ente-frb-log",
- "ente-legacy",
  "ente-ml",
  "flutter_rust_bridge",
 ]

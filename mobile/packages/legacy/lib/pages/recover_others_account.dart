@@ -16,7 +16,7 @@ import "package:password_strength/password_strength.dart";
 class RecoverOthersAccount extends StatefulWidget {
   final String recoveryKey;
   final KeyAttributes attributes;
-  final RecoverySessions sessions;
+  final LegacyRecoverySession sessions;
 
   const RecoverOthersAccount(
     this.recoveryKey,
