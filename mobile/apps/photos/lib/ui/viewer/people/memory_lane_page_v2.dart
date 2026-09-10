@@ -74,6 +74,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   Timer? _playbackTimer;
   Object? _playbackToken;
   bool _wasPlayingBeforeSeek = false;
+  bool _isSeeking = false;
   late final Future<void> _memoryLaneLoaded;
   Key _currentEntryKey = UniqueKey();
   MemoryLanePersonTimeline? _timeline;
@@ -162,6 +163,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
       _entries.length - 1,
     );
     setState(() {
+      _isSeeking = true;
       _playbackTimer?.cancel();
       _playbackToken = null;
       _selectEntry(index);
@@ -181,6 +183,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   void _onSeekEnd() {
     final wasPlaying = _wasPlayingBeforeSeek;
     _wasPlayingBeforeSeek = false;
+    setState(() => _isSeeking = false);
     if (wasPlaying) unawaited(_play(i));
   }
 
@@ -350,7 +353,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
               child: ColoredBox(
                 color: Colors.black,
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 750),
+                  duration: Duration(milliseconds: _isSeeking ? 100 : 750),
                   switchInCurve: Curves.easeOutExpo,
                   switchOutCurve: Curves.easeInExpo,
                   child: FutureBuilder<(Uint8List, int)?>(
@@ -483,7 +486,9 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
                             child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 1000),
+                              duration: Duration(
+                                milliseconds: _isSeeking ? 100 : 1000,
+                              ),
                               switchInCurve: Curves.easeOutCubic,
                               switchOutCurve: Curves.easeInCubic,
                               transitionBuilder: (child, animation) {
@@ -727,6 +732,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                               ),
                                           onHorizontalDragEnd: (_) =>
                                               _onSeekEnd(),
+                                          onHorizontalDragCancel: _onSeekEnd,
                                           child: Row(
                                             spacing: dotSpacing,
                                             children: List.generate(dotCount, (
