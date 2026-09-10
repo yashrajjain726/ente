@@ -21,6 +21,7 @@ class CastSession: ObservableObject {
     }
     
     func setState(_ newState: CastSessionState) {
+        guard state != newState else { return }
         state = newState
         isActive = !isIdle
     }
@@ -34,7 +35,7 @@ class CastSession: ObservableObject {
 }
 
 class RealCastPairingService {
-    private let baseURL = "https://api.ente.com"
+    private let baseURL = APIEndpoint.current.absoluteString
     private var pollingTimer: Timer?
     private var isPolling: Bool = false
     private var isFetchingPayload: Bool = false
@@ -176,9 +177,4 @@ class RealCastPairingService {
         pollingStartTime = nil
     }
     
-    func resetForNewSession() {
-        stopPolling()
-        hasDeliveredPayload = false
-        hasLoggedIntervalSwitch = false
-    }
 }

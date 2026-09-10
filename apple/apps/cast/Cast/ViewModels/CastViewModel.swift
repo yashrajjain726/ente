@@ -13,8 +13,9 @@ class CastViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
-    private let pairingService: RealCastPairingService
+    private var pairingService = RealCastPairingService()
     private let castSession: CastSession
+    private var sessionID = UUID()
 
     public let slideshowService: RealSlideshowService
 
@@ -28,7 +29,6 @@ class CastViewModel: ObservableObject {
 
     init() {
         self.castSession = CastSession()
-        self.pairingService = RealCastPairingService()
         self.slideshowService = RealSlideshowService()
 
         setupBindings()
@@ -120,6 +120,12 @@ class CastViewModel: ObservableObject {
     }
 
     func startCastSession() {
+        sessionID = UUID()
+        pairingService.stopPolling()
+        pairingService = RealCastPairingService()
+        let sessionID = sessionID
+        let pairingService = pairingService
+
         castSession.setState(.registering)
         deviceCode = ""
         currentView = .pairing
@@ -127,6 +133,7 @@ class CastViewModel: ObservableObject {
         Task {
             do {
                 let device = try await pairingService.registerDevice()
+                guard sessionID == self.sessionID else { return }
 
                 await MainActor.run {
                     deviceCode = device.deviceCode
@@ -139,19 +146,33 @@ class CastViewModel: ObservableObject {
                     device: device,
                     onPayloadReceived: { [weak self] payload in
                         Task { @MainActor in
-                            self?.handlePayloadReceived(payload)
+                            guard let self, sessionID == self.sessionID else { return }
+                            self.handlePayloadReceived(payload)
                         }
                     },
                     onError: { [weak self] error in
                         Task { @MainActor in
-                            self?.handleNetworkError(error)
+                            guard let self, sessionID == self.sessionID else { return }
+                            self.handleNetworkError(error)
                         }
                     }
                 )
 
             } catch {
+                guard sessionID == self.sessionID else { return }
                 handleNetworkError(error)
             }
+        }
+    }
+
+    func endpointChanged() {
+        sessionID = UUID()
+        errorMessage = nil
+        Task {
+            await resetSession()
+            await slideshowService.clearExpiredTokenState()
+            await slideshowService.clearCache()
+            startCastSession()
         }
     }
 
@@ -180,14 +201,17 @@ class CastViewModel: ObservableObject {
         currentView = .connecting
         statusMessage = ""
 
+        let sessionID = sessionID
         Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
+            guard sessionID == self.sessionID else { return }
 
             await slideshowService.start(castPayload: payload)
 
             try? await Task.sleep(nanoseconds: 1_000_000_000)
 
             await MainActor.run {
+                guard sessionID == self.sessionID else { return }
                 let hasError = slideshowService.error != nil && !slideshowService.error!.isEmpty
 
                 if hasError {
@@ -280,9 +304,11 @@ class CastViewModel: ObservableObject {
     private func handleNetworkError(_ error: Error) {
         handleError("An error occurred: \(error.localizedDescription)")
 
+        let sessionID = sessionID
         Task {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             await MainActor.run {
+                guard sessionID == self.sessionID else { return }
                 startCastSession()
             }
         }
@@ -292,7 +318,6 @@ class CastViewModel: ObservableObject {
         Task {
             await resetSession()
             await slideshowService.clearExpiredTokenState()
-            pairingService.resetForNewSession()
 
             await MainActor.run {
                 currentView = .connecting

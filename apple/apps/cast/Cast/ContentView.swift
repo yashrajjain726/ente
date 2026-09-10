@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = CastViewModel()
+    @State private var tapCount = 0
+    @State private var isConfiguringEndpoint = false
     
     var body: some View {
         ZStack {
@@ -40,6 +42,17 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.6), value: viewModel.currentView)
+        .focusable(viewModel.currentView != .slideshow)
+        .onTapGesture {
+            guard viewModel.currentView != .slideshow else { return }
+            tapCount += 1
+            guard tapCount == 7 else { return }
+            tapCount = 0
+            isConfiguringEndpoint = true
+        }
+        .sheet(isPresented: $isConfiguringEndpoint) {
+            APIEndpointView(onSave: viewModel.endpointChanged)
+        }
     }
 }
 

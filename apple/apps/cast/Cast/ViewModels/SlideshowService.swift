@@ -51,7 +51,7 @@ class RealSlideshowService: ObservableObject {
     
     private var didDisplayFirstFile: Bool = false
     
-    private let baseURL = "https://api.ente.com"
+    private var baseURL = APIEndpoint.current.absoluteString
     private let castDownloadURL = "https://cast-albums.ente.com/download"
     
     private let verboseFileLogging = false
@@ -141,43 +141,37 @@ class RealSlideshowService: ObservableObject {
         ScreenSaverManager.preventScreenSaver()
         
         await clearExpiredTokenState()
+        baseURL = APIEndpoint.current.absoluteString
         storedCastPayload = castPayload
-        await MainActor.run {
-            if self.error != nil { self.error = nil }
-        }
+        if error != nil { error = nil }
         
         do {
             
             await initializeFileList(castPayload: castPayload)
+            guard storedCastPayload == castPayload else { return }
             
             let fileCount = await MainActor.run { allFiles.count }
             if fileCount == 0 {
-                await MainActor.run {
-                    self.error = "No media files available in this album"
-                }
+                error = "No media files available in this album"
                 return
             }
             
             print("Found \(fileCount) files total")
             
             let validFileIDs = Set(await MainActor.run { allFiles.map { $0.id } })
-            await cleanupExpiredCache(validFileIDs: validFileIDs)
+            await cleanupExpiredCache(validFileIDs: validFileIDs, castPayload: castPayload)
+            guard storedCastPayload == castPayload else { return }
             
-            await MainActor.run {
-                self.totalSlides = fileCount
-                self.currentFileIndex = 0
-                self.currentSlideIndex = 0
-                self.isPlaying = true
-                self.isPaused = false
-            }
+            totalSlides = fileCount
+            currentFileIndex = 0
+            currentSlideIndex = 0
+            isPlaying = true
+            isPaused = false
             
             await displaySlideAtCurrentIndex()
+            guard storedCastPayload == castPayload else { return }
             
-            if fileCount == 1 {
-                startSlideTimer()
-            } else {
-                startSlideTimer()
-            }
+            startSlideTimer()
             print("Enhanced slideshow started with \(fileCount) slide(s)")
             
         } catch {
@@ -256,12 +250,14 @@ class RealSlideshowService: ObservableObject {
         
         do {
             try await fetchAllFiles(castPayload: castPayload)
+            guard storedCastPayload == castPayload else { return }
             hasCompletedInitialFetch = true
             if !allFiles.isEmpty {
                 allFiles.shuffle()
             }
             print("Initial diff fetch completed - \(allFiles.count) files cached (shuffled)")
         } catch {
+            guard storedCastPayload == castPayload else { return }
             print("Failed to fetch files: \(error)")
             hasCompletedInitialFetch = false
             self.error = "Failed to load files: \(error.localizedDescription)"
@@ -275,8 +271,10 @@ class RealSlideshowService: ObservableObject {
         while hasMore {
             if verboseFileLogging { print("Fetching files since time: \(sinceTime)") }
             let result = try await fetchFilesBatch(castPayload: castPayload, sinceTime: sinceTime)
+            guard storedCastPayload == castPayload else { return }
             
-            await processDiffBatch(result.files, collectionKey: castPayload.collectionKey)
+            await processDiffBatch(result.files, castPayload: castPayload)
+            guard storedCastPayload == castPayload else { return }
             
             await MainActor.run {
                 if result.latestUpdateTime > self.lastUpdateTime {
@@ -290,14 +288,13 @@ class RealSlideshowService: ObservableObject {
             
         }
         
+        guard storedCastPayload == castPayload else { return }
         print("Initial diff fetch complete - total files cached: \(await MainActor.run { allFiles.count })")
-        
-        await MainActor.run {
-            startPeriodicDiffPolling()
-        }
+        startPeriodicDiffPolling()
     }
     
     private func fetchFilesBatch(castPayload: CastPayload, sinceTime: Int64) async throws -> (files: [[String: Any]], hasMore: Bool, latestUpdateTime: Int64) {
+        guard storedCastPayload == castPayload else { throw CancellationError() }
         let url = URL(string: "\(baseURL)/cast/diff?sinceTime=\(sinceTime)")!
         
         
@@ -305,15 +302,12 @@ class RealSlideshowService: ObservableObject {
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
         
         let (data, response) = try await URLSession.shared.data(for: request)
+        guard storedCastPayload == castPayload else { throw CancellationError() }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw CastError.networkError("Invalid response")
         }
         
-        
-        if let responseString = String(data: data, encoding: .utf8) {
-            
-        }
         
         guard httpResponse.statusCode == 200 else {
             if httpResponse.statusCode == 401 {
@@ -331,16 +325,10 @@ class RealSlideshowService: ObservableObject {
         let hasMore = json["hasMore"] as? Bool ?? false
         
         var latestUpdateTime = sinceTime
-        var foundAnyUpdates = false
         for item in diff {
             if let updateTime = item["updationTime"] as? Int64 {
                 latestUpdateTime = max(latestUpdateTime, updateTime)
-                foundAnyUpdates = true
             }
-        }
-        
-        if !foundAnyUpdates {
-            latestUpdateTime = sinceTime
         }
         
         
@@ -349,12 +337,13 @@ class RealSlideshowService: ObservableObject {
     }
     
     @MainActor
-    private func processDiffBatch(_ items: [[String: Any]], collectionKey: String) async {
+    private func processDiffBatch(_ items: [[String: Any]], castPayload: CastPayload) async {
         let wasEmpty = allFiles.isEmpty
         var currentFileChanged = false
         let originalCurrentFile = currentFileIndex < allFiles.count ? allFiles[currentFileIndex] : nil
         
         for item in items {
+            guard storedCastPayload == castPayload else { return }
             guard let id = item["id"] as? Int else {
                 continue
             }
@@ -370,6 +359,7 @@ class RealSlideshowService: ObservableObject {
                         currentFileWasDeleted = true
                         
                         Task {
+                            guard self.storedCastPayload == castPayload else { return }
                             await self.nextSlide()
                         }
                     }
@@ -388,7 +378,8 @@ class RealSlideshowService: ObservableObject {
                 }
             } else {
                 do {
-                    if let file = try await decryptFileMetadata(item: item, collectionKey: collectionKey) {
+                    if let file = try await decryptFileMetadata(item: item, collectionKey: castPayload.collectionKey) {
+                        guard storedCastPayload == castPayload else { return }
                         // Cast images and Live Photos, not standalone videos.
                         if file.isVideo && !file.isLivePhoto {
                             if verboseFileLogging { print("Skipping video file: \(file.title) (ID: \(id))") }
@@ -418,6 +409,7 @@ class RealSlideshowService: ObservableObject {
                 }
             }
         }
+        guard storedCastPayload == castPayload else { return }
         
         print("File list now contains \(allFiles.count) files")
         
@@ -439,13 +431,15 @@ class RealSlideshowService: ObservableObject {
             currentSlideIndex = 0
             totalSlides = allFiles.count
             
-            if let payload = storedCastPayload {
+            if storedCastPayload != nil {
                 print("Restarting slideshow with \(allFiles.count) files")
                 // Clear before loading to avoid an empty-state flash.
                 error = nil
                 
                 Task {
+                    guard storedCastPayload == castPayload else { return }
                     await displaySlideAtCurrentIndex()
+                    guard storedCastPayload == castPayload else { return }
                     await MainActor.run {
                         self.isPlaying = true
                         self.isPaused = false
@@ -463,14 +457,15 @@ class RealSlideshowService: ObservableObject {
             
             if currentFileChanged && !allFiles.isEmpty {
                 Task {
+                    guard storedCastPayload == castPayload else { return }
                     await displaySlideAtCurrentIndex()
                 }
             }
         }
-        
+
         let currentValidFileIDs = Set(allFiles.map { $0.id })
         Task {
-            await cleanupExpiredCache(validFileIDs: currentValidFileIDs)
+            await cleanupExpiredCache(validFileIDs: currentValidFileIDs, castPayload: castPayload)
         }
     }
     
@@ -498,6 +493,7 @@ class RealSlideshowService: ObservableObject {
                 castPayload: payload,
                 file: file
             )
+            guard storedCastPayload == payload else { return }
             
             print("Successfully loaded file \(file.id): \(file.title) (\(decryptedData.count) bytes)")
             
@@ -509,6 +505,7 @@ class RealSlideshowService: ObservableObject {
             startPrefetching()
             
         } catch {
+            guard storedCastPayload == payload else { return }
             let file = allFiles[currentFileIndex]
             print("Failed to load file \(file.id): \(file.title) at index \(currentFileIndex) - \(error)")
             
@@ -518,6 +515,7 @@ class RealSlideshowService: ObservableObject {
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 Task {
+                    guard self.storedCastPayload == payload else { return }
                     await self.skipToNextSlide()
                 }
             }
@@ -626,7 +624,7 @@ class RealSlideshowService: ObservableObject {
     }
     
     private func skipToNextSlide() async {
-        guard !allFiles.isEmpty else { return }
+        guard !allFiles.isEmpty, let payload = storedCastPayload else { return }
         
         currentFileIndex = (currentFileIndex + 1) % allFiles.count
         
@@ -635,7 +633,6 @@ class RealSlideshowService: ObservableObject {
         
         while retryCount < maxRetries {
             do {
-                guard let payload = storedCastPayload else { return }
                 let file = allFiles[currentFileIndex]
                 
                 print("Attempting to load file \(file.id): \(file.title) at index \(currentFileIndex)")
@@ -644,6 +641,7 @@ class RealSlideshowService: ObservableObject {
                     castPayload: payload,
                     file: file
                 )
+                guard storedCastPayload == payload else { return }
                 
                 prefetchCache[currentFileIndex] = decryptedData
                 await updateCurrentSlide(with: decryptedData, file: file)
@@ -663,6 +661,7 @@ class RealSlideshowService: ObservableObject {
                 return
                 
             } catch {
+                guard storedCastPayload == payload else { return }
                 let file = allFiles[currentFileIndex]
                 print("Failed to load file \(file.id): \(file.title) - \(error)")
                 currentFileIndex = (currentFileIndex + 1) % allFiles.count
@@ -676,14 +675,14 @@ class RealSlideshowService: ObservableObject {
     }
     
     private func startPrefetching() {
+        guard let payload = storedCastPayload else { return }
         Task {
             let prefetchCount = min(3, allFiles.count)
             for i in 1...prefetchCount {
+                guard storedCastPayload == payload else { return }
                 let prefetchIndex = (currentFileIndex + i) % allFiles.count
                 
                 if prefetchCache[prefetchIndex] != nil { continue }
-                
-                guard let payload = storedCastPayload else { continue }
                 
                 do {
                     let file = allFiles[prefetchIndex]
@@ -691,6 +690,7 @@ class RealSlideshowService: ObservableObject {
                         castPayload: payload,
                         file: file
                     )
+                    guard storedCastPayload == payload else { return }
                     prefetchCache[prefetchIndex] = data
                     
                     if prefetchCache.count > 5 {
@@ -701,6 +701,7 @@ class RealSlideshowService: ObservableObject {
                     }
                     
                 } catch {
+                    guard storedCastPayload == payload else { return }
                     // Silently skip problematic files during prefetching
                     print("Prefetch failed for file \(prefetchIndex), will try on-demand")
                     continue
@@ -790,17 +791,17 @@ class RealSlideshowService: ObservableObject {
         do {
             let currentTime = await MainActor.run { lastUpdateTime }
             let result = try await fetchFilesBatch(castPayload: payload, sinceTime: currentTime)
+            guard storedCastPayload == payload else { return }
             
             if !result.files.isEmpty {
                 print("Periodic poll found \(result.files.count) changes")
                 
-                await processDiffBatch(result.files, collectionKey: payload.collectionKey)
+                await processDiffBatch(result.files, castPayload: payload)
+                guard storedCastPayload == payload else { return }
                 
-                await MainActor.run {
-                    if result.latestUpdateTime > self.lastUpdateTime {
-                        print("Updating lastUpdateTime: \(self.lastUpdateTime) → \(result.latestUpdateTime)")
-                        self.lastUpdateTime = result.latestUpdateTime
-                    }
+                if result.latestUpdateTime > lastUpdateTime {
+                    print("Updating lastUpdateTime: \(lastUpdateTime) → \(result.latestUpdateTime)")
+                    lastUpdateTime = result.latestUpdateTime
                 }
             } else {
                 print("Periodic poll found no changes since \(currentTime)")
@@ -841,13 +842,17 @@ class RealSlideshowService: ObservableObject {
     }
     
     private func downloadEncryptedFile(castPayload: CastPayload, fileID: Int) async throws -> Data {
-        let url = URL(string: "\(castDownloadURL)/?fileID=\(fileID)")!
+        guard storedCastPayload == castPayload else { throw CancellationError() }
+        let url = baseURL == APIEndpoint.production.absoluteString
+            ? URL(string: "\(castDownloadURL)/?fileID=\(fileID)")!
+            : URL(string: baseURL)!.appendingPathComponent("cast/files/download/\(fileID)")
         
         var request = URLRequest(url: url)
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
         
         
         let (data, response) = try await URLSession.shared.data(for: request)
+        guard storedCastPayload == castPayload else { throw CancellationError() }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw CastError.networkError("Invalid response")
@@ -895,8 +900,7 @@ class RealSlideshowService: ObservableObject {
             fileKey: fileKey,
             decryptionHeader: file.fileDecryptionHeader
         )
-            
-        
+        guard storedCastPayload == castPayload else { throw CancellationError() }
         await cacheFileContent(fileID: file.id, data: decryptedData)
         
         return decryptedData
@@ -1026,7 +1030,8 @@ class RealSlideshowService: ObservableObject {
         await fileCache.set(fileID, data: data)
     }
     
-    private func cleanupExpiredCache(validFileIDs: Set<Int>) async {
+    private func cleanupExpiredCache(validFileIDs: Set<Int>, castPayload: CastPayload) async {
+        guard storedCastPayload == castPayload else { return }
         let stats = await getCacheStats()
         print("Starting cache cleanup - current cache has \(stats.count) files")
         
@@ -1034,6 +1039,7 @@ class RealSlideshowService: ObservableObject {
         
         var removedCount = 0
         for cachedFileID in cachedFileIDs {
+            guard storedCastPayload == castPayload else { return }
             if !validFileIDs.contains(cachedFileID) {
                 await removeCachedFileContent(fileID: cachedFileID)
                 removedCount += 1
@@ -1050,7 +1056,7 @@ class RealSlideshowService: ObservableObject {
         await fileCache.remove(fileID)
     }
     
-    private func clearCache() async {
+    func clearCache() async {
         await fileCache.clear()
     }
     
