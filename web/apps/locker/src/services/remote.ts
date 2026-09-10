@@ -9,7 +9,6 @@ import {
     encryptBlob,
     encryptBox,
     generateKey,
-    stringToB64,
 } from "ente-locker-wasm";
 import {
     findCollectionByType,
