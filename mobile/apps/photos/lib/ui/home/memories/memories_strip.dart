@@ -162,10 +162,10 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         if (snapshot.connectionState != ConnectionState.done) {
           return SizedBox(height: cardHeight + 24);
         }
-        final cards = _buildCards(_memories, cardHeight);
-        if (cards.isEmpty) {
+        if (_memories.isEmpty) {
           return const SizedBox.shrink();
         }
+        final cards = _buildCards(_memories, cardHeight);
         return Padding(
           padding: const EdgeInsets.only(top: 12, bottom: 10),
           child: SizedBox(
