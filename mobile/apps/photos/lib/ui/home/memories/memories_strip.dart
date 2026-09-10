@@ -27,13 +27,13 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/memory_lane/memory_lane_service.dart";
+import "package:photos/ui/home/memories/all_memories_page.dart";
 import "package:photos/ui/home/memories/crafting_memories_card.dart";
 import 'package:photos/ui/home/memories/memory_card.dart';
 import "package:photos/ui/home/memories/memory_card_constants.dart";
 import "package:photos/ui/home/memories/memory_cover_util.dart";
 import "package:photos/ui/home/memories/memory_lane_card.dart";
 import "package:photos/ui/home/memories/memory_video_prefetcher.dart";
-import "package:photos/ui/viewer/people/memory_lane_page_v2.dart";
 
 class MemoryCardWrapper {
   final String id;
@@ -236,7 +236,38 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     final memoryLanePerson = _memoryLanePerson;
     final oldestMemoryLaneFile = _oldestMemoryLaneFile;
     final newestMemoryLaneFace = _newestMemoryLaneFace;
+    final hasMemoryLane =
+        flagService.internalUser &&
+        MemoryLaneService.instance.isFeatureEnabled &&
+        memoryLane != null &&
+        (memoryLane.isCluster || memoryLanePerson != null) &&
+        oldestMemoryLaneFile != null &&
+        newestMemoryLaneFace != null;
     final hasContent = memories.isNotEmpty || memoryLane != null;
+    final cardBuilders = <MemoryCardWrapper Function(VoidCallback onTap)>[
+      if (hasMemoryLane)
+        (onTap) => MemoryCardWrapper(
+          id: "memoryLane_${memoryLane.personId}",
+          widget: () => MemoryLaneCardWidget(
+            id: memoryLane.personId,
+            oldestFile: oldestMemoryLaneFile,
+            face: newestMemoryLaneFace,
+            personName: memoryLanePerson?.data.name ?? "",
+            size: Size(_cardWidth, cardHeight),
+            onTap: onTap,
+          ),
+        ),
+      for (final memory in memories)
+        (onTap) => MemoryCardWrapper(
+          id: memory.id,
+          widget: () => MemoryCardWidget(
+            memory: memory,
+            width: _cardWidth,
+            height: cardHeight,
+            onTap: onTap,
+          ),
+        ),
+    ];
     return [
       if (_shouldShowCraftingMemories && hasContent)
         MemoryCardWrapper(
@@ -254,37 +285,18 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
             },
           ),
         ),
-      if (flagService.internalUser &&
-          MemoryLaneService.instance.isFeatureEnabled &&
-          memoryLane != null &&
-          oldestMemoryLaneFile != null &&
-          newestMemoryLaneFace != null)
-        MemoryCardWrapper(
-          id: "memoryLane_${memoryLane.personId}",
-          widget: () => MemoryLaneCardWidget(
-            id: memoryLane.personId,
-            oldestFile: oldestMemoryLaneFile,
-            face: newestMemoryLaneFace,
-            personName: memoryLanePerson?.data.name ?? "",
-            size: Size(_cardWidth, cardHeight),
-            onTap: () => openMemoryLanePage(
-              context,
-              personId: memoryLane.personId,
-              person: memoryLanePerson,
-              isCluster: memoryLane.isCluster,
-            ),
-          ),
-        ),
-      ...memories.indexed.map(
-        (entry) => MemoryCardWrapper(
-          id: entry.$2.id,
-          widget: () => MemoryCardWidget(
-            memories: memories,
-            width: _cardWidth,
-            height: cardHeight,
-            index: entry.$1,
-          ),
-        ),
+      ...cardBuilders.indexed.map(
+        (entry) => entry.$2(() async {
+          await openAllMemoriesPage(
+            context: context,
+            allMemories: memories,
+            memoryLane: hasMemoryLane ? memoryLane : null,
+            memoryLanePerson: hasMemoryLane ? memoryLanePerson : null,
+            initialPageIndex: entry.$1,
+          );
+          if (!mounted) return;
+          setState(() {});
+        }),
       ),
     ];
   }
