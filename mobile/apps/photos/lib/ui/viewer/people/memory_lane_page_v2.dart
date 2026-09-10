@@ -562,34 +562,31 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                             constraints: const BoxConstraints(minHeight: 48),
                             child: Align(
                               alignment: Alignment.bottomCenter,
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: screenSize.width * 0.16,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  spacing: screenSize.width * 0.02,
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < ageCaptionParts.length;
-                                      index++
-                                    ) ...[
-                                      if (index > 0)
-                                        _MemoryLaneAnimatedDigit(value: age),
-                                      Flexible(
-                                        child: Text(
-                                          ageCaptionParts[index],
-                                          style: darkTheme.textTheme.bodyMuted,
-                                          textAlign: TextAlign.center,
-                                        ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                spacing: screenSize.width * 0.02,
+                                children: [
+                                  for (
+                                    var index = 0;
+                                    index < ageCaptionParts.length;
+                                    index++
+                                  ) ...[
+                                    if (index > 0)
+                                      _MemoryLaneAnimatedDigit(value: age),
+                                    Flexible(
+                                      child: Text(
+                                        ageCaptionParts[index],
+                                        style: darkTheme.textTheme.bodyMuted,
+                                        textAlign: TextAlign.center,
+                                        softWrap: false,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ],
+                                    ),
                                   ],
-                                ),
+                                ],
                               ),
                             ),
                           ),
