@@ -430,7 +430,6 @@ const Page: React.FC = () => {
                         ? () => void router.push(spaceRoutes.profile)
                         : undefined
                 }
-                onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onReplyToPost={
                     profile?.spaceId
                         ? (

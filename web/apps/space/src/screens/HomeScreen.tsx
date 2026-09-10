@@ -111,7 +111,6 @@ interface HomeScreenProps {
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
     onOpenProfile?: () => void;
-    onOpenSettings?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
         postId: number,
@@ -1017,7 +1016,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onMessageFriend,
     onPokeFriend,
     onOpenProfile,
-    onOpenSettings,
     onReplyToPost,
     onSetPostLiked,
     profile,
@@ -1742,9 +1740,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }}
             >
                 <SpaceHomeHeader
+                    profile={profile}
                     showUnreadIndicator={showUnreadIndicator}
                     onOpenMessages={onOpenMessages}
-                    onOpenSettings={onOpenSettings}
+                    onOpenProfile={onOpenProfile}
                 >
                     <Box
                         ref={postInputRef}

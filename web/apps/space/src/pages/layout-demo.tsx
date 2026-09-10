@@ -246,9 +246,8 @@ const LayoutDemoPage: React.FC = () => {
                 }}
             >
                 <SpaceHomeHeader
-                    onOpenSettings={() =>
-                        void router.push(spaceRoutes.settings)
-                    }
+                    profile={demoProfile}
+                    onOpenProfile={() => void router.push(spaceRoutes.profile)}
                 />
                 <Box
                     sx={{
