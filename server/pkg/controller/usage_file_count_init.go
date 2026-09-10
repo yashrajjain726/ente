@@ -15,6 +15,7 @@ import (
 
 type FileCountInitializer struct {
 	UsageRepo      *repo.UsageRepository
+	TrashRepo      *repo.TrashRepository
 	LockController *lock.LockController
 	afterUserID    int64
 	resumeAt       time.Time
@@ -35,7 +36,8 @@ func (c *FileCountInitializer) ProcessBatch() {
 		return
 	}
 
-	userIDs, err := c.UsageRepo.GetFileCountInitializationCandidates(context.Background(), c.afterUserID, fileCountInitializationBatchSize)
+	ctx := context.Background()
+	userIDs, err := c.UsageRepo.GetFileCountInitializationCandidates(ctx, c.afterUserID, fileCountInitializationBatchSize)
 	if err != nil {
 		log.WithError(err).Error("Failed to fetch file count initialization candidates")
 		return
@@ -61,7 +63,22 @@ func (c *FileCountInitializer) ProcessBatch() {
 		}
 		updated, err := func() (bool, error) {
 			defer c.LockController.ReleaseLock(lockID)
-			return c.UsageRepo.InitializeFileCounts(context.Background(), userID)
+			updated, err := c.UsageRepo.InitializeFileCounts(ctx, userID)
+			if errors.Is(err, repo.ErrFileCountIneligible) {
+				fileIDs, cleanupErr := c.TrashRepo.GetStaleDeletedFileIDs(ctx, userID)
+				if cleanupErr != nil {
+					log.WithError(cleanupErr).WithField("user_id", userID).Error("Failed to find stale deleted file memberships")
+				}
+				for _, fileID := range fileIDs {
+					if cleanupErr := c.TrashRepo.CleanUpDeletedFilesFromCollection(ctx, []int64{fileID}, userID); cleanupErr != nil {
+						log.WithError(cleanupErr).WithFields(log.Fields{
+							"user_id": userID,
+							"file_id": fileID,
+						}).Error("Failed to clean stale deleted file membership")
+					}
+				}
+			}
+			return updated, err
 		}()
 		if errors.Is(err, repo.ErrFileCountIneligible) {
 			ineligible++
