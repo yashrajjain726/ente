@@ -11,14 +11,15 @@ import {
 } from "@hugeicons/core-free-icons";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { Box } from "@mui/material";
-import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
 import { savedLogs } from "ente-base/log-web";
 import { saveStringAsFile } from "ente-base/utils/web";
 import { initiateEmail, openURL } from "ente-new/photos/utils/web";
 import { t } from "i18next";
-import React from "react";
+import React, { useState } from "react";
 import { Trans } from "react-i18next";
+import { lockerColorSx } from "./locker-tokens";
+import { LockerConfirmDialog } from "./LockerConfirmDialog";
 import {
     LockerSidebarCardButton,
     LockerSidebarLink,
@@ -41,7 +42,9 @@ const helpTopics = [
 export const LockerSupportDrawer: React.FC<
     LockerNestedSidebarDrawerVisibilityProps
 > = ({ open, onClose, onRootClose }) => {
-    const { showMiniDialog } = useBaseContext();
+    const [logsOpen, setLogsOpen] = useState(false);
+    const [isViewingLogs, setIsViewingLogs] = useState(false);
+    const [logsError, setLogsError] = useState<string>();
     const handleRootClose = () => {
         onClose();
         onRootClose();
@@ -63,12 +66,20 @@ export const LockerSupportDrawer: React.FC<
         }
     };
 
-    const confirmViewLogs = () =>
-        showMiniDialog({
-            title: t("view_logs"),
-            message: <Trans i18nKey="view_logs_message" />,
-            continue: { text: t("view_logs"), action: viewLogs },
-        });
+    const handleViewLogs = async () => {
+        if (isViewingLogs) return;
+        setIsViewingLogs(true);
+        setLogsError(undefined);
+        try {
+            await viewLogs();
+            setLogsOpen(false);
+        } catch (error) {
+            log.error("Failed to view Locker logs", error);
+            setLogsError(t("generic_error"));
+        } finally {
+            setIsViewingLogs(false);
+        }
+    };
 
     return (
         <LockerTitledNestedSidebarDrawer
@@ -97,7 +108,12 @@ export const LockerSupportDrawer: React.FC<
                 endIcon={<ChevronRightIcon />}
                 onClick={handleReportIssue}
             />
-            <LockerSidebarLink onClick={confirmViewLogs}>
+            <LockerSidebarLink
+                onClick={() => {
+                    setLogsError(undefined);
+                    setLogsOpen(true);
+                }}
+            >
                 {t("export_logs")}
             </LockerSidebarLink>
             <Box sx={{ mt: 2 }}>
@@ -122,6 +138,43 @@ export const LockerSupportDrawer: React.FC<
             >
                 {t("view_all_help_topics")}
             </LockerSidebarLink>
+            <LockerConfirmDialog
+                open={logsOpen}
+                illustration="/images/warning-grey.png"
+                title={t("view_logs")}
+                body={
+                    <Box
+                        component="span"
+                        sx={(theme) => ({
+                            display: "block",
+                            textAlign: "center",
+                            lineHeight: "22px",
+                            ...lockerColorSx(theme, { color: "textBase" }),
+                            "& > span": { display: "block" },
+                            "& > span + span": {
+                                mt: 2,
+                                p: 1.5,
+                                borderRadius: "12px",
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "fillDark",
+                                    color: "textLight",
+                                }),
+                            },
+                        })}
+                    >
+                        <Trans
+                            i18nKey="view_logs_message"
+                            components={{ p: <span /> }}
+                        />
+                    </Box>
+                }
+                confirmLabel={t("view_logs")}
+                tone="primary"
+                loading={isViewingLogs}
+                error={logsError}
+                onClose={() => setLogsOpen(false)}
+                onConfirm={handleViewLogs}
+            />
         </LockerTitledNestedSidebarDrawer>
     );
 };

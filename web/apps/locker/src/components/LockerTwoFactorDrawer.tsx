@@ -1,24 +1,34 @@
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import LockIcon from "@mui/icons-material/Lock";
-import { CircularProgress, Stack, Typography } from "@mui/material";
+import {
+    Box,
+    Button,
+    CircularProgress,
+    FormControlLabel,
+    Stack,
+    Switch,
+    Typography,
+} from "@mui/material";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import { updateSavedLocalUser } from "ente-accounts/services/accounts-db";
 import {
     disableTwoFactor,
     getTwoFactorStatus,
 } from "ente-accounts/services/user";
-import {
-    RowButton,
-    RowButtonGroup,
-    RowButtonGroupHint,
-    RowSwitch,
-} from "ente-base/components/RowButton";
-import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { useBaseContext } from "ente-base/context";
 import { isHTTP401Error } from "ente-base/http";
 import log from "ente-base/log";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
+import {
+    lockerColorSx,
+    lockerTextBodyBoldSx,
+    lockerTextBodySx,
+    lockerTextMiniSx,
+} from "./locker-tokens";
+import { LockerConfirmDialog } from "./LockerConfirmDialog";
+import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
 import {
     LockerTitledNestedSidebarDrawer,
     type LockerNestedSidebarDrawerVisibilityProps,
@@ -72,6 +82,10 @@ const TwoFactorContents: React.FC<TwoFactorContentsProps> = ({
     >();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | undefined>();
+    const [confirmation, setConfirmation] = useState<
+        "disable" | "reconfigure"
+    >();
+    const [isDisabling, setIsDisabling] = useState(false);
 
     const handleError = useCallback(
         (e: unknown, message: string) => {
@@ -106,49 +120,34 @@ const TwoFactorContents: React.FC<TwoFactorContentsProps> = ({
     }, [handleError]);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open) {
+            setConfirmation(undefined);
+            return;
+        }
         setIsTwoFactorEnabled(undefined);
         void refreshStatus();
     }, [open, refreshStatus]);
 
-    const confirmDisable = () =>
-        showMiniDialog({
-            title: t("disable_two_factor"),
-            message: t("disable_two_factor_message"),
-            continue: {
-                text: t("disable"),
-                color: "critical",
-                action: async () => {
-                    setError(undefined);
-                    try {
-                        await disableTwoFactor();
-                        onRootClose();
-                    } catch (e) {
-                        log.error("Failed to disable two-factor", e);
-                        if (isHTTP401Error(e)) {
-                            setTimeout(() => {
-                                showMiniDialog(
-                                    sessionExpiredDialogAttributes(logout),
-                                );
-                            }, 0);
-                            return;
-                        }
-                        throw e;
-                    }
-                },
-            },
-        });
-
-    const confirmReconfigure = () =>
-        showMiniDialog({
-            title: t("update_two_factor"),
-            message: t("update_two_factor_message"),
-            continue: {
-                text: t("update"),
-                color: "primary",
-                action: onConfigure,
-            },
-        });
+    const handleConfirm = async () => {
+        if (!confirmation || isDisabling) return;
+        if (confirmation === "reconfigure") {
+            setConfirmation(undefined);
+            onConfigure();
+            return;
+        }
+        setIsDisabling(true);
+        setError(undefined);
+        try {
+            await disableTwoFactor();
+            setConfirmation(undefined);
+            onRootClose();
+        } catch (e) {
+            handleError(e, "Failed to disable two-factor");
+            if (isHTTP401Error(e)) setConfirmation(undefined);
+        } finally {
+            setIsDisabling(false);
+        }
+    };
 
     if (isLoading && isTwoFactorEnabled === undefined) {
         return (
@@ -178,13 +177,49 @@ const TwoFactorContents: React.FC<TwoFactorContentsProps> = ({
         );
     }
 
-    return isTwoFactorEnabled ? (
-        <ManageTwoFactor
-            onDisable={confirmDisable}
-            onReconfigure={confirmReconfigure}
-        />
-    ) : (
-        <SetupTwoFactor onConfigure={onConfigure} />
+    return (
+        <>
+            {isTwoFactorEnabled ? (
+                <ManageTwoFactor
+                    onDisable={() => {
+                        setError(undefined);
+                        setConfirmation("disable");
+                    }}
+                    onReconfigure={() => {
+                        setError(undefined);
+                        setConfirmation("reconfigure");
+                    }}
+                />
+            ) : (
+                <SetupTwoFactor onConfigure={onConfigure} />
+            )}
+            <LockerConfirmDialog
+                open={!!confirmation}
+                illustration={
+                    confirmation === "disable"
+                        ? "/images/warning-red.png"
+                        : "/images/warning-grey.png"
+                }
+                title={t(
+                    confirmation === "disable"
+                        ? "disable_two_factor"
+                        : "update_two_factor",
+                )}
+                body={t(
+                    confirmation === "disable"
+                        ? "disable_two_factor_message"
+                        : "update_two_factor_message",
+                )}
+                confirmLabel={t(
+                    confirmation === "disable" ? "disable" : "update",
+                )}
+                tone={confirmation === "disable" ? "critical" : "primary"}
+                loading={isDisabling}
+                error={error}
+                onClose={() => setConfirmation(undefined)}
+                onConfirm={handleConfirm}
+            />
+        </>
     );
 };
 
@@ -193,20 +228,52 @@ interface SetupTwoFactorProps {
 }
 
 const SetupTwoFactor: React.FC<SetupTwoFactorProps> = ({ onConfigure }) => (
-    <Stack sx={{ px: "16px", py: "20px", alignItems: "center" }}>
-        <LockIcon sx={{ fontSize: "40px", color: "text.muted" }} />
+    <Stack sx={{ py: 2, alignItems: "center", gap: 3 }}>
+        <Box
+            sx={(theme) => ({
+                width: 80,
+                height: 80,
+                borderRadius: "20px",
+                display: "grid",
+                placeItems: "center",
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    color: "textLight",
+                }),
+            })}
+        >
+            <LockIcon sx={{ fontSize: 32 }} />
+        </Box>
         <Typography
-            sx={{
-                color: "text.muted",
+            sx={(theme) => ({
+                ...lockerTextBodySx,
                 textAlign: "center",
-                marginBlock: "32px 36px",
-            }}
+                ...lockerColorSx(theme, { color: "textLight" }),
+            })}
         >
             {t("two_factor_info")}
         </Typography>
-        <FocusVisibleButton color="accent" fullWidth onClick={onConfigure}>
+        <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={onConfigure}
+            sx={(theme) => ({
+                ...lockerTextBodyBoldSx,
+                minHeight: 52,
+                borderRadius: "20px",
+                textTransform: "none",
+                ...lockerColorSx(theme, {
+                    backgroundColor: "primary",
+                    color: "specialWhite",
+                }),
+                "&:hover": lockerColorSx(theme, {
+                    backgroundColor: "primaryDark",
+                }),
+            })}
+        >
             {t("enable_two_factor")}
-        </FocusVisibleButton>
+        </Button>
     </Stack>
 );
 
@@ -219,22 +286,38 @@ const ManageTwoFactor: React.FC<ManageTwoFactorProps> = ({
     onDisable,
     onReconfigure,
 }) => (
-    <Stack sx={{ px: "16px", py: "20px", gap: "24px" }}>
-        <RowButtonGroup>
-            <RowSwitch
-                label={t("enabled")}
-                checked={true}
-                onClick={onDisable}
-            />
-        </RowButtonGroup>
-
-        <Stack>
-            <RowButtonGroup>
-                <RowButton label={t("reconfigure")} onClick={onReconfigure} />
-            </RowButtonGroup>
-            <RowButtonGroupHint>
-                {t("reconfigure_two_factor_hint")}
-            </RowButtonGroupHint>
-        </Stack>
+    <Stack sx={{ gap: 1 }}>
+        <FormControlLabel
+            label={t("enabled")}
+            labelPlacement="start"
+            control={<Switch checked onChange={onDisable} color="primary" />}
+            sx={(theme) => ({
+                m: 0,
+                px: 1.5,
+                minHeight: 54,
+                borderRadius: "20px",
+                justifyContent: "space-between",
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    color: "textBase",
+                }),
+                "& .MuiFormControlLabel-label": lockerTextBodySx,
+            })}
+        />
+        <LockerSidebarCardButton
+            label={t("reconfigure")}
+            onClick={onReconfigure}
+            endIcon={<ChevronRightIcon />}
+        />
+        <Typography
+            sx={(theme) => ({
+                ...lockerTextMiniSx,
+                px: 1.5,
+                mt: 0.5,
+                ...lockerColorSx(theme, { color: "textLight" }),
+            })}
+        >
+            {t("reconfigure_two_factor_hint")}
+        </Typography>
     </Stack>
 );
