@@ -19,6 +19,34 @@ abstract interface class LegacyApi {
     required int recoveryNoticeInDays,
   });
 
+  Future<void> startRecovery({
+    required int userId,
+    required int emergencyContactId,
+  });
+
+  Future<void> stopRecovery({
+    required String recoveryId,
+    required int userId,
+    required int emergencyContactId,
+  });
+
+  Future<void> rejectRecovery({
+    required String recoveryId,
+    required int userId,
+    required int emergencyContactId,
+  });
+
+  Future<void> approveRecovery({
+    required String recoveryId,
+    required int userId,
+    required int emergencyContactId,
+  });
+
+  Future<void> changePassword({
+    required String recoveryId,
+    required String newPassword,
+  });
+
   Future<List<LegacyKit>> kits();
 
   Future<LegacyKitCreateResult> createKit({

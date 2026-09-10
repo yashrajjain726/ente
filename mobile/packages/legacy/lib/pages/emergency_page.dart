@@ -15,7 +15,6 @@ import "package:ente_legacy/pages/legacy_kit_intro_page.dart";
 import "package:ente_legacy/pages/other_contact_page.dart";
 import "package:ente_legacy/pages/select_contact_page.dart";
 import "package:ente_legacy/pages/share_legacy_kit_page.dart";
-import "package:ente_legacy/services/emergency_service.dart";
 import "package:ente_sharing/user_avator_widget.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
@@ -746,7 +745,11 @@ class _EmergencyPageState extends State<EmergencyPage> {
             backgroundColor: colorScheme.primary700,
             onTap: () async {
               Navigator.of(context).pop();
-              await EmergencyContactService.instance.approveRecovery(session);
+              await widget.legacy.approveRecovery(
+                recoveryId: session.id,
+                userId: session.user.id,
+                emergencyContactId: session.emergencyContact.id,
+              );
               if (mounted) {
                 setState(() {});
               }
@@ -758,7 +761,11 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
 
     if (confirmed == true) {
-      await EmergencyContactService.instance.rejectRecovery(session);
+      await widget.legacy.rejectRecovery(
+        recoveryId: session.id,
+        userId: session.user.id,
+        emergencyContactId: session.emergencyContact.id,
+      );
       info?.recoverSessions.removeWhere((element) => element.id == session.id);
       if (mounted) {
         setState(() {});

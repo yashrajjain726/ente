@@ -7,14 +7,12 @@ import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:photos/emergency/components/email_action_sheet.dart";
 import "package:photos/emergency/components/trusted_contact_sheet.dart";
-import "package:photos/emergency/emergency_service.dart";
 import "package:photos/emergency/model.dart";
 import "package:photos/emergency/other_contact_page.dart";
 import "package:photos/emergency/select_contact_page.dart";
 import "package:photos/services/authenticated_session.dart";
 import "package:photos/services/contacts/contact_identity_resolver.dart";
-import "package:photos/src/rust/third_party/ente_frb_lib/legacy/contact.dart"
-    as legacy;
+import "package:photos/services/legacy.dart" as legacy;
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
@@ -524,7 +522,12 @@ class _EmergencyPageState extends State<EmergencyPage> {
             shouldSurfaceExecutionStates: false,
             onTap: () async {
               Navigator.of(context).pop();
-              await EmergencyContactService.instance.approveRecovery(session);
+              await legacy.approveRecovery(
+                session: authenticatedSession(),
+                recoveryId: session.id,
+                userId: session.user.id,
+                emergencyContactId: session.emergencyContact.id,
+              );
               if (mounted) {
                 setState(() {});
               }
@@ -535,7 +538,12 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
 
     if (confirmed == true) {
-      await EmergencyContactService.instance.rejectRecovery(session);
+      await legacy.rejectRecovery(
+        session: authenticatedSession(),
+        recoveryId: session.id,
+        userId: session.user.id,
+        emergencyContactId: session.emergencyContact.id,
+      );
       info?.recoverSessions.removeWhere((element) => element.id == session.id);
       if (mounted) {
         setState(() {});

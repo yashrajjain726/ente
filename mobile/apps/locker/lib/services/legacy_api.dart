@@ -5,6 +5,8 @@ import "package:locker/src/rust/third_party/ente_frb_lib/legacy/contact.dart"
     as contact;
 import "package:locker/src/rust/third_party/ente_frb_lib/legacy/kit.dart"
     as kit;
+import "package:locker/src/rust/third_party/ente_frb_lib/legacy/recovery.dart"
+    as recovery;
 
 class LockerLegacyApi implements LegacyApi {
   const LockerLegacyApi();
@@ -42,6 +44,62 @@ class LockerLegacyApi implements LegacyApi {
     session: authenticatedSession(),
     emergencyContactId: emergencyContactId,
     recoveryNoticeInDays: recoveryNoticeInDays,
+  );
+
+  @override
+  Future<void> startRecovery({
+    required int userId,
+    required int emergencyContactId,
+  }) => recovery.startRecovery(
+    session: authenticatedSession(),
+    userId: userId,
+    emergencyContactId: emergencyContactId,
+  );
+
+  @override
+  Future<void> stopRecovery({
+    required String recoveryId,
+    required int userId,
+    required int emergencyContactId,
+  }) => recovery.stopRecovery(
+    session: authenticatedSession(),
+    recoveryId: recoveryId,
+    userId: userId,
+    emergencyContactId: emergencyContactId,
+  );
+
+  @override
+  Future<void> rejectRecovery({
+    required String recoveryId,
+    required int userId,
+    required int emergencyContactId,
+  }) => recovery.rejectRecovery(
+    session: authenticatedSession(),
+    recoveryId: recoveryId,
+    userId: userId,
+    emergencyContactId: emergencyContactId,
+  );
+
+  @override
+  Future<void> approveRecovery({
+    required String recoveryId,
+    required int userId,
+    required int emergencyContactId,
+  }) => recovery.approveRecovery(
+    session: authenticatedSession(),
+    recoveryId: recoveryId,
+    userId: userId,
+    emergencyContactId: emergencyContactId,
+  );
+
+  @override
+  Future<void> changePassword({
+    required String recoveryId,
+    required String newPassword,
+  }) => recovery.changePassword(
+    session: authenticatedSession(),
+    recoveryId: recoveryId,
+    newPassword: newPassword,
   );
 
   @override
