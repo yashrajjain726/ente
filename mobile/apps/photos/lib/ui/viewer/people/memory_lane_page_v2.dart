@@ -78,7 +78,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   Key _currentEntryKey = UniqueKey();
   MemoryLanePersonTimeline? _timeline;
   final List<Future<Uint8List?>> _entries = [];
-  final Map<(Future<Uint8List?>, Size), Future<(Uint8List, int)?>>
+  final Map<(Future<Uint8List?>, Size, bool), Future<(Uint8List, int)?>>
   _decodedEntries = {};
   final List<EnteFile> _files = [];
   int i = 0;
@@ -210,31 +210,37 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
 
   Future<(Uint8List, int)?> _fetchEntry(
     Future<Uint8List?> entry,
-    Size targetSize,
-  ) {
-    return _decodedEntries.putIfAbsent((entry, targetSize), () async {
-      final bytes = await entry;
-      if (bytes == null || !mounted) return null;
-      final buffer = await ImmutableBuffer.fromUint8List(bytes);
-      try {
-        final descriptor = await ImageDescriptor.encoded(buffer);
+    Size targetSize, {
+    bool fitWithin = false,
+  }) {
+    return _decodedEntries.putIfAbsent(
+      (entry, targetSize, fitWithin),
+      () async {
+        final bytes = await entry;
+        if (bytes == null || !mounted) return null;
+        final buffer = await ImmutableBuffer.fromUint8List(bytes);
         try {
-          final scale = math.max(
-            targetSize.width / descriptor.width,
-            targetSize.height / descriptor.height,
-          );
-          final decodeWidth = (descriptor.width * scale).ceil().clamp(
-            1,
-            descriptor.width,
-          );
-          return (bytes, decodeWidth);
+          final descriptor = await ImageDescriptor.encoded(buffer);
+          try {
+            final scale = (fitWithin ? math.min : math.max)(
+              targetSize.width / descriptor.width,
+              targetSize.height / descriptor.height,
+            );
+            final scaledWidth = descriptor.width * scale;
+            final decodeWidth =
+                (fitWithin ? scaledWidth.floor() : scaledWidth.ceil()).clamp(
+                  1,
+                  descriptor.width,
+                );
+            return (bytes, decodeWidth);
+          } finally {
+            descriptor.dispose();
+          }
         } finally {
-          descriptor.dispose();
+          buffer.dispose();
         }
-      } finally {
-        buffer.dispose();
-      }
-    });
+      },
+    );
   }
 
   void _selectEntry(int index) {
@@ -315,35 +321,29 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                   duration: const Duration(milliseconds: 750),
                   switchInCurve: Curves.easeOutExpo,
                   switchOutCurve: Curves.easeInExpo,
-                  child: LayoutBuilder(
+                  child: FutureBuilder<(Uint8List, int)?>(
                     key: _currentEntryKey,
-                    builder: (context, constraints) =>
-                        FutureBuilder<(Uint8List, int)?>(
-                          future: entry == null
-                              ? null
-                              : _fetchEntry(
-                                  entry,
-                                  constraints.biggest *
-                                      MediaQuery.devicePixelRatioOf(context),
-                                ),
-                          builder: (context, entrySnapshot) {
-                            final crop = entrySnapshot.data;
-                            if (crop == null) return const SizedBox.expand();
-                            return ImageFiltered(
-                              imageFilter: ImageFilter.blur(
-                                sigmaX: 100,
-                                sigmaY: 100,
-                              ),
-                              child: Image.memory(
-                                crop.$1,
-                                cacheWidth: crop.$2,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                              ),
-                            );
-                          },
+                    future: entry == null
+                        ? null
+                        : _fetchEntry(
+                            entry,
+                            const Size.square(256),
+                            fitWithin: true,
+                          ),
+                    builder: (context, entrySnapshot) {
+                      final crop = entrySnapshot.data;
+                      if (crop == null) return const SizedBox.expand();
+                      return ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+                        child: Image.memory(
+                          crop.$1,
+                          cacheWidth: crop.$2,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
                         ),
+                      );
+                    },
                   ),
                 ),
               ),
