@@ -2609,7 +2609,6 @@ dependencies = [
 name = "ente-legacy-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-accounts",
  "ente-core",
  "ente-legacy",
  "ente-wasm-lib",

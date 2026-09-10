@@ -207,24 +207,10 @@ describe("Legacy", () => {
         }
     });
 
-    test("uses the typed key attributes to share a decryptable recovery key", async () => {
+    test("shares the Session recovery key with the recipient", async () => {
         const masterKey = await generateKey();
         const recoveryKey = await generateKey();
-        const encryptedRecoveryKey = await encryptBox(recoveryKey, masterKey);
         const recipient = await generateKeyPair();
-        const keyAttributes = {
-            kekSalt: "",
-            encryptedKey: "",
-            keyDecryptionNonce: "",
-            publicKey: "",
-            encryptedSecretKey: "",
-            secretKeyDecryptionNonce: "",
-            memLimit: 0,
-            opsLimit: 0,
-            recoveryKeyEncryptedWithMasterKey:
-                encryptedRecoveryKey.encryptedData,
-            recoveryKeyDecryptionNonce: encryptedRecoveryKey.nonce,
-        };
         let sharedRecoveryKey: string | undefined;
         mockFetch(async (request) => {
             switch (new URL(request.url).pathname) {
@@ -252,15 +238,10 @@ describe("Legacy", () => {
             baseUrl: "http://localhost",
             authToken: "token",
             masterKeyB64: masterKey,
-            ...(await sessionKeyAttributes(masterKey)),
+            ...(await sessionKeyAttributes(masterKey, recoveryKey)),
         });
         try {
-            await legacy.addContact(
-                session,
-                "friend@example.com",
-                keyAttributes,
-                30,
-            );
+            await legacy.addContact(session, "friend@example.com", 30);
             expect(sharedRecoveryKey).toBe(recoveryKey);
         } finally {
             session.free();
@@ -278,11 +259,14 @@ const mockFetch = (
         return response;
     });
 
-const sessionKeyAttributes = async (masterKey: string) => {
+const sessionKeyAttributes = async (
+    masterKey: string,
+    recoveryKey?: string,
+) => {
     const { publicKey, privateKey } = await generateKeyPair();
     const encryptedSecretKey = await encryptBox(privateKey, masterKey);
     const encryptedRecoveryKey = await encryptBox(
-        await generateKey(),
+        recoveryKey ?? (await generateKey()),
         masterKey,
     );
     return {

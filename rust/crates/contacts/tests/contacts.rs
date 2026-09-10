@@ -230,14 +230,9 @@ async fn run_legacy_reinvite_stage(pair: &legacy::LegacyPair) {
         legacy::trusted_contact(&trusted_info, pair.owner.user_id, pair.trusted.user_id).is_none()
     );
 
-    ente_legacy::add_contact(
-        &pair.owner_session,
-        &pair.trusted.email,
-        &pair.owner.key_attributes,
-        Some(14),
-    )
-    .await
-    .unwrap();
+    ente_legacy::add_contact(&pair.owner_session, &pair.trusted.email, Some(14))
+        .await
+        .unwrap();
     ente_legacy::update_contact(
         &pair.trusted_session,
         pair.owner.user_id,
@@ -381,13 +376,10 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &auth::TestAccount) {
         .expect("legacy kit invalid create request failed");
     assert_eq!(invalid_create.status(), 400);
 
-    let waiting_kit = ente_legacy::create_kit(
-        &session,
-        ["North".into(), "East".into(), "West".into()],
-        24,
-    )
-    .await
-    .expect("waiting legacy kit create failed");
+    let waiting_kit =
+        ente_legacy::create_kit(&session, ["North".into(), "East".into(), "West".into()], 24)
+            .await
+            .expect("waiting legacy kit create failed");
     assert_eq!(waiting_kit.kit.notice_period_in_hours, 24);
     assert_eq!(waiting_kit.kit.metadata.parts.len(), 3);
     assert_eq!(waiting_kit.shares.len(), 3);
@@ -402,10 +394,9 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &auth::TestAccount) {
     assert_eq!(listed_waiting_kit.metadata.parts.len(), 3);
     assert_eq!(listed_waiting_kit.metadata.parts[0].name, "North");
 
-    let downloaded_shares =
-        ente_legacy::download_kit_shares(&session, &waiting_kit.kit.id)
-            .await
-            .expect("legacy kit share download failed");
+    let downloaded_shares = ente_legacy::download_kit_shares(&session, &waiting_kit.kit.id)
+        .await
+        .expect("legacy kit share download failed");
     assert_eq!(downloaded_shares.len(), 3);
     assert_eq!(downloaded_shares[0].kit_id, waiting_kit.kit.id);
     assert_eq!(
@@ -494,8 +485,7 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &auth::TestAccount) {
         LegacyKitRecoveryStatus::Waiting
     );
     assert!(matches!(
-        ente_legacy::update_kit_recovery_notice(&session, &waiting_kit.kit.id, 168)
-            .await,
+        ente_legacy::update_kit_recovery_notice(&session, &waiting_kit.kit.id, 168).await,
         Err(ente_legacy::Error::ActiveRecoverySession)
     ));
     assert!(
@@ -536,10 +526,9 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &auth::TestAccount) {
         .await
         .expect("resumed legacy kit session fetch failed");
     assert_eq!(resumed_session.status, LegacyKitRecoveryStatus::Waiting);
-    let owner_recovery_session =
-        ente_legacy::kit_recovery_session(&session, &waiting_kit.kit.id)
-            .await
-            .expect("owner legacy kit recovery session fetch failed");
+    let owner_recovery_session = ente_legacy::kit_recovery_session(&session, &waiting_kit.kit.id)
+        .await
+        .expect("owner legacy kit recovery session fetch failed");
     let owner_active_session = owner_recovery_session
         .session
         .as_ref()
@@ -649,10 +638,9 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &auth::TestAccount) {
         other => panic!("expected old legacy kit password login to fail, got {other:?}"),
     }
 
-    let recovered_login =
-        auth::login_without_totp(endpoint, &owner.email, &recovery_password)
-            .await
-            .expect("new password login should succeed after legacy kit recovery");
+    let recovered_login = auth::login_without_totp(endpoint, &owner.email, &recovery_password)
+        .await
+        .expect("new password login should succeed after legacy kit recovery");
     assert_eq!(recovered_login.user_id, owner.user_id);
     assert_eq!(recovered_login.secrets.master_key, owner.master_key);
 

@@ -6,8 +6,7 @@ use ente_wasm_lib::session::Session;
 use serde_wasm_bindgen as swb;
 use tsify::Tsify;
 use types::{
-    KeyAttributes, LegacyContactState, LegacyInfo, LegacyKitRecoverySession, LegacyKitShare,
-    OpenKitRecoveryInput,
+    LegacyContactState, LegacyInfo, LegacyKitRecoverySession, LegacyKitShare, OpenKitRecoveryInput,
 };
 use wasm_bindgen::prelude::*;
 
@@ -75,18 +74,11 @@ pub fn legacy_verification_id(public_key_b64: String) -> Result<String, Error> {
 pub async fn legacy_add_contact(
     session: &Session,
     email: String,
-    current_user_key_attrs: <KeyAttributes as Tsify>::JsType,
     recovery_notice_in_days: Option<i32>,
 ) -> Result<(), Error> {
-    let current_user_key_attrs = KeyAttributes::from_js(current_user_key_attrs)?;
-    ente_legacy::add_contact(
-        session.inner(),
-        &email,
-        &current_user_key_attrs.into(),
-        recovery_notice_in_days,
-    )
-    .await
-    .map_err(Into::into)
+    ente_legacy::add_contact(session.inner(), &email, recovery_notice_in_days)
+        .await
+        .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = legacyUpdateContact)]
