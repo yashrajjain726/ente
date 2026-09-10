@@ -117,7 +117,11 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   }
 
   bool _isCurrentSocialRefresh(int refreshID) {
-    return mounted && refreshID == _latestRefreshID;
+    return mounted &&
+        refreshID == _latestRefreshID &&
+        !_fileIDsWithReactionUpdateInProgress.contains(
+          widget.file.uploadedFileID,
+        );
   }
 
   bool _isOpenedFromHiddenCollection() {
@@ -289,6 +293,9 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
       );
     } finally {
       _fileIDsWithReactionUpdateInProgress.remove(fileID);
+      if (mounted && widget.file.uploadedFileID == fileID) {
+        unawaited(_refreshSocialState());
+      }
     }
   }
 
