@@ -92,7 +92,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
                   tag: 'memory-lane-title-$id',
                   child: Text(
                     title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyles.body.copyWith(
                       inherit: false,
