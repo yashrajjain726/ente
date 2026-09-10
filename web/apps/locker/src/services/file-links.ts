@@ -3,8 +3,8 @@ import { apiURL } from "ente-base/origins";
 import { openFileLinkSecret, prepareFileLink } from "ente-locker-wasm";
 import { z } from "zod";
 import { ensureAuthenticatedSession } from "./authenticated-session";
-import { getEncryptedFileRecord } from "./remote-cache";
-import { decryptFileKeyForRecord } from "./remote-read";
+import { getEncryptedFileRecord } from "./locker-cache";
+import { decryptFileKeyForRecord } from "./sync/decrypt";
 
 const RemoteFileShareLink = z.object({
     linkID: z.union([z.string(), z.number().transform(String)]),

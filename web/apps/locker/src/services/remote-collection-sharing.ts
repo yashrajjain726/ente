@@ -7,12 +7,12 @@ import { z } from "zod";
 import {
     getCollectionRecord,
     updateCollectionShareesInCache,
-} from "./remote-cache";
-import { decryptCollectionKey } from "./remote-read";
+} from "./locker-cache";
 import {
     RemoteCollectionUserSchema,
     toLockerCollectionParticipant,
 } from "./remote-types";
+import { decryptCollectionKey } from "./sync/decrypt";
 
 const RemoteShareesResponse = z.object({
     sharees: z.array(RemoteCollectionUserSchema),

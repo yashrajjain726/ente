@@ -18,11 +18,11 @@ const {
     customOrigin: vi.fn(),
     fetchFile: vi.fn(),
 }));
-vi.mock("../src/services/remote-cache", () => ({
+vi.mock("../src/services/locker-cache", () => ({
     getEncryptedFileRecord: getRecord,
     getLockerCacheSnapshot: getSnapshot,
 }));
-vi.mock("../src/services/remote-read", () => ({ decryptCollectionKey }));
+vi.mock("../src/services/sync/decrypt", () => ({ decryptCollectionKey }));
 vi.mock("ente-locker-wasm", () => ({
     decryptBox,
     createStreamDecryptor: createDecryptor,
