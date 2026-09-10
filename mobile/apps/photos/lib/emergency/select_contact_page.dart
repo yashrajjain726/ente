@@ -11,8 +11,7 @@ import "package:photos/services/account/user_service.dart";
 import "package:photos/services/authenticated_session.dart";
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/contacts/contact_identity_resolver.dart";
-import "package:photos/src/rust/third_party/ente_frb_lib/legacy/contact.dart"
-    as legacy;
+import "package:photos/services/legacy.dart" as legacy;
 import 'package:photos/theme/ente_theme.dart';
 import "package:photos/ui/common/user_dialogs.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";

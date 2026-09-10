@@ -6,8 +6,7 @@ import 'package:logging/logging.dart';
 import 'package:password_strength/password_strength.dart';
 import "package:photos/emergency/model.dart";
 import "package:photos/services/authenticated_session.dart";
-import "package:photos/src/rust/third_party/ente_frb_lib/legacy/recovery.dart"
-    as legacy;
+import "package:photos/services/legacy.dart" as legacy;
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/theme/text_style.dart";
