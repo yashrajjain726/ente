@@ -377,8 +377,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              DateFormat.yMMMd(
-                                Localizations.localeOf(context).languageCode,
+                              DateFormat.yMMMMd(
+                                Localizations.localeOf(context).toLanguageTag(),
                               ).format(
                                 DateTime.fromMicrosecondsSinceEpoch(
                                   creationTime,
