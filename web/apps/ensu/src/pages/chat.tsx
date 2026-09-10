@@ -394,7 +394,7 @@ const Page: React.FC = () => {
         : "rgba(0, 0, 0, 0.04)";
     const messageTypographySx = {
         fontSize: "15px",
-        lineHeight: "26px",
+        lineHeight: "22px",
         fontWeight: 400,
         fontFamily: messageFontFamily,
     } as const;
@@ -414,6 +414,7 @@ const Page: React.FC = () => {
         wordBreak: "break-word",
         overflowWrap: "anywhere",
     } as const;
+    const markdownParagraphSpacing = "12px";
     const assistantMarkdownSx = {
         ...messageTypographySx,
         color: "text.base",
@@ -432,22 +433,32 @@ const Page: React.FC = () => {
             marginLeft: "2px",
             animation: "ensu-blink 1s steps(1, end) infinite",
         },
-        "& p": { margin: 0 },
-        "& p + p": { marginTop: "12px" },
-        "& ul, & ol": { paddingLeft: "24px", margin: "12px 0 0" },
-        "& li": { marginBottom: "4px" },
+        "& p, & ul, & ol, & blockquote, & pre, & h1, & h2, & h3, & h4, & h5, & h6, & hr":
+            { margin: 0 },
+        "& .markdown-content > * + *, & li > * + *, & blockquote > * + *": {
+            marginTop: markdownParagraphSpacing,
+        },
+        "& ul, & ol": { paddingLeft: "24px" },
+        // Tight lists can have plain text before nested blocks, not a sibling element.
+        "& li > :is(ul, ol, .markdown-code-block, blockquote, h1, h2, h3, h4, h5, h6, hr)":
+            { marginTop: markdownParagraphSpacing },
+        "& li + li": { marginTop: markdownParagraphSpacing },
         "& code": { fontFamily: codeFontFamily, fontSize: "0.95em" },
-        "& .markdown-code-block": { position: "relative", margin: "12px 0 0" },
+        "& .markdown-code-block": {
+            borderRadius: "6px",
+            backgroundColor: codeBlockBackground,
+            overflow: "hidden",
+        },
         "& .markdown-code-block pre": {
             margin: 0,
             padding: "12px",
-            borderRadius: 6,
-            backgroundColor: codeBlockBackground,
             overflowX: "auto",
+            whiteSpace: "pre",
+            overflowWrap: "normal",
+            wordBreak: "normal",
         },
         "& .markdown-code-block pre code": { fontFamily: codeFontFamily },
         "& blockquote": {
-            margin: "12px 0 0",
             paddingLeft: "12px",
             borderLeft: "3px solid",
             borderLeftColor: "divider",
@@ -461,6 +472,22 @@ const Page: React.FC = () => {
             overflowX: "auto",
         },
         "& .katex": { color: "text.base" },
+        "& .markdown-table": { maxWidth: "100%", overflowX: "auto" },
+        "& table": {
+            borderCollapse: "collapse",
+            width: "max-content",
+            minWidth: "100%",
+        },
+        "& th, & td": {
+            border: "1px solid",
+            borderColor: "divider",
+            padding: "8px 12px",
+            minWidth: "100px",
+            maxWidth: "320px",
+            verticalAlign: "top",
+        },
+        "& th": { backgroundColor: codeBlockBackground },
+        "& img": { maxWidth: "100%", height: "auto" },
         "& a": { color: "accent.main" },
     };
     const streamingMessageSx = { transition: "all 0.2s ease" } as const;

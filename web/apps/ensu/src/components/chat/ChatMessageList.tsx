@@ -5,8 +5,11 @@ import {
     type BranchSwitcher,
 } from "@/services/chat/branching";
 import type { ChatAttachment, ChatMessage } from "@/services/chat/store";
+import {
+    handleExternalLinkClick,
+    safeExternalUrl,
+} from "@/services/external-links";
 import { noteSourceErrorMessage, openNoteDocument } from "@/services/notes";
-import { isTauriRuntime } from "@/services/tauri-runtime";
 import {
     ArrowLeft01Icon,
     ArrowRight01Icon,
@@ -44,23 +47,6 @@ interface IconProps {
     size: number;
     strokeWidth: number;
 }
-
-const openExternalUrl = async (url: string) => {
-    if (isTauriRuntime()) {
-        const opened = await import("@tauri-apps/plugin-opener")
-            .then(async ({ openUrl }) => {
-                await openUrl(url);
-                return true;
-            })
-            .catch(() => false);
-        if (opened) return;
-    }
-
-    if (typeof window !== "undefined") {
-        const popup = window.open(url, "_blank", "noopener,noreferrer");
-        if (!popup) window.location.href = url;
-    }
-};
 
 const sourceLinkSx = {
     border: 0,
@@ -260,21 +246,21 @@ const PackSourceCard = memo(
                 </Typography>
                 <Stack direction="row" sx={{ gap: 2, flexWrap: "wrap" }}>
                     <Link
-                        component="button"
-                        type="button"
+                        href={safeExternalUrl(citation.sourceUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         underline="hover"
-                        onClick={() => void openExternalUrl(citation.sourceUrl)}
+                        onClick={handleExternalLinkClick}
                         sx={sourceLinkSx}
                     >
                         Open source ↗
                     </Link>
                     <Link
-                        component="button"
-                        type="button"
+                        href={safeExternalUrl(citation.licenseUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         underline="hover"
-                        onClick={() =>
-                            void openExternalUrl(citation.licenseUrl)
-                        }
+                        onClick={handleExternalLinkClick}
                         sx={sourceLinkSx}
                     >
                         {citation.licenseLabel} ↗

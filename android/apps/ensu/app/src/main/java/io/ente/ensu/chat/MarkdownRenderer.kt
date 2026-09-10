@@ -92,7 +92,8 @@ fun MarkdownView(
                             }
                         }
                         is MarkdownBlock.ListItems -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.xs.dp)) {
+                            // Separate list items like paragraphs; wrapped lines use message typography.
+                            Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp)) {
                                 block.items.forEachIndexed { itemIndex, item ->
                                     key(itemIndex) {
                                         val itemCursor = appendCursor && itemIndex == block.items.lastIndex
@@ -858,14 +859,15 @@ private object MarkdownParser {
 
             if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
                 flushParagraph()
-                listItems.add(trimmed.drop(2))
+                // Marker padding must not indent only the first rendered line.
+                listItems.add(trimmed.drop(2).trimStart())
                 continue
             }
 
             val orderedMatch = Regex("^(\\d+)\\. ").find(trimmed)
             if (orderedMatch != null) {
                 flushParagraph()
-                listItems.add(trimmed.substring(orderedMatch.value.length))
+                listItems.add(trimmed.substring(orderedMatch.value.length).trimStart())
                 continue
             }
 

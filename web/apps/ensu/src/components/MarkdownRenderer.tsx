@@ -1,8 +1,11 @@
-import { isTauriRuntime } from "@/services/tauri-runtime";
+import {
+    handleExternalLinkClick,
+    safeExternalUrl,
+} from "@/services/external-links";
 import { Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, IconButton } from "@mui/material";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -33,19 +36,35 @@ const extractCodeText = (node: React.ReactNode): string => {
 };
 
 const CodeBlock = ({ children, node: _node, ...rest }: PreProps) => {
+    // Markdown adds one display newline; retain any blank lines in the code itself.
     const codeText = extractCodeText(children).replace(/\n$/, "");
-
-    const handleCopy = useCallback(
-        () => void navigator.clipboard.writeText(codeText),
-        [codeText],
-    );
+    const [copyResult, setCopyResult] = useState<{
+        text: string;
+        message: string;
+    }>();
+    const copyStatus = copyResult?.text === codeText ? copyResult.message : "";
+    const handleCopy = useCallback(() => {
+        void navigator.clipboard.writeText(codeText).then(
+            () => setCopyResult({ text: codeText, message: "Copied" }),
+            () => setCopyResult({ text: codeText, message: "Could not copy" }),
+        );
+    }, [codeText]);
 
     return (
-        <Box className="markdown-code-block" sx={{ position: "relative" }}>
-            <Box component="pre" {...rest}>
-                {children}
-            </Box>
-            <Box sx={{ position: "absolute", right: 8, bottom: 8 }}>
+        <Box className="markdown-code-block">
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 1,
+                    px: "8px",
+                    py: "4px",
+                }}
+            >
+                <Box component="span" role="status" sx={{ fontSize: "12px" }}>
+                    {copyStatus}
+                </Box>
                 <IconButton
                     aria-label="Copy code"
                     onClick={handleCopy}
@@ -66,39 +85,11 @@ const CodeBlock = ({ children, node: _node, ...rest }: PreProps) => {
                     />
                 </IconButton>
             </Box>
+            <Box component="pre" {...rest}>
+                {children}
+            </Box>
         </Box>
     );
-};
-
-const openExternalUrl = async (url: string) => {
-    if (isTauriRuntime()) {
-        try {
-            const { openUrl } = await import("@tauri-apps/plugin-opener");
-            await openUrl(url);
-            return;
-        } catch {
-            // Fall through to window.open.
-        }
-    }
-
-    if (typeof window !== "undefined") {
-        const popup = window.open(url, "_blank", "noopener,noreferrer");
-        if (!popup) {
-            window.location.href = url;
-        }
-    }
-};
-
-const safeExternalUrl = (href: string | undefined) => {
-    if (!href) return undefined;
-    try {
-        const url = new URL(href);
-        return ["http:", "https:", "mailto:"].includes(url.protocol)
-            ? url.toString()
-            : undefined;
-    } catch {
-        return undefined;
-    }
 };
 
 type AnchorProps = React.ComponentPropsWithoutRef<"a"> & { node?: unknown };
@@ -116,15 +107,27 @@ const ExternalLink = ({
         <a
             {...rest}
             href={safeHref}
-            onClick={(e) => {
-                e.preventDefault();
-                if (safeHref) void openExternalUrl(safeHref);
-            }}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleExternalLinkClick}
         >
             {children}
         </a>
     );
 };
+
+type TableProps = React.ComponentPropsWithoutRef<"table"> & { node?: unknown };
+
+const MarkdownTable = ({ node: _node, ...props }: TableProps) => (
+    <div
+        className="markdown-table"
+        tabIndex={0}
+        role="region"
+        aria-label="Table"
+    >
+        <table {...props} />
+    </div>
+);
 
 export const MarkdownRenderer = ({
     content,
@@ -137,7 +140,11 @@ export const MarkdownRenderer = ({
                 rehypePlugins={[
                     [rehypeKatex, { strict: false, throwOnError: false }],
                 ]}
-                components={{ pre: CodeBlock, a: ExternalLink }}
+                components={{
+                    pre: CodeBlock,
+                    a: ExternalLink,
+                    table: MarkdownTable,
+                }}
             >
                 {content}
             </ReactMarkdown>
