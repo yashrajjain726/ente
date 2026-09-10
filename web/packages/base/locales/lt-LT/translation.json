@@ -1112,5 +1112,10 @@
     "auto_lock_5_minutes": "5 minutės",
     "auto_lock_30_minutes": "30 minučių",
     "wrong_unlock_code_one": "Įvedėte neteisingą atrakinimo kodą {{count}} kartą.",
-    "wrong_unlock_code_other": "Įvedėte neteisingą atrakinimo kodą {{count}} kartus (-ų)."
+    "wrong_unlock_code_other": "Įvedėte neteisingą atrakinimo kodą {{count}} kartus (-ų).",
+    "trusted_contacts": "",
+    "legacy_accounts": "",
+    "add_trusted_contact": "",
+    "trusted_contacts_empty": "",
+    "legacy_accounts_empty": ""
 }

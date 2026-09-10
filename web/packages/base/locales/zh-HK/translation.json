@@ -1112,5 +1112,10 @@
     "auto_lock_5_minutes": "",
     "auto_lock_30_minutes": "",
     "wrong_unlock_code_one": "",
-    "wrong_unlock_code_other": ""
+    "wrong_unlock_code_other": "",
+    "trusted_contacts": "",
+    "legacy_accounts": "",
+    "add_trusted_contact": "",
+    "trusted_contacts_empty": "",
+    "legacy_accounts_empty": ""
 }
