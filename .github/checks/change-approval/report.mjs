@@ -4,6 +4,7 @@ export function writeReport({
     files: { binaries, large, guardrails, configs },
     dependencies,
     rust,
+    web,
 }) {
     const categories = [
         {
@@ -43,6 +44,11 @@ export function writeReport({
             plural: "Rust lint policy files",
             count: rust.length,
         },
+        {
+            singular: "Web lint policy file",
+            plural: "Web lint policy files",
+            count: web.length,
+        },
     ].filter(({ count }) => count);
     const summary = categories
         .map(
@@ -78,6 +84,8 @@ export function writeReport({
         sections.push(
             `## Rust lint declarations and files containing unsafe\n\n${list(rust.map(code))}`,
         );
+    if (web.length)
+        sections.push(`## Web lint directives\n\n${list(web.map(code))}`);
     const detail = sections.join("\n\n");
 
     const { GITHUB_OUTPUT, GITHUB_STEP_SUMMARY } = process.env;
