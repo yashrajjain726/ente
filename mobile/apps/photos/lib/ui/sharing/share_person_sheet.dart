@@ -36,10 +36,12 @@ Future<void> showSharePersonSheet(
     builder: (_) => _SharePersonSheet(person: person, files: files),
   );
   if (album == null || !context.mounted) return;
-  await shareText(
+  await shareAlbumLink(
+    context,
     CollectionsService.instance.getPublicUrl(album),
-    context: context,
-    key: shareButtonKey,
+    shareButtonKey,
+    albumName: album.displayName,
+    albumDescription: album.displayDescription,
   );
 }
 

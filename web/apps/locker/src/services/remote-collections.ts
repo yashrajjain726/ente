@@ -1,7 +1,7 @@
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { encryptBox, generateKey, stringToB64 } from "ente-locker-wasm";
+import { encryptBox, encryptBoxBytes, generateKey } from "ente-locker-wasm";
 import { findCollectionByType, getCollectionRecord } from "./remote-cache";
 import { decryptCollectionKey, fetchLockerData } from "./remote-read";
 import { RemoteCollectionCreateResponseSchema } from "./remote-types";
@@ -35,8 +35,10 @@ export const createCollection = async (
 ): Promise<number> => {
     const collectionKey = await generateKey();
     const encryptedKey = await encryptBox(collectionKey, masterKey);
-    const nameB64 = stringToB64(name);
-    const encryptedName = await encryptBox(nameB64, collectionKey);
+    const encryptedName = await encryptBoxBytes(
+        new TextEncoder().encode(name),
+        collectionKey,
+    );
 
     const res = await fetch(await apiURL("/collections"), {
         method: "POST",
@@ -73,8 +75,10 @@ export const renameCollection = async (
     }
 
     const collectionKey = await decryptCollectionKey(collectionRecord);
-    const nameB64 = stringToB64(newName);
-    const encryptedName = await encryptBox(nameB64, collectionKey);
+    const encryptedName = await encryptBoxBytes(
+        new TextEncoder().encode(newName),
+        collectionKey,
+    );
 
     const res = await fetch(await apiURL("/collections/rename"), {
         method: "POST",

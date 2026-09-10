@@ -11,7 +11,10 @@ import "package:photos/emergency/emergency_service.dart";
 import "package:photos/emergency/model.dart";
 import "package:photos/emergency/other_contact_page.dart";
 import "package:photos/emergency/select_contact_page.dart";
+import "package:photos/services/authenticated_session.dart";
 import "package:photos/services/contacts/contact_identity_resolver.dart";
+import "package:photos/src/rust/third_party/ente_frb_lib/legacy/contact.dart"
+    as legacy;
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
@@ -29,7 +32,7 @@ class EmergencyPage extends StatefulWidget {
 }
 
 class _EmergencyPageState extends State<EmergencyPage> {
-  EmergencyInfo? info;
+  LegacyInfo? info;
 
   @override
   void initState() {
@@ -41,7 +44,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
 
   Future<void> _fetchData() async {
     try {
-      final result = await EmergencyContactService.instance.getInfo();
+      final result = await legacy.info(session: authenticatedSession());
       if (mounted) {
         setState(() {
           info = result;
@@ -58,9 +61,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
     final l10n = context.strings;
-    final List<EmergencyContact> othersTrustedContacts =
+    final List<LegacyContactRecord> othersTrustedContacts =
         info?.othersEmergencyContact ?? [];
-    final List<EmergencyContact> trustedContacts = info?.contacts ?? [];
+    final List<LegacyContactRecord> trustedContacts = info?.contacts ?? [];
 
     return Scaffold(
       backgroundColor: colorScheme.backgroundColour,
@@ -108,7 +111,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                   final recoverSession = info!.recoverSessions[listIndex];
                   final isLastItem =
                       listIndex == info!.recoverSessions.length - 1;
-                  final emergencyUser = recoverSession.emergencyContact;
+                  final emergencyUser = recoverSession.emergencyContact.asUser;
                   return _buildGroupedMenuItem(
                     listIndex: listIndex,
                     isLastItem: isLastItem,
@@ -149,7 +152,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                     final listIndex = index - 1;
                     final contact = trustedContacts[listIndex];
                     final isLastItem = listIndex == trustedContacts.length - 1;
-                    final emergencyUser = contact.emergencyContact;
+                    final emergencyUser = contact.emergencyContact.asUser;
                     return _buildGroupedMenuItem(
                       listIndex: listIndex,
                       isLastItem: isLastItem,
@@ -254,7 +257,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                     final listIndex = index - 1;
                     final currentUser = othersTrustedContacts[listIndex];
                     final isLastItem = index == othersTrustedContacts.length;
-                    final emergencyUser = currentUser.user;
+                    final emergencyUser = currentUser.user.asUser;
                     return _buildGroupedMenuItem(
                       listIndex: listIndex,
                       isLastItem: isLastItem,
@@ -348,7 +351,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
 
   Future<void> showRevokeOrRemoveDialog(
     BuildContext context,
-    EmergencyContact contact,
+    LegacyContactRecord contact,
   ) async {
     final actionResult = await showTrustedContactSheet(
       context,
@@ -383,9 +386,11 @@ class _EmergencyPageState extends State<EmergencyPage> {
       );
 
       if (confirmed == true) {
-        await EmergencyContactService.instance.updateContact(
-          contact,
-          ContactState.userRevokedContact,
+        await legacy.updateContact(
+          session: authenticatedSession(),
+          userId: contact.user.id,
+          emergencyContactId: contact.emergencyContact.id,
+          state: LegacyContactState.revoked,
         );
         info?.contacts.remove(contact);
         if (mounted) {
@@ -403,33 +408,34 @@ class _EmergencyPageState extends State<EmergencyPage> {
     }
 
     try {
-      final success = await EmergencyContactService.instance
-          .updateRecoveryNotice(contact, selectedDays);
-      if (success) {
-        final updatedContact = contact.copyWith(
-          recoveryNoticeInDays: selectedDays,
+      await legacy.updateRecoveryNotice(
+        session: authenticatedSession(),
+        emergencyContactId: contact.emergencyContact.id,
+        recoveryNoticeInDays: selectedDays,
+      );
+      final updatedContact = contact.copyWith(
+        recoveryNoticeInDays: selectedDays,
+      );
+      final index = info?.contacts.indexWhere(
+        (element) =>
+            element.user.id == contact.user.id &&
+            element.emergencyContact.id == contact.emergencyContact.id,
+      );
+      if (index != null && index >= 0) {
+        info?.contacts[index] = updatedContact;
+      }
+      if (mounted) {
+        setState(() {});
+      }
+    } on LegacyError_ActiveRecoverySession {
+      if (mounted) {
+        if (!context.mounted) return;
+        await showAlertBottomSheet(
+          context,
+          title: context.strings.cannotUpdateRecoveryTime,
+          message: context.strings.cannotUpdateRecoveryTimeMessage,
+          assetPath: "assets/warning-grey.png",
         );
-        final index = info?.contacts.indexWhere(
-          (element) =>
-              element.user.id == contact.user.id &&
-              element.emergencyContact.id == contact.emergencyContact.id,
-        );
-        if (index != null && index >= 0) {
-          info?.contacts[index] = updatedContact;
-        }
-        if (mounted) {
-          setState(() {});
-        }
-      } else {
-        if (mounted) {
-          if (!context.mounted) return;
-          await showAlertBottomSheet(
-            context,
-            title: context.strings.cannotUpdateRecoveryTime,
-            message: context.strings.cannotUpdateRecoveryTimeMessage,
-            assetPath: "assets/warning-grey.png",
-          );
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -441,7 +447,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
 
   Future<void> showAcceptOrDeclineDialog(
     BuildContext context,
-    EmergencyContact contact,
+    LegacyContactRecord contact,
   ) async {
     final result = await showEmailActionSheet<String>(
       context,
@@ -464,12 +470,14 @@ class _EmergencyPageState extends State<EmergencyPage> {
     );
 
     if (result == "accept") {
-      await EmergencyContactService.instance.updateContact(
-        contact,
-        ContactState.contactAccepted,
+      await legacy.updateContact(
+        session: authenticatedSession(),
+        userId: contact.user.id,
+        emergencyContactId: contact.emergencyContact.id,
+        state: LegacyContactState.accepted,
       );
       final updatedContact = contact.copyWith(
-        state: ContactState.contactAccepted,
+        state: LegacyContactState.accepted,
       );
       info?.othersEmergencyContact.remove(contact);
       info?.othersEmergencyContact.add(updatedContact);
@@ -480,9 +488,11 @@ class _EmergencyPageState extends State<EmergencyPage> {
     }
 
     if (result == "decline") {
-      await EmergencyContactService.instance.updateContact(
-        contact,
-        ContactState.contactDenied,
+      await legacy.updateContact(
+        session: authenticatedSession(),
+        userId: contact.user.id,
+        emergencyContactId: contact.emergencyContact.id,
+        state: LegacyContactState.contactDenied,
       );
       info?.othersEmergencyContact.remove(contact);
       if (mounted) {
@@ -491,7 +501,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
     }
   }
 
-  Future<void> showRejectRecoveryDialog(RecoverySessions session) async {
+  Future<void> showRejectRecoveryDialog(LegacyRecoverySession session) async {
     final emergencyContactEmail = session.emergencyContact.email;
 
     final confirmed = await showEmailActionSheet<bool>(

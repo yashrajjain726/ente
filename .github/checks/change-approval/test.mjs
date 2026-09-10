@@ -975,6 +975,56 @@ fn helper() {}
     );
 });
 
+test("ESLint directives in added lines need approval", (t) => {
+    const body = "first();\n";
+    for (const directive of [
+        "// eslint-disable-next-line no-console\n",
+        "/* eslint-disable no-console */\n",
+        '/* eslint "no-console": "off" */\n',
+        'const example = "eslint-disable-next-line no-console";\n',
+    ])
+        assert.match(
+            scan(
+                t,
+                { "web/example.ts": body },
+                { "web/example.ts": directive + body },
+            ),
+            /^1 Web lint policy file\n/,
+        );
+    assert.match(
+        scan(
+            t,
+            {
+                "web/example.ts":
+                    "// eslint-disable-next-line no-console\n" + body,
+            },
+            {
+                "web/example.ts":
+                    "// eslint-disable-next-line no-alert\n" + body,
+            },
+        ),
+        /^1 Web lint policy file\n/,
+    );
+});
+
+test("unchanged and removed ESLint directives need no approval", (t) => {
+    const before = "// eslint-disable-next-line no-console\nfirst();\n";
+    for (const after of [before.replace("first", "second"), "first();\n", null])
+        assert.equal(
+            scan(t, { "web/example.ts": before }, { "web/example.ts": after }),
+            "",
+        );
+});
+
+test("new Web directives are checked in uncommitted and untracked files", (t) => {
+    const source = "// eslint-disable-next-line no-console\nfirst();\n";
+    for (const base of [{}, { "web/example.ts": "first();\n" }])
+        assert.match(
+            scan(t, base, { "web/example.ts": source }, { commit: false }),
+            /^1 Web lint policy file\n/,
+        );
+});
+
 test("checks started in a subdirectory inspect repository-wide changes", (t) => {
     const summary =
         "1 binary file, 1 new dependency\n\n## Binary files\n\n- `new.bin` (16 bytes)\n\n## New dependencies\n\n`rust/Cargo.lock`\n\n- b 2.0.0\n";
@@ -1011,6 +1061,7 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
     const { output, summary } = scan(
         t,
         {
+            "rust/Cargo.toml": '[lints.rust]\nunsafe_code = "deny"\n',
             [`${checkerDir}/rust.mjs`]:
                 'export { checkRust } from "./additional-rule.mjs";',
             [`${checkerDir}/additional-rule.mjs`]: readFileSync(
@@ -1019,15 +1070,23 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
             ),
         },
         {
+            "rust/Cargo.toml": '[lints.rust]\nunsafe_code = "allow"\n',
+            "tomllib.py": "def loads(source):\n    return {}\n",
             [`${checkerDir}/additional-rule.mjs`]:
                 "export function checkRust() { return []; }",
+            [`${checkerDir}/web.mjs`]:
+                'throw new Error("loaded an untrusted rule");',
             "src/lib.rs": "pub unsafe fn call() {}",
+            "web/example.ts":
+                "// eslint-disable-next-line no-console\nfirst();\n",
         },
         { ci: true, workflow: true },
     );
     assert.equal(
         output,
-        'categories=["guardrail files","Rust lint policy files"]\n',
+        'categories=["guardrail files","Rust lint policy files","Web lint policy files"]\n',
     );
     assert.match(summary, /- `src\/lib.rs`/);
+    assert.match(summary, /- `web\/example.ts`/);
+    assert.match(summary, /- `rust\/Cargo.toml`/);
 });

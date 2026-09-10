@@ -5,6 +5,7 @@ const cargoLints = (source) =>
     execFileSync(
         "python3",
         [
+            "-I",
             "-c",
             `
 import json, sys, tomllib

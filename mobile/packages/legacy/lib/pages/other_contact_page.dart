@@ -5,6 +5,7 @@ import "package:ente_base/models/key_attributes.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_configuration/base_configuration.dart";
 import "package:ente_legacy/components/gradient_button.dart";
+import "package:ente_legacy/legacy_api.dart";
 import "package:ente_legacy/models/emergency_models.dart";
 import "package:ente_legacy/pages/recover_others_account.dart";
 import "package:ente_legacy/services/emergency_service.dart";
@@ -18,14 +19,16 @@ import "package:intl/intl.dart";
 import "package:logging/logging.dart";
 
 class OtherContactPage extends StatefulWidget {
-  final EmergencyContact contact;
-  final EmergencyInfo emergencyInfo;
+  final LegacyContactRecord contact;
+  final LegacyInfo emergencyInfo;
   final BaseConfiguration config;
+  final LegacyApi legacy;
 
   const OtherContactPage({
     required this.contact,
     required this.emergencyInfo,
     required this.config,
+    required this.legacy,
     super.key,
   });
 
@@ -35,10 +38,10 @@ class OtherContactPage extends StatefulWidget {
 
 class _OtherContactPageState extends State<OtherContactPage> {
   late String accountEmail = widget.contact.user.email;
-  RecoverySessions? recoverySession;
+  LegacyRecoverySession? recoverySession;
   String? waitTill;
   final Logger _logger = Logger("_OtherContactPageState");
-  late EmergencyInfo emergencyInfo = widget.emergencyInfo;
+  late LegacyInfo emergencyInfo = widget.emergencyInfo;
 
   @override
   void initState() {
@@ -50,7 +53,7 @@ class _OtherContactPageState extends State<OtherContactPage> {
 
   Future<void> _fetchData() async {
     try {
-      final result = await EmergencyContactService.instance.getInfo();
+      final result = await widget.legacy.info();
       if (mounted) {
         setState(() {
           recoverySession = result.othersRecoverySession.firstWhereOrNull(
@@ -109,12 +112,14 @@ class _OtherContactPageState extends State<OtherContactPage> {
                 ),
                 style: textTheme.smallMuted,
               ),
-            if (recoverySession != null && recoverySession!.status == "READY")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.ready)
               Text(
                 context.strings.recoveryReady(email: accountEmail),
                 style: textTheme.smallMuted,
               ),
-            if (recoverySession != null && recoverySession!.status == "WAITING")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.waiting)
               Text(
                 context.strings.recoverAccountAfter(
                   email: accountEmail,
@@ -176,7 +181,8 @@ class _OtherContactPageState extends State<OtherContactPage> {
                         }
                       },
               ),
-            if (recoverySession != null && recoverySession!.status == "READY")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.ready)
               GradientButton(
                 text: context.strings.recoverAccount,
                 backgroundColor: colorScheme.primary700,
@@ -205,14 +211,15 @@ class _OtherContactPageState extends State<OtherContactPage> {
                   }
                 },
               ),
-            if (recoverySession != null && recoverySession!.status == "WAITING")
+            if (recoverySession != null &&
+                recoverySession!.status == LegacyRecoveryStatus.waiting)
               GradientButton(
                 text: context.strings.cancelRecovery,
                 backgroundColor: colorScheme.primary700,
                 onTap: () => _showCancelRecoverySheet(),
               ),
             if (recoverySession != null &&
-                recoverySession!.status == "READY") ...[
+                recoverySession!.status == LegacyRecoveryStatus.ready) ...[
               const SizedBox(height: 20),
               Center(
                 child: GestureDetector(
@@ -242,7 +249,7 @@ class _OtherContactPageState extends State<OtherContactPage> {
               ),
             ],
             if (recoverySession == null ||
-                recoverySession!.status != "READY") ...[
+                recoverySession!.status != LegacyRecoveryStatus.ready) ...[
               const SizedBox(height: 20),
               Center(
                 child: GestureDetector(
@@ -327,9 +334,10 @@ class _OtherContactPageState extends State<OtherContactPage> {
 
     if (confirmed == true) {
       try {
-        await EmergencyContactService.instance.updateContact(
-          widget.contact,
-          ContactState.contactLeft,
+        await widget.legacy.updateContact(
+          userId: widget.contact.user.id,
+          emergencyContactId: widget.contact.emergencyContact.id,
+          state: LegacyContactState.contactLeft,
         );
         if (mounted) {
           Navigator.of(context).pop();

@@ -219,10 +219,7 @@ Future<void> _init(bool bool, {String? via}) async {
     );
     await UpdateService.instance.init(preferences, packageInfo);
     await TrashService.instance.init(preferences);
-    await EmergencyContactService.instance.init(
-      UserService.instance,
-      Configuration.instance,
-    );
+    EmergencyContactService.instance.init(Configuration.instance);
     await LockerContactsDisplayService.init(preferences: preferences);
     unawaited(cleanStaleLegacyKitShareFiles());
     unawaited(

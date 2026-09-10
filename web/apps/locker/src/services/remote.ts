@@ -123,7 +123,7 @@ export const createInfoItem = async (
     };
     const metadataJSON = JSON.stringify(metadata);
     const encryptedMetadata = await encryptBlob(
-        stringToB64(metadataJSON),
+        new TextEncoder().encode(metadataJSON),
         fileKey,
     );
 
@@ -132,7 +132,10 @@ export const createInfoItem = async (
         noThumb: true,
     };
     const pubMMJSON = JSON.stringify(pubMagicMetadata);
-    const encryptedPubMM = await encryptBlob(stringToB64(pubMMJSON), fileKey);
+    const encryptedPubMM = await encryptBlob(
+        new TextEncoder().encode(pubMMJSON),
+        fileKey,
+    );
 
     const res = await fetch(await apiURL("/files/meta"), {
         method: "POST",
@@ -220,8 +223,10 @@ const updateItemMetadata = async (
         editedTime: Date.now(),
     };
     const pubMMJSON = JSON.stringify(pubMagicMetadata);
-    const encryptedPubMM = await encryptBlob(stringToB64(pubMMJSON), fileKey);
-
+    const encryptedPubMM = await encryptBlob(
+        new TextEncoder().encode(pubMMJSON),
+        fileKey,
+    );
     const version = fileRecord.pubMagicMetadata?.version ?? 1;
 
     const res = await fetch(await apiURL("/files/public-magic-metadata"), {

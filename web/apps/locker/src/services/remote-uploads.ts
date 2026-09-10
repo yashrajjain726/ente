@@ -6,13 +6,11 @@ import {
 } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import {
-    b64ToBytes,
     createStreamEncryptor,
     encryptBlob,
     encryptBox,
     encryptFileStreamWithKey,
     md5Base64,
-    stringToB64,
 } from "ente-locker-wasm";
 import { z } from "zod";
 import {
@@ -430,9 +428,8 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
         BLACK_THUMBNAIL_B64,
         fileKey,
     );
-    const encryptedThumbBytes = b64ToBytes(encryptedThumb.encryptedData);
     const thumbObjectKey = await uploadSingleObject(
-        encryptedThumbBytes,
+        encryptedThumb.encryptedData,
         encryptedThumb.md5Hash,
     );
 
@@ -454,14 +451,14 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
     };
     const metadataJSON = JSON.stringify(metadata);
     const encryptedMetadata = await encryptBlob(
-        stringToB64(metadataJSON),
+        new TextEncoder().encode(metadataJSON),
         fileKey,
     );
 
     const pubMagicMetadata = { noThumb: true };
     const pubMagicJSON = JSON.stringify(pubMagicMetadata);
     const encryptedPubMagic = await encryptBlob(
-        stringToB64(pubMagicJSON),
+        new TextEncoder().encode(pubMagicJSON),
         fileKey,
     );
 
@@ -482,7 +479,7 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
             thumbnail: {
                 objectKey: thumbObjectKey,
                 decryptionHeader: encryptedThumb.decryptionHeader,
-                size: encryptedThumbBytes.length,
+                size: encryptedThumb.encryptedData.length,
             },
             metadata: {
                 encryptedData: encryptedMetadata.encryptedData,

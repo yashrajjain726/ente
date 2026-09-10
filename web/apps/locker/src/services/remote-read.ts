@@ -10,9 +10,8 @@ import {
     decryptBox,
     decryptBoxBytes,
     decryptMetadataJSON,
-    encryptBox,
+    encryptBoxBytes,
     openCollectionKey,
-    stringToB64,
 } from "ente-locker-wasm";
 import { z } from "zod";
 import { ensureAuthenticatedSession } from "./authenticated-session";
@@ -327,8 +326,8 @@ const encryptCollectionPayload = async (
     payload: LockerCollectionPayload,
     collectionKey: string,
 ) => {
-    const encryptedPayload = await encryptBox(
-        stringToB64(JSON.stringify(payload)),
+    const encryptedPayload = await encryptBoxBytes(
+        new TextEncoder().encode(JSON.stringify(payload)),
         collectionKey,
     );
 
