@@ -61,7 +61,7 @@ export const LegacyActionSheet: React.FC<LegacyActionSheetProps> = ({
             <Stack sx={{ gap: 2.5 }}>
                 <Stack
                     direction="row"
-                    sx={{ alignItems: "center", gap: 1.5, height: 38 }}
+                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
                 >
                     <Typography
                         variant="h6"
