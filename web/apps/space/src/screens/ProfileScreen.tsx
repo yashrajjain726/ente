@@ -645,7 +645,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
-    const { isSticky, syncScroll } = useProfileStickyHeader(
+    const { isSticky, shouldAnimate, syncScroll } = useProfileStickyHeader(
         !isPublicProfile,
         profileIdentityRef,
         profileStickyHeaderHeight,
@@ -1233,8 +1233,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     py: 0,
                     top: compact ? 0 : undefined,
                     transition:
-                        compact && !isSticky
-                            ? "opacity 160ms ease-out"
+                        compact && shouldAnimate
+                            ? isSticky
+                                ? "opacity 240ms ease-in-out"
+                                : "opacity 160ms ease-out"
                             : "none",
                     width: "100%",
                     zIndex: compact ? 10 : 3,
