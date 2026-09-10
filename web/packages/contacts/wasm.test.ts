@@ -2,7 +2,7 @@ import * as legacy from "ente-legacy-wasm/authenticated";
 import * as locker from "ente-locker-wasm";
 import * as photos from "ente-photos-wasm";
 import {
-    boxSealOpen,
+    boxSealOpenBytes,
     encryptBox,
     generateKey,
     generateKeyPair,
@@ -211,7 +211,7 @@ describe("Legacy", () => {
         const masterKey = await generateKey();
         const recoveryKey = await generateKey();
         const recipient = await generateKeyPair();
-        let sharedRecoveryKey: string | undefined;
+        let sharedRecoveryKey: Uint8Array | undefined;
         mockFetch(async (request) => {
             switch (new URL(request.url).pathname) {
                 case "/users/public-key":
@@ -224,7 +224,7 @@ describe("Legacy", () => {
                     };
                     expect(body.email).toBe("friend@example.com");
                     expect(body.recoveryNoticeInDays).toBe(30);
-                    sharedRecoveryKey = await boxSealOpen(
+                    sharedRecoveryKey = await boxSealOpenBytes(
                         body.encryptedKey,
                         recipient,
                     );
@@ -242,7 +242,9 @@ describe("Legacy", () => {
         });
         try {
             await legacy.addContact(session, "friend@example.com", 30);
-            expect(sharedRecoveryKey).toBe(recoveryKey);
+            expect(sharedRecoveryKey).toStrictEqual(
+                new Uint8Array(Buffer.from(recoveryKey, "base64")),
+            );
         } finally {
             session.free();
         }
@@ -289,16 +291,11 @@ const encryptedContact = async () => {
     const wrappedRootKey = await encryptBox(rootKey, masterKey);
     const wrappedContactKey = await encryptBox(contactKey, rootKey);
     const data = await locker.encryptBlob(
-        Buffer.from(
-            JSON.stringify({ contactUserId: 42, name: "Zoë 🦋" }),
-        ).toString("base64"),
+        Buffer.from(JSON.stringify({ contactUserId: 42, name: "Zoë 🦋" })),
         contactKey,
     );
     const picture = Uint8Array.from({ length: 4096 }, (_, i) => i % 256);
-    const encryptedPicture = await locker.encryptBlob(
-        Buffer.from(picture).toString("base64"),
-        contactKey,
-    );
+    const encryptedPicture = await locker.encryptBlob(picture, contactKey);
     const fixture = {
         masterKey,
         wrappedRootContactKey: {
