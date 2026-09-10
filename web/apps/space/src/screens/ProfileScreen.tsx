@@ -57,6 +57,7 @@ import {
     spacePostPreviewImageForFile,
     type SpaceDraftPostImage,
 } from "utils/post-image";
+import { profilePhotoGap, profilePhotoRows } from "utils/profile-photo-layout";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 const green = "#08C225";
@@ -76,7 +77,7 @@ const profileAvatarTopOffset = 54;
 const profileAvatarSize = 132;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
-const photoMasonryGap = "3px";
+const photoMasonryGap = `${profilePhotoGap}px`;
 const photoMasonryPlaceholderBackground = spaceSurface;
 const photoMasonryRadius = "16px";
 const profileCoverRadius = "12px";
@@ -126,14 +127,10 @@ interface PostMasonryTile {
     item: ProfilePostItem;
 }
 
-interface PostMasonryRow {
-    aspectRatio: number;
-    tiles: PostMasonryTile[];
-}
-
 const buildPostMasonrySections = (
     items: ProfilePostItem[],
     loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
+    width: number,
 ) => {
     const now = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
@@ -173,7 +170,7 @@ const buildPostMasonrySections = (
                 ? latestSection
                 : sections.find(({ sinceMs }) => item.timestampMs >= sinceMs)!;
         section.tiles.push({
-            aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
+            aspectRatio: photoAspectRatio(dimensions),
             dimensions,
             index,
             item,
@@ -184,36 +181,8 @@ const buildPostMasonrySections = (
         .filter(({ tiles }) => tiles.length > 0)
         .map(({ title, tiles }) => ({
             title,
-            rows: buildPostMasonryRows(tiles),
+            rows: profilePhotoRows(tiles, width),
         }));
-};
-
-const buildPostMasonryRows = (tiles: PostMasonryTile[]): PostMasonryRow[] => {
-    const rows = new Array<PostMasonryRow>();
-    let nextTileIndex = 0;
-
-    while (nextTileIndex < tiles.length) {
-        const rowSize = preferredPostMasonryRowSize(
-            tiles.length - nextTileIndex,
-        );
-        const rowTiles = tiles.slice(nextTileIndex, nextTileIndex + rowSize);
-        rows.push({
-            aspectRatio: rowTiles.reduce(
-                (aspectRatio, tile) => aspectRatio + tile.aspectRatio,
-                0,
-            ),
-            tiles: rowTiles,
-        });
-        nextTileIndex += rowSize;
-    }
-
-    return rows;
-};
-
-const preferredPostMasonryRowSize = (remainingTiles: number) => {
-    if (remainingTiles <= 3) return remainingTiles;
-    if (remainingTiles == 4 || remainingTiles == 5) return 2;
-    return remainingTiles % 2 == 0 ? 2 : 3;
 };
 
 const profilePostImageCacheKey = (item: ProfilePostItem) =>
@@ -332,9 +301,9 @@ const ProfilePostLoadingIndicator: React.FC = () => (
 );
 
 interface ProfilePostTileProps {
-    aspectRatio: number;
     dimensions: ProfilePhotoDimensions;
     displayName: string;
+    flexGrow: number;
     imageUrl?: string;
     index: number;
     isSingleItemRow: boolean;
@@ -348,9 +317,9 @@ interface ProfilePostTileProps {
 }
 
 const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
-    aspectRatio,
     dimensions,
     displayName,
+    flexGrow,
     imageUrl,
     index,
     isSingleItemRow,
@@ -427,15 +396,12 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
             }}
             sx={{
                 appearance: "none",
-                aspectRatio: isSingleItemRow
-                    ? `${dimensions.width} / ${dimensions.height}`
-                    : undefined,
+                aspectRatio: `${dimensions.width} / ${dimensions.height}`,
                 bgcolor: photoMasonryPlaceholderBackground,
                 border: 0,
                 cursor: imageUrl && !isUnavailable ? "pointer" : "default",
                 display: "block",
-                flex: isSingleItemRow ? "0 0 100%" : `${aspectRatio} 1 0`,
-                height: isSingleItemRow ? "auto" : "100%",
+                flex: isSingleItemRow ? "0 0 100%" : `${flexGrow} 1 0`,
                 minWidth: 0,
                 opacity: 1,
                 overflow: "hidden",
@@ -628,6 +594,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         Record<string, true>
     >({});
     const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
+    const [postGridWidth, setPostGridWidth] = useState(0);
+    const postGridRef = React.useRef<HTMLDivElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const postImageLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | undefined>>
@@ -670,6 +638,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
+    React.useLayoutEffect(() => {
+        const grid = postGridRef.current;
+        if (!grid) return;
+
+        const observer = new ResizeObserver(([entry]) =>
+            setPostGridWidth(entry!.contentRect.width),
+        );
+        setPostGridWidth(grid.getBoundingClientRect().width);
+        observer.observe(grid);
+        return () => observer.disconnect();
+    }, [hasProfilePosts]);
     const shouldShowPostLoadingIndicator =
         isPostsLoading && (showPostLoadingIndicator ?? true);
     const isCoverImageLoading = Boolean(
@@ -687,6 +666,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const masonrySections = buildPostMasonrySections(
         visiblePostItems,
         loadedPhotoDimensionsByID,
+        postGridWidth,
     );
     const closeFriendActions = () => setFriendActionsAnchor(null);
 
@@ -1103,6 +1083,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const renderPostTile = (
         { aspectRatio, dimensions, index, item }: PostMasonryTile,
         isSingleItemRow: boolean,
+        rowAspectRatio: number,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
         const isLatestPost = index == 0 && !isPublicProfile;
@@ -1110,7 +1091,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         const tile = (
             <ProfilePostTile
                 key={`${item.id}-${index}`}
-                aspectRatio={aspectRatio}
+                flexGrow={aspectRatio / rowAspectRatio}
                 dimensions={
                     isLatestPost
                         ? {
@@ -1902,6 +1883,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 >
                     {hasProfilePosts ? (
                         <Box
+                            ref={postGridRef}
                             sx={{
                                 display: "flex",
                                 flexDirection: "column",
@@ -1948,10 +1930,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 <Box
                                                     key={row.tiles[0]!.item.id}
                                                     sx={{
-                                                        aspectRatio:
-                                                            isSingleItemRow
-                                                                ? undefined
-                                                                : `${row.aspectRatio} / 1`,
                                                         display: "flex",
                                                         gap: photoMasonryGap,
                                                         width: "100%",
@@ -1961,6 +1939,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                         renderPostTile(
                                                             tile,
                                                             isSingleItemRow,
+                                                            row.aspectRatio,
                                                         ),
                                                     )}
                                                 </Box>

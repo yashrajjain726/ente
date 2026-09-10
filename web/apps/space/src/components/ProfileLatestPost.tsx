@@ -4,7 +4,7 @@ import { spacePostLikePopDurationMs } from "components/post-like-animation";
 import { SpacePostReplyControls } from "components/PostReplyControls";
 import log from "ente-base/log";
 import React from "react";
-import { spaceTextMuted } from "styles/colors";
+import { spaceSurface, spaceTextMuted } from "styles/colors";
 import { clampSpaceMessageText } from "utils/message-limits";
 
 interface ProfileLatestPostProps {
@@ -92,7 +92,13 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
         <Box
             component="article"
             aria-label="Latest post"
-            sx={{ minWidth: 0, width: "100%" }}
+            sx={{
+                bgcolor: spaceSurface,
+                borderRadius: "16px",
+                minWidth: 0,
+                overflow: "hidden",
+                width: "100%",
+            }}
         >
             <Box
                 sx={{
@@ -146,7 +152,7 @@ export const ProfileLatestPost: React.FC<ProfileLatestPostProps> = ({
                 )}
             </Box>
             {(onReply || onSetLiked) && (
-                <Box sx={{ mt: "12px" }}>
+                <Box sx={{ p: "12px" }}>
                     <SpacePostReplyControls
                         canSendReply={canSendReply}
                         disabled={disabled}

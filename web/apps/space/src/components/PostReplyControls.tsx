@@ -19,10 +19,9 @@ import React from "react";
 const green = "#08C225";
 const textBase = "#F4F4F4";
 const textSecondary = "#A6A6A6";
-const controlBackground = "rgba(36, 36, 36, 0.72)";
-const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
-const inputBackground = "rgba(58, 58, 58, 0.86)";
-const inputBackgroundActive = "rgba(72, 72, 72, 0.9)";
+const controlBackground = "#36363A";
+const controlBackgroundHover = "#404044";
+const controlBackgroundActive = "#48484D";
 const controlIcon = "#D8D8D8";
 const replyInputMinHeight = 48;
 const replyInputPadding = 14;
@@ -35,7 +34,6 @@ const viewerActionButtonSx = {
     bgcolor: controlBackground,
     border: 0,
     borderRadius: "50%",
-    boxShadow: "0 10px 28px rgba(0, 0, 0, 0.36)",
     color: controlIcon,
     cursor: "pointer",
     display: "flex",
@@ -43,7 +41,7 @@ const viewerActionButtonSx = {
     justifyContent: "center",
     p: 0,
     width: 48,
-    "&:active": { bgcolor: "#3A3A3A" },
+    "&:active": { bgcolor: controlBackgroundActive },
     "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
     "&:hover": { bgcolor: controlBackgroundHover },
 };
@@ -109,7 +107,7 @@ export const SpacePostReplyControls: React.FC<SpacePostReplyControlsProps> = ({
                     rows={1}
                     {...replyInputProps}
                     sx={{
-                        bgcolor: inputBackground,
+                        bgcolor: controlBackground,
                         border: 0,
                         borderRadius: "24px",
                         boxSizing: "border-box",
@@ -131,7 +129,7 @@ export const SpacePostReplyControls: React.FC<SpacePostReplyControlsProps> = ({
                         resize: "none",
                         "&::placeholder": { color: textSecondary },
                         "&:disabled": { opacity: 0.74 },
-                        "&:focus": { bgcolor: inputBackgroundActive },
+                        "&:focus": { bgcolor: controlBackgroundHover },
                     }}
                 />
             )}
@@ -192,7 +190,9 @@ export const SpacePostReplyControls: React.FC<SpacePostReplyControlsProps> = ({
                                   : controlBackgroundHover,
                         },
                         "&:active": {
-                            bgcolor: isSendActive ? "#069B1E" : "#3A3A3A",
+                            bgcolor: isSendActive
+                                ? "#069B1E"
+                                : controlBackgroundActive,
                         },
                         "@media (prefers-reduced-motion: reduce)": {
                             animation: "none",
