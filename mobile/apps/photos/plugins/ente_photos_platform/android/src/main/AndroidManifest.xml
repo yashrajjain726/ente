@@ -3,17 +3,12 @@
     <application android:supportsRtl="true">
         <activity
             android:name="io.ente.photos.WallpaperActivity"
-            android:exported="true"
+            android:exported="false"
             android:enableOnBackInvokedCallback="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:label="@string/wallpaper"
             android:theme="@style/WallpaperTheme">
-            <intent-filter>
-                <action android:name="android.intent.action.ATTACH_DATA" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
         </activity>
     </application>
 </manifest>
