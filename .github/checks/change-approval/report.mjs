@@ -82,7 +82,7 @@ export function writeReport({
         );
     if (rust.length)
         sections.push(
-            `## Rust lint declarations and files containing unsafe\n\n${list(rust.map(code))}`,
+            `## Rust lint declarations and files containing unsafe\n\n${list(rust.map(({ path, reasons }) => `${code(path)}: ${reasons.map(code).join("; ")}`))}`,
         );
     if (web.length)
         sections.push(`## Web lint directives\n\n${list(web.map(code))}`);
@@ -110,7 +110,10 @@ function list(items) {
 }
 
 function code(path) {
-    return `\`${path}\``;
+    const fence = "`".repeat(
+        Math.max(0, ...(path.match(/`+/g) ?? []).map((run) => run.length)) + 1,
+    );
+    return `${fence}${path.startsWith("`") || path.endsWith("`") ? ` ${path} ` : path}${fence}`;
 }
 
 function withSize({ path, size }) {

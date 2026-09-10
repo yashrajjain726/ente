@@ -55,12 +55,14 @@ function rustPolicy(source) {
         if (closing) throw new Error("Unclosed Rust delimiter");
         return nodes;
     };
-    const lint = (nodes) =>
+    const lint = (
+        nodes,
+        levels = /^(?:r#)?(?:allow|expect|warn|deny|forbid)$/,
+    ) =>
         nodes.some((node, i) =>
             Array.isArray(node)
-                ? lint(node)
-                : /^(?:r#)?(?:allow|expect|warn|deny|forbid)$/.test(node) &&
-                  nodes[i + 1]?.[0] === "(",
+                ? lint(node, levels)
+                : levels.test(node) && nodes[i + 1]?.[0] === "(",
         );
     const declarations = [];
     const visit = (nodes) => {
@@ -89,7 +91,23 @@ function rustPolicy(source) {
                         )
                             stop++;
                     }
-                    declarations.push(JSON.stringify(nodes.slice(i, stop)));
+                    const attributes = nodes.slice(i, end);
+                    const target = nodes
+                        .slice(end, stop)
+                        .map((node) =>
+                            Array.isArray(node) ? [node[0], node.at(-1)] : node,
+                        );
+                    declarations.push({
+                        key: JSON.stringify([attributes, target]),
+                        restrictive: lint(
+                            attributes,
+                            /^(?:r#)?(?:warn|deny|forbid)$/,
+                        ),
+                        text: attributes
+                            .flat(Infinity)
+                            .join("")
+                            .replace(/\s+/g, " "),
+                    });
                 }
                 if (end > i) {
                     i = end - 1;
@@ -100,29 +118,40 @@ function rustPolicy(source) {
         }
     };
     visit(group());
-    return {
-        unsafe: tokens.includes("unsafe"),
-        declarations: JSON.stringify(declarations.sort()),
-    };
+    return { unsafe: tokens.includes("unsafe"), declarations };
 }
 
 export function checkRust({ files, readVersions }) {
-    return files
-        .filter(
-            ({ path }) =>
-                path.endsWith(".rs") || basename(path) === "Cargo.toml",
-        )
-        .filter(({ path }) => {
-            const { before, after } = readVersions(path);
-            if (!path.endsWith(".rs"))
-                return cargoLints(before) !== cargoLints(after);
+    const findings = [];
+    for (const { path } of files) {
+        if (!path.endsWith(".rs") && basename(path) !== "Cargo.toml") continue;
+        const { before, after } = readVersions(path);
+        const reasons = [];
+        if (!path.endsWith(".rs")) {
+            if (cargoLints(before) !== cargoLints(after))
+                reasons.push(
+                    "Cargo lint settings or workspace selection changed",
+                );
+        } else {
             const oldPolicy = rustPolicy(before);
             const newPolicy = rustPolicy(after);
-            return (
-                oldPolicy.unsafe ||
-                newPolicy.unsafe ||
-                oldPolicy.declarations !== newPolicy.declarations
-            );
-        })
-        .map(({ path }) => path);
+            if (oldPolicy.unsafe || newPolicy.unsafe)
+                reasons.push(
+                    "File contains unsafe before or after this change",
+                );
+            const remaining = oldPolicy.declarations;
+            for (const declaration of newPolicy.declarations) {
+                const index = remaining.findIndex(
+                    ({ key }) => key === declaration.key,
+                );
+                if (index !== -1) remaining.splice(index, 1);
+                else reasons.push(`Added or changed: ${declaration.text}`);
+            }
+            for (const declaration of remaining)
+                if (declaration.restrictive)
+                    reasons.push(`Removed or changed: ${declaration.text}`);
+        }
+        if (reasons.length) findings.push({ path, reasons });
+    }
+    return findings;
 }
