@@ -658,6 +658,16 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                   Expanded(
                                     child: LayoutBuilder(
                                       builder: (context, constraints) {
+                                        const maxDotSize = 15.0;
+                                        const dotSpacing = 5.0;
+                                        final dotCount =
+                                            ((constraints.maxWidth +
+                                                        dotSpacing) /
+                                                    (maxDotSize + dotSpacing))
+                                                .floor()
+                                                .clamp(1, _entries.length);
+                                        final activeDot =
+                                            i * dotCount ~/ _entries.length;
                                         return GestureDetector(
                                           behavior: HitTestBehavior.opaque,
                                           onHorizontalDragDown: (_) {
@@ -683,47 +693,44 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                           onHorizontalDragEnd: (_) =>
                                               _onSeekEnd(),
                                           child: Row(
-                                            children: List.generate(
-                                              _entries.length,
-                                              (index) {
-                                                final distance = (index - i)
-                                                    .abs();
-                                                final double size =
-                                                    switch (distance) {
-                                                      0 => 15,
-                                                      1 => 10,
-                                                      2 => 7.5,
-                                                      _ => 5,
-                                                    };
-                                                return Expanded(
-                                                  child: SizedBox(
-                                                    height: 40,
-                                                    child: Center(
-                                                      child: AnimatedContainer(
-                                                        duration:
-                                                            const Duration(
-                                                              milliseconds: 200,
+                                            spacing: dotSpacing,
+                                            children: List.generate(dotCount, (
+                                              index,
+                                            ) {
+                                              final distance =
+                                                  (index - activeDot).abs();
+                                              final double size =
+                                                  switch (distance) {
+                                                    0 => maxDotSize,
+                                                    1 => 10,
+                                                    2 => 7.5,
+                                                    _ => 5,
+                                                  };
+                                              return Expanded(
+                                                child: SizedBox(
+                                                  height: 40,
+                                                  child: Center(
+                                                    child: AnimatedContainer(
+                                                      duration: const Duration(
+                                                        milliseconds: 200,
+                                                      ),
+                                                      width: size,
+                                                      height: size,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: Colors.white
+                                                            .withValues(
+                                                              alpha:
+                                                                  distance == 0
+                                                                  ? 1
+                                                                  : 0.5,
                                                             ),
-                                                        width: size,
-                                                        height: size,
-                                                        decoration: BoxDecoration(
-                                                          shape:
-                                                              BoxShape.circle,
-                                                          color: Colors.white
-                                                              .withValues(
-                                                                alpha:
-                                                                    distance ==
-                                                                        0
-                                                                    ? 1
-                                                                    : 0.5,
-                                                              ),
-                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                );
-                                              },
-                                            ),
+                                                ),
+                                              );
+                                            }),
                                           ),
                                         );
                                       },
