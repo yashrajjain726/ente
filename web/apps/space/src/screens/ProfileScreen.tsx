@@ -32,6 +32,7 @@ import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareIcon } from "components/ShareInviteButton";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
+import { useProfileStickyHeader } from "hooks/use-profile-sticky-header";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpaceInviteIntent } from "services/invite";
@@ -74,6 +75,7 @@ const profileCoverTopShadow =
     "linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.18) 36%, rgba(0, 0, 0, 0.08) 72%, rgba(0, 0, 0, 0) 100%)";
 const profileCoverSkeletonBackground = spaceSurface;
 const profileHeaderHeight = 56;
+const profileStickyHeaderHeight = 44;
 const profileAvatarTopOffset = 54;
 const profileAvatarSize = 132;
 const profileCoverHeight =
@@ -598,6 +600,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     >({});
     const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
     const [postGridWidth, setPostGridWidth] = useState(0);
+    const profileIdentityRef = React.useRef<HTMLDivElement | null>(null);
     const postGridRef = React.useRef<HTMLDivElement | null>(null);
     const hasScrolledToLatestPost = React.useRef(false);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -642,6 +645,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
+    const { isSticky, syncScroll } = useProfileStickyHeader(
+        !isPublicProfile,
+        profileIdentityRef,
+        profileStickyHeaderHeight,
+    );
     React.useLayoutEffect(() => {
         const grid = postGridRef.current;
         if (!grid) return;
@@ -665,11 +673,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         if (!grid) return;
 
         window.scrollTo({
-            top: window.scrollY + grid.getBoundingClientRect().top - 16,
+            top:
+                window.scrollY +
+                grid.getBoundingClientRect().top -
+                (isPublicProfile ? 0 : profileStickyHeaderHeight) -
+                16,
             behavior: "instant",
         });
+        if (!isPublicProfile) syncScroll();
         hasScrolledToLatestPost.current = true;
-    }, [initialSection, postGridWidth]);
+    }, [initialSection, isPublicProfile, postGridWidth, syncScroll]);
     const shouldShowPostLoadingIndicator =
         isPostsLoading && (showPostLoadingIndicator ?? true);
     const isCoverImageLoading = Boolean(
@@ -1175,6 +1188,231 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         );
     };
 
+    const renderHeader = (compact = false) => {
+        return (
+            <Box
+                component={compact ? "nav" : "header"}
+                aria-label={compact ? "Profile navigation" : undefined}
+                aria-hidden={compact && !isSticky ? true : undefined}
+                inert={compact && !isSticky}
+                sx={{
+                    alignItems: "center",
+                    color: coverForeground,
+                    display: isPublicProfile ? "flex" : "grid",
+                    gridTemplateColumns: isPublicProfile
+                        ? undefined
+                        : `${spaceTouchTargetSize}px minmax(0, 1fr) ${spaceTouchTargetSize}px`,
+                    height: compact
+                        ? profileStickyHeaderHeight
+                        : profileHeaderHeight,
+                    bgcolor: compact ? profileCoverBackground : undefined,
+                    backgroundImage:
+                        compact && coverImageUrl
+                            ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url("${coverImageUrl}")`
+                            : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    borderBottomLeftRadius: compact
+                        ? profileCoverRadius
+                        : undefined,
+                    borderBottomRightRadius: compact
+                        ? profileCoverRadius
+                        : undefined,
+                    boxShadow: compact
+                        ? "0 2px 10px rgba(0, 0, 0, 0.16)"
+                        : undefined,
+                    insetInline: compact ? 0 : undefined,
+                    justifyContent: isPublicProfile
+                        ? "space-between"
+                        : undefined,
+                    mx: "auto",
+                    opacity: compact && !isSticky ? 0 : 1,
+                    pointerEvents: compact && !isSticky ? "none" : undefined,
+                    position: compact ? "fixed" : "relative",
+                    px: 2,
+                    py: 0,
+                    top: compact ? 0 : undefined,
+                    transition:
+                        compact && !isSticky
+                            ? "opacity 160ms ease-out"
+                            : "none",
+                    width: "100%",
+                    zIndex: compact ? 10 : 3,
+                    "@media (min-width: 600px)": { maxWidth: 390 },
+                }}
+            >
+                {isPublicProfile ? (
+                    <>
+                        <Box
+                            component="a"
+                            href="/"
+                            aria-label="Go to Space"
+                            sx={{
+                                display: "block",
+                                flexShrink: 0,
+                                lineHeight: 0,
+                            }}
+                        >
+                            <Box
+                                component="img"
+                                alt="Space"
+                                src="/images/space.svg"
+                                sx={{
+                                    display: "block",
+                                    height: 17,
+                                    width: "auto",
+                                }}
+                            />
+                        </Box>
+                        {isAnonymousPublicProfile
+                            ? onCreateSpace && (
+                                  <PublicProfileActionButton
+                                      label="Create your Space"
+                                      onClick={onCreateSpace}
+                                  />
+                              )
+                            : onAddFriend && (
+                                  <PublicProfileActionButton
+                                      disabled={isAddingFriend}
+                                      label="Add Friend"
+                                      onClick={onAddFriend}
+                                      showSpinner={showAddingFriendSpinner}
+                                  />
+                              )}
+                    </>
+                ) : (
+                    <>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={
+                                isFriendProfile
+                                    ? "Back to friends"
+                                    : "Back to home"
+                            }
+                            onClick={onBack}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: "inherit",
+                                cursor: "pointer",
+                                display: "flex",
+                                height: spaceTouchTargetSize,
+                                justifyContent: "flex-start",
+                                ml: "-2px",
+                                p: 0,
+                                width: spaceTouchTargetSize,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={ArrowLeft02Icon}
+                                size={24}
+                                strokeWidth={1.8}
+                            />
+                        </Box>
+                        <Box
+                            component="h1"
+                            sx={{
+                                color: "inherit",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 18,
+                                fontWeight: 700,
+                                justifySelf: "center",
+                                lineHeight: "24px",
+                                m: 0,
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                px: "4px",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {firstName}
+                        </Box>
+                        {isOwnerProfile ? (
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Settings"
+                                onClick={onOpenSettings}
+                                sx={{
+                                    alignItems: "center",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    color: "inherit",
+                                    cursor: onOpenSettings
+                                        ? "pointer"
+                                        : "default",
+                                    display: "flex",
+                                    height: spaceTouchTargetSize,
+                                    justifyContent: "flex-end",
+                                    p: 0,
+                                    width: spaceTouchTargetSize,
+                                    "&:focus-visible": {
+                                        borderRadius: "50%",
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={Menu01Icon}
+                                    size={20}
+                                    strokeWidth={2.4}
+                                />
+                            </Box>
+                        ) : onMessageFriend ? (
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={`Message ${displayName}`}
+                                onClick={onMessageFriend}
+                                sx={{
+                                    alignItems: "center",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    color: "inherit",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    height: spaceTouchTargetSize,
+                                    justifyContent: "flex-end",
+                                    p: 0,
+                                    width: spaceTouchTargetSize,
+                                    "& svg path:first-of-type": {
+                                        display: "none",
+                                    },
+                                    "&:focus-visible": {
+                                        borderRadius: "50%",
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={BubbleChatIcon}
+                                    size={20}
+                                    strokeWidth={2}
+                                />
+                            </Box>
+                        ) : (
+                            <Box
+                                aria-hidden
+                                sx={{ width: spaceTouchTargetSize }}
+                            />
+                        )}
+                    </>
+                )}
+            </Box>
+        );
+    };
+
     return (
         <Box
             component="main"
@@ -1299,196 +1537,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         }}
                     />
                 )}
+                {renderHeader()}
+                {!isPublicProfile && renderHeader(true)}
                 <Box
-                    component="header"
-                    sx={{
-                        alignItems: "center",
-                        color: coverForeground,
-                        display: isPublicProfile ? "flex" : "grid",
-                        gridTemplateColumns: isPublicProfile
-                            ? undefined
-                            : `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
-                        height: profileHeaderHeight,
-                        justifyContent: isPublicProfile
-                            ? "space-between"
-                            : undefined,
-                        position: "relative",
-                        px: 2,
-                        py: 0,
-                        width: "100%",
-                        zIndex: 3,
-                    }}
-                >
-                    {isPublicProfile ? (
-                        <>
-                            <Box
-                                component="a"
-                                href="/"
-                                aria-label="Go to Space"
-                                sx={{
-                                    display: "block",
-                                    flexShrink: 0,
-                                    lineHeight: 0,
-                                }}
-                            >
-                                <Box
-                                    component="img"
-                                    alt="Space"
-                                    src="/images/space.svg"
-                                    sx={{
-                                        display: "block",
-                                        height: 17,
-                                        width: "auto",
-                                    }}
-                                />
-                            </Box>
-                            {isAnonymousPublicProfile
-                                ? onCreateSpace && (
-                                      <PublicProfileActionButton
-                                          label="Create your Space"
-                                          onClick={onCreateSpace}
-                                      />
-                                  )
-                                : onAddFriend && (
-                                      <PublicProfileActionButton
-                                          disabled={isAddingFriend}
-                                          label="Add Friend"
-                                          onClick={onAddFriend}
-                                          showSpinner={showAddingFriendSpinner}
-                                      />
-                                  )}
-                        </>
-                    ) : (
-                        <>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    isFriendProfile
-                                        ? "Back to friends"
-                                        : "Back to home"
-                                }
-                                onClick={onBack}
-                                sx={{
-                                    alignItems: "center",
-                                    bgcolor: "transparent",
-                                    border: 0,
-                                    color: "inherit",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    height: spaceTouchTargetSize,
-                                    justifyContent: "flex-start",
-                                    ml: "-2px",
-                                    p: 0,
-                                    width: spaceTouchTargetSize,
-                                    "&:focus-visible": {
-                                        borderRadius: "50%",
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    icon={ArrowLeft02Icon}
-                                    size={24}
-                                    strokeWidth={1.8}
-                                />
-                            </Box>
-                            <Box
-                                component="h1"
-                                sx={{
-                                    color: "inherit",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 18,
-                                    fontWeight: 700,
-                                    justifySelf: "center",
-                                    lineHeight: "24px",
-                                    m: 0,
-                                    maxWidth: "100%",
-                                    overflow: "hidden",
-                                    px: "4px",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                {firstName}
-                            </Box>
-                            {isOwnerProfile ? (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label="Settings"
-                                    onClick={onOpenSettings}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: "inherit",
-                                        cursor: onOpenSettings
-                                            ? "pointer"
-                                            : "default",
-                                        display: "flex",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "flex-end",
-                                        p: 0,
-                                        width: spaceTouchTargetSize,
-                                        "&:focus-visible": {
-                                            borderRadius: "50%",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={Menu01Icon}
-                                        size={20}
-                                        strokeWidth={2.4}
-                                    />
-                                </Box>
-                            ) : onMessageFriend ? (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label={`Message ${displayName}`}
-                                    onClick={onMessageFriend}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: "inherit",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "flex-end",
-                                        p: 0,
-                                        width: spaceTouchTargetSize,
-                                        "& svg path:first-of-type": {
-                                            display: "none",
-                                        },
-                                        "&:focus-visible": {
-                                            borderRadius: "50%",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={BubbleChatIcon}
-                                        size={20}
-                                        strokeWidth={2}
-                                    />
-                                </Box>
-                            ) : (
-                                <Box
-                                    aria-hidden
-                                    sx={{ width: spaceTouchTargetSize }}
-                                />
-                            )}
-                        </>
-                    )}
-                </Box>
-                <Box
+                    ref={profileIdentityRef}
                     sx={{
                         alignItems: "center",
                         display: "flex",
