@@ -6,6 +6,10 @@ plugins {
 group 'io.ente.ente_qr'
 version '1.0-SNAPSHOT'
 
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
 android {
     namespace 'io.ente.ente_qr'
 
