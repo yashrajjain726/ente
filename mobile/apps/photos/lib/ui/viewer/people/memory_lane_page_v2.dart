@@ -302,16 +302,48 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
           );
           if (creationDate.isBefore(anniversary)) age--;
         }
-        const agePlaceholder = "\uFFFC";
-        final ageCaptionParts = age != null && name != null && name.isNotEmpty
-            ? context.strings
-                  .memoryLaneAgeCaption(
-                    name: name,
-                    count: age,
-                    age: agePlaceholder,
-                  )
-                  .split(agePlaceholder)
-            : const <String>[];
+        const captionPlaceholder = "\uFFFC";
+        int? captionValue;
+        String? caption;
+        if (age != null && name != null && name.isNotEmpty) {
+          captionValue = age;
+          caption = context.strings.memoryLaneAgeCaption(
+            name: name,
+            count: age,
+            age: captionPlaceholder,
+          );
+        } else if (creationDate != null) {
+          final now = DateTime.now();
+          final anniversary = DateTime(
+            now.year,
+            creationDate.month,
+            creationDate.day.clamp(
+              1,
+              DateTime(now.year, creationDate.month + 1, 0).day,
+            ),
+          );
+          captionValue =
+              (now.year -
+                      creationDate.year -
+                      (now.isBefore(anniversary) ? 1 : 0))
+                  .clamp(0, 1000);
+          caption = context.strings.facesTimelineCaptionYearsAgo(
+            count: captionValue,
+          );
+          if (caption.contains("#")) {
+            caption = caption.replaceAll("#", captionPlaceholder);
+          } else {
+            caption = caption.replaceFirst(
+              NumberFormat.decimalPattern(
+                context.strings.localeName,
+              ).format(captionValue),
+              captionPlaceholder,
+            );
+          }
+          if (name != null && name.isNotEmpty) caption = "$name $caption";
+        }
+        final captionParts =
+            caption?.split(captionPlaceholder) ?? const <String>[];
         return Stack(
           children: [
             Positioned.fill(
@@ -557,7 +589,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        if (age != null && name != null && name.isNotEmpty) ...[
+                        if (captionValue != null) ...[
                           ConstrainedBox(
                             constraints: const BoxConstraints(minHeight: 48),
                             child: Align(
@@ -570,14 +602,16 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                 children: [
                                   for (
                                     var index = 0;
-                                    index < ageCaptionParts.length;
+                                    index < captionParts.length;
                                     index++
                                   ) ...[
                                     if (index > 0)
-                                      _MemoryLaneAnimatedDigit(value: age),
+                                      _MemoryLaneAnimatedDigit(
+                                        value: captionValue,
+                                      ),
                                     Flexible(
                                       child: Text(
-                                        ageCaptionParts[index],
+                                        captionParts[index],
                                         style: darkTheme.textTheme.bodyMuted,
                                         textAlign: TextAlign.center,
                                         softWrap: false,
