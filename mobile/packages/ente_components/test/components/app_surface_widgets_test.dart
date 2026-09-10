@@ -282,8 +282,7 @@ void main() {
         );
         expect(tester.getTopLeft(title).dx, offset == 0 ? 16 : 52);
 
-        // Tap near each corner outside the arrow. The expanded title starts
-        // at y=48 and retains its own taps where it overlaps the target.
+        // The expanded title owns taps from y=48, so use y=47 for Back.
         for (final point in [
           const Offset(5, 5),
           const Offset(51, 5),
@@ -297,7 +296,6 @@ void main() {
 
         final previousBackTaps = backTaps;
         final previousTitleTaps = titleTaps;
-        // The area just outside each edge must no longer trigger back.
         for (final point in const [
           Offset(3, 28),
           Offset(53, 5),
@@ -314,7 +312,6 @@ void main() {
       }
       expect(actionTaps, 2);
 
-      // While collapsing, the title moves through the enlarged back target.
       controller.jumpTo(20);
       await tester.pump();
       final previousBackTaps = backTaps;

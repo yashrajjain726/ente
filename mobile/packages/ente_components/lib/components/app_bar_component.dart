@@ -808,7 +808,6 @@ class _HeaderAppBarBackButton extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             onTap: onBack ?? () => Navigator.maybePop(context),
             child: Padding(
-              // Preserve the icon position even with custom, compact headers.
               padding: EdgeInsets.only(
                 left: horizontalPadding - left,
                 top: _centeredTop(chromeHeight, _defaultBackIconSize) - top,
