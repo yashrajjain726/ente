@@ -50,8 +50,7 @@ import 'package:photos/ui/viewer/gallery/gallery.dart';
 import 'package:photos/utils/dialog_util.dart';
 
 const _socialRightInset = 24.0;
-const _socialBottomBarClearance = 130.0;
-const _videoStreamControlHeight = 32.0;
+const _socialBottomBarClearance = 98.0;
 const _galleryBottomBarHeight = 60.0;
 const _galleryCaptionGap = 12.0;
 const _galleryCaptionLineHeight = 16.0;
@@ -1095,8 +1094,7 @@ class _GallerySocialOverlay extends StatelessWidget {
       right: padding.right + _socialRightInset,
       bottom:
           padding.bottom +
-          _socialBottomBarClearance -
-          (file.fileType == FileType.video ? _videoStreamControlHeight : 0) +
+          _socialBottomBarClearance +
           (hasFilmstrip
               ? GalleryFileViewerFilmstripLayout.additionalBottomInset
               : 0),
