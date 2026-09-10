@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter/foundation.dart";
 import "package:flutter/widgets.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_event.dart";
@@ -9,6 +11,9 @@ typedef FileViewerFilmstripIdentityAt = Object? Function(int index);
 typedef FileViewerFilmstripImmediatePageJump = bool Function(int index);
 
 typedef FileViewerFilmstripWaitsForImageFrame = bool Function(Object identity);
+
+typedef FileViewerFilmstripTimeoutScheduler =
+    VoidCallback Function(Duration delay, VoidCallback callback);
 
 // Runs [callback] after a guaranteed future frame's paint phase.
 typedef FileViewerFilmstripPaintScheduler =
@@ -26,11 +31,14 @@ class FileViewerFilmstripCoordinator {
   final VoidCallback _requestPauseCurrentMedia;
   final FileViewerFilmstripPaintScheduler _scheduleAfterNextFramePaint;
   final FileViewerFilmstripWaitsForImageFrame _waitsForImageFrame;
+  final FileViewerFilmstripTimeoutScheduler _scheduleTimeout;
 
   final ValueNotifier<int?> _previewIndexNotifier = ValueNotifier(null);
   final Map<Object, _ActiveImagePage> _activeImagePages = Map.identity();
 
   _FilmstripSession _session = const _IdleFilmstripSession();
+  Object? _imageFrameWaitTimeoutToken;
+  VoidCallback? _cancelImageFrameWaitTimeout;
   bool _isDisposed = false;
 
   FileViewerFilmstripCoordinator({
@@ -40,11 +48,13 @@ class FileViewerFilmstripCoordinator {
     required VoidCallback requestPauseCurrentMedia,
     FileViewerFilmstripWaitsForImageFrame? waitsForImageFrame,
     FileViewerFilmstripPaintScheduler? scheduleAfterNextFramePaint,
+    FileViewerFilmstripTimeoutScheduler? scheduleTimeout,
   }) : _currentIndex = currentIndex,
        _identityAt = identityAt,
        _jumpToPageImmediately = jumpToPageImmediately,
        _requestPauseCurrentMedia = requestPauseCurrentMedia,
        _waitsForImageFrame = waitsForImageFrame ?? ((_) => false),
+       _scheduleTimeout = scheduleTimeout ?? _afterTimeout,
        _scheduleAfterNextFramePaint =
            scheduleAfterNextFramePaint ?? _afterNextFramePaint;
 
@@ -136,6 +146,11 @@ class FileViewerFilmstripCoordinator {
     readiness.removeListener(currentPage.listener);
     _activeImagePages.remove(fileIdentity);
     _invalidateScheduledRemovalFor(fileIdentity);
+    final session = _session;
+    if (session is _PendingFilmstripHandoffSession &&
+        identical(session.identity, fileIdentity)) {
+      _schedulePreviewRemovalIfReady(session);
+    }
   }
 
   void _handleImagePageReadinessChanged(
@@ -148,6 +163,11 @@ class FileViewerFilmstripCoordinator {
     }
     if (!readiness.value) {
       _invalidateScheduledRemovalFor(fileIdentity);
+      final session = _session;
+      if (session is _PendingFilmstripHandoffSession &&
+          identical(session.identity, fileIdentity)) {
+        _schedulePreviewRemovalIfReady(session);
+      }
       return;
     }
     final session = _session;
@@ -176,8 +196,45 @@ class FileViewerFilmstripCoordinator {
     }
     if (_waitsForImageFrame(pendingSession.identity)) {
       final imagePage = _activeImagePages[pendingSession.identity];
-      if (imagePage == null || !imagePage.readiness.value) return;
+      if (imagePage == null || !imagePage.readiness.value) {
+        _scheduleImageFrameWaitTimeout(pendingSession);
+        return;
+      }
     }
+    _schedulePreviewRemoval(pendingSession);
+  }
+
+  void _scheduleImageFrameWaitTimeout(
+    _PendingFilmstripHandoffSession pendingSession,
+  ) {
+    if (_cancelImageFrameWaitTimeout != null) return;
+    final token = Object();
+    _imageFrameWaitTimeoutToken = token;
+    _cancelImageFrameWaitTimeout = _scheduleTimeout(
+      const Duration(seconds: 5),
+      () {
+        if (_isDisposed || !identical(_imageFrameWaitTimeoutToken, token)) {
+          return;
+        }
+        _imageFrameWaitTimeoutToken = null;
+        _cancelImageFrameWaitTimeout = null;
+        final session = _session;
+        if (session is _PendingFilmstripHandoffSession &&
+            session.destinationPageSelected &&
+            !session.previewRemovalScheduled &&
+            _matchesPendingHandoff(
+              session,
+              pendingSession.index,
+              pendingSession.identity,
+            )) {
+          _schedulePreviewRemoval(session);
+        }
+      },
+    );
+  }
+
+  void _schedulePreviewRemoval(_PendingFilmstripHandoffSession pendingSession) {
+    _cancelPendingImageFrameWaitTimeout();
     final session = pendingSession.copyWith(previewRemovalScheduled: true);
     _setSession(session);
     _scheduleAfterNextFramePaint(() {
@@ -221,18 +278,34 @@ class FileViewerFilmstripCoordinator {
   ) => session.index == index && identical(session.identity, identity);
 
   void _setSession(_FilmstripSession session) {
+    if (!_hasSamePendingTarget(_session, session)) {
+      _cancelPendingImageFrameWaitTimeout();
+    }
     _session = session;
     _previewIndexNotifier.value = session.previewIndex;
   }
 
   void dispose() {
     _isDisposed = true;
+    _cancelPendingImageFrameWaitTimeout();
     _session = const _IdleFilmstripSession();
     for (final page in _activeImagePages.values) {
       page.readiness.removeListener(page.listener);
     }
     _activeImagePages.clear();
     _previewIndexNotifier.dispose();
+  }
+
+  bool _hasSamePendingTarget(_FilmstripSession a, _FilmstripSession b) =>
+      a is _PendingFilmstripHandoffSession &&
+      b is _PendingFilmstripHandoffSession &&
+      a.index == b.index &&
+      identical(a.identity, b.identity);
+
+  void _cancelPendingImageFrameWaitTimeout() {
+    _imageFrameWaitTimeoutToken = null;
+    _cancelImageFrameWaitTimeout?.call();
+    _cancelImageFrameWaitTimeout = null;
   }
 }
 
@@ -298,4 +371,9 @@ void _afterNextFramePaint(VoidCallback callback) {
   WidgetsBinding.instance.scheduleFrameCallback((_) {
     WidgetsBinding.instance.addPostFrameCallback((_) => callback());
   });
+}
+
+VoidCallback _afterTimeout(Duration delay, VoidCallback callback) {
+  final timer = Timer(delay, callback);
+  return timer.cancel;
 }

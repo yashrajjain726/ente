@@ -117,8 +117,35 @@ void main() {
     expect(harness.selectedIndex, 8);
     expect(harness.coordinator.previewIndex.value, 8);
     expect(harness.paintBarriers, isEmpty);
+    expect(harness.timeouts, hasLength(1));
 
     readiness.value = true;
+
+    expect(harness.timeouts.single.isCanceled, isTrue);
+    expect(harness.paintBarriers, hasLength(1));
+    harness.paintBarriers.single();
+    expect(harness.coordinator.previewIndex.value, isNull);
+  });
+
+  test("an image handoff eventually releases a preview without a frame", () {
+    final harness = _CoordinatorHarness(waitsForImageFrame: true);
+    final readiness = ValueNotifier(false);
+    addTearDown(harness.dispose);
+    addTearDown(() {
+      harness.coordinator.detachImagePage(harness.identities[8], readiness);
+      readiness.dispose();
+    });
+    harness.coordinator.attachImagePage(harness.identities[8], readiness);
+
+    harness.send(7, FileViewerFilmstripEventType.scrubStart);
+    harness.send(8, FileViewerFilmstripEventType.scrubPreview);
+    harness.send(8, FileViewerFilmstripEventType.scrubCommit);
+
+    expect(harness.coordinator.previewIndex.value, 8);
+    expect(harness.paintBarriers, isEmpty);
+    expect(harness.timeouts, hasLength(1));
+
+    harness.timeouts.single.run();
 
     expect(harness.paintBarriers, hasLength(1));
     harness.paintBarriers.single();
@@ -273,6 +300,7 @@ class _CoordinatorHarness {
   final List<Object> identities = List.generate(20, (_) => Object());
   final List<int> jumps = [];
   final List<VoidCallback> paintBarriers = [];
+  final List<_CancelableCallback> timeouts = [];
   final bool synchronousPageChanges;
   final bool waitsForImageFrame;
 
@@ -301,6 +329,11 @@ class _CoordinatorHarness {
       requestPauseCurrentMedia: () => pauseCount++,
       waitsForImageFrame: (_) => waitsForImageFrame,
       scheduleAfterNextFramePaint: paintBarriers.add,
+      scheduleTimeout: (delay, callback) {
+        final timeout = _CancelableCallback(callback);
+        timeouts.add(timeout);
+        return timeout.cancel;
+      },
     );
   }
 
@@ -309,6 +342,19 @@ class _CoordinatorHarness {
   }
 
   void dispose() => coordinator.dispose();
+}
+
+class _CancelableCallback {
+  final VoidCallback _callback;
+  bool isCanceled = false;
+
+  _CancelableCallback(this._callback);
+
+  void run() {
+    if (!isCanceled) _callback();
+  }
+
+  void cancel() => isCanceled = true;
 }
 
 class _PreviewHandoffHarness extends StatelessWidget {
