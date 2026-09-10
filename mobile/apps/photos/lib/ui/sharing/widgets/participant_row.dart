@@ -50,18 +50,10 @@ class _ScrollableParticipantRosterState
     return SizedBox(
       height: viewportHeight,
       child: showScrollbar
-          ? RawScrollbar(
+          ? shareScrollbar(
+              context,
               key: const ValueKey("participant-roster-scrollbar"),
               controller: _scrollController,
-              thumbVisibility: true,
-              trackVisibility: true,
-              interactive: true,
-              thickness: 5,
-              radius: const Radius.circular(3),
-              trackRadius: const Radius.circular(3),
-              thumbColor: context.componentColors.fillDarkest,
-              trackColor: context.componentColors.fillDark,
-              padding: EdgeInsets.zero,
               child: Padding(
                 padding: const EdgeInsetsDirectional.only(end: Spacing.sm + 5),
                 child: roster,

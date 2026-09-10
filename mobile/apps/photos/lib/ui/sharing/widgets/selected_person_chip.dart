@@ -5,6 +5,7 @@ import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/services/contacts/contact_identity_resolver.dart";
+import "package:photos/ui/sharing/share_components.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 
 class SelectedRecipientChips extends StatelessWidget {
@@ -49,24 +50,15 @@ class SelectedRecipientChips extends StatelessWidget {
                   if (viewportMaxHeight <= 0) {
                     return const SizedBox.shrink();
                   }
-                  final colors = context.componentColors;
                   return ConstrainedBox(
                     constraints: BoxConstraints(
                       minWidth: constraints.maxWidth,
                       maxHeight: viewportMaxHeight,
                     ),
-                    child: RawScrollbar(
+                    child: shareScrollbar(
+                      context,
                       key: const ValueKey("selected-people-scrollbar"),
                       controller: scrollController,
-                      thumbVisibility: true,
-                      trackVisibility: true,
-                      interactive: true,
-                      thickness: 5,
-                      radius: const Radius.circular(3),
-                      trackRadius: const Radius.circular(3),
-                      thumbColor: colors.fillDarkest,
-                      trackColor: colors.fillDark,
-                      padding: EdgeInsets.zero,
                       child: SingleChildScrollView(
                         key: const ValueKey("selected-people-scroll"),
                         controller: scrollController,

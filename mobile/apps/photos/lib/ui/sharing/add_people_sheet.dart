@@ -599,18 +599,10 @@ class _ContactSuggestions extends StatelessWidget {
         return SizedBox(
           height: viewportHeight,
           child: showScrollbar
-              ? RawScrollbar(
+              ? shareScrollbar(
+                  context,
                   key: const ValueKey("contact-suggestions-scrollbar"),
                   controller: scrollController,
-                  thumbVisibility: true,
-                  trackVisibility: true,
-                  interactive: true,
-                  thickness: 5,
-                  radius: const Radius.circular(3),
-                  trackRadius: const Radius.circular(3),
-                  thumbColor: context.componentColors.fillDarkest,
-                  trackColor: context.componentColors.fillDark,
-                  padding: EdgeInsets.zero,
                   child: grid,
                 )
               : grid,

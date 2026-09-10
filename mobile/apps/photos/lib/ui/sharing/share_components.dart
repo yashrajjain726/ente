@@ -223,6 +223,29 @@ class ShareMenuItem extends StatelessWidget {
   }
 }
 
+RawScrollbar shareScrollbar(
+  BuildContext context, {
+  Key? key,
+  required ScrollController controller,
+  required Widget child,
+}) {
+  final colors = context.componentColors;
+  return RawScrollbar(
+    key: key,
+    controller: controller,
+    thumbVisibility: true,
+    trackVisibility: true,
+    interactive: true,
+    thickness: 5,
+    radius: const Radius.circular(3),
+    trackRadius: const Radius.circular(3),
+    thumbColor: colors.fillDarkest,
+    trackColor: colors.fillDark,
+    padding: EdgeInsets.zero,
+    child: child,
+  );
+}
+
 Widget shareChevron(BuildContext context) {
   return Icon(
     Icons.chevron_right_rounded,
