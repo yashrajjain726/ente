@@ -90,6 +90,32 @@ void main() {
     expect(_occupiedWidth(rows.single), closeTo(402, 1e-9));
   });
 
+  test("avoids cramped landscape rows without imposing a count cap", () {
+    const ratios = [0.75, 0.75, 2.0, 2.0, 2.0, 2.0, 2.0, 0.4, 0.4, 0.4];
+    final compactRows = _rows(ratios, targetHeight: 224);
+
+    for (final row in compactRows) {
+      final rowRatios = ratios.sublist(row.firstIndex, row.lastIndex + 1);
+      if (rowRatios.length >= 3 && rowRatios.every((ratio) => ratio >= 1)) {
+        expect(row.height, greaterThanOrEqualTo(96));
+      }
+    }
+
+    final moderateLandscapeRow = _rows(
+      [4 / 3, 4 / 3, 4 / 3],
+      width: 393,
+      targetHeight: 100,
+    ).single;
+    expect(moderateLandscapeRow.itemWidths, hasLength(3));
+
+    final wideLandscapeRow = _rows(
+      List.filled(5, 2.0),
+      width: 1024,
+      targetHeight: 100,
+    ).single;
+    expect(wideLandscapeRow.itemWidths, hasLength(5));
+  });
+
   test("fills a final row until its configurable maximum height", () {
     final fitted = _rows([0.75, 0.75], targetHeight: 200).single;
     expect(fitted.height, closeTo(400 / 1.5, 1e-9));

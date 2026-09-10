@@ -8,6 +8,8 @@ import "package:photos/models/gallery/justified_layout.dart";
 class FlexLayoutCalculator {
   static const double _minimumTappableExtent = 48;
   static const double _defaultMaximumRowHeightFactor = 1.6;
+  static const double _minimumLandscapeRowHeight = 96;
+  static const int _minimumLandscapeDensityItemCount = 3;
   static const double _preferredTileWidthFactor = 0.6;
   static const double _cropPenaltyWeight = 4;
 
@@ -90,6 +92,11 @@ class FlexLayoutCalculator {
           maximumHeight: maximumHeight,
           isTail: isTail,
         );
+        if (itemCount >= _minimumLandscapeDensityItemCount &&
+            minimumRatio >= 1 &&
+            geometry.height < _minimumLandscapeRowHeight) {
+          continue;
+        }
         final heightDeviation = math.log(geometry.height / targetRowHeight);
         final narrowness = math.max(
           0.0,
