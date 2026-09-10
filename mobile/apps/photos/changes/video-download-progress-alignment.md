@@ -1,0 +1,1 @@
+- Fixed video download progress appearing away from the center of the viewer.

@@ -2,7 +2,6 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:media_kit/media_kit.dart";
@@ -23,10 +22,9 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/files_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/states/detail_page_state.dart";
-import "package:photos/theme/colors.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/notification/toast.dart";
+import "package:photos/ui/viewer/file/video_download_progress_indicator.dart";
 import "package:photos/ui/viewer/file/video_widget_media_kit_common.dart"
     as common;
 import "package:photos/utils/dialog_util.dart";
@@ -270,33 +268,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
                 child: ValueListenableBuilder(
                   valueListenable: _progressNotifier,
                   builder: (BuildContext context, double? progress, _) {
-                    return progress == null || progress == 1
-                        ? const EnteLoadingWidget(
-                            size: 32,
-                            color: fillBaseDark,
-                            padding: 0,
-                          )
-                        : Stack(
-                            children: [
-                              CircularProgressIndicator(
-                                backgroundColor: Colors.transparent,
-                                value: progress,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color.fromRGBO(45, 194, 98, 1.0),
-                                ),
-                                strokeWidth: 2,
-                                strokeCap: StrokeCap.round,
-                              ),
-                              Center(
-                                child: Text(
-                                  "${(progress * 100).toStringAsFixed(0)}%",
-                                  style: getEnteTextTheme(
-                                    context,
-                                  ).tiny.copyWith(color: textBaseDark),
-                                ),
-                              ),
-                            ],
-                          );
+                    return VideoDownloadProgressIndicator(progress: progress);
                   },
                 ),
               ),
