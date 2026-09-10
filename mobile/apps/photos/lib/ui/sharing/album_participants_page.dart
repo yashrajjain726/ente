@@ -102,11 +102,6 @@ class _AlbumParticipantsPageState extends State<AlbumParticipantsPage> {
     }
     final sortedSharees = sortedCollectionSharees(_collection);
     final participantRows = <Widget>[
-      ParticipantRow(
-        user: owner,
-        role: CollectionParticipantRole.owner,
-        currentUserID: currentUserID,
-      ),
       for (final sharee in sortedSharees)
         if (isAdmin && sharee.id != currentUserID)
           ParticipantRoleRow(
