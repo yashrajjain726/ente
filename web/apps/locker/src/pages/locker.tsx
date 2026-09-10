@@ -1,6 +1,7 @@
 import { CreateItemDialog } from "@/components/CreateItemDialog";
 import { ItemList } from "@/components/ItemList";
 import { LockerCollectionShareDrawer } from "@/components/LockerCollectionShareDrawer";
+import { LockerConfirmDialog } from "@/components/LockerConfirmDialog";
 import { LockerNavbar } from "@/components/LockerNavbar";
 import { LockerSidebar } from "@/components/LockerSidebar";
 import { lockerColorSx } from "@/components/locker-tokens";
@@ -59,6 +60,10 @@ export const LockerPage: React.FC = () => {
     } = useLockerData({ router, logout, showMiniDialog });
 
     const {
+        confirmDialog,
+        visibleConfirmDialog,
+        closeConfirmDialog,
+        handleConfirmDialogConfirm,
         createDialogOpen,
         deleteCollectionDialog,
         editItem,
@@ -110,7 +115,6 @@ export const LockerPage: React.FC = () => {
         refreshData,
         navigateHome,
         removeCollectionFromState,
-        showMiniDialog,
         trashLastUpdatedAt,
     });
 
@@ -234,6 +238,18 @@ export const LockerPage: React.FC = () => {
                 onLeaveCollection={handleLeaveCollection}
                 onRefreshSharees={fetchCollectionSharees}
                 warmContacts={warmContacts}
+            />
+            <LockerConfirmDialog
+                open={confirmDialog !== null}
+                illustration={visibleConfirmDialog?.illustration ?? ""}
+                title={visibleConfirmDialog?.title ?? ""}
+                body={visibleConfirmDialog?.body}
+                confirmLabel={visibleConfirmDialog?.confirmLabel ?? ""}
+                tone={visibleConfirmDialog?.tone}
+                loading={visibleConfirmDialog?.loading}
+                error={visibleConfirmDialog?.error}
+                onClose={closeConfirmDialog}
+                onConfirm={handleConfirmDialogConfirm}
             />
             <EmptyTrashDialog
                 dialogState={emptyTrashDialog}

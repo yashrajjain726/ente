@@ -1,3 +1,4 @@
+import { LockerMenuOption, LockerOverflowMenu } from "@/components/LockerMenu";
 import {
     deleteLockerFileShareLink,
     downloadLockerFile,
@@ -45,10 +46,6 @@ import {
     Typography,
 } from "@mui/material";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
-import {
-    OverflowMenu,
-    OverflowMenuOption,
-} from "ente-base/components/OverflowMenu";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import { t } from "i18next";
@@ -1187,6 +1184,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                                                         : undefined
                                                 }
                                                 onRename={
+                                                    canEditSelectedCollection &&
                                                     onRenameCollection
                                                         ? () => {
                                                               setRenameCollectionID(
@@ -1199,6 +1197,7 @@ export const ItemList: React.FC<ItemListProps> = ({
                                                         : undefined
                                                 }
                                                 onDelete={
+                                                    canEditSelectedCollection &&
                                                     onDeleteCollection
                                                         ? () =>
                                                               onDeleteCollection(
@@ -1669,11 +1668,11 @@ const SelectionActionBar: React.FC<{
                         }}
                     >
                         <CheckCircleRoundedIcon
-                            sx={{
+                            sx={(theme) => ({
                                 fontSize: 18,
-                                color: "#1071FF",
+                                ...lockerColorSx(theme, { color: "primary" }),
                                 flexShrink: 0,
-                            }}
+                            })}
                         />
                         <Typography
                             variant="body"
@@ -2266,45 +2265,45 @@ const CollectionContextMenu: React.FC<{
     onRename?: () => void;
     onDelete?: () => void;
 }> = ({ ariaID, onShare, onLeave, onRename, onDelete }) => (
-    <OverflowMenu
+    <LockerOverflowMenu
         ariaID={ariaID}
         triggerButtonSxProps={{ p: 0.25, color: "text.muted" }}
     >
         {onShare && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<ShareOutlinedIcon />}
                 onClick={onShare}
             >
-                {t("share")}
-            </OverflowMenuOption>
+                {t(onLeave ? "sharedWith" : "share")}
+            </LockerMenuOption>
         )}
         {onLeave && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<LogoutOutlinedIcon />}
-                color="critical"
+                critical
                 onClick={onLeave}
             >
                 {t("leaveCollection")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
         {onRename && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<EditOutlinedIcon />}
                 onClick={onRename}
             >
                 {t("renameCollection")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
         {onDelete && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<DeleteOutlinedIcon />}
-                color="critical"
+                critical
                 onClick={onDelete}
             >
                 {t("deleteCollection")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
-    </OverflowMenu>
+    </LockerOverflowMenu>
 );
 
 const CollectionHeaderMenu: React.FC<{
@@ -2313,43 +2312,43 @@ const CollectionHeaderMenu: React.FC<{
     onRename?: () => void;
     onDelete?: () => void;
 }> = ({ onShare, onLeave, onRename, onDelete }) => (
-    <OverflowMenu
+    <LockerOverflowMenu
         ariaID="collection-header-menu"
         triggerButtonSxProps={{ color: "text.muted" }}
     >
         {onShare && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<ShareOutlinedIcon />}
                 onClick={onShare}
             >
-                {t("share")}
-            </OverflowMenuOption>
+                {t(onLeave ? "sharedWith" : "share")}
+            </LockerMenuOption>
         )}
         {onLeave && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<LogoutOutlinedIcon />}
-                color="critical"
+                critical
                 onClick={onLeave}
             >
                 {t("leaveCollection")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
         {onRename && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<EditOutlinedIcon />}
                 onClick={onRename}
             >
                 {t("renameCollection")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
         {onDelete && (
-            <OverflowMenuOption
+            <LockerMenuOption
                 startIcon={<DeleteOutlinedIcon />}
-                color="critical"
+                critical
                 onClick={onDelete}
             >
                 {t("deleteCollection")}
-            </OverflowMenuOption>
+            </LockerMenuOption>
         )}
-    </OverflowMenu>
+    </LockerOverflowMenu>
 );

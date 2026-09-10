@@ -5,17 +5,24 @@ export const lockerColors = {
     backgroundBase: { light: "#f4f4f4", dark: "#161616" },
     fillLight: { light: "#ffffff", dark: "#212121" },
     fillDark: { light: "#eaeaea", dark: "#0a0a0a" },
+    fillDarkest: { light: "#d2d2d2", dark: "#292929" },
     strokeFaint: { light: "#ebebeb", dark: "#2a2a2a" },
+    strokeDark: { light: "#e0e0e0", dark: "#3e3e3e" },
     textBase: { light: "#000000", dark: "#ffffff" },
     textLight: { light: "#666666", dark: "#999999" },
     textLighter: { light: "#969696", dark: "#969696" },
     iconColor: { light: "rgba(0, 0, 0, 0.75)", dark: "#ffffff" },
     primary: { light: "#1071ff", dark: "#1071ff" },
+    primaryLight: { light: "#e7effa", dark: "#292929" },
     primaryDark: { light: "#0e5fd9", dark: "#0e5fd9" },
+    primaryStroke: { light: "#1071ff", dark: "#1071ff" },
     warning: { light: "#f63a3a", dark: "#f63a3a" },
+    warningLight: { light: "#faebeb", dark: "#292929" },
     warningDark: { light: "#dd3434", dark: "#dd3434" },
     specialWhite: { light: "#ffffff", dark: "#ffffff" },
 } as const;
+
+export const lockerShadowFloating = "0px 12px 24px rgba(0, 0, 0, 0.14)";
 
 export const lockerColorSx = (
     theme: Theme,

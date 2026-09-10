@@ -22,6 +22,7 @@ import log from "ente-base/log";
 import { savedAuthToken } from "ente-base/token";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useState } from "react";
+import { LockerConfirmDialog } from "./LockerConfirmDialog";
 import {
     LockerTitledNestedSidebarDrawer,
     type LockerNestedSidebarDrawerVisibilityProps,
@@ -35,6 +36,7 @@ import {
     textLightSx,
     titlebarActionButtonSx,
 } from "./locker-sidebar-styles";
+import { lockerColorSx } from "./locker-tokens";
 
 const mobileUserAgentRegex = /iphone|ipad|android|mobile/i;
 
@@ -103,6 +105,10 @@ const SessionsContents: React.FC<SessionsContentsProps> = ({
     const [currentToken, setCurrentToken] = useState<string | undefined>();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | undefined>();
+    const [sessionToTerminate, setSessionToTerminate] = useState<Session>();
+    const [terminationOpen, setTerminationOpen] = useState(false);
+    const [isTerminating, setIsTerminating] = useState(false);
+    const [terminationError, setTerminationError] = useState<string>();
 
     const fetchSessions = useCallback(async () => {
         setIsLoading(true);
@@ -136,52 +142,33 @@ const SessionsContents: React.FC<SessionsContentsProps> = ({
         void fetchSessions();
     }, [fetchSessions, refreshTrigger]);
 
-    const handleTerminateSession = useCallback(
-        (session: Session) => {
-            const isCurrentDevice = isCurrentSession(session, currentToken);
-
-            showMiniDialog({
-                title: t("terminate_session"),
-                message: isCurrentDevice ? (
-                    t("terminate_session_confirm_message_self")
-                ) : (
-                    <Box sx={{ whiteSpace: "pre-line" }}>
-                        {`${t("terminate_session_confirm_message")}:\n\n${session.prettyUA}\n${session.ip}`}
-                    </Box>
-                ),
-                continue: {
-                    text: t("terminate"),
-                    color: "critical",
-                    action: async () => {
-                        if (isCurrentDevice) {
-                            logout();
-                            return;
-                        }
-
-                        try {
-                            await terminateSession(session.token);
-                            await fetchSessions();
-                        } catch (e) {
-                            log.error("Failed to terminate session", e);
-                            if (isHTTP401Error(e)) {
-                                setTimeout(() => {
-                                    showMiniDialog(
-                                        sessionExpiredDialogAttributes(logout),
-                                    );
-                                }, 0);
-                            } else {
-                                showMiniDialog({
-                                    title: t("error"),
-                                    message: t("terminate_session_failed"),
-                                });
-                            }
-                        }
-                    },
-                },
-            });
-        },
-        [currentToken, fetchSessions, logout, showMiniDialog],
-    );
+    const handleTerminateSession = async () => {
+        if (!terminationOpen || !sessionToTerminate || isTerminating) return;
+        setIsTerminating(true);
+        setTerminationError(undefined);
+        try {
+            if (isCurrentSession(sessionToTerminate, currentToken)) {
+                logout();
+                setTerminationOpen(false);
+                return;
+            }
+            await terminateSession(sessionToTerminate.token);
+            setTerminationOpen(false);
+            await fetchSessions();
+        } catch (e) {
+            log.error("Failed to terminate session", e);
+            if (isHTTP401Error(e)) {
+                setTerminationOpen(false);
+                setTimeout(() => {
+                    showMiniDialog(sessionExpiredDialogAttributes(logout));
+                }, 0);
+            } else {
+                setTerminationError(t("terminate_session_failed"));
+            }
+        } finally {
+            setIsTerminating(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -234,9 +221,55 @@ const SessionsContents: React.FC<SessionsContentsProps> = ({
                     key={session.token}
                     session={session}
                     isCurrentDevice={isCurrentSession(session, currentToken)}
-                    onTerminate={() => handleTerminateSession(session)}
+                    onTerminate={() => {
+                        setTerminationError(undefined);
+                        setSessionToTerminate(session);
+                        setTerminationOpen(true);
+                    }}
                 />
             ))}
+            <LockerConfirmDialog
+                open={terminationOpen}
+                illustration="/images/warning-red.png"
+                title={t("terminate_session")}
+                body={
+                    sessionToTerminate &&
+                    isCurrentSession(sessionToTerminate, currentToken) ? (
+                        t("terminate_session_confirm_message_self")
+                    ) : (
+                        <>
+                            {t("terminate_session_confirm_message")}
+                            <Box
+                                component="span"
+                                sx={(theme) => ({
+                                    display: "block",
+                                    mt: 2,
+                                    p: 1.5,
+                                    borderRadius: "12px",
+                                    overflowWrap: "anywhere",
+                                    ...lockerColorSx(theme, {
+                                        backgroundColor: "fillDark",
+                                        color: "textLight",
+                                    }),
+                                })}
+                            >
+                                {sessionToTerminate?.prettyUA}
+                                <Box
+                                    component="span"
+                                    sx={{ display: "block", mt: 0.5 }}
+                                >
+                                    {sessionToTerminate?.ip}
+                                </Box>
+                            </Box>
+                        </>
+                    )
+                }
+                confirmLabel={t("terminate")}
+                loading={isTerminating}
+                error={terminationError}
+                onClose={() => setTerminationOpen(false)}
+                onConfirm={handleTerminateSession}
+            />
         </Stack>
     );
 };

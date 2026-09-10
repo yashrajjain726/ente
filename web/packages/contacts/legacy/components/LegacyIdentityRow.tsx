@@ -2,7 +2,6 @@ import CheckIcon from "@mui/icons-material/Check";
 import {
     Avatar,
     Box,
-    IconButton,
     Stack,
     Typography,
     type SxProps,
@@ -61,6 +60,8 @@ export const LegacyIdentityRow: React.FC<LegacyIdentityRowProps> = ({
                     p: "9px 12px",
                     bgcolor: "fill.faint",
                     borderRadius: "20px",
+                    border: "1.5px solid",
+                    borderColor: selected ? "stroke.muted" : "transparent",
                     transition: "background-color 160ms ease",
                     cursor: onClick ? "pointer" : "default",
                     "&:hover": onClick
@@ -88,8 +89,12 @@ export const LegacyIdentityRow: React.FC<LegacyIdentityRowProps> = ({
                     sx={{ alignItems: "center", gap: 0.75, minWidth: 0 }}
                 >
                     <Typography
-                        variant="body"
-                        sx={{ fontWeight: 500, color: primaryColor }}
+                        variant="small"
+                        sx={{
+                            fontWeight: 500,
+                            color: primaryColor,
+                            lineHeight: "20px",
+                        }}
                         noWrap
                     >
                         {label}
@@ -99,7 +104,11 @@ export const LegacyIdentityRow: React.FC<LegacyIdentityRowProps> = ({
                 {subtext && (
                     <Typography
                         variant="mini"
-                        sx={{ color: "text.muted", mt: 0.25 }}
+                        sx={{
+                            color: "text.muted",
+                            mt: 0.25,
+                            lineHeight: "16px",
+                        }}
                         noWrap
                     >
                         {subtext}
@@ -107,16 +116,20 @@ export const LegacyIdentityRow: React.FC<LegacyIdentityRowProps> = ({
                 )}
             </Box>
             {selected ? (
-                <IconButton
-                    size="small"
-                    disableRipple
+                <Box
                     sx={{
-                        color: "accent.main",
-                        "&:hover": { backgroundColor: "transparent" },
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        bgcolor: "accent.main",
+                        color: "accent.contrastText",
+                        display: "grid",
+                        placeItems: "center",
+                        flexShrink: 0,
                     }}
                 >
-                    <CheckIcon fontSize="small" />
-                </IconButton>
+                    <CheckIcon sx={{ fontSize: 12 }} />
+                </Box>
             ) : action ? (
                 <Box
                     sx={{
