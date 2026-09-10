@@ -382,7 +382,6 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
 
     let waiting_kit = ente_legacy::create_kit(
         &owner.owner_session,
-        &owner.owner.key_attributes,
         ["North".into(), "East".into(), "West".into()],
         24,
     )
@@ -614,7 +613,6 @@ async fn run_legacy_kit_stage(endpoint: &str, owner: &mut legacy_kit::LegacyKitO
 
     let immediate_kit = ente_legacy::create_kit(
         &owner.owner_session,
-        &owner.owner.key_attributes,
         ["Alpha".into(), "Bravo".into(), "Charlie".into()],
         0,
     )

@@ -9,7 +9,7 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:locker/services/authenticated_session.dart";
 import "package:locker/services/configuration.dart";
-import "package:locker/services/legacy_kit.dart" as legacy;
+import "package:locker/src/rust/api/legacy.dart" as legacy;
 import "package:logging/logging.dart";
 
 final _logger = Logger("LegacyUtils");
@@ -109,13 +109,8 @@ Future<LegacyKitCreateResult> _createLegacyKit(
   List<String> partNames,
   int noticePeriodInHours,
 ) async {
-  final keyAttributes = Configuration.instance.getKeyAttributes();
-  if (keyAttributes == null) {
-    throw StateError("Missing account key attributes");
-  }
   final result = await legacy.createKit(
     session: authenticatedSession(),
-    currentUserKeyAttrs: keyAttributes,
     partNames: partNames,
     noticePeriodInHours: noticePeriodInHours,
   );

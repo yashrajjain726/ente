@@ -2656,7 +2656,6 @@ dependencies = [
 name = "ente-locker-frb"
 version = "0.0.0"
 dependencies = [
- "ente-accounts",
  "ente-assets",
  "ente-core",
  "ente-frb-lib",
