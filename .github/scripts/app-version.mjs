@@ -49,10 +49,11 @@ if (!scripts[app] || !command) {
 
 function run(cmd, cmdArgs = [], opts = {}) {
     const [script, ...prefix] = scripts[app];
-    return execFileSync("node", [path.join(dir, script), ...prefix, cmd, ...cmdArgs], {
-        encoding: "utf8",
-        ...opts,
-    });
+    return execFileSync(
+        "node",
+        [path.join(dir, script), ...prefix, cmd, ...cmdArgs],
+        { encoding: "utf8", ...opts },
+    );
 }
 
 function commitVersion() {
@@ -60,10 +61,17 @@ function commitVersion() {
     const version = run("get", [], capture).trim();
     const build = run("get-build-base", [], capture).trim();
     const title = app[0].toUpperCase() + app.slice(1);
-    execFileSync("git", ["commit", "-m", `${title} ${version}+${build}`, "--", ...versionFiles[app]], {
-        cwd: root,
-        stdio: "inherit",
-    });
+    execFileSync(
+        "git",
+        [
+            "commit",
+            "-m",
+            `${title} ${version}+${build}`,
+            "--",
+            ...versionFiles[app],
+        ],
+        { cwd: root, stdio: "inherit" },
+    );
 }
 
 try {
