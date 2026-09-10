@@ -1,14 +1,12 @@
 import "dart:async";
 
 import "package:collection/collection.dart";
-import "package:ente_base/models/key_attributes.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_configuration/base_configuration.dart";
 import "package:ente_legacy/components/gradient_button.dart";
 import "package:ente_legacy/legacy_api.dart";
 import "package:ente_legacy/models/emergency_models.dart";
 import "package:ente_legacy/pages/recover_others_account.dart";
-import "package:ente_legacy/services/emergency_service.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
@@ -156,8 +154,11 @@ class _OtherContactPageState extends State<OtherContactPage> {
 
                         if (confirmed == true) {
                           try {
-                            await EmergencyContactService.instance
-                                .startRecovery(widget.contact);
+                            await widget.legacy.startRecovery(
+                              userId: widget.contact.user.id,
+                              emergencyContactId:
+                                  widget.contact.emergencyContact.id,
+                            );
                             if (context.mounted) {
                               _fetchData().ignore();
                               await showAlertBottomSheet(
@@ -186,30 +187,13 @@ class _OtherContactPageState extends State<OtherContactPage> {
               GradientButton(
                 text: context.strings.recoverAccount,
                 backgroundColor: colorScheme.primary700,
-                onTap: () async {
-                  try {
-                    final (
-                      String key,
-                      KeyAttributes attributes,
-                    ) = await EmergencyContactService.instance.getRecoveryInfo(
-                      recoverySession!,
-                    );
-                    if (!context.mounted) {
-                      return;
-                    }
-                    routeToPage(
-                      context,
-                      RecoverOthersAccount(key, attributes, recoverySession!),
-                    ).ignore();
-                  } catch (e) {
-                    if (context.mounted) {
-                      showGenericErrorDialog(
-                        context: context,
-                        error: e,
-                      ).ignore();
-                    }
-                  }
-                },
+                onTap: () => routeToPage(
+                  context,
+                  RecoverOthersAccount(
+                    session: recoverySession!,
+                    legacy: widget.legacy,
+                  ),
+                ).ignore(),
               ),
             if (recoverySession != null &&
                 recoverySession!.status == LegacyRecoveryStatus.waiting)
@@ -301,7 +285,11 @@ class _OtherContactPageState extends State<OtherContactPage> {
 
     if (confirmed == true) {
       try {
-        await EmergencyContactService.instance.stopRecovery(recoverySession!);
+        await widget.legacy.stopRecovery(
+          recoveryId: recoverySession!.id,
+          userId: recoverySession!.user.id,
+          emergencyContactId: recoverySession!.emergencyContact.id,
+        );
         if (mounted) {
           _fetchData().ignore();
         }
