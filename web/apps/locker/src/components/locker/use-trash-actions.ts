@@ -2,7 +2,7 @@ import {
     emptyTrash as emptyTrashAPI,
     permanentlyDeleteFromTrash,
     restoreFromTrash,
-} from "@/services/remote";
+} from "@/services/trash";
 import type { LockerItem } from "@/types";
 import log from "ente-base/log";
 import { t } from "i18next";
