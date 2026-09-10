@@ -295,6 +295,8 @@ export const useSpaceRouteTransitionPopState = () => {
         recordRouteReplace(routePath(router.asPath));
 
         router.beforePopState((state) => {
+            if (state.as == asPathRef.current) return false;
+
             const currentPath = routePath(asPathRef.current);
             const targetPath = routePath(state.as);
 

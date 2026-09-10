@@ -136,6 +136,10 @@ const buildPostMasonrySections = (
 ) => {
     const now = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
+    const latestSection = {
+        title: "Latest",
+        tiles: new Array<PostMasonryTile>(),
+    };
     const sections = [
         {
             title: "Today",
@@ -163,9 +167,10 @@ const buildPostMasonrySections = (
             height: item.height ?? 1,
             width: item.width ?? 1,
         };
-        const section = sections.find(
-            ({ sinceMs }) => item.timestampMs >= sinceMs,
-        )!;
+        const section =
+            index == 0
+                ? latestSection
+                : sections.find(({ sinceMs }) => item.timestampMs >= sinceMs)!;
         section.tiles.push({
             aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
             dimensions,
@@ -174,25 +179,22 @@ const buildPostMasonrySections = (
         });
     });
 
-    return sections
+    return [latestSection, ...sections]
         .filter(({ tiles }) => tiles.length > 0)
         .map(({ title, tiles }) => ({
             title,
-            rows: buildPostMasonryRows(tiles, title == "Today"),
+            rows: buildPostMasonryRows(tiles),
         }));
 };
 
-const buildPostMasonryRows = (
-    tiles: PostMasonryTile[],
-    isToday: boolean,
-): PostMasonryRow[] => {
+const buildPostMasonryRows = (tiles: PostMasonryTile[]): PostMasonryRow[] => {
     const rows = new Array<PostMasonryRow>();
     let nextTileIndex = 0;
 
     while (nextTileIndex < tiles.length) {
-        const rowSize = isToday
-            ? 1
-            : preferredPostMasonryRowSize(tiles.length - nextTileIndex);
+        const rowSize = preferredPostMasonryRowSize(
+            tiles.length - nextTileIndex,
+        );
         const rowTiles = tiles.slice(nextTileIndex, nextTileIndex + rowSize);
         rows.push({
             aspectRatio: rowTiles.reduce(
