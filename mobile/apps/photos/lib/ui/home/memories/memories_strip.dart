@@ -74,14 +74,20 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   final _scrollController = ScrollController();
   bool _shouldShowCraftingMemories = false;
   List<SmartMemory> _memories = [];
+  final _emptyMemoriesLoaded = Completer<void>();
   late final Future<void> _cardDataLoaded;
 
   @override
   void initState() {
     super.initState();
     _cardDataLoaded = Future.wait<void>([
-      _fetchMemories(),
-      _fetchMemoryLane(),
+      Future.any<void>([
+        Future.wait<void>([
+          _fetchMemories(),
+          _fetchMemoryLane(),
+        ]),
+        _emptyMemoriesLoaded.future,
+      ]),
       _fetchCraftingMemoriesShouldShow(),
     ]);
 
@@ -295,6 +301,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       if (memories.isEmpty || !memoriesCacheService.showAnyMemories) {
         _cancelPendingWarm();
         setState(() => _memories = []);
+        if (!_emptyMemoriesLoaded.isCompleted) {
+          _emptyMemoriesLoaded.complete();
+        }
         return;
       }
       _scheduleWarmCovers(memories);
@@ -303,6 +312,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       if (mounted && fetchGeneration == _fetchMemoriesGeneration) {
         _cancelPendingWarm();
         setState(() => _memories = []);
+        if (!_emptyMemoriesLoaded.isCompleted) {
+          _emptyMemoriesLoaded.complete();
+        }
       }
     }
   }
