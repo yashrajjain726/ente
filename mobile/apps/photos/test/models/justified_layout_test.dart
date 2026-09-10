@@ -63,7 +63,7 @@ void main() {
           spacing: 2,
         ).single;
 
-        expect(row.height, 400, reason: "available width ${testCase.width}");
+        expect(row.height, 320, reason: "available width ${testCase.width}");
         expect(
           _occupiedWidth(row, 2),
           lessThan(testCase.width),
@@ -103,8 +103,8 @@ void main() {
         closeTo(1 / 3, 1e-9),
       );
       expect(landscape.height, 200);
-      expect(mediumPortrait.height, 400);
-      expect(mediumPortrait.itemWidths.single, 200);
+      expect(mediumPortrait.height, 320);
+      expect(mediumPortrait.itemWidths.single, 160);
       expect(minimumTappablePortrait.height, 144);
       expect(minimumTappablePortrait.itemWidths.single, 48);
     });
@@ -243,7 +243,7 @@ void main() {
         );
         final expectedFinalHeight = testCase.width < 600
             ? 3 * targetHeight
-            : 1.25 * targetHeight;
+            : targetHeight;
         expect(
           rows.last.height,
           closeTo(expectedFinalHeight, 1e-9),
@@ -330,6 +330,7 @@ void main() {
         availableWidth: 600,
         targetRowHeight: 200,
         spacing: 2,
+        wideFinalMaximumRowHeightFactor: 1.25,
       );
 
       expect(rows.map((row) => row.itemWidths.length), [3, 2]);
