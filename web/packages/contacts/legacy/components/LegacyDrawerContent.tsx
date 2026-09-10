@@ -752,6 +752,7 @@ export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
             <LegacyActionSheet
                 open={isAddSheetOpen}
                 title="Add trusted contact"
+                subtitle="Search an email, verify the identity if needed, and choose how long recovery should wait."
                 onClose={() => setActiveSheet(undefined)}
             >
                 <LegacyAddContactContent
