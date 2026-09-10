@@ -110,10 +110,6 @@ fn apply_profile_to_image(
     }
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "Color transforms preserve the source buffer length and dimensions"
-)]
 fn transform_buffer<P>(
     mut buffer: ImageBuffer<P, Vec<P::Subpixel>>,
     source_profile: &ColorProfile,
@@ -127,6 +123,10 @@ where
 {
     let (width, height) = buffer.dimensions();
     match P::Subpixel::transform_to_srgb(buffer.as_mut(), source_profile, encoded_profile, layout) {
+        #[expect(
+            clippy::expect_used,
+            reason = "Color transforms preserve the source buffer length and dimensions"
+        )]
         Ok(Some(transformed)) => Ok(into_dynamic(
             ImageBuffer::from_raw(width, height, transformed)
                 .expect("transformed buffer length should match source dimensions"),

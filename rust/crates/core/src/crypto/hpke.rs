@@ -29,11 +29,11 @@ impl PublicKey {
         &self.0
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "PublicKey construction validates these bytes"
-    )]
     fn hpke_key(&self) -> <Kem as HpkeKem>::PublicKey {
+        #[expect(
+            clippy::expect_used,
+            reason = "PublicKey construction validates these bytes"
+        )]
         <Kem as HpkeKem>::PublicKey::from_bytes(&self.0)
             .expect("PublicKey is validated when constructed")
     }
@@ -73,11 +73,11 @@ impl SecretKey {
         &self.0
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "X-Wing accepts every 32-byte private key"
-    )]
     fn hpke_key(&self) -> <Kem as HpkeKem>::PrivateKey {
+        #[expect(
+            clippy::expect_used,
+            reason = "X-Wing accepts every 32-byte private key"
+        )]
         <Kem as HpkeKem>::PrivateKey::from_bytes(&self.0)
             .expect("X-Wing accepts every 32-byte private key")
     }

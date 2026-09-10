@@ -255,11 +255,11 @@ pub fn resolve_effective_model(
         .unwrap_or(policy.default_model)
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "Built-in defaults refer to IDs defined in the same catalog"
-)]
 fn catalog_preset(catalog: &[ModelPreset], id: &str) -> ModelPreset {
+    #[expect(
+        clippy::expect_used,
+        reason = "Built-in defaults refer to IDs defined in the same catalog"
+    )]
     catalog
         .iter()
         .find(|preset| preset.id == id)

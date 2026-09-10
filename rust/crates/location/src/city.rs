@@ -861,25 +861,25 @@ fn string_offset(bytes: &[u8], offset: usize, length: usize) -> crate::Result<us
     }
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "Index construction validates the string table as UTF-8"
-)]
 fn table_entry_u24(bytes: &[u8], offsets: usize, blob: usize, index: usize) -> &str {
     let mut reader = ByteReader::at(bytes, offsets + index * NAME_OFFSET_LEN);
     let start = reader.u24() as usize;
     let end = reader.u24() as usize;
+    #[expect(
+        clippy::expect_used,
+        reason = "Index construction validates the string table as UTF-8"
+    )]
     std::str::from_utf8(&bytes[blob + start..blob + end]).expect("validated UTF-8")
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "Index construction validates the string table as UTF-8"
-)]
 fn table_entry_u32(bytes: &[u8], offsets: usize, blob: usize, index: usize) -> &str {
     let mut reader = ByteReader::at(bytes, offsets + index * 4);
     let start = reader.u32() as usize;
     let end = reader.u32() as usize;
+    #[expect(
+        clippy::expect_used,
+        reason = "Index construction validates the string table as UTF-8"
+    )]
     std::str::from_utf8(&bytes[blob + start..blob + end]).expect("validated UTF-8")
 }
 

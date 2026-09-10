@@ -218,27 +218,31 @@ impl UrbanCenterIndex {
         }
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "Index construction validates terminated UTF-8 names"
-    )]
     fn name(&self, offset: usize) -> &str {
+        #[expect(
+            clippy::expect_used,
+            reason = "Index construction validates name terminators"
+        )]
         let end = self.bytes[offset..self.layout.geometry]
             .iter()
             .position(|&byte| byte == 0)
             .map(|length| offset + length)
             .expect("validated name terminator");
+        #[expect(
+            clippy::expect_used,
+            reason = "Index construction validates names as UTF-8"
+        )]
         std::str::from_utf8(&self.bytes[offset..end]).expect("validated name")
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "Index construction validates the country string table as UTF-8"
-    )]
     fn country(&self, index: usize) -> &str {
         let mut reader = ByteReader::at(&self.bytes, self.layout.country_offsets + index * 4);
         let start = reader.u32() as usize;
         let end = reader.u32() as usize;
+        #[expect(
+            clippy::expect_used,
+            reason = "Index construction validates the country string table as UTF-8"
+        )]
         std::str::from_utf8(&self.bytes[self.layout.countries + start..self.layout.countries + end])
             .expect("validated country")
     }

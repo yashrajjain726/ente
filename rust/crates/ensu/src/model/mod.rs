@@ -69,12 +69,12 @@ pub fn desktop_llm_asset(model_id: &str) -> Result<Asset, InvalidPreset> {
     llm_asset(&preset)
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "The built-in model preset has a valid asset key and checksum"
-)]
 pub fn transcription_model_asset() -> Asset {
     let preset = config::defaults().transcription_model;
+    #[expect(
+        clippy::expect_used,
+        reason = "The built-in model preset has a valid asset key and checksum"
+    )]
     Asset::tar_gz(
         model_key(&preset.id),
         preset.url,
@@ -84,12 +84,12 @@ pub fn transcription_model_asset() -> Asset {
     .expect("transcription asset config")
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "The built-in model preset has a valid asset key and checksum"
-)]
 pub fn voice_activity_model_asset() -> Asset {
     let preset = config::defaults().voice_activity_model;
+    #[expect(
+        clippy::expect_used,
+        reason = "The built-in model preset has a valid asset key and checksum"
+    )]
     Asset::files(
         model_key(&preset.id),
         vec![AssetFile {
@@ -102,12 +102,12 @@ pub fn voice_activity_model_asset() -> Asset {
     .expect("voice activity asset config")
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "The built-in model preset has a valid asset key and checksum"
-)]
 pub fn knowledge_embedding_model_asset() -> Asset {
     let embedding = config::knowledge_embedding_config();
+    #[expect(
+        clippy::expect_used,
+        reason = "The built-in model preset has a valid asset key and checksum"
+    )]
     Asset::files(
         model_key(&embedding.target_id),
         vec![AssetFile {

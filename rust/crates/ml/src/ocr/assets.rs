@@ -51,11 +51,11 @@ impl OcrModelFile {
         format!("{MODEL_BASE_URL}/{}", self.name)
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "The built-in OCR catalog has valid asset keys and checksums"
-    )]
     fn asset(&self) -> Asset {
+        #[expect(
+            clippy::expect_used,
+            reason = "The built-in OCR catalog has valid asset keys and checksums"
+        )]
         Asset::file(
             vec![MODELS.to_string(), self.key.to_string()],
             AssetFile {
@@ -68,11 +68,11 @@ impl OcrModelFile {
         .expect("valid OCR model catalog")
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "The filename and asset come from the same OCR catalog entry"
-    )]
     fn path(&self, store: &AssetStore) -> String {
+        #[expect(
+            clippy::expect_used,
+            reason = "The filename and asset come from the same OCR catalog entry"
+        )]
         store
             .file_path(&self.asset(), self.name)
             .expect("OCR model file")

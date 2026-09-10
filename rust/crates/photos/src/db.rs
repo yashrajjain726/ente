@@ -301,12 +301,12 @@ impl Pool {
         }
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "acquire_reader returns a guard owning a connection"
-    )]
     fn read<T>(&self, query: impl FnOnce(&mut Connection) -> Result<T>) -> Result<T> {
         let mut reader = self.acquire_reader();
+        #[expect(
+            clippy::expect_used,
+            reason = "acquire_reader returns a guard owning a connection"
+        )]
         query(
             reader
                 .connection

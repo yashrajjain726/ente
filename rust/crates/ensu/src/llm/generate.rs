@@ -93,12 +93,12 @@ pub struct ChatRequest {
     pub grammar: Option<String>,
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "llama.cpp reports insufficient buffer capacity as a negative byte count"
-)]
 fn token_piece_bytes(model: &LlamaModel, token: LlamaToken) -> Result<Vec<u8>, TokenToStringError> {
     match model.token_to_piece_bytes(token, 8, true, None) {
+        #[expect(
+            clippy::expect_used,
+            reason = "llama.cpp reports insufficient buffer capacity as a negative byte count"
+        )]
         Err(TokenToStringError::InsufficientBufferSpace(required)) => model.token_to_piece_bytes(
             token,
             (-required)
