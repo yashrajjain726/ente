@@ -189,7 +189,24 @@ export const AuthenticatedFriendProfile: React.FC<
                     replyToCurrentPost(actorSpaceId, postSpaceId, postId, text)
                 }
                 onSetPostLiked={async (postId, liked) => {
-                    await setCurrentPostLiked(actorSpaceId, postId, liked);
+                    const previousLiked =
+                        posts.find((post) => post.postId == postId)
+                            ?.viewerLiked ?? false;
+                    const updateLiked = (viewerLiked: boolean) =>
+                        setPosts((current) =>
+                            current.map((post) =>
+                                post.postId == postId
+                                    ? { ...post, viewerLiked }
+                                    : post,
+                            ),
+                        );
+                    updateLiked(liked);
+                    try {
+                        await setCurrentPostLiked(actorSpaceId, postId, liked);
+                    } catch (error) {
+                        updateLiked(previousLiked);
+                        throw error;
+                    }
                     void patchCachedSpaceHomePost(actorSpaceId, postId, {
                         viewerLiked: liked,
                     });

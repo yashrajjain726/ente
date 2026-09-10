@@ -27,6 +27,7 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
 import { SpacePostFloatingActionButton } from "components/PostFloatingActionButton";
+import { ProfileLatestPost } from "components/ProfileLatestPost";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareIcon } from "components/ShareInviteButton";
 import log from "ente-base/log";
@@ -1104,21 +1105,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         isSingleItemRow: boolean,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
-        return (
+        const isLatestPost = index == 0 && !isPublicProfile;
+        const isUnavailable = !viewerPostIndexByID.has(item.id);
+        const tile = (
             <ProfilePostTile
                 key={`${item.id}-${index}`}
                 aspectRatio={aspectRatio}
-                dimensions={dimensions}
+                dimensions={
+                    isLatestPost
+                        ? {
+                              width: dimensions.width,
+                              height: Math.min(
+                                  dimensions.height,
+                                  (dimensions.width * 4) / 3,
+                              ),
+                          }
+                        : dimensions
+                }
                 displayName={displayName}
                 imageUrl={imageUrl}
                 index={index}
                 isSingleItemRow={isSingleItemRow}
-                isUnavailable={
-                    Boolean(item.isUnavailable) ||
-                    Boolean(
-                        unavailablePostsByKey[profilePostImageCacheKey(item)],
-                    )
-                }
+                isUnavailable={isUnavailable}
                 item={item}
                 loadRootMargin={postImageLoadRootMargin}
                 onLoadImage={() => loadPostImage(item)}
@@ -1138,6 +1146,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 }}
                 onRememberDimensions={rememberLoadedPhotoDimensions}
             />
+        );
+        if (!isLatestPost) return tile;
+
+        const postId = item.postId;
+        const spaceId = item.spaceId;
+        return (
+            <ProfileLatestPost
+                key={item.id}
+                caption={isFriendProfile ? item.caption : undefined}
+                disabled={isUnavailable}
+                liked={item.viewerLiked ?? false}
+                onReply={
+                    isFriendProfile && onReplyToPost && postId && spaceId
+                        ? (text) => onReplyToPost(spaceId, postId, text)
+                        : undefined
+                }
+                onSetLiked={
+                    isFriendProfile && onSetPostLiked && postId
+                        ? (liked) => onSetPostLiked(postId, liked)
+                        : undefined
+                }
+            >
+                {tile}
+            </ProfileLatestPost>
         );
     };
 
@@ -1902,7 +1934,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             display: "flex",
                                             flexDirection: "column",
                                             gap: photoMasonryGap,
-                                            overflow: "hidden",
+                                            overflow:
+                                                title == "Latest" &&
+                                                !isPublicProfile
+                                                    ? "visible"
+                                                    : "hidden",
                                         }}
                                     >
                                         {rows.map((row) => {
