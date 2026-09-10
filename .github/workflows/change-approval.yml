@@ -27,8 +27,8 @@ jobs:
         id: scan
         run: |
           git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          git show origin/main:.github/checks/change-approval/check.mjs > "$RUNNER_TEMP/change-approval.mjs"
-          node "$RUNNER_TEMP/change-approval.mjs" HEAD^1
+          git archive origin/main .github/checks/change-approval | tar -x -C "$RUNNER_TEMP"
+          node "$RUNNER_TEMP/.github/checks/change-approval/check.mjs" HEAD^1
 
       - name: Run workflow security checks
         run: |
