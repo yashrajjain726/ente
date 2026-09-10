@@ -19,9 +19,9 @@ import {
 import { t } from "i18next";
 import dynamic from "next/dynamic";
 import React, { useEffect, useMemo, useState } from "react";
+import { LockerAuthenticateUser } from "../auth/LockerAuthenticateUser";
 import { LockerAboutDrawer } from "./LockerAboutDrawer";
 import { LockerAccountDrawer } from "./LockerAccountDrawer";
-import { LockerAuthenticateUser } from "./LockerAuthenticateUser";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
 import {
     LockerSidebarDrawer,

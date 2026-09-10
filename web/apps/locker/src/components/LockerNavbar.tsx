@@ -11,7 +11,7 @@ import {
 import { t } from "i18next";
 import React, { useDeferredValue, useEffect, useState } from "react";
 
-import { lockerContentMaxWidth } from "./locker-tokens";
+import { lockerContentMaxWidth } from "../styles/tokens";
 
 interface LockerNavbarProps {
     onOpenSidebar: () => void;

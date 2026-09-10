@@ -1,5 +1,5 @@
 import type { Theme } from "@mui/material";
-import { lockerColorSx, lockerShadowFloating } from "./locker-tokens";
+import { lockerColorSx, lockerShadowFloating } from "./tokens";
 
 export const lockerMenuPaperSx = (theme: Theme) => ({
     width: 180,

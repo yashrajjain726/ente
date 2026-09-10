@@ -1,25 +1,25 @@
-import {
-    lockerHeaderIconButtonSx,
-    lockerPrimaryButtonSx,
-    lockerScrollAreaSx,
-} from "@/components/createItemDialog/create-item-dialog-styles";
+import { lockerScrollAreaSx } from "@/components/create-item/create-item-dialog-styles";
 import {
     addCollectionName,
     toggleCollectionName,
     uploadQueueItemKey,
-} from "@/components/createItemDialog/file-upload-helpers";
-import { FileUploadSection } from "@/components/createItemDialog/FileUploadSection";
-import { typeDisplayName } from "@/components/createItemDialog/item-form-fields-utils";
+} from "@/components/create-item/file-upload-helpers";
+import { FileUploadSection } from "@/components/create-item/FileUploadSection";
+import { typeDisplayName } from "@/components/create-item/item-form-fields-utils";
 import {
     CollectionSelector,
     ItemFormFields,
-} from "@/components/createItemDialog/ItemFormFields";
+} from "@/components/create-item/ItemFormFields";
 import {
     createDocumentIconConfig,
     lockerItemIconConfig,
-} from "@/components/locker-item-icons";
+} from "@/components/items/locker-item-icons";
 import type { LockerUploadLimitState } from "@/services/locker-limits";
 import type { LockerUploadProgress } from "@/services/remote";
+import {
+    lockerHeaderIconButtonSx,
+    lockerPrimaryButtonSx,
+} from "@/styles/fields";
 import type {
     LockerCollection,
     LockerItemType,
@@ -51,7 +51,7 @@ import {
     type CreateItemDialogEditItem,
     type CreateOption,
     useCreateItemDialogState,
-} from "./createItemDialog/use-create-item-dialog-state";
+} from "./use-create-item-dialog-state";
 
 const CREATABLE_TYPES: {
     type: CreateOption;

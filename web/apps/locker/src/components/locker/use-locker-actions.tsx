@@ -39,8 +39,8 @@ import { t } from "i18next";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Trans } from "react-i18next";
-import { filterNonEmptyUploadItems } from "../createItemDialog/file-upload-helpers";
-import type { CreateItemDialogEditItem } from "../createItemDialog/use-create-item-dialog-state";
+import { filterNonEmptyUploadItems } from "../create-item/file-upload-helpers";
+import type { CreateItemDialogEditItem } from "../create-item/use-create-item-dialog-state";
 import type { EmptyTrashDialogState } from "./EmptyTrashDialog";
 
 type DragDataTransferItem = DataTransferItem & {

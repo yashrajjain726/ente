@@ -22,7 +22,8 @@ import log from "ente-base/log";
 import { savedAuthToken } from "ente-base/token";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useState } from "react";
-import { LockerConfirmDialog } from "./LockerConfirmDialog";
+import { lockerColorSx } from "../../styles/tokens";
+import { LockerConfirmDialog } from "../ui/LockerConfirmDialog";
 import {
     LockerTitledNestedSidebarDrawer,
     type LockerNestedSidebarDrawerVisibilityProps,
@@ -36,7 +37,6 @@ import {
     textLightSx,
     titlebarActionButtonSx,
 } from "./locker-sidebar-styles";
-import { lockerColorSx } from "./locker-tokens";
 
 const mobileUserAgentRegex = /iphone|ipad|android|mobile/i;
 

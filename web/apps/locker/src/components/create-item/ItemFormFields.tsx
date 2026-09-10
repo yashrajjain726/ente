@@ -1,6 +1,6 @@
-import { CollectionChipRow } from "@/components/createItemDialog/CollectionChipRow";
-import { lockerFieldSx } from "@/components/createItemDialog/create-item-dialog-styles";
-import { CreateCollectionRow } from "@/components/createItemDialog/CreateCollectionRow";
+import { CollectionChipRow } from "@/components/create-item/CollectionChipRow";
+import { CreateCollectionRow } from "@/components/create-item/CreateCollectionRow";
+import { FormField } from "@/components/ui/FormField";
 import type { LockerCollection, LockerItemType } from "@/types";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
@@ -9,71 +9,10 @@ import {
     IconButton,
     InputAdornment,
     Stack,
-    TextField,
     Typography,
-    type TextFieldProps,
 } from "@mui/material";
 import { t } from "i18next";
-import React, { useCallback, useId, useMemo, useState } from "react";
-
-type FormFieldProps = Omit<TextFieldProps, "label"> & {
-    label: string;
-    multilineMinHeight?: number;
-};
-
-export function FormField({
-    label,
-    required,
-    multiline,
-    multilineMinHeight,
-    ...rest
-}: FormFieldProps) {
-    const id = useId();
-
-    return (
-        <Stack sx={{ gap: "8px" }}>
-            <Typography
-                variant="small"
-                component="label"
-                htmlFor={id}
-                sx={{
-                    fontWeight: 500,
-                    lineHeight: "20px",
-                    display: "flex",
-                    gap: "2px",
-                    color: "text.base",
-                }}
-            >
-                {label}
-                {required && (
-                    <Box
-                        component="span"
-                        aria-hidden
-                        sx={{ color: "critical.main", fontWeight: 600 }}
-                    >
-                        *
-                    </Box>
-                )}
-            </Typography>
-            <TextField
-                {...rest}
-                id={id}
-                required={required}
-                multiline={multiline}
-                hiddenLabel
-                fullWidth
-                variant="outlined"
-                margin="none"
-                sx={(theme) =>
-                    lockerFieldSx(theme, {
-                        multiline,
-                        minHeight: multilineMinHeight,
-                    })
-                }
-            />
-        </Stack>
-    );
-}
+import React, { useCallback, useMemo, useState } from "react";
 
 export const ItemFormFields: React.FC<{
     type: LockerItemType;

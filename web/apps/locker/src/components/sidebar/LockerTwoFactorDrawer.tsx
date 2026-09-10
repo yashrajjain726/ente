@@ -26,8 +26,8 @@ import {
     lockerTextBodyBoldSx,
     lockerTextBodySx,
     lockerTextMiniSx,
-} from "./locker-tokens";
-import { LockerConfirmDialog } from "./LockerConfirmDialog";
+} from "../../styles/tokens";
+import { LockerConfirmDialog } from "../ui/LockerConfirmDialog";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
 import {
     LockerTitledNestedSidebarDrawer,

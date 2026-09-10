@@ -7,7 +7,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
-import { LockerAuthenticateUser } from "./LockerAuthenticateUser";
+import { LockerAuthenticateUser } from "../auth/LockerAuthenticateUser";
 import { LockerRecoveryKeyDrawer } from "./LockerRecoveryKeyDrawer";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
 import {

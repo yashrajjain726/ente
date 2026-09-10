@@ -1,4 +1,4 @@
-import { lockerItemIcon } from "@/components/locker-item-icons";
+import { lockerItemIcon } from "@/components/items/locker-item-icons";
 import { downloadLockerFile } from "@/services/remote";
 import type {
     AccountCredentialData,
@@ -36,7 +36,7 @@ import { formattedDateTime } from "ente-base/i18n-date";
 import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useState } from "react";
-import { typeDisplayName } from "./createItemDialog/item-form-fields-utils";
+import { typeDisplayName } from "../create-item/item-form-fields-utils";
 
 const textStyles = {
     display2: {

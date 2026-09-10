@@ -9,7 +9,7 @@ import { openAccountsManagePasskeysPage } from "ente-accounts/services/passkey";
 import { useBaseContext } from "ente-base/context";
 import { t } from "i18next";
 import React, { useEffect, useState } from "react";
-import { LockerAuthenticateUser } from "./LockerAuthenticateUser";
+import { LockerAuthenticateUser } from "../auth/LockerAuthenticateUser";
 import { LockerSessionsDrawer } from "./LockerSessionsDrawer";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
 import {

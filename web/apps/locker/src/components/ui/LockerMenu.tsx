@@ -10,12 +10,12 @@ import {
 import Menu, { type MenuProps } from "@mui/material/Menu";
 import { t } from "i18next";
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { lockerMenuPaperSx } from "./locker-dialog-styles";
+import { lockerMenuPaperSx } from "../../styles/dialog";
 import {
     lockerColorSx,
     lockerTextBodySx,
     lockerTextMiniSx,
-} from "./locker-tokens";
+} from "../../styles/tokens";
 
 const LockerMenuContext = createContext<{ close: () => void } | undefined>(
     undefined,
