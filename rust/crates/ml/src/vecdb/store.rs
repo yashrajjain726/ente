@@ -14,8 +14,8 @@ use super::graph::{Graph, search as graph_search, search_stored};
 use super::kernel::{StoredVector, VectorPayload, quantize_for};
 use super::lock::WriterLock;
 use super::log::{
-    HEADER_LEN, Log, LogEntry, LogRecord, header_generation, remove_if_present,
-    remove_stale_temp_sibling, sync_parent_dir,
+    HEADER_LEN, Log, LogCheckpoint, LogEntry, LogRecord, header_generation, remove_if_present,
+    remove_stale_temp_sibling, sync_parent_dir, writer_open_error, writer_options,
 };
 use super::snapshot::{
     LoadedSnapshot, load_snapshot, remove_snapshot, snapshot_path, write_snapshot,
@@ -184,8 +184,8 @@ enum WriterMode {
 }
 
 struct WriterState {
-    lock: WriterLock,
     log: Log,
+    lock: WriterLock,
     mutations_since_snapshot: usize,
     last_write: Option<Instant>,
 }
@@ -775,7 +775,7 @@ impl VecDb {
             mutations_since_snapshot,
             ..
         } = take_writer_state(&mut half)?;
-        let old_generation = log.generation();
+        let old_checkpoint = log.checkpoint();
         drop(log);
         let dims = self.shared.dims;
         let storage = self.shared.storage;
@@ -788,7 +788,7 @@ impl VecDb {
                     &self.shared,
                     &mut half,
                     lock,
-                    old_generation,
+                    old_checkpoint,
                     mutations_since_snapshot,
                 );
                 return Err(error);
@@ -1132,6 +1132,7 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
         let _ = std::fs::remove_file(&temp_path);
         return Err(error);
     }
+    let compacted_checkpoint = temp_log.checkpoint();
     let temp_file = temp_log.into_file();
     if let Err(source) = temp_file.sync_all() {
         drop(temp_file);
@@ -1145,11 +1146,12 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
         mutations_since_snapshot,
         last_write,
     } = take_writer_state(half)?;
+    let old_checkpoint = log.checkpoint();
     drop(log);
     let promoted = promote_compacted_log(&temp_path, &shared.path);
-    let pending = if temp_path.exists() {
+    let (pending, expected_checkpoint) = if temp_path.exists() {
         let _ = std::fs::remove_file(&temp_path);
-        mutations_since_snapshot
+        (mutations_since_snapshot, old_checkpoint)
     } else {
         let live_records = {
             let mut st = shared.state_write();
@@ -1170,9 +1172,10 @@ fn compact(shared: &Shared, half: &mut WriterHalf) -> Result<(), VecDbError> {
             Graph::rebuild(&st.arena)
         };
         shared.state_write().graph = Some(graph);
-        live_records
+        (live_records, compacted_checkpoint)
     };
-    let restored = restore_writer_mode(shared, half, lock, last_write, pending);
+    let restored =
+        restore_writer_mode(shared, half, lock, last_write, pending, expected_checkpoint);
     promoted?;
     restored?;
     write_snapshot_now(shared, half)
@@ -1184,13 +1187,45 @@ fn restore_writer_mode(
     lock: WriterLock,
     last_write: Option<Instant>,
     mutations_since_snapshot: usize,
+    expected_checkpoint: LogCheckpoint,
 ) -> Result<(), VecDbError> {
-    match reopen_log(&shared.path, shared.dims, Some(shared.storage)) {
-        Ok(log) => {
+    let restored = (|| {
+        let file = writer_options()
+            .open(&shared.path)
+            .map_err(|source| writer_open_error(&shared.path, source))?;
+        if file
+            .metadata()
+            .map_err(|source| VecDbError::io(&shared.path, source))?
+            .len()
+            < HEADER_LEN as u64
+        {
+            return Err(VecDbError::Corrupt(
+                "log header was truncated while the writer was closed".to_string(),
+            ));
+        }
+        let mut log = Log::open(file, &shared.path, shared.dims, Some(shared.storage))?;
+        let mut pending = mutations_since_snapshot;
+        if log.checkpoint() != expected_checkpoint {
+            let replayed = replay(&mut log, shared.dims, ReplayMode::Writer)?;
+            log.truncate_to(replayed.recoverable_end)?;
+            let graph = Graph::rebuild(&replayed.arena);
+            pending = replayed.total_records as usize;
+            *shared.state_write() = SearchState {
+                arena: replayed.arena,
+                graph: Some(graph),
+                attrs: replayed.attrs,
+                total_records: replayed.total_records,
+            };
+            half.compaction_retry_at_dead = 0;
+        }
+        Ok((log, pending))
+    })();
+    match restored {
+        Ok((log, pending)) => {
             half.mode = WriterMode::Active(WriterState {
                 lock,
                 log,
-                mutations_since_snapshot,
+                mutations_since_snapshot: pending,
                 last_write,
             });
             Ok(())
@@ -1213,12 +1248,10 @@ fn recover_after_failed_reset(
     shared: &Shared,
     half: &mut WriterHalf,
     lock: WriterLock,
-    old_generation: [u8; 16],
+    old_checkpoint: LogCheckpoint,
     old_pending: usize,
 ) {
-    let old_log_restored = restore_writer_mode(shared, half, lock, None, old_pending).is_ok()
-        && matches!(&half.mode, WriterMode::Active(state) if state.log.generation() == old_generation);
-    if old_log_restored {
+    if restore_writer_mode(shared, half, lock, None, old_pending, old_checkpoint).is_ok() {
         return;
     }
     if let Ok(empty) = VectorArena::with_storage(shared.dims, shared.storage) {
@@ -1228,9 +1261,6 @@ fn recover_after_failed_reset(
         st.attrs.reset();
         st.total_records = 0;
         half.compaction_retry_at_dead = 0;
-    }
-    if let WriterMode::Active(state) = &mut half.mode {
-        state.mutations_since_snapshot = 0;
     }
 }
 
@@ -1251,12 +1281,12 @@ fn build_writer(
 ) -> Result<BuiltWriter, VecDbError> {
     let lock = WriterLock::acquire(path)?;
     let mut log = if std::fs::metadata(path).is_ok() {
-        reopen_log(path, dims, storage)?
+        open_existing_writer_log(path, dims, storage)?
     } else {
         match Log::create(path, dims, storage.unwrap_or(StorageKind::F32)) {
             Ok(created) => created,
             Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
-                reopen_log(path, dims, storage)?
+                open_existing_writer_log(path, dims, storage)?
             }
             Err(error) => return Err(error),
         }
@@ -1629,12 +1659,33 @@ fn ensure_finite(key: &str, vector: &[f32]) -> Result<(), VecDbError> {
     Ok(())
 }
 
-fn reopen_log(path: &Path, dims: usize, storage: Option<StorageKind>) -> Result<Log, VecDbError> {
-    let file = File::options()
-        .read(true)
-        .write(true)
+fn open_existing_writer_log(
+    path: &Path,
+    dims: usize,
+    storage: Option<StorageKind>,
+) -> Result<Log, VecDbError> {
+    let file = writer_options()
         .open(path)
-        .map_err(|source| VecDbError::io(path, source))?;
+        .map_err(|source| writer_open_error(path, source))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        if file
+            .metadata()
+            .map_err(|source| VecDbError::io(path, source))?
+            .nlink()
+            > 1
+        {
+            return Err(VecDbError::io(
+                path,
+                std::io::Error::new(
+                    ErrorKind::InvalidInput,
+                    "hard-linked vector db files cannot be opened for writing",
+                ),
+            ));
+        }
+    }
     Log::open(file, path, dims, storage)
 }
 
@@ -2094,8 +2145,10 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 2, 500)).unwrap();
         db.flush().unwrap();
         drop(db);
-        let mut captured_for_read_only = reopen_log(&path, DIMS, None).unwrap();
-        let mut captured_for_writer = reopen_log(&path, DIMS, None).unwrap();
+        let mut captured_for_read_only =
+            Log::open(File::open(&path).unwrap(), &path, DIMS, None).unwrap();
+        let mut captured_for_writer =
+            Log::open(File::open(&path).unwrap(), &path, DIMS, None).unwrap();
         let stale_end = captured_for_read_only.current_end_offset();
         let racer = open_writer(&path);
         bulk_add(&racer, &bulk_entries(2, 2, 500)).unwrap();
@@ -2130,7 +2183,8 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 2, 700)).unwrap();
         db.flush().unwrap();
         drop(db);
-        let mut captured_for_read_only = reopen_log(&path, DIMS, None).unwrap();
+        let mut captured_for_read_only =
+            Log::open(File::open(&path).unwrap(), &path, DIMS, None).unwrap();
         let stale_end = captured_for_read_only.current_end_offset();
         let racer = open_writer(&path);
         bulk_add(&racer, &bulk_entries(2, 2, 700)).unwrap();
@@ -2446,6 +2500,141 @@ mod tests {
                 actual
             }) if expected == DIMS + 8 && actual == DIMS
         ));
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn hard_link_cannot_admit_a_second_writer() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let first = open_writer(&path);
+        fs::hard_link(&path, &alias).unwrap();
+        let bytes = fs::read(&path).unwrap();
+        assert!(VecDb::open(&alias, DIMS).is_err());
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        let second = open_writer(&path);
+        let reader = VecDb::open_read_only(&path, DIMS).unwrap();
+        first.add("first", &basis_vector(0)).unwrap();
+        second.add("second", &basis_vector(1)).unwrap();
+        assert!(reader.contains("first"));
+        assert!(reader.contains("second"));
+        drop(reader);
+        drop(second);
+        drop(first);
+        fs::remove_file(alias).unwrap();
+        let reopened = open_writer(&path);
+        assert!(reopened.contains("first"));
+        assert!(reopened.contains("second"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hard_link_refusal_preserves_incomplete_logs() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let partial = b"EVDB";
+        fs::write(&path, partial).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        for name in [&path, &alias] {
+            assert!(matches!(
+                VecDb::open(name, DIMS),
+                Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::InvalidInput
+            ));
+        }
+        assert_eq!(fs::read(&path).unwrap(), partial);
+        assert!(VecDb::open_read_only(&alias, DIMS).unwrap().is_empty());
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn hard_link_writer_process() {
+        let Some(path) = std::env::var_os("VECDB_HARD_LINK_TEST_PATH") else {
+            return;
+        };
+        let path = PathBuf::from(path);
+        match std::env::var("VECDB_HARD_LINK_TEST_ACTION")
+            .unwrap()
+            .as_str()
+        {
+            "blocked" => {
+                let result = VecDb::open(&path, DIMS);
+                #[cfg(unix)]
+                assert!(matches!(result, Err(VecDbError::Io { source, .. })
+                    if source.kind() == ErrorKind::InvalidInput));
+                #[cfg(windows)]
+                assert!(matches!(result, Err(VecDbError::Locked(_))));
+                let reader = VecDb::open_read_only(&path, DIMS).unwrap();
+                assert!(reader.contains("first"));
+            }
+            "write" => {
+                let writer = open_writer(&path);
+                assert!(writer.contains("first"));
+                writer.add("next", &basis_vector(1)).unwrap();
+            }
+            action => panic!("unexpected hard-link test action: {action}"),
+        }
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn hard_link_exclusion_and_writer_handoff_work_across_processes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let first = open_writer(&path);
+        first.add("first", &basis_vector(0)).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        let run = |action: &str| {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .arg("--exact")
+                .arg(format!(
+                    "{}::hard_link_writer_process",
+                    module_path!().split_once("::").unwrap().1
+                ))
+                .arg("--nocapture")
+                .env("VECDB_HARD_LINK_TEST_PATH", &alias)
+                .env("VECDB_HARD_LINK_TEST_ACTION", action)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{output:?}");
+            assert!(
+                String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+                "{output:?}"
+            );
+        };
+        run("blocked");
+        assert_eq!(first.len(), 1);
+        drop(first);
+        #[cfg(unix)]
+        fs::remove_file(&path).unwrap();
+        run("write");
+        let reader = VecDb::open_read_only(&alias, DIMS).unwrap();
+        assert_eq!(reader.len(), 2);
+        assert!(reader.contains("first"));
+        assert!(reader.contains("next"));
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn a_late_hard_link_does_not_interrupt_writer_maintenance() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let db = open_writer(&path);
+        bulk_add(&db, &bulk_entries(0, 10, 800)).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        let observer = VecDb::open_read_only(&alias, DIMS).unwrap();
+        assert_eq!(observer.len(), 10);
+        compact(&db.shared, &mut db.shared.writer_half()).unwrap();
+        assert_eq!(db.len(), 10);
+        fs::remove_file(&alias).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        db.reset().unwrap();
+        db.add("after", &basis_vector(0)).unwrap();
+        assert_eq!(db.len(), 1);
+        assert_eq!(observer.len(), 10);
     }
 
     #[test]
@@ -3420,7 +3609,7 @@ mod tests {
         assert!(!temp.exists());
         assert_eq!(generation_of(&path), new_generation);
         assert_ne!(generation_of(&path), old_generation);
-        let log = reopen_log(&path, DIMS, None).unwrap();
+        let log = open_existing_writer_log(&path, DIMS, None).unwrap();
         assert_eq!(log.generation(), new_generation);
         drop(log);
         assert!(matches!(
@@ -3442,6 +3631,7 @@ mod tests {
             mutations_since_snapshot,
             ..
         } = take_writer(&db);
+        let checkpoint = log.checkpoint();
         drop(log);
         assert_eq!(mutations_since_snapshot, 3);
         assert!(is_degraded(&db));
@@ -3456,8 +3646,15 @@ mod tests {
         ));
         {
             let mut half = db.shared.writer_half();
-            restore_writer_mode(&db.shared, &mut half, lock, None, mutations_since_snapshot)
-                .unwrap();
+            restore_writer_mode(
+                &db.shared,
+                &mut half,
+                lock,
+                None,
+                mutations_since_snapshot,
+                checkpoint,
+            )
+            .unwrap();
         }
         assert_eq!(mutations(&db), 3);
         db.add("after", &vector).unwrap();
@@ -3473,12 +3670,143 @@ mod tests {
     }
 
     #[test]
+    fn restore_writer_mode_replays_writes_made_while_the_log_was_closed() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("first", &basis_vector(0)).unwrap();
+        db.flush().unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
+        let checkpoint = log.checkpoint();
+        drop(log);
+        let mut foreign = open_existing_writer_log(&path, DIMS, None).unwrap();
+        foreign
+            .append(&[LogEntry::Add {
+                key: "foreign",
+                vector: VectorPayload::F32(&basis_vector(1)),
+                attrs: &[],
+            }])
+            .unwrap();
+        drop(foreign);
+        {
+            let mut half = db.shared.writer_half();
+            restore_writer_mode(&db.shared, &mut half, lock, None, 0, checkpoint).unwrap();
+        }
+        assert!(db.contains("foreign"));
+        assert_own_nearest(&db, "foreign", &basis_vector(1));
+        db.add("after", &basis_vector(2)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 3);
+        assert_own_nearest(&reopened, "foreign", &basis_vector(1));
+    }
+
+    #[test]
+    fn restore_writer_mode_reloads_a_new_generation_of_the_same_length() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("first", &basis_vector(0)).unwrap();
+        db.flush().unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
+        let checkpoint = log.checkpoint();
+        let old_len = log.current_end_offset();
+        drop(log);
+        fs::remove_file(&path).unwrap();
+        let mut replacement = Log::create(&path, DIMS, StorageKind::F32).unwrap();
+        replacement
+            .append(&[LogEntry::Add {
+                key: "other",
+                vector: VectorPayload::F32(&basis_vector(1)),
+                attrs: &[],
+            }])
+            .unwrap();
+        assert_eq!(replacement.current_end_offset(), old_len);
+        drop(replacement);
+        {
+            let mut half = db.shared.writer_half();
+            restore_writer_mode(&db.shared, &mut half, lock, None, 0, checkpoint).unwrap();
+        }
+        assert!(!db.contains("first"));
+        assert_own_nearest(&db, "other", &basis_vector(1));
+        db.add("after", &basis_vector(2)).unwrap();
+        db.flush().unwrap();
+        drop(db);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 2);
+        assert!(!reopened.contains("first"));
+        assert_own_nearest(&reopened, "other", &basis_vector(1));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn restore_writer_mode_cannot_rejoin_an_alias_writer() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let alias = dir.path().join("alias");
+        let db = open_writer(&path);
+        db.add("first", &basis_vector(0)).unwrap();
+        fs::hard_link(&path, &alias).unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
+        let checkpoint = log.checkpoint();
+        drop(log);
+        let foreign = open_writer(&alias);
+        foreign.add("other", &basis_vector(1)).unwrap();
+        {
+            let mut half = db.shared.writer_half();
+            assert!(matches!(
+                restore_writer_mode(&db.shared, &mut half, lock, None, 1, checkpoint),
+                Err(VecDbError::Locked(_))
+            ));
+        }
+        assert!(matches!(
+            db.add("lost", &basis_vector(2)),
+            Err(VecDbError::ReadOnly)
+        ));
+        drop(db);
+        foreign.add("after", &basis_vector(2)).unwrap();
+        drop(foreign);
+        let reopened = open_writer(&path);
+        assert_eq!(reopened.len(), 3);
+        assert!(!reopened.contains("lost"));
+        assert_own_nearest(&reopened, "after", &basis_vector(2));
+    }
+
+    #[test]
+    fn restore_writer_mode_preserves_a_truncated_header_and_disables_writes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db");
+        let db = open_writer(&path);
+        db.add("first", &basis_vector(0)).unwrap();
+        let WriterState { lock, log, .. } = take_writer(&db);
+        let checkpoint = log.checkpoint();
+        drop(log);
+        let bytes = b"EVDB";
+        fs::write(&path, bytes).unwrap();
+        {
+            let mut half = db.shared.writer_half();
+            assert!(matches!(
+                restore_writer_mode(&db.shared, &mut half, lock, None, 1, checkpoint),
+                Err(VecDbError::Corrupt(_))
+            ));
+        }
+        assert!(matches!(
+            db.add("after", &basis_vector(1)),
+            Err(VecDbError::ReadOnly)
+        ));
+        drop(db);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
     fn restore_writer_mode_degrades_to_accurate_read_only_when_reopen_fails() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 3, 270)).unwrap();
         let WriterState { lock, log, .. } = take_writer(&db);
+        let checkpoint = log.checkpoint();
         drop(log);
         let mut bytes = fs::read(&path).unwrap();
         bytes[20] ^= 0x5A;
@@ -3486,7 +3814,7 @@ mod tests {
         {
             let mut half = db.shared.writer_half();
             assert!(matches!(
-                restore_writer_mode(&db.shared, &mut half, lock, None, 3),
+                restore_writer_mode(&db.shared, &mut half, lock, None, 3, checkpoint),
                 Err(VecDbError::Corrupt(_))
             ));
             assert!(
@@ -3704,8 +4032,8 @@ mod tests {
         let path = dir.path().join("db");
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 5, 330)).unwrap();
-        let old_generation = generation_of(&path);
         let WriterState { lock, log, .. } = take_writer(&db);
+        let old_checkpoint = log.checkpoint();
         drop(log);
         remove_data_files(&path).unwrap();
         drop(
@@ -3715,7 +4043,7 @@ mod tests {
         );
         {
             let mut half = db.shared.writer_half();
-            recover_after_failed_reset(&db.shared, &mut half, lock, old_generation, 5);
+            recover_after_failed_reset(&db.shared, &mut half, lock, old_checkpoint, 5);
         }
         assert!(db.is_empty());
         assert!(!db.contains("key-0"));
@@ -4983,7 +5311,7 @@ mod tests {
     }
 
     fn logged_add_records(path: &Path, dims: usize) -> Vec<(String, StoredVector)> {
-        let mut log = reopen_log(path, dims, None).unwrap();
+        let mut log = Log::open(File::open(path).unwrap(), path, dims, None).unwrap();
         let mut scanner = log.scan().unwrap();
         let mut records = Vec::new();
         while let Some((record, _)) = scanner.next_record().unwrap() {
