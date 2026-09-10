@@ -1,7 +1,7 @@
 import {
     deleteLockerFileShareLink,
     getOrCreateLockerFileShareLink,
-} from "@/services/remote";
+} from "@/services/file-links";
 import type { LockerItem } from "@/types";
 import { canShareLockerFileLink, getItemTitle } from "@/types";
 import { isHTTPErrorWithStatus } from "ente-base/http";

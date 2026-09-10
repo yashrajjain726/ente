@@ -9,7 +9,7 @@ import { LockerFileLinkDialog } from "@/components/items/LockerFileLinkDialog";
 import { RestoreItemDialog } from "@/components/items/RestoreItemDialog";
 import { SelectionActionBar } from "@/components/items/SelectionActionBar";
 import { LockerConfirmDialog } from "@/components/ui/LockerConfirmDialog";
-import { downloadLockerFile } from "@/services/remote";
+import { downloadLockerFile } from "@/services/download";
 import {
     lockerColorSx,
     lockerContentMaxWidth,

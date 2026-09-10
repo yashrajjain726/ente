@@ -3,7 +3,7 @@ import {
     LockerMenuOption,
     LockerOverflowMenu,
 } from "@/components/ui/LockerMenu";
-import { downloadLockerFile } from "@/services/remote";
+import { downloadLockerFile } from "@/services/download";
 import type { GenericFileData, LockerItem } from "@/types";
 import { getItemTitle, hasDownloadableObject } from "@/types";
 import {

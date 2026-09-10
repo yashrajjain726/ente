@@ -1,5 +1,5 @@
 import { lockerItemIcon } from "@/components/items/locker-item-icons";
-import { downloadLockerFile } from "@/services/remote";
+import { downloadLockerFile } from "@/services/download";
 import type {
     AccountCredentialData,
     EmergencyContactData,

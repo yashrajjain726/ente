@@ -15,7 +15,7 @@ import {
     lockerItemIconConfig,
 } from "@/components/items/locker-item-icons";
 import type { LockerUploadLimitState } from "@/services/locker-limits";
-import type { LockerUploadProgress } from "@/services/remote";
+import type { LockerUploadProgress } from "@/services/uploads";
 import {
     lockerHeaderIconButtonSx,
     lockerPrimaryButtonSx,
