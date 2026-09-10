@@ -119,6 +119,14 @@ func (repo *UsageRepository) GetStorageWarningCandidates(ctx context.Context, us
 }
 
 func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64) (*LockerUsage, error) {
+	return repo.getLockerUsage(ctx, userIDs, true)
+}
+
+func (repo *UsageRepository) GetLockerStorageUsage(ctx context.Context, userIDs []int64) (*LockerUsage, error) {
+	return repo.getLockerUsage(ctx, userIDs, false)
+}
+
+func (repo *UsageRepository) getLockerUsage(ctx context.Context, userIDs []int64, includeFileCounts bool) (*LockerUsage, error) {
 	usage := &LockerUsage{}
 	if len(userIDs) == 0 {
 		return usage, nil
@@ -129,55 +137,57 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
 		userMap[userID] = &UserLockerUsage{UserID: userID}
 	}
 
-	rows, err := repo.DB.QueryContext(ctx, `SELECT requested.user_id, u.locker_file_count
-		FROM unnest($1::bigint[]) AS requested(user_id)
-		LEFT JOIN usage AS u ON u.user_id = requested.user_id`, pq.Array(userIDs))
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-	var uninitializedUserIDs []int64
-	for rows.Next() {
-		var userID int64
-		var fileCount sql.NullInt64
-		if err := rows.Scan(&userID, &fileCount); err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-		if fileCount.Valid {
-			userMap[userID].FileCount = fileCount.Int64
-		} else {
-			uninitializedUserIDs = append(uninitializedUserIDs, userID)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	if repo.QueueFileCountInitialization != nil {
-		for _, userID := range uninitializedUserIDs {
-			repo.QueueFileCountInitialization(userID)
-		}
-	}
-
-	if len(uninitializedUserIDs) > 0 {
-		rows, err = repo.DB.QueryContext(ctx, `SELECT c.owner_id, COUNT(DISTINCT cf.file_id)
-			FROM collections AS c
-			JOIN collection_files AS cf ON c.collection_id = cf.collection_id
-			WHERE c.app = 'locker' AND c.owner_id = ANY($1)
-				AND cf.f_owner_id = c.owner_id AND cf.is_deleted = FALSE
-			GROUP BY c.owner_id`, pq.Array(uninitializedUserIDs))
+	if includeFileCounts {
+		rows, err := repo.DB.QueryContext(ctx, `SELECT requested.user_id, u.locker_file_count
+			FROM unnest($1::bigint[]) AS requested(user_id)
+			LEFT JOIN usage AS u ON u.user_id = requested.user_id`, pq.Array(userIDs))
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		defer rows.Close()
+		var uninitializedUserIDs []int64
 		for rows.Next() {
-			var userID, fileCount int64
+			var userID int64
+			var fileCount sql.NullInt64
 			if err := rows.Scan(&userID, &fileCount); err != nil {
 				return nil, stacktrace.Propagate(err, "")
 			}
-			userMap[userID].FileCount = fileCount
+			if fileCount.Valid {
+				userMap[userID].FileCount = fileCount.Int64
+			} else {
+				uninitializedUserIDs = append(uninitializedUserIDs, userID)
+			}
 		}
 		if err := rows.Err(); err != nil {
 			return nil, stacktrace.Propagate(err, "")
+		}
+		if repo.QueueFileCountInitialization != nil {
+			for _, userID := range uninitializedUserIDs {
+				repo.QueueFileCountInitialization(userID)
+			}
+		}
+
+		if len(uninitializedUserIDs) > 0 {
+			rows, err = repo.DB.QueryContext(ctx, `SELECT c.owner_id, COUNT(DISTINCT cf.file_id)
+				FROM collections AS c
+				JOIN collection_files AS cf ON c.collection_id = cf.collection_id
+				WHERE c.app = 'locker' AND c.owner_id = ANY($1)
+					AND cf.f_owner_id = c.owner_id AND cf.is_deleted = FALSE
+				GROUP BY c.owner_id`, pq.Array(uninitializedUserIDs))
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var userID, fileCount int64
+				if err := rows.Scan(&userID, &fileCount); err != nil {
+					return nil, stacktrace.Propagate(err, "")
+				}
+				userMap[userID].FileCount = fileCount
+			}
+			if err := rows.Err(); err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
 		}
 	}
 
@@ -197,7 +207,7 @@ func (repo *UsageRepository) GetLockerUsage(ctx context.Context, userIDs []int64
       GROUP BY unique_files.owner_id;
    `
 
-	rows, err = repo.DB.QueryContext(ctx, sizeQuery, pq.Array(userIDs))
+	rows, err := repo.DB.QueryContext(ctx, sizeQuery, pq.Array(userIDs))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

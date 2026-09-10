@@ -22,10 +22,11 @@ func TestGetLockerUsageUsesStoredAndLegacyCountsPerUser(t *testing.T) {
 	linkObjectTestFileToCollection(t, db, collectionID, fileID, legacyUserID)
 
 	var queued []int64
-	usage, err := (&UsageRepository{
+	usageRepo := &UsageRepository{
 		DB:                           db,
 		QueueFileCountInitialization: func(userID int64) { queued = append(queued, userID) },
-	}).GetLockerUsage(t.Context(), []int64{readyUserID, legacyUserID})
+	}
+	usage, err := usageRepo.GetLockerUsage(t.Context(), []int64{readyUserID, legacyUserID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,5 +38,14 @@ func TestGetLockerUsageUsesStoredAndLegacyCountsPerUser(t *testing.T) {
 	}
 	if len(queued) != 1 || queued[0] != legacyUserID {
 		t.Fatalf("queued users = %v, want [%d]", queued, legacyUserID)
+	}
+
+	queued = nil
+	usage, err = usageRepo.GetLockerStorageUsage(t.Context(), []int64{readyUserID, legacyUserID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if usage.TotalFileCount != 0 || len(queued) != 0 {
+		t.Fatalf("storage-only usage = %+v, queued users = %v", usage, queued)
 	}
 }
