@@ -305,7 +305,7 @@ export const LockerCollectionShareDrawer: React.FC<
                             flexShrink: 0,
                             ...lockerColorSx(theme, { color: "textLight" }),
                             "&&:hover": lockerColorSx(theme, {
-                                backgroundColor: "fillDark",
+                                backgroundColor: "fillHover",
                             }),
                         })}
                     >

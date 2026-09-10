@@ -14,7 +14,7 @@ export const rowSurfaceSx = (theme: Theme) => ({
     "&:active": { backgroundColor: "#dedede" },
     ...theme.applyStyles("dark", {
         backgroundColor: "#212121",
-        "&:hover": { backgroundColor: "#0a0a0a" },
+        "&:hover": { backgroundColor: "#292929" },
         "&:active": { backgroundColor: "#141414" },
     }),
 });

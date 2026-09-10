@@ -104,7 +104,7 @@ export const LockerMenuOption: React.FC<
                     backgroundColor: "primaryLight",
                 }),
                 "&:hover, &.Mui-selected:hover": lockerColorSx(theme, {
-                    backgroundColor: critical ? "warningLight" : "fillDark",
+                    backgroundColor: critical ? "warningLight" : "fillHover",
                 }),
             })}
         >
@@ -180,7 +180,7 @@ export const LockerMenuFooter: React.FC<
                 color: "textLight",
                 borderColor: "strokeFaint",
             }),
-            "&:hover": lockerColorSx(theme, { backgroundColor: "fillDark" }),
+            "&:hover": lockerColorSx(theme, { backgroundColor: "fillHover" }),
         })}
     >
         {children}

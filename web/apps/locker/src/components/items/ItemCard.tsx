@@ -26,7 +26,6 @@ import {
     Stack,
     Typography,
 } from "@mui/material";
-import { formatTimeAgo } from "ente-base/date";
 import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useState } from "react";
@@ -34,7 +33,6 @@ import {
     lockerColors,
     lockerColorSx,
     lockerTextBodySx,
-    lockerTextMiniSx,
 } from "../../styles/tokens";
 
 interface ItemCardProps {
@@ -193,7 +191,7 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     opacity: selectionMode && !selectable ? 0.58 : 1,
                     "&:hover": {
                         ...lockerColorSx(theme, {
-                            backgroundColor: "fillDark",
+                            backgroundColor: "fillHover",
                         }),
                     },
                 })}
@@ -268,20 +266,6 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     <Typography variant="body" sx={lockerTextBodySx} noWrap>
                         {title}
                     </Typography>
-                    {isTrashView && item.updatedAt !== undefined && (
-                        <Typography
-                            sx={(theme) => ({
-                                ...lockerTextMiniSx,
-                                ...lockerColorSx(theme, { color: "textLight" }),
-                                mt: 0.5,
-                            })}
-                            noWrap
-                        >
-                            {t("deletedTimeAgo", {
-                                time: formatTimeAgo(item.updatedAt),
-                            })}
-                        </Typography>
-                    )}
                 </Box>
 
                 {selectionMode ? null : isTrashView ? (
@@ -358,8 +342,8 @@ const ItemOverflowMenu: React.FC<{
         ariaID={`item-menu-${item.id}`}
         triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
         triggerButtonSxProps={(theme) => ({
-            width: 24,
-            height: 24,
+            width: 40,
+            height: 40,
             p: 0,
             ...lockerColorSx(theme, { color: "textLight" }),
         })}
@@ -418,8 +402,8 @@ const TrashActions: React.FC<{
             ariaID={`trash-item-menu-${item.id}`}
             triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
             triggerButtonSxProps={(theme) => ({
-                width: 24,
-                height: 24,
+                width: 40,
+                height: 40,
                 p: 0,
                 ...lockerColorSx(theme, { color: "textLight" }),
             })}

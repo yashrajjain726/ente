@@ -6,6 +6,7 @@ import {
     InformationCircleIcon,
     Logout05Icon,
     SecurityCheckIcon,
+    Sun03Icon,
     UserIcon,
     Wallet05Icon,
 } from "@hugeicons/core-free-icons";
@@ -29,6 +30,7 @@ import {
 } from "./LockerSidebarShell";
 import { LockerSocialFooter } from "./LockerSocialFooter";
 import { LockerSupportDrawer } from "./LockerSupportDrawer";
+import { LockerThemeDrawer } from "./LockerThemeDrawer";
 
 import { LockerSecurityDrawer } from "./LockerSecurityDrawer";
 import {
@@ -83,6 +85,7 @@ export const LockerSidebar: React.FC<LockerSidebarProps> = ({
     userDetails,
 }) => {
     const { logout } = useBaseContext();
+    const [isThemeOpen, setIsThemeOpen] = useState(false);
     const [isAccountOpen, setIsAccountOpen] = useState(false);
     const [isLegacyAuthenticateOpen, setIsLegacyAuthenticateOpen] =
         useState(false);
@@ -134,6 +137,7 @@ export const LockerSidebar: React.FC<LockerSidebarProps> = ({
             setIsSupportOpen(false);
             setIsAboutOpen(false);
             setIsSecurityOpen(false);
+            setIsThemeOpen(false);
         }
     }, [open]);
 
@@ -270,6 +274,12 @@ export const LockerSidebar: React.FC<LockerSidebarProps> = ({
                                 onClick={() => setIsSecurityOpen(true)}
                             />
                             <LockerSidebarCardButton
+                                icon={Sun03Icon}
+                                label={t("appearance")}
+                                endIcon={<ChevronRightIcon />}
+                                onClick={() => setIsThemeOpen(true)}
+                            />
+                            <LockerSidebarCardButton
                                 icon={HelpCircleIcon}
                                 label={t("help_and_support")}
                                 endIcon={<ChevronRightIcon />}
@@ -325,6 +335,11 @@ export const LockerSidebar: React.FC<LockerSidebarProps> = ({
             <LockerAboutDrawer
                 open={isAboutOpen}
                 onClose={() => setIsAboutOpen(false)}
+                onRootClose={onClose}
+            />
+            <LockerThemeDrawer
+                open={isThemeOpen}
+                onClose={() => setIsThemeOpen(false)}
                 onRootClose={onClose}
             />
         </>

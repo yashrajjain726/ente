@@ -1,8 +1,12 @@
-import { lockerColorSx } from "@/styles/tokens";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import {
+    lockerColorSx,
+    lockerShadowFloating,
+    lockerTextBodyBoldSx,
+    lockerTextBodySx,
+} from "@/styles/tokens";
+import { Delete02Icon, Download01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
-import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import { t } from "i18next";
 import React from "react";
@@ -30,150 +34,121 @@ export const SelectionActionBar: React.FC<{
     onDelete,
     onDone,
 }) => (
-    <Box sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.25, sm: 1.5 } }}>
-        <Box
+    <Box sx={{ px: { xs: 2, sm: 3 }, py: 1.5 }}>
+        <Stack
+            direction={{ xs: "column", sm: "row" }}
             sx={(theme) => ({
                 maxWidth: 760,
                 mx: "auto",
-                borderRadius: "20px",
-                border: `1px solid ${theme.vars.palette.stroke.faint}`,
-                backgroundColor: theme.vars.palette.background.paper,
-                boxShadow: "0 12px 30px rgba(15, 23, 42, 0.12)",
-                backdropFilter: "blur(18px)",
-                px: { xs: 1.25, sm: 1.5 },
-                py: 1.25,
+                p: 1.5,
+                gap: 1.5,
+                alignItems: { xs: "stretch", sm: "center" },
+                borderRadius: "24px",
+                boxShadow: lockerShadowFloating,
+                ...lockerColorSx(theme, {
+                    backgroundColor: "fillLight",
+                    color: "textBase",
+                }),
             })}
         >
             <Stack
-                direction={{ xs: "column", sm: "row" }}
-                sx={{
-                    alignItems: { xs: "stretch", sm: "center" },
-                    justifyContent: "space-between",
-                    gap: 1,
-                }}
+                direction="row"
+                sx={{ alignItems: "center", gap: 1, flex: 1, minWidth: 0 }}
             >
-                <Stack
-                    direction="row"
+                <IconButton
+                    aria-label={t("close")}
+                    onClick={onDone}
+                    disabled={bulkDownloading}
+                    sx={(theme) => ({
+                        width: 40,
+                        height: 40,
+                        flexShrink: 0,
+                        ...lockerColorSx(theme, { color: "textLight" }),
+                    })}
+                >
+                    <ClearRoundedIcon sx={{ fontSize: 20 }} />
+                </IconButton>
+                <Typography
+                    sx={{ ...lockerTextBodyBoldSx, flex: 1, minWidth: 0 }}
+                    aria-live="polite"
+                >
+                    {t("selected_count", { selected: selectedCount })}
+                </Typography>
+                <Button
+                    variant="text"
+                    onClick={onToggleSelectAll}
+                    disabled={bulkDownloading}
                     sx={{
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 1,
+                        ...lockerTextBodySx,
+                        minHeight: 40,
+                        px: 1.5,
+                        flexShrink: 0,
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            minWidth: 0,
-                            px: 1.25,
-                            py: 0.875,
-                            borderRadius: "14px",
-                            backgroundColor: "rgba(16, 113, 255, 0.10)",
-                            border: "1px solid rgba(16, 113, 255, 0.16)",
-                        }}
-                    >
-                        <CheckCircleRoundedIcon
-                            sx={(theme) => ({
-                                fontSize: 18,
-                                ...lockerColorSx(theme, { color: "primary" }),
-                                flexShrink: 0,
-                            })}
-                        />
-                        <Typography
-                            variant="body"
-                            sx={{ fontWeight: 600, minWidth: 0 }}
-                            noWrap
-                        >
-                            {t("filesSelected", { count: selectedCount })}
-                        </Typography>
-                    </Box>
-                    <IconButton
-                        onClick={onDone}
-                        disabled={bulkDownloading}
-                        sx={(theme) => ({
-                            color: "text.muted",
-                            width: 38,
-                            height: 38,
-                            flexShrink: 0,
-                            border: `1px solid ${theme.vars.palette.stroke.faint}`,
-                            backgroundColor: theme.vars.palette.fill.faint,
-                            "&:hover": {
-                                backgroundColor:
-                                    theme.vars.palette.fill.faintHover,
-                            },
-                        })}
-                    >
-                        <ClearRoundedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                </Stack>
-                <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    sx={{ alignItems: { xs: "stretch", sm: "center" }, gap: 1 }}
-                >
-                    <Button
-                        color="secondary"
-                        onClick={onToggleSelectAll}
-                        disabled={bulkDownloading}
-                        sx={(theme) => ({
-                            minHeight: 42,
-                            px: 1.5,
-                            borderRadius: "14px",
-                            border: `1px solid ${theme.vars.palette.stroke.faint}`,
-                            backgroundColor: theme.vars.palette.fill.faint,
-                            "&:hover": {
-                                backgroundColor:
-                                    theme.vars.palette.fill.faintHover,
-                            },
-                        })}
-                    >
-                        {allSelected ? t("deselectAll") : t("selectAll")}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<FileDownloadOutlinedIcon />}
-                        onClick={onDownload}
-                        disabled={bulkDownloading || !canDownload}
-                        sx={{
-                            minHeight: 42,
-                            px: 1.75,
-                            borderRadius: "14px",
-                            boxShadow: "none",
-                            color: "#FFFFFF",
-                            background:
-                                "linear-gradient(180deg, #1674FF 0%, #0B5FE0 100%)",
-                            "& .MuiButton-startIcon": { color: "#FFFFFF" },
-                            "&:hover": {
-                                boxShadow: "none",
-                                background:
-                                    "linear-gradient(180deg, #2A82FF 0%, #1269F0 100%)",
-                            },
-                        }}
-                    >
-                        {bulkDownloading && bulkDownloadProgress
-                            ? `${t("downloading")} ${bulkDownloadProgress.completed}/${bulkDownloadProgress.total}`
-                            : t("download")}
-                    </Button>
-                    <Button
-                        color="critical"
-                        startIcon={<DeleteOutlinedIcon />}
-                        onClick={onDelete}
-                        disabled={bulkDownloading || !canDelete}
-                        sx={{
-                            minHeight: 42,
-                            px: 1.75,
-                            borderRadius: "14px",
-                            color: "#FFFFFF",
-                            border: "1px solid rgba(185, 28, 28, 0.26)",
-                            backgroundColor: "#D14343",
-                            "& .MuiButton-startIcon": { color: "#FFFFFF" },
-                            "&:hover": { backgroundColor: "#B93838" },
-                        }}
-                    >
-                        {t("delete")}
-                    </Button>
-                </Stack>
+                    {allSelected ? t("deselect_all") : t("select_all")}
+                </Button>
             </Stack>
-        </Box>
+            <Stack
+                direction="row"
+                sx={{
+                    gap: 1,
+                    "& > button": {
+                        flex: { xs: 1, sm: "initial" },
+                        minHeight: 44,
+                        px: 2,
+                        ...lockerTextBodyBoldSx,
+                    },
+                }}
+            >
+                <Button
+                    variant="contained"
+                    startIcon={
+                        <HugeiconsIcon
+                            icon={Download01Icon}
+                            size={18}
+                            strokeWidth={1.6}
+                        />
+                    }
+                    onClick={onDownload}
+                    disabled={bulkDownloading || !canDownload}
+                >
+                    {bulkDownloading && bulkDownloadProgress
+                        ? `${t("downloading")} ${bulkDownloadProgress.completed}/${bulkDownloadProgress.total}`
+                        : t("download")}
+                </Button>
+                <Button
+                    variant="text"
+                    color="critical"
+                    startIcon={
+                        <HugeiconsIcon
+                            icon={Delete02Icon}
+                            size={18}
+                            strokeWidth={1.6}
+                        />
+                    }
+                    onClick={onDelete}
+                    disabled={bulkDownloading || !canDelete}
+                    sx={(theme) => ({
+                        ...lockerColorSx(theme, {
+                            backgroundColor: "warningLight",
+                            color: "warning",
+                        }),
+                        "&:hover": lockerColorSx(theme, {
+                            backgroundColor: "warningLight",
+                            color: "warningDark",
+                        }),
+                        "&.Mui-disabled": {
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "fillDark",
+                                color: "textLighter",
+                            }),
+                            opacity: 0.5,
+                        },
+                    })}
+                >
+                    {t("delete")}
+                </Button>
+            </Stack>
+        </Stack>
     </Box>
 );

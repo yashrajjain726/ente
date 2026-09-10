@@ -71,9 +71,9 @@ export const LockerNavbar: React.FC<LockerNavbarProps> = ({
 
                 <Box
                     component="img"
-                    src="/images/locker-beta.svg"
-                    alt="Locker beta"
-                    sx={{ height: 29, width: "auto" }}
+                    src="/images/app-logo.svg"
+                    alt="Locker"
+                    sx={{ height: 29, width: 73, objectFit: "contain" }}
                 />
 
                 <Box sx={{ width: 40 }} />

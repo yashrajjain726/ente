@@ -122,7 +122,7 @@ export const LockerFileLinkDialog: React.FC<LockerFileLinkDialogProps> = ({
                                 }),
                                 "&:hover": {
                                     ...lockerColorSx(theme, {
-                                        backgroundColor: "fillDark",
+                                        backgroundColor: "fillHover",
                                     }),
                                 },
                             })}
@@ -180,7 +180,7 @@ export const LockerFileLinkDialog: React.FC<LockerFileLinkDialogProps> = ({
                                 ...lockerColorSx(theme, { color: "iconColor" }),
                                 "&:hover": {
                                     ...lockerColorSx(theme, {
-                                        backgroundColor: "fillDark",
+                                        backgroundColor: "fillHover",
                                     }),
                                 },
                             })}

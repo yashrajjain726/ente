@@ -5,6 +5,7 @@ export const lockerColors = {
     backgroundBase: { light: "#f4f4f4", dark: "#161616" },
     fillLight: { light: "#ffffff", dark: "#212121" },
     fillDark: { light: "#eaeaea", dark: "#0a0a0a" },
+    fillHover: { light: "#eaeaea", dark: "#292929" },
     fillDarkest: { light: "#d2d2d2", dark: "#292929" },
     strokeFaint: { light: "#ebebeb", dark: "#2a2a2a" },
     strokeDark: { light: "#e0e0e0", dark: "#3e3e3e" },
