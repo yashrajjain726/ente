@@ -12,15 +12,14 @@ enum APIEndpoint {
     static func update(_ value: String) async throws {
         let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: value),
-              let scheme = components.scheme,
-              ["http", "https"].contains(scheme.lowercased()),
+              components.scheme?.lowercased() == "https",
               components.host != nil,
               components.user == nil,
               components.query == nil,
               components.fragment == nil,
               components.path.isEmpty || components.path == "/"
         else { throw EndpointError.invalidURL }
-        components.scheme = scheme.lowercased()
+        components.scheme = "https"
         components.path = ""
         guard let url = components.url else { throw EndpointError.invalidURL }
 
@@ -37,7 +36,7 @@ enum APIEndpoint {
     private struct Ping: Decodable { let message: String }
 
     private enum EndpointError: String, LocalizedError {
-        case invalidURL = "Enter a valid HTTP or HTTPS API URL"
+        case invalidURL = "Enter a valid HTTPS API URL"
         case invalidServer = "The URL is not an Ente API server"
         var errorDescription: String? { rawValue }
     }
