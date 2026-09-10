@@ -19,6 +19,7 @@ class FlexLayoutCalculator {
     required double targetRowHeight,
     required double spacing,
     double maximumRowHeightFactor = _defaultMaximumRowHeightFactor,
+    double? minimumNonFinalSingletonAspectRatio,
   }) {
     if (!availableWidth.isFinite || availableWidth <= 0) {
       throw ArgumentError.value(availableWidth, "availableWidth");
@@ -33,6 +34,14 @@ class FlexLayoutCalculator {
       throw ArgumentError.value(
         maximumRowHeightFactor,
         "maximumRowHeightFactor",
+      );
+    }
+    if (minimumNonFinalSingletonAspectRatio != null &&
+        (!minimumNonFinalSingletonAspectRatio.isFinite ||
+            minimumNonFinalSingletonAspectRatio <= 0)) {
+      throw ArgumentError.value(
+        minimumNonFinalSingletonAspectRatio,
+        "minimumNonFinalSingletonAspectRatio",
       );
     }
 
@@ -65,8 +74,12 @@ class FlexLayoutCalculator {
         if (contentWidth < itemCount * _minimumTappableExtent) break;
 
         final isTail = end == count - 1;
-        // Product decision: a singleton is only allowed at the group tail.
-        if (!isTail && itemCount == 1) continue;
+        if (!isTail &&
+            itemCount == 1 &&
+            (minimumNonFinalSingletonAspectRatio == null ||
+                ratios[start] < minimumNonFinalSingletonAspectRatio)) {
+          continue;
+        }
         final geometry = _rowGeometry(
           ratios: ratios,
           start: start,

@@ -20,13 +20,15 @@ class _JustifiedLayoutTuningScreenState
   @override
   Widget build(BuildContext context) {
     final flexTuning = localSettings.getFlexLayoutTuning();
+    final flexFullRowsTuning = localSettings.getFlexFullRowsLayoutTuning();
     final comfortLargeTuning = localSettings.getComfortLargeLayoutTuning();
 
     return SettingsPageScaffold(
       title: "Justified layout tuning",
       children: [
         Text(
-          "Values are multipliers of the responsive target row height.",
+          "Height values are multipliers of the responsive target row height. "
+          "Aspect ratio uses width ÷ height.",
           style: TextStyles.mini.copyWith(
             color: context.componentColors.textLight,
           ),
@@ -45,6 +47,26 @@ class _JustifiedLayoutTuningScreenState
               title: "Reset all",
               showChevron: false,
               onTap: _resetFlexValues,
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const MenuSectionTitle(title: "Flex Full Rows"),
+        MenuGroupComponent(
+          items: [
+            for (final field in FlexFullRowsLayoutTuningField.values)
+              SettingsItem(
+                title: _flexFullRowsFieldLabel(field),
+                trailing: _valueLabel(
+                  context,
+                  flexFullRowsTuning.valueFor(field),
+                ),
+                onTap: () => _editFlexFullRowsValue(field),
+              ),
+            SettingsItem(
+              title: "Reset all",
+              showChevron: false,
+              onTap: _resetFlexFullRowsValues,
             ),
           ],
         ),
@@ -69,6 +91,27 @@ class _JustifiedLayoutTuningScreenState
           ],
         ),
       ],
+    );
+  }
+
+  Future<void> _editFlexFullRowsValue(
+    FlexFullRowsLayoutTuningField field,
+  ) async {
+    final tuning = localSettings.getFlexFullRowsLayoutTuning();
+    await _showValueSheet(
+      title: _flexFullRowsFieldLabel(field),
+      initialValue: tuning.valueFor(field),
+      defaultValue: field.defaultValue,
+      isValid: field.isValid,
+      validRange: (field.minimumValue, field.maximumValue),
+      onSave: (value) async {
+        await localSettings.setFlexFullRowsLayoutTuningValue(field, value);
+        _refreshGallery();
+      },
+      onReset: () async {
+        await localSettings.resetFlexFullRowsLayoutTuningValue(field);
+        _refreshGallery();
+      },
     );
   }
 
@@ -144,6 +187,11 @@ class _JustifiedLayoutTuningScreenState
 
   Future<void> _resetFlexValues() async {
     await localSettings.resetFlexLayoutTuning();
+    _refreshGallery();
+  }
+
+  Future<void> _resetFlexFullRowsValues() async {
+    await localSettings.resetFlexFullRowsLayoutTuning();
     _refreshGallery();
   }
 
@@ -263,6 +311,15 @@ String _flexFieldLabel(FlexLayoutTuningField field) => switch (field) {
   FlexLayoutTuningField.targetHeightScale => "Target height scale",
   FlexLayoutTuningField.maximumHeightFactor => "Maximum height factor",
 };
+
+String _flexFullRowsFieldLabel(FlexFullRowsLayoutTuningField field) =>
+    switch (field) {
+      FlexFullRowsLayoutTuningField.targetHeightScale => "Target height scale",
+      FlexFullRowsLayoutTuningField.maximumHeightFactor =>
+        "Maximum height factor",
+      FlexFullRowsLayoutTuningField.minimumNonFinalSingletonAspectRatio =>
+        "Minimum non-final singleton aspect ratio",
+    };
 
 String _comfortLargeFieldLabel(ComfortLargeLayoutTuningField field) =>
     switch (field) {

@@ -41,6 +41,7 @@ void main() {
       for (final strategy in [
         JustifiedLayoutStrategy.comfortLarge,
         JustifiedLayoutStrategy.flex,
+        JustifiedLayoutStrategy.flexFullRows,
       ]) {
         await settings.setJustifiedLayoutStrategy(strategy);
         expect(
@@ -61,6 +62,14 @@ void main() {
         expect(flex.valueFor(field), FlexLayoutTuning.defaults.valueFor(field));
       }
 
+      final flexFullRows = settings.getFlexFullRowsLayoutTuning();
+      for (final field in FlexFullRowsLayoutTuningField.values) {
+        expect(
+          flexFullRows.valueFor(field),
+          FlexFullRowsLayoutTuning.defaults.valueFor(field),
+        );
+      }
+
       final comfortLarge = settings.getComfortLargeLayoutTuning();
       for (final field in ComfortLargeLayoutTuningField.values) {
         expect(
@@ -78,6 +87,12 @@ void main() {
         FlexLayoutTuningField.targetHeightScale: 2.718281828,
         FlexLayoutTuningField.maximumHeightFactor: 9.125,
       };
+      const flexFullRowsValues = <FlexFullRowsLayoutTuningField, double>{
+        FlexFullRowsLayoutTuningField.targetHeightScale: 1.23456789,
+        FlexFullRowsLayoutTuningField.maximumHeightFactor: 7.25,
+        FlexFullRowsLayoutTuningField.minimumNonFinalSingletonAspectRatio:
+            0.8125,
+      };
       const comfortLargeValues = <ComfortLargeLayoutTuningField, double>{
         ComfortLargeLayoutTuningField.targetHeightScale: 0.123456789,
         ComfortLargeLayoutTuningField.maximumHeightFactor: 8.75,
@@ -88,6 +103,9 @@ void main() {
       for (final entry in flexValues.entries) {
         await settings.setFlexLayoutTuningValue(entry.key, entry.value);
       }
+      for (final entry in flexFullRowsValues.entries) {
+        await settings.setFlexFullRowsLayoutTuningValue(entry.key, entry.value);
+      }
       for (final entry in comfortLargeValues.entries) {
         await settings.setComfortLargeLayoutTuningValue(entry.key, entry.value);
       }
@@ -96,6 +114,10 @@ void main() {
       final flex = reloadedSettings.getFlexLayoutTuning();
       for (final entry in flexValues.entries) {
         expect(flex.valueFor(entry.key), entry.value);
+      }
+      final flexFullRows = reloadedSettings.getFlexFullRowsLayoutTuning();
+      for (final entry in flexFullRowsValues.entries) {
+        expect(flexFullRows.valueFor(entry.key), entry.value);
       }
       final comfortLarge = reloadedSettings.getComfortLargeLayoutTuning();
       for (final entry in comfortLargeValues.entries) {
@@ -107,6 +129,11 @@ void main() {
       SharedPreferences.setMockInitialValues({
         LocalSettings.kFlexLayoutTuningTargetHeightScale: "invalid",
         LocalSettings.kFlexLayoutTuningMaximumHeightFactor: double.nan,
+        LocalSettings.kFlexFullRowsLayoutTuningTargetHeightScale: 0.0,
+        LocalSettings.kFlexFullRowsLayoutTuningMaximumHeightFactor: 0.99,
+        LocalSettings
+                .kFlexFullRowsLayoutTuningMinimumNonFinalSingletonAspectRatio:
+            "invalid",
         LocalSettings.kComfortLargeLayoutTuningTargetHeightScale: 0.0,
         LocalSettings.kComfortLargeLayoutTuningMaximumHeightFactor: 0.99,
         LocalSettings.kComfortLargeLayoutTuningWideFinalMaximumHeightFactor:
@@ -120,6 +147,13 @@ void main() {
       for (final field in FlexLayoutTuningField.values) {
         expect(flex.valueFor(field), FlexLayoutTuning.defaults.valueFor(field));
       }
+      final flexFullRows = settings.getFlexFullRowsLayoutTuning();
+      for (final field in FlexFullRowsLayoutTuningField.values) {
+        expect(
+          flexFullRows.valueFor(field),
+          FlexFullRowsLayoutTuning.defaults.valueFor(field),
+        );
+      }
       final comfortLarge = settings.getComfortLargeLayoutTuning();
       for (final field in ComfortLargeLayoutTuningField.values) {
         expect(
@@ -129,7 +163,7 @@ void main() {
       }
     });
 
-    test("keeps Flex and Comfort Large tuning isolated", () async {
+    test("keeps strategy tuning isolated", () async {
       SharedPreferences.setMockInitialValues({});
       final settings = LocalSettings(await SharedPreferences.getInstance());
 
@@ -143,6 +177,16 @@ void main() {
         ),
         ComfortLargeLayoutTuning.defaults.targetHeightScale,
       );
+      expect(
+        settings.getFlexFullRowsLayoutTuning().targetHeightScale,
+        FlexFullRowsLayoutTuning.defaults.targetHeightScale,
+      );
+
+      await settings.setFlexFullRowsLayoutTuningValue(
+        FlexFullRowsLayoutTuningField.targetHeightScale,
+        2.17,
+      );
+      expect(settings.getFlexLayoutTuning().targetHeightScale, 1.91);
 
       await settings.setComfortLargeLayoutTuningValue(
         ComfortLargeLayoutTuningField.targetHeightScale,
@@ -154,6 +198,7 @@ void main() {
         ),
         1.91,
       );
+      expect(settings.getFlexFullRowsLayoutTuning().targetHeightScale, 2.17);
     });
 
     test("resets one field without changing its siblings", () async {
@@ -175,12 +220,23 @@ void main() {
         ComfortLargeLayoutTuningField.maximumHeightFactor,
         3.41,
       );
+      await settings.setFlexFullRowsLayoutTuningValue(
+        FlexFullRowsLayoutTuningField.targetHeightScale,
+        1.71,
+      );
+      await settings.setFlexFullRowsLayoutTuningValue(
+        FlexFullRowsLayoutTuningField.maximumHeightFactor,
+        2.41,
+      );
 
       await settings.resetFlexLayoutTuningValue(
         FlexLayoutTuningField.targetHeightScale,
       );
       await settings.resetComfortLargeLayoutTuningValue(
         ComfortLargeLayoutTuningField.targetHeightScale,
+      );
+      await settings.resetFlexFullRowsLayoutTuningValue(
+        FlexFullRowsLayoutTuningField.targetHeightScale,
       );
 
       final flex = settings.getFlexLayoutTuning();
@@ -195,6 +251,12 @@ void main() {
         ComfortLargeLayoutTuning.defaults.targetHeightScale,
       );
       expect(comfortLarge.maximumHeightFactor, 3.41);
+      final flexFullRows = settings.getFlexFullRowsLayoutTuning();
+      expect(
+        flexFullRows.targetHeightScale,
+        FlexFullRowsLayoutTuning.defaults.targetHeightScale,
+      );
+      expect(flexFullRows.maximumHeightFactor, 2.41);
     });
 
     test("reset all removes only the selected strategy keys", () async {
@@ -205,6 +267,14 @@ void main() {
         await settings.setFlexLayoutTuningValue(
           field,
           field == FlexLayoutTuningField.maximumHeightFactor ? 2.0 : 1.5,
+        );
+      }
+      for (final field in FlexFullRowsLayoutTuningField.values) {
+        await settings.setFlexFullRowsLayoutTuningValue(
+          field,
+          field == FlexFullRowsLayoutTuningField.maximumHeightFactor
+              ? 2.0
+              : 1.5,
         );
       }
       for (final field in ComfortLargeLayoutTuningField.values) {
@@ -224,6 +294,17 @@ void main() {
       expect(
         preferences.getKeys().where((key) => key.contains(".comfort_large.")),
         isNotEmpty,
+      );
+      expect(
+        preferences.getKeys().where((key) => key.contains(".flex_full_rows.")),
+        isNotEmpty,
+      );
+
+      await settings.resetFlexFullRowsLayoutTuning();
+
+      expect(
+        preferences.getKeys().where((key) => key.contains(".flex_full_rows.")),
+        isEmpty,
       );
 
       await settings.resetComfortLargeLayoutTuning();
@@ -252,6 +333,13 @@ void main() {
         ),
         throwsArgumentError,
       );
+      await expectLater(
+        settings.setFlexFullRowsLayoutTuningValue(
+          FlexFullRowsLayoutTuningField.minimumNonFinalSingletonAspectRatio,
+          0,
+        ),
+        throwsArgumentError,
+      );
 
       expect(
         settings.getFlexLayoutTuning().targetHeightScale,
@@ -260,6 +348,12 @@ void main() {
       expect(
         settings.getComfortLargeLayoutTuning().maximumHeightFactor,
         ComfortLargeLayoutTuning.defaults.maximumHeightFactor,
+      );
+      expect(
+        settings
+            .getFlexFullRowsLayoutTuning()
+            .minimumNonFinalSingletonAspectRatio,
+        FlexFullRowsLayoutTuning.defaults.minimumNonFinalSingletonAspectRatio,
       );
     });
   });

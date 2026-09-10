@@ -8,5 +8,7 @@ extension JustifiedLayoutStrategyLabel on JustifiedLayoutStrategy {
     JustifiedLayoutStrategy.comfortLarge =>
       "${context.strings.layoutJustifiedComfort} Large",
     JustifiedLayoutStrategy.flex => context.strings.layoutJustifiedFlex,
+    JustifiedLayoutStrategy.flexFullRows =>
+      "${context.strings.layoutJustifiedFlex} Full Rows",
   };
 }

@@ -53,6 +53,7 @@ void main() {
       JustifiedLayoutStrategy.comfort,
     );
     await localSettings.resetFlexLayoutTuning();
+    await localSettings.resetFlexFullRowsLayoutTuning();
     await localSettings.resetComfortLargeLayoutTuning();
     await localSettings.setPhotoGridSize(4);
   });
@@ -160,6 +161,39 @@ void main() {
     );
     final flex = groups().groupLayouts.single as JustifiedSectionLayout;
     expect(flex.rows.single.itemWidths, hasLength(4));
+  });
+
+  test("routes Flex Full Rows with independent tuning", () async {
+    final files = List<EnteFile>.generate(
+      3,
+      (index) => _file(
+        index: index,
+        creationTime: DateTime(2026, 8, 19).microsecondsSinceEpoch,
+        width: 16,
+        height: 9,
+      ),
+    );
+    await localSettings.setPhotoGridSize(2);
+    await localSettings.setJustifiedLayoutStrategy(
+      JustifiedLayoutStrategy.flexFullRows,
+    );
+
+    JustifiedSectionLayout section() =>
+        _galleryGroups(
+              files: files,
+              groupType: GroupType.none,
+              groupHeaderExtent: GalleryGroups.spacing,
+              widthAvailable: 402,
+            ).groupLayouts.single
+            as JustifiedSectionLayout;
+
+    expect(section().rows.map((row) => row.itemWidths.length), [1, 1, 1]);
+    await localSettings.setFlexFullRowsLayoutTuningValue(
+      FlexFullRowsLayoutTuningField.minimumNonFinalSingletonAspectRatio,
+      2,
+    );
+    final constrainedRows = section().rows;
+    expect(constrainedRows.map((row) => row.itemWidths.length), [2, 1]);
   });
 
   test("keeps layout tuning separate for Flex and Comfort Large", () async {

@@ -23,6 +23,39 @@ void main() {
     }
   });
 
+  test(
+    "full-row variant allows landscape singletons without internal gaps",
+    () {
+      const ratios = [16 / 9, 16 / 9, 16 / 9];
+      final rows = _rows(ratios, minimumNonFinalSingletonAspectRatio: 0.75);
+
+      expect(rows.first.itemWidths, hasLength(1));
+      for (final row in rows.take(rows.length - 1)) {
+        expect(_occupiedWidth(row), closeTo(402, 1e-9));
+      }
+    },
+  );
+
+  test("full-row variant keeps tall portraits out of non-final singletons", () {
+    const ratios = [16 / 9, 9 / 16, 16 / 9, 9 / 16, 16 / 9];
+    final rows = _rows(ratios, minimumNonFinalSingletonAspectRatio: 0.75);
+
+    for (final row in rows.take(rows.length - 1)) {
+      if (row.itemWidths.length == 1) {
+        expect(ratios[row.firstIndex], greaterThanOrEqualTo(0.75));
+      }
+      expect(_occupiedWidth(row), closeTo(402, 1e-9));
+    }
+  });
+
+  test("full-row variant permits a ragged portrait-only group", () {
+    final row = _rows([
+      9 / 16,
+    ], minimumNonFinalSingletonAspectRatio: 0.75).single;
+
+    expect(_occupiedWidth(row), lessThan(402));
+  });
+
   test("uses adaptive cropping only when a row cannot remain tappable", () {
     final rows = _rows([4, 1 / 3, 1, 1]);
     final extremeRow = rows.first;
@@ -110,8 +143,12 @@ void main() {
     expect(_rows([]), isEmpty);
   });
 
-  test("rejects invalid height tuning", () {
+  test("rejects invalid tuning", () {
     expect(() => _rows([1], maximumHeightFactor: 0.9), throwsArgumentError);
+    expect(
+      () => _rows([1], minimumNonFinalSingletonAspectRatio: 0),
+      throwsArgumentError,
+    );
   });
 }
 
@@ -120,6 +157,7 @@ List<JustifiedRowLayout> _rows(
   double width = 402,
   double? targetHeight,
   double maximumHeightFactor = 1.6,
+  double? minimumNonFinalSingletonAspectRatio,
 }) {
   return FlexLayoutCalculator.computeRows(
     aspectRatios: ratios,
@@ -127,6 +165,7 @@ List<JustifiedRowLayout> _rows(
     targetRowHeight: targetHeight ?? (width < 600 ? 200 : 320),
     spacing: 2,
     maximumRowHeightFactor: maximumHeightFactor,
+    minimumNonFinalSingletonAspectRatio: minimumNonFinalSingletonAspectRatio,
   );
 }
 
