@@ -61,7 +61,7 @@ void main() {
     await localSettings.setInternalUserDisabled(false);
     await localSettings.setGalleryLayoutType(GalleryLayoutType.grid);
     await localSettings.setJustifiedLayoutStrategy(
-      JustifiedLayoutStrategy.comfort,
+      JustifiedLayoutStrategy.comfortLarge,
     );
     await localSettings.resetFlexLayoutTuning();
     await localSettings.resetFlexFullRowsLayoutTuning();
@@ -83,7 +83,7 @@ void main() {
       for (final quickMenu in [true, false]) {
         await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
         await localSettings.setJustifiedLayoutStrategy(
-          JustifiedLayoutStrategy.comfort,
+          JustifiedLayoutStrategy.comfortLarge,
         );
         events = 0;
         await tester.pumpWidget(
@@ -115,6 +115,7 @@ void main() {
           await tester.tap(find.text("Layout"));
           await tester.pumpAndSettle();
         }
+        expect(find.text("Justified · Comfort"), findsNothing);
         await tester.tap(find.text("Justified · Flex Full Rows"));
         await tester.pumpAndSettle();
         expect(

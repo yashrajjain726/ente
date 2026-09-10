@@ -29,17 +29,16 @@ void main() {
   });
 
   test(
-    "justified strategy defaults to Comfort and persists alternatives",
+    "justified strategy defaults to Comfort Large and persists alternatives",
     () async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
       final settings = LocalSettings(preferences);
       expect(
         settings.getJustifiedLayoutStrategy(),
-        JustifiedLayoutStrategy.comfort,
+        JustifiedLayoutStrategy.comfortLarge,
       );
       for (final strategy in [
-        JustifiedLayoutStrategy.comfortLarge,
         JustifiedLayoutStrategy.flex,
         JustifiedLayoutStrategy.flexFullRows,
       ]) {

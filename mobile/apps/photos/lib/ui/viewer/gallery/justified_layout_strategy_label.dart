@@ -4,7 +4,6 @@ import "package:photos/models/gallery/justified_layout_strategy.dart";
 
 extension JustifiedLayoutStrategyLabel on JustifiedLayoutStrategy {
   String label(BuildContext context) => switch (this) {
-    JustifiedLayoutStrategy.comfort => context.strings.layoutJustifiedComfort,
     JustifiedLayoutStrategy.comfortLarge =>
       "${context.strings.layoutJustifiedComfort} Large",
     JustifiedLayoutStrategy.flex => context.strings.layoutJustifiedFlex,

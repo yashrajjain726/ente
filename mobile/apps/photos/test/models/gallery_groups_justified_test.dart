@@ -50,7 +50,7 @@ void main() {
   setUp(() async {
     await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
     await localSettings.setJustifiedLayoutStrategy(
-      JustifiedLayoutStrategy.comfort,
+      JustifiedLayoutStrategy.comfortLarge,
     );
     await localSettings.resetFlexLayoutTuning();
     await localSettings.resetFlexFullRowsLayoutTuning();
@@ -148,19 +148,23 @@ void main() {
       ),
     );
     await localSettings.setPhotoGridSize(2);
+    await localSettings.setComfortLargeLayoutTuningValue(
+      ComfortLargeLayoutTuningField.targetHeightScale,
+      1,
+    );
     GalleryGroups groups() => _galleryGroups(
       files: files,
       groupType: GroupType.none,
       groupHeaderExtent: GalleryGroups.spacing,
       widthAvailable: 402,
     );
-    final comfort = groups().groupLayouts.single as JustifiedSectionLayout;
-    expect(comfort.rows.map((row) => row.itemWidths.length), [2, 2]);
+    final comfortLarge = groups().groupLayouts.single as JustifiedSectionLayout;
+    expect(comfortLarge.rows.map((row) => row.itemWidths.length), [2, 2]);
     await localSettings.setJustifiedLayoutStrategy(
       JustifiedLayoutStrategy.flex,
     );
     final flex = groups().groupLayouts.single as JustifiedSectionLayout;
-    expect(flex.rows.single.itemWidths, hasLength(4));
+    expect(flex.rows.map((row) => row.itemWidths.length), [3, 1]);
   });
 
   test("routes Flex Full Rows with independent tuning", () async {
@@ -216,20 +220,16 @@ void main() {
       return section.rows.single.height;
     }
 
-    expect(rowHeight(), 320);
-
-    await localSettings.setJustifiedLayoutStrategy(
-      JustifiedLayoutStrategy.comfortLarge,
-    );
     expect(
       rowHeight(),
       320 * ComfortLargeLayoutTuning.defaults.targetHeightScale,
     );
+
     await localSettings.setComfortLargeLayoutTuningValue(
       ComfortLargeLayoutTuningField.targetHeightScale,
-      1.5,
+      1.25,
     );
-    expect(rowHeight(), 480);
+    expect(rowHeight(), 400);
 
     await localSettings.setJustifiedLayoutStrategy(
       JustifiedLayoutStrategy.flex,
@@ -248,7 +248,11 @@ void main() {
 
   test(
     "headerless justified remains one continuous group past grid chunks",
-    () {
+    () async {
+      await localSettings.setComfortLargeLayoutTuningValue(
+        ComfortLargeLayoutTuningField.targetHeightScale,
+        1,
+      );
       const fileCount = 100;
       final files = List<EnteFile>.generate(
         fileCount,
@@ -322,6 +326,10 @@ void main() {
       }
 
       await localSettings.setPhotoGridSize(2);
+      await localSettings.setComfortLargeLayoutTuningValue(
+        ComfortLargeLayoutTuningField.targetHeightScale,
+        1,
+      );
       expect(rowHeight(), 320);
 
       await localSettings.setPhotoGridSize(4);

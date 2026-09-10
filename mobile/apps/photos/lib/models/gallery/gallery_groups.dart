@@ -463,7 +463,6 @@ class GalleryGroups {
         ? math.min(gridTargetRowHeight, _maximumJustifiedTargetRowHeight)
         : gridTargetRowHeight;
     final targetHeightScale = switch (strategy) {
-      JustifiedLayoutStrategy.comfort => 1.0,
       JustifiedLayoutStrategy.comfortLarge =>
         comfortLargeTuning.targetHeightScale,
       JustifiedLayoutStrategy.flex => flexTuning.targetHeightScale,
@@ -484,13 +483,6 @@ class GalleryGroups {
         ),
       );
       final rows = switch (strategy) {
-        JustifiedLayoutStrategy.comfort =>
-          JustifiedLayoutCalculator.computeRows(
-            aspectRatios: aspectRatios,
-            availableWidth: widthAvailable,
-            targetRowHeight: targetRowHeight,
-            spacing: spacing,
-          ),
         JustifiedLayoutStrategy.comfortLarge =>
           JustifiedLayoutCalculator.computeRows(
             aspectRatios: aspectRatios,
