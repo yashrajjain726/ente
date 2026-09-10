@@ -424,7 +424,7 @@ void main() {
       } else {
         expect(find.byIcon(Icons.close), findsNothing);
       }
-      await tester.tapAt(const Offset(1, 1));
+      await tester.tapAt(const Offset(5, 5));
     }
 
     await pumpComponent(
@@ -437,7 +437,7 @@ void main() {
       ),
     );
     expect(find.byIcon(Icons.arrow_back), findsNothing);
-    await tester.tapAt(const Offset(1, 1));
+    await tester.tapAt(const Offset(5, 5));
     expect(backTaps, 0);
     expect(closeTaps, 1);
     expect(tester.takeException(), isNull);
