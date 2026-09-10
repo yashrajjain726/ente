@@ -1,1 +1,0 @@
-- Fixed a loading flicker when opening photos from the gallery viewer filmstrip.
