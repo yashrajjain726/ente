@@ -626,68 +626,69 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                           ),
                           SizedBox(height: screenSize.height * 0.02),
                         ],
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 48),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenSize.width * 0.16,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: .center,
-                              children: [
-                                // TODO: Replace with an Ente component.
-                                IconButton(
-                                  style: ButtonStyle(
-                                    fixedSize: const WidgetStatePropertyAll(
-                                      Size.square(48),
-                                    ),
-                                    shape: const WidgetStatePropertyAll(
-                                      CircleBorder(),
-                                    ),
-                                    foregroundColor:
-                                        const WidgetStatePropertyAll(
-                                          Colors.white,
-                                        ),
-                                    overlayColor: const WidgetStatePropertyAll(
-                                      Colors.transparent,
-                                    ),
-                                    backgroundColor:
-                                        WidgetStateProperty.resolveWith(
-                                          (states) => Colors.white.withValues(
-                                            alpha:
-                                                states.contains(
-                                                  WidgetState.disabled,
-                                                )
-                                                ? 0.16
-                                                : states.contains(
-                                                    WidgetState.pressed,
-                                                  )
-                                                ? 0.36
-                                                : states.contains(
-                                                    WidgetState.hovered,
-                                                  )
-                                                ? 0.30
-                                                : 0.24,
+                        if (_entries.isNotEmpty)
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenSize.width * 0.16,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: .center,
+                                children: [
+                                  // TODO: Replace with an Ente component.
+                                  IconButton(
+                                    style: ButtonStyle(
+                                      fixedSize: const WidgetStatePropertyAll(
+                                        Size.square(48),
+                                      ),
+                                      shape: const WidgetStatePropertyAll(
+                                        CircleBorder(),
+                                      ),
+                                      foregroundColor:
+                                          const WidgetStatePropertyAll(
+                                            Colors.white,
                                           ),
-                                        ),
+                                      overlayColor:
+                                          const WidgetStatePropertyAll(
+                                            Colors.transparent,
+                                          ),
+                                      backgroundColor:
+                                          WidgetStateProperty.resolveWith(
+                                            (states) => Colors.white.withValues(
+                                              alpha:
+                                                  states.contains(
+                                                    WidgetState.disabled,
+                                                  )
+                                                  ? 0.16
+                                                  : states.contains(
+                                                      WidgetState.pressed,
+                                                    )
+                                                  ? 0.36
+                                                  : states.contains(
+                                                      WidgetState.hovered,
+                                                    )
+                                                  ? 0.30
+                                                  : 0.24,
+                                            ),
+                                          ),
+                                    ),
+                                    tooltip: _playbackToken != null
+                                        ? context
+                                              .strings
+                                              .facesTimelinePlaybackPause
+                                        : context
+                                              .strings
+                                              .facesTimelinePlaybackPlay,
+                                    onPressed: _onPlayPauseTap,
+                                    icon: HugeIcon(
+                                      icon: _playbackToken != null
+                                          ? HugeIcons.strokeRoundedPause
+                                          : HugeIcons.strokeRoundedPlay,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                  tooltip: _playbackToken != null
-                                      ? context
-                                            .strings
-                                            .facesTimelinePlaybackPause
-                                      : context
-                                            .strings
-                                            .facesTimelinePlaybackPlay,
-                                  onPressed: _onPlayPauseTap,
-                                  icon: HugeIcon(
-                                    icon: _playbackToken != null
-                                        ? HugeIcons.strokeRoundedPause
-                                        : HugeIcons.strokeRoundedPlay,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                if (_entries.isNotEmpty) ...[
                                   SizedBox(width: screenSize.width * 0.03),
                                   Expanded(
                                     child: LayoutBuilder(
@@ -771,10 +772,9 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                     ),
                                   ),
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                        ),
                         SizedBox(height: screenSize.height * 0.055),
                       ],
                     ),
