@@ -4,7 +4,6 @@ import { SpaceFriendRequestCanceledToast } from "components/FriendRequestCancele
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
-import { useOwnLatestPost } from "hooks/use-own-latest-post";
 import React, { useEffect, useState } from "react";
 import { HomeScreen } from "screens/HomeScreen";
 import {
@@ -62,13 +61,6 @@ const Page: React.FC = () => {
     );
     const [latestPosts, setLatestPosts] = useState<SpacePost[]>([]);
     const [spaceId, setSpaceId] = useState<string>();
-    const {
-        ownLatestPost,
-        isOwnLatestPostLoading,
-        isOwnLatestPostUnavailable,
-        deleteOwnPost,
-        updateOwnPostCaption,
-    } = useOwnLatestPost(spaceId);
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
@@ -258,9 +250,6 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <HomeScreen
-                ownLatestPost={ownLatestPost}
-                isOwnLatestPostLoading={isOwnLatestPostLoading}
-                isOwnLatestPostUnavailable={isOwnLatestPostUnavailable}
                 latestPosts={latestPosts}
                 unreadPosts={unreadPosts}
                 friendRequestSentToastName={friendRequestSentToastName}
@@ -345,8 +334,6 @@ const Page: React.FC = () => {
                           }
                         : undefined
                 }
-                onDeletePost={deleteOwnPost}
-                onUpdatePostCaption={updateOwnPostCaption}
                 onOpenFriend={(friendID, username, section) => {
                     const friend = friends.find(
                         (candidate) =>
@@ -427,13 +414,6 @@ const Page: React.FC = () => {
                     );
                     await refreshUnreadStatus(profile.spaceId);
                 }}
-                onOpenOwnPost={() =>
-                    void router.push(
-                        `${spaceRoutes.profile}?section=latest`,
-                        undefined,
-                        { scroll: false },
-                    )
-                }
                 onOpenProfile={
                     profile
                         ? () => void router.push(spaceRoutes.profile)

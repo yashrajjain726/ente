@@ -16,7 +16,7 @@ import {
 } from "components/FileViewer";
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpaceOwnPostTile } from "components/OwnPostTile";
+import { SpaceNewPostButton } from "components/NewPostButton";
 import {
     SpacePostBadge,
     SpacePostUnreadBadge,
@@ -78,9 +78,6 @@ const tileBadgeBackground = "#343438";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
-    ownLatestPost?: SpacePost;
-    isOwnLatestPostLoading?: boolean;
-    isOwnLatestPostUnavailable?: boolean;
     latestPosts: SpacePost[];
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
@@ -96,8 +93,6 @@ interface HomeScreenProps {
         image: SpaceDraftPostImage,
         caption: string,
     ) => Promise<void>;
-    onDeletePost?: (postId: number) => Promise<void>;
-    onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onLoadPostImage?: SpacePostAssetURLLoader;
     onFriendRequestSentToastClose?: () => void;
@@ -113,7 +108,6 @@ interface HomeScreenProps {
     onOpenMessages?: () => void;
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
-    onOpenOwnPost?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
@@ -994,9 +988,6 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
-    ownLatestPost,
-    isOwnLatestPostLoading = false,
-    isOwnLatestPostUnavailable = false,
     latestPosts,
     unreadPosts,
     friendRequestSentToastName,
@@ -1009,8 +1000,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isHomeCacheLoading = false,
     showInstallPrompt = false,
     onCreatePost,
-    onDeletePost,
-    onUpdatePostCaption,
     onAcceptFriendRequest,
     onAddFriend,
     onDiscardFriendRequest,
@@ -1022,7 +1011,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenMessages,
     onMessageFriend,
     onPokeFriend,
-    onOpenOwnPost,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -1064,7 +1052,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const isPostPhotoButtonDisabled =
         isPostPhotoOpening || !viewerSpaceId || !onCreatePost;
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
-    const selectedPhotoPostId = selectedViewer?.photo.postId;
     const selectedPhotoIsOwn =
         Boolean(viewerSpaceId) && selectedPhotoFriendID == viewerSpaceId;
     const latestPostByFriendID = React.useMemo(() => {
@@ -1138,7 +1125,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         postTileCanvasSize.width,
         postTileCanvasSize.height,
     );
-    const firstFriendTile = postLayout?.friends[0];
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
     const isHomeItemsLoading = isFriendsLoading || isFriendRequestsLoading;
@@ -1389,29 +1375,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         },
         [onSetPostLiked],
     );
-    const updateSelectedViewerPostCaption = async (
-        postId: number,
-        caption: string,
-    ) => {
-        await onUpdatePostCaption?.(postId, caption);
-        const normalizedCaption = caption.trim() || undefined;
-        setSelectedViewer((viewer) =>
-            viewer
-                ? {
-                      ...viewer,
-                      photo:
-                          viewer.photo.postId == postId
-                              ? { ...viewer.photo, caption: normalizedCaption }
-                              : viewer.photo,
-                      posts: viewer.posts?.map((post) =>
-                          post.postId == postId
-                              ? { ...post, caption: normalizedCaption }
-                              : post,
-                      ),
-                  }
-                : viewer,
-        );
-    };
 
     React.useEffect(() => {
         if (!selectedViewerPosts || selectedViewerPostIndex == undefined)
@@ -1774,25 +1737,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             )
                         )}
                     </Box>
-                    <SpaceOwnPostTile
-                        profile={profile}
-                        post={ownLatestPost}
-                        avatarSize={
-                            firstFriendTile
-                                ? spaceTileAvatarSize(
-                                      firstFriendTile,
-                                      orderedHomeItems.length ==
-                                          maximumHomeTileCount,
-                                  )
-                                : undefined
-                        }
-                        isLoading={isOwnLatestPostLoading}
-                        isUnavailable={isOwnLatestPostUnavailable}
-                        isNewPostDisabled={isPostPhotoButtonDisabled}
-                        onLoadPostImage={onLoadPostImage}
-                        onNewPost={openPostPhotoPicker}
-                        onOpenProfile={onOpenProfile}
-                        onOpenPost={onOpenOwnPost}
+                    <SpaceNewPostButton
+                        isDisabled={isPostPhotoButtonDisabled}
+                        onClick={openPostPhotoPicker}
                     />
                 </Box>
                 {selectedContact && (
@@ -1834,18 +1781,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 : undefined
                         }
                         onClose={closeSelectedPhoto}
-                        onDeletePost={
-                            selectedPhotoIsOwn &&
-                            selectedPhotoPostId &&
-                            onDeletePost
-                                ? () => onDeletePost(selectedPhotoPostId)
-                                : undefined
-                        }
-                        onUpdatePostCaption={
-                            selectedPhotoIsOwn && onUpdatePostCaption
-                                ? updateSelectedViewerPostCaption
-                                : undefined
-                        }
                         onOpenProfile={
                             selectedPhotoIsOwn && onOpenProfile
                                 ? () => {

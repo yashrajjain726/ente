@@ -5,7 +5,7 @@ import { SpaceAddFriendDialog } from "components/AddFriendDialog";
 import { SpaceAddFriendTile } from "components/AddFriendTile";
 import { SpaceFileViewer } from "components/FileViewer";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpaceOwnPostTile } from "components/OwnPostTile";
+import { SpaceNewPostButton } from "components/NewPostButton";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
 import { FriendPostTile } from "screens/HomeScreen";
@@ -30,18 +30,6 @@ const demoProfile: SetupProfile = {
     spaceId: "demo-self",
     username: "you",
 };
-const demoOwnPosts: SpacePost[] = [
-    spaceDefaultCoverImagePath,
-    "/images/invite-bg.jpg",
-].map((imageUrl, index) => ({
-    friendID: "demo-self",
-    imageUrl,
-    name: demoProfile.fullName,
-    postId: 100 - index,
-    spaceId: "demo-self",
-    timestampMs: 1_700_000_000_000 - index * 86_400_000,
-    viewerLiked: false,
-}));
 
 interface CanvasSize {
     height: number;
@@ -144,36 +132,18 @@ const LayoutDemoPage: React.FC = () => {
     const router = useSpaceRouter();
     const [isAddFriendOpen, setIsAddFriendOpen] = React.useState(false);
     const [profileLink, setProfileLink] = React.useState<string>();
-    const [{ friendCount, ownPosts }, setDemo] = React.useState({
-        friendCount: 0,
-        ownPosts: [] as SpacePost[],
-    });
+    const [friendCount, setFriendCount] = React.useState(0);
     const changeFriendCount = React.useCallback((delta: number) => {
-        setDemo(({ friendCount }) => {
-            const count = Math.max(
-                0,
-                Math.min(maximumHomeTileCount, friendCount + delta),
-            );
-            return {
-                friendCount: count,
-                ownPosts: count % 2 == 0 ? [] : demoOwnPosts,
-            };
-        });
+        setFriendCount((count) =>
+            Math.max(0, Math.min(maximumHomeTileCount, count + delta)),
+        );
     }, []);
-    const [ownViewerPosts, setOwnViewerPosts] = React.useState<SpacePost[]>([]);
-    const [ownPostIndex, setOwnPostIndex] = React.useState<number>();
-    const ownViewerOpen = ownPostIndex !== undefined;
+    const [isPostPreviewOpen, setIsPostPreviewOpen] = React.useState(false);
     useBrowserBackClose({
-        open: ownViewerOpen,
-        onClose: () => setOwnPostIndex(undefined),
+        open: isPostPreviewOpen,
+        onClose: () => setIsPostPreviewOpen(false),
         stateKey: "space-layout-demo-viewer",
     });
-    const ownPostPhotos = ownViewerPosts.map((post) => ({
-        ...post,
-        alt: "Your post",
-        avatarUrl: demoProfile.avatarUrl,
-        imageUrl: post.imageUrl ?? "",
-    }));
     const [canvasSize, setCanvasSize] = React.useState<CanvasSize>({
         height: 0,
         width: 0,
@@ -195,7 +165,7 @@ const LayoutDemoPage: React.FC = () => {
     }, []);
 
     React.useEffect(() => {
-        if (ownViewerOpen || isAddFriendOpen) return;
+        if (isPostPreviewOpen || isAddFriendOpen) return;
 
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key == "ArrowLeft") {
@@ -206,7 +176,7 @@ const LayoutDemoPage: React.FC = () => {
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [changeFriendCount, isAddFriendOpen, ownViewerOpen]);
+    }, [changeFriendCount, isAddFriendOpen, isPostPreviewOpen]);
 
     const layout = homeTileLayout(
         friendCount,
@@ -368,19 +338,8 @@ const LayoutDemoPage: React.FC = () => {
                             </>
                         )}
                     </Box>
-                    <SpaceOwnPostTile
-                        profile={demoProfile}
-                        post={ownPosts[0]}
-                        onNewPost={() =>
-                            setDemo((current) => ({
-                                ...current,
-                                ownPosts: demoOwnPosts,
-                            }))
-                        }
-                        onOpenPost={() => {
-                            setOwnViewerPosts(ownPosts);
-                            setOwnPostIndex(0);
-                        }}
+                    <SpaceNewPostButton
+                        onClick={() => setIsPostPreviewOpen(true)}
                     />
                 </Box>
                 <SpaceAddFriendDialog
@@ -395,41 +354,18 @@ const LayoutDemoPage: React.FC = () => {
                     profileLink={profileLink}
                     username={demoProfile.username}
                 />
-                {ownPostIndex !== undefined && (
+                {isPostPreviewOpen && (
                     <SpaceFileViewer
-                        photo={ownPostPhotos[ownPostIndex]!}
-                        photos={ownPostPhotos}
-                        photoIndex={ownPostIndex}
-                        onPhotoIndexChange={setOwnPostIndex}
-                        postActionMode="hidden"
-                        onClose={() => setOwnPostIndex(undefined)}
-                        onDeletePost={() => {
-                            const postId = ownViewerPosts[ownPostIndex]!.postId;
-                            setDemo((current) => ({
-                                ...current,
-                                ownPosts: current.ownPosts.filter(
-                                    (post) => post.postId != postId,
-                                ),
-                            }));
+                        photo={{
+                            alt: "Your post",
+                            avatarUrl: demoProfile.avatarUrl,
+                            imageUrl: spaceDefaultCoverImagePath,
+                            name: demoProfile.fullName,
+                            timestampMs: 1_700_000_000_000,
                         }}
-                        onUpdatePostCaption={(postId, caption) => {
-                            const updatePosts = (posts: SpacePost[]) =>
-                                posts.map((post) =>
-                                    post.postId == postId
-                                        ? {
-                                              ...post,
-                                              caption:
-                                                  caption.trim() || undefined,
-                                          }
-                                        : post,
-                                );
-                            setDemo((current) => ({
-                                ...current,
-                                ownPosts: updatePosts(current.ownPosts),
-                            }));
-                            setOwnViewerPosts(updatePosts);
-                            return Promise.resolve();
-                        }}
+                        postActionMode="draft-post"
+                        onClose={() => setIsPostPreviewOpen(false)}
+                        onPublishDraftPost={() => Promise.resolve()}
                     />
                 )}
             </Box>
