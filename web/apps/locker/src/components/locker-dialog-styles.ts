@@ -5,7 +5,8 @@ export const lockerMenuPaperSx = (theme: Theme) => ({
     "& .MuiMenuItem-root:last-of-type": { borderBottomColor: "transparent" },
     width: 196,
     borderRadius: "20px",
-    overflow: "hidden",
+    overflowX: "hidden" as const,
+    overflowY: "auto" as const,
     boxShadow: lockerShadowFloating,
     border: "1px solid",
     ...lockerColorSx(theme, {

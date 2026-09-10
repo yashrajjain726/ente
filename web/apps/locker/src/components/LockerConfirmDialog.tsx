@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { t } from "i18next";
-import type React from "react";
+import React, { useId } from "react";
 
 interface LockerConfirmDialogProps {
     open: boolean;
@@ -55,6 +55,8 @@ export function LockerConfirmDialog({
     onClose,
     onConfirm,
 }: LockerConfirmDialogProps) {
+    const titleID = useId();
+    const bodyID = useId();
     const handleClose = () => {
         if (!loading) {
             onClose();
@@ -64,6 +66,8 @@ export function LockerConfirmDialog({
     return (
         <Dialog
             open={open}
+            aria-labelledby={titleID}
+            aria-describedby={bodyID}
             onClose={handleClose}
             fullWidth
             maxWidth="xs"
@@ -113,11 +117,13 @@ export function LockerConfirmDialog({
                     }}
                 />
                 <Typography
+                    id={titleID}
                     sx={{ ...lockerTextH2Sx, textAlign: "center", mt: 2.5 }}
                 >
                     {title}
                 </Typography>
                 <Typography
+                    id={bodyID}
                     sx={(theme) => ({
                         ...lockerTextBodySx,
                         textAlign: "center",

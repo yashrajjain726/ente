@@ -28,7 +28,7 @@ import {
 } from "@mui/material";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { t } from "i18next";
-import React from "react";
+import React, { useId } from "react";
 import {
     lockerSheetContainerSx,
     lockerSheetPaperSx,
@@ -126,448 +126,461 @@ export const ItemListDialogs: React.FC<ItemListDialogsProps> = ({
     setRestoreCollectionID,
     collectionFilterAnchorEl,
     fileLinkDialogOpen,
-}) => (
-    <>
-        <LockerFileLinkDialog
-            open={fileLinkDialogOpen}
-            itemTitle={activeFileLinkItemTitle}
-            url={activeFileLinkURL ?? undefined}
-            loading={isCreatingFileLink}
-            deleting={isDeletingFileLink}
-            showShareAction={canNativeShare}
-            onClose={closeFileLinkDialog}
-            onCopy={onCopyFileLink}
-            onShare={onShareFileLink}
-            onDelete={onRequestDeleteFileLink}
-        />
+}) => {
+    const restoreTitleID = useId();
+    return (
+        <>
+            <LockerFileLinkDialog
+                open={fileLinkDialogOpen}
+                itemTitle={activeFileLinkItemTitle}
+                url={activeFileLinkURL ?? undefined}
+                loading={isCreatingFileLink}
+                deleting={isDeletingFileLink}
+                showShareAction={canNativeShare}
+                onClose={closeFileLinkDialog}
+                onCopy={onCopyFileLink}
+                onShare={onShareFileLink}
+                onDelete={onRequestDeleteFileLink}
+            />
 
-        <LockerConfirmDialog
-            open={isDeleteFileLinkConfirmOpen}
-            illustration="/images/file_delete_icon.png"
-            title={t("deleteShareLinkDialogTitle")}
-            body={t("deleteShareLinkConfirmation")}
-            confirmLabel={t("delete")}
-            loading={isDeletingFileLink}
-            onClose={() => {
-                if (!isDeletingFileLink) {
-                    setDeleteFileLinkConfirmOpen(false);
-                }
-            }}
-            onConfirm={deleteFileLink}
-        />
+            <LockerConfirmDialog
+                open={isDeleteFileLinkConfirmOpen}
+                illustration="/images/file_delete_icon.png"
+                title={t("deleteShareLinkDialogTitle")}
+                body={t("deleteShareLinkConfirmation")}
+                confirmLabel={t("delete")}
+                loading={isDeletingFileLink}
+                onClose={() => {
+                    if (!isDeletingFileLink) {
+                        setDeleteFileLinkConfirmOpen(false);
+                    }
+                }}
+                onConfirm={deleteFileLink}
+            />
 
-        <Dialog
-            slotProps={{
-                paper: { sx: lockerSheetPaperSx },
-                container: { sx: lockerSheetContainerSx },
-            }}
-            open={restoreDialogOpen}
-            onClose={() => {
-                if (!restoringItem) {
-                    onCloseRestoreDialog();
-                }
-            }}
-            fullWidth
-            maxWidth="xs"
-        >
-            <Stack>
-                <Stack
-                    direction="row"
-                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
-                >
-                    <Typography
-                        noWrap
-                        sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+            <Dialog
+                slotProps={{
+                    paper: { sx: lockerSheetPaperSx },
+                    container: { sx: lockerSheetContainerSx },
+                }}
+                open={restoreDialogOpen}
+                aria-labelledby={restoreTitleID}
+                onClose={() => {
+                    if (!restoringItem) {
+                        onCloseRestoreDialog();
+                    }
+                }}
+                fullWidth
+                maxWidth="xs"
+            >
+                <Stack>
+                    <Stack
+                        direction="row"
+                        sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
                     >
-                        {t("restoreToCollection")}
-                    </Typography>
-                    <IconButton
-                        aria-label={t("cancel")}
-                        disabled={restoringItem}
-                        onClick={() => {
-                            if (!restoringItem) {
-                                onCloseRestoreDialog();
-                            }
-                        }}
+                        <Typography
+                            id={restoreTitleID}
+                            noWrap
+                            sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+                        >
+                            {t("restoreToCollection")}
+                        </Typography>
+                        <IconButton
+                            aria-label={t("cancel")}
+                            disabled={restoringItem}
+                            onClick={() => {
+                                if (!restoringItem) {
+                                    onCloseRestoreDialog();
+                                }
+                            }}
+                            sx={(theme) => ({
+                                width: 36,
+                                height: 36,
+                                borderRadius: "50%",
+                                p: 0,
+                                flexShrink: 0,
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "fillLight",
+                                    color: "iconColor",
+                                }),
+                                "&:hover": {
+                                    ...lockerColorSx(theme, {
+                                        backgroundColor: "fillDark",
+                                    }),
+                                },
+                            })}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={1.5}
+                            />
+                        </IconButton>
+                    </Stack>
+                    <Typography
                         sx={(theme) => ({
-                            width: 36,
-                            height: 36,
-                            borderRadius: "50%",
-                            p: 0,
-                            flexShrink: 0,
+                            ...lockerTextMiniSx,
+                            mt: 2.5,
+                            mb: 1,
+                            ...lockerColorSx(theme, { color: "textLight" }),
+                        })}
+                    >
+                        {t("collections")}
+                    </Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                        {restoreCollections.length > 0 ? (
+                            restoreCollections.map((collection) => (
+                                <Chip
+                                    key={collection.id}
+                                    label={collection.name}
+                                    icon={
+                                        restoreCollectionID ===
+                                        collection.id ? (
+                                            <CheckRoundedIcon
+                                                sx={{ fontSize: 14 }}
+                                            />
+                                        ) : undefined
+                                    }
+                                    disabled={restoringItem}
+                                    onClick={() =>
+                                        setRestoreCollectionID(collection.id)
+                                    }
+                                    sx={(theme) => ({
+                                        height: 36,
+                                        borderRadius: "9999px",
+                                        px: "14px",
+                                        border: "1px solid",
+                                        ...lockerColorSx(theme, {
+                                            backgroundColor:
+                                                restoreCollectionID ===
+                                                collection.id
+                                                    ? "primaryLight"
+                                                    : "fillLight",
+                                            color:
+                                                restoreCollectionID ===
+                                                collection.id
+                                                    ? "primary"
+                                                    : "textBase",
+                                            ...(restoreCollectionID ===
+                                            collection.id
+                                                ? {
+                                                      borderColor:
+                                                          "primaryStroke" as const,
+                                                  }
+                                                : {}),
+                                        }),
+                                        ...(restoreCollectionID ===
+                                        collection.id
+                                            ? {}
+                                            : { borderColor: "transparent" }),
+                                        "& .MuiChip-label": {
+                                            ...lockerTextBodySx,
+                                            px: 0,
+                                        },
+                                        "& .MuiChip-icon": {
+                                            ml: 0,
+                                            mr: 0.75,
+                                            ...lockerColorSx(theme, {
+                                                color: "primary",
+                                            }),
+                                        },
+                                    })}
+                                />
+                            ))
+                        ) : (
+                            <Typography
+                                sx={(theme) => ({
+                                    ...lockerTextBodySx,
+                                    ...lockerColorSx(theme, {
+                                        color: "textLight",
+                                    }),
+                                })}
+                            >
+                                {t("noCollectionsAvailableForSelection")}
+                            </Typography>
+                        )}
+                    </Box>
+                    {restoreError && (
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextMiniSx,
+                                mt: 1.5,
+                                ...lockerColorSx(theme, { color: "warning" }),
+                            })}
+                        >
+                            {restoreError}
+                        </Typography>
+                    )}
+                    <LoadingButton
+                        fullWidth
+                        variant="contained"
+                        loading={restoringItem}
+                        disabled={restoreCollectionID === null}
+                        onClick={onConfirmRestore}
+                        sx={(theme) => ({
+                            ...lockerTextBodyBoldSx,
+                            mt: 3,
+                            minHeight: 52,
+                            borderRadius: "20px",
+                            textTransform: "none",
                             ...lockerColorSx(theme, {
-                                backgroundColor: "fillLight",
-                                color: "iconColor",
+                                backgroundColor: "primary",
+                                color: "specialWhite",
                             }),
                             "&:hover": {
                                 ...lockerColorSx(theme, {
-                                    backgroundColor: "fillDark",
+                                    backgroundColor: "primaryDark",
+                                }),
+                            },
+                            "&.Mui-disabled": {
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "fillDarkest",
+                                    color: "textLighter",
                                 }),
                             },
                         })}
                     >
-                        <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={18}
-                            strokeWidth={1.5}
-                        />
-                    </IconButton>
+                        {t("restore")}
+                    </LoadingButton>
                 </Stack>
-                <Typography
-                    sx={(theme) => ({
-                        ...lockerTextMiniSx,
-                        mt: 2.5,
-                        mb: 1,
-                        ...lockerColorSx(theme, { color: "textLight" }),
-                    })}
-                >
-                    {t("collections")}
-                </Typography>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                    {restoreCollections.length > 0 ? (
-                        restoreCollections.map((collection) => (
-                            <Chip
-                                key={collection.id}
-                                label={collection.name}
-                                icon={
-                                    restoreCollectionID === collection.id ? (
-                                        <CheckRoundedIcon
-                                            sx={{ fontSize: 14 }}
-                                        />
-                                    ) : undefined
-                                }
-                                disabled={restoringItem}
-                                onClick={() =>
-                                    setRestoreCollectionID(collection.id)
-                                }
-                                sx={(theme) => ({
-                                    height: 36,
-                                    borderRadius: "9999px",
-                                    px: "14px",
-                                    border: "1px solid",
-                                    ...lockerColorSx(theme, {
-                                        backgroundColor:
-                                            restoreCollectionID ===
-                                            collection.id
-                                                ? "primaryLight"
-                                                : "fillLight",
-                                        color:
-                                            restoreCollectionID ===
-                                            collection.id
-                                                ? "primary"
-                                                : "textBase",
-                                        ...(restoreCollectionID ===
-                                        collection.id
-                                            ? {
-                                                  borderColor:
-                                                      "primaryStroke" as const,
-                                              }
-                                            : {}),
-                                    }),
-                                    ...(restoreCollectionID === collection.id
-                                        ? {}
-                                        : { borderColor: "transparent" }),
-                                    "& .MuiChip-label": {
-                                        ...lockerTextBodySx,
-                                        px: 0,
-                                    },
-                                    "& .MuiChip-icon": {
-                                        ml: 0,
-                                        mr: 0.75,
-                                        ...lockerColorSx(theme, {
-                                            color: "primary",
-                                        }),
-                                    },
-                                })}
+            </Dialog>
+
+            <Dialog
+                slotProps={{
+                    paper: { sx: lockerSheetPaperSx },
+                    container: { sx: lockerSheetContainerSx },
+                }}
+                open={renameCollectionOpen}
+                onClose={() => {
+                    if (!renamingCollection) {
+                        onCloseRenameDialog();
+                    }
+                }}
+                fullWidth
+                maxWidth="xs"
+            >
+                <Stack>
+                    <Stack
+                        direction="row"
+                        sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
+                    >
+                        <Typography
+                            sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+                        >
+                            {t("renameCollection")}
+                        </Typography>
+                        <IconButton
+                            aria-label={t("close")}
+                            onClick={onCloseRenameDialog}
+                            disabled={renamingCollection}
+                            sx={lockerHeaderIconButtonSx}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={1.5}
                             />
-                        ))
-                    ) : (
+                        </IconButton>
+                    </Stack>
+                    <Box sx={{ mt: 2.5 }}>
+                        <FormField
+                            value={renameValue}
+                            onChange={(event) =>
+                                setRenameValue(event.target.value)
+                            }
+                            label={t("enterCollectionName")}
+                            required
+                            autoFocus
+                            disabled={renamingCollection}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    void onConfirmRename();
+                                }
+                            }}
+                        />
+                    </Box>
+                    {renameError && (
                         <Typography
                             sx={(theme) => ({
-                                ...lockerTextBodySx,
-                                ...lockerColorSx(theme, { color: "textLight" }),
+                                ...lockerTextMiniSx,
+                                mt: 1.5,
+                                ...lockerColorSx(theme, { color: "warning" }),
                             })}
                         >
-                            {t("noCollectionsAvailableForSelection")}
+                            {renameError}
                         </Typography>
                     )}
-                </Box>
-                {restoreError && (
-                    <Typography
+                    <LoadingButton
+                        fullWidth
+                        color="primary"
+                        loading={renamingCollection}
+                        disabled={!renameValue.trim()}
+                        onClick={onConfirmRename}
                         sx={(theme) => ({
-                            ...lockerTextMiniSx,
-                            mt: 1.5,
-                            ...lockerColorSx(theme, { color: "warning" }),
+                            ...lockerTextBodyBoldSx,
+                            mt: 3,
+                            borderRadius: "20px",
+                            textTransform: "none",
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "primary",
+                                color: "specialWhite",
+                            }),
+                            "&:hover": {
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "primaryDark",
+                                }),
+                            },
+                            ...lockerPrimaryButtonSx(theme, {
+                                loading: renamingCollection,
+                            }),
                         })}
                     >
-                        {restoreError}
-                    </Typography>
-                )}
-                <LoadingButton
-                    fullWidth
-                    variant="contained"
-                    loading={restoringItem}
-                    disabled={restoreCollectionID === null}
-                    onClick={onConfirmRestore}
-                    sx={(theme) => ({
-                        ...lockerTextBodyBoldSx,
-                        mt: 3,
-                        minHeight: 52,
-                        borderRadius: "20px",
-                        textTransform: "none",
-                        ...lockerColorSx(theme, {
-                            backgroundColor: "primary",
-                            color: "specialWhite",
-                        }),
-                        "&:hover": {
-                            ...lockerColorSx(theme, {
-                                backgroundColor: "primaryDark",
-                            }),
-                        },
-                        "&.Mui-disabled": {
-                            ...lockerColorSx(theme, {
-                                backgroundColor: "fillDarkest",
-                                color: "textLighter",
-                            }),
-                        },
-                    })}
-                >
-                    {t("restore")}
-                </LoadingButton>
-            </Stack>
-        </Dialog>
-
-        <Dialog
-            slotProps={{
-                paper: { sx: lockerSheetPaperSx },
-                container: { sx: lockerSheetContainerSx },
-            }}
-            open={renameCollectionOpen}
-            onClose={() => {
-                if (!renamingCollection) {
-                    onCloseRenameDialog();
-                }
-            }}
-            fullWidth
-            maxWidth="xs"
-        >
-            <Stack>
-                <Stack
-                    direction="row"
-                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
-                >
-                    <Typography
-                        sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
-                    >
-                        {t("renameCollection")}
-                    </Typography>
-                    <IconButton
-                        aria-label={t("close")}
-                        onClick={onCloseRenameDialog}
-                        disabled={renamingCollection}
-                        sx={lockerHeaderIconButtonSx}
-                    >
-                        <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={18}
-                            strokeWidth={1.5}
-                        />
-                    </IconButton>
+                        {t("save")}
+                    </LoadingButton>
                 </Stack>
-                <Box sx={{ mt: 2.5 }}>
-                    <FormField
-                        value={renameValue}
-                        onChange={(event) => setRenameValue(event.target.value)}
-                        label={t("enterCollectionName")}
-                        required
-                        autoFocus
-                        disabled={renamingCollection}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                                void onConfirmRename();
-                            }
-                        }}
-                    />
-                </Box>
-                {renameError && (
-                    <Typography
-                        sx={(theme) => ({
-                            ...lockerTextMiniSx,
-                            mt: 1.5,
-                            ...lockerColorSx(theme, { color: "warning" }),
-                        })}
-                    >
-                        {renameError}
-                    </Typography>
-                )}
-                <LoadingButton
-                    fullWidth
-                    color="primary"
-                    loading={renamingCollection}
-                    disabled={!renameValue.trim()}
-                    onClick={onConfirmRename}
-                    sx={(theme) => ({
-                        ...lockerTextBodyBoldSx,
-                        mt: 3,
-                        borderRadius: "20px",
-                        textTransform: "none",
-                        ...lockerColorSx(theme, {
-                            backgroundColor: "primary",
-                            color: "specialWhite",
-                        }),
-                        "&:hover": {
-                            ...lockerColorSx(theme, {
-                                backgroundColor: "primaryDark",
-                            }),
-                        },
-                        ...lockerPrimaryButtonSx(theme, {
-                            loading: renamingCollection,
-                        }),
-                    })}
-                >
-                    {t("save")}
-                </LoadingButton>
-            </Stack>
-        </Dialog>
+            </Dialog>
 
-        <Dialog
-            slotProps={{
-                paper: { sx: lockerSheetPaperSx },
-                container: { sx: lockerSheetContainerSx },
-            }}
-            open={createCollectionOpen}
-            onClose={() => {
-                if (!creatingCollection) {
-                    onCloseCreateCollectionDialog();
-                }
-            }}
-            fullWidth
-            maxWidth="xs"
-        >
-            <Stack>
-                <Stack
-                    direction="row"
-                    sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
-                >
-                    <Typography
-                        sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+            <Dialog
+                slotProps={{
+                    paper: { sx: lockerSheetPaperSx },
+                    container: { sx: lockerSheetContainerSx },
+                }}
+                open={createCollectionOpen}
+                onClose={() => {
+                    if (!creatingCollection) {
+                        onCloseCreateCollectionDialog();
+                    }
+                }}
+                fullWidth
+                maxWidth="xs"
+            >
+                <Stack>
+                    <Stack
+                        direction="row"
+                        sx={{ alignItems: "center", gap: 1.5, minHeight: 38 }}
                     >
-                        {t("createCollection")}
-                    </Typography>
-                    <IconButton
-                        aria-label={t("close")}
-                        onClick={onCloseCreateCollectionDialog}
-                        disabled={creatingCollection}
-                        sx={lockerHeaderIconButtonSx}
-                    >
-                        <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={18}
-                            strokeWidth={1.5}
+                        <Typography
+                            sx={{ ...lockerTextH2Sx, flex: 1, minWidth: 0 }}
+                        >
+                            {t("createCollection")}
+                        </Typography>
+                        <IconButton
+                            aria-label={t("close")}
+                            onClick={onCloseCreateCollectionDialog}
+                            disabled={creatingCollection}
+                            sx={lockerHeaderIconButtonSx}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={1.5}
+                            />
+                        </IconButton>
+                    </Stack>
+                    <Box sx={{ mt: 2.5 }}>
+                        <FormField
+                            value={createCollectionName}
+                            onChange={(event) =>
+                                setCreateCollectionName(event.target.value)
+                            }
+                            label={t("enterCollectionName")}
+                            required
+                            autoFocus
+                            disabled={creatingCollection}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    onConfirmCreateCollection();
+                                }
+                            }}
                         />
-                    </IconButton>
-                </Stack>
-                <Box sx={{ mt: 2.5 }}>
-                    <FormField
-                        value={createCollectionName}
-                        onChange={(event) =>
-                            setCreateCollectionName(event.target.value)
-                        }
-                        label={t("enterCollectionName")}
-                        required
-                        autoFocus
-                        disabled={creatingCollection}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                                onConfirmCreateCollection();
-                            }
-                        }}
-                    />
-                </Box>
-                {createCollectionError && (
-                    <Typography
+                    </Box>
+                    {createCollectionError && (
+                        <Typography
+                            sx={(theme) => ({
+                                ...lockerTextMiniSx,
+                                mt: 1.5,
+                                ...lockerColorSx(theme, { color: "warning" }),
+                            })}
+                        >
+                            {createCollectionError}
+                        </Typography>
+                    )}
+                    <LoadingButton
+                        fullWidth
+                        color="primary"
+                        loading={creatingCollection}
+                        disabled={!createCollectionName.trim()}
+                        onClick={onConfirmCreateCollection}
                         sx={(theme) => ({
-                            ...lockerTextMiniSx,
-                            mt: 1.5,
-                            ...lockerColorSx(theme, { color: "warning" }),
+                            ...lockerTextBodyBoldSx,
+                            mt: 3,
+                            borderRadius: "20px",
+                            textTransform: "none",
+                            ...lockerColorSx(theme, {
+                                backgroundColor: "primary",
+                                color: "specialWhite",
+                            }),
+                            "&:hover": {
+                                ...lockerColorSx(theme, {
+                                    backgroundColor: "primaryDark",
+                                }),
+                            },
+                            ...lockerPrimaryButtonSx(theme, {
+                                loading: creatingCollection,
+                            }),
                         })}
                     >
-                        {createCollectionError}
-                    </Typography>
-                )}
-                <LoadingButton
-                    fullWidth
-                    color="primary"
-                    loading={creatingCollection}
-                    disabled={!createCollectionName.trim()}
-                    onClick={onConfirmCreateCollection}
-                    sx={(theme) => ({
-                        ...lockerTextBodyBoldSx,
-                        mt: 3,
-                        borderRadius: "20px",
-                        textTransform: "none",
-                        ...lockerColorSx(theme, {
-                            backgroundColor: "primary",
-                            color: "specialWhite",
-                        }),
-                        "&:hover": {
-                            ...lockerColorSx(theme, {
-                                backgroundColor: "primaryDark",
-                            }),
-                        },
-                        ...lockerPrimaryButtonSx(theme, {
-                            loading: creatingCollection,
-                        }),
-                    })}
-                >
-                    {t("createCollectionButton")}
-                </LoadingButton>
-            </Stack>
-        </Dialog>
+                        {t("createCollectionButton")}
+                    </LoadingButton>
+                </Stack>
+            </Dialog>
 
-        <Menu
-            anchorEl={collectionFilterAnchorEl}
-            open={!!collectionFilterAnchorEl}
-            onClose={closeCollectionFilterMenu}
-            slotProps={{
-                paper: { sx: [lockerMenuPaperSx, { mt: 1 }] },
-                list: { disablePadding: true },
-            }}
-        >
-            {dropdownHomeCollections.map((collection) => {
-                const isSelected = homeSelectedCollectionIDs.includes(
-                    collection.id,
-                );
-                return (
-                    <LockerMenuOption
-                        key={collection.id}
-                        onClick={() => onToggleHomeCollection(collection.id)}
-                        selected={isSelected}
-                        secondary={new Intl.NumberFormat().format(
-                            collection.items.length,
-                        )}
+            <Menu
+                anchorEl={collectionFilterAnchorEl}
+                open={!!collectionFilterAnchorEl}
+                onClose={closeCollectionFilterMenu}
+                slotProps={{
+                    paper: { sx: [lockerMenuPaperSx, { mt: 1 }] },
+                    list: { disablePadding: true },
+                }}
+            >
+                {dropdownHomeCollections.map((collection) => {
+                    const isSelected = homeSelectedCollectionIDs.includes(
+                        collection.id,
+                    );
+                    return (
+                        <LockerMenuOption
+                            key={collection.id}
+                            onClick={() =>
+                                onToggleHomeCollection(collection.id)
+                            }
+                            selected={isSelected}
+                            secondary={new Intl.NumberFormat().format(
+                                collection.items.length,
+                            )}
+                        >
+                            {collection.name}
+                        </LockerMenuOption>
+                    );
+                })}
+                {homeSelectedCollectionIDs.length > 0 && (
+                    <LockerMenuFooter
+                        onClick={() => {
+                            clearHomeCollectionSelection();
+                            closeCollectionFilterMenu();
+                        }}
                     >
-                        {collection.name}
-                    </LockerMenuOption>
-                );
-            })}
-            {homeSelectedCollectionIDs.length > 0 && (
-                <LockerMenuFooter
-                    onClick={() => {
-                        clearHomeCollectionSelection();
-                        closeCollectionFilterMenu();
-                    }}
-                >
-                    {t("clearSelection")}
-                </LockerMenuFooter>
-            )}
-        </Menu>
+                        {t("clearSelection")}
+                    </LockerMenuFooter>
+                )}
+            </Menu>
 
-        <Snackbar
-            open={feedbackMessage !== null}
-            message={feedbackMessage}
-            autoHideDuration={2500}
-            onClose={onCloseFeedback}
-        />
-    </>
-);
+            <Snackbar
+                open={feedbackMessage !== null}
+                message={feedbackMessage}
+                autoHideDuration={2500}
+                onClose={onCloseFeedback}
+            />
+        </>
+    );
+};
