@@ -28,38 +28,35 @@ Future<void> showCastSheet(
   final showAutoPair = service.isSupported;
   final logger = Logger("showCastSheet");
   if (!flagService.enableMultiCast) {
-    if (service.getActiveSessions().isNotEmpty) {
+    final shouldStop = service.getActiveSessions().isNotEmpty;
+    if (shouldStop) {
       final result = await showChoiceDialog(
         context,
         title: l10n.stopCastingTitle,
         body: l10n.stopCastingBody,
         firstButtonLabel: l10n.yes,
         secondButtonLabel: l10n.no,
-        firstButtonOnTap: () async {
-          await gw.revokeAllTokens();
-          await service.closeActiveCasts();
-        },
       );
-      if (result?.action == ButtonAction.error && context.mounted) {
-        await showGenericErrorDialog(
-          context: context,
-          error: result?.exception,
-        );
+      if (result?.action != ButtonAction.first || !context.mounted) {
+        return;
       }
-      return;
     }
     final dialog = createProgressDialog(context, l10n.pleaseWait);
     await dialog.show();
     try {
       await gw.revokeAllTokens();
+      if (shouldStop) {
+        await service.closeActiveCasts();
+      }
       await dialog.hide();
     } catch (e, s) {
       await dialog.hide();
-      logger.severe("Failed to revoke cast tokens before pairing", e, s);
+      logger.severe("Failed to revoke or stop cast sessions", e, s);
       if (!context.mounted) return;
       await showGenericErrorDialog(context: context, error: e);
       return;
     }
+    if (shouldStop) return;
   }
   List<CastInfo> sessions = [];
   if (flagService.enableMultiCast) {

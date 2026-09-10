@@ -4,6 +4,7 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:package_info_plus/package_info_plus.dart";
+import "package:photos/core/network/network.dart";
 import "package:photos/ente_theme_data.dart";
 import "package:photos/gateways/cast/cast_gateway.dart";
 import "package:photos/models/collection/collection.dart";
@@ -43,12 +44,27 @@ void main() {
 
     await tester.tap(find.text("Cast"));
     await tester.pumpAndSettle();
+    await tester.tap(find.text("No"));
+    await tester.pumpAndSettle();
+    expect(requests.pending, isEmpty);
+    expect(transport.closeCount, 0);
+
+    await tester.tap(find.text("Cast"));
+    await tester.pumpAndSettle();
     await tester.tap(find.text("Yes"));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(seconds: 1));
 
     expect(requests.pending, hasLength(1));
     expect(transport.closeCount, 0);
-    expect(find.text("Stop casting"), findsOneWidget);
+    expect(find.text("No"), findsNothing);
+    expect(find.text("Please wait..."), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text("Please wait..."), findsOneWidget);
 
     requests.fail();
     await tester.pumpAndSettle();
@@ -60,6 +76,8 @@ void main() {
     await tester.tap(find.text("Cast"));
     await tester.pumpAndSettle();
     await tester.tap(find.text("Yes"));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(seconds: 1));
     expect(transport.closeCount, 0);
 
@@ -99,6 +117,21 @@ void main() {
     expect(find.text("Auto pair"), findsOneWidget);
     expect(find.text("Pair using code"), findsOneWidget);
     expect(transport.closeCount, 0);
+
+    await tester.tap(find.text("Pair using code"));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), "ABC123");
+    await tester.tap(find.text("Pair"));
+    await tester.pump(const Duration(seconds: 1));
+    expect(requests.pending, hasLength(1));
+    expect(requests.pending.single.$1.method, "GET");
+    expect(requests.pending.single.$1.path, "/cast/device-info/ABC123");
+    requests.fail();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text("Error"), findsOneWidget);
+    await tester.tap(find.text("OK"));
+    await tester.pumpAndSettle();
   });
 }
 
@@ -107,6 +140,9 @@ Future<void> _pumpCastButton(
   _RevocationRequests requests,
   CastService transport,
 ) async {
+  final originalNetworkClient = NetworkClient.instance;
+  NetworkClient.instance = _FakeNetworkClient(requests.dio);
+  addTearDown(() => NetworkClient.instance = originalNetworkClient);
   await tester.pumpWidget(
     MaterialApp(
       theme: lightThemeData,
@@ -137,8 +173,6 @@ class _RevocationRequests {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          expect(options.method, "DELETE");
-          expect(options.path, "/cast/revoke-all-tokens");
           pending.add((options, handler));
         },
       ),
@@ -182,3 +216,10 @@ class _FakeCastService extends Fake implements CastService {
 }
 
 class _FakeCollection extends Fake implements Collection {}
+
+class _FakeNetworkClient extends Fake implements NetworkClient {
+  @override
+  final Dio enteDio;
+
+  _FakeNetworkClient(this.enteDio);
+}
