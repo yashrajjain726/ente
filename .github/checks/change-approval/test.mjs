@@ -1061,6 +1061,7 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
     const { output, summary } = scan(
         t,
         {
+            "rust/Cargo.toml": '[lints.rust]\nunsafe_code = "deny"\n',
             [`${checkerDir}/rust.mjs`]:
                 'export { checkRust } from "./additional-rule.mjs";',
             [`${checkerDir}/additional-rule.mjs`]: readFileSync(
@@ -1069,6 +1070,8 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
             ),
         },
         {
+            "rust/Cargo.toml": '[lints.rust]\nunsafe_code = "allow"\n',
+            "tomllib.py": "def loads(source):\n    return {}\n",
             [`${checkerDir}/additional-rule.mjs`]:
                 "export function checkRust() { return []; }",
             [`${checkerDir}/web.mjs`]:
@@ -1085,4 +1088,5 @@ test("workflow scans PR changes with the complete checker from main", (t) => {
     );
     assert.match(summary, /- `src\/lib.rs`/);
     assert.match(summary, /- `web\/example.ts`/);
+    assert.match(summary, /- `rust\/Cargo.toml`/);
 });
