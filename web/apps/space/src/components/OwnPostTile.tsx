@@ -106,7 +106,7 @@ interface SpaceOwnPostTileProps {
     isUnavailable?: boolean;
     isNewPostDisabled?: boolean;
     onLoadPostImage?: SpacePostAssetURLLoader;
-    onOpenPost?: (imageUrl: string) => void;
+    onOpenPost?: () => void;
     onOpenProfile?: () => void;
     onNewPost: () => void;
 }
@@ -145,10 +145,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     const unavailable =
         isUnavailable || post?.isUnavailable || postImage?.failed;
     const canOpenPost = Boolean(
-        imageUrl &&
-        !unavailable &&
-        onOpenPost &&
-        (!publishPhase || publishPhase == "posted"),
+        post && onOpenPost && (!publishPhase || publishPhase == "posted"),
     );
     const loading =
         isLoading || Boolean(post?.imageAsset && !imageUrl && !unavailable);
@@ -202,7 +199,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                 type="button"
                 aria-label="Open your posts"
                 disabled={!canOpenPost}
-                onClick={() => imageUrl && onOpenPost?.(imageUrl)}
+                onClick={onOpenPost}
                 sx={{
                     appearance: "none",
                     bgcolor: "transparent",

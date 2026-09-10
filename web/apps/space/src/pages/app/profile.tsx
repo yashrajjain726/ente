@@ -23,6 +23,8 @@ const initialPostLoadingIndicatorDelayMs = 350;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
+    const initialSection =
+        router.query.section == "latest" ? "latest" : undefined;
     const {
         profile,
         profileLoadError,
@@ -96,7 +98,11 @@ const Page: React.FC = () => {
         return () => window.clearTimeout(timeoutID);
     }, [isInitialPostsLoading]);
 
-    if (profileLoadStatus != "ready" || !profile) {
+    if (
+        profileLoadStatus != "ready" ||
+        !profile ||
+        (initialSection == "latest" && isPostsLoading)
+    ) {
         return (
             <SpaceRouteFallback
                 background={spaceAppBackgroundColor}
@@ -119,6 +125,7 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileScreen
                 friendsCount={friendsCount}
+                initialSection={initialSection}
                 isPostsLoading={isPostsLoading}
                 isStatsLoading={isPostsLoading}
                 postItems={postItems}

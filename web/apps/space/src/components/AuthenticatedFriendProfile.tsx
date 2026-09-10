@@ -39,6 +39,8 @@ export const AuthenticatedFriendProfile: React.FC<
     AuthenticatedFriendProfileProps
 > = ({ friendSpaceId, username }) => {
     const router = useSpaceRouter();
+    const initialSection =
+        router.query.section == "latest" ? "latest" : undefined;
     const { friends, profile, profileLoadError, profileLoadStatus } =
         useSpaceAppState();
     const [friendProfile, setFriendProfile] =
@@ -152,7 +154,8 @@ export const AuthenticatedFriendProfile: React.FC<
         );
     }
     if (
-        !hadCachedFriendProfileOnMount.current &&
+        (!hadCachedFriendProfileOnMount.current ||
+            initialSection == "latest") &&
         (isProfileLoading || isPostsLoading)
     ) {
         return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
@@ -165,6 +168,7 @@ export const AuthenticatedFriendProfile: React.FC<
             <ProfileScreen
                 friendsCount={displayedProfile.friendsCount}
                 headerVariant="friend"
+                initialSection={initialSection}
                 isCoverLoading={isProfileLoading}
                 isNameLoading={isProfileLoading && !immediateFriendProfile}
                 isPostsLoading={isPostsLoading}

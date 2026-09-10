@@ -104,11 +104,16 @@ interface HomeScreenProps {
     onAcceptFriendRequest?: (requestID: number) => Promise<void>;
     onAddFriend: () => void;
     onDiscardFriendRequest?: (requestID: number) => Promise<void>;
-    onOpenFriend?: (friendID: string, username?: string) => void;
+    onOpenFriend?: (
+        friendID: string,
+        username?: string,
+        section?: "latest",
+    ) => void;
     onOpenFriendRequests?: () => void;
     onOpenMessages?: () => void;
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
+    onOpenOwnPost?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
@@ -269,7 +274,7 @@ interface FriendPostTileProps {
     onLoadImage?: () => Promise<string | undefined>;
     onAcceptFriendRequest?: () => Promise<void>;
     onDiscardFriendRequest?: () => Promise<void>;
-    onOpenFriend?: (friendID: string, username?: string) => void;
+    onOpenFriend?: HomeScreenProps["onOpenFriend"];
     onOpenAvatar?: (anchorRect: DOMRect) => void;
     onOpenFriendRequest?: () => void;
     onOpenPosts: (
@@ -344,7 +349,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         isLoading ||
         isFriendRequestActionBusy ||
         (isRequestPending && !canOpenFriendRequest) ||
-        Boolean(post && !postUnavailable && !isPhotoReady);
+        Boolean(post && !isRead && !postUnavailable && !isPhotoReady);
     const tileSize = Math.min(placement.width, placement.height);
     const tileRadius = Math.min(spacePostTileRadius, tileSize * 0.2);
     const avatarSize = spaceTileAvatarSize(placement);
@@ -426,6 +431,10 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
         }
         if (!post || postUnavailable) {
             onOpenFriend?.(friend.id, friend.username);
+            return;
+        }
+        if (isRead) {
+            onOpenFriend?.(friend.id, friend.username, "latest");
             return;
         }
         if (!canOpenPost || !displayImageUrl) return;
@@ -1011,6 +1020,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenMessages,
     onMessageFriend,
     onPokeFriend,
+    onOpenOwnPost,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -1770,25 +1780,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onLoadPostImage={onLoadPostImage}
                         onNewPost={openPostPhotoPicker}
                         onOpenProfile={onOpenProfile}
-                        onOpenPost={(imageUrl) => {
-                            if (!ownLatestPost || !profile) return;
-
-                            const self = {
-                                ...profile,
-                                id: ownLatestPost.spaceId,
-                                friendsCount: friends.length,
-                            };
-                            openPostPhotos(
-                                self,
-                                [ownLatestPost],
-                                viewerPhotoForPost(
-                                    ownLatestPost,
-                                    self,
-                                    profile.avatarUrl,
-                                    imageUrl,
-                                ),
-                            );
-                        }}
+                        onOpenPost={onOpenOwnPost}
                     />
                 </Box>
                 {selectedContact && (

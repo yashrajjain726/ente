@@ -347,7 +347,7 @@ const Page: React.FC = () => {
                 }
                 onDeletePost={deleteOwnPost}
                 onUpdatePostCaption={updateOwnPostCaption}
-                onOpenFriend={(friendID, username) => {
+                onOpenFriend={(friendID, username, section) => {
                     const friend = friends.find(
                         (candidate) =>
                             candidate.id == friendID ||
@@ -355,9 +355,11 @@ const Page: React.FC = () => {
                     );
                     const friendUsername = username || friend?.username;
                     if (friendUsername) {
+                        const query = section ? "?section=latest" : "";
                         void router.push(
-                            spaceRoutes.friendPage,
-                            spaceRoutes.friend(friendUsername),
+                            `${spaceRoutes.friendPage}${query}`,
+                            `${spaceRoutes.friend(friendUsername)}${query}`,
+                            { scroll: section != "latest" },
                         );
                     }
                 }}
@@ -425,6 +427,13 @@ const Page: React.FC = () => {
                     );
                     await refreshUnreadStatus(profile.spaceId);
                 }}
+                onOpenOwnPost={() =>
+                    void router.push(
+                        `${spaceRoutes.profile}?section=latest`,
+                        undefined,
+                        { scroll: false },
+                    )
+                }
                 onOpenProfile={
                     profile
                         ? () => void router.push(spaceRoutes.profile)
