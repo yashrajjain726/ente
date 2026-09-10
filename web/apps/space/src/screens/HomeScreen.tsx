@@ -637,7 +637,19 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                         Unavailable
                     </SpacePostBadge>
                 )}
-                {!isRead && <SpacePostUnreadBadge count={posts.length} />}
+                {!isLoading &&
+                    post &&
+                    !postUnavailable &&
+                    (isRead ? (
+                        <SpacePostBadge
+                            backgroundColor={tileBadgeBackground}
+                            color={textBase}
+                        >
+                            Seen
+                        </SpacePostBadge>
+                    ) : (
+                        <SpacePostUnreadBadge count={posts.length} />
+                    ))}
             </Box>
             {friendRequestDirection != "received" &&
                 !isAvatarPending &&

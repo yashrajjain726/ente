@@ -1,12 +1,11 @@
 import { Box } from "@mui/material";
 import React from "react";
-import { spaceTileCircleInset } from "styles/tiles";
+import { spaceTilePillInset } from "styles/tiles";
 
 interface SpacePostBadgeProps extends React.PropsWithChildren {
     backgroundColor: string;
     color: string;
     placement?: "center" | "top-right";
-    variant?: "default" | "unread";
 }
 
 export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
@@ -14,10 +13,9 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
     children,
     color,
     placement = "top-right",
-    variant = "default",
 }) => {
-    const height = variant == "unread" || placement == "center" ? 24 : 20;
-    const inset = spaceTileCircleInset(height);
+    const height = placement == "center" ? 24 : 18;
+    const inset = spaceTilePillInset(height);
     return (
         <Box
             component="span"
@@ -54,11 +52,6 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
                           top: inset,
                           maxWidth: `calc(100% - 2 * (${inset}))`,
                       }),
-                ...(variant == "unread" && {
-                    border: "1px solid #FFFFFF",
-                    fontSize: 12,
-                    px: "6px",
-                }),
             }}
         >
             <Box
@@ -74,7 +67,7 @@ export const SpacePostBadge: React.FC<SpacePostBadgeProps> = ({
 export const SpacePostUnreadBadge: React.FC<{ count: number }> = ({
     count,
 }) => (
-    <SpacePostBadge backgroundColor="#F63A3A" color="#FFFFFF" variant="unread">
-        {count}
+    <SpacePostBadge backgroundColor="#F63A3A" color="#FFFFFF">
+        {count} new
     </SpacePostBadge>
 );

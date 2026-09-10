@@ -14,3 +14,6 @@ export const spaceTileInnerRadius =
 
 export const spaceTileCircleInset = (diameter: number) =>
     `max(var(--space-tile-padding), calc(var(--space-tile-radius) - ${diameter / 2}px))`;
+
+export const spaceTilePillInset = (height: number) =>
+    `calc(var(--space-tile-padding) + max(0px, ${spaceTileInnerRadius} - ${height / 2}px) * ${1 - Math.SQRT1_2})`;
