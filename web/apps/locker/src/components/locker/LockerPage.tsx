@@ -4,9 +4,13 @@ import { CreateItemDialog } from "@/components/create-item/CreateItemDialog";
 import { ItemList } from "@/components/items/ItemList";
 import { EmptyTrashDialog } from "@/components/locker/EmptyTrashDialog";
 import { LockerDragOverlay } from "@/components/locker/LockerDragOverlay";
-import { useLockerActions } from "@/components/locker/use-locker-actions";
+import { useCollectionActions } from "@/components/locker/use-collection-actions";
+import { useItemActions } from "@/components/locker/use-item-actions";
+import { useLockerConfirmation } from "@/components/locker/use-locker-confirmation";
 import { useLockerData } from "@/components/locker/use-locker-data";
 import { useLockerNavigation } from "@/components/locker/use-locker-navigation";
+import { useLockerUploads } from "@/components/locker/use-locker-uploads";
+import { useTrashActions } from "@/components/locker/use-trash-actions";
 import { LockerNavbar } from "@/components/LockerNavbar";
 import { LockerSidebar } from "@/components/sidebar/LockerSidebar";
 import { LockerConfirmDialog } from "@/components/ui/LockerConfirmDialog";
@@ -28,6 +32,7 @@ export const LockerPage: React.FC = () => {
     const isLockerI18nReady = useSetupLockerI18n();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [toast, setToast] = useState<string | null>(null);
 
     const closeSidebar = useCallback(() => {
         setSidebarOpen(false);
@@ -64,57 +69,85 @@ export const LockerPage: React.FC = () => {
         visibleConfirmDialog,
         closeConfirmDialog,
         handleConfirmDialogConfirm,
-        createDialogOpen,
-        deleteCollectionDialog,
+        requestConfirmation,
+    } = useLockerConfirmation();
+
+    const {
         editItem,
-        emptyTrashDialog,
-        ensureCollectionsExist,
-        handleConfirmDeleteCollection,
-        handleConfirmEmptyTrash,
-        handleCreateCollection,
-        handleCreateDialogClose,
+        setEditItem,
         handleCreateItem,
-        handleDeleteCollection,
+        handleUpdateItem,
         handleDeleteItem,
         handleDeleteItems,
-        handleDragEnter,
-        handleDragLeave,
-        handleDragOver,
-        handleDrop,
         handleEditItem,
-        handleEmptyTrash,
-        handleLeaveCollection,
-        handleOpenShareCollection,
-        handlePermanentlyDelete,
+    } = useItemActions({
+        collections,
+        masterKey,
+        selectedCollectionID,
+        refreshData,
+        setToast,
+        requestConfirmation,
+    });
+
+    const {
+        deleteCollectionDialog,
+        visibleDeleteCollectionDialog,
+        setDeleteCollectionDialog,
+        shareCollectionID,
+        setShareCollectionID,
+        handleCreateCollection,
+        ensureCollectionsExist,
         handleRenameCollection,
-        handleRestoreItem,
+        handleDeleteCollection,
+        handleConfirmDeleteCollection,
+        handleOpenShareCollection,
         handleShareCollection,
         handleUnshareCollection,
-        handleUpdateItem,
-        handleUploadFileWithProgress,
-        handleUploadItemComplete,
-        handleUploadsFinished,
-        isDragActive,
-        openCreateDialog,
-        prefilledUploadItems,
-        setDeleteCollectionDialog,
-        setEditItem,
-        setEmptyTrashDialog,
-        setShareCollectionID,
-        shareCollectionID,
-        setToast,
-        toast,
-        visibleDeleteCollectionDialog,
-        visibleEmptyTrashDialog,
-    } = useLockerActions({
+        handleLeaveCollection,
+    } = useCollectionActions({
         collections,
-        ensureUploadLimitState,
         masterKey,
         selectedCollectionID,
         routerPathname: router.pathname,
-        refreshData,
         navigateHome,
         removeCollectionFromState,
+        refreshData,
+        setToast,
+        requestConfirmation,
+    });
+
+    const {
+        createDialogOpen,
+        prefilledUploadItems,
+        isDragActive,
+        handleCreateDialogClose,
+        openCreateDialog,
+        handleUploadFileWithProgress,
+        handleUploadsFinished,
+        handleUploadItemComplete,
+        handleDragEnter,
+        handleDragOver,
+        handleDragLeave,
+        handleDrop,
+    } = useLockerUploads({
+        masterKey,
+        ensureUploadLimitState,
+        refreshData,
+        setToast,
+    });
+
+    const {
+        emptyTrashDialog,
+        visibleEmptyTrashDialog,
+        setEmptyTrashDialog,
+        handlePermanentlyDelete,
+        handleRestoreItem,
+        handleEmptyTrash,
+        handleConfirmEmptyTrash,
+    } = useTrashActions({
+        refreshData,
+        requestConfirmation,
+        setToast,
         trashLastUpdatedAt,
     });
 

@@ -1,7 +1,7 @@
 import { LockerConfirmDialog } from "@/components/ui/LockerConfirmDialog";
 import { t } from "i18next";
 import React from "react";
-import type { DeleteCollectionDialogState } from "../locker/use-locker-actions";
+import type { DeleteCollectionDialogState } from "../locker/use-collection-actions";
 
 interface DeleteCollectionDialogProps {
     dialogState: DeleteCollectionDialogState | null;
