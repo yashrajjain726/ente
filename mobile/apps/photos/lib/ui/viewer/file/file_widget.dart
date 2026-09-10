@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import "package:photos/states/detail_page_state.dart";
+import "package:photos/ui/viewer/file/file_viewer_image_page_readiness.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import "package:photos/ui/viewer/file/video_stream_change.dart";
 import "package:photos/ui/viewer/file/video_widget.dart";
@@ -27,6 +28,8 @@ class FileWidget extends StatelessWidget {
   final VideoStreamChangeController? streamChangeController;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueChanged<File>? onFinalImageLoaded;
+  final FileViewerImagePageReadinessRegistration?
+  onImagePageReadinessRegistration;
   final ValueNotifier<QrCodeDetectionResult?>? qrDetectionsNotifier;
   final GestureLongPressStartCallback? onTextSelectionStart;
 
@@ -46,6 +49,7 @@ class FileWidget extends StatelessWidget {
     this.streamChangeController,
     this.onFinalFileLoad,
     this.onFinalImageLoaded,
+    this.onImagePageReadinessRegistration,
     this.qrDetectionsNotifier,
     this.onTextSelectionStart,
     super.key,
@@ -66,6 +70,7 @@ class FileWidget extends StatelessWidget {
         key: key ?? ValueKey(fileKey),
         onFinalFileLoad: onFinalFileLoad,
         onFinalImageLoaded: onFinalImageLoaded,
+        onImagePageReadinessRegistration: onImagePageReadinessRegistration,
         qrDetectionsNotifier: qrDetectionsNotifier,
         onTextSelectionStart: onTextSelectionStart,
       );

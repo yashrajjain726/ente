@@ -37,6 +37,7 @@ import "package:photos/ui/tools/editor/video_editor_page.dart";
 import "package:photos/ui/viewer/file/file_app_bar.dart";
 import "package:photos/ui/viewer/file/file_bottom_bar.dart";
 import "package:photos/ui/viewer/file/file_viewer_filmstrip_coordinator.dart";
+import "package:photos/ui/viewer/file/file_viewer_image_page_readiness.dart";
 import 'package:photos/ui/viewer/file/file_widget.dart';
 import "package:photos/ui/viewer/file/gallery_file_viewer_filmstrip.dart";
 import "package:photos/ui/viewer/file/ocr/inline_text_detection.dart";
@@ -187,6 +188,8 @@ class _BodyState extends State<_Body> {
   late PageController _pageController;
   final _selectedIndexNotifier = ValueNotifier(0);
   late final FileViewerFilmstripCoordinator _filmstripCoordinator;
+  late final FileViewerImagePageReadinessRegistration
+  _imagePageReadinessRegistration;
   final _inlineTextDetectionController = InlineTextDetectionController();
   bool _isFirstOpened = true;
   bool isGuestView = false;
@@ -228,7 +231,12 @@ class _BodyState extends State<_Body> {
           Bus.instance.fire(PauseVideoEvent(fileTag: selectedFile!.tag));
         }
       },
+      waitsForImageFrame: (identity) =>
+          identity is EnteFile &&
+          (identity.fileType == FileType.image ||
+              identity.fileType == FileType.livePhoto),
     );
+    _imagePageReadinessRegistration = _registerImagePageReadiness;
     _guestViewEventSubscription = Bus.instance.on<GuestViewEvent>().listen((
       event,
     ) {
@@ -589,6 +597,9 @@ class _BodyState extends State<_Body> {
               _evaluateQrIfEligible(file);
             }
           },
+          onImagePageReadinessRegistration: _shouldShowFilmstrip
+              ? _imagePageReadinessRegistration
+              : null,
           qrDetectionsNotifier: _qrHelper?.qrDetectionsNotifier,
           playbackSpeed: _playbackSpeed,
           streamChangeController: _videoStreamChangeControllerFor(file),
@@ -648,6 +659,18 @@ class _BodyState extends State<_Body> {
       controller: _pageController,
       itemCount: _files!.length,
     );
+  }
+
+  void _registerImagePageReadiness(
+    Object fileIdentity,
+    ValueListenable<bool> readiness, {
+    required bool isAttached,
+  }) {
+    if (isAttached) {
+      _filmstripCoordinator.attachImagePage(fileIdentity, readiness);
+    } else {
+      _filmstripCoordinator.detachImagePage(fileIdentity, readiness);
+    }
   }
 
   void _evaluateQrIfEligible(EnteFile file) {
