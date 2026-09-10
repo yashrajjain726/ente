@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use ente_core::b64;
 use ente_legacy::{Error, LegacyKitRecoveryClient, LegacyKitShare, validate_share_pair};
 use serde::Deserialize;

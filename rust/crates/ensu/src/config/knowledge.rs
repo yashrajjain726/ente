@@ -97,9 +97,17 @@ pub(crate) fn knowledge_index_contract() -> KnowledgeIndexContract {
 }
 
 pub(crate) fn format_knowledge_document_prompt(title: &str, text: &str) -> String {
+    #[expect(
+        clippy::expect_used,
+        reason = "The fixed prompt contains the title placeholder"
+    )]
     let (prefix, remainder) = DOCUMENT_PROMPT
         .split_once("{title}")
         .expect("knowledge document prompt contains a title placeholder");
+    #[expect(
+        clippy::expect_used,
+        reason = "The fixed prompt contains the text placeholder after the title"
+    )]
     let (middle, suffix) = remainder
         .split_once("{text}")
         .expect("knowledge document prompt contains a text placeholder");

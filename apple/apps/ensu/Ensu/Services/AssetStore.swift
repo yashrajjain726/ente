@@ -56,8 +56,8 @@ final class AssetStore: @unchecked Sendable {
         core.llmMmprojPath(asset: asset).map { URL(fileURLWithPath: $0) }
     }
 
-    func voiceActivityModelPath(_ asset: Asset) -> URL {
-        URL(fileURLWithPath: core.voiceActivityModelPath(asset: asset))
+    func voiceActivityModelPath() -> URL {
+        URL(fileURLWithPath: core.voiceActivityModelPath())
     }
 
     func isDownloaded(_ asset: Asset) -> Bool {

@@ -123,6 +123,10 @@ where
 {
     let (width, height) = buffer.dimensions();
     match P::Subpixel::transform_to_srgb(buffer.as_mut(), source_profile, encoded_profile, layout) {
+        #[expect(
+            clippy::expect_used,
+            reason = "Color transforms preserve the source buffer length and dimensions"
+        )]
         Ok(Some(transformed)) => Ok(into_dynamic(
             ImageBuffer::from_raw(width, height, transformed)
                 .expect("transformed buffer length should match source dimensions"),
@@ -216,6 +220,10 @@ fn cached_color_profile(encoded: &[u8]) -> Result<Arc<ColorProfile>, String> {
             .iter()
             .position(|entry| entry.encoded.as_ref() == encoded)
         {
+            #[expect(
+                clippy::expect_used,
+                reason = "The index comes from this cache while its lock is held"
+            )]
             let entry = cache
                 .remove(index)
                 .expect("cache index came from iteration");

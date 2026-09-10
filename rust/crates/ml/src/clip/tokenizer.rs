@@ -15,6 +15,10 @@ use super::CLIP_TEXT_TOKEN_COUNT;
 
 const BPE_MERGES_END_EXCLUSIVE: usize = 49152 - 256 - 2 + 1;
 
+#[expect(
+    clippy::expect_used,
+    reason = "The tokenizer regex is a fixed valid literal"
+)]
 static TOKEN_PATTERN: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         // Keep this aligned with MobileCLIP's Python tokenizer path
@@ -24,6 +28,10 @@ static TOKEN_PATTERN: Lazy<Regex> = Lazy::new(|| {
     .expect("valid clip tokenizer regex")
 });
 
+#[expect(
+    clippy::expect_used,
+    reason = "The whitespace regex is a fixed valid literal"
+)]
 static WHITESPACE_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s+").expect("valid whitespace regex"));
 
