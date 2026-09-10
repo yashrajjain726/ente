@@ -16,7 +16,7 @@ import {
     getCollectionRecord,
     getEncryptedFileRecord,
     updateCachedPubMagicMetadata,
-} from "./remote-cache";
+} from "./locker-cache";
 import {
     deleteCollectionKeepingFilesWithDeps,
     type EncryptedCollectionFileItem,
@@ -27,17 +27,17 @@ import {
     ensureFavoritesCollection,
     ensureUncategorizedCollection,
 } from "./remote-collections";
-import {
-    decryptCollectionKey,
-    fetchLockerTrash,
-    loadPersistedLockerState,
-    syncLockerState,
-} from "./remote-read";
 import { RemoteIDResponseSchema } from "./remote-types";
 import {
     type LockerUploadProgress,
     uploadLockerFileWithDeps,
 } from "./remote-uploads";
+import { decryptCollectionKey } from "./sync/decrypt";
+import {
+    fetchLockerTrash,
+    loadPersistedLockerState,
+    syncLockerState,
+} from "./sync/sync";
 export {
     fetchCollectionSharees,
     shareCollection,

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { updateFileItem, updateInfoItem } from "../src/services/remote";
 import {
     getEncryptedFileRecord,
     replaceLockerCache,
     type EncryptedFileRecord,
-} from "../src/services/remote-cache";
+} from "../src/services/locker-cache";
+import { updateFileItem, updateInfoItem } from "../src/services/remote";
 
 const { encryptBlob, decryptMetadataJSON } = vi.hoisted(() => ({
     encryptBlob: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock("ente-locker-wasm", () => ({
     encryptBlob,
 }));
 vi.mock("../src/services/authenticated-session", () => ({}));
-vi.mock("../src/services/remote-read", () => ({
+vi.mock("../src/services/sync/decrypt", () => ({
     decryptCollectionKey: () => "collection-key",
 }));
 

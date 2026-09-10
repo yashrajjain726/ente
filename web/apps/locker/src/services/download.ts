@@ -3,8 +3,8 @@ import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { customAPIOrigin } from "ente-base/origins";
 import { createStreamDecryptor, decryptBox } from "ente-locker-wasm";
-import { getEncryptedFileRecord, getLockerCacheSnapshot } from "./remote-cache";
-import { decryptCollectionKey } from "./remote-read";
+import { getEncryptedFileRecord, getLockerCacheSnapshot } from "./locker-cache";
+import { decryptCollectionKey } from "./sync/decrypt";
 
 const DOWNLOAD_URL_REVOKE_DELAY_MS = 30_000;
 

@@ -2,9 +2,10 @@ import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import { encryptBox, encryptBoxBytes, generateKey } from "ente-locker-wasm";
-import { findCollectionByType, getCollectionRecord } from "./remote-cache";
-import { decryptCollectionKey, fetchLockerData } from "./remote-read";
+import { findCollectionByType, getCollectionRecord } from "./locker-cache";
 import { RemoteCollectionCreateResponseSchema } from "./remote-types";
+import { decryptCollectionKey } from "./sync/decrypt";
+import { fetchLockerData } from "./sync/sync";
 
 const ensureCollectionWithType = async (
     name: string,

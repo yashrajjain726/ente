@@ -13,10 +13,10 @@ const { getRecord, decryptKey, session, prepare, openSecret } = vi.hoisted(
         openSecret: vi.fn(),
     }),
 );
-vi.mock("../src/services/remote-cache", () => ({
+vi.mock("../src/services/locker-cache", () => ({
     getEncryptedFileRecord: getRecord,
 }));
-vi.mock("../src/services/remote-read", () => ({
+vi.mock("../src/services/sync/decrypt", () => ({
     decryptFileKeyForRecord: decryptKey,
 }));
 vi.mock("../src/services/authenticated-session", () => ({
