@@ -1,5 +1,6 @@
 name: Change approval
 
+# Guardrail for accidental policy changes; this workflow remains PR-editable.
 on:
   pull_request:
 
