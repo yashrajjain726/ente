@@ -144,7 +144,7 @@ const CollectionFilterChip: React.FC<{
                 }),
                 "&:hover": {
                     ...lockerColorSx(theme, {
-                        backgroundColor: selected ? "primary" : "fillDark",
+                        backgroundColor: selected ? "primary" : "fillHover",
                     }),
                 },
             })}

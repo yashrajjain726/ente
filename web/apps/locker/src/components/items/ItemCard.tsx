@@ -193,7 +193,7 @@ export const ItemCard: React.FC<ItemCardProps> = React.memo(function ItemCard({
                     opacity: selectionMode && !selectable ? 0.58 : 1,
                     "&:hover": {
                         ...lockerColorSx(theme, {
-                            backgroundColor: "fillDark",
+                            backgroundColor: "fillHover",
                         }),
                     },
                 })}
@@ -358,8 +358,8 @@ const ItemOverflowMenu: React.FC<{
         ariaID={`item-menu-${item.id}`}
         triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
         triggerButtonSxProps={(theme) => ({
-            width: 24,
-            height: 24,
+            width: 40,
+            height: 40,
             p: 0,
             ...lockerColorSx(theme, { color: "textLight" }),
         })}
@@ -418,8 +418,8 @@ const TrashActions: React.FC<{
             ariaID={`trash-item-menu-${item.id}`}
             triggerButtonIcon={<MoreVertIcon sx={{ fontSize: 20 }} />}
             triggerButtonSxProps={(theme) => ({
-                width: 24,
-                height: 24,
+                width: 40,
+                height: 40,
                 p: 0,
                 ...lockerColorSx(theme, { color: "textLight" }),
             })}

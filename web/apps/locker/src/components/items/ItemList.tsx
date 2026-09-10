@@ -479,6 +479,17 @@ export const ItemList: React.FC<ItemListProps> = ({
                     overflowY: "auto",
                     overscrollBehavior: "contain",
                     WebkitOverflowScrolling: "touch",
+                    scrollbarWidth: "thin",
+                    scrollbarColor: `${theme.vars.palette.fill.muted} transparent`,
+                    "&::-webkit-scrollbar": { width: 6 },
+                    "&::-webkit-scrollbar-track": { background: "transparent" },
+                    "&::-webkit-scrollbar-thumb": {
+                        borderRadius: "999px",
+                        backgroundColor: theme.vars.palette.fill.muted,
+                    },
+                    "&::-webkit-scrollbar-thumb:hover": {
+                        backgroundColor: theme.vars.palette.stroke.muted,
+                    },
                     ...lockerColorSx(theme, {
                         backgroundColor: "backgroundBase",
                     }),
@@ -1025,7 +1036,7 @@ const SectionHeader: React.FC<{
                     }),
                     "&:hover": {
                         ...lockerColorSx(theme, {
-                            backgroundColor: "fillDark",
+                            backgroundColor: "fillHover",
                         }),
                     },
                 })}

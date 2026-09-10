@@ -90,7 +90,7 @@ export function LockerConfirmDialog({
                             }),
                             "&:hover": {
                                 ...lockerColorSx(theme, {
-                                    backgroundColor: "fillDark",
+                                    backgroundColor: "fillHover",
                                 }),
                             },
                         })}

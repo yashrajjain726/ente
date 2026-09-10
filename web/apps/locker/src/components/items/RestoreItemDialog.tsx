@@ -162,7 +162,7 @@ export function RestoreItemDialog({
                             }),
                             "&:hover": {
                                 ...lockerColorSx(theme, {
-                                    backgroundColor: "fillDark",
+                                    backgroundColor: "fillHover",
                                 }),
                             },
                         })}

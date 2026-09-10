@@ -84,7 +84,7 @@ export const LockerAuthenticateUser: React.FC<LockerAuthenticateUserProps> = ({
                         color: "iconColor",
                     }),
                     "&:hover": lockerColorSx(theme, {
-                        backgroundColor: "fillDark",
+                        backgroundColor: "fillHover",
                     }),
                 })}
             >
@@ -211,7 +211,7 @@ const LockerPasswordForm: React.FC<VerifyMasterPasswordPresentationProps> = ({
                                             backgroundColor: "transparent",
                                         },
                                         "&&:hover": lockerColorSx(theme, {
-                                            backgroundColor: "fillDark",
+                                            backgroundColor: "fillHover",
                                         }),
                                     })}
                                 >

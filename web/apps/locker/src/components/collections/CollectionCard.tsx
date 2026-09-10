@@ -42,7 +42,7 @@ export const CollectionCard: React.FC<{
                     borderColor: "fillLight",
                 }),
                 "&:hover": {
-                    ...lockerColorSx(theme, { backgroundColor: "fillDark" }),
+                    ...lockerColorSx(theme, { backgroundColor: "fillHover" }),
                 },
             })}
         >
