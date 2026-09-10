@@ -20,6 +20,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/memory_lane/memory_lane_service.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/home/memories/memory_music_session.dart";
 import "package:photos/ui/viewer/gallery/jump_to_date_gallery.dart";
 import "package:photos/ui/viewer/people/memory_lane_page.dart";
 import "package:photos/utils/dialog_util.dart";
@@ -55,11 +56,17 @@ class MemoryLanePageV2 extends StatefulWidget {
   final String personId;
   final bool isCluster;
   final PersonEntity? person;
+  final bool isActive;
+  final VoidCallback? onNextMemory;
+  final VoidCallback? onPreviousMemory;
 
   const MemoryLanePageV2({
     required this.personId,
     required this.isCluster,
     required this.person,
+    this.isActive = true,
+    this.onNextMemory,
+    this.onPreviousMemory,
     super.key,
   });
 
@@ -88,6 +95,32 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   void initState() {
     super.initState();
     _memoryLaneLoaded = _loadMemoryLane();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final musicController = MemoryMusicScope.maybeOf(context)?.controller;
+    if (widget.isActive) {
+      unawaited(musicController?.setViewerActionPaused(true));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant MemoryLanePageV2 oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    if (!widget.isActive) {
+      _pause();
+      return;
+    }
+    unawaited(_play(0));
+    unawaited(
+      MemoryMusicScope.maybeOf(
+        context,
+        listen: false,
+      )?.controller?.setViewerActionPaused(true),
+    );
   }
 
   @override
@@ -126,9 +159,13 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
           previousEntry = entryFuture;
         }
       }
-      if (_entries.isNotEmpty) unawaited(_play(0));
+      unawaited(_play(0));
     } catch (error) {
-      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      if (!mounted ||
+          !widget.isActive ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
       final navigator = Navigator.of(context);
       navigator.pop();
       await showGenericErrorDialog(context: navigator.context, error: error);
@@ -136,17 +173,27 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   }
 
   Future<void> _play(int index) async {
-    if (_entries.isEmpty) return;
+    if (!widget.isActive || _entries.isEmpty) return;
     final token = Object();
     setState(() {
       _playbackTimer?.cancel();
       _selectEntry(index);
-      _playbackToken = index < _entries.length - 1 ? token : null;
+      _playbackToken =
+          index < _entries.length - 1 || widget.onNextMemory != null
+          ? token
+          : null;
     });
     if (_playbackToken == null) return;
     await _entries[index];
-    if (!mounted || _playbackToken != token) return;
-    _playbackTimer = Timer(_playbackInterval, () => _play(index + 1));
+    if (!mounted || !widget.isActive || _playbackToken != token) return;
+    _playbackTimer = Timer(_playbackInterval, () {
+      if (index < _entries.length - 1) {
+        unawaited(_play(index + 1));
+      } else {
+        _pause();
+        widget.onNextMemory?.call();
+      }
+    });
   }
 
   void _pause() {
@@ -255,6 +302,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
       _entries[index].then((bytes) async {
         if (bytes == null ||
             !mounted ||
+            !widget.isActive ||
             _currentEntryKey != entryKey ||
             ModalRoute.of(context)?.isCurrent != true ||
             localSettings.hasSeenMemoryLane(widget.personId)) {
@@ -475,111 +523,138 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
               body: Column(
                 children: [
                   Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenSize.width * 0.08,
-                        vertical: screenSize.height * 0.04,
-                      ),
-                      child: Align(
-                        child: AspectRatio(
-                          aspectRatio: 3 / 4,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: AnimatedSwitcher(
-                              duration: Duration(
-                                milliseconds: _isSeeking ? 100 : 1000,
-                              ),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) {
-                                return AnimatedBuilder(
-                                  animation: animation,
-                                  child: FadeTransition(
-                                    opacity: animation,
-                                    child: ScaleTransition(
-                                      scale: Tween<double>(
-                                        begin: 1,
-                                        end: 1.1,
-                                      ).animate(animation),
-                                      child: child,
-                                    ),
-                                  ),
-                                  builder: (context, child) {
-                                    final blur = 12 * (1 - animation.value);
-                                    return ImageFiltered(
-                                      imageFilter: ImageFilter.blur(
-                                        sigmaX: blur,
-                                        sigmaY: blur,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp:
+                          widget.onNextMemory == null &&
+                              widget.onPreviousMemory == null
+                          ? null
+                          : (details) {
+                              if (!widget.isActive || _entries.isEmpty) return;
+                              final previous =
+                                  details.localPosition.dx <
+                                  screenSize.width / 2;
+                              final index = i + (previous ? -1 : 1);
+                              if (index < 0 || index >= _entries.length) {
+                                final onMemory = previous
+                                    ? widget.onPreviousMemory
+                                    : widget.onNextMemory;
+                                if (onMemory != null) {
+                                  _pause();
+                                  onMemory();
+                                }
+                              } else if (_playbackToken != null) {
+                                unawaited(_play(index));
+                              } else {
+                                setState(() => _selectEntry(index));
+                              }
+                            },
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenSize.width * 0.08,
+                          vertical: screenSize.height * 0.04,
+                        ),
+                        child: Align(
+                          child: AspectRatio(
+                            aspectRatio: 3 / 4,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: AnimatedSwitcher(
+                                duration: Duration(
+                                  milliseconds: _isSeeking ? 100 : 1000,
+                                ),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  return AnimatedBuilder(
+                                    animation: animation,
+                                    child: FadeTransition(
+                                      opacity: animation,
+                                      child: ScaleTransition(
+                                        scale: Tween<double>(
+                                          begin: 1,
+                                          end: 1.1,
+                                        ).animate(animation),
+                                        child: child,
                                       ),
-                                      child: child,
-                                    );
-                                  },
-                                );
-                              },
-                              child: switch (snapshot.connectionState) {
-                                ConnectionState.done when file != null =>
-                                  LayoutBuilder(
-                                    key: _currentEntryKey,
-                                    builder: (context, constraints) =>
-                                        FutureBuilder<(Uint8List, int)?>(
-                                          future: entry == null
-                                              ? null
-                                              : _fetchEntry(
-                                                  entry,
-                                                  constraints.biggest *
-                                                      MediaQuery.devicePixelRatioOf(
-                                                        context,
-                                                      ) *
-                                                      1.1,
-                                                ),
-                                          builder: (context, entrySnapshot) {
-                                            final crop = entrySnapshot.data;
-                                            if (crop == null) {
-                                              if (entrySnapshot
-                                                      .connectionState ==
-                                                  ConnectionState.done) {
-                                                return Center(
-                                                  child: Text(
-                                                    context
-                                                        .strings
-                                                        .facesTimelineUnavailable,
-                                                    style: darkTheme
-                                                        .textTheme
-                                                        .small,
+                                    ),
+                                    builder: (context, child) {
+                                      final blur = 12 * (1 - animation.value);
+                                      return ImageFiltered(
+                                        imageFilter: ImageFilter.blur(
+                                          sigmaX: blur,
+                                          sigmaY: blur,
+                                        ),
+                                        child: child,
+                                      );
+                                    },
+                                  );
+                                },
+                                child: switch (snapshot.connectionState) {
+                                  ConnectionState.done when file != null =>
+                                    LayoutBuilder(
+                                      key: _currentEntryKey,
+                                      builder: (context, constraints) =>
+                                          FutureBuilder<(Uint8List, int)?>(
+                                            future: entry == null
+                                                ? null
+                                                : _fetchEntry(
+                                                    entry,
+                                                    constraints.biggest *
+                                                        MediaQuery.devicePixelRatioOf(
+                                                          context,
+                                                        ) *
+                                                        1.1,
                                                   ),
+                                            builder: (context, entrySnapshot) {
+                                              final crop = entrySnapshot.data;
+                                              if (crop == null) {
+                                                if (entrySnapshot
+                                                        .connectionState ==
+                                                    ConnectionState.done) {
+                                                  return Center(
+                                                    child: Text(
+                                                      context
+                                                          .strings
+                                                          .facesTimelineUnavailable,
+                                                      style: darkTheme
+                                                          .textTheme
+                                                          .small,
+                                                    ),
+                                                  );
+                                                }
+                                                return const Center(
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        color: Colors.white,
+                                                      ),
                                                 );
                                               }
-                                              return const Center(
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      color: Colors.white,
-                                                    ),
+                                              return Image.memory(
+                                                crop.$1,
+                                                cacheWidth: crop.$2,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                height: double.infinity,
                                               );
-                                            }
-                                            return Image.memory(
-                                              crop.$1,
-                                              cacheWidth: crop.$2,
-                                              fit: BoxFit.cover,
-                                              width: double.infinity,
-                                              height: double.infinity,
-                                            );
-                                          },
-                                        ),
+                                            },
+                                          ),
+                                    ),
+                                  ConnectionState.done => Center(
+                                    key: const ValueKey("memory-lane-empty"),
+                                    child: Text(
+                                      context.strings.facesTimelineUnavailable,
+                                      style: darkTheme.textTheme.small,
+                                    ),
                                   ),
-                                ConnectionState.done => Center(
-                                  key: const ValueKey("memory-lane-empty"),
-                                  child: Text(
-                                    context.strings.facesTimelineUnavailable,
-                                    style: darkTheme.textTheme.small,
+                                  _ => const Center(
+                                    key: ValueKey("memory-lane-loading"),
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                                _ => const Center(
-                                  key: ValueKey("memory-lane-loading"),
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              },
+                                },
+                              ),
                             ),
                           ),
                         ),
