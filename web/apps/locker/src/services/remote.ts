@@ -1,9 +1,4 @@
-import type {
-    LockerCollection,
-    LockerCollectionParticipant,
-    LockerItem,
-    LockerItemType,
-} from "@/types";
+import type { LockerCollection, LockerItem, LockerItemType } from "@/types";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
@@ -21,13 +16,11 @@ import {
 import { z } from "zod";
 import { ensureAuthenticatedSession } from "./authenticated-session";
 import {
-    clearLockerCache,
     findCollectionByType,
     getCollectionIDsForFile,
     getCollectionRecord,
     getEncryptedFileRecord,
     updateCachedPubMagicMetadata,
-    updateCollectionShareesInCache,
 } from "./remote-cache";
 import {
     deleteCollectionKeepingFilesWithDeps,
@@ -35,22 +28,14 @@ import {
     updateItemCollectionsWithDeps,
 } from "./remote-collection-mutations";
 import {
-    fetchCollectionShareesWithDeps,
-    shareCollectionWithDeps,
-    unshareCollectionWithDeps,
-} from "./remote-collection-sharing";
-import {
-    createCollectionWithDeps,
-    deleteCollectionWithDeps,
-    ensureFavoritesCollectionWithDeps,
-    ensureUncategorizedCollectionWithDeps,
-    renameCollectionWithDeps,
+    deleteCollection,
+    ensureFavoritesCollection,
+    ensureUncategorizedCollection,
 } from "./remote-collections";
 import {
     decryptCollectionKey,
     decryptFileKeyForRecord,
     downloadLockerFile,
-    fetchLockerData,
     fetchLockerTrash,
     loadPersistedLockerState,
     syncLockerState,
@@ -60,15 +45,15 @@ import {
     type LockerUploadProgress,
     uploadLockerFileWithDeps,
 } from "./remote-uploads";
-
 export {
-    clearLockerCache,
-    downloadLockerFile,
-    fetchLockerData,
-    fetchLockerTrash,
-    loadPersistedLockerState,
-    syncLockerState,
-};
+    fetchCollectionSharees,
+    shareCollection,
+    unshareCollection,
+} from "./remote-collection-sharing";
+export { createCollection, renameCollection } from "./remote-collections";
+export { deleteCollection };
+
+export { downloadLockerFile, loadPersistedLockerState, syncLockerState };
 
 const RemoteFileShareLink = z.object({
     linkID: z.union([z.string(), z.number().transform(String)]),
@@ -92,21 +77,13 @@ const RemoteFileShareLink = z.object({
     encryptedShareKey: z.string().nullish(),
 });
 
-export interface LockerFileShareLink {
+interface LockerFileShareLink {
     linkID: string;
     url: string;
     fileID?: number;
     validTill?: number | null;
     enableDownload?: boolean;
     passwordEnabled?: boolean;
-}
-
-export interface LockerFileShareLinkSummary {
-    linkID: string;
-    fileID: number;
-    validTill?: number | null;
-    enableDownload: boolean;
-    passwordEnabled: boolean;
 }
 
 const infoItemTitle = (
@@ -141,13 +118,6 @@ const resolveCollectionIDsWithUncategorizedFallback = async (
     collectionIDs.length > 0
         ? Array.from(new Set(collectionIDs))
         : [(await ensureUncategorizedCollection(masterKey)).id];
-
-export const fetchLockerFileShareLinks = (): Promise<
-    Map<number, LockerFileShareLinkSummary>
-> => {
-    // TODO: Re-enable this after GET /files/share-url is deployed on the API.
-    return Promise.resolve(new Map<number, LockerFileShareLinkSummary>());
-};
 
 export const getOrCreateLockerFileShareLink = async (
     fileID: number,
@@ -300,78 +270,20 @@ export const updateInfoItem = async (
     fileID: number,
     infoType: LockerItemType,
     infoData: Record<string, unknown>,
-): Promise<void> => {
-    const fileRecord = getEncryptedFileRecord(fileID);
-    if (!fileRecord) throw new Error(`File ${fileID} not in cache`);
-
-    const collectionRecord = getCollectionRecord(fileRecord.collectionID);
-    if (!collectionRecord)
-        throw new Error(`Collection ${fileRecord.collectionID} not in cache`);
-
-    const collectionKey = await decryptCollectionKey(collectionRecord);
-    const fileKey = await decryptBox(
-        {
-            encryptedData: fileRecord.encryptedKey,
-            nonce: fileRecord.keyDecryptionNonce,
-        },
-        collectionKey,
-    );
-
-    const existingPubMagicMetadata = fileRecord.pubMagicMetadata
-        ? ((await decryptMetadataJSON(
-              {
-                  encryptedData: fileRecord.pubMagicMetadata.data,
-                  decryptionHeader: fileRecord.pubMagicMetadata.header,
-              },
-              fileKey,
-          )) as Record<string, unknown>)
-        : {};
-
-    const title = infoItemTitle(infoType, infoData);
-    const pubMagicMetadata = {
-        ...existingPubMagicMetadata,
+): Promise<void> =>
+    updateItemMetadata(fileID, {
         info: { type: infoType, data: infoData },
-        noThumb: true,
-        editedName: title,
-        editedTime: Date.now(),
-    };
-    const pubMMJSON = JSON.stringify(pubMagicMetadata);
-    const encryptedPubMM = await encryptBlob(stringToB64(pubMMJSON), fileKey);
-
-    const version = fileRecord.pubMagicMetadata?.version ?? 1;
-
-    const res = await fetch(await apiURL("/files/public-magic-metadata"), {
-        method: "PUT",
-        headers: {
-            ...(await authenticatedRequestHeaders()),
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            metadataList: [
-                {
-                    id: fileID,
-                    magicMetadata: {
-                        version,
-                        count: Object.keys(pubMagicMetadata).length,
-                        data: encryptedPubMM.encryptedData,
-                        header: encryptedPubMM.decryptionHeader,
-                    },
-                },
-            ],
-        }),
+        editedName: infoItemTitle(infoType, infoData),
     });
-    ensureOk(res);
-
-    updateCachedPubMagicMetadata(fileID, {
-        version: version + 1,
-        data: encryptedPubMM.encryptedData,
-        header: encryptedPubMM.decryptionHeader,
-    });
-};
 
 export const updateFileItem = async (
     fileID: number,
     title: string,
+): Promise<void> => updateItemMetadata(fileID, { editedName: title.trim() });
+
+const updateItemMetadata = async (
+    fileID: number,
+    updates: Record<string, unknown>,
 ): Promise<void> => {
     const fileRecord = getEncryptedFileRecord(fileID);
     if (!fileRecord) throw new Error(`File ${fileID} not in cache`);
@@ -401,12 +313,13 @@ export const updateFileItem = async (
 
     const pubMagicMetadata = {
         ...existingPubMagicMetadata,
+        ...updates,
         noThumb: true,
-        editedName: title.trim(),
         editedTime: Date.now(),
     };
     const pubMMJSON = JSON.stringify(pubMagicMetadata);
     const encryptedPubMM = await encryptBlob(stringToB64(pubMMJSON), fileKey);
+
     const version = fileRecord.pubMagicMetadata?.version ?? 1;
 
     const res = await fetch(await apiURL("/files/public-magic-metadata"), {
@@ -735,53 +648,6 @@ export const restoreFromTrash = async (
     ensureOk(res);
 };
 
-export const createCollection = async (
-    name: string,
-    masterKey: string,
-    type = "folder",
-): Promise<number> => {
-    return createCollectionWithDeps(name, masterKey, type);
-};
-
-const ensureUncategorizedCollection = async (masterKey: string) => {
-    const currentUserID = ensureLocalUser().id;
-    return ensureUncategorizedCollectionWithDeps(masterKey, {
-        findCollectionByType: (type) =>
-            findCollectionByType(type, currentUserID),
-        refetchCollections: async () => {
-            await fetchLockerData();
-        },
-    });
-};
-
-const ensureFavoritesCollection = async (masterKey: string) => {
-    const currentUserID = ensureLocalUser().id;
-    return ensureFavoritesCollectionWithDeps(masterKey, {
-        findCollectionByType: (type) =>
-            findCollectionByType(type, currentUserID),
-        refetchCollections: async () => {
-            await fetchLockerData();
-        },
-    });
-};
-
-export const renameCollection = async (
-    collectionID: number,
-    newName: string,
-): Promise<void> => {
-    await renameCollectionWithDeps(collectionID, newName, {
-        getCollectionRecord,
-        decryptCollectionKey,
-    });
-};
-
-export const deleteCollection = async (
-    collectionID: number,
-    opts?: { keepFiles?: boolean },
-): Promise<void> => {
-    await deleteCollectionWithDeps(collectionID, opts);
-};
-
 export const deleteCollectionKeepingFiles = async (
     collection: LockerCollection,
     masterKey: string,
@@ -792,38 +658,6 @@ export const deleteCollectionKeepingFiles = async (
         deps: createCollectionMutationDeps(),
     });
     await deleteCollection(collection.id, { keepFiles: true });
-};
-
-export const fetchCollectionSharees = async (
-    collectionID: number,
-): Promise<LockerCollectionParticipant[]> => {
-    return fetchCollectionShareesWithDeps(collectionID, {
-        getCollectionRecord,
-        decryptCollectionKey,
-        updateCollectionShareesInCache,
-    });
-};
-
-export const shareCollection = async (
-    collectionID: number,
-    email: string,
-): Promise<LockerCollectionParticipant[]> => {
-    return shareCollectionWithDeps(collectionID, email, {
-        getCollectionRecord,
-        decryptCollectionKey,
-        updateCollectionShareesInCache,
-    });
-};
-
-export const unshareCollection = async (
-    collectionID: number,
-    email: string,
-): Promise<LockerCollectionParticipant[]> => {
-    return unshareCollectionWithDeps(collectionID, email, {
-        getCollectionRecord,
-        decryptCollectionKey,
-        updateCollectionShareesInCache,
-    });
 };
 
 export const leaveCollection = async (collectionID: number): Promise<void> => {

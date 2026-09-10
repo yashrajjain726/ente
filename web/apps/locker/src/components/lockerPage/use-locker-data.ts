@@ -48,7 +48,7 @@ interface LockerUsageResponse {
     userStorage?: number;
 }
 
-export interface UserDetails extends LockerUploadLimitState {
+interface UserDetails extends LockerUploadLimitState {
     email: string;
 }
 
@@ -65,11 +65,6 @@ interface UserDetailsRefreshTrigger {
 
 interface UploadLimitStateSnapshot {
     userDetails: UserDetails;
-}
-
-interface LoadUserDetailsResult {
-    applied: boolean;
-    snapshot?: UploadLimitStateSnapshot;
 }
 
 export const useLockerData = ({
@@ -184,34 +179,29 @@ export const useLockerData = ({
         [],
     );
 
-    const loadUserDetails =
-        useCallback(async (): Promise<LoadUserDetailsResult> => {
-            const requestID = ++latestUserDetailsRequestRef.current;
-            try {
-                const headers = await authenticatedRequestHeaders();
-                const [lockerUsage, email] = await Promise.all([
-                    loadLockerUsage(headers),
-                    loadUserEmail(headers),
-                ]);
-                const nextUserDetails = { ...lockerUsage.userDetails, email };
-                const snapshot = {
-                    userDetails: nextUserDetails,
-                } satisfies UploadLimitStateSnapshot;
-
-                if (
-                    !mountedRef.current ||
-                    requestID !== latestUserDetailsRequestRef.current
-                ) {
-                    return { applied: false, snapshot };
-                }
-
-                setUserDetails(nextUserDetails);
-                return { applied: true, snapshot };
-            } catch (error) {
-                log.error("Failed to fetch user details", error);
-                return { applied: false };
+    const loadUserDetails = useCallback(async (): Promise<boolean> => {
+        const requestID = ++latestUserDetailsRequestRef.current;
+        try {
+            const headers = await authenticatedRequestHeaders();
+            const [lockerUsage, email] = await Promise.all([
+                loadLockerUsage(headers),
+                loadUserEmail(headers),
+            ]);
+            const nextUserDetails = { ...lockerUsage.userDetails, email };
+            if (
+                !mountedRef.current ||
+                requestID !== latestUserDetailsRequestRef.current
+            ) {
+                return false;
             }
-        }, [loadLockerUsage, loadUserEmail]);
+
+            setUserDetails(nextUserDetails);
+            return true;
+        } catch (error) {
+            log.error("Failed to fetch user details", error);
+            return false;
+        }
+    }, [loadLockerUsage, loadUserEmail]);
 
     const refreshUserDetailsForSyncState = useCallback(
         async (trigger: UserDetailsRefreshTrigger) => {
@@ -227,8 +217,8 @@ export const useLockerData = ({
             isRefreshingUserDetailsRef.current = true;
             let pendingTrigger: UserDetailsRefreshTrigger | undefined;
             try {
-                const result = await loadUserDetails();
-                if (result.applied) {
+                const applied = await loadUserDetails();
+                if (applied) {
                     lastUserDetailsRefreshKeyRef.current = key;
                 }
             } finally {

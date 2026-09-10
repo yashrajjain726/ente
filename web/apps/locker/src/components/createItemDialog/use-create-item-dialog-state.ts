@@ -18,7 +18,7 @@ import type {
 import {
     isCollectionOwner,
     isUncategorizedCollection,
-    visibleLockerCollections,
+    sortLockerCollections,
 } from "@/types";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
 import log from "ente-base/log";
@@ -135,7 +135,7 @@ export const useCreateItemDialogState = ({
         [editItem],
     );
     const displayCollections = useMemo(() => {
-        const ownedVisibleCollections = visibleLockerCollections(
+        const ownedVisibleCollections = sortLockerCollections(
             collections,
         ).filter(
             (collection) =>
