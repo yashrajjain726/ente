@@ -23,6 +23,7 @@ import { isSxArray } from "ente-base/components/utils/sx";
 import { useBaseContext } from "ente-base/context";
 import { downloadManager } from "ente-gallery/services/download";
 import { uniqueFilesByID } from "ente-gallery/utils/file";
+import { getLeaflet } from "ente-gallery/utils/leaflet";
 import type { EnteFile } from "ente-media/file";
 import {
     fileCreationPhotoSortTime,
@@ -902,10 +903,8 @@ function createMarkerIcon(
     clusterCount?: number,
     interactive = true,
 ): import("leaflet").DivIcon | null {
-    if (typeof window === "undefined") return null;
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const leaflet = require("leaflet") as typeof import("leaflet");
+    const leaflet = getLeaflet();
+    if (!leaflet) return null;
 
     const pinSize = 84;
     const triangleHeight = 10;
