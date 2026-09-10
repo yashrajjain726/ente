@@ -5,6 +5,11 @@ import { apiURL } from "ente-base/origins";
 import { boxSeal } from "ente-locker-wasm";
 import { z } from "zod";
 import {
+    getCollectionRecord,
+    updateCollectionShareesInCache,
+} from "./remote-cache";
+import { decryptCollectionKey } from "./remote-read";
+import {
     RemoteCollectionUserSchema,
     toLockerCollectionParticipant,
 } from "./remote-types";
@@ -13,53 +18,34 @@ const RemoteShareesResponse = z.object({
     sharees: z.array(RemoteCollectionUserSchema),
 });
 
-interface CollectionSharingDeps<TCollectionRecord> {
-    getCollectionRecord: (
-        collectionID: number,
-    ) => TCollectionRecord | undefined;
-    decryptCollectionKey: (
-        collectionRecord: TCollectionRecord,
-    ) => Promise<string>;
-    updateCollectionShareesInCache: (
-        collectionID: number,
-        sharees: LockerCollectionParticipant[],
-    ) => void;
-}
-
-const parseAndCacheSharees = <TCollectionRecord>(
-    collectionID: number,
-    responseBody: unknown,
-    deps: CollectionSharingDeps<TCollectionRecord>,
-) => {
+const parseAndCacheSharees = (collectionID: number, responseBody: unknown) => {
     const { sharees } = RemoteShareesResponse.parse(responseBody);
     const parsedSharees = sharees.map(toLockerCollectionParticipant);
-    deps.updateCollectionShareesInCache(collectionID, parsedSharees);
+    updateCollectionShareesInCache(collectionID, parsedSharees);
     return parsedSharees;
 };
 
-export const fetchCollectionShareesWithDeps = async <TCollectionRecord>(
+export const fetchCollectionSharees = async (
     collectionID: number,
-    deps: CollectionSharingDeps<TCollectionRecord>,
 ): Promise<LockerCollectionParticipant[]> => {
     const res = await fetch(
         await apiURL("/collections/sharees", { collectionID }),
         { headers: await authenticatedRequestHeaders() },
     );
     ensureOk(res);
-    return parseAndCacheSharees(collectionID, await res.json(), deps);
+    return parseAndCacheSharees(collectionID, await res.json());
 };
 
-export const shareCollectionWithDeps = async <TCollectionRecord>(
+export const shareCollection = async (
     collectionID: number,
     email: string,
-    deps: CollectionSharingDeps<TCollectionRecord>,
 ): Promise<LockerCollectionParticipant[]> => {
-    const collectionRecord = deps.getCollectionRecord(collectionID);
+    const collectionRecord = getCollectionRecord(collectionID);
     if (!collectionRecord) {
         throw new Error(`Collection ${collectionID} not in cache`);
     }
 
-    const collectionKey = await deps.decryptCollectionKey(collectionRecord);
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     const publicKey = await getPublicKey(email);
     const encryptedKey = await boxSeal(collectionKey, publicKey);
 
@@ -77,13 +63,12 @@ export const shareCollectionWithDeps = async <TCollectionRecord>(
         }),
     });
     ensureOk(res);
-    return parseAndCacheSharees(collectionID, await res.json(), deps);
+    return parseAndCacheSharees(collectionID, await res.json());
 };
 
-export const unshareCollectionWithDeps = async <TCollectionRecord>(
+export const unshareCollection = async (
     collectionID: number,
     email: string,
-    deps: CollectionSharingDeps<TCollectionRecord>,
 ): Promise<LockerCollectionParticipant[]> => {
     const res = await fetch(await apiURL("/collections/unshare"), {
         method: "POST",
@@ -94,5 +79,5 @@ export const unshareCollectionWithDeps = async <TCollectionRecord>(
         body: JSON.stringify({ collectionID, email }),
     });
     ensureOk(res);
-    return parseAndCacheSharees(collectionID, await res.json(), deps);
+    return parseAndCacheSharees(collectionID, await res.json());
 };

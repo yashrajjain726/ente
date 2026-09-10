@@ -1,44 +1,26 @@
+import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import { encryptBox, generateKey, stringToB64 } from "ente-locker-wasm";
+import { findCollectionByType, getCollectionRecord } from "./remote-cache";
+import { decryptCollectionKey, fetchLockerData } from "./remote-read";
 import { RemoteCollectionCreateResponseSchema } from "./remote-types";
 
-interface CollectionRecordLike {
-    id: number;
-    type: string;
-}
-
-interface RenameCollectionDeps<TCollectionRecord> {
-    getCollectionRecord: (
-        collectionID: number,
-    ) => TCollectionRecord | undefined;
-    decryptCollectionKey: (
-        collectionRecord: TCollectionRecord,
-    ) => Promise<string>;
-}
-
-interface EnsureUncategorizedDeps<TCollectionRecord> {
-    findCollectionByType: (type: string) => TCollectionRecord | undefined;
-    refetchCollections: () => Promise<void>;
-}
-
-const ensureCollectionWithTypeWithDeps = async <
-    TCollectionRecord extends CollectionRecordLike,
->(
+const ensureCollectionWithType = async (
     name: string,
     type: string,
     masterKey: string,
-    deps: EnsureUncategorizedDeps<TCollectionRecord>,
-): Promise<TCollectionRecord> => {
-    let collection = deps.findCollectionByType(type);
+) => {
+    const currentUserID = ensureLocalUser().id;
+    let collection = findCollectionByType(type, currentUserID);
     if (collection) {
         return collection;
     }
 
-    await createCollectionWithDeps(name, masterKey, type);
-    await deps.refetchCollections();
+    await createCollection(name, masterKey, type);
+    await fetchLockerData();
 
-    collection = deps.findCollectionByType(type);
+    collection = findCollectionByType(type, currentUserID);
     if (!collection) {
         throw new Error(`Failed to create ${name} collection`);
     }
@@ -46,7 +28,7 @@ const ensureCollectionWithTypeWithDeps = async <
     return collection;
 };
 
-export const createCollectionWithDeps = async (
+export const createCollection = async (
     name: string,
     masterKey: string,
     type = "folder",
@@ -75,38 +57,22 @@ export const createCollectionWithDeps = async (
     return data.collection.id;
 };
 
-export const ensureUncategorizedCollectionWithDeps = async <
-    TCollectionRecord extends CollectionRecordLike,
->(
-    masterKey: string,
-    deps: EnsureUncategorizedDeps<TCollectionRecord>,
-): Promise<TCollectionRecord> =>
-    ensureCollectionWithTypeWithDeps(
-        "Uncategorized",
-        "uncategorized",
-        masterKey,
-        deps,
-    );
+export const ensureUncategorizedCollection = (masterKey: string) =>
+    ensureCollectionWithType("Uncategorized", "uncategorized", masterKey);
 
-export const ensureFavoritesCollectionWithDeps = async <
-    TCollectionRecord extends CollectionRecordLike,
->(
-    masterKey: string,
-    deps: EnsureUncategorizedDeps<TCollectionRecord>,
-): Promise<TCollectionRecord> =>
-    ensureCollectionWithTypeWithDeps("Important", "favorites", masterKey, deps);
+export const ensureFavoritesCollection = (masterKey: string) =>
+    ensureCollectionWithType("Important", "favorites", masterKey);
 
-export const renameCollectionWithDeps = async <TCollectionRecord>(
+export const renameCollection = async (
     collectionID: number,
     newName: string,
-    deps: RenameCollectionDeps<TCollectionRecord>,
 ): Promise<void> => {
-    const collectionRecord = deps.getCollectionRecord(collectionID);
+    const collectionRecord = getCollectionRecord(collectionID);
     if (!collectionRecord) {
         throw new Error(`Collection ${collectionID} not in cache`);
     }
 
-    const collectionKey = await deps.decryptCollectionKey(collectionRecord);
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     const nameB64 = stringToB64(newName);
     const encryptedName = await encryptBox(nameB64, collectionKey);
 
@@ -125,7 +91,7 @@ export const renameCollectionWithDeps = async <TCollectionRecord>(
     ensureOk(res);
 };
 
-export const deleteCollectionWithDeps = async (
+export const deleteCollection = async (
     collectionID: number,
     opts?: { keepFiles?: boolean },
 ): Promise<void> => {

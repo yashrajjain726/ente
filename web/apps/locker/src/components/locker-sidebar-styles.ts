@@ -4,10 +4,6 @@ export const sidebarBackgroundSx = (theme: Theme) => ({
     backgroundColor: "#f4f4f4",
     ...theme.applyStyles("dark", { backgroundColor: "#161616" }),
 });
-export const fillLightSx = (theme: Theme) => ({
-    backgroundColor: "#ffffff",
-    ...theme.applyStyles("dark", { backgroundColor: "#212121" }),
-});
 export const fillDarkSx = (theme: Theme) => ({
     backgroundColor: "#eaeaea",
     ...theme.applyStyles("dark", { backgroundColor: "#0a0a0a" }),

@@ -36,6 +36,7 @@ import { formattedDateTime } from "ente-base/i18n-date";
 import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useState } from "react";
+import { typeDisplayName } from "./createItemDialog/item-form-fields-utils";
 
 const textStyles = {
     display2: {
@@ -192,7 +193,7 @@ export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     mt: "4px",
                                 }}
                             >
-                                {typeLabel(item.type)}
+                                {typeDisplayName(item.type)}
                             </Typography>
                         </Box>
                         <Stack
@@ -451,23 +452,6 @@ export const ItemDetailView: React.FC<ItemDetailViewProps> = ({
             />
         </Drawer>
     );
-};
-
-const typeLabel = (type: string): string => {
-    switch (type) {
-        case "note":
-            return t("personalNote");
-        case "accountCredential":
-            return t("secret");
-        case "physicalRecord":
-            return t("thing");
-        case "emergencyContact":
-            return t("emergencyContact");
-        case "file":
-            return t("document");
-        default:
-            return type;
-    }
 };
 
 interface FieldRowProps {

@@ -15,7 +15,6 @@ import {
     isLockerItemOwner,
     restoreTargetLockerCollections,
     sortLockerCollections,
-    visibleLockerCollections,
 } from "@/types";
 import {
     Delete02Icon,
@@ -179,13 +178,8 @@ export const ItemList: React.FC<ItemListProps> = ({
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
     const displayCollections = useMemo(
-        () =>
-            uniqueCollectionsByID(
-                isCollectionsView
-                    ? sortLockerCollections(collections)
-                    : visibleLockerCollections(collections),
-            ),
-        [collections, isCollectionsView],
+        () => uniqueCollectionsByID(sortLockerCollections(collections)),
+        [collections],
     );
     const restoreCollections = useMemo(
         () =>

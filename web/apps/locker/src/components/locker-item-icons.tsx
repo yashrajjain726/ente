@@ -74,15 +74,6 @@ export const createDocumentIconConfig: LockerIconConfig = {
     backgroundColor: "rgba(16, 113, 255, 0.06)",
 };
 
-export const createDocumentIcon = (size = 20, strokeWidth = 1.9) => (
-    <HugeiconsIcon
-        icon={createDocumentIconConfig.icon}
-        size={size}
-        strokeWidth={strokeWidth}
-        color={createDocumentIconConfig.color}
-    />
-);
-
 export const lockerItemIconConfig = (
     type: LockerItemType,
     fileName?: string,

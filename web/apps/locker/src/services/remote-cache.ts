@@ -48,11 +48,6 @@ let encryptedCollections = new Map<number, EncryptedCollectionRecord>();
 
 let encryptedFiles = new Map<number, Map<number, EncryptedFileRecord>>();
 
-export const createEmptyLockerCache = (): LockerEncryptedCache => ({
-    collections: new Map<number, EncryptedCollectionRecord>(),
-    files: new Map<number, Map<number, EncryptedFileRecord>>(),
-});
-
 export const setEncryptedFileRecord = (
     target: Map<number, Map<number, EncryptedFileRecord>>,
     record: EncryptedFileRecord,
@@ -80,8 +75,6 @@ export const clearLockerCache = () => {
 
 export const getCollectionRecord = (collectionID: number) =>
     encryptedCollections.get(collectionID);
-
-export const getCollectionRecords = () => [...encryptedCollections.values()];
 
 export const findCollectionByType = (type: string, ownerID?: number) =>
     [...encryptedCollections.values()].find(
@@ -126,30 +119,9 @@ export const getEncryptedFileRecord = (
     return records.values().next().value;
 };
 
-export const getAllEncryptedFileRecords = (): EncryptedFileRecord[] =>
-    [...encryptedFiles.values()].flatMap((records) => [...records.values()]);
-
 export const getCollectionIDsForFile = (fileID: number): number[] => {
     const records = encryptedFiles.get(fileID);
     return records ? [...records.keys()] : [];
-};
-
-export const mergeEncryptedFileRecordsIntoCache = (
-    records: EncryptedFileRecord[],
-) => {
-    if (records.length === 0) {
-        return;
-    }
-
-    const nextFiles = new Map(encryptedFiles);
-    for (const record of records) {
-        const existingRecords =
-            nextFiles.get(record.id) ?? new Map<number, EncryptedFileRecord>();
-        const nextRecords = new Map(existingRecords);
-        nextRecords.set(record.collectionID, record);
-        nextFiles.set(record.id, nextRecords);
-    }
-    encryptedFiles = nextFiles;
 };
 
 export const updateCachedPubMagicMetadata = (
