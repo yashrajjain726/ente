@@ -18,8 +18,8 @@ import { initiateEmail, openURL } from "ente-new/photos/utils/web";
 import { t } from "i18next";
 import React, { useState } from "react";
 import { Trans } from "react-i18next";
-import { lockerColorSx } from "./locker-tokens";
-import { LockerConfirmDialog } from "./LockerConfirmDialog";
+import { lockerColorSx } from "../../styles/tokens";
+import { LockerConfirmDialog } from "../ui/LockerConfirmDialog";
 import {
     LockerSidebarCardButton,
     LockerSidebarLink,

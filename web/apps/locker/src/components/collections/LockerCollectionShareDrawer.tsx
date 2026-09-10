@@ -1,4 +1,8 @@
-import { LockerMenuOption, LockerOverflowMenu } from "@/components/LockerMenu";
+import { FormField } from "@/components/ui/FormField";
+import {
+    LockerMenuOption,
+    LockerOverflowMenu,
+} from "@/components/ui/LockerMenu";
 import {
     canLeaveCollection,
     canManageCollectionSharing,
@@ -27,23 +31,22 @@ import {
 } from "ente-contacts";
 import { t } from "i18next";
 import React, { useEffect, useMemo, useState } from "react";
-import { LockerConfirmDialog } from "./LockerConfirmDialog";
-import {
-    LockerSidebarDrawer,
-    LockerSidebarTitlebar,
-} from "./LockerSidebarShell";
-import { FormField } from "./createItemDialog/ItemFormFields";
 import {
     lockerSheetContainerSx,
     lockerSheetPaperSx,
-} from "./locker-dialog-styles";
+} from "../../styles/dialog";
 import {
     lockerColorSx,
     lockerTextBodyBoldSx,
     lockerTextBodySx,
     lockerTextH2Sx,
     lockerTextMiniSx,
-} from "./locker-tokens";
+} from "../../styles/tokens";
+import {
+    LockerSidebarDrawer,
+    LockerSidebarTitlebar,
+} from "../sidebar/LockerSidebarShell";
+import { LockerConfirmDialog } from "../ui/LockerConfirmDialog";
 
 interface LockerCollectionShareDrawerProps {
     open: boolean;

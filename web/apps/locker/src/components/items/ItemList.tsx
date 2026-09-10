@@ -1,4 +1,7 @@
-import { LockerMenuOption, LockerOverflowMenu } from "@/components/LockerMenu";
+import {
+    LockerMenuOption,
+    LockerOverflowMenu,
+} from "@/components/ui/LockerMenu";
 import {
     deleteLockerFileShareLink,
     downloadLockerFile,
@@ -56,9 +59,6 @@ import React, {
     useRef,
     useState,
 } from "react";
-import { ItemCard } from "./ItemCard";
-import { ItemDetailView } from "./ItemDetailView";
-import { ItemListDialogs } from "./itemList/ItemListDialogs";
 import {
     lockerColors,
     lockerColorSx,
@@ -67,7 +67,10 @@ import {
     lockerTextDisplay2Sx,
     lockerTextLargeSx,
     lockerTextMiniSx,
-} from "./locker-tokens";
+} from "../../styles/tokens";
+import { ItemCard } from "./ItemCard";
+import { ItemDetailView } from "./ItemDetailView";
+import { ItemListDialogs } from "./ItemListDialogs";
 
 const uniqueCollectionsByID = (collections: LockerCollection[]) => {
     const seen = new Set<number>();

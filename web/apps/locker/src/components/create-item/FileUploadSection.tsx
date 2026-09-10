@@ -1,11 +1,9 @@
-import { CollectionChipRow } from "@/components/createItemDialog/CollectionChipRow";
-import {
-    lockerPrimaryButtonSx,
-    lockerScrollAreaSx,
-} from "@/components/createItemDialog/create-item-dialog-styles";
-import { CreateCollectionRow } from "@/components/createItemDialog/CreateCollectionRow";
-import { lockerItemIcon } from "@/components/locker-item-icons";
+import { CollectionChipRow } from "@/components/create-item/CollectionChipRow";
+import { lockerScrollAreaSx } from "@/components/create-item/create-item-dialog-styles";
+import { CreateCollectionRow } from "@/components/create-item/CreateCollectionRow";
+import { lockerItemIcon } from "@/components/items/locker-item-icons";
 import type { LockerUploadProgress } from "@/services/remote";
+import { lockerPrimaryButtonSx } from "@/styles/fields";
 import type { LockerCollection, LockerUploadCandidate } from "@/types";
 import { Cancel01Icon, FileUploadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";

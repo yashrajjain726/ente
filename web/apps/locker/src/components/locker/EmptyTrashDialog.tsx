@@ -1,4 +1,4 @@
-import { LockerConfirmDialog } from "@/components/LockerConfirmDialog";
+import { LockerConfirmDialog } from "@/components/ui/LockerConfirmDialog";
 import { t } from "i18next";
 
 export interface EmptyTrashDialogState {

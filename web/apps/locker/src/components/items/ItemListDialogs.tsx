@@ -1,17 +1,17 @@
+import { FormField } from "@/components/ui/FormField";
+import { LockerMenuFooter, LockerMenuOption } from "@/components/ui/LockerMenu";
+import { lockerMenuPaperSx } from "@/styles/dialog";
 import {
     lockerHeaderIconButtonSx,
     lockerPrimaryButtonSx,
-} from "@/components/createItemDialog/create-item-dialog-styles";
-import { FormField } from "@/components/createItemDialog/ItemFormFields";
-import { lockerMenuPaperSx } from "@/components/locker-dialog-styles";
+} from "@/styles/fields";
 import {
     lockerColorSx,
     lockerTextBodyBoldSx,
     lockerTextBodySx,
     lockerTextH2Sx,
     lockerTextMiniSx,
-} from "@/components/locker-tokens";
-import { LockerMenuFooter, LockerMenuOption } from "@/components/LockerMenu";
+} from "@/styles/tokens";
 import type { LockerCollection } from "@/types";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -32,9 +32,9 @@ import React, { useId } from "react";
 import {
     lockerSheetContainerSx,
     lockerSheetPaperSx,
-} from "../locker-dialog-styles";
-import { LockerConfirmDialog } from "../LockerConfirmDialog";
-import { LockerFileLinkDialog } from "../LockerFileLinkDialog";
+} from "../../styles/dialog";
+import { LockerConfirmDialog } from "../ui/LockerConfirmDialog";
+import { LockerFileLinkDialog } from "./LockerFileLinkDialog";
 
 interface ItemListDialogsProps {
     activeFileLinkItemTitle: string;

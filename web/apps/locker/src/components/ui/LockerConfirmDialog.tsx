@@ -1,14 +1,11 @@
-import {
-    lockerSheetContainerSx,
-    lockerSheetPaperSx,
-} from "@/components/locker-dialog-styles";
+import { lockerSheetContainerSx, lockerSheetPaperSx } from "@/styles/dialog";
 import {
     lockerColorSx,
     lockerTextBodyBoldSx,
     lockerTextBodySx,
     lockerTextH2Sx,
     lockerTextMiniSx,
-} from "@/components/locker-tokens";
+} from "@/styles/tokens";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {

@@ -28,16 +28,16 @@ import log from "ente-base/log";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useState } from "react";
 
-import { FormField } from "./createItemDialog/ItemFormFields";
+import { FormField } from "@/components/ui/FormField";
 import {
     lockerSheetContainerSx,
     lockerSheetPaperSx,
-} from "./locker-dialog-styles";
+} from "../../styles/dialog";
 import {
     lockerColorSx,
     lockerTextBodyBoldSx,
     lockerTextH2Sx,
-} from "./locker-tokens";
+} from "../../styles/tokens";
 
 type LockerAuthenticateUserProps = ModalVisibilityProps & {
     onAuthenticate: () => void;

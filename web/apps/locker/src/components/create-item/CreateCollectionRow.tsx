@@ -1,7 +1,4 @@
-import {
-    lockerFieldSx,
-    lockerPrimaryButtonSx,
-} from "@/components/createItemDialog/create-item-dialog-styles";
+import { lockerFieldSx, lockerPrimaryButtonSx } from "@/styles/fields";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Stack, TextField } from "@mui/material";

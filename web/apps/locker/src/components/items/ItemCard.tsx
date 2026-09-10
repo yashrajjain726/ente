@@ -1,5 +1,8 @@
-import { lockerItemIcon } from "@/components/locker-item-icons";
-import { LockerMenuOption, LockerOverflowMenu } from "@/components/LockerMenu";
+import { lockerItemIcon } from "@/components/items/locker-item-icons";
+import {
+    LockerMenuOption,
+    LockerOverflowMenu,
+} from "@/components/ui/LockerMenu";
 import { downloadLockerFile } from "@/services/remote";
 import type { GenericFileData, LockerItem } from "@/types";
 import { getItemTitle, hasDownloadableObject } from "@/types";
@@ -32,7 +35,7 @@ import {
     lockerColorSx,
     lockerTextBodySx,
     lockerTextMiniSx,
-} from "./locker-tokens";
+} from "../../styles/tokens";
 
 interface ItemCardProps {
     item: LockerItem;
