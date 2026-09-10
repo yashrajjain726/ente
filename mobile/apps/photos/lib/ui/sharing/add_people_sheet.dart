@@ -22,6 +22,7 @@ import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/ui/sharing/widgets/selected_person_chip.dart";
 import "package:photos/ui/sharing/widgets/sharing_progress_sheet.dart";
+import "package:photos/ui/sharing/widgets/sharing_role.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 
@@ -86,7 +87,7 @@ Future<AddEmailToCollectionResult?> _shareSelected({
   AddEmailToCollectionResult? firstFailure;
   for (final collection in collections) {
     for (final suggestion in selected) {
-      if (!_needsShare(collection, suggestion.email)) {
+      if (!collectionNeedsShare(collection, suggestion.email)) {
         continue;
       }
       final result = await actions.addEmailToCollection(
@@ -100,16 +101,6 @@ Future<AddEmailToCollectionResult?> _shareSelected({
     }
   }
   return firstFailure;
-}
-
-bool _needsShare(Collection collection, String email) {
-  final normalized = email.trim().toLowerCase();
-  if (collection.owner.email.trim().toLowerCase() == normalized) {
-    return false;
-  }
-  return !collection.sharees.any(
-    (sharee) => sharee.email.trim().toLowerCase() == normalized,
-  );
 }
 
 bool _hasActiveLink(Collection collection) {
@@ -149,7 +140,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
     super.initState();
     _contacts = UserService.instance.getRelevantContacts().where((suggestion) {
       return widget.collections.any(
-        (collection) => _needsShare(collection, suggestion.email),
+        (collection) => collectionNeedsShare(collection, suggestion.email),
       );
     }).toList()..sort((a, b) => a.email.compareTo(b.email));
   }
@@ -167,13 +158,13 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
   Widget build(BuildContext context) {
     final selectedEmails = {
       for (final suggestion in widget.selected)
-        suggestion.email.trim().toLowerCase(),
+        normalizedSharingEmail(suggestion.email),
     };
-    final query = _textController.text.trim().toLowerCase();
+    final query = normalizedSharingEmail(_textController.text);
     final filteredContacts = _contacts
         .where(
           (contact) =>
-              !selectedEmails.contains(contact.email.trim().toLowerCase()) &&
+              !selectedEmails.contains(normalizedSharingEmail(contact.email)) &&
               matchesResolvedSuggestionQuery(contact, query),
         )
         .toList();
@@ -240,6 +231,9 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
                     onToggle: _toggleSuggestion,
                   ),
                 ),
+                ShareSectionDescription(
+                  context.strings.longPressAnEmailToVerifyEndToEndEncryption,
+                ),
               ],
             ],
           ),
@@ -260,11 +254,12 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
   }
 
   Future<void> _tryAddTypedEmail() async {
-    final email = _textController.text.trim().toLowerCase();
+    final email = normalizedSharingEmail(_textController.text);
+    final currentEmail = Configuration.instance.getEmail();
     if (!EmailValidator.validate(email)) {
       return;
     }
-    if (email == Configuration.instance.getEmail()?.trim().toLowerCase()) {
+    if (currentEmail != null && email == normalizedSharingEmail(currentEmail)) {
       await showErrorDialog(
         context,
         context.strings.oops,
@@ -277,7 +272,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
       return;
     }
     if (!widget.collections.any(
-      (collection) => _needsShare(collection, email),
+      (collection) => collectionNeedsShare(collection, email),
     )) {
       showShortToast(context, context.strings.personAlreadyHasAccess);
       _clearEmail();
@@ -289,7 +284,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
       if (!mounted) {
         return;
       }
-      if (_textController.text.trim().toLowerCase() != email ||
+      if (normalizedSharingEmail(_textController.text) != email ||
           _isSelected(email)) {
         return;
       }
@@ -313,7 +308,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
         return;
       }
       final suggestion = _contacts.firstWhereOrNull(
-        (contact) => contact.email.trim().toLowerCase() == email,
+        (contact) => normalizedSharingEmail(contact.email) == email,
       );
       setState(() {
         widget.selected.add(suggestion ?? UserSuggestion(email));
@@ -334,8 +329,8 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
     setState(() {
       final index = widget.selected.indexWhere(
         (selected) =>
-            selected.email.trim().toLowerCase() ==
-            suggestion.email.trim().toLowerCase(),
+            normalizedSharingEmail(selected.email) ==
+            normalizedSharingEmail(suggestion.email),
       );
       if (index == -1) {
         widget.selected.add(suggestion);
@@ -374,7 +369,8 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
   bool _isSelected(String email) {
     return widget.selected.any(
       (selected) =>
-          selected.email.trim().toLowerCase() == email.trim().toLowerCase(),
+          normalizedSharingEmail(selected.email) ==
+          normalizedSharingEmail(email),
     );
   }
 

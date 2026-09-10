@@ -114,7 +114,7 @@ class SelectedPersonChip extends StatefulWidget {
 class _SelectedPersonChipState extends State<SelectedPersonChip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _animation;
+  late final CurvedAnimation _animation;
   bool _isRemoving = false;
 
   @override
@@ -130,6 +130,7 @@ class _SelectedPersonChipState extends State<SelectedPersonChip>
 
   @override
   void dispose() {
+    _animation.dispose();
     _controller.dispose();
     super.dispose();
   }

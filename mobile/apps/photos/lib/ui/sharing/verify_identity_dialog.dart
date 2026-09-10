@@ -149,6 +149,7 @@ class _VerifyIdentitySheetContentState
             color: colors.textReverse,
             fontFamily: 'monospace',
             letterSpacing: 0.5,
+            height: 1.5,
           ),
           textAlign: TextAlign.justify,
         ),
