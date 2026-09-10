@@ -96,7 +96,7 @@ class JustifiedLayoutCalculator {
   static const double _minimumAspectRatio = 1 / 3;
   static const double _maximumAspectRatio = 4.0;
   static const double _maximumRowHeightFactor = 2.4;
-  static const double _maximumWideFinalRowHeightFactor = 1.25;
+  static const double _maximumWideFinalRowHeightFactor = 1.0;
   static const double _minimumLandscapeRowHeightFactor = 0.88;
   static const double _mediumWidthBreakpoint = 600;
   static const double _expandedWidthBreakpoint = 1008;

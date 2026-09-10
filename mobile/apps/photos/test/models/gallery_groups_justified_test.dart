@@ -163,8 +163,12 @@ void main() {
     await localSettings.setJustifiedLayoutStrategy(
       JustifiedLayoutStrategy.flex,
     );
+    await localSettings.setFlexLayoutTuningValue(
+      FlexLayoutTuningField.targetHeightScale,
+      1,
+    );
     final flex = groups().groupLayouts.single as JustifiedSectionLayout;
-    expect(flex.rows.map((row) => row.itemWidths.length), [3, 1]);
+    expect(flex.rows.single.itemWidths, hasLength(4));
   });
 
   test("routes Flex Full Rows with independent tuning", () async {

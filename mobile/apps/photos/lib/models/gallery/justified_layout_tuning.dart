@@ -95,7 +95,7 @@ class ComfortLargeLayoutTuning {
   const ComfortLargeLayoutTuning({
     this.targetHeightScale = 1.5,
     this.maximumHeightFactor = 2.4,
-    this.wideFinalMaximumHeightFactor = 1.25,
+    this.wideFinalMaximumHeightFactor = 1.0,
     this.minimumLandscapeHeightFactor = 0.88,
   });
 
