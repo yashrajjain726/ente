@@ -12,15 +12,19 @@ import java.util.concurrent.Executors
 
 @android.annotation.TargetApi(24)
 internal class WallpaperSession(context: Context, private val uri: Uri?, private val size: Point) : AutoCloseable {
+    private companion object {
+        const val maxPreviewBytes = 24 * 1024 * 1024
+    }
+
     private val service = WallpaperService(context.applicationContext)
     private val executor = Executors.newSingleThreadExecutor()
 
     fun preview(): CompletableFuture<ByteArray> = CompletableFuture.supplyAsync({
         require(uri?.scheme == ContentResolver.SCHEME_CONTENT) { "Expected an image content URI" }
         if (!service.isAvailable) throw UnsupportedOperationException("Wallpaper changes are not allowed")
-        val bitmap = service.decode(requireNotNull(uri), size)
+        val bitmap = service.preview(requireNotNull(uri), size)
         try {
-            ByteArrayOutputStream().use {
+            BoundedByteArrayOutputStream(maxPreviewBytes).use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                 it.toByteArray()
             }
@@ -39,4 +43,20 @@ internal class WallpaperSession(context: Context, private val uri: Uri?, private
     }, executor)
 
     override fun close() { executor.shutdown() }
+}
+
+private class BoundedByteArrayOutputStream(private val limit: Int) : ByteArrayOutputStream() {
+    override fun write(value: Int) {
+        checkSize(1)
+        super.write(value)
+    }
+
+    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+        checkSize(length)
+        super.write(bytes, offset, length)
+    }
+
+    private fun checkSize(length: Int) {
+        check(count.toLong() + length <= limit) { "Wallpaper preview is too large" }
+    }
 }
