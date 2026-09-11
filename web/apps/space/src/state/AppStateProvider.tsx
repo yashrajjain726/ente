@@ -79,17 +79,6 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         [postPreviewUrl],
     );
 
-    useEffect(() => {
-        if (postPublication?.phase != "failed") return;
-
-        const timeoutID = window.setTimeout(() => {
-            setPostPublication((current) =>
-                current == postPublication ? null : current,
-            );
-        }, 2500);
-        return () => window.clearTimeout(timeoutID);
-    }, [postPublication]);
-
     const publishPost = useCallback(
         async (
             image: Parameters<SpaceAppState["publishPost"]>[0],

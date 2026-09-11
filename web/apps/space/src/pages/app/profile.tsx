@@ -132,9 +132,14 @@ const Page: React.FC = () => {
                 profile={profile}
                 showPostLoadingIndicator={showInitialPostLoadingIndicator}
                 onBack={() => void router.push(spaceRoutes.home)}
-                onPostSubmitted={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
-                    await publishPost(image, caption);
+                    const post = await publishPost(image, caption);
+                    setPosts((currentPosts) => [
+                        post,
+                        ...currentPosts.filter(
+                            (currentPost) => currentPost.postId != post.postId,
+                        ),
+                    ]);
                 }}
                 onDeletePost={async (postId) => {
                     const spaceId = profile.spaceId;
