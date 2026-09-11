@@ -186,7 +186,7 @@ fn run_scale(scale: usize, dims: usize, attrs: bool, storage: StorageKind, temp_
         VecDb::open(
             &dir.join("bench.vecdb"),
             dims,
-            storage,
+            Some(storage),
             DistanceMetric::Cosine,
         )
         .expect("open vecdb"),
@@ -327,7 +327,8 @@ fn run_vecdb(
     scale: usize,
 ) -> VecdbReport {
     let path = dir.join("bench.vecdb");
-    let mut db = VecDb::open(&path, dims, storage, DistanceMetric::Cosine).expect("open vecdb");
+    let mut db =
+        VecDb::open(&path, dims, Some(storage), DistanceMetric::Cosine).expect("open vecdb");
     let ingest = ingest_phase(&mut db, data, attrs, scale);
     let searches = search_phase(&db, data, storage, scale);
     let stats = db.stats().expect("vecdb stats");
@@ -545,14 +546,14 @@ fn reopen_phase(
 ) -> (ReopenTimings, VecDb) {
     eprintln!("[scale {scale}] vecdb cold open with snapshot");
     let started = Instant::now();
-    let reopened = VecDb::open(path, dims, storage, DistanceMetric::Cosine)
+    let reopened = VecDb::open(path, dims, Some(storage), DistanceMetric::Cosine)
         .expect("vecdb reopen with snapshot");
     let open_with_snapshot = started.elapsed();
     drop(reopened);
     std::fs::remove_file(snapshot_file).expect("remove snapshot");
     eprintln!("[scale {scale}] vecdb cold open without snapshot (full rebuild)");
     let started = Instant::now();
-    let db = VecDb::open(path, dims, storage, DistanceMetric::Cosine)
+    let db = VecDb::open(path, dims, Some(storage), DistanceMetric::Cosine)
         .expect("vecdb reopen without snapshot");
     let open_full_rebuild = started.elapsed();
     (
