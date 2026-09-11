@@ -31,6 +31,14 @@ const demoProfile: SetupProfile = {
     username: "you",
 };
 
+const singleFriendVariants = [
+    "no-posts",
+    "one-post",
+    "three-posts",
+    "received",
+    "sent",
+] as const;
+
 interface CanvasSize {
     height: number;
     width: number;
@@ -47,22 +55,49 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
     index,
     placement,
 }) => {
+    const [variantIndex, setVariantIndex] = React.useState(0);
+
+    React.useEffect(() => {
+        setVariantIndex(0);
+        if (count != 1) return;
+
+        const timer = window.setInterval(() => {
+            setVariantIndex(
+                (current) => (current + 1) % singleFriendVariants.length,
+            );
+        }, 3000);
+        return () => window.clearInterval(timer);
+    }, [count]);
+
+    const singleFriendVariant =
+        count == 1 ? singleFriendVariants[variantIndex] : undefined;
     const showAllVariants = count >= 5;
-    const friendRequestDirection = showAllVariants
-        ? index == 0
-            ? ("sent" as const)
-            : index == 1
-              ? ("received" as const)
-              : undefined
-        : count == 2 && index == 1
-          ? ("sent" as const)
-          : count >= 2 && index == 0
-            ? ("received" as const)
+    const singleFriendRequestDirection =
+        singleFriendVariant == "sent" || singleFriendVariant == "received"
+            ? singleFriendVariant
             : undefined;
+    const friendRequestDirection =
+        count == 1
+            ? singleFriendRequestDirection
+            : showAllVariants
+              ? index == 0
+                  ? ("sent" as const)
+                  : index == 1
+                    ? ("received" as const)
+                    : undefined
+              : count == 2 && index == 1
+                ? ("sent" as const)
+                : count >= 2 && index == 0
+                  ? ("received" as const)
+                  : undefined;
     const seenPostIndex = showAllVariants ? 2 : count >= 3 ? 1 : undefined;
     const unseenPostIndex = showAllVariants ? 3 : count >= 3 ? 2 : undefined;
     const hasPlaceholderMedia = index == seenPostIndex;
-    const isUnread = index == unseenPostIndex;
+    const isUnread =
+        count == 1
+            ? singleFriendVariant == "one-post" ||
+              singleFriendVariant == "three-posts"
+            : index == unseenPostIndex;
     const username = friendRequestDirection
         ? friendRequestDirection == "sent"
             ? "request_pending"
@@ -74,18 +109,22 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
         id: `demo-friend-${index + 1}`,
         username,
     };
-    const post: SpacePost | undefined =
+    const posts: SpacePost[] =
         hasPlaceholderMedia || isUnread
-            ? {
-                  friendID: friend.id,
-                  name: friend.fullName,
-                  postId: index + 1,
-                  spaceId: friend.id,
-                  timestampMs: 1_700_000_000_000 - index * 60_000,
-                  username,
-                  viewerLiked: false,
-              }
-            : undefined;
+            ? Array.from(
+                  { length: singleFriendVariant == "three-posts" ? 3 : 1 },
+                  (_, postIndex) => ({
+                      friendID: friend.id,
+                      name: friend.fullName,
+                      postId: index + postIndex + 1,
+                      spaceId: friend.id,
+                      timestampMs:
+                          1_700_000_000_000 - (index + postIndex) * 60_000,
+                      username,
+                      viewerLiked: false,
+                  }),
+              )
+            : [];
 
     return (
         <FriendPostTile
@@ -123,7 +162,7 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
             isNineTileLayout={count == maximumHomeTileCount}
             isTwoTileLayout={count == 2}
             placement={placement}
-            posts={post ? [post] : []}
+            posts={posts}
             showFriendRequestDetails={count <= 2}
         />
     );

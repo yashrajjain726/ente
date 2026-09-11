@@ -42,7 +42,6 @@ import {
     spaceSurface,
     spaceSurfaceHover,
     spaceText,
-    spaceTextMuted,
 } from "styles/colors";
 import {
     spacePostTileRadius,
@@ -72,7 +71,6 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 const green = "#08C225";
 const textBase = spaceText;
-const textSecondary = spaceTextMuted;
 const avatarFallbackColor = spaceSurfaceHover;
 const avatarFallbackTextColor = "#FFFFFF";
 const mediaPlaceholderColor = spaceSurface;
@@ -788,7 +786,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 component="span"
                                 aria-hidden
                                 sx={{
-                                    color: textSecondary,
+                                    color: "rgba(255, 255, 255, 0.75)",
                                     fontSize: 13,
                                     fontWeight: 500,
                                     lineHeight: 1.4,
