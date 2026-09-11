@@ -297,7 +297,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         <Box
                             component="span"
                             sx={{
-                                color: spaceTextMuted,
+                                color: isEmpty ? spaceText : spaceTextMuted,
                                 display: "block",
                                 fontSize: 12,
                                 fontWeight: 400,
@@ -314,7 +314,7 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                         component="span"
                         title={post ? caption : undefined}
                         sx={{
-                            color: isEmpty ? spaceText : spaceTextMuted,
+                            color: spaceTextMuted,
                             display: "block",
                             fontSize: 12,
                             fontWeight: 400,
