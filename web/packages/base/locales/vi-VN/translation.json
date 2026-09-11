@@ -1037,6 +1037,7 @@
     "save": "Lưu",
     "save_changes": "Lưu thay đổi",
     "theme": "Chủ đề",
+    "appearance": "Giao diện",
     "system": "Giống hệ thống",
     "light": "Sáng",
     "dark": "Tối",
@@ -1113,9 +1114,9 @@
     "auto_lock_30_minutes": "30 phút",
     "wrong_unlock_code_one": "Bạn đã nhập sai mã mở khóa {{count}} lần.",
     "wrong_unlock_code_other": "Bạn đã nhập sai mã mở khóa {{count}} lần.",
-    "trusted_contacts": "",
-    "legacy_accounts": "",
-    "add_trusted_contact": "",
-    "trusted_contacts_empty": "",
-    "legacy_accounts_empty": ""
+    "trusted_contacts": "Liên hệ tin cậy",
+    "legacy_accounts": "Tài khoản thừa kế",
+    "add_trusted_contact": "Thêm liên hệ tin cậy",
+    "trusted_contacts_empty": "Đề cử một người dùng Ente khác làm liên hệ tin cậy để khôi phục tài khoản của bạn",
+    "legacy_accounts_empty": "Các liên hệ tin cậy có thể khởi động quá trình khôi phục tài khoản, và nếu không bị chặn trong vòng 30 ngày, có thể đặt lại mật khẩu và truy cập tài khoản của bạn."
 }
