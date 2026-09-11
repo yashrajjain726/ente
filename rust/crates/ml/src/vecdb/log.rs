@@ -127,7 +127,7 @@ impl Log {
         expected_dims: usize,
         requested: Option<StorageKind>,
     ) -> Result<Self, VecDbError> {
-        let fallback = requested.unwrap_or(StorageKind::F32);
+        let fallback = requested.unwrap_or(StorageKind::I8);
         let file_len = file
             .metadata()
             .map_err(|source| VecDbError::io(path, source))?
@@ -1257,7 +1257,7 @@ mod tests {
             let path = dir.path().join("log");
             std::fs::write(&path, vec![1u8; junk_len]).unwrap();
             let file = File::options().read(true).write(true).open(&path).unwrap();
-            let mut log = Log::open(file, &path, 8, None).unwrap();
+            let mut log = Log::open(file, &path, 8, Some(StorageKind::F32)).unwrap();
             assert_eq!(log.current_end_offset(), HEADER_LEN as u64);
             assert_eq!(std::fs::metadata(&path).unwrap().len(), HEADER_LEN as u64);
             let (records, _) = scan_all(&mut log);
@@ -2854,7 +2854,7 @@ mod tests {
         let file = File::options().read(true).write(true).open(&other).unwrap();
         assert_eq!(
             Log::open(file, &other, 64, None).unwrap().storage(),
-            StorageKind::F32
+            StorageKind::I8
         );
     }
 

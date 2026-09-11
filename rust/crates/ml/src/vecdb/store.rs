@@ -1281,7 +1281,7 @@ fn build_writer(
     let mut log = if std::fs::metadata(path).is_ok() {
         open_existing_writer_log(path, dims, storage)?
     } else {
-        match Log::create(path, dims, storage.unwrap_or(StorageKind::F32)) {
+        match Log::create(path, dims, storage.unwrap_or(StorageKind::I8)) {
             Ok(created) => created,
             Err(VecDbError::Io { source, .. }) if source.kind() == ErrorKind::AlreadyExists => {
                 open_existing_writer_log(path, dims, storage)?
@@ -1469,7 +1469,7 @@ fn build_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
 fn empty_read_only(path: &Path, dims: usize) -> Result<Shared, VecDbError> {
     Ok(read_only_shared(
         path,
-        VectorArena::new(dims)?,
+        VectorArena::with_storage(dims, StorageKind::I8)?,
         Graph::new(),
         AttrTable::default(),
         0,
@@ -1788,7 +1788,7 @@ mod tests {
     }
 
     fn open_writer(path: &Path) -> VecDb {
-        VecDb::open(path, DIMS).unwrap()
+        VecDb::open_with_storage(path, DIMS, StorageKind::F32).unwrap()
     }
 
     fn generation_of(path: &Path) -> [u8; 16] {
@@ -2525,7 +2525,7 @@ mod tests {
             ));
         }
         assert_eq!(fs::read(&path).unwrap(), partial);
-        assert!(VecDb::open_read_only(&alias, DIMS).unwrap().is_empty());
+        assert!(VecDb::open_read_only(&alias, I8_DIMS).unwrap().is_empty());
         drop(holder);
         let writer = open_writer(&alias);
         assert!(writer.is_empty());
@@ -2678,7 +2678,7 @@ mod tests {
         fs::create_dir(&subdir).unwrap();
         let plain = subdir.join("db");
         let dotted = subdir.join("..").join("indexes").join("db");
-        let first = VecDb::open(&plain, DIMS).unwrap();
+        let first = open_writer(&plain);
         let second = VecDb::open(&dotted, DIMS).unwrap();
         assert!(Arc::ptr_eq(&first.shared, &second.shared));
         let vector = seeded_unit_vector(5, DIMS);
@@ -2826,7 +2826,7 @@ mod tests {
         let closed = closed_instance(&path);
         let key = registry_key_for(&path).unwrap();
         let slot = plant_closed_marker(&key, &closed);
-        let reopened = VecDb::open(&path, DIMS).unwrap();
+        let reopened = open_writer(&path);
         assert!(!Arc::ptr_eq(&reopened.shared, &closed));
         reopened
             .add("fresh", &seeded_unit_vector(78, DIMS))
@@ -2870,7 +2870,7 @@ mod tests {
             }
             let opener = {
                 let path = path.clone();
-                thread::spawn(move || VecDb::open(&path, DIMS))
+                thread::spawn(move || VecDb::open_with_storage(&path, DIMS, StorageKind::F32))
             };
             thread::sleep(Duration::from_millis(5));
             drop(frozen);
@@ -2914,10 +2914,10 @@ mod tests {
         let stalled_openers: Vec<_> = (0..2)
             .map(|_| {
                 let path = stalled_path.clone();
-                thread::spawn(move || VecDb::open(&path, DIMS).unwrap())
+                thread::spawn(move || open_writer(&path))
             })
             .collect();
-        let other = VecDb::open(&other_path, DIMS).unwrap();
+        let other = open_writer(&other_path);
         other.add("other", &seeded_unit_vector(1, DIMS)).unwrap();
         assert_eq!(other.len(), 1);
         drop(build_in_progress);
@@ -3024,6 +3024,7 @@ mod tests {
 
     #[test]
     fn read_only_open_of_missing_file_is_empty() {
+        const DIMS: usize = I8_DIMS;
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("absent");
         let db = VecDb::open_read_only(&path, DIMS).unwrap();
@@ -3042,7 +3043,7 @@ mod tests {
                 live_count: 0,
                 dead_count: 0,
                 dims: DIMS,
-                storage: StorageKind::F32,
+                storage: StorageKind::I8,
                 log_bytes: 0,
                 records_since_snapshot: 0,
                 approximate_memory_bytes: 0,
@@ -3614,7 +3615,7 @@ mod tests {
         let path = dir.path().join("db");
         let partial = [0x45u8, 0x56, 0x44, 0x42, 0x01, 0x00, 0x00];
         fs::write(&path, partial).unwrap();
-        let db = VecDb::open_read_only(&path, DIMS).unwrap();
+        let db = VecDb::open_read_only(&path, I8_DIMS).unwrap();
         assert!(db.is_empty());
         assert_eq!(db.stats().unwrap().log_bytes, 0);
         assert_eq!(fs::read(&path).unwrap(), partial);
@@ -5361,7 +5362,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let narrow = dir.path().join("narrow");
         let wide = dir.path().join("wide");
-        let live = VecDb::open(&narrow, 8).unwrap();
+        let live = VecDb::open_with_storage(&narrow, 8, StorageKind::F32).unwrap();
         live.add("n", &seeded_unit_vector(1, 8)).unwrap();
         assert!(matches!(
             VecDb::open_with_storage(&narrow, 8, StorageKind::I8),
@@ -5378,7 +5379,7 @@ mod tests {
                 actual: StorageKind::F32
             })
         ));
-        drop(VecDb::open(&wide, I8_DIMS).unwrap());
+        drop(VecDb::open_with_storage(&wide, I8_DIMS, StorageKind::F32).unwrap());
         assert!(matches!(
             VecDb::open_with_storage(&wide, 8, StorageKind::I8),
             Err(VecDbError::StorageMismatch {
@@ -5416,7 +5417,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let f32_path = dir.path().join("f32");
         let i8_path = dir.path().join("i8");
-        let f32_db = VecDb::open(&f32_path, I8_DIMS).unwrap();
+        let f32_db = VecDb::open_with_storage(&f32_path, I8_DIMS, StorageKind::F32).unwrap();
         f32_db.add("f", &seeded_unit_vector(1, I8_DIMS)).unwrap();
         assert_eq!(f32_db.stats().unwrap().storage, StorageKind::F32);
         assert!(matches!(
@@ -5445,7 +5446,7 @@ mod tests {
                 .storage,
             StorageKind::F32
         );
-        let i8_db = open_i8(&i8_path);
+        let i8_db = VecDb::open(&i8_path, I8_DIMS).unwrap();
         let vector = seeded_unit_vector(2, I8_DIMS);
         i8_db.add("i", &vector).unwrap();
         assert_eq!(i8_db.stats().unwrap().storage, StorageKind::I8);
@@ -5492,12 +5493,12 @@ mod tests {
         ));
         assert!(VecDb::open_with_storage(&dir.path().join("narrow"), 16, StorageKind::F32).is_ok());
         assert_eq!(
-            VecDb::open_read_only(&dir.path().join("absent"), DIMS)
+            VecDb::open_read_only(&dir.path().join("absent"), I8_DIMS)
                 .unwrap()
                 .stats()
                 .unwrap()
                 .storage,
-            StorageKind::F32
+            StorageKind::I8
         );
     }
 
@@ -5696,7 +5697,8 @@ mod tests {
     fn i8_stats_report_the_storage_and_a_quarter_of_the_vector_memory() {
         let dir = TempDir::new().unwrap();
         let dims = 512;
-        let f32_db = VecDb::open(&dir.path().join("f32"), dims).unwrap();
+        let f32_db =
+            VecDb::open_with_storage(&dir.path().join("f32"), dims, StorageKind::F32).unwrap();
         let i8_db =
             VecDb::open_with_storage(&dir.path().join("i8"), dims, StorageKind::I8).unwrap();
         let entries: Vec<(String, Vec<f32>)> = (0..200u64)
