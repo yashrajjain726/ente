@@ -13,6 +13,39 @@ mod store;
 
 pub use store::{OpenCost, Stats, VecDb};
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DistanceMetric {
+    InnerProduct,
+    #[default]
+    Cosine,
+}
+
+impl DistanceMetric {
+    pub(crate) fn header_tag(self) -> u8 {
+        match self {
+            Self::InnerProduct => 0,
+            Self::Cosine => 1,
+        }
+    }
+
+    pub(crate) fn from_header_tag(tag: u8) -> Option<Self> {
+        match tag {
+            0 => Some(Self::InnerProduct),
+            1 => Some(Self::Cosine),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for DistanceMetric {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::InnerProduct => "inner product",
+            Self::Cosine => "cosine",
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageKind {
     F32,
@@ -123,6 +156,11 @@ pub enum VecDbError {
     StorageMismatch {
         expected: StorageKind,
         actual: StorageKind,
+    },
+    #[error("distance metric mismatch: expected {expected}, found {actual}")]
+    MetricMismatch {
+        expected: DistanceMetric,
+        actual: DistanceMetric,
     },
     #[error("search requires a limit or a max distance")]
     UnboundedSearch,
