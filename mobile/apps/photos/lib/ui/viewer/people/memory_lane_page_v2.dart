@@ -159,7 +159,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
       _chunkinator = _Chunkinator(
         keys: _entries,
         chunkSize: chunkSize,
-        chunkDelay: _playbackInterval * (chunkSize - 0.5),
         fetch: (entry) async {
           if (!mounted) return null;
           return _loadEntry(entry, files[entry.fileId]!);
@@ -1068,18 +1067,11 @@ class _Chunkinator<K, V> {
   final List<K> keys;
   final Future<V> Function(K key) fetch;
   final int chunkSize;
-  final Duration chunkDelay;
 
   final Map<K, Future<V>> _cache = {};
-  Object? _chunkToken;
-  Timer? _chunkTimer;
+  bool _disposed = false;
 
-  _Chunkinator({
-    required this.keys,
-    required this.fetch,
-    this.chunkSize = 5,
-    this.chunkDelay = Duration.zero,
-  }) {
+  _Chunkinator({required this.keys, required this.fetch, this.chunkSize = 5}) {
     if (chunkSize <= 0) {
       throw ArgumentError.value(
         chunkSize,
@@ -1090,15 +1082,13 @@ class _Chunkinator<K, V> {
   }
 
   void dispose() {
-    _chunkToken = null;
-    _chunkTimer?.cancel();
+    _disposed = true;
     _cache.clear();
   }
 
   Future<V> get(K key) {
-    final cached = _cache[key];
-    if (cached != null) {
-      return cached;
+    if (_disposed) {
+      throw StateError('Chunkinator is disposed');
     }
     final index = keys.indexOf(key);
     if (index == -1) {
@@ -1109,23 +1099,19 @@ class _Chunkinator<K, V> {
   }
 
   Future<void> _fetchChunk(int start) async {
-    _chunkTimer?.cancel();
-    final token = Object();
-    _chunkToken = token;
     if (start >= keys.length) {
       return;
     }
     final end = math.min(start + chunkSize, keys.length);
-    final futures = <Future<V>>[];
-    for (var i = start; i < end; i++) {
-      final key = keys[i];
-      futures.add(_cache.putIfAbsent(key, () => fetch(key)));
+    while (start < end && _cache.containsKey(keys[start])) {
+      start++;
     }
-    await Future.wait(futures);
-    if (_chunkToken != token || end >= keys.length) return;
-    _chunkTimer = Timer(chunkDelay, () {
-      if (_chunkToken != token) return;
-      unawaited(_fetchChunk(end));
-    });
+    for (var i = start; i < end; i++) {
+      if (_disposed) return;
+      final key = keys[i];
+      try {
+        await _cache.putIfAbsent(key, () => fetch(key));
+      } catch (_) {}
+    }
   }
 }
