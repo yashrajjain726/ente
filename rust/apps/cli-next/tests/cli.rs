@@ -237,7 +237,7 @@ fn vault_schema_version_is_checked_after_decryption() {
 }
 
 #[tokio::test]
-async fn raw_api_preserves_requests_and_responses_without_leaking_credentials() {
+async fn raw_api_preserves_requests_and_responses() {
     let mut origin = mockito::Server::new_async().await;
     let home = TestHome::new();
     home.seed(&origin.url());
@@ -268,13 +268,12 @@ async fn raw_api_preserves_requests_and_responses_without_leaking_credentials() 
         .match_header("x-auth-token", secret)
         .match_header("x-client-package", "io.ente.photos")
         .with_body(body)
-        .expect(2)
+        .expect(1)
         .create_async()
         .await;
-    assert_eq!(
-        success(home.run(&["photos", "api", "/local", "--json"])).stdout,
-        body
-    );
+    let output = home.run(&["photos", "api", "/local"]);
+    assert!(failure(&output).contains("HTTP 307 Temporary Redirect"));
+    assert!(output.stdout.is_empty());
     assert_eq!(
         success(home.run(&["photos", "api", &format!("{}/bytes", origin.url())])).stdout,
         body
@@ -300,7 +299,7 @@ async fn raw_api_preserves_requests_and_responses_without_leaking_credentials() 
             "api",
             "/request",
             "--method",
-            "PATCH",
+            "patch",
             "--query",
             "label=a & b",
             "--headers",
@@ -555,6 +554,8 @@ fn account_updates_preserve_identity_and_selection() {
         after[..Header::BYTES],
         "vault rewrite reused its nonce"
     );
+    success(home.run(&["account", "switch", "other"]));
+    assert_eq!(home.read_encrypted_vault(), after);
 }
 
 struct TestHome {

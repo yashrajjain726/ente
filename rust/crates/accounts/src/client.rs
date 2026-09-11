@@ -80,6 +80,7 @@ impl AccountsClient {
         let details: Details = self
             .api
             .get("/users/details/v2")
+            .query(&[("memoryCount", false)])
             .send()
             .await?
             .error_for_code()

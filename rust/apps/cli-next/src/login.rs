@@ -41,6 +41,9 @@ pub async fn login(
     };
     let credentials = args.input.as_deref().map(Credentials::read).transpose()?;
     let vault = Vault::open()?;
+    if let Some(name) = args.name.as_deref() {
+        vault.state.check_name(name)?;
+    }
     let (expected, origin) = match target {
         Target::Existing(name) => {
             let account = &vault.state.accounts[vault.state.named(name)?];

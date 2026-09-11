@@ -156,8 +156,11 @@ async fn account_command(command: AccountCommand, json_output: bool) -> Result<(
             let mut vault = Vault::open()?;
             let state = &mut vault.state;
             let index = state.named(&name)?;
-            state.selected = Some(state.accounts[index].storage_id);
-            vault.save()?;
+            let selected = Some(state.accounts[index].storage_id);
+            if state.selected != selected {
+                state.selected = selected;
+                vault.save()?;
+            }
             output_account(vault.into_state(), index, json_output)
         }
         AccountCommand::Rename { name, new_name } => {

@@ -10,6 +10,7 @@ use ente_core::{
 use reqwest::{
     Client, Method,
     header::{HeaderMap, HeaderName, HeaderValue},
+    redirect::Policy,
 };
 use url::Url;
 use zeroize::Zeroizing;
@@ -27,6 +28,7 @@ pub fn http() -> Result<Client> {
         .user_agent(USER_AGENT)
         .connect_timeout(Duration::from_secs(15))
         .read_timeout(Duration::from_secs(30))
+        .redirect(Policy::none())
         .build()?)
 }
 
@@ -109,9 +111,8 @@ pub async fn raw(account: &Account, product: Product, args: ApiArgs) -> Result<(
             HeaderValue::from_static(product.client_package()),
         );
     }
-    let mut request = http()?
-        .request(Method::from_bytes(args.method.as_bytes())?, url)
-        .headers(headers);
+    let method = Method::from_bytes(args.method.to_ascii_uppercase().as_bytes())?;
+    let mut request = http()?.request(method, url).headers(headers);
     if let Some(path) = args.body {
         request = request.body(read_input(&path)?.to_vec());
     }
