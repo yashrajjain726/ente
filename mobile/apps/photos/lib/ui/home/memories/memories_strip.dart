@@ -11,7 +11,6 @@ import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/collection_updated_event.dart";
 import "package:photos/events/diff_sync_complete_event.dart";
-import "package:photos/events/event.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/events/memories_changed_event.dart";
@@ -73,30 +72,29 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
   final _videoPrefetcher = MemoryVideoPrefetcher();
   final _scrollController = ScrollController();
   bool _shouldShowCraftingMemories = false;
-  late Future<void> _shouldShowCraftingMemoriesLoaded;
-  late final Future<void> _memoryLaneLoaded;
-  late List<SmartMemory> _initialMemories;
-  late Future<List<SmartMemory>> _memories;
+  List<SmartMemory> _memories = [];
+  final _emptyMemoriesLoaded = Completer<void>();
+  late final Future<void> _cardDataLoaded;
 
   @override
   void initState() {
     super.initState();
-    _initialMemories = _getInitialMemories();
-    _shouldShowCraftingMemoriesLoaded = CraftingMemoriesCardWidget.shouldShow()
-        .then((value) {
-          _shouldShowCraftingMemories = value;
-        });
-
-    _fetchMemories(null);
+    _cardDataLoaded = Future.wait<void>([
+      Future.any<void>([
+        Future.wait<void>([_fetchMemories(), _fetchMemoryLane()]),
+        _emptyMemoriesLoaded.future,
+      ]),
+      _fetchCraftingMemoriesShouldShow(),
+    ]);
 
     _memoriesSettingSubscription = Bus.instance
         .on<MemoriesSettingChanged>()
-        .listen(_fetchMemories);
+        .listen((_) => _fetchMemories());
     _memoriesChangedSubscription = Bus.instance
         .on<MemoriesChangedEvent>()
-        .listen(_fetchMemories);
+        .listen((_) => _fetchMemories());
     _memorySeenSubscription = Bus.instance.on<MemorySeenEvent>().listen(
-      _fetchMemories,
+      (_) => _fetchMemories(),
     );
     _mlConsentChangedSubscription = Bus.instance
         .on<MLConsentChangedEvent>()
@@ -113,7 +111,6 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _diffSyncCompleteSubscription = Bus.instance
         .on<DiffSyncCompleteEvent>()
         .listen((_) => _hideMemoryLaneIfFilesMissingOrHidden());
-    _memoryLaneLoaded = _loadScheduledMemoryLane();
     MemoryLaneService.instance.readyPersonIds.addListener(
       _onMemoryLaneReadyTimelinesChanged,
     );
@@ -161,45 +158,36 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
       return const SizedBox.shrink();
     }
     return FutureBuilder(
-      future: _memories,
-      initialData: _initialMemories,
+      future: _cardDataLoaded,
       builder: (context, snapshot) {
-        final memories = snapshot.data ?? [];
-        return FutureBuilder(
-          future: _shouldShowCraftingMemoriesLoaded,
-          builder: (context, _) {
-            final cardHeight = _cardWidth / kMemoryCardAspectRatio;
-            return FutureBuilder(
-              future: _memoryLaneLoaded,
-              builder: (context, _) {
-                final cards = _buildCards(memories, cardHeight);
-                if (cards.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 10),
-                  child: SizedBox(
-                    height: cardHeight + 2,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: kMemoryCardStripGap / 2.0,
-                      ),
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: cards.length,
-                      itemBuilder: (context, i) => KeyedSubtree(
-                        key: ValueKey(cards[i].id),
-                        child: cards[i].widget(),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
+        final cardHeight = _cardWidth / kMemoryCardAspectRatio;
+        if (snapshot.connectionState != ConnectionState.done) {
+          return SizedBox(height: cardHeight + 24);
+        }
+        if (_memories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final cards = _buildCards(_memories, cardHeight);
+        return Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 10),
+          child: SizedBox(
+            height: cardHeight + 2,
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(
+                horizontal: kMemoryCardStripGap / 2.0,
+              ),
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              scrollDirection: Axis.horizontal,
+              itemCount: cards.length,
+              itemBuilder: (context, i) => KeyedSubtree(
+                key: ValueKey(cards[i].id),
+                child: cards[i].widget(),
+              ),
+            ),
+          ),
         ).animate().fadeIn(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOutCirc,
@@ -217,14 +205,6 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     });
 
     return indexedMemories.map((entry) => entry.$2).toList();
-  }
-
-  List<SmartMemory> _getInitialMemories() {
-    return _sortMemories(
-      (memoriesCacheService.currentMemoriesSync ?? [])
-          .where((memory) => memory.shouldShowNow())
-          .toList(),
-    );
   }
 
   List<MemoryCardWrapper> _buildCards(
@@ -300,38 +280,39 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     ];
   }
 
-  void _fetchMemories(Event? event) {
+  Future<void> _fetchCraftingMemoriesShouldShow() async {
+    _shouldShowCraftingMemories = await CraftingMemoriesCardWidget.shouldShow();
+  }
+
+  Future<void> _fetchMemories() async {
     final fetchGeneration = ++_fetchMemoriesGeneration;
-    setState(() {
-      if (event is MemoriesSettingChanged &&
-          memoriesCacheService.showAnyMemories) {
-        _initialMemories = _getInitialMemories();
+    try {
+      final memories = _sortMemories(await memoriesCacheService.getMemories());
+      if (!mounted || fetchGeneration != _fetchMemoriesGeneration) {
+        return;
       }
-      _memories = memoriesCacheService
-          .getMemories()
-          .then(_sortMemories)
-          .then((memories) {
-            if (!mounted || fetchGeneration != _fetchMemoriesGeneration) {
-              return memories;
-            }
-            if (_scrollController.hasClients) {
-              _scrollController.jumpTo(0);
-            }
-            if (memories.isEmpty || !memoriesCacheService.showAnyMemories) {
-              _cancelPendingWarm();
-              return <SmartMemory>[];
-            } else {
-              _scheduleWarmCovers(memories);
-            }
-            return memories;
-          })
-          .onError((_, _) {
-            if (mounted && fetchGeneration == _fetchMemoriesGeneration) {
-              _cancelPendingWarm();
-            }
-            return [];
-          });
-    });
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+      if (memories.isEmpty || !memoriesCacheService.showAnyMemories) {
+        _cancelPendingWarm();
+        setState(() => _memories = []);
+        if (!_emptyMemoriesLoaded.isCompleted) {
+          _emptyMemoriesLoaded.complete();
+        }
+        return;
+      }
+      _scheduleWarmCovers(memories);
+      setState(() => _memories = memories);
+    } catch (_) {
+      if (mounted && fetchGeneration == _fetchMemoriesGeneration) {
+        _cancelPendingWarm();
+        setState(() => _memories = []);
+        if (!_emptyMemoriesLoaded.isCompleted) {
+          _emptyMemoriesLoaded.complete();
+        }
+      }
+    }
   }
 
   void _scheduleWarmCovers(List<SmartMemory> memories) {
@@ -385,7 +366,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     _videoPrefetcher.clearPending();
   }
 
-  Future<void> _loadScheduledMemoryLane() async {
+  Future<void> _fetchMemoryLane() async {
     if (!flagService.internalUser) {
       return;
     }
