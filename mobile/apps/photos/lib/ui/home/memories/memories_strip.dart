@@ -82,10 +82,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
     super.initState();
     _cardDataLoaded = Future.wait<void>([
       Future.any<void>([
-        Future.wait<void>([
-          _fetchMemories(),
-          _fetchMemoryLane(),
-        ]),
+        Future.wait<void>([_fetchMemories(), _fetchMemoryLane()]),
         _emptyMemoriesLoaded.future,
       ]),
       _fetchCraftingMemoriesShouldShow(),
