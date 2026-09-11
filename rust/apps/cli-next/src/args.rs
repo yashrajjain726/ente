@@ -12,6 +12,12 @@ use serde::{Deserialize, Serialize};
 pub struct Cli {
     #[arg(long, global = true, help = "Print the result as JSON")]
     pub json: bool,
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Args)]
+pub struct AccountSelector {
     #[arg(
         long,
         global = true,
@@ -19,24 +25,28 @@ pub struct Cli {
         help = "Use this account instead of the selected one"
     )]
     pub account: Option<String>,
-    #[command(subcommand)]
-    pub command: Command,
 }
 
 #[derive(Subcommand)]
 pub enum Command {
     #[command(about = "Manage Ente Photos")]
     Photos {
+        #[command(flatten)]
+        selector: AccountSelector,
         #[command(subcommand)]
         command: PhotosCommand,
     },
     #[command(about = "Manage Ente Locker")]
     Locker {
+        #[command(flatten)]
+        selector: AccountSelector,
         #[command(subcommand)]
         command: SessionCommand,
     },
     #[command(about = "Manage Ente Auth")]
     Auth {
+        #[command(flatten)]
+        selector: AccountSelector,
         #[command(subcommand)]
         command: SessionCommand,
     },
@@ -161,10 +171,15 @@ pub enum AccountCommand {
         #[arg(help = "New local name")]
         new_name: String,
     },
-    #[command(about = "Forget an account on this device; remote sessions stay valid")]
-    Remove {
+    #[command(about = "Log out of every product and remove the account from this device")]
+    Logout {
         #[arg(help = "Account name")]
         name: String,
+        #[arg(
+            long,
+            help = "Forget the account on this device without logging out on the server"
+        )]
+        local: bool,
     },
 }
 

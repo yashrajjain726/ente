@@ -406,20 +406,8 @@ fn logout_reconciles_remote_and_local_session_state() {
         success(home.run(&["photos", "logout"])).stdout,
         b"Logged out of Ente Photos for \"fixture\".\n"
     );
-    assert_eq!(
-        home.json(&["account", "view", "fixture"])["products"],
-        json!([])
-    );
-    let origin = server.url();
-    assert_eq!(
-        success(home.run(&["account", "list"])).stdout,
-        format!(
-            "SELECTED  NAME     EMAIL                {host:<width$}  LOGGED IN  ID\n*         fixture  fixture@example.org  {origin}  none       9007199254740993\n",
-            host = "HOST",
-            width = origin.len()
-        )
-        .as_bytes()
-    );
+    assert_eq!(home.json(&["account", "list"]), json!([]));
+    assert_eq!(home.read_vault(), json!({"accounts": [], "selected": null}));
     revoked.assert();
 
     let unavailable = server
@@ -436,6 +424,88 @@ fn logout_reconciles_remote_and_local_session_state() {
         before
     );
     unavailable.assert();
+}
+
+#[test]
+fn account_logout_revokes_every_product_before_removing_the_account() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let mut state = home.read_vault();
+    state["accounts"][0]["sessions"]["locker"] = json!({"token": [1]});
+    state["accounts"][0]["sessions"]["auth"] = json!({"token": [2]});
+    home.write_vault(&state);
+    let photos = server
+        .mock("POST", "/users/logout")
+        .match_header("x-auth-token", "--8=")
+        .match_header("x-client-package", "io.ente.photos")
+        .create();
+    let locker_token = b64::encode_url_safe(&[1]);
+    let locker = server
+        .mock("POST", "/users/logout")
+        .match_header("x-auth-token", locker_token.as_str())
+        .match_header("x-client-package", "io.ente.locker")
+        .create();
+    let auth_token = b64::encode_url_safe(&[2]);
+    let auth = server
+        .mock("POST", "/users/logout")
+        .match_header("x-auth-token", auth_token.as_str())
+        .match_header("x-client-package", "io.ente.auth")
+        .create();
+
+    assert_eq!(
+        success(home.run(&["account", "logout", "fixture"])).stdout,
+        b"Logged out of Ente Photos, Ente Locker, and Ente Auth for \"fixture\".\n"
+    );
+    assert_eq!(home.read_vault(), json!({"accounts": [], "selected": null}));
+    photos.assert();
+    locker.assert();
+    auth.assert();
+}
+
+#[test]
+fn account_logout_preserves_sessions_that_it_could_not_revoke() {
+    let mut server = mockito::Server::new();
+    let home = TestHome::new();
+    home.seed(&server.url());
+    let mut state = home.read_vault();
+    state["accounts"][0]["sessions"]["locker"] = json!({"token": [1]});
+    state["accounts"][0]["sessions"]["auth"] = json!({"token": [2]});
+    home.write_vault(&state);
+    let photos = server
+        .mock("POST", "/users/logout")
+        .match_header("x-client-package", "io.ente.photos")
+        .create();
+    let locker = server
+        .mock("POST", "/users/logout")
+        .match_header("x-client-package", "io.ente.locker")
+        .with_status(403)
+        .create();
+    let auth = server
+        .mock("POST", "/users/logout")
+        .match_header("x-client-package", "io.ente.auth")
+        .expect(0)
+        .create();
+
+    let output = home.run(&["account", "logout", "fixture"]);
+    assert!(output.stdout.is_empty());
+    let error = failure(&output);
+    assert!(error.contains("cannot log out of Ente Locker for \"fixture\": HTTP 403"));
+    assert!(error.contains("Still logged in: Ente Locker and Ente Auth."));
+    let state = home.read_vault();
+    let sessions = &state["accounts"][0]["sessions"];
+    assert!(sessions.get("photos").is_none());
+    assert!(sessions.get("locker").is_some());
+    assert!(sessions.get("auth").is_some());
+
+    assert_eq!(
+        success(home.run(&["account", "logout", "fixture", "--local"])).stdout,
+        b"Logged out of \"fixture\" on this device only. Still logged in on the server: Ente Locker and Ente Auth.\n"
+    );
+    assert_eq!(home.read_vault(), json!({"accounts": [], "selected": null}));
+    photos.assert();
+    locker.assert();
+    auth.assert();
 }
 
 #[test]
@@ -457,7 +527,7 @@ fn account_updates_preserve_identity_and_selection() {
     let mut second = state["accounts"][0].clone();
     second["storage_id"] = json!("f6579aae-83ef-4f28-965e-8d34883d3fe5");
     second["name"] = json!("second");
-    second["sessions"] = json!({});
+    second["sessions"] = json!({"locker": {"token": [1]}});
     state["accounts"].as_array_mut().unwrap().push(second);
     home.write_vault(&state);
 

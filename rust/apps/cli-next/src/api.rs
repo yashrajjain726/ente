@@ -38,6 +38,16 @@ pub fn accounts_client(origin: &str, product: Product) -> Result<AccountsClient>
     )?)
 }
 
+pub async fn logout(account: &Account, product: Product) -> Result<()> {
+    let client = accounts_client(&account.origin, product)?;
+    client.set_auth_token(Some(b64::encode_url_safe(account.token(product)?)));
+    match client.logout().await {
+        Ok(()) => Ok(()),
+        Err(ente_accounts::Error::Http(error)) if error.status_code() == Some(401) => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
 pub fn session(account: &Account, product: Product) -> Result<Session> {
     let mut config = ApiConfig::new(account.origin.clone());
     config.client_package = Some(product.client_package().into());
