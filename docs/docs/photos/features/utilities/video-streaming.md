@@ -64,6 +64,7 @@ These controls are available whether Ente plays the original video or a streamab
 - New uploads will automatically generate streams
 - All existing previously uploaded videos will be processed
 - Stream generation is CPU intensive and happens in the background
+- The **Streamable videos** section shows the percentage of existing videos processed
 - Click the search bar to see "Processing videos..." status
 - Processed videos sync to mobile automatically
 
