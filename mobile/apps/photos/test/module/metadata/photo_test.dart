@@ -49,15 +49,9 @@ void main() {
       ),
     );
 
-    expect(
-      file.creationTime,
-      1786450130 * Duration.microsecondsPerSecond,
-    );
+    expect(file.creationTime, 1786450130 * Duration.microsecondsPerSecond);
     applyCreationTimeMetadata(file, null);
-    expect(
-      file.creationTime,
-      1786450130 * Duration.microsecondsPerSecond,
-    );
+    expect(file.creationTime, 1786450130 * Duration.microsecondsPerSecond);
   });
 
   test(
