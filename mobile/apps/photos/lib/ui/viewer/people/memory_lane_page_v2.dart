@@ -85,7 +85,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   late final Future<void> _memoryLaneLoaded;
   Key _currentEntryKey = UniqueKey();
   MemoryLanePersonTimeline? _timeline;
-  final List<Future<Uint8List?>> _entries = [];
+  final List<MemoryLaneEntry> _entries = [];
+  _Chunkinator<MemoryLaneEntry, Uint8List?>? _chunkinator;
   final Map<(Future<Uint8List?>, Size, bool), Future<(Uint8List, int)?>>
   _decodedEntries = {};
   final List<EnteFile> _files = [];
@@ -126,6 +127,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   @override
   void dispose() {
     _playbackTimer?.cancel();
+    _chunkinator?.dispose();
     super.dispose();
   }
 
@@ -146,19 +148,22 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
         timeline.entries.map((entry) => entry.fileId).toSet(),
       );
       if (!mounted) return;
-      Future<Uint8List?> previousEntry = Future.value();
       for (final entry in timeline.entries) {
         final file = files[entry.fileId];
         if (file != null) {
           _files.add(file);
-          final entryFuture = previousEntry.then((_) async {
-            if (!mounted) return null;
-            return _loadEntry(entry, file);
-          });
-          _entries.add(entryFuture);
-          previousEntry = entryFuture;
+          _entries.add(entry);
         }
       }
+      const chunkSize = 5;
+      _chunkinator = _Chunkinator(
+        keys: _entries,
+        chunkSize: chunkSize,
+        fetch: (entry) async {
+          if (!mounted) return null;
+          return _loadEntry(entry, files[entry.fileId]!);
+        },
+      );
       unawaited(_play(0));
     } catch (error) {
       if (!mounted ||
@@ -184,7 +189,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
           : null;
     });
     if (_playbackToken == null) return;
-    await _entries[index];
+    await _chunkinator!.get(_entries[index]);
     if (!mounted || !widget.isActive || _playbackToken != token) return;
     _playbackTimer = Timer(_playbackInterval, () {
       if (index < _entries.length - 1) {
@@ -300,7 +305,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     if (index != _entries.length - 1) return;
     final entryKey = _currentEntryKey;
     unawaited(
-      _entries[index].then((bytes) async {
+      _chunkinator!.get(_entries[index]).then((bytes) async {
         if (bytes == null ||
             !mounted ||
             !widget.isActive ||
@@ -329,7 +334,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
           );
         }
         final file = _files.isEmpty ? null : _files[i];
-        final entry = _entries.isEmpty ? null : _entries[i];
+        final entry = _entries.isEmpty ? null : _chunkinator!.get(_entries[i]);
         final creationTime = file?.creationTime;
         final birthDate = DateTime.tryParse(
           widget.person?.data.birthDate ?? "",
@@ -1077,5 +1082,58 @@ class _MemoryLaneAnimatedDigitState extends State<_MemoryLaneAnimatedDigit>
         },
       ),
     );
+  }
+}
+
+class _Chunkinator<K, V> {
+  final List<K> keys;
+  final Future<V> Function(K key) fetch;
+  final int chunkSize;
+
+  final Map<K, Future<V>> _cache = {};
+  bool _disposed = false;
+
+  _Chunkinator({required this.keys, required this.fetch, this.chunkSize = 5}) {
+    if (chunkSize <= 0) {
+      throw ArgumentError.value(
+        chunkSize,
+        'chunkSize',
+        'Must be greater than 0',
+      );
+    }
+  }
+
+  void dispose() {
+    _disposed = true;
+    _cache.clear();
+  }
+
+  Future<V> get(K key) {
+    if (_disposed) {
+      throw StateError('Chunkinator is disposed');
+    }
+    final index = keys.indexOf(key);
+    if (index == -1) {
+      throw StateError('Key not found in keys: $key');
+    }
+    unawaited(_fetchChunk(index));
+    return _cache[key]!;
+  }
+
+  Future<void> _fetchChunk(int start) async {
+    if (start >= keys.length) {
+      return;
+    }
+    final end = math.min(start + chunkSize, keys.length);
+    while (start < end && _cache.containsKey(keys[start])) {
+      start++;
+    }
+    for (var i = start; i < end; i++) {
+      if (_disposed) return;
+      final key = keys[i];
+      try {
+        await _cache.putIfAbsent(key, () => fetch(key));
+      } catch (_) {}
+    }
   }
 }
