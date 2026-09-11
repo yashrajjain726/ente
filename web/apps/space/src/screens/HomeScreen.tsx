@@ -2,10 +2,7 @@ import { Cancel01Icon, UserAdd02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/ActionFeedback";
-import {
-    SpaceActionToast,
-    spaceToastAutoDismissDurationMs,
-} from "components/ActionToast";
+import { SpaceActionToast } from "components/ActionToast";
 import { SpaceAddFriendButton } from "components/AddFriendButton";
 import { SpaceAddFriendTile } from "components/AddFriendTile";
 import { SpaceAvatarImage } from "components/AvatarImage";
@@ -989,7 +986,6 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
     onClose,
 }) => (
     <SpaceActionToast
-        autoDismissAfterMs={spaceToastAutoDismissDurationMs}
         closeLabel="Dismiss friend request status"
         icon={
             <HugeiconsIcon icon={UserAdd02Icon} size={20} strokeWidth={1.8} />
