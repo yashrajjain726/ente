@@ -791,21 +791,43 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                             i * dotCount ~/ _entries.length;
                                         return GestureDetector(
                                           behavior: HitTestBehavior.opaque,
-                                          onHorizontalDragDown: (_) {
+                                          onTapUp: (details) {
+                                            if (constraints.maxWidth <= 0) {
+                                              return;
+                                            }
+                                            final index =
+                                                (details.localPosition.dx /
+                                                        constraints.maxWidth *
+                                                        _entries.length)
+                                                    .floor()
+                                                    .clamp(
+                                                      0,
+                                                      _entries.length - 1,
+                                                    );
+                                            if (_playbackToken != null) {
+                                              unawaited(
+                                                _play(
+                                                  index,
+                                                  fastTransition: true,
+                                                ),
+                                              );
+                                            } else {
+                                              setState(
+                                                () => _selectEntry(
+                                                  index,
+                                                  fastTransition: true,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          onHorizontalDragStart: (details) {
                                             _wasPlayingBeforeSeek =
                                                 _playbackToken != null;
+                                            _seekFromPosition(
+                                              details.localPosition.dx,
+                                              constraints.maxWidth,
+                                            );
                                           },
-                                          onTapDown: (details) =>
-                                              _seekFromPosition(
-                                                details.localPosition.dx,
-                                                constraints.maxWidth,
-                                              ),
-                                          onTapUp: (_) => _onSeekEnd(),
-                                          onHorizontalDragStart: (details) =>
-                                              _seekFromPosition(
-                                                details.localPosition.dx,
-                                                constraints.maxWidth,
-                                              ),
                                           onHorizontalDragUpdate: (details) =>
                                               _seekFromPosition(
                                                 details.localPosition.dx,
