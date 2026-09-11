@@ -2741,7 +2741,10 @@ dependencies = [
  "ente-core",
  "ente-paste",
  "ente-wasm-lib",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.18",
+ "tsify",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
