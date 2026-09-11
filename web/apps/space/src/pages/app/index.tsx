@@ -66,7 +66,7 @@ const Page: React.FC = () => {
         ownLatestPost,
         isOwnLatestPostLoading,
         isOwnLatestPostUnavailable,
-    } = useOwnLatestPost(spaceId);
+    } = useOwnLatestPost();
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);

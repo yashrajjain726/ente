@@ -136,8 +136,17 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     );
     const loading =
         isLoading || Boolean(post?.imageAsset && !imageUrl && !unavailable);
+    const [showSkeleton, setShowSkeleton] = React.useState(false);
     const isEmpty = !post && !loading && !unavailable;
     const caption = post?.caption?.trim();
+
+    React.useEffect(() => {
+        setShowSkeleton(false);
+        if (!loading) return;
+
+        const timeoutID = window.setTimeout(() => setShowSkeleton(true), 200);
+        return () => window.clearTimeout(timeoutID);
+    }, [loading]);
 
     React.useEffect(() => {
         if (hasPublication)
@@ -178,6 +187,9 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                 height: groupHeight,
                 minWidth: 0,
                 p: `${groupInset}px`,
+                "& .MuiSkeleton-root": {
+                    visibility: showSkeleton ? "visible" : "hidden",
+                },
             }}
         >
             <Box
@@ -276,6 +288,11 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                             phase={publishPhase}
                             expiresAtMs={postPublication?.statusExpiresAtMs}
                         />
+                    ) : loading ? (
+                        <Skeleton
+                            width={72}
+                            sx={{ fontSize: 12, lineHeight: "18px" }}
+                        />
                     ) : (
                         <Box
                             component="span"
@@ -288,11 +305,9 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            {loading
-                                ? "Loading…"
-                                : unavailable
-                                  ? "Post unavailable"
-                                  : "Share your first post."}
+                            {unavailable
+                                ? "Post unavailable"
+                                : "Share your first post."}
                         </Box>
                     )}
                     <Box
@@ -310,9 +325,13 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {isEmpty
-                            ? "What are you up to?"
-                            : caption || "No caption"}
+                        {!post && loading ? (
+                            <Skeleton width="70%" />
+                        ) : isEmpty ? (
+                            "What are you up to?"
+                        ) : post ? (
+                            caption || "No caption"
+                        ) : null}
                     </Box>
                 </Box>
             </Box>
