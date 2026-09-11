@@ -76,7 +76,8 @@ const textSecondary = spaceTextMuted;
 const avatarFallbackColor = spaceSurfaceHover;
 const avatarFallbackTextColor = "#FFFFFF";
 const mediaPlaceholderColor = spaceSurface;
-const tileBadgeBackground = "#343438";
+const tileBadgeBackground = "rgba(0, 0, 0, 0.22)";
+const tileBadgeText = "rgba(255, 255, 255, 0.9)";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
@@ -590,7 +591,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     ) && (
                         <SpacePostBadge
                             backgroundColor={tileBadgeBackground}
-                            color={textBase}
+                            color={tileBadgeText}
                             placement="center"
                         >
                             {friendRequestDirection == "sent"
@@ -609,7 +610,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 bgcolor: tileBadgeBackground,
                                 borderRadius: "999px",
                                 boxSizing: "border-box",
-                                color: textSecondary,
+                                color: tileBadgeText,
                                 display: "inline-flex",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
@@ -647,7 +648,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                 {!isLoading && postUnavailable && (
                     <SpacePostBadge
                         backgroundColor={tileBadgeBackground}
-                        color={textBase}
+                        color={tileBadgeText}
                     >
                         Unavailable
                     </SpacePostBadge>
@@ -759,7 +760,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 bgcolor: tileBadgeBackground,
                                 borderRadius: "999px",
                                 boxSizing: "border-box",
-                                color: textBase,
+                                color: tileBadgeText,
                                 display: "block",
                                 fontFamily: '"Nunito", sans-serif',
                                 fontSize: requestUsernameTextSize,
@@ -880,11 +881,11 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 }
                                 sx={{
                                     alignItems: "center",
-                                    bgcolor: spaceSurfaceHover,
+                                    bgcolor: "rgba(255, 255, 255, 0.12)",
                                     border: 0,
                                     borderRadius: spaceTileInnerRadius,
                                     boxSizing: "border-box",
-                                    color: textBase,
+                                    color: "rgba(255, 255, 255, 0.85)",
                                     cursor: isFriendRequestActionBusy
                                         ? "default"
                                         : "pointer",
@@ -904,7 +905,10 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                     },
                                     "&:hover": isFriendRequestActionBusy
                                         ? undefined
-                                        : { bgcolor: "#48484E" },
+                                        : {
+                                              bgcolor:
+                                                  "rgba(255, 255, 255, 0.18)",
+                                          },
                                 }}
                             >
                                 {friendRequestAction == "discard" ? (
@@ -938,7 +942,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 bgcolor: "transparent",
                                 border: 0,
                                 borderRadius: "50%",
-                                color: textSecondary,
+                                color: "rgba(255, 255, 255, 0.65)",
                                 cursor: isFriendRequestActionBusy
                                     ? "default"
                                     : "pointer",
@@ -958,7 +962,7 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                                 },
                                 "&:hover": isFriendRequestActionBusy
                                     ? undefined
-                                    : { color: textBase },
+                                    : { color: "rgba(255, 255, 255, 0.85)" },
                             }}
                         >
                             {friendRequestAction == "discard" ? (
