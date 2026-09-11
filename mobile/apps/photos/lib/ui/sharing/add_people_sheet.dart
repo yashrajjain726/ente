@@ -17,7 +17,6 @@ import "package:photos/ui/actions/collection/collection_sharing_actions.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/sharing/choose_access_sheet.dart";
 import "package:photos/ui/sharing/manage_links_widget.dart";
-import "package:photos/ui/sharing/share_components.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/ui/sharing/widgets/selected_person_chip.dart";
@@ -108,7 +107,7 @@ bool _hasActiveLink(Collection collection) {
   return url != null && !url.isExpired;
 }
 
-bool _canUseNonEnteFallback(Collection collection, int currentUserID) {
+bool _canSharePublicLink(Collection collection, int currentUserID) {
   if (_hasActiveLink(collection)) {
     return true;
   }
@@ -130,7 +129,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
   final _focusNode = FocusNode();
   final _selectedPeopleScrollController = ScrollController();
   final _contactsScrollController = ScrollController();
-  final _fallbackShareKey = GlobalKey();
+  final _shareLinkKey = GlobalKey();
   late final List<UserSuggestion> _contacts;
   bool _emailIsValid = false;
   bool _emailHasNoAccount = false;
@@ -196,6 +195,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
                 focusNode: _focusNode,
                 emailIsValid: _emailIsValid,
                 emailHasNoAccount: _emailHasNoAccount,
+                shareKey: _shareLinkKey,
                 onChanged: (value) {
                   setState(() {
                     _emailIsValid = EmailValidator.validate(value.trim());
@@ -203,21 +203,9 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
                   });
                 },
                 onSubmit: _tryAddTypedEmail,
+                onShareLink: _sharePublicLink,
               ),
-              _NonEnteFallback(
-                collection:
-                    _emailHasNoAccount &&
-                        widget.collections.length == 1 &&
-                        _canUseNonEnteFallback(
-                          widget.collections.first,
-                          Configuration.instance.getUserID()!,
-                        )
-                    ? widget.collections.first
-                    : null,
-                shareKey: _fallbackShareKey,
-                onTap: _shareFallback,
-              ),
-              if (availableContacts.isNotEmpty) ...[
+              if (!_emailHasNoAccount && availableContacts.isNotEmpty) ...[
                 const SizedBox(height: Spacing.xl),
                 _ContactSuggestions(
                   contacts: availableContacts,
@@ -228,7 +216,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
             ],
           ),
         ),
-        actions: keyboardVisible
+        actions: keyboardVisible && !_emailHasNoAccount
             ? const []
             : [
                 ButtonComponent(
@@ -279,9 +267,8 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
         return;
       }
       if (publicKey == null || publicKey.isEmpty) {
-        setState(() => _emailHasNoAccount = true);
         if (widget.collections.length != 1 ||
-            !_canUseNonEnteFallback(
+            !_canSharePublicLink(
               widget.collections.first,
               Configuration.instance.getUserID()!,
             )) {
@@ -294,7 +281,9 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
               email: email,
             ),
           );
+          return;
         }
+        setState(() => _emailHasNoAccount = true);
         return;
       }
       final suggestion = _contacts.firstWhereOrNull(
@@ -306,10 +295,13 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
       _clearEmail();
       _scrollSelectedPeopleToEnd();
     } catch (error) {
-      if (mounted) {
-        setState(() => _emailHasNoAccount = false);
-        await showGenericErrorDialog(context: context, error: error);
+      if (!mounted ||
+          normalizedSharingEmail(_textController.text) != email ||
+          _isSelected(email)) {
+        return;
       }
+      setState(() => _emailHasNoAccount = false);
+      await showGenericErrorDialog(context: context, error: error);
     }
   }
 
@@ -364,13 +356,13 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
     });
   }
 
-  Future<void> _shareFallback() async {
+  Future<void> _sharePublicLink() async {
     if (widget.collections.length != 1) {
       return;
     }
     final collection = widget.collections.first;
     final currentUserID = Configuration.instance.getUserID()!;
-    if (!_canUseNonEnteFallback(collection, currentUserID)) {
+    if (!_canSharePublicLink(collection, currentUserID)) {
       return;
     }
     if (collection.hasLink && !_hasActiveLink(collection)) {
@@ -396,7 +388,7 @@ class _AddPeopleSheetState extends State<_AddPeopleSheet> {
     await shareAlbumLink(
       context,
       url,
-      _fallbackShareKey,
+      _shareLinkKey,
       albumName: collection.displayName,
       albumDescription: collection.displayDescription,
     );
@@ -409,94 +401,97 @@ class _EmailField extends StatelessWidget {
     required this.focusNode,
     required this.emailIsValid,
     required this.emailHasNoAccount,
+    required this.shareKey,
     required this.onChanged,
     required this.onSubmit,
+    required this.onShareLink,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool emailIsValid;
   final bool emailHasNoAccount;
+  final GlobalKey shareKey;
   final ValueChanged<String> onChanged;
   final Future<void> Function() onSubmit;
+  final Future<void> Function() onShareLink;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final messageStyle = TextStyles.mini.copyWith(
+      color: context.componentColors.textLight,
+    );
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: TextInputComponent(
-            controller: controller,
-            focusNode: focusNode,
-            hintText: context.strings.enterAnEmailAddress,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.email],
-            autocorrect: false,
-            enableSuggestions: false,
-            isClearable: true,
-            messageType: emailHasNoAccount
-                ? TextInputComponentMessageType.error
-                : TextInputComponentMessageType.helper,
-            message: emailHasNoAccount
-                ? context.strings.noEnteAccountWithThisEmail
-                : null,
-            onChanged: onChanged,
-            onSubmit: (_) => onSubmit(),
-          ),
-        ),
-        const SizedBox(width: Spacing.sm),
-        Padding(
-          padding: const EdgeInsets.only(top: Spacing.sm),
-          child: IconButtonComponent(
-            variant: IconButtonComponentVariant.green,
-            shouldSurfaceExecutionStates: false,
-            tooltip: context.strings.add,
-            icon: const HugeIcon(icon: HugeIcons.strokeRoundedMailAdd01),
-            onTap: emailIsValid ? onSubmit : null,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NonEnteFallback extends StatelessWidget {
-  const _NonEnteFallback({
-    required this.collection,
-    required this.shareKey,
-    required this.onTap,
-  });
-
-  final Collection? collection;
-  final GlobalKey shareKey;
-  final Future<void> Function() onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final collection = this.collection;
-    return AnimatedSize(
-      duration: Motion.standard,
-      curve: Curves.easeOutCubic,
-      alignment: AlignmentDirectional.topStart,
-      child: collection == null
-          ? const SizedBox.shrink()
-          : Padding(
-              padding: const EdgeInsets.only(top: Spacing.md),
-              child: ShareMenuItem(
-                key: shareKey,
-                title: _hasActiveLink(collection)
-                    ? context.strings.shareYourAlbumLink
-                    : context.strings.createPublicLink,
-                subtitle: _hasActiveLink(collection)
-                    ? context.strings.albumAlreadyHasPublicLink
-                    : context.strings.shareWithPeopleNotOnEnte,
-                icon: HugeIcons.strokeRoundedLink04,
-                showChevron: true,
-                onTap: onTap,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextInputComponent(
+                controller: controller,
+                focusNode: focusNode,
+                hintText: context.strings.enterAnEmailAddress,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                enableSuggestions: false,
+                isClearable: !emailHasNoAccount,
+                suffix: emailHasNoAccount
+                    ? HugeIcon(
+                        icon: HugeIcons.strokeRoundedAlert02,
+                        size: IconSizes.small,
+                        color: context.componentColors.textLight,
+                      )
+                    : null,
+                onChanged: onChanged,
+                onSubmit: (_) => onSubmit(),
               ),
             ),
+            if (!emailHasNoAccount) ...[
+              const SizedBox(width: Spacing.sm),
+              Padding(
+                padding: const EdgeInsets.only(top: Spacing.sm),
+                child: IconButtonComponent(
+                  variant: IconButtonComponentVariant.green,
+                  shouldSurfaceExecutionStates: false,
+                  tooltip: context.strings.add,
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedMailAdd01),
+                  onTap: emailIsValid ? onSubmit : null,
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (emailHasNoAccount) ...[
+          const SizedBox(height: Spacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              children: [
+                Text(
+                  '${context.strings.noEnteAccountWithThisEmail} ',
+                  style: messageStyle,
+                ),
+                InkWell(
+                  key: shareKey,
+                  onTap: () => onShareLink(),
+                  child: Text(
+                    context.strings.shareALinkInline,
+                    style: messageStyle.copyWith(
+                      color: context.componentColors.textBase,
+                      decoration: TextDecoration.underline,
+                      decorationColor: context.componentColors.textBase,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -5006,11 +5006,9 @@
       }
     }
   },
-  "noEnteAccountWithThisEmail": "No Ente account with this email",
+  "noEnteAccountWithThisEmail": "No Ente account with this email.",
+  "shareALinkInline": "Share a link.",
   "personAlreadyHasAccess": "This person already has access.",
-  "shareWithPeopleNotOnEnte": "Share with people not on Ente",
-  "shareYourAlbumLink": "Share your album link",
-  "albumAlreadyHasPublicLink": "This album already has a public link",
   "removePersonTitle": "Remove {name}?",
   "@removePersonTitle": {
     "placeholders": {
