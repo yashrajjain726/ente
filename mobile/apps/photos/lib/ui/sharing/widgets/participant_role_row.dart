@@ -64,16 +64,11 @@ class _ParticipantRoleRowState extends State<ParticipantRoleRow> {
               onSelected: (action) => action == _ParticipantRoleAction.remove
                   ? _removeParticipant()
                   : _changeRole(action.role!),
-              child: SizedBox.square(
-                dimension: kMinInteractiveDimension,
-                child: Center(
-                  child: HugeIcon(
-                    icon: albumSharingRoleIcon(role),
-                    color: context.componentColors.textBase,
-                    size: IconSizes.small,
-                    strokeWidth: 1.6,
-                  ),
-                ),
+              child: HugeIcon(
+                icon: albumSharingRoleIcon(role),
+                color: context.componentColors.textBase,
+                size: IconSizes.small,
+                strokeWidth: 1.6,
               ),
             ),
     );

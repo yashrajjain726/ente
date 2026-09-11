@@ -3,6 +3,7 @@ import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/collection/collection.dart";
+import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/sharing/share_components.dart";
 import "package:photos/ui/sharing/verify_identity_dialog.dart";
 import "package:photos/ui/sharing/widgets/selected_person_chip.dart";
@@ -48,6 +49,7 @@ class _ChooseAccessSheetState extends State<_ChooseAccessSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.componentColors;
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.95,
@@ -78,10 +80,19 @@ class _ChooseAccessSheetState extends State<_ChooseAccessSheet> {
                         title: shareableRoleLabel(context, role),
                         subtitle: shareableRoleDescription(context, role),
                         icon: albumSharingRoleIcon(role),
-                        trailing: RadioComponent(
-                          selected: _role == role,
-                          onChanged: (_) => _selectRole(role),
-                        ),
+                        trailing: _role == role
+                            ? const CollectionSelectedBadge()
+                            : SizedBox.square(
+                                dimension: IconSizes.small,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: colors.strokeDark,
+                                    ),
+                                  ),
+                                ),
+                              ),
                         onTap: () => _selectRole(role),
                       ),
                   ],

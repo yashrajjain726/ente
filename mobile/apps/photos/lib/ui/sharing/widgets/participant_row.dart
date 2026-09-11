@@ -87,7 +87,7 @@ class _ScrollableParticipantRosterState
     final textExtent =
         MediaQuery.textScalerOf(context).scale(textStyle.fontSize!) *
         textStyle.height!;
-    return math.max(kMinInteractiveDimension, textExtent) + 20.0;
+    return math.max(60.0, textExtent + 20.0);
   }
 }
 
