@@ -13,7 +13,6 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
-import { FriendTilePokeButton } from "components/FriendTilePokeButton";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
 import { SpaceNewPostButton } from "components/NewPostButton";
 import {
@@ -270,7 +269,6 @@ interface FriendPostTileProps {
     onOpenFriend?: HomeScreenProps["onOpenFriend"];
     onOpenAvatar?: (anchorRect: DOMRect) => void;
     onOpenFriendRequest?: () => void;
-    onPoke?: () => Promise<void>;
     onOpenPosts: (
         friend: FriendProfile,
         posts: SpacePost[],
@@ -300,7 +298,6 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     onOpenAvatar,
     onOpenFriendRequest,
     onOpenPosts,
-    onPoke,
     isNineTileLayout = false,
     isTwoTileLayout = false,
     placement,
@@ -319,7 +316,6 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
     );
     const post = posts[0];
     const isRequestPending = Boolean(friendRequestDirection);
-    const showPokeButton = !isLoading && !post && !isRequestPending && onPoke;
     const isFriendRequestActionBusy = friendRequestAction != null;
     const canOpenFriendRequest =
         friendRequestDirection == "sent" && Boolean(onOpenFriendRequest);
@@ -653,14 +649,6 @@ export const FriendPostTile: React.FC<FriendPostTileProps> = ({
                     <SpacePostUnreadBadge count={posts.length} />
                 )}
             </Box>
-            {showPokeButton && (
-                <FriendTilePokeButton
-                    avatarSize={avatarSize}
-                    name={displayName}
-                    onPoke={onPoke}
-                    tileWidth={placement.width}
-                />
-            )}
             {friendRequestDirection != "received" &&
                 !isAvatarPending &&
                 decodedAvatar.ready && (
@@ -1450,7 +1438,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     setSelectedContact({ anchorRect, friend, avatarUrl })
                 }
                 onOpenPosts={openPostPhotos}
-                onPoke={() => onPokeFriend(friend)}
                 isNineTileLayout={
                     orderedHomeItems.length == maximumHomeTileCount
                 }

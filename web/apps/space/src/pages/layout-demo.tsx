@@ -159,7 +159,6 @@ const LayoutDemoPost: React.FC<LayoutDemoPostProps> = ({
                 friendRequestDirection ? () => undefined : undefined
             }
             onOpenPosts={() => undefined}
-            onPoke={() => Promise.resolve()}
             isNineTileLayout={count == maximumHomeTileCount}
             isTwoTileLayout={count == 2}
             placement={placement}
