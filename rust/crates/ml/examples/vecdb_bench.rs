@@ -98,7 +98,7 @@ fn parse_args() -> Config {
     let mut scales = parse_scales(DEFAULT_SCALES);
     let mut dims = DEFAULT_DIMS;
     let mut attrs = false;
-    let mut storage = StorageKind::F32;
+    let mut storage = StorageKind::I8;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {

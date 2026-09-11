@@ -113,6 +113,7 @@ pub(crate) struct VectorArena {
 }
 
 impl VectorArena {
+    #[cfg(test)]
     pub(crate) fn new(dims: usize) -> Result<Self, VecDbError> {
         Self::with_storage(dims, StorageKind::F32)
     }

@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn add_search_stats_round_trip() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
         db.bulk_add_vectors(vec![key("b"), key("c")], vec![basis(1), basis(2)])
             .unwrap();
@@ -468,7 +468,7 @@ mod tests {
     #[test]
     fn bulk_add_rejects_length_mismatch() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         let error = db
             .bulk_add_vectors(vec![key("a")], vec![basis(0), basis(1)])
             .unwrap_err();
@@ -479,7 +479,7 @@ mod tests {
     #[test]
     fn similarity_threshold_conversion_edges() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
         db.add_vector(key("b"), basis(1)).unwrap();
         let close = db
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn bulk_search_within_similarity_honors_per_query_thresholds() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.bulk_add_vectors(
             vec![key("a"), key("b"), key("c")],
             vec![basis(0), basis(1), basis(2)],
@@ -569,7 +569,7 @@ mod tests {
     #[test]
     fn bulk_filtered_search_stays_query_aligned() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.bulk_add_vectors(
             vec![key("a"), key("b"), key("c")],
             vec![basis(0), basis(1), basis(2)],
@@ -623,7 +623,7 @@ mod tests {
     #[test]
     fn bulk_search_keys_excludes_self_and_honors_the_filters() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.bulk_add_vectors(
             vec![key("a"), key("b"), key("c")],
             vec![basis(0), basis(1), basis(2)],
@@ -661,7 +661,7 @@ mod tests {
     #[test]
     fn attrs_round_trip_through_the_api() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         let attrs = vec![
             VecDbAttr {
                 name: key("model"),
@@ -753,7 +753,7 @@ mod tests {
             check_open_cost(dir.db_path()),
             VecDbOpenCost::Absent
         ));
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
         assert!(matches!(
             check_open_cost(dir.db_path()),
@@ -775,7 +775,7 @@ mod tests {
     #[test]
     fn delete_vec_db_files_purges_with_and_without_live_instances() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
         db.flush().unwrap();
         delete_vec_db_files(dir.db_path()).unwrap();
@@ -786,7 +786,7 @@ mod tests {
             db.get_index_stats(),
             Err(RustVecDbError::Closed { .. })
         ));
-        let reopened = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let reopened = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
         assert_eq!(reopened.get_index_stats().unwrap().live_count, 0);
         reopened.add_vector(key("b"), basis(1)).unwrap();
         drop(reopened);
@@ -865,25 +865,25 @@ mod tests {
     }
 
     #[test]
-    fn storage_defaults_to_f32_and_rejects_i8_dims_off_the_lane_grid() {
+    fn storage_defaults_to_i8_and_rejects_dims_off_the_lane_grid() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), DIMS, None).unwrap();
+        let db = VecDb::new(dir.db_path(), 32, None).unwrap();
         assert!(matches!(
             db.get_index_stats().unwrap().storage,
-            VecDbStorage::F32
+            VecDbStorage::I8
         ));
-        let explicit = VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32)).unwrap();
+        let explicit = VecDb::new(dir.db_path(), 32, Some(VecDbStorage::I8)).unwrap();
         assert!(matches!(
             explicit.get_index_stats().unwrap().storage,
-            VecDbStorage::F32
+            VecDbStorage::I8
         ));
         assert!(matches!(
-            VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::I8)),
+            VecDb::new(dir.db_path(), 32, Some(VecDbStorage::F32)),
             Err(RustVecDbError::StorageMismatch { .. })
         ));
         let other = TestDir::create();
         assert!(matches!(
-            VecDb::new(other.db_path(), DIMS, Some(VecDbStorage::I8)),
+            VecDb::new(other.db_path(), DIMS, None),
             Err(RustVecDbError::InvalidDimensions { message }) if message.contains("i8") && message.contains("32")
         ));
         assert!(!PathBuf::from(other.db_path()).exists());
