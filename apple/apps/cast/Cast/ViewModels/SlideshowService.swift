@@ -843,14 +843,21 @@ class RealSlideshowService: ObservableObject {
     
     private func downloadEncryptedFile(castPayload: CastPayload, fileID: Int) async throws -> Data {
         guard storedCastPayload == castPayload else { throw CancellationError() }
-        let url = baseURL == APIEndpoint.production.absoluteString
+        let isProduction = baseURL == APIEndpoint.production.absoluteString
+        let url = isProduction
             ? URL(string: "\(castDownloadURL)/?fileID=\(fileID)")!
-            : URL(string: baseURL)!.appendingPathComponent("cast/files/download/\(fileID)")
+            : URL(string: baseURL)!.appendingPathComponent("cast/files/download/v3/\(fileID)")
         
         var request = URLRequest(url: url)
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
-        
-        
+
+        let data = try await download(request, castPayload: castPayload, fileID: fileID)
+        guard !isProduction else { return data }
+        let fileURL = try JSONDecoder().decode(FileURL.self, from: data).url
+        return try await download(URLRequest(url: fileURL), castPayload: castPayload, fileID: fileID)
+    }
+
+    private func download(_ request: URLRequest, castPayload: CastPayload, fileID: Int) async throws -> Data {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard storedCastPayload == castPayload else { throw CancellationError() }
         
@@ -861,7 +868,8 @@ class RealSlideshowService: ObservableObject {
         guard httpResponse.statusCode == 200 else {
             let snippet = (String(data: data, encoding: .utf8) ?? "").prefix(160)
             print("Download error [\(httpResponse.statusCode)] fileID=\(fileID): \(snippet)")
-            if httpResponse.statusCode == 401 {
+            if httpResponse.statusCode == 401,
+               request.value(forHTTPHeaderField: "X-Cast-Access-Token") != nil {
                 await handleUnauthorizedError()
                 throw CastError.serverError(401, "Authentication expired - resetting to pairing mode")
             } else {
@@ -871,6 +879,8 @@ class RealSlideshowService: ObservableObject {
         if verboseFileLogging { print("Successfully downloaded \(data.count) bytes for file \(fileID)") }
         return data
     }
+
+    private struct FileURL: Decodable { let url: URL }
     
     private func downloadAndDecryptFileContent(castPayload: CastPayload, file: CastFile) async throws -> Data {
         let stopping = await MainActor.run { isStopping }
