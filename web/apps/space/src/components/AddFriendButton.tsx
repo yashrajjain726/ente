@@ -3,7 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import React from "react";
 import { spaceEmptyStateButtonSx } from "styles/buttons";
-import { spaceSurface, spaceSurfaceHover } from "styles/colors";
+import { spaceSurface } from "styles/colors";
 
 export const SpaceAddFriendButton: React.FC<{ onClick: () => void }> = ({
     onClick,
@@ -15,15 +15,15 @@ export const SpaceAddFriendButton: React.FC<{ onClick: () => void }> = ({
         onClick={onClick}
         sx={{
             ...spaceEmptyStateButtonSx,
-            bgcolor: spaceSurface,
+            bgcolor: "transparent",
             borderRadius: "50%",
-            color: "#65656D",
+            color: "#505058",
             height: 64,
             p: 0,
             width: 64,
-            "&:hover:not(:disabled)": { bgcolor: spaceSurfaceHover },
+            "&:hover:not(:disabled)": { bgcolor: spaceSurface },
         }}
     >
-        <HugeiconsIcon icon={UserAdd02Icon} size={28} strokeWidth={1.7} />
+        <HugeiconsIcon icon={UserAdd02Icon} size={24} strokeWidth={1.5} />
     </Box>
 );
