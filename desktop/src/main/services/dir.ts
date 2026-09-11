@@ -16,9 +16,7 @@ export const openDirectory = async (dirPath: string) => {
     // shell.openPath requires native separators, not our POSIX IPC paths.
     const nativePath = path.normalize(dirPath);
 
-    // On Linux shell.openPath launches xdg-open without waiting for it, and
-    // drops the callback that'd settle the promise it returned (see OpenPath in
-    // Electron's platform_util_linux.cc). Awaiting it would hang this handler.
+    // On Linux shell.openPath's promise never settles, so don't await it.
     if (process.platform == "linux") {
         if (!existsSync(nativePath))
             throw new Error(`Failed to open directory ${dirPath}`);
