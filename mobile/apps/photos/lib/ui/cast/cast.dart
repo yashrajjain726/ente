@@ -51,7 +51,7 @@ Future<void> showCastSheet(
       await dialog.hide();
     } catch (e, s) {
       await dialog.hide();
-      logger.severe("Failed to revoke or stop cast sessions", e, s);
+      logger.warning("Failed to revoke or stop cast sessions", e, s);
       if (!context.mounted) return;
       await showGenericErrorDialog(context: context, error: e);
       return;
