@@ -100,9 +100,9 @@ export const FriendTilePokeButton: React.FC<{
                     bgcolor: "#FFFFFF",
                     borderRadius: "50%",
                     display: "flex",
-                    height: avatarSize,
+                    height: avatarSize - 3,
                     justifyContent: "center",
-                    width: avatarSize,
+                    width: avatarSize - 3,
                 }}
             >
                 <Box
