@@ -17,7 +17,7 @@ export const SpaceAddFriendButton: React.FC<{ onClick: () => void }> = ({
             ...spaceEmptyStateButtonSx,
             bgcolor: "transparent",
             borderRadius: "50%",
-            color: "#505058",
+            color: "#585860",
             height: 64,
             p: 0,
             width: 64,
