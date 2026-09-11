@@ -1037,7 +1037,6 @@
     "save": "Зберегти",
     "save_changes": "Зберегти зміни",
     "theme": "Тема",
-    "appearance": "",
     "system": "Як у системі",
     "light": "Світла",
     "dark": "Темна",
@@ -1113,10 +1112,5 @@
     "auto_lock_5_minutes": "5 хвилин",
     "auto_lock_30_minutes": "30 хвилин",
     "wrong_unlock_code_one": "Ви ввели неправильний код розблокування {{count}} раз.",
-    "wrong_unlock_code_other": "Ви ввели неправильний код розблокування {{count}} раз.",
-    "trusted_contacts": "",
-    "legacy_accounts": "",
-    "add_trusted_contact": "",
-    "trusted_contacts_empty": "",
-    "legacy_accounts_empty": ""
+    "wrong_unlock_code_other": "Ви ввели неправильний код розблокування {{count}} раз."
 }
