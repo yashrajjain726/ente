@@ -8,7 +8,7 @@ use anyhow::{Context, Result, ensure};
 use dialoguer::{Input, Password, Select, console::Term};
 use ente_accounts::{
     AuthFlow, AuthFlowUi, DEFAULT_API_ORIGIN, LoginParams, OtpPurpose, SecondFactorMethod,
-    TotpPurpose,
+    TotpPurpose, auth,
 };
 use ente_core::http::{Api, ApiConfig, Http};
 use serde::Deserialize;
@@ -28,20 +28,25 @@ pub async fn login(
     args: LoginArgs,
     selected: Option<&str>,
 ) -> Result<(State, usize)> {
-    let requested_origin = match selected {
-        Some(_) => None,
-        None => Some(normalize_host(
+    enum Target<'a> {
+        Existing(&'a str),
+        New(String),
+    }
+
+    let target = match selected {
+        Some(name) => Target::Existing(name),
+        None => Target::New(normalize_host(
             args.host.as_deref().unwrap_or(DEFAULT_API_ORIGIN),
         )?),
     };
     let credentials = args.input.as_deref().map(Credentials::read).transpose()?;
     let vault = Vault::open()?;
-    let (expected, origin) = match selected {
-        Some(name) => {
+    let (expected, origin) = match target {
+        Target::Existing(name) => {
             let account = &vault.state.accounts[vault.state.named(name)?];
             (Some(account.storage_id), account.origin.clone())
         }
-        None => (None, requested_origin.unwrap()),
+        Target::New(origin) => (None, origin),
     };
     let (snapshot, access) = vault.release();
     let mut config = ApiConfig::new(origin.clone());
@@ -107,8 +112,15 @@ pub async fn login(
                 "authenticated identity does not match --account"
             );
         }
+        let recovery_key = Zeroizing::new(
+            authenticated
+                .recovery_key
+                .take()
+                .context("account has no recovery key")?,
+        );
         let identity = AccountKeys {
             master_key: std::mem::take(&mut authenticated.secrets.master_key),
+            recovery_key: auth::recovery_key_from_mnemonic_or_hex(&recovery_key)?.into_vec(),
             secret_key: std::mem::take(&mut authenticated.secrets.secret_key),
         };
         let session = StoredSession {
@@ -117,7 +129,7 @@ pub async fn login(
         let index = if let Some(index) = existing {
             ensure!(
                 !supplied_name,
-                "account already exists; use account rename to change its local name"
+                "account already exists; use accounts rename to change its local name"
             );
             let account = &mut vault.state.accounts[index];
             account.email = email;
@@ -179,7 +191,10 @@ fn normalize_host(host: &str) -> Result<String> {
                     .is_ok_and(|ip| ip.is_loopback())
         })
     {
-        url.set_scheme("http").expect("HTTP is a valid URL scheme");
+        ensure!(
+            url.set_scheme("http").is_ok(),
+            "host must be an HTTP or HTTPS origin"
+        );
     }
     ensure!(
         matches!(url.scheme(), "http" | "https") && url.host_str().is_some(),

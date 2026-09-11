@@ -52,7 +52,7 @@ async fn run(cli: Cli) -> Result<()> {
                     command: AlbumCommand::List,
                 },
         } => album_list(selector.account.as_deref(), json).await,
-        Command::Account { command } => account_command(command, json).await,
+        Command::Accounts { command } => account_command(command, json).await,
         Command::Vault {
             command:
                 VaultCommand::Key {

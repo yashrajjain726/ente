@@ -57,6 +57,7 @@ pub fn session(account: &Account, product: Product) -> Result<Session> {
         config,
         account.user_id,
         Key::try_from_slice(&account.identity.master_key)?,
+        Key::try_from_slice(&account.identity.recovery_key)?,
         SecretKey::try_from_slice(&account.identity.secret_key)?,
     )
     .map_err(Into::into)

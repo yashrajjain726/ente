@@ -64,6 +64,7 @@ pub struct Account {
 #[derive(Serialize, Deserialize, ZeroizeOnDrop)]
 pub struct AccountKeys {
     pub master_key: Vec<u8>,
+    pub recovery_key: Vec<u8>,
     pub secret_key: Vec<u8>,
 }
 
@@ -170,7 +171,7 @@ impl State {
         self.accounts
             .iter()
             .position(|a| a.name == name)
-            .with_context(|| format!("no account named {name:?}; use account list"))
+            .with_context(|| format!("no account named {name:?}; use accounts list"))
     }
 
     pub fn resolve(&self, name: Option<&str>) -> Result<usize> {
@@ -187,7 +188,7 @@ impl State {
         match self.accounts.len() {
             0 => bail!("no accounts; use photos login, locker login, or auth login"),
             1 => Ok(0),
-            _ => bail!("no account selected; use account switch <name> or --account <name>"),
+            _ => bail!("no account selected; use accounts switch <name> or --account <name>"),
         }
     }
 

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use std::{
     fs,
     io::Write,
@@ -20,14 +22,14 @@ fn reads_do_not_initialize_storage() {
             fs::create_dir(&path).unwrap();
         }
         let output = home
-            .command(&["account", "list"])
+            .command(&["accounts", "list"])
             .env("ENTE_CLI_HOME", &path)
             .output()
             .unwrap();
         assert_eq!(success(output).stdout, b"No accounts on this device.\n");
         for args in [
-            vec!["account", "list", "--json"],
-            vec!["account", "view", "missing"],
+            vec!["accounts", "list", "--json"],
+            vec!["accounts", "view", "missing"],
             vec!["photos", "album", "list"],
             vec!["photos", "api", "/users/details/v2"],
         ] {
@@ -662,7 +664,10 @@ impl TestHome {
             "accounts": [{
                 "storage_id": id, "name": "fixture", "email": "fixture@example.org",
                 "origin": origin, "user_id": 9007199254740993i64,
-                "identity": {"master_key": vec![0u8; 32], "secret_key": vec![0u8; 32]},
+                "identity": {
+                    "master_key": vec![0u8; 32], "recovery_key": vec![0u8; 32],
+                    "secret_key": vec![0u8; 32]
+                },
                 "sessions": {"photos": {"token": [0xfb, 0xef]}}
             }]
         }));

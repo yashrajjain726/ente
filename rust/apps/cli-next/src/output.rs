@@ -122,7 +122,7 @@ pub fn account(account: &AccountView<'_>) -> Result<()> {
         .iter()
         .map(|(name, _)| measure_text_width(name))
         .max()
-        .unwrap();
+        .unwrap_or(0);
     let mut stdout = std::io::stdout().lock();
     for (name, value) in fields {
         writeln!(
@@ -184,7 +184,7 @@ fn write_table<const N: usize>(
             .chain(rows)
             .map(|row| measure_text_width(&row[column]))
             .max()
-            .unwrap()
+            .unwrap_or(0)
     });
     for row in std::iter::once(&header).chain(rows) {
         for (column, cell) in row.iter().enumerate() {

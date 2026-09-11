@@ -139,11 +139,11 @@ async fn exercise(origin: String) -> TestResult {
     let alice = create_account(&origin, &alice_email).await;
     let alice_id = alice.user_id.to_string();
     let bob = create_account(&origin, &bob_email).await;
-    let (album, key) = create_album(&origin, &alice, "Monsoon 🌧", "folder", false).await;
-    let (archive, archive_key) = create_album(&origin, &alice, "Archive", "album", true).await;
-    let (hidden, hidden_key) = create_album(&origin, &alice, "Private album", "album", false).await;
+    let (album, key) = create_album(&origin, &alice, "Monsoon 🌧", "folder").await;
+    let (archive, archive_key) = create_album(&origin, &alice, "Archive", "album").await;
+    let (hidden, hidden_key) = create_album(&origin, &alice, "Private album", "album").await;
     let (default_hidden, default_hidden_key) =
-        create_album(&origin, &alice, "Default hidden", "album", false).await;
+        create_album(&origin, &alice, "Default hidden", "album").await;
     set_album_metadata(
         &origin,
         &alice,
@@ -171,7 +171,7 @@ async fn exercise(origin: String) -> TestResult {
         json!({"subType": 1}),
     )
     .await;
-    let (bob_album, _) = create_album(&origin, &bob, "Bob's album", "album", false).await;
+    let (bob_album, _) = create_album(&origin, &bob, "Bob's album", "album").await;
     let shared_key = sealed::seal(
         key.as_bytes(),
         &PublicKey::try_from_slice(&bob.secrets.public_key).unwrap(),
@@ -416,7 +416,6 @@ async fn create_album(
     owner: &AuthenticatedAccount,
     name: &str,
     kind: &str,
-    legacy: bool,
 ) -> (i64, Key) {
     let key = Key::generate();
     let wrapped = secretbox::encrypt(
@@ -428,7 +427,7 @@ async fn create_album(
         .header("x-auth-token", b64::encode_url_safe(&owner.secrets.token)).header("x-client-package", "io.ente.photos")
         .json(&json!({
             "encryptedKey": b64::encode(&wrapped.encrypted_data), "keyDecryptionNonce": b64::encode(wrapped.nonce.as_bytes()),
-            "name": if legacy { name } else { "" }, "encryptedName": b64::encode(&encrypted_name.encrypted_data),
+            "name": "", "encryptedName": b64::encode(&encrypted_name.encrypted_data),
             "nameDecryptionNonce": b64::encode(encrypted_name.nonce.as_bytes()), "type": kind, "attributes": {"version": 1}
         })).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
     (response["collection"]["id"].as_i64().unwrap(), key)

@@ -50,8 +50,8 @@ pub enum Command {
         #[command(subcommand)]
         command: SessionCommand,
     },
-    #[command(about = "Manage accounts on this device")]
-    Account {
+    #[command(about = "Manage accounts on this device", alias = "account")]
+    Accounts {
         #[command(subcommand)]
         command: AccountCommand,
     },
