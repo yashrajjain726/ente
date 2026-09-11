@@ -35,6 +35,31 @@ void main() {
     expect(file.metadataVersion, -1);
   });
 
+  test("keeps an earlier MediaStore modification time without EXIF", () {
+    final file = fileFromAsset(
+      "EnteThumbnailBench",
+      AssetEntity(
+        id: "bench",
+        typeInt: 1,
+        width: 4032,
+        height: 3024,
+        title: "bench-IMG_8606_rotate_90_cw_contains_text.HEIC",
+        createDateSecond: 1786506608,
+        modifiedDateSecond: 1786450130,
+      ),
+    );
+
+    expect(
+      file.creationTime,
+      1786450130 * Duration.microsecondsPerSecond,
+    );
+    applyCreationTimeMetadata(file, null);
+    expect(
+      file.creationTime,
+      1786450130 * Duration.microsecondsPerSecond,
+    );
+  });
+
   test(
     "refined dimensions invalidate the model cache and preserve other fields",
     () {
