@@ -69,7 +69,7 @@ const PostTimestamp: React.FC<{
             sx={{
                 color:
                     status == "posted"
-                        ? green
+                        ? "color(display-p3 0.0314 0.7608 0.1451 / 0.85)"
                         : status == "failed"
                           ? "#FF8585"
                           : spaceTextMuted,
