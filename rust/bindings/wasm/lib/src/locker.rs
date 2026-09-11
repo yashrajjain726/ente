@@ -13,15 +13,9 @@ pub enum Error {
     Locker(#[from] ente_locker::Error),
 }
 
-impl Error {
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
-}
-
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        js_sys::Error::new(&error.message()).into()
+        crate::js_error(&error, None)
     }
 }
 

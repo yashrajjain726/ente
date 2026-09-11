@@ -6,23 +6,9 @@ use crate::session::Session;
 #[error(transparent)]
 pub struct Error(#[from] ente_collections::Error);
 
-impl Error {
-    fn name(&self) -> Option<&'static str> {
-        None
-    }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
-}
-
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        crate::js_error(&error, None)
     }
 }
 

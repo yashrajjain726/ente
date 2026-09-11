@@ -12,16 +12,11 @@ serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-ente-accounts.workspace = true
 ente-legacy.workspace = true
 ente-test-support.workspace = true
-hmac.workspace = true
 mockito.workspace = true
 serde_json.workspace = true
-sha1.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
-uuid = { workspace = true, features = ["v4", "js"] }
-zeroize.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true

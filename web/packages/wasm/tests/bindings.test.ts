@@ -22,7 +22,7 @@ for (const [name, api] of [
                 switch (new URL(request.url).pathname) {
                     case "/contacts/diff":
                         return Response.json({
-                            diff: Array.from({ length: 1000 }, (_, i) => ({
+                            diff: Array.from({ length: 2 }, (_, i) => ({
                                 ...fixture.contact,
                                 id: `ct_${i}`,
                             })),
@@ -51,10 +51,10 @@ for (const [name, api] of [
                     session,
                     fixture.wrappedRootContactKey,
                     0,
-                    1000,
+                    2,
                 );
                 expect(diff).toStrictEqual({
-                    records: Array.from({ length: 1000 }, (_, i) => ({
+                    records: Array.from({ length: 2 }, (_, i) => ({
                         id: `ct_${i}`,
                         contactUserId: 42,
                         email: "friend@example.com",

@@ -18,3 +18,11 @@ mod types;
 
 #[cfg(any(feature = "crypto", feature = "session"))]
 pub use types::EncryptedBox;
+
+pub fn js_error(error: &dyn std::error::Error, name: Option<&str>) -> wasm_bindgen::JsValue {
+    let js_error = js_sys::Error::new(&ente_core::error::chain(error));
+    if let Some(name) = name {
+        js_error.set_name(name);
+    }
+    js_error.into()
+}

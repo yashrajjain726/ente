@@ -1,5 +1,4 @@
 use ente_paste::{Client, OpenPaste, PasteSession};
-use ente_wasm_lib as _;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,19 +31,11 @@ impl Error {
             _ => None,
         }
     }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
 }
 
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        ente_wasm_lib::js_error(&error, error.name())
     }
 }
 
