@@ -77,6 +77,10 @@
         "mobile/**/pubspec.yaml"
     ],
     "repo-lint": null,
+    "rust-cli-test": [
+        ".github/workflows/rust-cli-test.yml",
+        "rust/apps/cli-next/**"
+    ],
     "rust-lint": [".github/workflows/rust-lint.yml", "rust/**"],
     "rust-test": [".github/workflows/rust-test.yml", "rust/**", "server/**"],
     "server-lint": [".github/workflows/server-lint.yml", "server/**"],
