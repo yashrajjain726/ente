@@ -472,7 +472,7 @@ class LocalSyncService {
         "track ${updatedFiles.length}/ $updateCount files due to modification change",
       );
       if (updatedFiles.isNotEmpty) {
-        await _db.refreshLocalDimensions(updatedFiles);
+        await _db.refreshModifiedLocalFiles(updatedFiles);
         await FileUpdationDB.instance.insertMultiple(
           updatedFiles.map((file) => file.localID!).toList(),
           FileUpdationDB.modificationTimeUpdated,

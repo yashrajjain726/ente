@@ -1181,7 +1181,7 @@ class FilesDB with SqlDbBase {
     );
   }
 
-  Future<void> refreshLocalDimensions(List<EnteFile> files) async {
+  Future<void> refreshModifiedLocalFiles(List<EnteFile> files) async {
     final db = await instance.sqliteAsyncDB;
     await db.writeTransaction((tx) async {
       for (final file in files) {
@@ -1189,6 +1189,8 @@ class FilesDB with SqlDbBase {
           '''
           UPDATE $filesTable
           SET $columnModificationTime = ?,
+              $columnLatitude = NULL,
+              $columnLongitude = NULL,
               $columnPubMMdEncodedJson = json_patch(COALESCE($columnPubMMdEncodedJson, '{}'), ?),
               $columnMetadataVersion = -1
           WHERE $columnLocalID = ? AND $columnModificationTime != ?

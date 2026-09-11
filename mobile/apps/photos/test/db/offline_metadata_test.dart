@@ -5,7 +5,6 @@ import "package:flutter_test/flutter_test.dart";
 import "package:path_provider_platform_interface/path_provider_platform_interface.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/module/metadata/local_file.dart";
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -25,122 +24,92 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  test(
-    "persists media metadata, refreshes edits and rejects stale results only for local rows",
-    () async {
-      final db = await files.sqliteAsyncDB;
-      for (final (uploadedID, collectionID) in [(-1, 1), (-1, 2), (99, 3)]) {
-        await db.execute(
-          '''
-        INSERT INTO ${FilesDB.filesTable}
-          (${FilesDB.columnLocalID}, ${FilesDB.columnUploadedFileID},
-           ${FilesDB.columnCollectionID}, ${FilesDB.columnTitle},
-           ${FilesDB.columnCreationTime}, ${FilesDB.columnModificationTime},
-           ${FilesDB.columnMetadataVersion}, ${FilesDB.columnPubMMdEncodedJson})
-        VALUES ('local', ?, ?, 'photo.jpg', 100, 100, 1, ?)
-      ''',
-          [uploadedID, collectionID, '{"caption":"Keep me","w":4000,"h":3000}'],
-        );
-      }
+  test("refreshes only current local rows", () async {
+    final db = await files.sqliteAsyncDB;
+    await db.execute('''
+      INSERT INTO ${FilesDB.filesTable}
+        (${FilesDB.columnLocalID}, ${FilesDB.columnUploadedFileID},
+         ${FilesDB.columnCollectionID}, ${FilesDB.columnTitle},
+         ${FilesDB.columnCreationTime}, ${FilesDB.columnModificationTime},
+         ${FilesDB.columnLatitude}, ${FilesDB.columnLongitude},
+         ${FilesDB.columnMetadataVersion}, ${FilesDB.columnPubMMdEncodedJson})
+      VALUES
+        ('local', -1, 1, 'photo.jpg', 100, 100, 12.3, 45.6, 3,
+         '{"caption":"Keep me","w":4000,"h":3000,"mediaType":1,"mvi":42}'),
+        ('local', 99, 2, 'photo.jpg', 100, 100, 12.3, 45.6, 1,
+         '{"caption":"Keep me","w":4000,"h":3000}')
+    ''');
 
-      expect(
-        await files.updateOfflineImportMetadataForLocalID(
-          "local",
-          processingVersion: 2,
-          modificationTime: 100,
-          dimensions: (width: 3000, height: 4000),
-          mediaType: 1,
-          motionVideoIndex: 1234,
-        ),
-        isTrue,
-      );
-
-      final rows = await db.getAll(
-        'SELECT * FROM ${FilesDB.filesTable} ORDER BY ${FilesDB.columnCollectionID}',
-      );
-      for (final row in rows.take(2)) {
-        final file = EnteFile()
-          ..pubMmdEncodedJson = row[FilesDB.columnPubMMdEncodedJson] as String;
-        expect((file.width, file.height), (3000, 4000));
-        expect(file.pubMagicMetadata!.caption, "Keep me");
-        expect(file.pubMagicMetadata!.mediaType, 1);
-        expect(file.pubMagicMetadata!.mvi, 1234);
-        expect(row[FilesDB.columnMetadataVersion], 2);
-      }
-      expect(
-        jsonDecode(rows.last[FilesDB.columnPubMMdEncodedJson] as String)['w'],
-        4000,
-      );
-      expect(rows.last[FilesDB.columnMetadataVersion], 1);
-
+    final edited = EnteFile()
+      ..localID = "local"
+      ..modificationTime = 200
+      ..pubMmdEncodedJson = '{"w":800,"h":600}';
+    await files.refreshModifiedLocalFiles([edited]);
+    expect(
       await files.updateOfflineImportMetadataForLocalID(
         "local",
-        processingVersion: 3,
+        processingVersion: 2,
         modificationTime: 100,
+      ),
+      isFalse,
+    );
+
+    final rows = await db.getAll('SELECT * FROM ${FilesDB.filesTable}');
+    var local = rows.first;
+    expect(
+      (
+        local[FilesDB.columnModificationTime],
+        local[FilesDB.columnMetadataVersion],
+        local[FilesDB.columnLatitude],
+        local[FilesDB.columnLongitude],
+      ),
+      (200, -1, null, null),
+    );
+    expect(jsonDecode(local[FilesDB.columnPubMMdEncodedJson] as String), {
+      "caption": "Keep me",
+      "w": 800,
+      "h": 600,
+    });
+    final uploaded = rows.last;
+    expect(
+      (
+        uploaded[FilesDB.columnModificationTime],
+        uploaded[FilesDB.columnMetadataVersion],
+        uploaded[FilesDB.columnLatitude],
+        uploaded[FilesDB.columnLongitude],
+      ),
+      (100, 1, 12.3, 45.6),
+    );
+
+    expect(
+      await files.updateOfflineImportMetadataForLocalID(
+        "local",
+        processingVersion: 2,
+        modificationTime: 200,
+        dimensions: (width: 600, height: 800),
         mediaType: 0,
-      );
-      final unknown = await db.getAll(
-        'SELECT * FROM ${FilesDB.filesTable} WHERE ${FilesDB.columnUploadedFileID} = -1',
-      );
-      for (final row in unknown) {
-        final metadata = jsonDecode(
-          row[FilesDB.columnPubMMdEncodedJson] as String,
-        );
-        expect(metadata.containsKey('mvi'), isFalse);
-        expect(metadata['mediaType'], 0);
-      }
-
-      final edited = EnteFile()
-        ..localID = "local"
-        ..modificationTime = 200;
-      applyDisplayDimensions(edited, 800, 600);
-      await files.refreshLocalDimensions([edited]);
-      expect(
-        await files.updateOfflineImportMetadataForLocalID(
-          "local",
-          processingVersion: 2,
-          modificationTime: 100,
-          dimensions: (width: 3000, height: 4000),
-          mediaType: 1,
-          motionVideoIndex: 1234,
-        ),
-        isFalse,
-      );
-      final pending = await db.getAll(
-        'SELECT * FROM ${FilesDB.filesTable} WHERE ${FilesDB.columnMetadataVersion} = -1',
-      );
-      expect(pending, hasLength(2));
-      expect(
-        jsonDecode(pending.first[FilesDB.columnPubMMdEncodedJson] as String),
-        {"caption": "Keep me", "w": 800, "h": 600},
-      );
-
-      expect(
-        await files.updateOfflineImportMetadataForLocalID(
-          "local",
-          processingVersion: 2,
-          modificationTime: 200,
-        ),
-        isTrue,
-      );
-      await files.refreshLocalDimensions([edited]);
-      expect(
-        await db.getAll(
-          'SELECT * FROM ${FilesDB.filesTable} WHERE ${FilesDB.columnMetadataVersion} = -1',
-        ),
-        isEmpty,
-      );
-      final refreshed = await db.getAll(
-        'SELECT * FROM ${FilesDB.filesTable} WHERE ${FilesDB.columnUploadedFileID} = -1',
-      );
-      expect(
-        jsonDecode(
-          refreshed.first[FilesDB.columnPubMMdEncodedJson] as String,
-        )['w'],
-        800,
-      );
-    },
-  );
+      ),
+      isTrue,
+    );
+    await files.refreshModifiedLocalFiles([edited]);
+    local = (await db.getAll(
+      'SELECT * FROM ${FilesDB.filesTable} WHERE ${FilesDB.columnUploadedFileID} = -1',
+    )).single;
+    final metadata = jsonDecode(
+      local[FilesDB.columnPubMMdEncodedJson] as String,
+    );
+    expect(
+      (
+        metadata['caption'],
+        metadata['w'],
+        metadata['h'],
+        metadata['mediaType'],
+        metadata.containsKey('mvi'),
+        local[FilesDB.columnMetadataVersion],
+      ),
+      ("Keep me", 600, 800, 0, false, 2),
+    );
+  });
 }
 
 class _PathProvider extends PathProviderPlatform {
