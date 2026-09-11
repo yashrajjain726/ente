@@ -1,12 +1,15 @@
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import {
+    spaceNewPostButtonRadius,
+    spaceNewPostButtonSize,
+} from "components/NewPostButton";
 import React from "react";
 
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
-const buttonSize = 64;
-const iconSize = 34;
+const iconSize = 28;
 
 interface SpacePostFloatingActionButtonProps {
     disabled?: boolean;
@@ -28,14 +31,14 @@ export const SpacePostFloatingActionButton: React.FC<
             appearance: "none",
             bgcolor: green,
             border: 0,
-            borderRadius: "50%",
+            borderRadius: `${spaceNewPostButtonRadius}px`,
             bottom: "calc(env(safe-area-inset-bottom) + 16px)",
             boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
             color: "#FFFFFF",
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             fontSize: 0,
-            height: buttonSize,
+            height: spaceNewPostButtonSize,
             justifyContent: "center",
             lineHeight: 0,
             opacity: disabled ? 0.72 : 1,
@@ -44,7 +47,7 @@ export const SpacePostFloatingActionButton: React.FC<
             right: "16px",
             transition:
                 "background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
-            width: buttonSize,
+            width: spaceNewPostButtonSize,
             zIndex: 5,
             "@media (min-width: 600px)": {
                 right: "calc((100vw - 390px) / 2 + 16px)",

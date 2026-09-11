@@ -17,6 +17,7 @@ export interface SpacePostPublication {
     phase: SpacePostPublishPhase;
     post: SpacePost;
     previewUrl: string;
+    statusExpiresAtMs?: number;
 }
 export type PendingCreateProfile = SetupProfileDetails & {
     source: CreateProfileSource;

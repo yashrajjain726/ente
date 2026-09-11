@@ -17,7 +17,7 @@ import {
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
 import { FriendTilePokeButton } from "components/FriendTilePokeButton";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpaceNewPostButton } from "components/NewPostButton";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
 import {
     SpacePostBadge,
     SpacePostUnreadBadge,
@@ -79,6 +79,9 @@ const tileBadgeText = "rgba(255, 255, 255, 0.9)";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
+    ownLatestPost?: SpacePost;
+    isOwnLatestPostLoading?: boolean;
+    isOwnLatestPostUnavailable?: boolean;
     latestPosts: SpacePost[];
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
@@ -109,6 +112,7 @@ interface HomeScreenProps {
     onOpenMessages?: () => void;
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
+    onOpenOwnPost?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
@@ -999,6 +1003,9 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    ownLatestPost,
+    isOwnLatestPostLoading = false,
+    isOwnLatestPostUnavailable = false,
     latestPosts,
     unreadPosts,
     friendRequestSentToastName,
@@ -1022,6 +1029,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenMessages,
     onMessageFriend,
     onPokeFriend,
+    onOpenOwnPost,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -1749,9 +1757,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             )
                         )}
                     </Box>
-                    <SpaceNewPostButton
-                        isDisabled={isPostPhotoButtonDisabled}
-                        onClick={openPostPhotoPicker}
+                    <SpaceOwnPostTile
+                        post={ownLatestPost}
+                        isLoading={isOwnLatestPostLoading}
+                        isUnavailable={isOwnLatestPostUnavailable}
+                        isNewPostDisabled={isPostPhotoButtonDisabled}
+                        onLoadPostImage={onLoadPostImage}
+                        onNewPost={openPostPhotoPicker}
+                        onOpenPost={onOpenOwnPost}
                     />
                 </Box>
                 {selectedContact && (
