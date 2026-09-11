@@ -36,8 +36,6 @@ import {
 } from "state/app-state";
 import { prepareSpacePostImageFromEdit } from "utils/post-image";
 
-const postStatusDurationMs = 2000;
-
 export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     children,
 }) => {
@@ -152,7 +150,6 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                         ...publication,
                         phase: "posted",
                         post,
-                        statusExpiresAtMs: Date.now() + postStatusDurationMs,
                     });
                 }
                 return post;

@@ -1,11 +1,12 @@
 import { ArrowLeft02Icon, ArrowRight02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceAddFriendButton } from "components/AddFriendButton";
 import { SpaceAddFriendDialog } from "components/AddFriendDialog";
 import { SpaceAddFriendTile } from "components/AddFriendTile";
 import { SpaceFileViewer } from "components/FileViewer";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpaceOwnPostTile } from "components/OwnPostTile";
+import { SpaceNewPostButton } from "components/NewPostButton";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
 import { FriendPostTile } from "screens/HomeScreen";
@@ -29,15 +30,6 @@ const demoProfile: SetupProfile = {
     fullName: "Alex Morgan",
     spaceId: "demo-self",
     username: "you",
-};
-const demoOwnPost: SpacePost = {
-    friendID: "demo-self",
-    imageUrl: spaceDefaultCoverImagePath,
-    name: demoProfile.fullName,
-    postId: 100,
-    spaceId: "demo-self",
-    timestampMs: 1_700_000_000_000,
-    viewerLiked: false,
 };
 
 const singleFriendVariants = [
@@ -187,14 +179,10 @@ const LayoutDemoPage: React.FC = () => {
             Math.max(0, Math.min(maximumHomeTileCount, count + delta)),
         );
     }, []);
-    const [ownPost, setOwnPost] = React.useState<SpacePost>();
-    const [postPreviewActionMode, setPostPreviewActionMode] = React.useState<
-        "draft-post" | "hidden"
-    >();
-    const isPostPreviewOpen = postPreviewActionMode !== undefined;
+    const [isPostPreviewOpen, setIsPostPreviewOpen] = React.useState(false);
     useBrowserBackClose({
         open: isPostPreviewOpen,
-        onClose: () => setPostPreviewActionMode(undefined),
+        onClose: () => setIsPostPreviewOpen(false),
         stateKey: "space-layout-demo-viewer",
     });
     const [canvasSize, setCanvasSize] = React.useState<CanvasSize>({
@@ -202,6 +190,10 @@ const LayoutDemoPage: React.FC = () => {
         width: 0,
     });
     const canvasRef = React.useRef<HTMLDivElement | null>(null);
+    const openAddFriend = () => {
+        setProfileLink(spaceInviteURL({ spaceUsername: demoProfile.username }));
+        setIsAddFriendOpen(true);
+    };
 
     React.useEffect(() => {
         const canvas = canvasRef.current;
@@ -377,25 +369,27 @@ const LayoutDemoPage: React.FC = () => {
                                     <SpaceAddFriendTile
                                         placement={layout.addFriend}
                                         variant={layout.addFriendVariant}
-                                        onClick={() => {
-                                            setProfileLink(
-                                                spaceInviteURL({
-                                                    spaceUsername:
-                                                        demoProfile.username,
-                                                }),
-                                            );
-                                            setIsAddFriendOpen(true);
-                                        }}
+                                        onClick={openAddFriend}
                                     />
                                 )}
                             </>
                         )}
                     </Box>
-                    <SpaceOwnPostTile
-                        post={ownPost}
-                        onNewPost={() => setPostPreviewActionMode("draft-post")}
-                        onOpenPost={() => setPostPreviewActionMode("hidden")}
-                    />
+                    <Box
+                        sx={{
+                            alignItems: "center",
+                            display: "flex",
+                            gap: `${homeTileGap}px`,
+                            justifyContent: "flex-end",
+                        }}
+                    >
+                        {[1, 2, 4, 6, 8].includes(friendCount) && (
+                            <SpaceAddFriendButton onClick={openAddFriend} />
+                        )}
+                        <SpaceNewPostButton
+                            onClick={() => setIsPostPreviewOpen(true)}
+                        />
+                    </Box>
                 </Box>
                 <SpaceAddFriendDialog
                     friendRequests={[]}
@@ -412,21 +406,15 @@ const LayoutDemoPage: React.FC = () => {
                 {isPostPreviewOpen && (
                     <SpaceFileViewer
                         photo={{
-                            ...(ownPost ?? demoOwnPost),
                             alt: "Your post",
                             avatarUrl: demoProfile.avatarUrl,
                             imageUrl: spaceDefaultCoverImagePath,
+                            name: demoProfile.fullName,
+                            timestampMs: 1_700_000_000_000,
                         }}
-                        postActionMode={postPreviewActionMode}
-                        onClose={() => setPostPreviewActionMode(undefined)}
-                        onPublishDraftPost={(caption) => {
-                            setOwnPost({
-                                ...demoOwnPost,
-                                caption,
-                                timestampMs: Date.now(),
-                            });
-                            return Promise.resolve();
-                        }}
+                        postActionMode="draft-post"
+                        onClose={() => setIsPostPreviewOpen(false)}
+                        onPublishDraftPost={() => Promise.resolve()}
                     />
                 )}
             </Box>
