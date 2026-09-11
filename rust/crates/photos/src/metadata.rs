@@ -25,6 +25,9 @@ pub fn read_photo_metadata(path: impl AsRef<Path>) -> Result<PhotoMetadata, Erro
                 && !(date.offset_time.is_none() && date.date_time == "1970-01-01T00:00:00")
                 && date.date_time != "4501-01-01T00:00:00"
         }),
-        location: metadata.exif_location().or_else(|| metadata.xmp_location()),
+        location: metadata
+            .exif_location()
+            .filter(|location| location.latitude != 0.0 || location.longitude != 0.0)
+            .or_else(|| metadata.xmp_location()),
     })
 }

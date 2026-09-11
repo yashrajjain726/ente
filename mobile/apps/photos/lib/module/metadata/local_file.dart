@@ -42,8 +42,7 @@ void applyMediaTypeMetadata(
 ) {
   file.pubMmdEncodedJson = jsonEncode({
     ...jsonDecode(file.pubMmdEncodedJson ?? '{}') as Map<String, dynamic>,
-    mediaTypeKey:
-        ((file.pubMagicMetadata?.mediaType ?? 0) & ~1) | (isPanorama ? 1 : 0),
+    mediaTypeKey: isPanorama ? 1 : 0,
     motionVideoIndexKey: motionVideoIndex,
   });
 }

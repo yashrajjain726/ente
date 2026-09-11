@@ -6,16 +6,16 @@ import "package:photos/module/metadata/photo.dart";
 import "package:photos/src/rust/api/metadata_api.dart";
 
 void main() {
-  test("media detection preserves other bits and clears stale detections", () {
+  test("media detection replaces prior state and preserves other metadata", () {
     final file = EnteFile()
-      ..pubMmdEncodedJson = '{"mediaType":2,"caption":"Keep me"}';
-    applyMediaTypeMetadata(file, true, 1234);
-    expect(file.pubMagicMetadata!.mediaType, 3);
-    expect(file.pubMagicMetadata!.mvi, 1234);
+      ..pubMmdEncodedJson = '{"mediaType":1,"mvi":42,"caption":"Keep me"}';
     applyMediaTypeMetadata(file, false, null);
-    expect(file.pubMagicMetadata!.mediaType, 2);
+    expect(file.pubMagicMetadata!.mediaType, 0);
     expect(file.pubMagicMetadata!.mvi, isNull);
     expect(file.pubMagicMetadata!.caption, "Keep me");
+    applyMediaTypeMetadata(file, true, 1234);
+    expect(file.pubMagicMetadata!.mediaType, 1);
+    expect(file.pubMagicMetadata!.mvi, 1234);
   });
 
   test("local discovery supplies oriented mosaic dimensions", () {
