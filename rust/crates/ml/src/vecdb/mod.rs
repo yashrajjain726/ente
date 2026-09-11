@@ -13,10 +13,9 @@ mod store;
 
 pub use store::{OpenCost, Stats, VecDb};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DistanceMetric {
     InnerProduct,
-    #[default]
     Cosine,
 }
 
