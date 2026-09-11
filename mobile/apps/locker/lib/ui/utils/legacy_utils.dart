@@ -5,7 +5,7 @@ import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:flutter/material.dart";
 import "package:locker/services/configuration.dart";
-import "package:locker/services/legacy_api.dart";
+import "package:locker/services/legacy.dart";
 import "package:logging/logging.dart";
 
 const _legacy = LockerLegacyApi();
