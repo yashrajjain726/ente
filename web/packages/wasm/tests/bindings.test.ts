@@ -3,11 +3,13 @@ import * as locker from "ente-locker-wasm";
 import * as photos from "ente-photos-wasm";
 import {
     boxSealOpenBytes,
+    deriveKey,
     encryptBox,
     generateKey,
     generateKeyPair,
 } from "ente-prelogin-wasm";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { lockerPrepareFileLinkPayload } from "../locker/pkg/ente_locker_wasm";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -131,6 +133,29 @@ for (const [name, api] of [
         });
     });
 }
+
+test("Locker file-link payload survives cloning and unlocks its file key", async () => {
+    const fileKey = await generateKey();
+    const prepared = lockerPrepareFileLinkPayload(fileKey);
+    const payload = structuredClone(prepared);
+    expect(payload).toStrictEqual(prepared);
+
+    const key = await deriveKey(
+        payload.fragment,
+        payload.kdfNonce,
+        payload.kdfOpsLimit,
+        payload.kdfMemLimit,
+    );
+    expect(
+        await locker.decryptBox(
+            {
+                encryptedData: payload.encryptedFileKey,
+                nonce: payload.encryptedFileKeyNonce,
+            },
+            key,
+        ),
+    ).toBe(fileKey);
+});
 
 describe("Legacy", () => {
     test("returns plain information and sends typed updates through a reused session", async () => {
