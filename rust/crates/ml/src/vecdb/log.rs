@@ -127,10 +127,9 @@ impl Log {
         mut file: File,
         path: &Path,
         expected_dims: usize,
-        requested: Option<StorageKind>,
-        requested_metric: Option<DistanceMetric>,
+        requested: StorageKind,
+        requested_metric: DistanceMetric,
     ) -> Result<Self, VecDbError> {
-        let fallback = requested.unwrap_or(StorageKind::I8);
         let file_len = file
             .metadata()
             .map_err(|source| VecDbError::io(path, source))?
@@ -140,22 +139,38 @@ impl Log {
                 "reinitializing {} whose {file_len}-byte header was never completed",
                 path.display()
             );
-            validate_dims(expected_dims, fallback)?;
-            return Self::initialize(
-                file,
-                path,
-                expected_dims,
-                fallback,
-                requested_metric.unwrap_or_default(),
-            );
+            validate_dims(expected_dims, requested)?;
+            return Self::initialize(file, path, expected_dims, requested, requested_metric);
         }
         file.seek(SeekFrom::Start(0))
             .map_err(|source| VecDbError::io(path, source))?;
         let mut header = [0u8; HEADER_LEN];
         file.read_exact(&mut header)
             .map_err(|source| VecDbError::io(path, source))?;
-        let (generation, storage, metric) =
-            decode_header(&header, expected_dims, requested, requested_metric)?;
+        let Header {
+            generation,
+            dims,
+            storage,
+            metric,
+        } = decode_header(&header)?;
+        if requested != storage {
+            return Err(VecDbError::StorageMismatch {
+                expected: requested,
+                actual: storage,
+            });
+        }
+        if requested_metric != metric {
+            return Err(VecDbError::MetricMismatch {
+                expected: requested_metric,
+                actual: metric,
+            });
+        }
+        if dims != expected_dims {
+            return Err(VecDbError::DimensionMismatch {
+                expected: expected_dims,
+                actual: dims,
+            });
+        }
         validate_dims(expected_dims, storage)?;
         Ok(Self {
             file,
@@ -779,16 +794,18 @@ fn encode_header(
 }
 
 pub(crate) fn header_generation(bytes: &[u8; HEADER_LEN]) -> Result<[u8; 16], VecDbError> {
-    let dims = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
-    decode_header(bytes, dims, None, None).map(|(generation, _, _)| generation)
+    decode_header(bytes).map(|header| header.generation)
 }
 
-fn decode_header(
-    bytes: &[u8; HEADER_LEN],
-    expected_dims: usize,
-    requested: Option<StorageKind>,
-    requested_metric: Option<DistanceMetric>,
-) -> Result<([u8; 16], StorageKind, DistanceMetric), VecDbError> {
+#[derive(Debug, PartialEq, Eq)]
+struct Header {
+    generation: [u8; 16],
+    dims: usize,
+    storage: StorageKind,
+    metric: DistanceMetric,
+}
+
+fn decode_header(bytes: &[u8; HEADER_LEN]) -> Result<Header, VecDbError> {
     if bytes[0..4] != MAGIC {
         return Err(VecDbError::Corrupt(format!(
             "bad log magic {:02x?}",
@@ -811,35 +828,18 @@ fn decode_header(
     let storage = StorageKind::from_header_tag(bytes[STORAGE_TAG_OFFSET]).ok_or_else(|| {
         VecDbError::Corrupt(format!("unknown scalar tag {}", bytes[STORAGE_TAG_OFFSET]))
     })?;
-    if let Some(requested) = requested
-        && requested != storage
-    {
-        return Err(VecDbError::StorageMismatch {
-            expected: requested,
-            actual: storage,
-        });
-    }
     let metric = DistanceMetric::from_header_tag(bytes[METRIC_TAG_OFFSET]).ok_or_else(|| {
         VecDbError::Corrupt(format!("unknown metric tag {}", bytes[METRIC_TAG_OFFSET]))
     })?;
-    if let Some(requested) = requested_metric
-        && requested != metric
-    {
-        return Err(VecDbError::MetricMismatch {
-            expected: requested,
-            actual: metric,
-        });
-    }
     let dims = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
-    if dims != expected_dims {
-        return Err(VecDbError::DimensionMismatch {
-            expected: expected_dims,
-            actual: dims,
-        });
-    }
     let mut generation = [0u8; 16];
     generation.copy_from_slice(&bytes[12..28]);
-    Ok((generation, storage, metric))
+    Ok(Header {
+        generation,
+        dims,
+        storage,
+        metric,
+    })
 }
 
 fn validate_entry(
@@ -1056,9 +1056,9 @@ mod tests {
             .collect()
     }
 
-    fn reopen(path: &Path, dims: usize) -> Log {
+    fn reopen(path: &Path, dims: usize, storage: StorageKind) -> Log {
         let file = open_writer_file(path, false).unwrap();
-        Log::open(file, path, dims, None, None).unwrap()
+        Log::open(file, path, dims, storage, InnerProduct).unwrap()
     }
 
     fn append_bounds(log: &mut Log, entries: &[LogEntry<'_>]) -> (u64, u64) {
@@ -1149,7 +1149,7 @@ mod tests {
         mutate(&mut bytes);
         std::fs::write(&path, bytes).unwrap();
         let file = File::options().read(true).write(true).open(&path).unwrap();
-        Log::open(file, &path, expected_dims, None, None)
+        Log::open(file, &path, expected_dims, StorageKind::F32, InnerProduct)
     }
 
     #[test]
@@ -1161,7 +1161,7 @@ mod tests {
         assert_eq!(created.current_end_offset(), HEADER_LEN as u64);
         assert_eq!(created.path(), path.as_path());
         drop(created.into_file());
-        let reopened = reopen(&path, 512);
+        let reopened = reopen(&path, 512, StorageKind::F32);
         assert_eq!(reopened.generation(), generation);
         assert_eq!(reopened.current_end_offset(), HEADER_LEN as u64);
     }
@@ -1187,7 +1187,7 @@ mod tests {
             Err(VecDbError::Locked(_))
         ));
         drop(file);
-        let reopened = reopen(&alias, 8);
+        let reopened = reopen(&alias, 8, StorageKind::F32);
         assert!(matches!(
             open_writer_file(&path, false),
             Err(VecDbError::Locked(_))
@@ -1287,7 +1287,7 @@ mod tests {
             let path = dir.path().join("log");
             std::fs::write(&path, vec![1u8; junk_len]).unwrap();
             let file = File::options().read(true).write(true).open(&path).unwrap();
-            let mut log = Log::open(file, &path, 8, Some(StorageKind::F32), None).unwrap();
+            let mut log = Log::open(file, &path, 8, StorageKind::F32, InnerProduct).unwrap();
             assert_eq!(log.current_end_offset(), HEADER_LEN as u64);
             assert_eq!(std::fs::metadata(&path).unwrap().len(), HEADER_LEN as u64);
             let (records, _) = scan_all(&mut log);
@@ -1304,7 +1304,7 @@ mod tests {
             assert_eq!(start, HEADER_LEN as u64);
             let generation = log.generation();
             drop(log);
-            let reopened = reopen(&path, 8);
+            let reopened = reopen(&path, 8, StorageKind::F32);
             assert_eq!(reopened.generation(), generation);
             assert_eq!(reopened.current_end_offset(), end);
         }
@@ -1334,7 +1334,7 @@ mod tests {
         );
         let file = File::options().read(true).write(true).open(&path).unwrap();
         assert!(matches!(
-            Log::open(file, &path, 12, None, None),
+            Log::open(file, &path, 12, StorageKind::F32, InnerProduct),
             Err(VecDbError::DimensionMismatch {
                 expected: 12,
                 actual: 8
@@ -1417,7 +1417,7 @@ mod tests {
         bytes.extend_from_slice(&golden_attr_add);
         bytes.extend_from_slice(&golden_tombstone);
         std::fs::write(&path, &bytes).unwrap();
-        let mut log = reopen(&path, 8);
+        let mut log = reopen(&path, 8, StorageKind::F32);
         assert_eq!(log.generation(), generation);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(
@@ -1586,7 +1586,7 @@ mod tests {
         for cut in intact_end..boundaries[2].1 {
             let torn_path = dir.path().join(format!("torn-{cut}"));
             std::fs::write(&torn_path, &full_bytes[..cut as usize]).unwrap();
-            let mut torn_log = reopen(&torn_path, 8);
+            let mut torn_log = reopen(&torn_path, 8, StorageKind::F32);
             let (records, recoverable_end) = scan_all(&mut torn_log);
             assert_eq!(records.len(), 2);
             assert_eq!(records[0].1, boundaries[0].0);
@@ -1622,7 +1622,7 @@ mod tests {
         let file = File::options().read(true).write(true).open(&path).unwrap();
         file.set_len(cut).unwrap();
         drop(file);
-        let mut log = reopen(&path, 8);
+        let mut log = reopen(&path, 8, StorageKind::F32);
         assert_eq!(log.current_end_offset(), cut);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
@@ -1683,7 +1683,7 @@ mod tests {
         assert_eq!(log.current_end_offset(), grown_end);
         let generation = log.generation();
         drop(log);
-        assert_eq!(generation, reopen(&path, 8).generation());
+        assert_eq!(generation, reopen(&path, 8, StorageKind::F32).generation());
     }
 
     #[test]
@@ -1709,7 +1709,7 @@ mod tests {
         log.discard_unacked_tail().unwrap();
         assert_eq!(std::fs::metadata(&path).unwrap().len(), acked_end);
         drop(log);
-        let mut reopened = reopen(&path, 8);
+        let mut reopened = reopen(&path, 8, StorageKind::F32);
         let (records, recoverable_end) = scan_all(&mut reopened);
         assert_eq!(records.len(), 1);
         assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "acked"));
@@ -1751,7 +1751,7 @@ mod tests {
         assert!(end < acked_end + stale.len() as u64);
         assert_eq!(std::fs::metadata(&path).unwrap().len(), end);
         drop(log);
-        let mut reopened = reopen(&path, 8);
+        let mut reopened = reopen(&path, 8, StorageKind::F32);
         let (records, recoverable_end) = scan_all(&mut reopened);
         assert_eq!(records.len(), 2);
         assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "acked"));
@@ -1806,8 +1806,8 @@ mod tests {
         let staged_bytes = std::fs::read(&staged_path).unwrap();
         assert_eq!(staged_bytes.len(), synced_bytes.len());
         assert_eq!(staged_bytes[HEADER_LEN..], synced_bytes[HEADER_LEN..]);
-        let (synced_records, synced_end) = scan_all(&mut reopen(&synced_path, 8));
-        let (staged_records, staged_end) = scan_all(&mut reopen(&staged_path, 8));
+        let (synced_records, synced_end) = scan_all(&mut reopen(&synced_path, 8, StorageKind::F32));
+        let (staged_records, staged_end) = scan_all(&mut reopen(&staged_path, 8, StorageKind::F32));
         assert_eq!(staged_records.len(), 4);
         assert_eq!(staged_records, synced_records);
         assert_eq!(staged_end, synced_end);
@@ -1829,7 +1829,7 @@ mod tests {
         );
         drop(log);
         let unwritable = File::open(&path).unwrap();
-        let mut log = Log::open(unwritable, &path, 8, None, None).unwrap();
+        let mut log = Log::open(unwritable, &path, 8, StorageKind::F32, InnerProduct).unwrap();
         assert!(matches!(
             log.append(&[LogEntry::Add {
                 key: "lost",
@@ -1841,7 +1841,7 @@ mod tests {
         assert_eq!(log.current_end_offset(), acked_end);
         drop(log);
         assert_eq!(std::fs::metadata(&path).unwrap().len(), acked_end);
-        let mut reopened = reopen(&path, 8);
+        let mut reopened = reopen(&path, 8, StorageKind::F32);
         let (records, _) = scan_all(&mut reopened);
         assert_eq!(records.len(), 1);
         assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "kept"));
@@ -1878,7 +1878,7 @@ mod tests {
         assert!(matches!(&records[1].0, LogRecord::Add { key, .. } if key == "third"));
         assert_eq!(recoverable_end, end);
         drop(log);
-        let mut reopened = reopen(&path, 8);
+        let mut reopened = reopen(&path, 8, StorageKind::F32);
         let (records, _) = scan_all(&mut reopened);
         assert_eq!(records.len(), 2);
         assert!(
@@ -1921,7 +1921,7 @@ mod tests {
             let mut corrupted = bytes.clone();
             corrupted[*position] ^= 0x01;
             std::fs::write(&corrupt_path, &corrupted).unwrap();
-            let mut corrupt_log = reopen(&corrupt_path, 8);
+            let mut corrupt_log = reopen(&corrupt_path, 8, StorageKind::F32);
             let (records, recoverable_end) = scan_all(&mut corrupt_log);
             assert_eq!(records.len(), 1);
             assert_eq!(records[0].1, boundaries[0].0);
@@ -1959,7 +1959,7 @@ mod tests {
             let mut record_bytes = good.clone();
             record_bytes.extend_from_slice(bad);
             write_log_file(&path, dims as u32, &record_bytes);
-            let mut log = reopen(&path, dims);
+            let mut log = reopen(&path, dims, StorageKind::F32);
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(records.len(), 1);
             assert_eq!(records[0].1, HEADER_LEN as u64);
@@ -1998,7 +1998,7 @@ mod tests {
         assert_eq!(offsets, expected_offsets);
         assert_eq!(recoverable_end, previous_end);
         drop(log);
-        let reopened = reopen(&path, 8);
+        let reopened = reopen(&path, 8, StorageKind::F32);
         assert_eq!(reopened.current_end_offset(), previous_end);
     }
 
@@ -2078,7 +2078,7 @@ mod tests {
         );
         let temp_generation = temp_log.generation();
         drop(temp_log);
-        let reopened = reopen(&temp_path, 8);
+        let reopened = reopen(&temp_path, 8, StorageKind::F32);
         assert_eq!(reopened.generation(), temp_generation);
     }
 
@@ -2203,7 +2203,7 @@ mod tests {
             .unwrap();
             assert_eq!(&scan_attrs_of_single_add(&mut log), attrs);
             drop(log);
-            let mut reopened = reopen(&path, 8);
+            let mut reopened = reopen(&path, 8, StorageKind::F32);
             assert_eq!(&scan_attrs_of_single_add(&mut reopened), attrs);
         }
     }
@@ -2406,7 +2406,7 @@ mod tests {
             let mut record_bytes = good.clone();
             record_bytes.extend_from_slice(bad);
             write_log_file(&path, dims as u32, &record_bytes);
-            let mut log = reopen(&path, dims);
+            let mut log = reopen(&path, dims, StorageKind::F32);
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(records.len(), 1, "case {index}");
             assert_eq!(records[0].1, HEADER_LEN as u64, "case {index}");
@@ -2450,7 +2450,7 @@ mod tests {
             let mut record_bytes = good.clone();
             record_bytes.extend_from_slice(&torn[..cut]);
             write_log_file(&path, dims as u32, &record_bytes);
-            let mut log = reopen(&path, dims);
+            let mut log = reopen(&path, dims, StorageKind::F32);
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(records.len(), 1, "cut {cut}");
             assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -2473,7 +2473,7 @@ mod tests {
                 record_bytes.extend_from_slice(&vec![0xAA; garbage_len]);
                 record_bytes.extend_from_slice(survivor);
                 write_log_file(&path, dims as u32, &record_bytes);
-                let mut log = reopen(&path, dims);
+                let mut log = reopen(&path, dims, StorageKind::F32);
                 let (records, recoverable_end) = scan_all(&mut log);
                 assert_eq!(records.len(), 1);
                 assert_eq!(recoverable_end, HEADER_LEN as u64 + first.len() as u64);
@@ -2524,7 +2524,7 @@ mod tests {
             record_bytes.push(0xAA);
             record_bytes.extend_from_slice(tail);
             write_log_file(&path, dims as u32, &record_bytes);
-            let mut log = reopen(&path, dims);
+            let mut log = reopen(&path, dims, StorageKind::F32);
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(records.len(), 1, "case {index}");
             assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -2549,7 +2549,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         write_log_file(&path, dims as u32, &record_bytes);
-        let mut log = reopen(&path, dims);
+        let mut log = reopen(&path, dims, StorageKind::F32);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
         assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -2580,7 +2580,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         write_log_file(&path, dims as u32, &record_bytes);
-        let mut log = reopen(&path, dims);
+        let mut log = reopen(&path, dims, StorageKind::F32);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
         assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -2606,7 +2606,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         write_log_file(&path, dims as u32, &record_bytes);
-        let mut log = reopen(&path, dims);
+        let mut log = reopen(&path, dims, StorageKind::F32);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
         assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -2653,7 +2653,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         write_log_file(&path, dims as u32, &record_bytes);
-        let mut log = reopen(&path, dims);
+        let mut log = reopen(&path, dims, StorageKind::F32);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
         assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -2671,7 +2671,7 @@ mod tests {
         corrupted_bytes[crc_last] ^= 0xFF;
         let corrupted_path = dir.path().join("log-corrupted");
         write_log_file(&corrupted_path, dims as u32, &corrupted_bytes);
-        let mut corrupted_log = reopen(&corrupted_path, dims);
+        let mut corrupted_log = reopen(&corrupted_path, dims, StorageKind::F32);
         let (corrupted_records, corrupted_end) = scan_all(&mut corrupted_log);
         assert_eq!(corrupted_records.len(), 1);
         assert!(
@@ -2716,7 +2716,7 @@ mod tests {
             bytes.extend_from_slice(&first);
             bytes.extend_from_slice(&after_first);
             std::fs::write(&path, &bytes).unwrap();
-            let mut log = reopen(&path, dims);
+            let mut log = reopen(&path, dims, StorageKind::I8);
             let (records, recoverable_end) = scan_all(&mut log);
             assert_eq!(records.len(), 1);
             assert!(matches!(&records[0].0, LogRecord::Add { key, .. } if key == "first"));
@@ -2790,7 +2790,7 @@ mod tests {
         bytes.extend_from_slice(&golden_add);
         bytes.extend_from_slice(&tombstone);
         std::fs::write(&path, &bytes).unwrap();
-        let mut log = reopen(&path, 32);
+        let mut log = reopen(&path, 32, StorageKind::I8);
         assert_eq!(log.storage(), StorageKind::I8);
         assert_eq!(log.generation(), generation);
         let (records, recoverable_end) = scan_all(&mut log);
@@ -2821,8 +2821,13 @@ mod tests {
         let header = encode_header(8, &[7u8; 16], StorageKind::F32, InnerProduct);
         assert_eq!(header[STORAGE_TAG_OFFSET], 0);
         assert_eq!(
-            decode_header(&header, 8, None, None).unwrap(),
-            ([7u8; 16], StorageKind::F32, InnerProduct)
+            decode_header(&header).unwrap(),
+            Header {
+                generation: [7u8; 16],
+                dims: 8,
+                storage: StorageKind::F32,
+                metric: InnerProduct
+            }
         );
     }
 
@@ -2855,27 +2860,30 @@ mod tests {
                 .unwrap()
                 .into_file(),
         );
-        let open = |path: &Path, requested: Option<StorageKind>| {
+        let open = |path: &Path, requested: StorageKind| {
             let file = File::options().read(true).write(true).open(path).unwrap();
-            Log::open(file, path, 32, requested, None)
+            Log::open(file, path, 32, requested, InnerProduct)
         };
-        let detected = open(&i8_path, None).unwrap();
+        let detected = open(&i8_path, StorageKind::I8).unwrap();
         assert_eq!(detected.storage(), StorageKind::I8);
         assert_eq!(detected.generation(), generation);
         assert_eq!(
-            open(&i8_path, Some(StorageKind::I8)).unwrap().storage(),
+            open(&i8_path, StorageKind::I8).unwrap().storage(),
             StorageKind::I8
         );
         assert!(matches!(
-            open(&i8_path, Some(StorageKind::F32)),
+            open(&i8_path, StorageKind::F32),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::F32,
                 actual: StorageKind::I8
             })
         ));
-        assert_eq!(open(&f32_path, None).unwrap().storage(), StorageKind::F32);
+        assert_eq!(
+            open(&f32_path, StorageKind::F32).unwrap().storage(),
+            StorageKind::F32
+        );
         assert!(matches!(
-            open(&f32_path, Some(StorageKind::I8)),
+            open(&f32_path, StorageKind::I8),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::I8,
                 actual: StorageKind::F32
@@ -2891,15 +2899,20 @@ mod tests {
         let path = dir.path().join("log");
         std::fs::write(&path, [1u8; 5]).unwrap();
         let file = File::options().read(true).write(true).open(&path).unwrap();
-        let log = Log::open(file, &path, 64, Some(StorageKind::I8), None).unwrap();
+        let log = Log::open(file, &path, 64, StorageKind::I8, InnerProduct).unwrap();
         assert_eq!(log.storage(), StorageKind::I8);
         drop(log);
-        assert_eq!(reopen(&path, 64).storage(), StorageKind::I8);
+        assert_eq!(
+            reopen(&path, 64, StorageKind::I8).storage(),
+            StorageKind::I8
+        );
         let other = dir.path().join("other");
         std::fs::write(&other, [1u8; 5]).unwrap();
         let file = File::options().read(true).write(true).open(&other).unwrap();
         assert_eq!(
-            Log::open(file, &other, 64, None, None).unwrap().storage(),
+            Log::open(file, &other, 64, StorageKind::I8, InnerProduct)
+                .unwrap()
+                .storage(),
             StorageKind::I8
         );
     }
@@ -2929,7 +2942,7 @@ mod tests {
         let path = dir.path().join("c");
         let file = File::options().read(true).write(true).open(&path).unwrap();
         assert!(matches!(
-            Log::open(file, &path, 8, Some(StorageKind::I8), None),
+            Log::open(file, &path, 8, StorageKind::I8, InnerProduct),
             Err(VecDbError::DimensionMismatch {
                 expected: 8,
                 actual: 32
@@ -2945,7 +2958,7 @@ mod tests {
             .open(&forged_path)
             .unwrap();
         assert!(matches!(
-            Log::open(file, &forged_path, 8, None, None),
+            Log::open(file, &forged_path, 8, StorageKind::I8, InnerProduct),
             Err(VecDbError::InvalidDimensions {
                 dims: 8,
                 storage: StorageKind::I8
@@ -3006,7 +3019,7 @@ mod tests {
                 assert_eq!(decoded_values, values);
             }
             drop(log);
-            let (reopened, _) = scan_all(&mut reopen(&path, dims));
+            let (reopened, _) = scan_all(&mut reopen(&path, dims, StorageKind::I8));
             assert_eq!(reopened.len(), records.len());
             for ((record, offset), (again, again_offset)) in records.iter().zip(&reopened) {
                 assert_eq!(offset, again_offset);
@@ -3111,7 +3124,7 @@ mod tests {
         for cut in intact_end..boundaries[2].1 {
             let torn_path = dir.path().join(format!("torn-{cut}"));
             std::fs::write(&torn_path, &full_bytes[..cut as usize]).unwrap();
-            let mut torn_log = reopen(&torn_path, dims);
+            let mut torn_log = reopen(&torn_path, dims, StorageKind::I8);
             let (records, recoverable_end) = scan_all(&mut torn_log);
             assert_eq!(records.len(), 2);
             assert_eq!(recoverable_end, intact_end);
@@ -3121,7 +3134,7 @@ mod tests {
         mixed.extend_from_slice(&f32_sized);
         let mixed_path = dir.path().join("mixed");
         std::fs::write(&mixed_path, &mixed).unwrap();
-        let mut mixed_log = reopen(&mixed_path, dims);
+        let mut mixed_log = reopen(&mixed_path, dims, StorageKind::I8);
         let (records, recoverable_end) = scan_all(&mut mixed_log);
         assert_eq!(records.len(), 2);
         assert_eq!(recoverable_end, intact_end);
@@ -3150,7 +3163,7 @@ mod tests {
                 record_bytes.extend_from_slice(&vec![0xAA; garbage_len]);
                 record_bytes.extend_from_slice(survivor);
                 write_i8_log_file(&path, dims as u32, &record_bytes);
-                let mut log = reopen(&path, dims);
+                let mut log = reopen(&path, dims, StorageKind::I8);
                 assert_eq!(log.storage(), StorageKind::I8);
                 let (records, recoverable_end) = scan_all(&mut log);
                 assert_eq!(records.len(), 1);
@@ -3195,7 +3208,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         write_i8_log_file(&path, dims as u32, &record_bytes);
-        let mut log = reopen(&path, dims);
+        let mut log = reopen(&path, dims, StorageKind::I8);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
         assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
@@ -3213,7 +3226,7 @@ mod tests {
         corrupted_bytes[crc_last] ^= 0xFF;
         let corrupted_path = dir.path().join("log-corrupted");
         write_i8_log_file(&corrupted_path, dims as u32, &corrupted_bytes);
-        let mut corrupted_log = reopen(&corrupted_path, dims);
+        let mut corrupted_log = reopen(&corrupted_path, dims, StorageKind::I8);
         let (corrupted_records, corrupted_end) = scan_all(&mut corrupted_log);
         assert_eq!(corrupted_records.len(), 1);
         assert!(
@@ -3237,7 +3250,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("log");
         write_i8_log_file(&path, dims as u32, &record_bytes);
-        let mut log = reopen(&path, dims);
+        let mut log = reopen(&path, dims, StorageKind::I8);
         let (records, recoverable_end) = scan_all(&mut log);
         assert_eq!(records.len(), 1);
         assert_eq!(recoverable_end, HEADER_LEN as u64 + good.len() as u64);
