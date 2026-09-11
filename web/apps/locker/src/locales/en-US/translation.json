@@ -122,6 +122,7 @@
     "searchEverywhereEmpty": "Try searching for something else.",
     "home": "Home",
     "security": "Security",
+    "appearance": "Appearance",
     "help_and_support": "Help & Support",
     "about": "About",
     "we_are_open_source": "We are open source",
@@ -247,5 +248,10 @@
     "troubleshooting": "Troubleshooting",
     "troubleshooting_desc": "Common issues and their solutions",
     "view_all_help_topics": "View all help topics",
-    "legacy_intro": "Legacy allows trusted contacts to access your account in your absence."
+    "legacy_intro": "Legacy allows trusted contacts to access your account in your absence.",
+    "trusted_contacts": "Trusted contacts",
+    "legacy_accounts": "Legacy accounts",
+    "add_trusted_contact": "Add trusted contact",
+    "trusted_contacts_empty": "Nominate another Ente user as a trusted contact to recover your account",
+    "legacy_accounts_empty": "Trusted contacts can initiate account recovery, and if not blocked within 30 days, reset your password and access your account."
 }
