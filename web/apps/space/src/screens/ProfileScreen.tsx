@@ -1949,11 +1949,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         display: "flex",
                         flex: hasProfilePosts ? "0 0 auto" : "1 1 0",
                         flexDirection: "column",
-                        minHeight: hasProfilePosts
-                            ? initialSection == "latest"
-                                ? "100svh"
-                                : undefined
-                            : 0,
+                        minHeight: 0,
                         mt: "24px",
                         pb: "16px",
                         px: 0,
