@@ -1673,7 +1673,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: `${homeTileGap * 2.5}px`,
                         minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
-                        pb: "calc(env(safe-area-inset-bottom) + 16px)",
+                        pb: "calc(env(safe-area-inset-bottom) + 12px)",
                         px: homeHorizontalPadding,
                         pt: "22px",
                         width: "100%",
