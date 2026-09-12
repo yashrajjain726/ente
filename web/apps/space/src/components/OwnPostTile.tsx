@@ -1,22 +1,14 @@
-import { Image01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import { spaceHomeHeaderBarHeight } from "components/HomeHeader";
 import {
     SpaceNewPostButton,
-    spaceNewPostButtonRadius,
     spaceNewPostButtonSize,
 } from "components/NewPostButton";
 import log from "ente-base/log";
 import React from "react";
 import type { SpacePost, SpacePostAssetURLLoader } from "services/space";
 import { useSpaceAppState, type SpacePostPublishPhase } from "state/app-state";
-import {
-    spaceSurface,
-    spaceSurfaceHover,
-    spaceText,
-    spaceTextMuted,
-} from "styles/colors";
+import { spaceSurfaceHover, spaceText, spaceTextMuted } from "styles/colors";
 import { formatSpaceDate } from "utils/display";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
@@ -24,7 +16,6 @@ const green = "#08C225";
 const groupInset = 8;
 const groupGap = groupInset * 1.5;
 const groupHeight = spaceHomeHeaderBarHeight;
-const groupRadius = groupHeight / 2;
 
 const PostTimestamp: React.FC<{
     timestampMs: number;
@@ -87,7 +78,15 @@ const PostTimestamp: React.FC<{
                 </time>
             )}
             {status == "posting" && (
-                <Box component="span" aria-hidden>
+                <Box
+                    component="span"
+                    aria-hidden
+                    sx={{
+                        display: "inline-block",
+                        textAlign: "left",
+                        width: "1em",
+                    }}
+                >
                     {".".repeat((Math.floor(now / 500) % 3) + 1)}
                 </Box>
             )}
@@ -177,151 +176,147 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
             aria-label="Your latest post"
             sx={{
                 alignItems: "center",
-                bgcolor: spaceSurface,
-                borderRadius: `${groupRadius}px`,
                 boxSizing: "border-box",
                 display: "flex",
                 flexShrink: 0,
                 fontFamily: '"Inter Variable", Inter, sans-serif',
                 gap: `${groupGap}px`,
                 height: groupHeight,
+                justifyContent: isEmpty ? "flex-end" : "space-between",
                 minWidth: 0,
-                p: `${groupInset}px`,
                 "& .MuiSkeleton-root": {
                     visibility: showSkeleton ? "visible" : "hidden",
                 },
             }}
         >
-            <Box
-                component="button"
-                type="button"
-                aria-label="Open your posts"
-                disabled={!canOpenPost}
-                onClick={onOpenPost}
-                sx={{
-                    alignItems: "center",
-                    appearance: "none",
-                    bgcolor: "transparent",
-                    border: 0,
-                    borderRadius: `${spaceNewPostButtonRadius}px`,
-                    color: spaceText,
-                    cursor: canOpenPost ? "pointer" : "default",
-                    display: "flex",
-                    flex: 1,
-                    font: "inherit",
-                    gap: `${groupGap}px`,
-                    minWidth: 0,
-                    p: 0,
-                    textAlign: "left",
-                    "&:focus-visible": {
-                        outline: `2px solid ${green}`,
-                        outlineOffset: 2,
-                    },
-                }}
-            >
+            {!isEmpty && (
                 <Box
-                    component="span"
+                    component="button"
+                    type="button"
+                    aria-label="Open your posts"
+                    disabled={!canOpenPost}
+                    onClick={onOpenPost}
                     sx={{
-                        bgcolor: spaceSurfaceHover,
-                        borderRadius: `${spaceNewPostButtonRadius}px`,
-                        display: "grid",
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "#232326",
+                        border: 0,
+                        borderRadius: "12px",
+                        color: spaceText,
+                        cursor: canOpenPost ? "pointer" : "default",
+                        display: "flex",
                         flexShrink: 0,
-                        height: spaceNewPostButtonSize,
-                        overflow: "hidden",
-                        placeItems: "center",
-                        position: "relative",
-                        width: spaceNewPostButtonSize,
-                    }}
-                >
-                    {isEmpty && (
-                        <HugeiconsIcon
-                            icon={Image01Icon}
-                            size={18}
-                            strokeWidth={1.6}
-                            color={spaceTextMuted}
-                            aria-hidden
-                        />
-                    )}
-                    {thumbHashDataURL && !unavailable && (
-                        <Box
-                            component="img"
-                            alt=""
-                            src={thumbHashDataURL}
-                            sx={{
-                                filter: "blur(8px)",
-                                height: "100%",
-                                inset: 0,
-                                objectFit: "cover",
-                                position: "absolute",
-                                transform: "scale(1.08)",
-                                width: "100%",
-                            }}
-                        />
-                    )}
-                    {imageUrl && !unavailable ? (
-                        <Box
-                            component="img"
-                            alt=""
-                            src={imageUrl}
-                            onError={() =>
-                                post && setLoadedImage({ post, failed: true })
-                            }
-                            sx={{
-                                display: "block",
-                                height: "100%",
-                                objectFit: "cover",
-                                position: "relative",
-                                width: "100%",
-                            }}
-                        />
-                    ) : loading && !thumbHashDataURL ? (
-                        <Skeleton
-                            variant="rectangular"
-                            sx={{ height: "100%", width: "100%" }}
-                        />
-                    ) : null}
-                </Box>
-                <Box
-                    component="span"
-                    sx={{
-                        display: "grid",
-                        flex: 1,
+                        font: "inherit",
+                        height: "100%",
                         minWidth: 0,
-                        placeItems: "center",
+                        p: 0,
+                        textAlign: "left",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
                     }}
                 >
-                    {post ? (
-                        <PostTimestamp
-                            timestampMs={post.timestampMs}
-                            phase={publishPhase}
-                            expiresAtMs={postPublication?.statusExpiresAtMs}
-                        />
-                    ) : loading ? (
-                        <Skeleton
-                            width={72}
-                            sx={{ fontSize: 12, lineHeight: "18px" }}
-                        />
-                    ) : (
-                        <Box
-                            component="span"
-                            sx={{
-                                color: isEmpty ? spaceText : spaceTextMuted,
-                                display: "block",
-                                fontSize: 12,
-                                fontWeight: 400,
-                                lineHeight: "18px",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {unavailable
-                                ? "Post unavailable"
-                                : "Share your first post."}
-                        </Box>
-                    )}
+                    <Box
+                        component="span"
+                        sx={{
+                            bgcolor: spaceSurfaceHover,
+                            borderRadius: "inherit",
+                            display: "grid",
+                            flexShrink: 0,
+                            height: spaceNewPostButtonSize,
+                            overflow: "hidden",
+                            placeItems: "center",
+                            position: "relative",
+                            width: spaceNewPostButtonSize,
+                        }}
+                    >
+                        {thumbHashDataURL && !unavailable && (
+                            <Box
+                                component="img"
+                                alt=""
+                                src={thumbHashDataURL}
+                                sx={{
+                                    filter: "blur(8px)",
+                                    height: "100%",
+                                    inset: 0,
+                                    objectFit: "cover",
+                                    position: "absolute",
+                                    transform: "scale(1.08)",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                        {imageUrl && !unavailable ? (
+                            <Box
+                                component="img"
+                                alt=""
+                                src={imageUrl}
+                                onError={() =>
+                                    post &&
+                                    setLoadedImage({ post, failed: true })
+                                }
+                                sx={{
+                                    display: "block",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    position: "relative",
+                                    width: "100%",
+                                }}
+                            />
+                        ) : loading && !thumbHashDataURL ? (
+                            <Skeleton
+                                variant="rectangular"
+                                sx={{ height: "100%", width: "100%" }}
+                            />
+                        ) : null}
+                    </Box>
+                    <Box
+                        component="span"
+                        sx={{
+                            boxSizing: "border-box",
+                            display: "grid",
+                            flexShrink: 0,
+                            height: "100%",
+                            minWidth: 0,
+                            px: `${groupGap}px`,
+                            py: `${groupInset}px`,
+                            placeItems: "center start",
+                            textAlign: "left",
+                        }}
+                    >
+                        {post ? (
+                            <PostTimestamp
+                                timestampMs={post.timestampMs}
+                                phase={publishPhase}
+                                expiresAtMs={postPublication?.statusExpiresAtMs}
+                            />
+                        ) : loading ? (
+                            <Skeleton
+                                width={72}
+                                sx={{ fontSize: 12, lineHeight: "18px" }}
+                            />
+                        ) : (
+                            <Box
+                                component="span"
+                                sx={{
+                                    color: spaceTextMuted,
+                                    display: "block",
+                                    fontSize: 12,
+                                    fontWeight: 400,
+                                    lineHeight: "18px",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                Post unavailable
+                            </Box>
+                        )}
+                    </Box>
                 </Box>
-            </Box>
+            )}
             <SpaceNewPostButton
                 isDisabled={isNewPostDisabled}
+                label={isEmpty ? "Share your first photo" : undefined}
                 onClick={onNewPost}
             />
         </Box>

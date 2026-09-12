@@ -28,7 +28,7 @@ export const SpacePostFloatingActionButton: React.FC<
             appearance: "none",
             bgcolor: green,
             border: 0,
-            borderRadius: "50%",
+            borderRadius: "12px",
             bottom: "calc(env(safe-area-inset-bottom) + 16px)",
             boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
             color: "#FFFFFF",
