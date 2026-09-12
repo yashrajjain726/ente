@@ -5,8 +5,8 @@ import React from "react";
 
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
-const buttonSize = 64;
-const iconSize = 34;
+const buttonSize = 48;
+const iconSize = 28;
 
 interface SpacePostFloatingActionButtonProps {
     disabled?: boolean;

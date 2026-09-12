@@ -26,6 +26,7 @@ const avatarFadeSx = {
 } as const;
 
 export const spaceHomeHeaderHeight = 64;
+export const spaceHomeHeaderBarHeight = 44;
 
 interface SpaceHomeHeaderProps {
     children?: React.ReactNode;
@@ -66,7 +67,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                 bgcolor: spaceSurface,
                 borderRadius: "999px",
                 content: '""',
-                height: 44,
+                height: spaceHomeHeaderBarHeight,
                 left: "16px",
                 pointerEvents: "none",
                 position: "absolute",

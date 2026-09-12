@@ -6,6 +6,9 @@ import { useSpaceAppState } from "state/app-state";
 
 const green = "#08C225";
 
+export const spaceNewPostButtonSize = 28;
+export const spaceNewPostButtonRadius = spaceNewPostButtonSize / 2;
+
 export const SpaceNewPostButton: React.FC<{
     isDisabled?: boolean;
     onClick: () => void;
@@ -23,22 +26,19 @@ export const SpaceNewPostButton: React.FC<{
             onClick={onClick}
             sx={{
                 alignItems: "center",
-                alignSelf: "flex-end",
                 appearance: "none",
                 bgcolor: green,
                 border: 0,
-                borderRadius: "50%",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.32)",
+                borderRadius: `${spaceNewPostButtonRadius}px`,
                 color: "#FFFFFF",
                 cursor: disabled ? "default" : "pointer",
                 display: "flex",
                 flexShrink: 0,
-                height: 64,
+                height: spaceNewPostButtonSize,
                 justifyContent: "center",
-                ml: "auto",
                 opacity: disabled ? 0.6 : 1,
                 p: 0,
-                width: 64,
+                width: spaceNewPostButtonSize,
                 "&:hover:not(:disabled)": { bgcolor: "#07B422" },
                 "&:focus-visible": {
                     outline: `2px solid ${green}`,
@@ -46,7 +46,7 @@ export const SpaceNewPostButton: React.FC<{
                 },
             }}
         >
-            <HugeiconsIcon icon={Add01Icon} size={32} strokeWidth={2} />
+            <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={2} />
         </Box>
     );
 };

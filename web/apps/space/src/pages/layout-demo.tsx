@@ -1,12 +1,11 @@
 import { ArrowLeft02Icon, ArrowRight02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
-import { SpaceAddFriendButton } from "components/AddFriendButton";
 import { SpaceAddFriendDialog } from "components/AddFriendDialog";
 import { SpaceAddFriendTile } from "components/AddFriendTile";
 import { SpaceFileViewer } from "components/FileViewer";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpaceNewPostButton } from "components/NewPostButton";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
 import { FriendPostTile } from "screens/HomeScreen";
@@ -30,6 +29,15 @@ const demoProfile: SetupProfile = {
     fullName: "Alex Morgan",
     spaceId: "demo-self",
     username: "you",
+};
+const demoOwnPost: SpacePost = {
+    friendID: "demo-self",
+    imageUrl: spaceDefaultCoverImagePath,
+    name: demoProfile.fullName,
+    postId: 100,
+    spaceId: "demo-self",
+    timestampMs: 1_700_000_000_000,
+    viewerLiked: false,
 };
 
 const singleFriendVariants = [
@@ -178,10 +186,14 @@ const LayoutDemoPage: React.FC = () => {
             Math.max(0, Math.min(maximumHomeTileCount, count + delta)),
         );
     }, []);
-    const [isPostPreviewOpen, setIsPostPreviewOpen] = React.useState(false);
+    const [ownPost, setOwnPost] = React.useState<SpacePost>();
+    const [postPreviewActionMode, setPostPreviewActionMode] = React.useState<
+        "draft-post" | "hidden"
+    >();
+    const isPostPreviewOpen = postPreviewActionMode !== undefined;
     useBrowserBackClose({
         open: isPostPreviewOpen,
-        onClose: () => setIsPostPreviewOpen(false),
+        onClose: () => setPostPreviewActionMode(undefined),
         stateKey: "space-layout-demo-viewer",
     });
     const [canvasSize, setCanvasSize] = React.useState<CanvasSize>({
@@ -332,12 +344,12 @@ const LayoutDemoPage: React.FC = () => {
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: `${homeTileGap}px`,
+                        gap: `${homeTileGap * 2.5}px`,
                         minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 16px)",
                         px: "16px",
-                        pt: "4px",
+                        pt: "22px",
                         width: "100%",
                     }}
                 >
@@ -374,21 +386,11 @@ const LayoutDemoPage: React.FC = () => {
                             </>
                         )}
                     </Box>
-                    <Box
-                        sx={{
-                            alignItems: "center",
-                            display: "flex",
-                            gap: `${homeTileGap}px`,
-                            justifyContent: "flex-end",
-                        }}
-                    >
-                        {[1, 2, 4, 6, 8].includes(friendCount) && (
-                            <SpaceAddFriendButton onClick={openAddFriend} />
-                        )}
-                        <SpaceNewPostButton
-                            onClick={() => setIsPostPreviewOpen(true)}
-                        />
-                    </Box>
+                    <SpaceOwnPostTile
+                        post={ownPost}
+                        onNewPost={() => setPostPreviewActionMode("draft-post")}
+                        onOpenPost={() => setPostPreviewActionMode("hidden")}
+                    />
                 </Box>
                 <SpaceAddFriendDialog
                     friendRequests={[]}
@@ -405,15 +407,21 @@ const LayoutDemoPage: React.FC = () => {
                 {isPostPreviewOpen && (
                     <SpaceFileViewer
                         photo={{
+                            ...(ownPost ?? demoOwnPost),
                             alt: "Your post",
                             avatarUrl: demoProfile.avatarUrl,
                             imageUrl: spaceDefaultCoverImagePath,
-                            name: demoProfile.fullName,
-                            timestampMs: 1_700_000_000_000,
                         }}
-                        postActionMode="draft-post"
-                        onClose={() => setIsPostPreviewOpen(false)}
-                        onPublishDraftPost={() => Promise.resolve()}
+                        postActionMode={postPreviewActionMode}
+                        onClose={() => setPostPreviewActionMode(undefined)}
+                        onPublishDraftPost={(caption) => {
+                            setOwnPost({
+                                ...demoOwnPost,
+                                caption,
+                                timestampMs: Date.now(),
+                            });
+                            return Promise.resolve();
+                        }}
                     />
                 )}
             </Box>

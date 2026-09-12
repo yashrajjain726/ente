@@ -16,6 +16,8 @@ import {
     spacePostPreviewImageForFile,
     type SpaceDraftPostImage,
 } from "utils/post-image";
+import { useSpaceRouter } from "utils/route-transitions";
+import { spaceRoutes } from "utils/routes";
 
 interface PendingPostDraft {
     error?: string;
@@ -39,6 +41,7 @@ const SpacePostComposer: React.FC<SpacePostComposerProps> = ({
     onPublish,
     profile,
 }) => {
+    const router = useSpaceRouter();
     const publishedPreviewURLRef = React.useRef<string>(undefined);
     const displayName =
         profile.fullName.trim() || profile.username.trim() || "You";
@@ -131,7 +134,9 @@ const SpacePostComposer: React.FC<SpacePostComposerProps> = ({
                 }
                 onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                 onDraftPostPublished={() => {
-                    void clearBrowserBackState("back");
+                    void clearBrowserBackState("back").then(() =>
+                        router.push(spaceRoutes.home),
+                    );
                 }}
                 onPublishDraftPost={
                     draft.isPreviewPending || draft.error

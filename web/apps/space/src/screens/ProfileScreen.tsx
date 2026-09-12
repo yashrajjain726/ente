@@ -503,6 +503,7 @@ interface ProfileScreenProps {
     isStatsLoading?: boolean;
     showPostLoadingIndicator?: boolean;
     onBack?: () => void;
+    onPostSubmitted?: () => void;
     onAddFriend?: () => void;
     onAddFriendForPostAction?: (intent: SpaceInviteIntent) => void;
     onCreateSpace?: () => void;
@@ -544,6 +545,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     isPostsLoading = false,
     isStatsLoading = false,
     onBack,
+    onPostSubmitted,
     onAddFriend,
     onAddFriendForPostAction,
     onCreateSpace,
@@ -2159,7 +2161,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         }}
                         onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                         onDraftPostPublished={() => {
-                            void clearSelectedPostHistory("back");
+                            void clearSelectedPostHistory("back").then(() =>
+                                onPostSubmitted?.(),
+                            );
                         }}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined

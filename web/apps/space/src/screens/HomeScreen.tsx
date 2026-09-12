@@ -3,7 +3,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/ActionFeedback";
 import { SpaceActionToast } from "components/ActionToast";
-import { SpaceAddFriendButton } from "components/AddFriendButton";
 import { SpaceAddFriendTile } from "components/AddFriendTile";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import {
@@ -14,7 +13,7 @@ import {
 } from "components/FileViewer";
 import { FriendQuickActionsDialog } from "components/FriendQuickActionsDialog";
 import { SpaceHomeHeader, spaceHomeHeaderHeight } from "components/HomeHeader";
-import { SpaceNewPostButton } from "components/NewPostButton";
+import { SpaceOwnPostTile } from "components/OwnPostTile";
 import {
     SpacePostBadge,
     SpacePostUnreadBadge,
@@ -76,6 +75,9 @@ const tileBadgeText = "rgba(255, 255, 255, 0.9)";
 const homeHorizontalPadding = "16px";
 const postTileMediaLoadRootMargin = "640px 0px";
 interface HomeScreenProps {
+    ownLatestPost?: SpacePost;
+    isOwnLatestPostLoading?: boolean;
+    isOwnLatestPostUnavailable?: boolean;
     latestPosts: SpacePost[];
     unreadPosts: SpacePost[];
     friendRequestSentToastName?: string;
@@ -106,6 +108,7 @@ interface HomeScreenProps {
     onOpenMessages?: () => void;
     onMessageFriend: (friend: FriendProfile) => void;
     onPokeFriend: (friend: FriendProfile) => Promise<void>;
+    onOpenOwnPost?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (
         postSpaceId: string,
@@ -984,6 +987,9 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    ownLatestPost,
+    isOwnLatestPostLoading = false,
+    isOwnLatestPostUnavailable = false,
     latestPosts,
     unreadPosts,
     friendRequestSentToastName,
@@ -1007,6 +1013,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenMessages,
     onMessageFriend,
     onPokeFriend,
+    onOpenOwnPost,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -1663,12 +1670,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: `${homeTileGap}px`,
+                        gap: `${homeTileGap * 2.5}px`,
                         minHeight: `calc(100svh - ${spaceHomeHeaderHeight}px)`,
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 16px)",
                         px: homeHorizontalPadding,
-                        pt: "4px",
+                        pt: "22px",
                         width: "100%",
                     }}
                 >
@@ -1733,23 +1740,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             )
                         )}
                     </Box>
-                    <Box
-                        sx={{
-                            alignItems: "center",
-                            display: "flex",
-                            gap: `${homeTileGap}px`,
-                            justifyContent: "flex-end",
-                        }}
-                    >
-                        {!isHomeItemsLoading &&
-                            [1, 2, 4, 6, 8].includes(
-                                orderedHomeItems.length,
-                            ) && <SpaceAddFriendButton onClick={onAddFriend} />}
-                        <SpaceNewPostButton
-                            isDisabled={isPostPhotoButtonDisabled}
-                            onClick={openPostPhotoPicker}
-                        />
-                    </Box>
+                    <SpaceOwnPostTile
+                        post={ownLatestPost}
+                        isLoading={isOwnLatestPostLoading}
+                        isUnavailable={isOwnLatestPostUnavailable}
+                        isNewPostDisabled={isPostPhotoButtonDisabled}
+                        onLoadPostImage={onLoadPostImage}
+                        onNewPost={openPostPhotoPicker}
+                        onOpenPost={onOpenOwnPost}
+                    />
                 </Box>
                 {selectedContact && (
                     <FriendQuickActionsDialog
