@@ -66,8 +66,6 @@ const PostTimestamp: React.FC<{
                           ? "#FF8585"
                           : spaceTextMuted,
                 display: "block",
-                fontSize: 12,
-                lineHeight: "18px",
             }}
         >
             {status ? (
@@ -137,7 +135,8 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
     const loading =
         isLoading || Boolean(post?.imageAsset && !imageUrl && !unavailable);
     const [showSkeleton, setShowSkeleton] = React.useState(false);
-    const isEmpty = !post && !loading && !unavailable;
+    const hasPostPreview = Boolean(post || unavailable);
+    const isEmpty = !hasPostPreview && !isLoading;
 
     React.useEffect(() => {
         setShowSkeleton(false);
@@ -180,16 +179,18 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                 display: "flex",
                 flexShrink: 0,
                 fontFamily: '"Inter Variable", Inter, sans-serif',
+                fontSize: 12,
                 gap: `${groupGap}px`,
                 height: groupHeight,
-                justifyContent: isEmpty ? "flex-end" : "space-between",
+                justifyContent: hasPostPreview ? "space-between" : "flex-end",
+                lineHeight: "18px",
                 minWidth: 0,
                 "& .MuiSkeleton-root": {
                     visibility: showSkeleton ? "visible" : "hidden",
                 },
             }}
         >
-            {!isEmpty && (
+            {hasPostPreview && (
                 <Box
                     component="button"
                     type="button"
@@ -291,20 +292,13 @@ export const SpaceOwnPostTile: React.FC<SpaceOwnPostTileProps> = ({
                                 phase={publishPhase}
                                 expiresAtMs={postPublication?.statusExpiresAtMs}
                             />
-                        ) : loading ? (
-                            <Skeleton
-                                width={72}
-                                sx={{ fontSize: 12, lineHeight: "18px" }}
-                            />
                         ) : (
                             <Box
                                 component="span"
                                 sx={{
                                     color: spaceTextMuted,
                                     display: "block",
-                                    fontSize: 12,
                                     fontWeight: 400,
-                                    lineHeight: "18px",
                                     whiteSpace: "nowrap",
                                 }}
                             >
