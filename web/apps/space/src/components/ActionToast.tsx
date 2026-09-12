@@ -63,7 +63,7 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
                 px: toastHorizontalPadding,
                 pointerEvents: "none",
                 position: "fixed",
-                top: "calc(env(safe-area-inset-top) + 10px)",
+                top: "calc(env(safe-area-inset-top) + 12px)",
                 transform: "translateX(-50%)",
                 width: "100%",
                 zIndex,
@@ -79,7 +79,7 @@ export const SpaceActionToast: React.FC<SpaceActionToastProps> = ({
                 sx={{
                     alignItems: "center",
                     bgcolor: spaceDialogBackground,
-                    borderRadius: "18px",
+                    borderRadius: "12px",
                     boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                     boxSizing: "border-box",
                     color: textBase,
