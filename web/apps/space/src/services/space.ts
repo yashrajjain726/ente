@@ -19,6 +19,10 @@ import {
     spaceProfileMediaCacheKey,
 } from "services/media-cache";
 import {
+    cacheOwnLatestPost,
+    patchCachedOwnLatestPost,
+} from "services/post-cache";
+import {
     ensureCurrentSpaceContext,
     loadExistingSpaceProfile,
     persistCurrentOwnedSpaces,
@@ -1219,7 +1223,7 @@ export const loadCurrentSpaceProfilePostsPage = async (
 ): Promise<SpaceProfilePostPage> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        return profilePostPageFromPage(
+        const page = profilePostPageFromPage(
             (await ctx.listPosts(
                 spaceId,
                 viewerSpaceId ?? null,
@@ -1227,6 +1231,10 @@ export const loadCurrentSpaceProfilePostsPage = async (
                 60,
             )) as SpacePostPageResponse,
         );
+        if (!cursor && spaceId == viewerSpaceId) {
+            await cacheOwnLatestPost(spaceId, page.items[0]);
+        }
+        return page;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1366,7 +1374,9 @@ export const createCurrentPhotoPost = async ({
         )) as SpacePostResponse;
         const object = firstObject(created);
         if (object) await cacheAccountPostAssetURL(created, object, file);
-        return await postFromAccountPost(ctx, created, true, spaceId);
+        const post = await postFromAccountPost(ctx, created, true, spaceId);
+        await cacheOwnLatestPost(spaceId, post);
+        return post;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1716,6 +1726,7 @@ export const deleteCurrentPost = async (spaceId: string, postId: number) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
         await ctx.deletePost(spaceId, BigInt(postId));
+        await patchCachedOwnLatestPost(spaceId, postId, undefined);
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1733,6 +1744,9 @@ export const updateCurrentPostCaption = async (
             BigInt(postId),
             caption.trim() || null,
         );
+        await patchCachedOwnLatestPost(spaceId, postId, {
+            caption: caption.trim() || undefined,
+        });
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

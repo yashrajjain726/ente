@@ -1300,7 +1300,7 @@ const PostQuotePreview: React.FC<{
                     appearance: "none",
                     bgcolor: "transparent",
                     border: 0,
-                    borderRadius: "20%",
+                    borderRadius: "28px",
                     color: "inherit",
                     cursor: canOpen ? "pointer" : "default",
                     display: "inline-flex",

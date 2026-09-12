@@ -1425,7 +1425,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            {activePhotoIndex + 1} of {viewerPhotos.length}
+                            {activePhotoIndex + 1} / {viewerPhotos.length}
                         </Box>
                     )}
                     {canManagePost && !isCaptionEditing && (
