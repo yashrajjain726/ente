@@ -5,7 +5,7 @@ import {
 import { Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, IconButton } from "@mui/material";
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -36,19 +36,18 @@ const extractCodeText = (node: React.ReactNode): string => {
 };
 
 const CodeBlock = ({ children, node: _node, ...rest }: PreProps) => {
-    // Markdown adds one display newline; retain any blank lines in the code itself.
     const codeText = extractCodeText(children).replace(/\n$/, "");
     const [copyResult, setCopyResult] = useState<{
         text: string;
         message: string;
     }>();
     const copyStatus = copyResult?.text === codeText ? copyResult.message : "";
-    const handleCopy = useCallback(() => {
+    const handleCopy = () => {
         void navigator.clipboard.writeText(codeText).then(
             () => setCopyResult({ text: codeText, message: "Copied" }),
             () => setCopyResult({ text: codeText, message: "Could not copy" }),
         );
-    }, [codeText]);
+    };
 
     return (
         <Box className="markdown-code-block">

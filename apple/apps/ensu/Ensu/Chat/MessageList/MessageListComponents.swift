@@ -742,7 +742,6 @@ struct MarkdownView: View {
                         }
                         : items
 
-                    // Use paragraph spacing both between items and within wrapped item text.
                     VStack(alignment: .leading, spacing: EnsuSpacing.md) {
                         ForEach(Array(resolvedItems.enumerated()), id: \.offset) { _, item in
                             HStack(alignment: .top, spacing: EnsuSpacing.sm) {

@@ -439,7 +439,6 @@ const Page: React.FC = () => {
             marginTop: markdownParagraphSpacing,
         },
         "& ul, & ol": { paddingLeft: "24px" },
-        // Tight lists can have plain text before nested blocks, not a sibling element.
         "& li > :is(ul, ol, .markdown-code-block, blockquote, h1, h2, h3, h4, h5, h6, hr)":
             { marginTop: markdownParagraphSpacing },
         "& li + li": { marginTop: markdownParagraphSpacing },
@@ -450,7 +449,6 @@ const Page: React.FC = () => {
             overflow: "hidden",
         },
         "& .markdown-code-block pre": {
-            margin: 0,
             padding: "12px",
             overflowX: "auto",
             whiteSpace: "pre",

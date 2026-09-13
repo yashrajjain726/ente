@@ -13,7 +13,6 @@ export const safeExternalUrl = (href: string | undefined) => {
     }
 };
 
-/** Browsers keep native link behavior, including modifier and middle clicks. */
 export const handleExternalLinkClick = (
     event: MouseEvent<HTMLAnchorElement>,
 ) => {
@@ -23,8 +22,5 @@ export const handleExternalLinkClick = (
     event.preventDefault();
     void import("@tauri-apps/plugin-opener")
         .then(({ openUrl }) => openUrl(href))
-        .catch(() => {
-            // noopener returns null even on success; never navigate the chat away.
-            window.open(href, "_blank", "noopener,noreferrer");
-        });
+        .catch(() => window.open(href, "_blank", "noopener,noreferrer"));
 };
