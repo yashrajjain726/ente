@@ -34,6 +34,7 @@ import {
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
 import type { SystemStyleObject } from "@mui/system";
+import { useBaseContext } from "ente-base/context";
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 interface DocumentAttachment {
@@ -225,6 +226,7 @@ type LocalNoteSource = Extract<MessageSource, { type: "localNote" }>;
 
 const PackSourceCard = memo(
     ({ source, number }: { source: PackSource; number: number }) => {
+        const { showMiniDialog } = useBaseContext();
         const { citation } = source;
         return (
             <Stack
@@ -250,7 +252,9 @@ const PackSourceCard = memo(
                         target="_blank"
                         rel="noopener noreferrer"
                         underline="hover"
-                        onClick={handleExternalLinkClick}
+                        onClick={(event) =>
+                            handleExternalLinkClick(event, showMiniDialog)
+                        }
                         sx={sourceLinkSx}
                     >
                         Open source ↗
@@ -260,7 +264,9 @@ const PackSourceCard = memo(
                         target="_blank"
                         rel="noopener noreferrer"
                         underline="hover"
-                        onClick={handleExternalLinkClick}
+                        onClick={(event) =>
+                            handleExternalLinkClick(event, showMiniDialog)
+                        }
                         sx={sourceLinkSx}
                     >
                         {citation.licenseLabel} ↗

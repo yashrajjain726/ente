@@ -5,6 +5,7 @@ import {
 import { Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, IconButton } from "@mui/material";
+import { useBaseContext } from "ente-base/context";
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
@@ -99,6 +100,7 @@ const ExternalLink = ({
     children,
     ...rest
 }: AnchorProps) => {
+    const { showMiniDialog } = useBaseContext();
     const safeHref = safeExternalUrl(href);
     if (!safeHref) return <>{children}</>;
 
@@ -108,7 +110,7 @@ const ExternalLink = ({
             href={safeHref}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={handleExternalLinkClick}
+            onClick={(event) => handleExternalLinkClick(event, showMiniDialog)}
         >
             {children}
         </a>

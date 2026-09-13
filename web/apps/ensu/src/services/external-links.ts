@@ -1,4 +1,5 @@
 import { isTauriRuntime } from "@/services/tauri-runtime";
+import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import type { MouseEvent } from "react";
 
 export const safeExternalUrl = (href: string | undefined) => {
@@ -15,6 +16,7 @@ export const safeExternalUrl = (href: string | undefined) => {
 
 export const handleExternalLinkClick = (
     event: MouseEvent<HTMLAnchorElement>,
+    showMiniDialog: (attributes: MiniDialogAttributes) => void,
 ) => {
     if (!isTauriRuntime() || event.button !== 0) return;
     const href = safeExternalUrl(event.currentTarget.href);
@@ -22,5 +24,15 @@ export const handleExternalLinkClick = (
     event.preventDefault();
     void import("@tauri-apps/plugin-opener")
         .then(({ openUrl }) => openUrl(href))
-        .catch(() => window.open(href, "_blank", "noopener,noreferrer"));
+        .catch(() =>
+            showMiniDialog({
+                title: "Unable to open link",
+                message: href,
+                continue: {
+                    text: "Copy link",
+                    action: () => navigator.clipboard.writeText(href),
+                },
+                cancel: "Close",
+            }),
+        );
 };
