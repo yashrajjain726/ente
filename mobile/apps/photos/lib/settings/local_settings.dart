@@ -60,7 +60,6 @@ class LocalSettings {
   static const kGalleryGroupType = "gallery_group_type";
   static const kGalleryLayoutType = "gallery_layout_type";
   static const kJustifiedLayoutStrategy = "justified_layout_strategy";
-  // Keep the former Full Rows keys so its tuning survives the option rename.
   static const kFlexLayoutTuningTargetHeightScale =
       "gallery.justified.flex_full_rows.target_height_scale";
   static const kFlexLayoutTuningMaximumHeightFactor =
