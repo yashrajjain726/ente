@@ -11,6 +11,7 @@ import (
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/internal/testutil"
 	museumcontroller "github.com/ente/museum/pkg/controller"
+	"github.com/ente/museum/pkg/controller/access"
 	"github.com/ente/museum/pkg/repo"
 	castRepo "github.com/ente/museum/pkg/repo/cast"
 	publicRepo "github.com/ente/museum/pkg/repo/public"
@@ -18,6 +19,14 @@ import (
 )
 
 type panicUserLookup struct{}
+
+func requireBadRequestError(t *testing.T, err error) {
+	t.Helper()
+	var apiErr *ente.ApiError
+	if !errors.As(err, &apiErr) || apiErr.Code != ente.BadRequest {
+		t.Fatalf("error = %v, want %s", err, ente.BadRequest)
+	}
+}
 
 func (panicUserLookup) LookupUserID(int64, string) (int64, error) {
 	panic("user lookup must not be called while revoking collection access")
@@ -102,6 +111,24 @@ func setupCollectionShareTest(
 	return db, newShareTestCollectionRepo(db), ownerID, shareeID
 }
 
+func newBatchShareTestController(
+	db *sql.DB,
+	collectionRepo *repo.CollectionRepository,
+) *CollectionController {
+	return &CollectionController{
+		AccessCtrl:     access.NewAccessController(collectionRepo, nil),
+		CollectionRepo: collectionRepo,
+		UserLookup:     newShareTestUserLookup(db),
+	}
+}
+
+func newBatchShareTestContext(userID int64) *gin.Context {
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/collections/share/batch", nil)
+	ctx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+	return ctx
+}
+
 func setShareTestFamilyAdmin(t *testing.T, db *sql.DB, userID int64, familyAdminID any) {
 	t.Helper()
 	if _, err := db.Exec(
@@ -135,6 +162,18 @@ func collectionUpdationTime(t *testing.T, db *sql.DB, collectionID int64) int64 
 		t.Fatal(err)
 	}
 	return updationTime
+}
+
+func collectionShareCount(t *testing.T, db *sql.DB, collectionID int64) int {
+	t.Helper()
+	var count int
+	if err := db.QueryRow(
+		`SELECT count(*) FROM collection_shares WHERE collection_id = $1`,
+		collectionID,
+	).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	return count
 }
 
 func addShareTestShare(
@@ -628,5 +667,277 @@ func TestBulkShareRejectsOversizedBatch(t *testing.T) {
 	})
 	if !errors.Is(err, ente.ErrBatchSizeTooLarge) {
 		t.Fatalf("oversized batch error = %v, want %v", err, ente.ErrBatchSizeTooLarge)
+	}
+}
+
+func TestBatchShareWritesEveryShareWithOneTimestamp(t *testing.T) {
+	db, collectionRepo, ownerID, firstShareeID := setupCollectionShareTest(t)
+	secondShareeID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       3,
+		Email:        "second-sharee@example.com",
+		CreationTime: 1,
+	})
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	addShareTestShare(t, collectionRepo, collectionID, ownerID, firstShareeID, ente.VIEWER)
+	if _, err := collectionRepo.UnShareContext(context.Background(), collectionID, firstShareeID); err != nil {
+		t.Fatal(err)
+	}
+	controller := newBatchShareTestController(db, collectionRepo)
+	ctx := newBatchShareTestContext(ownerID)
+	admin := ente.ADMIN
+	collaborator := ente.COLLABORATOR
+
+	sharees, err := controller.BatchShare(ctx, []ente.AlterShareRequest{
+		{
+			CollectionID: collectionID,
+			Email:        "sharee@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+			Role:         &admin,
+		},
+		{
+			CollectionID: collectionID,
+			Email:        "second-sharee@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+			Role:         &collaborator,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sharees) != 2 {
+		t.Fatalf("sharees = %+v, want 2", sharees)
+	}
+
+	roles := make(map[int64]ente.CollectionParticipantRole, len(sharees))
+	for _, sharee := range sharees {
+		roles[sharee.ID] = sharee.Role
+	}
+	if roles[firstShareeID] != ente.ADMIN || roles[secondShareeID] != ente.COLLABORATOR {
+		t.Fatalf("sharee roles = %+v", roles)
+	}
+	var existingKey string
+	if err := db.QueryRow(
+		`SELECT encrypted_key FROM collection_shares
+		 WHERE collection_id = $1 AND to_user_id = $2`,
+		collectionID,
+		firstShareeID,
+	).Scan(&existingKey); err != nil {
+		t.Fatal(err)
+	}
+	if existingKey != "share-key" {
+		t.Fatalf("existing encrypted key = %q, want %q", existingKey, "share-key")
+	}
+
+	var collectionTime, shareTime int64
+	var distinctShareTimes int
+	if err := db.QueryRow(
+		`SELECT count(DISTINCT updation_time), min(updation_time)
+		 FROM collection_shares WHERE collection_id = $1`,
+		collectionID,
+	).Scan(&distinctShareTimes, &shareTime); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(
+		`SELECT updation_time FROM collections WHERE collection_id = $1`,
+		collectionID,
+	).Scan(&collectionTime); err != nil {
+		t.Fatal(err)
+	}
+	if distinctShareTimes != 1 || shareTime != collectionTime {
+		t.Fatalf("share times = %d distinct at %d; collection time = %d", distinctShareTimes, shareTime, collectionTime)
+	}
+}
+
+func TestBatchShareDoesNotWriteWhenAnyLookupFails(t *testing.T) {
+	db, collectionRepo, ownerID, _ := setupCollectionShareTest(t)
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	controller := newBatchShareTestController(db, collectionRepo)
+	ctx := newBatchShareTestContext(ownerID)
+
+	_, err := controller.BatchShare(ctx, []ente.AlterShareRequest{
+		{
+			CollectionID: collectionID,
+			Email:        "sharee@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+		},
+		{
+			CollectionID: collectionID,
+			Email:        "missing@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+		},
+	})
+	if err == nil {
+		t.Fatal("BatchShare() error = nil, want missing-user error")
+	}
+
+	if count := collectionShareCount(t, db, collectionID); count != 0 {
+		t.Fatalf("collection shares = %d, want 0", count)
+	}
+}
+
+func TestBatchShareRollsBackWhenAnyWriteFails(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	originalCollectionTime := collectionUpdationTime(t, db, collectionID)
+
+	err := collectionRepo.BatchShare(
+		context.Background(),
+		collectionID,
+		ownerID,
+		[]repo.CollectionShareItem{
+			{ToUserID: shareeID, EncryptedKey: "share-key", Role: ente.VIEWER},
+			{ToUserID: shareeID + 1000, EncryptedKey: "missing-user-key", Role: ente.VIEWER},
+		},
+		originalCollectionTime+1,
+	)
+	if err == nil {
+		t.Fatal("BatchShare() error = nil, want foreign-key error")
+	}
+
+	shareCount := collectionShareCount(t, db, collectionID)
+	collectionTime := collectionUpdationTime(t, db, collectionID)
+	if shareCount != 0 || collectionTime != originalCollectionTime {
+		t.Fatalf("after rollback: shares = %d, collection time = %d, want %d", shareCount, collectionTime, originalCollectionTime)
+	}
+}
+
+func TestBatchShareRejectsDeletedCollection(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	if _, err := db.Exec(
+		`UPDATE collections SET is_deleted = TRUE WHERE collection_id = $1`,
+		collectionID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	controller := newBatchShareTestController(db, collectionRepo)
+	_, err := controller.BatchShare(newBatchShareTestContext(ownerID), []ente.AlterShareRequest{
+		{
+			CollectionID: collectionID,
+			Email:        "sharee@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+		},
+	})
+	if !errors.Is(err, ente.ErrCollectionDeleted) {
+		t.Fatalf("BatchShare() error = %v, want %v", err, ente.ErrCollectionDeleted)
+	}
+	_, err = controller.BatchShare(newBatchShareTestContext(shareeID), []ente.AlterShareRequest{
+		{CollectionID: collectionID, Email: "owner@example.com"},
+	})
+	if !errors.Is(err, ente.ErrPermissionDenied) {
+		t.Fatalf("unauthorized BatchShare() error = %v, want %v", err, ente.ErrPermissionDenied)
+	}
+
+	err = collectionRepo.BatchShare(
+		context.Background(),
+		collectionID,
+		ownerID,
+		[]repo.CollectionShareItem{{
+			ToUserID:     shareeID,
+			EncryptedKey: "share-key",
+			Role:         ente.VIEWER,
+		}},
+		2,
+	)
+	if !errors.Is(err, ente.ErrCollectionDeleted) {
+		t.Fatalf("CollectionRepository.BatchShare() error = %v, want %v", err, ente.ErrCollectionDeleted)
+	}
+	if count := collectionShareCount(t, db, collectionID); count != 0 {
+		t.Fatalf("collection shares = %d, want 0", count)
+	}
+}
+
+func TestBulkUnShareStillSucceedsOnDeletedCollection(t *testing.T) {
+	db, collectionRepo, ownerID, shareeID := setupCollectionShareTest(t)
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	addShareTestShare(t, collectionRepo, collectionID, ownerID, shareeID, ente.VIEWER)
+	for _, query := range []string{
+		`UPDATE collection_shares SET is_deleted = TRUE WHERE collection_id = $1`,
+		`UPDATE collections SET is_deleted = TRUE WHERE collection_id = $1`,
+	} {
+		if _, err := db.Exec(query, collectionID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	controller := &CollectionController{
+		CollectionRepo: collectionRepo,
+		CastRepo:       &castRepo.Repository{DB: db},
+		UserLookup:     panicUserLookup{},
+	}
+
+	results, err := controller.BulkUnShare(newBatchShareTestContext(ownerID), ente.BulkCollectionUnshareRequest{
+		RecipientUserID: shareeID,
+		Source:          ente.ManualShare,
+		CollectionIDs:   []int64{collectionID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Status != ente.CollectionAlreadyUnshared {
+		t.Fatalf("bulk unshare results = %+v, want %q", results, ente.CollectionAlreadyUnshared)
+	}
+}
+
+func TestBatchShareRejectsInvalidInputAsBadRequest(t *testing.T) {
+	db, collectionRepo, ownerID, _ := setupCollectionShareTest(t)
+	collectionID := createShareTestCollection(t, collectionRepo, ownerID)
+	invalidRole := ente.CollectionParticipantRole("INVALID")
+	controller := newBatchShareTestController(db, collectionRepo)
+
+	_, err := controller.BatchShare(newBatchShareTestContext(ownerID), []ente.AlterShareRequest{
+		{
+			CollectionID: collectionID,
+			Email:        "sharee@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+			Role:         &invalidRole,
+		},
+	})
+	requireBadRequestError(t, err)
+
+	_, err = controller.BatchShare(newBatchShareTestContext(ownerID), []ente.AlterShareRequest{
+		{
+			CollectionID: collectionID,
+			Email:        "sharee@example.com",
+			EncryptedKey: "invalid",
+		},
+	})
+	requireBadRequestError(t, err)
+}
+
+func TestBatchShareRejectsNormalizedDuplicates(t *testing.T) {
+	err := validateBatchShares([]ente.AlterShareRequest{
+		{CollectionID: 1, Email: "sharee@example.com"},
+		{CollectionID: 1, Email: " SHAREE@EXAMPLE.COM "},
+	})
+	if !errors.Is(err, ente.ErrBadRequest) {
+		t.Fatalf("duplicate share email error = %v, want %v", err, ente.ErrBadRequest)
+	}
+}
+
+func TestBatchShareRejectsDifferentCollectionsBeforeWrites(t *testing.T) {
+	controller := &CollectionController{}
+	_, err := controller.BatchShare(&gin.Context{}, []ente.AlterShareRequest{
+		{CollectionID: 1, Email: "first@example.com", EncryptedKey: b64OfLen(sealedCollectionKeyLen)},
+		{CollectionID: 2, Email: "second@example.com", EncryptedKey: b64OfLen(sealedCollectionKeyLen)},
+	})
+	if !errors.Is(err, ente.ErrBadRequest) {
+		t.Fatalf("different collection IDs error = %v, want %v", err, ente.ErrBadRequest)
+	}
+}
+
+func TestBatchShareRejectsOversizedBatch(t *testing.T) {
+	shares := make([]ente.AlterShareRequest, ente.MaxBatchShareSize+1)
+	for index := range shares {
+		shares[index] = ente.AlterShareRequest{
+			CollectionID: 1,
+			Email:        "sharee" + strconv.Itoa(index) + "@example.com",
+			EncryptedKey: b64OfLen(sealedCollectionKeyLen),
+		}
+	}
+	controller := &CollectionController{}
+	_, err := controller.BatchShare(&gin.Context{}, shares)
+	if !errors.Is(err, ente.ErrBatchSizeTooLarge) {
+		t.Fatalf("oversized share batch error = %v, want %v", err, ente.ErrBatchSizeTooLarge)
 	}
 }
