@@ -1,4 +1,4 @@
-import { decryptStreamBytes } from "ente-base/crypto";
+import { decryptStreamBytes, decryptStreamChunk } from "ente-base/crypto";
 import {
     createDownloadManager,
     NetworkDownloadError,
@@ -13,8 +13,9 @@ vi.mock("ente-base/crypto", () => ({
     initChunkDecryption: vi
         .fn()
         .mockResolvedValue({ pullState: 0, decryptionChunkSize: 2 }),
-    decryptStreamChunk: (data: Uint8Array<ArrayBuffer>) =>
+    decryptStreamChunk: vi.fn((data: Uint8Array<ArrayBuffer>) =>
         Promise.resolve(data),
+    ),
 }));
 vi.mock("ente-base/blob-cache", () => ({ blobCache: vi.fn() }));
 vi.mock("ente-base/log", () => ({
@@ -38,6 +39,99 @@ const managerFor = (response: Response) =>
     });
 
 describe("download byte progress", () => {
+    test("a throwing observer cannot interrupt image bytes or other observers", async () => {
+        const bytes = new Uint8Array([3, 1, 4, 1, 5]);
+        const manager = managerFor(
+            new Response(
+                new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(bytes.slice(0, 2));
+                        controller.enqueue(bytes.slice(2));
+                        controller.close();
+                    },
+                }),
+            ),
+        );
+        manager.fileDownloadProgressSubscribe(() => {
+            throw new Error("observer failed");
+        });
+        const updates: (FileDownloadProgress | undefined)[] = [];
+        manager.fileDownloadProgressSubscribe(() => {
+            updates.push(manager.fileDownloadProgressSnapshot().get(file.id));
+        });
+        vi.mocked(decryptStreamBytes).mockImplementationOnce(
+            ({ encryptedData }) => {
+                expect(encryptedData).toEqual(bytes);
+                return Promise.resolve(encryptedData);
+            },
+        );
+        const stream = await manager.fileStream({ ...file, info: undefined });
+        expect(
+            new Uint8Array(await new Response(stream).arrayBuffer()),
+        ).toEqual(bytes);
+        expect(updates).toEqual([
+            { loaded: 2, total: undefined },
+            { loaded: 5, total: undefined },
+            { loaded: 5, total: 5 },
+            undefined,
+        ]);
+    });
+
+    test("cancelling a pending read does not recreate progress", async () => {
+        const cancel = vi.fn();
+        const manager = managerFor(
+            new Response(new ReadableStream({ cancel })),
+        );
+        const onChange = vi.fn();
+        manager.fileDownloadProgressSubscribe(onChange);
+        const stream = await manager.fileStream({
+            ...file,
+            metadata: { ...file.metadata, fileType: FileType.video },
+        });
+        await stream!.cancel("viewer closed");
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(cancel).toHaveBeenCalledWith("viewer closed");
+        expect(onChange).not.toHaveBeenCalled();
+        expect(manager.fileDownloadProgressSnapshot().has(file.id)).toBe(false);
+    });
+
+    test("cancelling during decryption stops processing further chunks", async () => {
+        const decrypting = Promise.withResolvers<undefined>();
+        const decrypted = Promise.withResolvers<Uint8Array<ArrayBuffer>>();
+        vi.mocked(decryptStreamChunk).mockClear();
+        vi.mocked(decryptStreamChunk).mockImplementationOnce(() => {
+            decrypting.resolve(undefined);
+            return decrypted.promise;
+        });
+        const cancel = vi.fn();
+        const manager = managerFor(
+            new Response(
+                new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(new Uint8Array([1, 2, 3, 4]));
+                    },
+                    cancel,
+                }),
+            ),
+        );
+        const updates: (FileDownloadProgress | undefined)[] = [];
+        manager.fileDownloadProgressSubscribe(() => {
+            updates.push(manager.fileDownloadProgressSnapshot().get(file.id));
+        });
+        const stream = await manager.fileStream({
+            ...file,
+            metadata: { ...file.metadata, fileType: FileType.video },
+        });
+        await decrypting.promise;
+        await stream!.cancel("viewer closed");
+        decrypted.resolve(new Uint8Array([1, 2]));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(cancel).toHaveBeenCalledWith("viewer closed");
+        expect(decryptStreamChunk).toHaveBeenCalledTimes(1);
+        expect(updates).toEqual([{ loaded: 4, total: 5 }, undefined]);
+        expect(manager.fileDownloadProgressSnapshot().has(file.id)).toBe(false);
+    });
+
     test("notifies for every chunk and EOF, retaining 100% until decryption settles", async () => {
         const body = new ReadableStream<Uint8Array>({
             start(controller) {

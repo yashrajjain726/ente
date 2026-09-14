@@ -10,6 +10,7 @@ import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import { decodeLivePhoto } from "ente-media/live-photo";
+import { mergeUint8Arrays } from "ente-utils/array";
 import { detectFileTypeInfoFromChunk } from "../utils/detect-type";
 
 export type RenderableSourceURLs =
@@ -274,33 +275,33 @@ export class DownloadManagerCore {
                 file.metadata.fileType == FileType.image ||
                 file.metadata.fileType == FileType.livePhoto
             ) {
-                const encryptedData = new Uint8Array(
-                    await wrapErrors(async () => {
-                        if (!res.body) return res.arrayBuffer();
-                        const counter = new TransformStream<
-                            Uint8Array,
-                            Uint8Array
-                        >({
-                            transform: (chunk, controller) => {
-                                loaded += chunk.byteLength;
-                                this.setFileDownloadProgress(file.id, {
-                                    loaded,
-                                    total,
-                                });
-                                controller.enqueue(chunk);
-                            },
-                            flush: () => {
+                const encryptedData = await wrapErrors(async () => {
+                    if (!res.body)
+                        return new Uint8Array(await res.arrayBuffer());
+                    const reader = res.body.getReader();
+                    const chunks: Uint8Array[] = [];
+                    try {
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) {
                                 this.setFileDownloadProgress(file.id, {
                                     loaded,
                                     total: loaded,
                                 });
-                            },
-                        });
-                        return new Response(
-                            res.body.pipeThrough(counter),
-                        ).arrayBuffer();
-                    }),
-                );
+                                break;
+                            }
+                            loaded += value.byteLength;
+                            this.setFileDownloadProgress(file.id, {
+                                loaded,
+                                total,
+                            });
+                            chunks.push(value);
+                        }
+                    } finally {
+                        reader.releaseLock();
+                    }
+                    return mergeUint8Arrays(chunks);
+                });
                 const decrypted = await decryptStreamBytes(
                     {
                         encryptedData,
@@ -318,6 +319,8 @@ export class DownloadManagerCore {
             const { pullState, decryptionChunkSize } =
                 await initChunkDecryption(file.file.decryptionHeader, file.key);
             let leftoverBytes: Uint8Array = new Uint8Array();
+            let cancelled = false;
+            const isCancelled = () => cancelled;
 
             return new ReadableStream({
                 pull: async (controller) => {
@@ -328,6 +331,7 @@ export class DownloadManagerCore {
                             const { done, value } = await wrapErrors(() =>
                                 reader.read(),
                             );
+                            if (isCancelled()) return;
 
                             let data: Uint8Array;
                             if (done) {
@@ -359,6 +363,7 @@ export class DownloadManagerCore {
                                     data.slice(0, decryptionChunkSize),
                                     pullState,
                                 );
+                                if (isCancelled()) return;
                                 controller.enqueue(decryptedData);
                                 didEnqueue = true;
                                 data = data.slice(decryptionChunkSize);
@@ -372,6 +377,7 @@ export class DownloadManagerCore {
                                             data,
                                             pullState,
                                         );
+                                    if (isCancelled()) return;
                                     controller.enqueue(decryptedData);
                                 }
                                 didEnqueue = true;
@@ -390,6 +396,8 @@ export class DownloadManagerCore {
                     }
                 },
                 cancel: (reason: unknown) => {
+                    // An in-flight read or decryption may settle after cancel.
+                    cancelled = true;
                     this.setFileDownloadProgress(file.id, undefined);
                     return reader.cancel(reason);
                 },
