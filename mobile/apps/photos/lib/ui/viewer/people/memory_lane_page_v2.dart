@@ -81,6 +81,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   Timer? _playbackTimer;
   Object? _playbackToken;
   bool _wasPlayingBeforeSeek = false;
+  bool _wasPlayingBeforeTouch = false;
+  int? _photoPointer;
   bool _useFastTransition = false;
   late final Future<void> _memoryLaneLoaded;
   Key _currentEntryKey = UniqueKey();
@@ -229,6 +231,14 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     } else {
       unawaited(_play(i));
     }
+  }
+
+  void _onPhotoPointerEnd(PointerEvent event) {
+    if (event.pointer != _photoPointer) return;
+    _photoPointer = null;
+    final wasPlaying = _wasPlayingBeforeTouch;
+    _wasPlayingBeforeTouch = false;
+    if (wasPlaying) unawaited(_play(i, fastTransition: true));
   }
 
   void _onSeekEnd() {
@@ -532,147 +542,165 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                 child: Column(
                   children: [
                     Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTapUp:
-                            widget.onNextMemory == null &&
-                                widget.onPreviousMemory == null
-                            ? null
-                            : (details) {
-                                if (!widget.isActive || _entries.isEmpty)
-                                  return;
-                                final previous =
-                                    details.localPosition.dx <
-                                    screenSize.width / 2;
-                                final index = i + (previous ? -1 : 1);
-                                if (index < 0 || index >= _entries.length) {
-                                  final onMemory = previous
-                                      ? widget.onPreviousMemory
-                                      : widget.onNextMemory;
-                                  if (onMemory != null) {
-                                    _pause();
-                                    onMemory();
+                      child: Listener(
+                        onPointerDown: (event) {
+                          if (_photoPointer != null || !widget.isActive) return;
+                          _photoPointer = event.pointer;
+                          _wasPlayingBeforeTouch = _playbackToken != null;
+                          _pause();
+                        },
+                        onPointerUp: _onPhotoPointerEnd,
+                        onPointerCancel: _onPhotoPointerEnd,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp:
+                              widget.onNextMemory == null &&
+                                  widget.onPreviousMemory == null
+                              ? null
+                              : (details) {
+                                  if (!widget.isActive || _entries.isEmpty) {
+                                    return;
                                   }
-                                } else if (_playbackToken != null) {
-                                  unawaited(_play(index, fastTransition: true));
-                                } else {
-                                  setState(
-                                    () => _selectEntry(
-                                      index,
-                                      fastTransition: true,
-                                    ),
-                                  );
-                                }
-                              },
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenSize.width * 0.08,
-                            vertical: screenSize.height * 0.04,
-                          ),
-                          child: Align(
-                            child: AspectRatio(
-                              aspectRatio: 3 / 4,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
-                                child: AnimatedSwitcher(
-                                  duration: Duration(
-                                    milliseconds: _useFastTransition
-                                        ? 100
-                                        : 1000,
-                                  ),
-                                  switchInCurve: Curves.easeOutCubic,
-                                  switchOutCurve: Curves.easeInCubic,
-                                  transitionBuilder: (child, animation) {
-                                    return AnimatedBuilder(
-                                      animation: animation,
-                                      child: FadeTransition(
-                                        opacity: animation,
-                                        child: ScaleTransition(
-                                          scale: Tween<double>(
-                                            begin: 1,
-                                            end: 1.1,
-                                          ).animate(animation),
-                                          child: child,
-                                        ),
-                                      ),
-                                      builder: (context, child) {
-                                        final blur = 12 * (1 - animation.value);
-                                        return ImageFiltered(
-                                          imageFilter: ImageFilter.blur(
-                                            sigmaX: blur,
-                                            sigmaY: blur,
-                                          ),
-                                          child: child,
-                                        );
-                                      },
+                                  final previous =
+                                      details.localPosition.dx <
+                                      screenSize.width / 2;
+                                  final index = i + (previous ? -1 : 1);
+                                  if (index < 0 || index >= _entries.length) {
+                                    final onMemory = previous
+                                        ? widget.onPreviousMemory
+                                        : widget.onNextMemory;
+                                    if (onMemory != null) {
+                                      _pause();
+                                      onMemory();
+                                    }
+                                  } else if (_playbackToken != null) {
+                                    unawaited(
+                                      _play(index, fastTransition: true),
                                     );
-                                  },
-                                  child: switch (snapshot.connectionState) {
-                                    ConnectionState.done when file != null =>
-                                      LayoutBuilder(
-                                        key: _currentEntryKey,
-                                        builder: (context, constraints) =>
-                                            FutureBuilder<(Uint8List, int)?>(
-                                              future: entry == null
-                                                  ? null
-                                                  : _fetchEntry(
-                                                      entry,
-                                                      constraints.biggest *
-                                                          MediaQuery.devicePixelRatioOf(
-                                                            context,
-                                                          ) *
-                                                          1.1,
-                                                    ),
-                                              builder: (context, entrySnapshot) {
-                                                final crop = entrySnapshot.data;
-                                                if (crop == null) {
-                                                  if (entrySnapshot
-                                                          .connectionState ==
-                                                      ConnectionState.done) {
-                                                    return Center(
-                                                      child: Text(
-                                                        context
-                                                            .strings
-                                                            .facesTimelineUnavailable,
-                                                        style: darkTheme
-                                                            .textTheme
-                                                            .small,
+                                  } else {
+                                    setState(
+                                      () => _selectEntry(
+                                        index,
+                                        fastTransition: true,
+                                      ),
+                                    );
+                                  }
+                                },
+                          onLongPress: () {},
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenSize.width * 0.08,
+                              vertical: screenSize.height * 0.04,
+                            ),
+                            child: Align(
+                              child: AspectRatio(
+                                aspectRatio: 3 / 4,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: AnimatedSwitcher(
+                                    duration: Duration(
+                                      milliseconds: _useFastTransition
+                                          ? 100
+                                          : 1000,
+                                    ),
+                                    switchInCurve: Curves.easeOutCubic,
+                                    switchOutCurve: Curves.easeInCubic,
+                                    transitionBuilder: (child, animation) {
+                                      return AnimatedBuilder(
+                                        animation: animation,
+                                        child: FadeTransition(
+                                          opacity: animation,
+                                          child: ScaleTransition(
+                                            scale: Tween<double>(
+                                              begin: 1,
+                                              end: 1.1,
+                                            ).animate(animation),
+                                            child: child,
+                                          ),
+                                        ),
+                                        builder: (context, child) {
+                                          final blur =
+                                              12 * (1 - animation.value);
+                                          return ImageFiltered(
+                                            imageFilter: ImageFilter.blur(
+                                              sigmaX: blur,
+                                              sigmaY: blur,
+                                            ),
+                                            child: child,
+                                          );
+                                        },
+                                      );
+                                    },
+                                    child: switch (snapshot.connectionState) {
+                                      ConnectionState.done when file != null =>
+                                        LayoutBuilder(
+                                          key: _currentEntryKey,
+                                          builder: (context, constraints) =>
+                                              FutureBuilder<(Uint8List, int)?>(
+                                                future: entry == null
+                                                    ? null
+                                                    : _fetchEntry(
+                                                        entry,
+                                                        constraints.biggest *
+                                                            MediaQuery.devicePixelRatioOf(
+                                                              context,
+                                                            ) *
+                                                            1.1,
                                                       ),
+                                                builder: (context, entrySnapshot) {
+                                                  final crop =
+                                                      entrySnapshot.data;
+                                                  if (crop == null) {
+                                                    if (entrySnapshot
+                                                            .connectionState ==
+                                                        ConnectionState.done) {
+                                                      return Center(
+                                                        child: Text(
+                                                          context
+                                                              .strings
+                                                              .facesTimelineUnavailable,
+                                                          style: darkTheme
+                                                              .textTheme
+                                                              .small,
+                                                        ),
+                                                      );
+                                                    }
+                                                    return const Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            color: Colors.white,
+                                                          ),
                                                     );
                                                   }
-                                                  return const Center(
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          color: Colors.white,
-                                                        ),
+                                                  return Image.memory(
+                                                    crop.$1,
+                                                    cacheWidth: crop.$2,
+                                                    fit: BoxFit.cover,
+                                                    width: double.infinity,
+                                                    height: double.infinity,
                                                   );
-                                                }
-                                                return Image.memory(
-                                                  crop.$1,
-                                                  cacheWidth: crop.$2,
-                                                  fit: BoxFit.cover,
-                                                  width: double.infinity,
-                                                  height: double.infinity,
-                                                );
-                                              },
-                                            ),
+                                                },
+                                              ),
+                                        ),
+                                      ConnectionState.done => Center(
+                                        key: const ValueKey(
+                                          "memory-lane-empty",
+                                        ),
+                                        child: Text(
+                                          context
+                                              .strings
+                                              .facesTimelineUnavailable,
+                                          style: darkTheme.textTheme.small,
+                                        ),
                                       ),
-                                    ConnectionState.done => Center(
-                                      key: const ValueKey("memory-lane-empty"),
-                                      child: Text(
-                                        context
-                                            .strings
-                                            .facesTimelineUnavailable,
-                                        style: darkTheme.textTheme.small,
+                                      _ => const Center(
+                                        key: ValueKey("memory-lane-loading"),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    ),
-                                    _ => const Center(
-                                      key: ValueKey("memory-lane-loading"),
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  },
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
