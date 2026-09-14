@@ -11,7 +11,6 @@ import { decryptBox } from "ente-accounts/services/crypto";
 import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/prelogin-session";
 import { recoveryKeyFromMnemonic } from "ente-accounts/services/recovery-key";
 import { appHomeRoute, stashRedirect } from "ente-accounts/services/redirect";
-import { haveMasterKeyInSession } from "ente-accounts/services/session-storage";
 import type { KeyAttributes } from "ente-accounts/services/user";
 import {
     decryptAndStoreTokenIfNeeded,
@@ -24,6 +23,7 @@ import {
 } from "ente-base/components/SingleInputForm";
 import { useBaseContext } from "ente-base/context";
 import log from "ente-base/log";
+import { haveMasterKeyInSession } from "ente-base/session-storage";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState, type ComponentType } from "react";

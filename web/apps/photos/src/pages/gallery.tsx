@@ -82,11 +82,11 @@ import { subscribeMainWindowFocus } from "ente-base/electron";
 import { isNamedError } from "ente-base/error";
 import { hasPendingAlbumToJoin } from "ente-base/join-album";
 import log from "ente-base/log";
+import { masterKeyFromSession } from "ente-base/session";
 import {
     clearSessionStorage,
     haveMasterKeyInSession,
-    masterKeyFromSession,
-} from "ente-base/session";
+} from "ente-base/session-storage";
 import { savedAuthToken } from "ente-base/token";
 import type { Location } from "ente-base/types";
 import { ensureContactsReady } from "ente-contacts";

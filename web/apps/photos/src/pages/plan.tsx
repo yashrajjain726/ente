@@ -8,7 +8,7 @@ import {
     LoadingIndicator,
     TranslucentLoadingOverlay,
 } from "ente-base/components/loaders";
-import { haveMasterKeyInSession } from "ente-base/session";
+import { haveMasterKeyInSession } from "ente-base/session-storage";
 import { savedAuthToken } from "ente-base/token";
 import { useRouter } from "next/router";
 import { useEffect, useState, type JSX } from "react";

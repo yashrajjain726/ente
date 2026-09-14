@@ -1,4 +1,5 @@
 import { z } from "zod";
+import log from "./log";
 
 export const clearSessionStorage = () => sessionStorage.clear();
 
@@ -66,8 +67,8 @@ export const createSessionStorage = ({
         await saveKeyInSessionStore("encryptionKey", masterKey);
         try {
             await globalThis.electron?.saveMasterKeyInSafeStorage(masterKey);
-        } catch {
-            // Best effort, matching the current accounts package behaviour.
+        } catch (e) {
+            log.warn("Failed to save master key in safe storage", e);
         }
     };
 
@@ -78,8 +79,8 @@ export const createSessionStorage = ({
         let masterKey: string | undefined;
         try {
             masterKey = await electron.masterKeyFromSafeStorage();
-        } catch {
-            masterKey = undefined;
+        } catch (e) {
+            log.warn("Failed to read master key from safe storage", e);
         }
 
         if (masterKey) await saveKeyInSessionStore("encryptionKey", masterKey);

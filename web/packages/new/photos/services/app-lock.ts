@@ -6,7 +6,7 @@ import {
 } from "ente-base/electron";
 import { getKVN, getKVS, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
-import { haveMasterKeyInSession } from "ente-base/session";
+import { haveMasterKeyInSession } from "ente-base/session-storage";
 import type {
     NativeDeviceLockCapability,
     NativeDeviceLockUnavailableReason,
