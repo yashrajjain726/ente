@@ -17,7 +17,7 @@ final class BackgroundRuntime: NSObject {
   private var isForeground = false
   private var installed = false
   private var reconciling = false
-  private var needsRearm = Set<String>()
+  private var scheduleRevision = 0
   private var changedTasks = Set<String>()
   private var configurationResults: [FlutterResult] = []
 
@@ -143,8 +143,14 @@ final class BackgroundRuntime: NSObject {
   private func reconcile() {
     guard !reconciling else { return }
     reconciling = true
+    let revision = scheduleRevision
     BGTaskScheduler.shared.getPendingTaskRequests { requests in
       DispatchQueue.main.async {
+        guard revision == self.scheduleRevision else {
+          self.reconciling = false
+          self.reconcile()
+          return
+        }
         let pending = Dictionary(
           requests.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
         let enabled = self.configuration.enabled && self.isAllowed()
@@ -155,25 +161,11 @@ final class BackgroundRuntime: NSObject {
         }
         var failure: Error?
         for task in desired {
-          let rearming = self.needsRearm.contains(task.identifier)
-          if pending[task.identifier] != nil && !rearming
-            && !self.changedTasks.contains(task.identifier)
-          {
+          if pending[task.identifier] != nil && !self.changedTasks.contains(task.identifier) {
             continue
           }
-          let request: BGTaskRequest
-          if task.kind == "processing" {
-            let processing = BGProcessingTaskRequest(identifier: task.identifier)
-            processing.requiresNetworkConnectivity = task.requiresNetwork
-            processing.requiresExternalPower = task.requiresCharging
-            request = processing
-          } else {
-            request = BGAppRefreshTaskRequest(identifier: task.identifier)
-          }
-          let delay = rearming ? task.frequencyMs : task.initialDelayMs
-          request.earliestBeginDate = Date(timeIntervalSinceNow: Double(delay) / 1000)
           do {
-            try BGTaskScheduler.shared.submit(request)
+            try self.submit(task, delayMs: task.initialDelayMs)
           } catch {
             failure = error
             self.report(
@@ -182,7 +174,6 @@ final class BackgroundRuntime: NSObject {
           }
         }
         self.changedTasks.removeAll()
-        self.needsRearm.removeAll()
         self.reconciling = false
         let results = self.configurationResults
         self.configurationResults.removeAll()
@@ -196,6 +187,20 @@ final class BackgroundRuntime: NSObject {
         }
       }
     }
+  }
+
+  private func submit(_ task: TaskConfiguration, delayMs: Int64) throws {
+    let request: BGTaskRequest
+    if task.kind == "processing" {
+      let processing = BGProcessingTaskRequest(identifier: task.identifier)
+      processing.requiresNetworkConnectivity = task.requiresNetwork
+      processing.requiresExternalPower = task.requiresCharging
+      request = processing
+    } else {
+      request = BGAppRefreshTaskRequest(identifier: task.identifier)
+    }
+    request.earliestBeginDate = Date(timeIntervalSinceNow: Double(delayMs) / 1000)
+    try BGTaskScheduler.shared.submit(request)
   }
 
   func scheduledTasks(_ result: @escaping FlutterResult) {
@@ -212,6 +217,7 @@ final class BackgroundRuntime: NSObject {
   }
 
   private func deliver(_ task: BGTask, startedAt: TimeInterval) {
+    scheduleRevision += 1
     guard configuration.enabled, isAllowed(),
       let policy = configuration.tasks.first(where: { $0.identifier == task.identifier })
     else {
@@ -220,8 +226,14 @@ final class BackgroundRuntime: NSObject {
       task.setTaskCompleted(success: true)
       return
     }
-    needsRearm.insert(task.identifier)
-    reconcile()
+    do {
+      try submit(policy, delayMs: policy.frequencyMs)
+      changedTasks.remove(task.identifier)
+    } catch {
+      report(
+        identifier: task.identifier, outcome: "failed", reason: "schedule",
+        error: String(describing: error))
+    }
     let skip: String?
     if active != nil {
       skip = "busy"
