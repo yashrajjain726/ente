@@ -638,6 +638,24 @@ test("new GitHub workflows, actions and policies need approval", (t) => {
     assert.match(scan(t, {}, files, { commit: false }), /^3 guardrail files\n/);
 });
 
+test("new lint and formatter configs need approval, including untracked files", (t) => {
+    const files = {
+        ".github/checks/new/.prettierrc.json": "{}\n",
+        "apple/apps/cast/.swift-format": "{}\n",
+        "apple/apps/cast/.swiftlint.yml": "only_rules: []\n",
+        "rust/crates/example/.rustfmt.toml": "max_width = 120\n",
+        "rust/rustfmt.toml": "max_width = 120\n",
+        "web/apps/photos/nested/.prettierrc.json": "{}\n",
+        "web/apps/photos/nested/eslint.config.mjs": "export default [];\n",
+    };
+    const { output, summary } = scan(t, {}, files, { ci: true });
+    assert.equal(output, 'categories=["guardrail files"]\n');
+    assert.match(summary, /^7 guardrail files\n/);
+    for (const file of Object.keys(files))
+        assert.ok(summary.includes(`\`${file}\``));
+    assert.match(scan(t, {}, files, { commit: false }), /^7 guardrail files\n/);
+});
+
 test("toolchain and registry config added, modified, or deleted", (t) => {
     const output = scan(
         t,
