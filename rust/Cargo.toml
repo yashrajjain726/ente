@@ -39,6 +39,7 @@ members = [
     "crates/photos",
     "crates/space",
     "crates/test-support",
+    "crates/vecdb",
     "tools/codegen",
     "tools/location-dataset",
 ]
@@ -73,6 +74,7 @@ ente-photos = { path = "crates/photos" }
 ente-space = { path = "crates/space" }
 ente-test-support = { path = "crates/test-support" }
 ente-uniffi-log = { path = "bindings/uniffi/log" }
+ente-vecdb = { path = "crates/vecdb" }
 ente-wasm-lib = { path = "bindings/wasm/lib" }
 fast_image_resize = { version = "5.5.0", features = ["image"] }
 flate2 = "1.1.9"
@@ -153,6 +155,8 @@ unwrap_used = "deny"
 [profile.dev.package.argon2]
 opt-level = 3
 
-# Unoptimized HNSW construction makes the vecdb recall fixtures dominate test runtime.
 [profile.dev.package.ente-ml]
+opt-level = 3
+
+[profile.dev.package.ente-vecdb]
 opt-level = 3

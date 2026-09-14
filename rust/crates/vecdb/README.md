@@ -5,7 +5,7 @@ optional and default to i8 and cosine. These settings are persisted at creation 
 remain unchanged through reopen, compaction, and reset.
 
 ```rust
-use ente_ml::vecdb::{DistanceMetric, StorageKind, VecDb};
+use ente_vecdb::{DistanceMetric, StorageKind, VecDb};
 
 let index = VecDb::open(path, 512, None, None)?;
 let reader = VecDb::open_read_only(path, 512, None, None)?;

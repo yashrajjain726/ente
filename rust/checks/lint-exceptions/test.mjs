@@ -38,14 +38,14 @@ assert.equal(result.status, 0, result.stderr);
 assert.equal(result.stderr, "");
 
 result = run(
-    "rust/crates/ml/examples/vecdb_bench.rs",
+    "rust/crates/vecdb/examples/vecdb_bench.rs",
     '#![expect(clippy::expect_used, reason = "fixture")]\nfn main() {}\n',
 );
 assert.equal(result.status, 0, result.stderr);
 assert.equal(result.stderr, "");
 
 result = run(
-    "rust/crates/ml/examples/vecdb_bench.rs",
+    "rust/crates/vecdb/examples/vecdb_bench.rs",
     '#![expect(clippy::expect_used, clippy::unwrap_used, reason = "fixture")]\nfn main() {}\n',
 );
 assert.equal(result.status, 1, result.stderr);

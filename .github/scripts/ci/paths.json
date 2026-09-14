@@ -22,6 +22,7 @@
         "rust/bindings/napi/**",
         "rust/crates/image/**",
         "rust/crates/ml/**",
+        "rust/crates/vecdb/**",
         "rust/tools/codegen/**"
     ],
     "docs-verify-build": [".github/workflows/docs-verify-build.yml", "docs/**"],
@@ -67,6 +68,7 @@
         "rust/crates/locker/**",
         "rust/crates/ml/**",
         "rust/crates/photos/**",
+        "rust/crates/vecdb/**",
         "rust/tools/codegen/**"
     ],
     "mobile-podfile-lock": [

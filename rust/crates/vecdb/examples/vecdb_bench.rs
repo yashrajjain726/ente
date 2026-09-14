@@ -7,9 +7,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use ente_ml::vecdb::{
-    AttrValue, Attribute, DistanceMetric, Match, SearchParams, StorageKind, VecDb,
-};
+use ente_vecdb::{AttrValue, Attribute, DistanceMetric, Match, SearchParams, StorageKind, VecDb};
 
 const SEED: u64 = 0xE47E_0000_0000_0001;
 const LATENT_DIMS: usize = 24;
@@ -172,7 +170,7 @@ fn parse_scales(list: &str) -> Vec<usize> {
 
 fn usage_exit() -> ! {
     eprintln!(
-        "usage: cargo run -p ente-ml --example vecdb_bench --release -- \
+        "usage: cargo run -p ente-vecdb --example vecdb_bench --release -- \
          [--scales 10000,100000] [--dims 512] [--attrs] [--storage f32|i8] [--metric cosine|ip]"
     );
     std::process::exit(2);

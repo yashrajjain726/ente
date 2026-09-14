@@ -11,7 +11,7 @@ for (const path of files()) {
         const lints = expectedLints(attribute.text);
         if (attribute.inner) {
             if (
-                path !== "rust/crates/ml/examples/vecdb_bench.rs" ||
+                path !== "rust/crates/vecdb/examples/vecdb_bench.rs" ||
                 lints?.length !== 1 ||
                 lints[0] !== "clippy::expect_used"
             ) {
