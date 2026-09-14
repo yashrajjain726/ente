@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 
 // Ente's pinned custom ONNX Runtime static-library XCFramework for iOS
 // (CoreML and CPU; device and ARM64 Simulator). SPM downloads the release ZIP, verifies

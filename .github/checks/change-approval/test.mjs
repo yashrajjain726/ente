@@ -1052,6 +1052,42 @@ test("new Web directives are checked in uncommitted and untracked files", (t) =>
         );
 });
 
+test("Swift lint directives in added lines need approval", (t) => {
+    const file = "apple/apps/cast/Example.swift";
+    for (const directive of [
+        "// swift-format-ignore",
+        "// swift-format-ignore: NeverForceUnwrap",
+        "// swift-format-ignore-file",
+        "// swiftlint:disable:next empty_count",
+        "// swiftlint:enable empty_count",
+    ]) {
+        const { output, summary } = scan(
+            t,
+            { [file]: "first()\n" },
+            { [file]: `${directive}\nfirst()\n` },
+            { ci: true },
+        );
+        assert.equal(output, 'categories=["Swift lint policy files"]\n');
+        assert.match(summary, /## Swift lint directives/);
+        assert.ok(summary.includes(`\`${file}\``));
+    }
+});
+
+test("Swift directive edits need approval; ordinary edits and removals do not", (t) => {
+    const file = "apple/apps/cast/Example.swift";
+    const before = "// swift-format-ignore: NeverForceUnwrap\nfirst()\n";
+    assert.match(
+        scan(
+            t,
+            { [file]: before },
+            { [file]: before.replace(": NeverForceUnwrap", "") },
+        ),
+        /^1 Swift lint policy file\n/,
+    );
+    for (const after of [before.replace("first", "second"), "first()\n", null])
+        assert.equal(scan(t, { [file]: before }, { [file]: after }), "");
+});
+
 test("checks started in a subdirectory inspect repository-wide changes", (t) => {
     const summary =
         "1 binary file, 1 new dependency\n\n## Binary files\n\n- `new.bin` (16 bytes)\n\n## New dependencies\n\n`rust/Cargo.lock`\n\n- b 2.0.0\n";

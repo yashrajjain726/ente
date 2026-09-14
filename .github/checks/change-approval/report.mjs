@@ -4,6 +4,7 @@ export function writeReport({
     files: { binaries, large, guardrails, configs },
     dependencies,
     rust,
+    swift,
     web,
 }) {
     const categories = [
@@ -45,6 +46,11 @@ export function writeReport({
             count: rust.length,
         },
         {
+            singular: "Swift lint policy file",
+            plural: "Swift lint policy files",
+            count: swift.length,
+        },
+        {
             singular: "Web lint policy file",
             plural: "Web lint policy files",
             count: web.length,
@@ -84,6 +90,8 @@ export function writeReport({
         sections.push(
             `## Rust lint declarations and files containing unsafe\n\n${list(rust.map(({ path, reasons }) => `${code(path)}: ${reasons.map(code).join("; ")}`))}`,
         );
+    if (swift.length)
+        sections.push(`## Swift lint directives\n\n${list(swift.map(code))}`);
     if (web.length)
         sections.push(`## Web lint directives\n\n${list(web.map(code))}`);
     const detail = sections.join("\n\n");
