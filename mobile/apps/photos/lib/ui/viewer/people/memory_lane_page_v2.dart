@@ -84,6 +84,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   Timer? _playbackTimer;
   Object? _playbackToken;
   bool _wasPlayingBeforeSeek = false;
+  bool _wasPlayingBeforeTouch = false;
+  int? _photoPointer;
   bool _useFastTransition = false;
   late final Future<void> _memoryLaneLoaded;
   Key _currentEntryKey = UniqueKey();
@@ -243,6 +245,14 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     } else {
       unawaited(_play(i));
     }
+  }
+
+  void _onPhotoPointerEnd(PointerEvent event) {
+    if (event.pointer != _photoPointer) return;
+    _photoPointer = null;
+    final wasPlaying = _wasPlayingBeforeTouch;
+    _wasPlayingBeforeTouch = false;
+    if (wasPlaying) unawaited(_play(i, fastTransition: true));
   }
 
   void _onSeekEnd() {
@@ -554,372 +564,404 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                     ),
                 ],
               ),
-              body: Column(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapUp:
-                          widget.onNextMemory == null &&
-                              widget.onPreviousMemory == null
-                          ? null
-                          : (details) {
-                              if (!widget.isActive || _entries.isEmpty) return;
-                              final previous =
-                                  details.localPosition.dx <
-                                  screenSize.width / 2;
-                              final index = i + (previous ? -1 : 1);
-                              if (index < 0 || index >= _entries.length) {
-                                final onMemory = previous
-                                    ? widget.onPreviousMemory
-                                    : widget.onNextMemory;
-                                if (onMemory != null) {
-                                  _pause();
-                                  onMemory();
-                                }
-                              } else if (_playbackToken != null) {
-                                unawaited(_play(index, fastTransition: true));
-                              } else {
-                                setState(
-                                  () =>
-                                      _selectEntry(index, fastTransition: true),
-                                );
-                              }
-                            },
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenSize.width * 0.08,
-                          vertical: screenSize.height * 0.04,
-                        ),
-                        child: Align(
-                          child: AspectRatio(
-                            aspectRatio: 3 / 4,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: AnimatedSwitcher(
-                                duration: Duration(
-                                  milliseconds: _useFastTransition ? 100 : 1000,
-                                ),
-                                switchInCurve: Curves.easeOutCubic,
-                                switchOutCurve: Curves.easeInCubic,
-                                transitionBuilder: (child, animation) {
-                                  return AnimatedBuilder(
-                                    animation: animation,
-                                    child: FadeTransition(
-                                      opacity: animation,
-                                      child: ScaleTransition(
-                                        scale: Tween<double>(
-                                          begin: 1,
-                                          end: 1.1,
-                                        ).animate(animation),
-                                        child: child,
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Listener(
+                        onPointerDown: (event) {
+                          if (_photoPointer != null || !widget.isActive) return;
+                          _photoPointer = event.pointer;
+                          _wasPlayingBeforeTouch = _playbackToken != null;
+                          _pause();
+                        },
+                        onPointerUp: _onPhotoPointerEnd,
+                        onPointerCancel: _onPhotoPointerEnd,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp:
+                              widget.onNextMemory == null &&
+                                  widget.onPreviousMemory == null
+                              ? null
+                              : (details) {
+                                  if (!widget.isActive || _entries.isEmpty) {
+                                    return;
+                                  }
+                                  final previous =
+                                      details.localPosition.dx <
+                                      screenSize.width / 2;
+                                  final index = i + (previous ? -1 : 1);
+                                  if (index < 0 || index >= _entries.length) {
+                                    final onMemory = previous
+                                        ? widget.onPreviousMemory
+                                        : widget.onNextMemory;
+                                    if (onMemory != null) {
+                                      _pause();
+                                      onMemory();
+                                    }
+                                  } else if (_playbackToken != null) {
+                                    unawaited(
+                                      _play(index, fastTransition: true),
+                                    );
+                                  } else {
+                                    setState(
+                                      () => _selectEntry(
+                                        index,
+                                        fastTransition: true,
                                       ),
+                                    );
+                                  }
+                                },
+                          onLongPress: () {},
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenSize.width * 0.08,
+                              vertical: screenSize.height * 0.04,
+                            ),
+                            child: Align(
+                              child: AspectRatio(
+                                aspectRatio: 3 / 4,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: AnimatedSwitcher(
+                                    duration: Duration(
+                                      milliseconds: _useFastTransition
+                                          ? 100
+                                          : 1000,
                                     ),
-                                    builder: (context, child) {
-                                      final blur = 12 * (1 - animation.value);
-                                      return ImageFiltered(
-                                        imageFilter: ImageFilter.blur(
-                                          sigmaX: blur,
-                                          sigmaY: blur,
+                                    switchInCurve: Curves.easeOutCubic,
+                                    switchOutCurve: Curves.easeInCubic,
+                                    transitionBuilder: (child, animation) {
+                                      return AnimatedBuilder(
+                                        animation: animation,
+                                        child: FadeTransition(
+                                          opacity: animation,
+                                          child: ScaleTransition(
+                                            scale: Tween<double>(
+                                              begin: 1,
+                                              end: 1.1,
+                                            ).animate(animation),
+                                            child: child,
+                                          ),
                                         ),
-                                        child: child,
+                                        builder: (context, child) {
+                                          final blur =
+                                              12 * (1 - animation.value);
+                                          return ImageFiltered(
+                                            imageFilter: ImageFilter.blur(
+                                              sigmaX: blur,
+                                              sigmaY: blur,
+                                            ),
+                                            child: child,
+                                          );
+                                        },
                                       );
                                     },
-                                  );
-                                },
-                                child: switch (snapshot.connectionState) {
-                                  ConnectionState.done when file != null =>
-                                    LayoutBuilder(
-                                      key: _currentEntryKey,
-                                      builder: (context, constraints) =>
-                                          FutureBuilder<(Uint8List, int)?>(
-                                            future: entry == null
-                                                ? null
-                                                : _fetchEntry(
-                                                    entry,
-                                                    constraints.biggest *
-                                                        MediaQuery.devicePixelRatioOf(
-                                                          context,
-                                                        ) *
-                                                        1.1,
-                                                  ),
-                                            builder: (context, entrySnapshot) {
-                                              final crop = entrySnapshot.data;
-                                              if (crop == null) {
-                                                if (entrySnapshot
-                                                        .connectionState ==
-                                                    ConnectionState.done) {
-                                                  return Center(
-                                                    child: Text(
-                                                      context
-                                                          .strings
-                                                          .facesTimelineUnavailable,
-                                                      style: darkTheme
-                                                          .textTheme
-                                                          .small,
-                                                    ),
-                                                  );
-                                                }
-                                                return const Center(
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
+                                    child: switch (snapshot.connectionState) {
+                                      ConnectionState.done when file != null =>
+                                        LayoutBuilder(
+                                          key: _currentEntryKey,
+                                          builder: (context, constraints) =>
+                                              FutureBuilder<(Uint8List, int)?>(
+                                                future: entry == null
+                                                    ? null
+                                                    : _fetchEntry(
+                                                        entry,
+                                                        constraints.biggest *
+                                                            MediaQuery.devicePixelRatioOf(
+                                                              context,
+                                                            ) *
+                                                            1.1,
                                                       ),
-                                                );
-                                              }
-                                              return Image.memory(
-                                                crop.$1,
-                                                cacheWidth: crop.$2,
-                                                fit: BoxFit.cover,
-                                                width: double.infinity,
-                                                height: double.infinity,
-                                              );
-                                            },
-                                          ),
-                                    ),
-                                  ConnectionState.done => Center(
-                                    key: const ValueKey("memory-lane-empty"),
-                                    child: Text(
-                                      context.strings.facesTimelineUnavailable,
-                                      style: darkTheme.textTheme.small,
-                                    ),
+                                                builder: (context, entrySnapshot) {
+                                                  final crop =
+                                                      entrySnapshot.data;
+                                                  if (crop == null) {
+                                                    if (entrySnapshot
+                                                            .connectionState ==
+                                                        ConnectionState.done) {
+                                                      return Center(
+                                                        child: Text(
+                                                          context
+                                                              .strings
+                                                              .facesTimelineUnavailable,
+                                                          style: darkTheme
+                                                              .textTheme
+                                                              .small,
+                                                        ),
+                                                      );
+                                                    }
+                                                    return const Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            color: Colors.white,
+                                                          ),
+                                                    );
+                                                  }
+                                                  return Image.memory(
+                                                    crop.$1,
+                                                    cacheWidth: crop.$2,
+                                                    fit: BoxFit.cover,
+                                                    width: double.infinity,
+                                                    height: double.infinity,
+                                                  );
+                                                },
+                                              ),
+                                        ),
+                                      ConnectionState.done => Center(
+                                        key: const ValueKey(
+                                          "memory-lane-empty",
+                                        ),
+                                        child: Text(
+                                          context
+                                              .strings
+                                              .facesTimelineUnavailable,
+                                          style: darkTheme.textTheme.small,
+                                        ),
+                                      ),
+                                      _ => const Center(
+                                        key: ValueKey("memory-lane-loading"),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    },
                                   ),
-                                  _ => const Center(
-                                    key: ValueKey("memory-lane-loading"),
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                },
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: screenSize.height * 0.2,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        if (captionValue != null) ...[
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 48),
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                spacing: screenSize.width * 0.02,
-                                children: [
-                                  for (
-                                    var index = 0;
-                                    index < captionParts.length;
-                                    index++
-                                  ) ...[
-                                    if (index > 0)
-                                      _MemoryLaneAnimatedDigit(
-                                        value: captionValue,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: screenSize.height * 0.2,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          if (captionValue != null) ...[
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48),
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  spacing: screenSize.width * 0.02,
+                                  children: [
+                                    for (
+                                      var index = 0;
+                                      index < captionParts.length;
+                                      index++
+                                    ) ...[
+                                      if (index > 0)
+                                        _MemoryLaneAnimatedDigit(
+                                          value: captionValue,
+                                        ),
+                                      Flexible(
+                                        child: Text(
+                                          captionParts[index],
+                                          style: darkTheme.textTheme.bodyMuted,
+                                          textAlign: TextAlign.center,
+                                          softWrap: false,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    Flexible(
-                                      child: Text(
-                                        captionParts[index],
-                                        style: darkTheme.textTheme.bodyMuted,
-                                        textAlign: TextAlign.center,
-                                        softWrap: false,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                          SizedBox(height: screenSize.height * 0.02),
-                        ],
-                        if (_entries.isNotEmpty)
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 48),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: screenSize.width * 0.16,
-                              ),
-                              child: Row(
-                                mainAxisAlignment: .center,
-                                children: [
-                                  // TODO: Replace with an Ente component.
-                                  IconButton(
-                                    style: ButtonStyle(
-                                      fixedSize: const WidgetStatePropertyAll(
-                                        Size.square(48),
-                                      ),
-                                      shape: const WidgetStatePropertyAll(
-                                        CircleBorder(),
-                                      ),
-                                      foregroundColor:
-                                          const WidgetStatePropertyAll(
-                                            Colors.white,
-                                          ),
-                                      overlayColor:
-                                          const WidgetStatePropertyAll(
-                                            Colors.transparent,
-                                          ),
-                                      backgroundColor:
-                                          WidgetStateProperty.resolveWith(
-                                            (states) => Colors.white.withValues(
-                                              alpha:
-                                                  states.contains(
-                                                    WidgetState.disabled,
-                                                  )
-                                                  ? 0.16
-                                                  : states.contains(
-                                                      WidgetState.pressed,
-                                                    )
-                                                  ? 0.36
-                                                  : states.contains(
-                                                      WidgetState.hovered,
-                                                    )
-                                                  ? 0.30
-                                                  : 0.24,
+                            SizedBox(height: screenSize.height * 0.02),
+                          ],
+                          if (_entries.isNotEmpty)
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 48),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: screenSize.width * 0.16,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: .center,
+                                  children: [
+                                    // TODO: Replace with an Ente component.
+                                    IconButton(
+                                      style: ButtonStyle(
+                                        fixedSize: const WidgetStatePropertyAll(
+                                          Size.square(48),
+                                        ),
+                                        shape: const WidgetStatePropertyAll(
+                                          CircleBorder(),
+                                        ),
+                                        foregroundColor:
+                                            const WidgetStatePropertyAll(
+                                              Colors.white,
                                             ),
-                                          ),
+                                        overlayColor:
+                                            const WidgetStatePropertyAll(
+                                              Colors.transparent,
+                                            ),
+                                        backgroundColor:
+                                            WidgetStateProperty.resolveWith(
+                                              (states) =>
+                                                  Colors.white.withValues(
+                                                    alpha:
+                                                        states.contains(
+                                                          WidgetState.disabled,
+                                                        )
+                                                        ? 0.16
+                                                        : states.contains(
+                                                            WidgetState.pressed,
+                                                          )
+                                                        ? 0.36
+                                                        : states.contains(
+                                                            WidgetState.hovered,
+                                                          )
+                                                        ? 0.30
+                                                        : 0.24,
+                                                  ),
+                                            ),
+                                      ),
+                                      tooltip: _playbackToken != null
+                                          ? context
+                                                .strings
+                                                .facesTimelinePlaybackPause
+                                          : context
+                                                .strings
+                                                .facesTimelinePlaybackPlay,
+                                      onPressed: _onPlayPauseTap,
+                                      icon: HugeIcon(
+                                        icon: _playbackToken != null
+                                            ? HugeIcons.strokeRoundedPause
+                                            : HugeIcons.strokeRoundedPlay,
+                                        size: 18,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                    tooltip: _playbackToken != null
-                                        ? context
-                                              .strings
-                                              .facesTimelinePlaybackPause
-                                        : context
-                                              .strings
-                                              .facesTimelinePlaybackPlay,
-                                    onPressed: _onPlayPauseTap,
-                                    icon: HugeIcon(
-                                      icon: _playbackToken != null
-                                          ? HugeIcons.strokeRoundedPause
-                                          : HugeIcons.strokeRoundedPlay,
-                                      size: 18,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  SizedBox(width: screenSize.width * 0.03),
-                                  Expanded(
-                                    child: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        const maxDotSize = 15.0;
-                                        const dotSpacing = 5.0;
-                                        final dotCount =
-                                            ((constraints.maxWidth +
-                                                        dotSpacing) /
-                                                    (maxDotSize + dotSpacing))
-                                                .floor()
-                                                .clamp(1, _entries.length);
-                                        final activeDot =
-                                            i * dotCount ~/ _entries.length;
-                                        return GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTapUp: (details) {
-                                            if (constraints.maxWidth <= 0) {
-                                              return;
-                                            }
-                                            final index =
-                                                (details.localPosition.dx /
-                                                        constraints.maxWidth *
-                                                        _entries.length)
-                                                    .floor()
-                                                    .clamp(
-                                                      0,
-                                                      _entries.length - 1,
-                                                    );
-                                            if (_playbackToken != null) {
-                                              unawaited(
-                                                _play(
-                                                  index,
-                                                  fastTransition: true,
-                                                ),
-                                              );
-                                            } else {
-                                              setState(
-                                                () => _selectEntry(
-                                                  index,
-                                                  fastTransition: true,
-                                                ),
-                                              );
-                                            }
-                                          },
-                                          onHorizontalDragStart: (details) {
-                                            _wasPlayingBeforeSeek =
-                                                _playbackToken != null;
-                                            _seekFromPosition(
-                                              details.localPosition.dx,
-                                              constraints.maxWidth,
-                                            );
-                                          },
-                                          onHorizontalDragUpdate: (details) =>
+                                    SizedBox(width: screenSize.width * 0.03),
+                                    Expanded(
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          const maxDotSize = 15.0;
+                                          const dotSpacing = 5.0;
+                                          final dotCount =
+                                              ((constraints.maxWidth +
+                                                          dotSpacing) /
+                                                      (maxDotSize + dotSpacing))
+                                                  .floor()
+                                                  .clamp(1, _entries.length);
+                                          final activeDot =
+                                              i * dotCount ~/ _entries.length;
+                                          return GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onTapUp: (details) {
+                                              if (constraints.maxWidth <= 0) {
+                                                return;
+                                              }
+                                              final index =
+                                                  (details.localPosition.dx /
+                                                          constraints.maxWidth *
+                                                          _entries.length)
+                                                      .floor()
+                                                      .clamp(
+                                                        0,
+                                                        _entries.length - 1,
+                                                      );
+                                              if (_playbackToken != null) {
+                                                unawaited(
+                                                  _play(
+                                                    index,
+                                                    fastTransition: true,
+                                                  ),
+                                                );
+                                              } else {
+                                                setState(
+                                                  () => _selectEntry(
+                                                    index,
+                                                    fastTransition: true,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            onHorizontalDragStart: (details) {
+                                              _wasPlayingBeforeSeek =
+                                                  _playbackToken != null;
                                               _seekFromPosition(
                                                 details.localPosition.dx,
                                                 constraints.maxWidth,
-                                              ),
-                                          onHorizontalDragEnd: (_) =>
-                                              _onSeekEnd(),
-                                          onHorizontalDragCancel: _onSeekEnd,
-                                          child: Row(
-                                            spacing: dotSpacing,
-                                            children: List.generate(dotCount, (
-                                              index,
-                                            ) {
-                                              final distance =
-                                                  (index - activeDot).abs();
-                                              final double size =
-                                                  switch (distance) {
-                                                    0 => maxDotSize,
-                                                    1 => 10,
-                                                    2 => 7.5,
-                                                    _ => 5,
-                                                  };
-                                              return Expanded(
-                                                child: SizedBox(
-                                                  height: 40,
-                                                  child: Center(
-                                                    child: AnimatedContainer(
-                                                      duration: const Duration(
-                                                        milliseconds: 200,
-                                                      ),
-                                                      width: size,
-                                                      height: size,
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        color: Colors.white
-                                                            .withValues(
-                                                              alpha:
-                                                                  distance == 0
-                                                                  ? 1
-                                                                  : 0.5,
+                                              );
+                                            },
+                                            onHorizontalDragUpdate: (details) =>
+                                                _seekFromPosition(
+                                                  details.localPosition.dx,
+                                                  constraints.maxWidth,
+                                                ),
+                                            onHorizontalDragEnd: (_) =>
+                                                _onSeekEnd(),
+                                            onHorizontalDragCancel: _onSeekEnd,
+                                            child: Row(
+                                              spacing: dotSpacing,
+                                              children: List.generate(dotCount, (
+                                                index,
+                                              ) {
+                                                final distance =
+                                                    (index - activeDot).abs();
+                                                final double size =
+                                                    switch (distance) {
+                                                      0 => maxDotSize,
+                                                      1 => 10,
+                                                      2 => 7.5,
+                                                      _ => 5,
+                                                    };
+                                                return Expanded(
+                                                  child: SizedBox(
+                                                    height: 40,
+                                                    child: Center(
+                                                      child: AnimatedContainer(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 200,
                                                             ),
+                                                        width: size,
+                                                        height: size,
+                                                        decoration: BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          color: Colors.white
+                                                              .withValues(
+                                                                alpha:
+                                                                    distance ==
+                                                                        0
+                                                                    ? 1
+                                                                    : 0.5,
+                                                              ),
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                              );
-                                            }),
-                                          ),
-                                        );
-                                      },
+                                                );
+                                              }),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        SizedBox(height: screenSize.height * 0.055),
-                      ],
+                          SizedBox(height: screenSize.height * 0.055),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
