@@ -33,7 +33,7 @@ import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import { t } from "i18next";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileViewer } from "./FileViewer";
 
 export interface PublicAlbumSingleFileViewerProps {
@@ -105,6 +105,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
     const isViewerPrimed = !needsThumbnailPrime || primedFileID === file.id;
     const viewerFiles = useMemo(() => [viewerFile], [viewerFile]);
     const shouldShowWarningIcon = isPhotoSwipeContentError;
+    const progressHostRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         document.body.classList.add(bodyClassName);
@@ -136,6 +137,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
         let pswpElement: HTMLElement | null = null;
         let preloaderElement: HTMLElement | null = null;
         let errorElement: HTMLElement | null = null;
+        let progressElement: HTMLElement | null = null;
+        let progressParent: HTMLElement | null = null;
 
         const updateVisibility = () => {
             setIsPhotoSwipeUIVisible(
@@ -205,6 +208,9 @@ export const PublicAlbumSingleFileViewer: React.FC<
         const bindToPhotoSwipeElement = () => {
             const next = document.querySelector<HTMLElement>(".pswp");
             if (next !== pswpElement) {
+                progressElement?.remove();
+                progressElement = null;
+                progressParent = null;
                 classObserver?.disconnect();
                 classObserver = undefined;
                 pswpElement = next;
@@ -232,6 +238,17 @@ export const PublicAlbumSingleFileViewer: React.FC<
 
             bindToPreloaderElement();
             bindToErrorElement();
+
+            const progress = pswpElement?.querySelector<HTMLElement>(
+                ".pswp__ente-progress-text",
+            );
+            if (progress && progressHostRef.current) {
+                // Move the existing control so its progress updates and Retry
+                // handler stay attached while it participates in header layout.
+                progressElement = progress;
+                progressParent = progress.parentElement;
+                progressHostRef.current.replaceChildren(progress);
+            }
         };
 
         const treeObserver = new MutationObserver(bindToPhotoSwipeElement);
@@ -243,6 +260,11 @@ export const PublicAlbumSingleFileViewer: React.FC<
             classObserver?.disconnect();
             preloaderObserver?.disconnect();
             errorObserver?.disconnect();
+            if (progressElement) {
+                if (progressParent?.isConnected)
+                    progressParent.append(progressElement);
+                else progressElement.remove();
+            }
         };
     }, []);
 
@@ -529,6 +551,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                         { display: "none !important" },
                     [`body.${bodyClassName} .pswp-ente-public-album .pswp__error`]:
                         { display: "none !important" },
+                    [`body.${bodyClassName} .pswp-ente-public-album .pswp__ente-progress-text`]:
+                        { margin: 0, "&::before": { content: "none" } },
                 }}
             />
             <FileViewer
@@ -575,6 +599,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                             sx={{
                                 justifyContent: "space-between",
                                 alignItems: "center",
+                                gap: 1.5,
                                 pointerEvents: topControlsVisible
                                     ? "auto"
                                     : "none",
@@ -583,7 +608,11 @@ export const PublicAlbumSingleFileViewer: React.FC<
                             <Stack
                                 direction="row"
                                 spacing={1.5}
-                                sx={{ alignItems: "center" }}
+                                sx={{
+                                    alignItems: "center",
+                                    minWidth: 0,
+                                    flex: 1,
+                                }}
                             >
                                 <Box
                                     component="a"
@@ -594,6 +623,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                         color: "white",
                                         opacity: 0.85,
                                         lineHeight: 0,
+                                        flexShrink: 0,
                                         "& svg": {
                                             width: "auto",
                                             height: { xs: 17, sm: 21 },
@@ -700,11 +730,20 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                         </Stack>
                                     )
                                 )}
+                                <Box
+                                    ref={progressHostRef}
+                                    className="pswp-ente pswp-ente-public-album"
+                                    sx={{
+                                        display: { xs: "none", sm: "block" },
+                                        minWidth: 0,
+                                        flex: 1,
+                                    }}
+                                />
                             </Stack>
                             <Stack
                                 direction="row"
                                 spacing={1}
-                                sx={{ alignItems: "center" }}
+                                sx={{ alignItems: "center", flexShrink: 0 }}
                             >
                                 <Button
                                     variant="contained"
