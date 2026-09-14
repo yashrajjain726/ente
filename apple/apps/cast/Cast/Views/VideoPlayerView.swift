@@ -12,6 +12,7 @@ struct VideoPlayerView: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var toastIcon = ""
+    @State private var playerObservers: [NSObjectProtocol] = []
 
     init(videoData: Data, suggestedFilename: String? = nil) {
         self.videoData = videoData
@@ -70,30 +71,22 @@ struct VideoPlayerView: View {
                     suggestedExtension: suggestedExtension,
                 )
 
-                await MainActor.run {
-                    let asset = AVURLAsset(url: tempURL)
+                let asset = AVURLAsset(url: tempURL)
+                let isPlayable = try await asset.load(.isPlayable)
+                let hasVideoTracks = try await !asset.loadTracks(withMediaType: .video).isEmpty
 
-                    Task {
-                        let isPlayable = try await asset.load(.isPlayable)
-                        let hasVideoTracks = try await !asset.loadTracks(withMediaType: .video)
-                            .isEmpty
+                if isPlayable, hasVideoTracks {
+                    let playerItem = AVPlayerItem(url: tempURL)
+                    let player = AVPlayer(playerItem: playerItem)
 
-                        await MainActor.run {
-                            if isPlayable, hasVideoTracks {
-                                let playerItem = AVPlayerItem(url: tempURL)
-                                let player = AVPlayer(playerItem: playerItem)
+                    monitorPlayerItemStatus(playerItem)
 
-                                monitorPlayerItemStatus(playerItem)
+                    self.playerItem = playerItem
+                    self.player = player
 
-                                self.playerItem = playerItem
-                                self.player = player
-
-                                setupPlayer()
-                            } else {
-                                tryVideoFallback(originalURL: tempURL)
-                            }
-                        }
-                    }
+                    setupPlayer()
+                } else {
+                    tryVideoFallback(originalURL: tempURL)
                 }
             } catch {
                 print("Failed to setup video player: \(error)")
@@ -171,8 +164,9 @@ struct VideoPlayerView: View {
 
     private func setupPlayerObservers() {
         guard let player, let currentItem = player.currentItem else { return }
+        removePlayerObservers()
 
-        NotificationCenter.default.addObserver(
+        let playbackEnded = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: currentItem,
             queue: .main,
@@ -181,7 +175,7 @@ struct VideoPlayerView: View {
             player.play()
         }
 
-        NotificationCenter.default.addObserver(
+        let playbackFailed = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime,
             object: currentItem,
             queue: .main,
@@ -193,7 +187,7 @@ struct VideoPlayerView: View {
             }
         }
 
-        NotificationCenter.default.addObserver(
+        let willResignActive = NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification,
             object: nil,
             queue: .main,
@@ -201,7 +195,7 @@ struct VideoPlayerView: View {
             player.pause()
         }
 
-        NotificationCenter.default.addObserver(
+        let didBecomeActive = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main,
@@ -212,6 +206,7 @@ struct VideoPlayerView: View {
                 }
             }
         }
+        playerObservers = [playbackEnded, playbackFailed, willResignActive, didBecomeActive]
     }
 
     private func createTemporaryVideoFile(
@@ -286,29 +281,16 @@ struct VideoPlayerView: View {
         return "mp4"
     }
 
+    private func removePlayerObservers() {
+        for observer in playerObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        playerObservers.removeAll()
+    }
+
     private func cleanup() {
         player?.pause()
-
-        NotificationCenter.default.removeObserver(
-            self,
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: nil,
-        )
-        NotificationCenter.default.removeObserver(
-            self,
-            name: .AVPlayerItemFailedToPlayToEndTime,
-            object: nil,
-        )
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIApplication.willResignActiveNotification,
-            object: nil,
-        )
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIApplication.didBecomeActiveNotification,
-            object: nil,
-        )
+        removePlayerObservers()
 
         do {
             try AVAudioSession.sharedInstance().setActive(

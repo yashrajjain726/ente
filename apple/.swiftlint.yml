@@ -1,0 +1,18 @@
+only_rules:
+  - unowned_variable_capture
+  - weak_delegate
+  - class_delegate_protocol
+  - discarded_notification_center_observer
+  - unhandled_throwing_task
+  - private_swiftui_state
+  - identical_operands
+  - duplicate_conditions
+  - unused_setter_value
+  - blanket_disable_command
+  - superfluous_disable_command
+
+excluded:
+  - apps/cast/Cast/Generated/cast.swift
+
+allow_zero_lintable_files: false
+strict: true

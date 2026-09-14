@@ -39,6 +39,7 @@ class RealSlideshowService: ObservableObject {
     private var slideTimer: Timer?
     private var prefetchCache: [Int: Data] = [:]
     private var videoTempFiles: [Int: URL] = [:]
+    private var videoEndObserver: NSObjectProtocol?
     private let slideshowConfiguration = SlideConfiguration.tvOptimized
     private var slideTimeRemaining: TimeInterval = 0
     private var slidePauseTime: Date?
@@ -186,6 +187,7 @@ class RealSlideshowService: ObservableObject {
 
     func stop() async {
         ScreenSaverManager.allowScreenSaver()
+        removeVideoEndObserver()
 
         await MainActor.run {
             isStopping = true
@@ -215,6 +217,7 @@ class RealSlideshowService: ObservableObject {
 
     func clearExpiredTokenState() async {
         ScreenSaverManager.allowScreenSaver()
+        removeVideoEndObserver()
 
         await MainActor.run {
             // A late timer callback would surface a false empty state.
@@ -756,8 +759,9 @@ class RealSlideshowService: ObservableObject {
     }
 
     private func prepareVideoPlayer(url: URL) {
+        removeVideoEndObserver()
         let playerItem = AVPlayerItem(url: url)
-        NotificationCenter.default.addObserver(
+        videoEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: playerItem,
             queue: .main,
@@ -778,6 +782,13 @@ class RealSlideshowService: ObservableObject {
         }
         playVideo()
         startVideoProgressUpdates()
+    }
+
+    private func removeVideoEndObserver() {
+        if let videoEndObserver {
+            NotificationCenter.default.removeObserver(videoEndObserver)
+        }
+        videoEndObserver = nil
     }
 
     private func startVideoProgressUpdates() {
