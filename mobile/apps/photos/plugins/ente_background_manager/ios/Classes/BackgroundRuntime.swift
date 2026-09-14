@@ -263,6 +263,12 @@ final class BackgroundRuntime: NSObject {
     let engine = FlutterEngine(
       name: "ente-background-\(run.invocation)", project: nil, allowHeadlessExecution: true)
     run.engine = engine
+    guard
+      engine.run(withEntrypoint: callback.callbackName, libraryURI: callback.callbackLibraryPath)
+    else {
+      retire(run, outcome: "failed", reason: "bootstrap", error: "Flutter engine failed to start")
+      return
+    }
     let channel = FlutterMethodChannel(
       name: "io.ente.background/worker", binaryMessenger: engine.binaryMessenger)
     run.channel = channel
@@ -303,12 +309,6 @@ final class BackgroundRuntime: NSObject {
       default:
         result(FlutterMethodNotImplemented)
       }
-    }
-    guard
-      engine.run(withEntrypoint: callback.callbackName, libraryURI: callback.callbackLibraryPath)
-    else {
-      retire(run, outcome: "failed", reason: "bootstrap", error: "Flutter engine failed to start")
-      return
     }
     registrant(engine)
   }
