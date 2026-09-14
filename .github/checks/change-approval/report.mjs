@@ -6,6 +6,7 @@ export function writeReport({
     rust,
     swift,
     web,
+    android,
 }) {
     const categories = [
         {
@@ -55,6 +56,11 @@ export function writeReport({
             plural: "Web lint policy files",
             count: web.length,
         },
+        {
+            singular: "Android lint policy file",
+            plural: "Android lint policy files",
+            count: android.length,
+        },
     ].filter(({ count }) => count);
     const summary = categories
         .map(
@@ -94,6 +100,10 @@ export function writeReport({
         sections.push(`## Swift lint directives\n\n${list(swift.map(code))}`);
     if (web.length)
         sections.push(`## Web lint directives\n\n${list(web.map(code))}`);
+    if (android.length)
+        sections.push(
+            `## Android lint directives\n\n${list(android.map(code))}`,
+        );
     const detail = sections.join("\n\n");
 
     const { GITHUB_OUTPUT, GITHUB_STEP_SUMMARY } = process.env;

@@ -4,6 +4,9 @@ const routineBinary = (file) =>
     /\.(png|jpe?g|webp|gif|ico|icns|ttf|otf|woff2?|riv|mp3)$/i.test(file) ||
     file.includes("Assets.xcassets/");
 const guardrailDirs = [
+    "android/checks/",
+    "android/scripts/",
+    "android/gradle/",
     "apple/scripts/",
     "mobile/checks/",
     "mobile/scripts/",
@@ -24,6 +27,19 @@ const guardrailFiles = new Set([
     ".prettierrc.json",
     "analysis_options.yaml",
 ]);
+const androidConfigFiles = new Set([
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
+    "gradle.properties",
+    "detekt.yml",
+    "detekt.yaml",
+    "lint.xml",
+    "gradlew",
+    "gradlew.bat",
+    "verification-metadata.xml",
+]);
 const configFile =
     /(^|\/)(\.gitattributes|\.?clippy\.toml|rust-toolchain\.toml|\.cargo\/(config|audit)\.toml|\.npmrc|\.nvmrc|\.tool-versions|\.node-version|\.python-version|gradle-wrapper\.properties)$/;
 
@@ -43,7 +59,9 @@ export function checkFiles({ files }) {
                 path.startsWith(".github/") ||
                 (!added && guardrailDirs.some((dir) => path.startsWith(dir))) ||
                 guardrailFiles.has(path) ||
-                guardrailFiles.has(basename(path)),
+                guardrailFiles.has(basename(path)) ||
+                (path.startsWith("android/") &&
+                    androidConfigFiles.has(basename(path))),
         )
         .map(({ path }) => path);
     const configs = files

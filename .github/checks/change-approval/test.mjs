@@ -656,6 +656,54 @@ test("new lint and formatter configs need approval, including untracked files", 
     assert.match(scan(t, {}, files, { commit: false }), /^7 guardrail files\n/);
 });
 
+test("Android lint configurations need approval when added, edited, or deleted", (t) => {
+    const files = {
+        "android/build.gradle.kts": "",
+        "android/settings.gradle.kts": "",
+        "android/gradle.properties": "",
+        "android/gradlew": "",
+        "android/gradlew.bat": "",
+        "android/gradle/verification-metadata.xml": "",
+        "android/detekt.yml": "",
+        "android/apps/example/detekt.yaml": "",
+        "android/apps/example/lint.xml": "",
+        "android/apps/example/build.gradle": "",
+    };
+    for (const [base, change] of [
+        [{}, files],
+        [
+            files,
+            Object.fromEntries(Object.keys(files).map((file) => [file, "\n"])),
+        ],
+        [
+            files,
+            Object.fromEntries(Object.keys(files).map((file) => [file, null])),
+        ],
+    ]) {
+        const { summary } = scan(t, base, change, { ci: true });
+        assert.match(summary, /10 guardrail files/);
+        for (const file of Object.keys(files))
+            assert.ok(summary.includes(`\`${file}\``));
+    }
+});
+
+test("Android lint scripts and checks need approval when edited", (t) => {
+    assert.match(
+        scan(
+            t,
+            {
+                "android/scripts/lint.sh": "",
+                "android/checks/gradle-order/check.py": "",
+            },
+            {
+                "android/scripts/lint.sh": "\n",
+                "android/checks/gradle-order/check.py": "\n",
+            },
+        ),
+        /^2 guardrail files\n/,
+    );
+});
+
 test("toolchain and registry config added, modified, or deleted", (t) => {
     const output = scan(
         t,
@@ -1102,6 +1150,34 @@ test("Swift directive edits need approval; ordinary edits and removals do not", 
         ),
         /^1 Swift lint policy file\n/,
     );
+    for (const after of [before.replace("first", "second"), "first()\n", null])
+        assert.equal(scan(t, { [file]: before }, { [file]: after }), "");
+});
+
+test("added Android lint suppressions need approval", (t) => {
+    for (const [extension, directive] of [
+        ["kt", '@Suppress("UnsafeCallOnNullableType")'],
+        ["kts", '@file:Suppress("DEPRECATION")'],
+        ["java", '@android.annotation.SuppressLint("NewApi")'],
+        ["java", '@SuppressWarnings("deprecation")'],
+        ["xml", 'tools:ignore="HardcodedText"'],
+        ["kt", "//noinspection KotlinConstantConditions"],
+    ]) {
+        const file = `android/apps/example/Example.${extension}`;
+        assert.match(
+            scan(
+                t,
+                { [file]: "first()\n" },
+                { [file]: `${directive}\nfirst()\n` },
+            ),
+            /^1 Android lint policy file\n/,
+        );
+    }
+});
+
+test("ordinary Android edits and removed suppressions need no approval", (t) => {
+    const file = "android/apps/example/Example.kt";
+    const before = '@Suppress("DEPRECATION")\nfirst()\n';
     for (const after of [before.replace("first", "second"), "first()\n", null])
         assert.equal(scan(t, { [file]: before }, { [file]: after }), "");
 });

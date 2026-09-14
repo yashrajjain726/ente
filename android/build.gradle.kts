@@ -1,3 +1,4 @@
+import com.android.build.api.dsl.CommonExtension
 import com.ncorti.ktfmt.gradle.KtfmtExtension
 import dev.detekt.gradle.extensions.DetektExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
@@ -18,12 +19,15 @@ allprojects {
 
     apply(plugin = "com.ncorti.ktfmt.gradle")
     apply(plugin = "dev.detekt")
-    extensions.configure<KtfmtExtension> {
-        kotlinLangStyle()
-        maxWidth.set(100)
-    }
+    extensions.configure<KtfmtExtension> { kotlinLangStyle() }
 
     extensions.configure<DetektExtension> { config.setFrom(rootProject.file("detekt.yml")) }
+
+    listOf("com.android.application", "com.android.library").forEach { id ->
+        pluginManager.withPlugin(id) {
+            extensions.configure<CommonExtension<*, *, *, *, *, *>> { lint.warningsAsErrors = true }
+        }
+    }
 
     tasks.withType<KotlinCompilationTask<*>>().configureEach {
         compilerOptions.allWarningsAsErrors.set(true)
