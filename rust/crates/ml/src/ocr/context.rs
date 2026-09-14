@@ -286,13 +286,10 @@ mod tests {
                     3 => 704,
                     _ => 960,
                 } / mask.shape[2] as usize;
-                assert_eq!(
-                    mask.values.iter().filter(|&&v| v == 1.0).count(),
-                    height * width / (scale * scale)
-                );
+                let active = height / scale * (width / scale);
+                assert_eq!(mask.values.iter().filter(|&&v| v == 1.0).count(), active);
                 let scale_name = mask.name.replace("mask", "pool_scale");
                 if let Some(pool_scale) = inputs.iter().find(|input| input.name == scale_name) {
-                    let active = height * width / (scale * scale);
                     assert!(
                         (pool_scale.values[0] * active as f32 / mask.values.len() as f32 - 1.0)
                             .abs()

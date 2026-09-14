@@ -427,6 +427,35 @@ fn mean_confidence(spans: &[CharacterSpan]) -> f32 {
     spans.iter().map(|span| span.confidence).sum::<f32>() / spans.len() as f32
 }
 
+fn choose_packed_width(pending: &[usize], lines: &[super::context::Line]) -> usize {
+    let mut best_width = 7168;
+    let mut best_cost = f64::INFINITY;
+    for &width in super::context::branch_widths() {
+        if width < lines[pending[0]].width {
+            continue;
+        }
+        let mut used = 0;
+        let mut payload = 0;
+        let mut count = 0;
+        for &index in pending {
+            let size = lines[index].width.div_ceil(8) * 8;
+            if count < width / 336 && used + size <= width {
+                used += size + 16;
+                payload += lines[index].width;
+                count += 1;
+            }
+        }
+        if payload > 0 {
+            let cost = (width + 128) as f64 / payload as f64;
+            if cost < best_cost {
+                best_cost = cost;
+                best_width = width;
+            }
+        }
+    }
+    best_width
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,7 +661,9 @@ mod tests {
         };
         let expected = decode_output(&[2, 6, 4], &full, &layout, &dictionary()).unwrap();
         let actual: Vec<_> = compact
-            .chunks_exact(12)
+            .as_chunks::<12>()
+            .0
+            .iter()
             .zip(&layout.content_widths)
             .map(|(values, &content_width)| {
                 decode_line(
@@ -1195,33 +1226,4 @@ mod tests {
         assert_eq!(calls, 1);
         assert!(matches!(error, OcrError::Cancelled));
     }
-}
-
-fn choose_packed_width(pending: &[usize], lines: &[super::context::Line]) -> usize {
-    let mut best_width = 7168;
-    let mut best_cost = f64::INFINITY;
-    for &width in super::context::branch_widths() {
-        if width < lines[pending[0]].width {
-            continue;
-        }
-        let mut used = 0;
-        let mut payload = 0;
-        let mut count = 0;
-        for &index in pending {
-            let size = lines[index].width.div_ceil(8) * 8;
-            if count < width / 336 && used + size <= width {
-                used += size + 16;
-                payload += lines[index].width;
-                count += 1;
-            }
-        }
-        if payload > 0 {
-            let cost = (width + 128) as f64 / payload as f64;
-            if cost < best_cost {
-                best_cost = cost;
-                best_width = width;
-            }
-        }
-    }
-    best_width
 }
