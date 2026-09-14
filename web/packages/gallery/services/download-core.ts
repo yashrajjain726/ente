@@ -10,7 +10,6 @@ import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import { decodeLivePhoto } from "ente-media/live-photo";
-import { mergeUint8Arrays } from "ente-utils/array";
 import { detectFileTypeInfoFromChunk } from "../utils/detect-type";
 
 export type RenderableSourceURLs =
@@ -278,29 +277,26 @@ export class DownloadManagerCore {
                 const encryptedData = await wrapErrors(async () => {
                     if (!res.body)
                         return new Uint8Array(await res.arrayBuffer());
-                    const reader = res.body.getReader();
-                    const chunks: Uint8Array[] = [];
-                    try {
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) {
+                    const body = res.body.pipeThrough(
+                        new TransformStream<Uint8Array, Uint8Array>({
+                            transform: (chunk, controller) => {
+                                loaded += chunk.byteLength;
                                 this.setFileDownloadProgress(file.id, {
                                     loaded,
-                                    total: loaded,
+                                    total,
                                 });
-                                break;
-                            }
-                            loaded += value.byteLength;
-                            this.setFileDownloadProgress(file.id, {
-                                loaded,
-                                total,
-                            });
-                            chunks.push(value);
-                        }
-                    } finally {
-                        reader.releaseLock();
-                    }
-                    return mergeUint8Arrays(chunks);
+                                controller.enqueue(chunk);
+                            },
+                        }),
+                    );
+                    const data = new Uint8Array(
+                        await new Response(body).arrayBuffer(),
+                    );
+                    this.setFileDownloadProgress(file.id, {
+                        loaded,
+                        total: loaded,
+                    });
+                    return data;
                 });
                 const decrypted = await decryptStreamBytes(
                     {
