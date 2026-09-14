@@ -5,7 +5,7 @@ use super::kernel::{
     pack_lanes, pack_lanes_i8, pack_lanes_i8_into, pack_lanes_into, quantize_for, unpack_lanes,
     unpack_lanes_i8, validate_dims,
 };
-use super::{DistanceMetric, StorageKind, VecDbError};
+use super::{StorageKind, VecDbError};
 
 pub(crate) const VECTORS_PER_CHUNK: usize = 4096;
 pub(crate) const MAX_KEY_BYTES: usize = 256;
@@ -114,7 +114,6 @@ pub(crate) struct VectorArena {
     dims: usize,
     lanes_per_vector: usize,
     storage: Storage,
-    metric: DistanceMetric,
     norms: Vec<f64>,
     keys_to_slots: HashMap<Box<str>, u32>,
     slots_to_keys: Vec<Box<str>>,
@@ -129,16 +128,7 @@ impl VectorArena {
         Self::with_storage(dims, StorageKind::F32)
     }
 
-    #[cfg(test)]
     pub(crate) fn with_storage(dims: usize, storage: StorageKind) -> Result<Self, VecDbError> {
-        Self::with_metric(dims, storage, DistanceMetric::InnerProduct)
-    }
-
-    pub(crate) fn with_metric(
-        dims: usize,
-        storage: StorageKind,
-        metric: DistanceMetric,
-    ) -> Result<Self, VecDbError> {
         validate_dims(dims, storage)?;
         let storage = match storage {
             StorageKind::F32 => Storage::F32 { chunks: Vec::new() },
@@ -151,7 +141,6 @@ impl VectorArena {
             dims,
             lanes_per_vector: dims / storage.kind().lane_width(),
             storage,
-            metric,
             norms: Vec::new(),
             keys_to_slots: HashMap::new(),
             slots_to_keys: Vec::new(),
@@ -159,10 +148,6 @@ impl VectorArena {
             free_slots: Vec::new(),
             live_count: 0,
         })
-    }
-
-    pub(crate) fn metric(&self) -> DistanceMetric {
-        self.metric
     }
 
     pub(crate) fn dims(&self) -> usize {
@@ -250,9 +235,7 @@ impl VectorArena {
         if slot as usize / 64 == self.alive.len() {
             self.alive.push(0);
         }
-        if self.metric == DistanceMetric::Cosine {
-            self.norms.push(0.0);
-        }
+        self.norms.push(0.0);
         self.slots_to_keys.push(Box::from(key));
         self.keys_to_slots.insert(Box::from(key), slot);
         self.mark_alive(slot);
@@ -317,9 +300,7 @@ impl VectorArena {
     }
 
     fn move_vector(&mut self, src: u32, dst: u32) {
-        if self.metric == DistanceMetric::Cosine {
-            self.norms[dst as usize] = self.norms[src as usize];
-        }
+        self.norms[dst as usize] = self.norms[src as usize];
         let lanes = self.lanes_per_vector;
         match &mut self.storage {
             Storage::F32 { chunks } => move_lanes(chunks, lanes, src, dst),
@@ -392,20 +373,12 @@ impl VectorArena {
         Ok(match quantize_for(self.storage_kind(), values) {
             Some(StoredVector::I8 { scale, values }) => {
                 let lanes = pack_lanes_i8(&values);
-                let norm = if self.metric == DistanceMetric::Cosine {
-                    i8_lanes_norm(scale, &lanes)
-                } else {
-                    0.0
-                };
+                let norm = i8_lanes_norm(scale, &lanes);
                 PackedQuery::I8 { scale, lanes, norm }
             }
             Some(StoredVector::F32(_)) | None => {
                 let lanes = pack_lanes(values);
-                let norm = if self.metric == DistanceMetric::Cosine {
-                    f32_lanes_norm(&lanes)
-                } else {
-                    0.0
-                };
+                let norm = f32_lanes_norm(&lanes);
                 PackedQuery::F32(lanes, norm)
             }
         })
@@ -418,9 +391,6 @@ impl VectorArena {
     pub(crate) fn distance_to_query(&self, query: Query<'_>, slot: u32) -> f32 {
         match (query, self.stored_query(slot)) {
             (Query::F32(a, norm_a), Query::F32(b, norm_b)) => {
-                if self.metric == DistanceMetric::InnerProduct {
-                    return F32Kernel::distance(a, b);
-                }
                 let denominator = norm_a * norm_b;
                 let dot = if denominator >= f64::from(f32::MIN_POSITIVE)
                     && denominator <= f64::from(f32::MAX)
@@ -437,21 +407,16 @@ impl VectorArena {
             }
             (
                 Query::I8 {
-                    scale: scale_a,
                     lanes: a,
                     norm: norm_a,
+                    ..
                 },
                 Query::I8 {
-                    scale: scale_b,
                     lanes: b,
                     norm: norm_b,
+                    ..
                 },
-            ) => {
-                if self.metric == DistanceMetric::InnerProduct {
-                    return I8Kernel::distance(a, scale_a, b, scale_b);
-                }
-                cosine_distance(f64::from(I8Kernel::dot(a, b)), norm_a * norm_b)
-            }
+            ) => cosine_distance(f64::from(I8Kernel::dot(a, b)), norm_a * norm_b),
             _ => unreachable!("queries are packed by the arena that searches them"),
         }
     }
@@ -481,9 +446,7 @@ impl VectorArena {
                 unreachable!("payload kind is validated before a slot is written")
             }
         }
-        if self.metric == DistanceMetric::Cosine {
-            self.norms[slot as usize] = self.stored_norm(slot);
-        }
+        self.norms[slot as usize] = self.stored_norm(slot);
     }
 
     fn mark_alive(&mut self, slot: u32) {
@@ -576,8 +539,7 @@ mod tests {
     fn cosine_norms_match_their_scalar_references_and_agree_between_query_and_slot() {
         for dims in [512usize, 768] {
             for storage in [StorageKind::F32, StorageKind::I8] {
-                let mut arena =
-                    VectorArena::with_metric(dims, storage, DistanceMetric::Cosine).unwrap();
+                let mut arena = VectorArena::with_storage(dims, storage).unwrap();
                 let vectors: Vec<Vec<f32>> = (0..16u64)
                     .map(|seed| seeded_vector(0x5E1F_0000 + seed, dims))
                     .collect();
@@ -1175,7 +1137,7 @@ mod tests {
     }
 
     #[test]
-    fn distances_use_the_kernel_metric() {
+    fn distances_are_cosine() {
         let mut arena = VectorArena::new(16).unwrap();
         arena.upsert("x", &basis_vector(16, 0)).unwrap();
         arena.upsert("y", &basis_vector(16, 9)).unwrap();
@@ -1254,21 +1216,24 @@ mod tests {
     }
 
     #[test]
-    fn i8_distances_follow_the_scaled_dot_formula() {
+    fn i8_distances_follow_the_quantized_cosine_formula() {
         let dims = 64;
         let mut arena = VectorArena::with_storage(dims, StorageKind::I8).unwrap();
         let a = seeded_unit_vector(11, dims);
         let b = seeded_unit_vector(12, dims);
         arena.upsert("a", &a).unwrap();
         arena.upsert("b", &b).unwrap();
-        let (scale_a, values_a) = stored_i8(&arena, 0);
-        let (scale_b, values_b) = stored_i8(&arena, 1);
-        let dot: i32 = values_a
-            .iter()
-            .zip(&values_b)
-            .map(|(x, y)| i32::from(*x) * i32::from(*y))
-            .sum();
-        let expected = 1.0 - dot as f32 * scale_a * scale_b;
+        let (_, values_a) = stored_i8(&arena, 0);
+        let (_, values_b) = stored_i8(&arena, 1);
+        let dot = |x: &[i8], y: &[i8]| -> f64 {
+            x.iter()
+                .zip(y)
+                .map(|(x, y)| f64::from(*x) * f64::from(*y))
+                .sum()
+        };
+        let norm = |values: &[i8]| dot(values, values).sqrt();
+        let expected =
+            (1.0 - dot(&values_a, &values_b) / (norm(&values_a) * norm(&values_b))) as f32;
         assert_eq!(
             arena.distance_between_slots(0, 1).to_bits(),
             expected.to_bits()
@@ -1288,7 +1253,7 @@ mod tests {
         );
         let f32_distance = 1.0 - a.iter().zip(&b).map(|(x, y)| x * y).sum::<f32>();
         assert!((expected - f32_distance).abs() < 0.01);
-        assert!(arena.distance_between_slots(0, 0).abs() < 0.02);
+        assert!(arena.distance_between_slots(0, 0).abs() < 1.0e-6);
     }
 
     #[test]
@@ -1390,13 +1355,15 @@ mod tests {
             f32_arena.upsert(&format!("key-{index}"), &values).unwrap();
             i8_arena.upsert(&format!("key-{index}"), &values).unwrap();
         }
+        let norm_bytes = f32_arena.norms.capacity() * size_of::<f64>();
+        assert_eq!(i8_arena.norms.capacity() * size_of::<f64>(), norm_bytes);
         assert_eq!(
             f32_arena.vector_memory_bytes(),
-            VECTORS_PER_CHUNK * dims * size_of::<f32>()
+            VECTORS_PER_CHUNK * dims * size_of::<f32>() + norm_bytes
         );
         assert_eq!(
             i8_arena.vector_memory_bytes(),
-            VECTORS_PER_CHUNK * dims + 100 * size_of::<f32>()
+            VECTORS_PER_CHUNK * dims + 100 * size_of::<f32>() + norm_bytes
         );
     }
 }

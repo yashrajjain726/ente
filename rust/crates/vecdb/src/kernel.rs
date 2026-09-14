@@ -143,10 +143,6 @@ pub(crate) trait VectorKernel {
     type Lane;
 
     fn dot(a: &[Self::Lane], b: &[Self::Lane]) -> f32;
-
-    fn distance(a: &[Self::Lane], b: &[Self::Lane]) -> f32 {
-        1.0 - Self::dot(a, b)
-    }
 }
 
 pub(crate) struct F32Kernel;
@@ -180,10 +176,6 @@ impl I8Kernel {
             total += lane;
         }
         total
-    }
-
-    pub(crate) fn distance(a: &[LaneI8], scale_a: f32, b: &[LaneI8], scale_b: f32) -> f32 {
-        1.0 - Self::dot(a, b) as f32 * scale_a * scale_b
     }
 }
 
@@ -290,11 +282,11 @@ mod tests {
     }
 
     #[test]
-    fn distance_of_basis_vectors_is_exact() {
+    fn dot_of_basis_vectors_is_exact() {
         let e0 = pack_lanes(&basis_vector(128, 0));
         let e1 = pack_lanes(&basis_vector(128, 100));
-        assert_eq!(F32Kernel::distance(&e0, &e0), 0.0);
-        assert_eq!(F32Kernel::distance(&e0, &e1), 1.0);
+        assert_eq!(F32Kernel::dot(&e0, &e0), 1.0);
+        assert_eq!(F32Kernel::dot(&e0, &e1), 0.0);
     }
 
     #[test]
@@ -388,26 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn i8_distance_pins_the_evaluation_order() {
-        let a = pack_lanes_i8(&seeded_i8_values(5, 64));
-        let b = pack_lanes_i8(&seeded_i8_values(6, 64));
-        let scale_a = 0.012_345_6f32;
-        let scale_b = 0.045_678_9f32;
-        let dot = I8Kernel::dot(&a, &b);
-        let scaled_once = dot as f32 * scale_a;
-        let expected = 1.0 - scaled_once * scale_b;
-        assert_eq!(
-            I8Kernel::distance(&a, scale_a, &b, scale_b).to_bits(),
-            expected.to_bits()
-        );
-        assert_eq!(
-            I8Kernel::distance(&b, scale_b, &a, scale_a).to_bits(),
-            (1.0 - (dot as f32 * scale_b) * scale_a).to_bits()
-        );
-    }
-
-    #[test]
-    fn i8_distance_of_basis_vectors_is_orthogonal_exactly_and_self_within_rounding() {
+    fn i8_dot_of_basis_vectors_is_orthogonal_exactly_and_self_within_rounding() {
         let (scale_0, values_0) = quantized_parts(&basis_vector(32, 0));
         let (scale_5, values_5) = quantized_parts(&basis_vector(32, 5));
         assert_eq!(scale_0, 1.0 / 127.0);
@@ -415,8 +388,9 @@ mod tests {
         assert!(values_0[1..].iter().all(|&value| value == 0));
         let e0 = pack_lanes_i8(&values_0);
         let e5 = pack_lanes_i8(&values_5);
-        assert_eq!(I8Kernel::distance(&e0, scale_0, &e5, scale_5), 1.0);
-        assert!(I8Kernel::distance(&e0, scale_0, &e0, scale_0).abs() < 1.0e-6);
+        assert_eq!(I8Kernel::dot(&e0, &e5), 0);
+        assert!((I8Kernel::dot(&e0, &e0) as f32 * scale_0 * scale_0 - 1.0).abs() < 1.0e-6);
+        assert_eq!(scale_5, scale_0);
     }
 
     #[test]
@@ -538,18 +512,19 @@ mod tests {
     }
 
     #[test]
-    fn i8_distance_tracks_f32_distance_on_unit_vectors_within_the_bound() {
+    fn i8_dot_tracks_f32_dot_on_unit_vectors_within_the_bound() {
         let mut max_delta = 0.0f32;
         for (dims, pairs, seed) in [(512usize, 300u64, 0x1000u64), (64, 300, 0x2000)] {
             for pair in 0..pairs {
                 let a = seeded_unit_values(seed + pair * 2, dims);
                 let b = seeded_unit_values(seed + pair * 2 + 1, dims);
-                let f32_distance = F32Kernel::distance(&pack_lanes(&a), &pack_lanes(&b));
+                let f32_dot = F32Kernel::dot(&pack_lanes(&a), &pack_lanes(&b));
                 let (scale_a, qa) = quantized_parts(&a);
                 let (scale_b, qb) = quantized_parts(&b);
-                let i8_distance =
-                    I8Kernel::distance(&pack_lanes_i8(&qa), scale_a, &pack_lanes_i8(&qb), scale_b);
-                let delta = (i8_distance - f32_distance).abs();
+                let i8_dot = I8Kernel::dot(&pack_lanes_i8(&qa), &pack_lanes_i8(&qb)) as f32
+                    * scale_a
+                    * scale_b;
+                let delta = (i8_dot - f32_dot).abs();
                 assert!(delta <= 0.01, "dims {dims} pair {pair}: delta {delta}");
                 max_delta = max_delta.max(delta);
             }
