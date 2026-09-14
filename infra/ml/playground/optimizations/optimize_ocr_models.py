@@ -157,47 +157,6 @@ def fold_input_affine(model):
     return (remove_unused_nodes(model), count)
 
 
-def align_recognizer_projection(model, width):
-    values = constant_arrays(model)
-    node = next(n for n in model.graph.node if n.name == "MatMul.12")
-    weights = values[node.input[1]]
-    assert weights.shape == (120, 18385)
-    padded = np.pad(weights, ((0, 0), (0, width - 18385)))
-    model.graph.initializer.extend(
-        [
-            numpy_helper.from_array(padded, "modelopt_projection_weight"),
-            numpy_helper.from_array(
-                np.array([0], dtype=np.int64), "modelopt_slice_start"
-            ),
-            numpy_helper.from_array(
-                np.array([18385], dtype=np.int64), "modelopt_slice_end"
-            ),
-            numpy_helper.from_array(
-                np.array([2], dtype=np.int64), "modelopt_slice_axis"
-            ),
-        ]
-    )
-    node.input[1] = "modelopt_projection_weight"
-    output = node.output[0]
-    node.output[0] = "modelopt_padded_projection"
-    index = next((i for i, n in enumerate(model.graph.node) if n.name == node.name))
-    model.graph.node.insert(
-        index + 1,
-        helper.make_node(
-            "Slice",
-            [
-                node.output[0],
-                "modelopt_slice_start",
-                "modelopt_slice_end",
-                "modelopt_slice_axis",
-            ],
-            [output],
-            name="modelopt_projection_slice",
-        ),
-    )
-    return remove_unused_nodes(model)
-
-
 def fuse_recognizer_layer_norms(model):
     model = onnx.version_converter.convert_version(model, 17)
     values = constant_arrays(model)
@@ -683,33 +642,60 @@ def recognizer_model(source_model, width, slots):
     return model, metadata
 
 
-def pad_vocabulary(original):
-    model = copy.deepcopy(original)
-    values = {v.name: numpy_helper.to_array(v) for v in model.graph.initializer}
-    for node in model.graph.node:
-        if node.op_type == "Constant":
-            for attribute in node.attribute:
-                if attribute.name == "value":
-                    values[node.output[0]] = numpy_helper.to_array(attribute.t)
-    removed = next(
+def pad_vocabulary(model):
+    values = constant_arrays(model)
+    projection = next(n for n in model.graph.node if n.name == "MatMul.12")
+    weights = values[projection.input[1]]
+    assert weights.shape == (120, 18385)
+    add = next(
         node
         for node in model.graph.node
-        if node.op_type == "Slice" and node.input[0] == "modelopt_padded_projection"
+        if node.op_type == "Add" and projection.output[0] in node.input
+    )
+    bias = values[next(name for name in add.input if name in values)].reshape(-1)
+    assert bias.size == 18385
+    insertion = next(
+        i
+        for i, value in enumerate(model.graph.initializer)
+        if value.name == "shared_positions"
+    )
+    model.graph.initializer.insert(
+        insertion,
+        numpy_helper.from_array(
+            np.pad(weights, ((0, 0), (0, 47))), "modelopt_projection_weight"
+        ),
+    )
+    projection.input[1] = "modelopt_projection_weight"
+    original = projection.output[0]
+    projection.output[0] = "modelopt_padded_projection"
+    add.input[:] = [
+        projection.output[0] if name == original else name for name in add.input
+    ]
+    model = remove_unused_nodes(model)
+    insertion = next(
+        i
+        for i, value in enumerate(model.graph.initializer)
+        if value.name == "shared_positions"
+    )
+    published_slice_constants = [("start", 0), ("end", 18385), ("axis", 2)]
+    for offset, (name, value) in enumerate(published_slice_constants):
+        model.graph.initializer.insert(
+            insertion + offset,
+            numpy_helper.from_array(
+                np.array([value], dtype=np.int64), f"modelopt_slice_{name}"
+            ),
+        )
+    model.graph.initializer.append(
+        numpy_helper.from_array(
+            np.pad(bias, (0, 47), constant_values=-np.inf), "vocabulary_bias_padded"
+        )
     )
     add = next(
         node
         for node in model.graph.node
-        if node.op_type == "Add" and removed.output[0] in node.input
-    )
-    bias_name = next(name for name in add.input if name in values)
-    bias = values[bias_name].reshape(-1)
-    assert bias.size == 18385
-    extended = np.pad(bias, (0, 18432 - bias.size), constant_values=-np.inf)
-    model.graph.initializer.append(
-        numpy_helper.from_array(extended, "vocabulary_bias_padded")
+        if node.op_type == "Add" and "modelopt_padded_projection" in node.input
     )
     add.input[:] = ["modelopt_padded_projection", "vocabulary_bias_padded"]
-    model.graph.node.remove(removed)
     for value in model.graph.initializer:
         if value.name == "shared_positions":
             value.CopyFrom(
@@ -1012,7 +998,6 @@ def optimize(models):
             f"Unexpected recognizer rewrites: folded={folded!r}, normalized={normalized!r}"
         )
     recognition = expand_hardswish(recognition)
-    recognition = align_recognizer_projection(recognition, 18432)
     recognition = compact_recognizer_output(recognition)
     detection = fold_detector_head(copy.deepcopy(models["det"]))
     detection = expand_hardswish(detection)

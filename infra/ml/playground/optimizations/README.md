@@ -32,7 +32,8 @@ input adapter; they cannot replace the original models independently.
 
 Missing sources are downloaded from `https://models.ente.com/PP-OCRv5`. Source and
 output hashes are verified. Upload only `det_fixed_v1.onnx`, `cls_fixed_v1.onnx`,
-and `rec_fixed_v1.onnx`; the dictionary is unchanged. The generated
+and `rec_fixed_v1.onnx`; the dictionary is unchanged. Unused legacy constants are
+retained for byte-for-byte CDN reproducibility. The generated
 `ocr_model_manifest.json` records the input shapes, hashes, and sizes.
 
 ## Rebuilding the models
