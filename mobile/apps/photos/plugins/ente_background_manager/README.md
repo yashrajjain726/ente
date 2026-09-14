@@ -22,6 +22,8 @@ Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer'
 
 Each platform has one process-local runtime. Admission checks backend eligibility, the active execution slot, and native foreground visibility before creating an engine. Busy or foreground deliveries finish as skips. Every admitted run captures its configuration and dispatcher binding and uses a fresh engine. On Android, a stop received during Flutter initialization retires the run before creating an engine.
 
+The native eligibility callback controls whether work may run; it preserves future schedules when eligibility is temporarily false. Scheduling follows the configured enablement and task identifiers. On iOS, failed schedule updates remain pending for a later configuration call or normal delivery to apply them; the plugin does not retry automatically.
+
 The slot remains occupied during startup, execution, cleanup, and teardown. Native callbacks and timers are tied to a unique invocation. Foreground entry always requests stopping, including during startup. Stops remain latched; repeated visibility changes cannot revive a task or extend its grace. A callback returning `completed` after a stop request is reported as `stopped`. Configuration updates affect later runs only.
 
 Normal completion, startup failure, system interruption, and configured forced teardown share one retirement path. Retirement invalidates timers, detaches the task channel, destroys the background engine, and completes the native invocation once. iOS re-arms normal future opportunities independently of Dart. No plugin retry loop, work queue, engine pool, or persistent event history is used.

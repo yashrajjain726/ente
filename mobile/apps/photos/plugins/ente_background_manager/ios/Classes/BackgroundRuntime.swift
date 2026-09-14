@@ -153,12 +153,12 @@ final class BackgroundRuntime: NSObject {
         }
         let pending = Dictionary(
           requests.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
-        let enabled = self.configuration.enabled && self.isAllowed()
-        let desired = enabled ? self.configuration.tasks : []
+        let desired = self.configuration.enabled ? self.configuration.tasks : []
         let identifiers = Set(desired.map(\.identifier))
         for identifier in self.registrations.keys where !identifiers.contains(identifier) {
           BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
         }
+        self.changedTasks.formIntersection(identifiers)
         var failure: Error?
         for task in desired {
           if pending[task.identifier] != nil && !self.changedTasks.contains(task.identifier) {
@@ -166,6 +166,7 @@ final class BackgroundRuntime: NSObject {
           }
           do {
             try self.submit(task, delayMs: task.initialDelayMs)
+            self.changedTasks.remove(task.identifier)
           } catch {
             failure = error
             self.report(
@@ -173,7 +174,6 @@ final class BackgroundRuntime: NSObject {
               error: String(describing: error))
           }
         }
-        self.changedTasks.removeAll()
         self.reconciling = false
         let results = self.configurationResults
         self.configurationResults.removeAll()
@@ -218,7 +218,7 @@ final class BackgroundRuntime: NSObject {
 
   private func deliver(_ task: BGTask, startedAt: TimeInterval) {
     scheduleRevision += 1
-    guard configuration.enabled, isAllowed(),
+    guard configuration.enabled,
       let policy = configuration.tasks.first(where: { $0.identifier == task.identifier })
     else {
       BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: task.identifier)
@@ -235,7 +235,9 @@ final class BackgroundRuntime: NSObject {
         error: String(describing: error))
     }
     let skip: String?
-    if active != nil {
+    if !isAllowed() {
+      skip = "disabled"
+    } else if active != nil {
       skip = "busy"
     } else if isForeground || UIApplication.shared.applicationState != .background {
       skip = "foreground"
