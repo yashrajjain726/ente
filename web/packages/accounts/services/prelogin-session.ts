@@ -1,5 +1,5 @@
+import { createSessionStorage } from "ente-base/session-storage";
 import { decryptBox, encryptBox, generateKey } from "ente-prelogin-wasm";
-import { createSessionStorage } from "./session-storage";
 
 export const {
     ensureMasterKeyFromSession,

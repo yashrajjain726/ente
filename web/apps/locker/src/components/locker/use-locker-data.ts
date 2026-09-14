@@ -20,7 +20,7 @@ import { isNamedError } from "ente-base/error";
 import { authenticatedRequestHeaders, isHTTP401Error } from "ente-base/http";
 import log from "ente-base/log";
 import { savedAuthToken } from "ente-base/token";
-import { ensureContactsReady } from "ente-contacts";
+import { initContacts, pullContacts } from "ente-contacts";
 import { contactsGetDiff, contactsGetProfilePicture } from "ente-locker-wasm";
 import { t } from "i18next";
 import type { NextRouter } from "next/router";
@@ -94,12 +94,13 @@ export const useLockerData = ({
             authToken,
             masterKey,
         );
-        await ensureContactsReady(
+        await initContacts(
             userID,
             session,
             contactsGetDiff,
             contactsGetProfilePicture,
         );
+        await pullContacts();
     }, []);
 
     const loadUserDetails = useCallback(async (): Promise<boolean> => {

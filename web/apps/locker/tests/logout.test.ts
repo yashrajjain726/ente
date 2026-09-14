@@ -1,3 +1,5 @@
+import { logoutClearStateAgain } from "ente-accounts/services/logout";
+import { logoutContacts } from "ente-contacts";
 import { expect, test, vi } from "vitest";
 import { openAuthenticatedSession } from "../src/services/authenticated-session";
 import { lockerLogout } from "../src/services/logout";
@@ -17,6 +19,8 @@ const {
     ),
     accountLogout: vi.fn<() => Promise<void>>(),
 }));
+
+vi.mock("ente-contacts", () => ({ logoutContacts: vi.fn() }));
 
 vi.mock("ente-base/app", () => ({
     clientPackageName: "io.ente.locker.web",
@@ -44,7 +48,10 @@ vi.mock("ente-accounts/services/user", () => ({
 vi.mock("ente-accounts/services/accounts-db", () => ({
     savedLocalUser: () => ({ id: 1 }),
 }));
-vi.mock("ente-accounts/services/logout", () => ({ accountLogout }));
+vi.mock("ente-accounts/services/logout", () => ({
+    accountLogout,
+    logoutClearStateAgain: vi.fn(),
+}));
 vi.mock("ente-locker-wasm", () => ({
     encryptBoxWithRecoveryKey,
     generateKey,
@@ -72,4 +79,6 @@ test("logout rejects pending sessions while account cleanup is pending", async (
         accountCleanup.resolve(undefined);
         await loggingOut;
     }
+    expect(logoutContacts).toHaveBeenCalledOnce();
+    expect(logoutClearStateAgain).toHaveBeenCalledOnce();
 });
