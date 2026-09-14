@@ -72,7 +72,14 @@ import type {
 } from "ente-new/photos/services/ml/people";
 import { t } from "i18next";
 import memoize from "memoize-one";
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import {
     VariableSizeList,
@@ -495,6 +502,13 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
 }) => {
     const columns = GridColumns;
     const listOuterRef = useRef<HTMLDivElement>(null);
+    const [scrollbarWidth, setScrollbarWidth] = useState(0);
+    const handleListOuterRef = useCallback((element: HTMLDivElement | null) => {
+        listOuterRef.current = element;
+        if (element) {
+            setScrollbarWidth(element.offsetWidth - element.clientWidth);
+        }
+    }, []);
 
     const shouldShowMoreFacesButton = showMoreFacesButton && !hasSearchQuery;
     const shouldShowExpandedPeople =
@@ -553,6 +567,7 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
                         0,
                         Math.floor(
                             (width -
+                                scrollbarWidth -
                                 2 * GridPaddingInline -
                                 (GridColumns - 1) * GridGap) /
                                 GridColumns,
@@ -561,7 +576,10 @@ const AllPeopleContent: React.FC<AllPeopleContentProps> = ({
                     return (
                         <VariableSizeList
                             {...{ width, height }}
-                            outerRef={listOuterRef}
+                            outerRef={handleListOuterRef}
+                            // Keep the measured gutter stable as rows are added
+                            // or removed, including when searching for people.
+                            style={{ scrollbarGutter: "stable" }}
                             key={`${listKey}-${tileSize}`}
                             itemCount={items.length}
                             itemSize={(index) =>
