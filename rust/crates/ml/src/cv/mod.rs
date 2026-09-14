@@ -13,6 +13,7 @@ mod stats;
 mod structuring;
 mod transform;
 mod warp;
+mod warp_rgb;
 
 use rayon::prelude::*;
 

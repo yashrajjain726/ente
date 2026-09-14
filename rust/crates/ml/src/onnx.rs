@@ -24,6 +24,13 @@ pub(crate) use tensor::{
 
 use providers::{ExecutionProvider, ProviderPlan};
 
+#[derive(Clone, Debug)]
+pub(crate) struct GpuOptions {
+    pub(crate) subgraphs: bool,
+    #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
+    pub(crate) prefer_nhwc: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AccelerationValidation {
     GoldenRequired,
@@ -58,6 +65,7 @@ pub(crate) struct OnnxSession {
     model_namespace: String,
     mode: ExecutionMode,
     validation: AccelerationValidation,
+    gpu_options: Option<GpuOptions>,
     provider_plan: Option<ProviderPlan>,
     session: Option<(Session, ExecutionProvider)>,
     first_run_canary: Option<webgpu::ArmedCanary>,
@@ -70,6 +78,7 @@ impl OnnxSession {
             model_namespace: model_namespace.to_string(),
             mode,
             validation: AccelerationValidation::GoldenRequired,
+            gpu_options: None,
             provider_plan: None,
             session: None,
             first_run_canary: None,
@@ -80,6 +89,11 @@ impl OnnxSession {
     // silently poison stored data.
     pub(crate) fn with_unvalidated_acceleration(mut self) -> Self {
         self.validation = AccelerationValidation::Unvalidated;
+        self
+    }
+
+    pub(crate) fn with_gpu_options(mut self, options: GpuOptions) -> Self {
+        self.gpu_options = Some(options);
         self
     }
 
@@ -152,8 +166,13 @@ impl OnnxSession {
         let model_name = model_file_label(model_path);
         log::info!("loading {model_name} with {:?} execution", self.mode);
         let started_at = std::time::Instant::now();
-        let (loaded, execution_provider) =
-            build_next_session(model_path, provider_plan, model_namespace, self.validation)?;
+        let (loaded, execution_provider) = build_next_session(
+            model_path,
+            provider_plan,
+            model_namespace,
+            self.validation,
+            self.gpu_options.as_ref(),
+        )?;
         log::info!(
             "loaded {model_name} with {execution_provider:?} in {:?}",
             started_at.elapsed()
@@ -218,7 +237,7 @@ impl SessionRunError {
         Self::Retryable(error)
     }
 
-    fn from_inference_error(error: ort::Error) -> Self {
+    pub(crate) fn from_inference_error(error: ort::Error) -> Self {
         match error.code() {
             ort::ErrorCode::GenericFailure
             | ort::ErrorCode::RuntimeException
@@ -276,9 +295,15 @@ fn build_next_session(
     plan: &mut ProviderPlan,
     model_namespace: &str,
     validation: AccelerationValidation,
+    gpu_options: Option<&GpuOptions>,
 ) -> MlResult<(LoadedSession, ExecutionProvider)> {
     let result = providers::run_provider_plan(plan, |execution_provider| {
-        let attempt = providers::provider_attempt(execution_provider, model_path, model_namespace);
+        let attempt = providers::provider_attempt(
+            execution_provider,
+            model_path,
+            model_namespace,
+            gpu_options,
+        );
         if attempt.execution_provider() == ExecutionProvider::WebGpu {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
@@ -348,6 +373,7 @@ fn build_cpu_session(model_path: &str) -> MlResult<Session> {
         &mut plan,
         "golden-tooling",
         AccelerationValidation::GoldenRequired,
+        None,
     )
     .map(|(loaded, _)| loaded.session)
 }
@@ -610,6 +636,24 @@ fn model_file_label(model_path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{ExecutionMode, ExecutionProvider, OnnxSession, provider_attempt_failure_message};
+
+    #[test]
+    fn unvalidated_acceleration_does_not_enable_ocr_gpu_options() {
+        let indexing = OnnxSession::new("model.onnx", "indexing", ExecutionMode::PlatformDefault);
+        assert!(indexing.gpu_options.is_none());
+        assert_eq!(
+            indexing.validation,
+            super::AccelerationValidation::GoldenRequired
+        );
+
+        let scanner = indexing.with_unvalidated_acceleration();
+        assert!(scanner.gpu_options.is_none());
+        assert_eq!(
+            scanner.validation,
+            super::AccelerationValidation::Unvalidated
+        );
+        assert_eq!(scanner.mode, ExecutionMode::PlatformDefault);
+    }
 
     fn first_run_canary(temp: &tempfile::TempDir) -> super::webgpu::ArmedCanary {
         let model = temp.path().join("model.onnx");
