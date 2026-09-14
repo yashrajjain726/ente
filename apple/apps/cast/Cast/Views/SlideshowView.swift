@@ -136,7 +136,7 @@ struct SlideshowView: View {
                 toastOverlay
             }
         }
-        .onChange(of: imageData) { newValue in
+        .onChange(of: imageData) { _, newValue in
             if let newData = newValue {
                 Task {
                     let decodedImage = decodedUIImage(from: newData)

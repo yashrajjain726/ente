@@ -149,39 +149,30 @@ class RealSlideshowService: ObservableObject {
             error = nil
         }
 
-        do {
-            await initializeFileList(castPayload: castPayload)
-            guard storedCastPayload == castPayload else { return }
+        await initializeFileList(castPayload: castPayload)
+        guard storedCastPayload == castPayload else { return }
 
-            let fileCount = await MainActor.run { allFiles.count }
-            if fileCount == 0 {
-                error = "No media files available in this album"
-                return
-            }
-
-            let validFileIDs = await Set(MainActor.run { allFiles.map(\.id) })
-            await cleanupExpiredCache(validFileIDs: validFileIDs, castPayload: castPayload)
-            guard storedCastPayload == castPayload else { return }
-
-            totalSlides = fileCount
-            currentFileIndex = 0
-            currentSlideIndex = 0
-            isPlaying = true
-            isPaused = false
-
-            await displaySlideAtCurrentIndex()
-            guard storedCastPayload == castPayload else { return }
-
-            startSlideTimer()
-            logger.info("Slideshow started with \(fileCount) slides")
-
-        } catch {
-            logger.error(
-                "Failed to start slideshow: \(error.localizedDescription, privacy: .public)")
-            await MainActor.run {
-                self.error = "Failed to load slideshow: \(error.localizedDescription)"
-            }
+        let fileCount = await MainActor.run { allFiles.count }
+        if fileCount == 0 {
+            error = "No media files available in this album"
+            return
         }
+
+        let validFileIDs = await Set(MainActor.run { allFiles.map(\.id) })
+        await cleanupExpiredCache(validFileIDs: validFileIDs, castPayload: castPayload)
+        guard storedCastPayload == castPayload else { return }
+
+        totalSlides = fileCount
+        currentFileIndex = 0
+        currentSlideIndex = 0
+        isPlaying = true
+        isPaused = false
+
+        await displaySlideAtCurrentIndex()
+        guard storedCastPayload == castPayload else { return }
+
+        startSlideTimer()
+        logger.info("Slideshow started with \(fileCount) slides")
     }
 
     func stop() async {
@@ -308,7 +299,7 @@ class RealSlideshowService: ObservableObject {
 
         guard httpResponse.statusCode == 200 else {
             if httpResponse.statusCode == 401 {
-                await handleUnauthorizedError()
+                handleUnauthorizedError()
                 throw CastError.serverError(
                     401,
                     "Authentication expired - resetting to pairing mode",
@@ -482,7 +473,7 @@ class RealSlideshowService: ObservableObject {
         }
 
         if let cachedData = prefetchCache[currentFileIndex] {
-            await updateCurrentSlide(with: cachedData, file: allFiles[currentFileIndex])
+            updateCurrentSlide(with: cachedData, file: allFiles[currentFileIndex])
             await MainActor.run { slideLoadingProgress = 1.0 }
             return
         }
@@ -499,7 +490,7 @@ class RealSlideshowService: ObservableObject {
 
             prefetchCache[currentFileIndex] = decryptedData
 
-            await updateCurrentSlide(with: decryptedData, file: file)
+            updateCurrentSlide(with: decryptedData, file: file)
             await MainActor.run { slideLoadingProgress = 1.0 }
 
             startPrefetching()
@@ -649,7 +640,7 @@ class RealSlideshowService: ObservableObject {
                 guard storedCastPayload == payload else { return }
 
                 prefetchCache[currentFileIndex] = decryptedData
-                await updateCurrentSlide(with: decryptedData, file: file)
+                updateCurrentSlide(with: decryptedData, file: file)
 
                 await MainActor.run {
                     currentSlideIndex = currentFileIndex
@@ -900,7 +891,7 @@ class RealSlideshowService: ObservableObject {
             if httpResponse.statusCode == 401,
                 request.value(forHTTPHeaderField: "X-Cast-Access-Token") != nil
             {
-                await handleUnauthorizedError()
+                handleUnauthorizedError()
                 throw CastError.serverError(
                     401,
                     "Authentication expired - resetting to pairing mode",
