@@ -28,6 +28,7 @@ struct Config {
     dims: usize,
     attrs: bool,
     storage: StorageKind,
+    metric: DistanceMetric,
 }
 
 struct BenchData {
@@ -68,9 +69,10 @@ struct VecdbReport {
 fn main() {
     let config = parse_args();
     println!(
-        "vecdb bench  dims={}  storage={}  queries={}  seed={:#018x}{}",
+        "vecdb bench  dims={}  storage={}  metric={}  queries={}  seed={:#018x}{}",
         config.dims,
         storage_name(config.storage),
+        metric_name(config.metric),
         QUERY_COUNT,
         SEED,
         if config.attrs { "  attrs=on" } else { "" }
@@ -91,6 +93,7 @@ fn main() {
             config.dims,
             config.attrs,
             config.storage,
+            config.metric,
             temp_root.path(),
         );
     }
@@ -101,6 +104,7 @@ fn parse_args() -> Config {
     let mut dims = DEFAULT_DIMS;
     let mut attrs = false;
     let mut storage = StorageKind::I8;
+    let mut metric = DistanceMetric::Cosine;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -115,6 +119,13 @@ fn parse_args() -> Config {
                 storage = match required_value(args.next()).as_str() {
                     "f32" => StorageKind::F32,
                     "i8" => StorageKind::I8,
+                    _ => usage_exit(),
+                }
+            }
+            "--metric" => {
+                metric = match required_value(args.next()).as_str() {
+                    "cosine" => DistanceMetric::Cosine,
+                    "ip" => DistanceMetric::InnerProduct,
                     _ => usage_exit(),
                 }
             }
@@ -137,6 +148,7 @@ fn parse_args() -> Config {
         dims,
         attrs,
         storage,
+        metric,
     }
 }
 
@@ -161,9 +173,16 @@ fn parse_scales(list: &str) -> Vec<usize> {
 fn usage_exit() -> ! {
     eprintln!(
         "usage: cargo run -p ente-ml --example vecdb_bench --release -- \
-         [--scales 10000,100000] [--dims 512] [--attrs] [--storage f32|i8]"
+         [--scales 10000,100000] [--dims 512] [--attrs] [--storage f32|i8] [--metric cosine|ip]"
     );
     std::process::exit(2);
+}
+
+fn metric_name(metric: DistanceMetric) -> &'static str {
+    match metric {
+        DistanceMetric::Cosine => "cosine",
+        DistanceMetric::InnerProduct => "ip",
+    }
 }
 
 fn storage_name(storage: StorageKind) -> &'static str {
@@ -173,27 +192,27 @@ fn storage_name(storage: StorageKind) -> &'static str {
     }
 }
 
-fn run_scale(scale: usize, dims: usize, attrs: bool, storage: StorageKind, temp_root: &Path) {
+fn run_scale(
+    scale: usize,
+    dims: usize,
+    attrs: bool,
+    storage: StorageKind,
+    metric: DistanceMetric,
+    temp_root: &Path,
+) {
     let clusters = (scale / 150).max(1) as u64;
     println!();
     println!(
-        "=== scale {scale}  dims {dims}  storage {}  clusters {clusters} ===",
-        storage_name(storage)
+        "=== scale {scale}  dims {dims}  storage {}  metric {}  clusters {clusters} ===",
+        storage_name(storage),
+        metric_name(metric)
     );
     let dir = temp_root.join(format!("scale-{scale}-{dims}"));
     std::fs::create_dir_all(&dir).expect("create bench dir");
-    drop(
-        VecDb::open(
-            &dir.join("bench.vecdb"),
-            dims,
-            Some(storage),
-            DistanceMetric::Cosine,
-        )
-        .expect("open vecdb"),
-    );
+    drop(VecDb::open(&dir.join("bench.vecdb"), dims, Some(storage), metric).expect("open vecdb"));
     eprintln!("[scale {scale}] generating data");
     let data = generate_data(scale, dims, clusters);
-    let vecdb = run_vecdb(&data, dims, attrs, storage, &dir, scale);
+    let vecdb = run_vecdb(&data, dims, attrs, storage, metric, &dir, scale);
     print_vecdb_report(&vecdb);
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -323,12 +342,12 @@ fn run_vecdb(
     dims: usize,
     attrs: bool,
     storage: StorageKind,
+    metric: DistanceMetric,
     dir: &Path,
     scale: usize,
 ) -> VecdbReport {
     let path = dir.join("bench.vecdb");
-    let mut db =
-        VecDb::open(&path, dims, Some(storage), DistanceMetric::Cosine).expect("open vecdb");
+    let mut db = VecDb::open(&path, dims, Some(storage), metric).expect("open vecdb");
     let ingest = ingest_phase(&mut db, data, attrs, scale);
     let searches = search_phase(&db, data, storage, scale);
     let stats = db.stats().expect("vecdb stats");
@@ -337,7 +356,7 @@ fn run_vecdb(
         .map(|meta| meta.len())
         .unwrap_or(0);
     drop(db);
-    let (reopens, mut db) = reopen_phase(&path, dims, storage, &snapshot_file, scale);
+    let (reopens, mut db) = reopen_phase(&path, dims, storage, metric, &snapshot_file, scale);
     let compaction = compaction_phase(&mut db, data, scale);
     db.delete().expect("vecdb delete");
     VecdbReport {
@@ -541,20 +560,20 @@ fn reopen_phase(
     path: &Path,
     dims: usize,
     storage: StorageKind,
+    metric: DistanceMetric,
     snapshot_file: &Path,
     scale: usize,
 ) -> (ReopenTimings, VecDb) {
     eprintln!("[scale {scale}] vecdb cold open with snapshot");
     let started = Instant::now();
-    let reopened = VecDb::open(path, dims, Some(storage), DistanceMetric::Cosine)
-        .expect("vecdb reopen with snapshot");
+    let reopened =
+        VecDb::open(path, dims, Some(storage), metric).expect("vecdb reopen with snapshot");
     let open_with_snapshot = started.elapsed();
     drop(reopened);
     std::fs::remove_file(snapshot_file).expect("remove snapshot");
     eprintln!("[scale {scale}] vecdb cold open without snapshot (full rebuild)");
     let started = Instant::now();
-    let db = VecDb::open(path, dims, Some(storage), DistanceMetric::Cosine)
-        .expect("vecdb reopen without snapshot");
+    let db = VecDb::open(path, dims, Some(storage), metric).expect("vecdb reopen without snapshot");
     let open_full_rebuild = started.elapsed();
     (
         ReopenTimings {
