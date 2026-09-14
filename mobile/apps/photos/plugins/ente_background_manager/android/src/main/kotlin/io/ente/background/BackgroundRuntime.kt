@@ -56,6 +56,7 @@ internal object BackgroundRuntime {
         var channel: MethodChannel? = null
         var ready = false
         var retiring = false
+        var teardownFailure: Exception? = null
         var stopReason: String? = null
         var budgetTimer: Runnable? = null
         var foregroundTimer: Runnable? = null
@@ -124,6 +125,10 @@ internal object BackgroundRuntime {
         val run = active
         if (run == null) {
             result?.success(null)
+            return
+        }
+        run.teardownFailure?.let {
+            result?.error("teardown", it.message, null)
             return
         }
         if (result != null) run.stopResults.add(result)
@@ -329,6 +334,10 @@ internal object BackgroundRuntime {
                         retire(run, "stopped", "system")
                         return@ensureInitializationCompleteAsync
                     }
+                    run.stopReason?.let {
+                        retire(run, "stopped", it)
+                        return@ensureInitializationCompleteAsync
+                    }
                     try {
                         val callback =
                             requireNotNull(findCallback(configuration.callbackHandle)) {
@@ -474,18 +483,29 @@ internal object BackgroundRuntime {
         run.budgetTimer?.let(main::removeCallbacks)
         run.foregroundTimer?.let(main::removeCallbacks)
         val terminal = if (outcome == "completed" && run.stopReason != null) "stopped" else outcome
+        var failure: Exception? = null
         try {
             run.channel?.setMethodCallHandler(null)
+        } catch (exception: Exception) {
+            failure = exception
+        }
+        try {
             run.engine?.destroy()
         } catch (exception: Exception) {
-            report(run.configuration.identifier, "failed", "teardown", exception.message)
-            run.stopResults.forEach { it.error("teardown", exception.message, null) }
+            run.teardownFailure = exception
+            failure = exception
+        }
+        if (run.teardownFailure == null) {
+            active = null
+            retireUnselectedSchedule(run.configuration.identifier)
+        }
+        if (failure != null) {
+            report(run.configuration.identifier, "failed", "teardown", failure.message)
+            run.stopResults.forEach { it.error("teardown", failure.message, null) }
             run.stopResults.clear()
             run.completion(false)
             return
         }
-        active = null
-        retireUnselectedSchedule(run.configuration.identifier)
         if (terminal != "completed") report(run.configuration.identifier, terminal, reason, error)
         run.completion(terminal != "failed" && terminal != "forcedTeardown")
         run.stopResults.forEach { it.success(null) }

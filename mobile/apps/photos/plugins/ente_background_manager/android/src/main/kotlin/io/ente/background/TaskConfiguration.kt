@@ -39,17 +39,22 @@ internal data class TaskConfiguration(
             callbackHandle: Long = json.getLong("callbackHandle"),
         ): TaskConfiguration {
             fun duration(key: String): Long? =
-                if (json.isNull(key)) null else json.getLong(key).also { require(it >= 0) }
+                if (json.isNull(key)) null
+                else json.getLong(key).also { require(it >= 0) { "$key must not be negative" } }
 
             val identifier = json.getString("identifier")
             val kind = json.getString("kind")
             val frequency = json.getLong("frequencyMs")
             val flex = duration("flexMs")
-            require(identifier.isNotBlank())
-            require(kind == "refresh" || kind == "processing")
-            require(frequency >= 15 * 60 * 1000L)
-            require(flex == null || flex in 5 * 60 * 1000L..frequency)
-            require(callbackHandle != 0L)
+            require(identifier.isNotBlank()) { "Task identifier must not be blank" }
+            require(kind == "refresh" || kind == "processing") {
+                "Task kind must be refresh or processing"
+            }
+            require(frequency >= 15 * 60 * 1000L) { "Frequency must be at least 15 minutes" }
+            require(flex == null || flex in 5 * 60 * 1000L..frequency) {
+                "Flex must be at least 5 minutes and no greater than frequency"
+            }
+            require(callbackHandle != 0L) { "A retained background dispatcher is required" }
             return TaskConfiguration(
                 identifier,
                 kind,

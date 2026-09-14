@@ -8,7 +8,7 @@ The package is part of the mobile workspace. Photos does not depend on or initia
 
 ## Consumer interface
 
-- `BackgroundManager.configure` supplies a retained top-level dispatcher, task configurations, scheduling enablement, and an outcome handler. Repeated configuration reconciles persistent schedules.
+- `BackgroundManager.configure` supplies a retained top-level dispatcher, task configurations, scheduling enablement, and an outcome handler. Repeated configuration reconciles persistent schedules. Setting `enabled: false` disables future scheduling and requests stopping of the active run.
 - `BackgroundManager.executeTask` runs the callback inside the dispatcher and handles readiness, stop delivery, errors, and completion.
 - `BackgroundTask` exposes its identifier, elapsed time, optional remaining budget, and a latched stop signal. The callback stops admitting work, drains cleanup, and returns a `BackgroundTaskResult`.
 - `BackgroundManager.stopActiveRun` requests stopping of the current invocation and completes after retirement. It preserves future registrations and is an immediate no-op when idle. Use it from the foreground; a background callback should return after cleanup instead of awaiting its own retirement.
@@ -20,11 +20,13 @@ Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer'
 
 ## Native lifecycle
 
-Each platform has one process-local runtime. Admission checks backend eligibility, the active execution slot, and native foreground visibility before creating an engine. Busy or foreground deliveries finish as skips. Every admitted run captures its configuration and dispatcher binding and creates a fresh engine.
+Each platform has one process-local runtime. Admission checks backend eligibility, the active execution slot, and native foreground visibility before creating an engine. Busy or foreground deliveries finish as skips. Every admitted run captures its configuration and dispatcher binding and uses a fresh engine. On Android, a stop received during Flutter initialization retires the run before creating an engine.
 
-The slot remains occupied during startup, execution, cleanup, and teardown. Native callbacks and timers are tied to a unique invocation. Foreground entry always requests stopping, including during startup. Stops remain latched; repeated visibility changes cannot revive a task or extend its grace. Configuration updates affect later runs only.
+The slot remains occupied during startup, execution, cleanup, and teardown. Native callbacks and timers are tied to a unique invocation. Foreground entry always requests stopping, including during startup. Stops remain latched; repeated visibility changes cannot revive a task or extend its grace. A callback returning `completed` after a stop request is reported as `stopped`. Configuration updates affect later runs only.
 
 Normal completion, startup failure, system interruption, and configured forced teardown share one retirement path. Retirement invalidates timers, detaches the task channel, destroys the background engine, and completes the native invocation once. iOS re-arms normal future opportunities independently of Dart. No plugin retry loop, work queue, engine pool, or persistent event history is used.
+
+If Android engine destruction throws, the plugin reports a teardown failure and fails pending and subsequent `stopActiveRun` calls. The slot stays occupied until the process restarts because the engine may still be alive; subsequent background deliveries skip.
 
 Consumers log their task activity. Skips, stops, forced teardown, and failures are forwarded to an available outcome handler; otherwise the plugin writes one native log line (`EnteBackgroundManager` on Android, `io.ente.background` on iOS).
 
@@ -38,7 +40,7 @@ On iOS, call `BackgroundManagerPlugin.install` in `AppDelegate` with an eligibil
 
 ## Validation
 
-The Android test runs the real worker, scheduler configuration, method-channel encoding, and lifecycle/timer logic with mocked Flutter engines. It covers foreground and busy admission, ownership during teardown, startup stops, cooperative completion, foreground grace, configuration changes during a run, stale events, bootstrap failure, and preservation of recurring scheduling after active-run stopping.
+The Android test runs the real worker, scheduler configuration, method-channel encoding, and lifecycle/timer logic with mocked Flutter engines. It covers foreground and busy admission, ownership during teardown, teardown failures, startup stops, cooperative completion, foreground grace, configuration changes during a run, stale events, bootstrap failure, and preservation of recurring scheduling after active-run stopping.
 
 Use a temporary Flutter host with a path dependency on this package to run native checks. Match Photos' Android build-tool versions and set the host's minimum SDK to 26. From its `android` directory:
 

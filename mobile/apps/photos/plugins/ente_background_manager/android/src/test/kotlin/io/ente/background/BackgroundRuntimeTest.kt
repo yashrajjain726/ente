@@ -3,6 +3,7 @@ package io.ente.background
 import android.app.Activity
 import android.app.Application
 import android.os.Looper
+import android.os.SystemClock
 import androidx.work.Configuration
 import androidx.work.Data
 import androidx.work.ListenableWorker
@@ -169,9 +170,16 @@ class BackgroundRuntimeTest {
 
         val budgetPolicy = policy(budget = 100)
         configure(budgetPolicy)
-        val budgetRun = worker(budgetPolicy).startWork()
+        val expiredDuringInitialization = worker(budgetPolicy).startWork()
+        val enginesBeforeExpiredRun = engines.size
         main.idleFor(Duration.ofMillis(150))
+        startups.removeFirst().run()
+        assertEquals(ListenableWorker.Result.success(), expiredDuringInitialization.get())
+        assertEquals(enginesBeforeExpiredRun, engines.size)
+
+        val budgetRun = worker(budgetPolicy).startWork()
         val budgetChannel = bootstrap()
+        main.idleFor(Duration.ofMillis(150))
         val budgetReady = budgetChannel.call("ready") as Map<*, *>
         assertEquals("budget", budgetReady["stopReason"])
         assertTrue((budgetReady["elapsedMs"] as Long) >= 150)
@@ -182,9 +190,22 @@ class BackgroundRuntimeTest {
         assertTrue(budgetRun.isDone)
 
         configure(cooperative)
+        val stoppedDuringInitialization = worker(cooperative).startWork()
+        val enginesBeforeStoppedRun = engines.size
+        val opening = Robolectric.buildActivity(Activity::class.java).create().start().resume()
+        val initializationStop = Reply()
+        BackgroundRuntime.requestStop(initializationStop)
+        assertFalse(initializationStop.done)
+        opening.pause().stop().destroy()
+        startups.removeFirst().run()
+        assertEquals(ListenableWorker.Result.success(), stoppedDuringInitialization.get())
+        assertEquals(enginesBeforeStoppedRun, engines.size)
+        assertTrue(initializationStop.done)
+        assertNull(initializationStop.error)
+
         val stoppingDuringStartup = worker(cooperative).startWork()
-        val foreground = Robolectric.buildActivity(Activity::class.java).create().start().resume()
         val stoppedChannel = bootstrap()
+        val foreground = Robolectric.buildActivity(Activity::class.java).create().start().resume()
         val stoppedReady = stoppedChannel.call("ready") as Map<*, *>
         assertEquals("foreground", stoppedReady["stopReason"])
         foreground.pause().stop().destroy()
@@ -246,8 +267,8 @@ class BackgroundRuntimeTest {
         val immediatePolicy = policy(budget = 0, grace = 0)
         configure(immediatePolicy)
         val immediate = worker(immediatePolicy).startWork()
-        main.idle()
         val immediateChannel = bootstrap()
+        main.idle()
         val immediateReady = immediateChannel.call("ready") as Map<*, *>
         assertEquals("budget", immediateReady["stopReason"])
         assertFalse(immediate.isDone)
@@ -271,6 +292,54 @@ class BackgroundRuntimeTest {
         assertEquals("requested", (lastChannel.sent.single().arguments as Map<*, *>)["reason"])
         complete(lastChannel, lastReady)
         assertTrue(last.isDone)
+
+        configure(cooperative)
+        val handlerFailureRun = worker(cooperative).startWork()
+        val handlerFailureChannel = bootstrap()
+        val handlerFailureReady = handlerFailureChannel.call("ready") as Map<*, *>
+        val handlerFailureStop = Reply()
+        BackgroundRuntime.requestStop(handlerFailureStop)
+        handlerFailureChannel.failHandlerRemoval = true
+        complete(handlerFailureChannel, handlerFailureReady)
+        assertEquals(ListenableWorker.Result.failure(), handlerFailureRun.get())
+        assertEquals("teardown: Handler removal failed", handlerFailureStop.error)
+        verify(engines.last().first).destroy()
+
+        val afterHandlerFailure = worker(cooperative).startWork()
+        val afterHandlerFailureChannel = bootstrap()
+        val afterHandlerFailureReady = afterHandlerFailureChannel.call("ready") as Map<*, *>
+        complete(handlerFailureChannel, handlerFailureReady)
+        assertFalse(afterHandlerFailure.isDone)
+        complete(afterHandlerFailureChannel, afterHandlerFailureReady)
+        assertEquals(ListenableWorker.Result.success(), afterHandlerFailure.get())
+
+        val teardownWorker = worker(cooperative)
+        var teardownCompletions = 0
+        BackgroundRuntime.start(teardownWorker, SystemClock.elapsedRealtime()) { success ->
+            assertFalse(success)
+            teardownCompletions++
+        }
+        val teardownChannel = bootstrap()
+        val teardownReady = teardownChannel.call("ready") as Map<*, *>
+        val teardownEngine = engines.last().first
+        doThrow(IllegalStateException("Engine destruction failed")).`when`(teardownEngine).destroy()
+        val teardownStop = Reply()
+        BackgroundRuntime.requestStop(teardownStop)
+        complete(teardownChannel, teardownReady)
+        assertEquals("teardown: Engine destruction failed", teardownStop.error)
+        assertEquals(1, teardownCompletions)
+        val laterStop = Reply()
+        BackgroundRuntime.requestStop(laterStop)
+        assertTrue(laterStop.done)
+        assertEquals(teardownStop.error, laterStop.error)
+        val enginesAfterFailure = engines.size
+        assertEquals(ListenableWorker.Result.success(), worker(cooperative).startWork().get())
+        assertTrue(startups.isEmpty())
+        assertEquals(enginesAfterFailure, engines.size)
+        teardownWorker.onStopped()
+        main.idleFor(Duration.ofSeconds(1))
+        assertEquals(1, teardownCompletions)
+        verify(teardownEngine, times(1)).destroy()
     }
 
     private class Reply : MethodChannel.Result {
@@ -279,16 +348,19 @@ class BackgroundRuntimeTest {
         var value: Any? = null
 
         override fun success(result: Any?) {
+            assertFalse("Reply already completed", done)
             value = result
             done = true
         }
 
         override fun error(code: String, message: String?, details: Any?) {
+            assertFalse("Reply already completed", done)
             error = "$code: $message"
             done = true
         }
 
         override fun notImplemented() {
+            assertFalse("Reply already completed", done)
             error = "notImplemented"
             done = true
         }
@@ -297,6 +369,7 @@ class BackgroundRuntimeTest {
     private class Messenger : BinaryMessenger {
         private val codec = StandardMethodCodec.INSTANCE
         private var handler: BinaryMessenger.BinaryMessageHandler? = null
+        var failHandlerRemoval = false
         val sent = ArrayList<MethodCall>()
 
         override fun send(channel: String, message: ByteBuffer?) = send(channel, message, null)
@@ -315,6 +388,7 @@ class BackgroundRuntimeTest {
             channel: String,
             handler: BinaryMessenger.BinaryMessageHandler?,
         ) {
+            check(handler != null || !failHandlerRemoval) { "Handler removal failed" }
             this.handler = handler
         }
 
