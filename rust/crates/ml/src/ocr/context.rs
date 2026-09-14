@@ -193,16 +193,17 @@ pub(super) fn branch_widths() -> &'static [usize] {
 }
 
 pub(super) fn recognizer_paths(mut selected: Vec<Input>, width: usize) -> Vec<Input> {
-    let mut original = selected.remove(0);
-    let mut image = Input::zeros("x", &[1, 3, 48, 7168]);
-    if width == 7168 {
-        std::mem::swap(&mut image.values, &mut original.values);
+    let original = selected.remove(0);
+    let image = if width == 7168 {
+        original
     } else {
+        let mut image = Input::zeros("x", &[1, 3, 48, 7168]);
         for row in 0..3 * 48 {
             image.values[row * 7168..row * 7168 + width]
                 .copy_from_slice(&original.values[row * width..(row + 1) * width]);
         }
-    }
+        image
+    };
     static UNUSED: std::sync::OnceLock<Vec<Vec<Input>>> = std::sync::OnceLock::new();
     let widths = branch_widths();
     let unused = UNUSED.get_or_init(|| {
@@ -353,10 +354,10 @@ mod tests {
             let (inputs, offsets) = packed(&[&line], 7168, 21);
             assert_eq!(offsets, [0]);
             assert_eq!(input(&inputs, "mask_1_896").values[895], 1.0);
-            assert_eq!(
-                input(&recognizer_paths(inputs, 7168), "path_0").values[0],
-                0.0
-            );
+            let pixels = input(&inputs, "x").values.as_ptr();
+            let inputs = recognizer_paths(inputs, 7168);
+            assert_eq!(input(&inputs, "path_0").values[0], 0.0);
+            assert_eq!(input(&inputs, "x").values.as_ptr(), pixels);
         }
     }
 }

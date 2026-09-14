@@ -143,17 +143,11 @@ impl TextRecognizer {
                 let line = &lines[index];
                 let start = offset / 8 * 2;
                 let count = line.width.div_ceil(4) / 2;
-                let layout = BatchLayout {
-                    target_width: line.width as i32,
-                    content_widths: vec![line.content_width],
-                };
-                let mut decoded = decode_compact_output(
-                    &[1, count as i64, 2],
+                results[crop_indices[index]] = decode_line(
                     &values[start..start + count * 2],
-                    &layout,
+                    line.width as f32 / line.content_width as f32,
                     dictionary,
                 )?;
-                results[crop_indices[index]] = decoded.remove(0);
                 lines[index].values = Vec::new();
             }
         }
@@ -161,50 +155,21 @@ impl TextRecognizer {
     }
 }
 
-fn decode_compact_output(
-    shape: &[i64],
-    values: &[f32],
-    layout: &BatchLayout,
-    dictionary: &[String],
-) -> MlResult<Vec<Recognition>> {
-    let count = layout.content_widths.len();
-    let steps = match *shape {
-        [n, steps, 2]
-            if n == count as i64 && steps > 0 && values.len() == count * steps as usize * 2 =>
-        {
-            steps as usize
-        }
-        _ => {
-            return Err(MlError::CorruptModel(format!(
-                "text recognizer produced output shape {shape:?} with {} values, expected [{count}, T, 2]",
-                values.len()
-            )));
-        }
-    };
-    layout
-        .content_widths
-        .iter()
-        .zip(values.chunks_exact(steps * 2))
-        .map(|(&content_width, sequence)| {
-            let best = compact_steps(sequence, dictionary.len())?;
-            Ok(decode_steps(
-                &best,
-                dictionary,
-                layout.padding_scale(content_width),
-            ))
-        })
-        .collect()
-}
-
-fn compact_steps(values: &[f32], vocabulary: usize) -> MlResult<Vec<StepBest>> {
-    values
+fn decode_line(values: &[f32], padding_scale: f32, dictionary: &[String]) -> MlResult<Recognition> {
+    if values.is_empty() || !values.len().is_multiple_of(2) {
+        return Err(MlError::CorruptModel(format!(
+            "text recognizer produced {} values for a line, expected index/probability pairs",
+            values.len()
+        )));
+    }
+    let best = values
         .as_chunks::<2>()
         .0
         .iter()
         .map(|&[index, probability]| {
             if !index.is_finite()
                 || index < 0.0
-                || index >= vocabulary as f32
+                || index >= dictionary.len() as f32
                 || index.fract() != 0.0
                 || !probability.is_finite()
                 || probability < 0.0
@@ -218,7 +183,8 @@ fn compact_steps(values: &[f32], vocabulary: usize) -> MlResult<Vec<StepBest>> {
                 probability,
             })
         })
-        .collect()
+        .collect::<MlResult<Vec<_>>>()?;
+    Ok(decode_steps(&best, dictionary, padding_scale))
 }
 
 struct PlannedBatch {
@@ -317,10 +283,6 @@ impl BatchLayout {
             target_width,
             content_widths,
         })
-    }
-
-    fn padding_scale(&self, content_width: i32) -> f32 {
-        self.target_width as f32 / content_width as f32
     }
 
     fn tensor(&self, batch: &[&ImageU8]) -> MlResult<Vec<f32>> {
@@ -576,7 +538,7 @@ mod tests {
                     logits,
                     output.vocabulary,
                     dictionary,
-                    layout.padding_scale(content_width),
+                    layout.target_width as f32 / content_width as f32,
                 )
             })
             .collect())
@@ -669,18 +631,25 @@ mod tests {
             content_widths: vec![160, 320],
         };
         let expected = decode_output(&[2, 6, 4], &full, &layout, &dictionary()).unwrap();
-        let actual = decode_compact_output(&[2, 6, 2], &compact, &layout, &dictionary()).unwrap();
+        let actual: Vec<_> = compact
+            .chunks_exact(12)
+            .zip(&layout.content_widths)
+            .map(|(values, &content_width)| {
+                decode_line(
+                    values,
+                    layout.target_width as f32 / content_width as f32,
+                    &dictionary(),
+                )
+                .unwrap()
+            })
+            .collect();
         assert_eq!(actual, expected);
         assert_eq!(actual[0].text, "aabc");
         assert_eq!(actual[1], Recognition::default());
     }
 
     #[test]
-    fn compact_output_rejects_invalid_indices_probabilities_and_shapes() {
-        let layout = BatchLayout {
-            target_width: 320,
-            content_widths: vec![320],
-        };
+    fn compact_output_rejects_invalid_indices_probabilities_and_lengths() {
         for values in [
             [-1.0, 0.9],
             [4.0, 0.9],
@@ -691,10 +660,10 @@ mod tests {
             [1.0, f32::INFINITY],
             [1.0, -0.1],
         ] {
-            assert!(decode_compact_output(&[1, 1, 2], &values, &layout, &dictionary()).is_err());
+            assert!(decode_line(&values, 1.0, &dictionary()).is_err());
         }
-        for shape in [[2, 1, 2], [1, 0, 2], [1, 2, 2], [1, 1, 4]] {
-            assert!(decode_compact_output(&shape, &[1.0, 0.9], &layout, &dictionary()).is_err());
+        for values in [&[][..], &[1.0], &[1.0, 0.9, 2.0]] {
+            assert!(decode_line(values, 1.0, &dictionary()).is_err());
         }
     }
 
@@ -752,7 +721,6 @@ mod tests {
         let layout = BatchLayout::new(&crops.iter().collect::<Vec<_>>()).unwrap();
         assert_eq!(layout.target_width, 400);
         assert_eq!(layout.content_widths, [100, 400, 112]);
-        assert_close(layout.padding_scale(100), 4.0);
 
         let narrow = [solid(10, 48, [0; 3])];
         let layout = BatchLayout::new(&narrow.iter().collect::<Vec<_>>()).unwrap();
@@ -1107,7 +1075,6 @@ mod tests {
             assert_eq!(layout.target_width, REC_MAX_WIDTH);
             assert_eq!(layout.content_widths, [REC_MAX_WIDTH]);
             assert_eq!(content_height(&crop), resized_height);
-            assert_eq!(layout.padding_scale(REC_MAX_WIDTH), 1.0);
             let tensor = layout.tensor(&[&crop]).unwrap();
             assert_eq!(tensor.len(), 3 * 48 * 7168);
             let top = (48 - resized_height) as usize / 2;
