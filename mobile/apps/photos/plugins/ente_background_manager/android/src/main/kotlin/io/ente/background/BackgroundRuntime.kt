@@ -23,6 +23,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.FlutterCallbackInformation
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import org.json.JSONArray
 import org.json.JSONObject
@@ -158,7 +159,6 @@ internal object BackgroundRuntime {
             return
         }
         if (!enabled) requestStop()
-        val activeIdentifier = active?.configuration?.identifier
         scheduler.execute {
             try {
                 val preferences = app.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -189,6 +189,12 @@ internal object BackgroundRuntime {
                         previousTasks.getJSONObject(index).getString("identifier")
                     )
                 }
+                val activeTask = FutureTask {
+                    if (!enabled) requestStop()
+                    active?.configuration?.identifier
+                }
+                main.post(activeTask)
+                val activeIdentifier = activeTask.get()
                 for (identifier in existingIdentifiers) {
                     if (identifier !in selected && identifier != activeIdentifier) {
                         manager.cancelUniqueWork(identifier).result.get()

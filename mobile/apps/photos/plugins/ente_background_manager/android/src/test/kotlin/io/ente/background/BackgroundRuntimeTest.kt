@@ -9,8 +9,10 @@ import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.impl.WorkManagerImpl
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.google.common.util.concurrent.SettableFuture
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
@@ -22,6 +24,8 @@ import io.flutter.plugin.common.StandardMethodCodec
 import io.flutter.view.FlutterCallbackInformation
 import java.nio.ByteBuffer
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,6 +66,10 @@ class BackgroundRuntimeTest {
         )
 
     private fun configure(policy: TaskConfiguration, enabled: Boolean = true) {
+        awaitReply(beginConfigure(policy, enabled))
+    }
+
+    private fun beginConfigure(policy: TaskConfiguration, enabled: Boolean = true): Reply {
         val data = org.json.JSONObject(policy.encode())
         val result = Reply()
         BackgroundRuntime.configure(
@@ -77,6 +85,10 @@ class BackgroundRuntimeTest {
             ),
             result,
         )
+        return result
+    }
+
+    private fun awaitReply(result: Reply) {
         val deadline = System.nanoTime() + 10_000_000_000L
         while (!result.done && System.nanoTime() < deadline) {
             main.idle()
@@ -98,6 +110,64 @@ class BackgroundRuntimeTest {
 
     private fun complete(messenger: Messenger, ready: Map<*, *>, outcome: String = "completed") {
         messenger.call("complete", mapOf("invocation" to ready["invocation"], "outcome" to outcome))
+    }
+
+    private fun reconfigureWhileStarting(policy: TaskConfiguration, enabled: Boolean) {
+        configure(policy)
+        val original = WorkManagerImpl.getInstance(app)
+        val scheduled = original.getWorkInfosForUniqueWork(policy.identifier).get()
+        val manager = spy(original)
+        val blocked = CountDownLatch(1)
+        val query = SettableFuture.create<List<WorkInfo>>()
+        doAnswer {
+                blocked.countDown()
+                query
+            }
+            .`when`(manager)
+            .getWorkInfosForUniqueWork(policy.identifier)
+        WorkManagerImpl.setDelegate(manager)
+        try {
+            val pendingQuery = Reply()
+            BackgroundRuntime.scheduledTasks(pendingQuery)
+            assertTrue("Scheduler did not reach the query", blocked.await(10, TimeUnit.SECONDS))
+            val changed = beginConfigure(policy.copy(identifier = "test.replacement"), enabled)
+            val running = worker(policy).startWork()
+            val channel = bootstrap()
+            val ready = channel.call("ready") as Map<*, *>
+            query.set(scheduled)
+            awaitReply(pendingQuery)
+            awaitReply(changed)
+            verify(manager, never()).cancelUniqueWork(policy.identifier)
+            assertFalse(running.isDone)
+            assertFalse(
+                original
+                    .getWorkInfosForUniqueWork(policy.identifier)
+                    .get()
+                    .single()
+                    .state
+                    .isFinished
+            )
+            if (enabled) {
+                assertTrue(channel.sent.isEmpty())
+            } else {
+                assertEquals("requested", (channel.sent.single().arguments as Map<*, *>)["reason"])
+            }
+            complete(channel, ready)
+            assertEquals(ListenableWorker.Result.success(), running.get())
+            val afterRetirement = Reply()
+            BackgroundRuntime.scheduledTasks(afterRetirement)
+            awaitReply(afterRetirement)
+            assertEquals(
+                WorkInfo.State.CANCELLED,
+                original.getWorkInfosForUniqueWork(policy.identifier).get().single().state,
+            )
+            val enginesBeforeSkip = engines.size
+            assertEquals(ListenableWorker.Result.success(), worker(policy).startWork().get())
+            assertEquals(enginesBeforeSkip, engines.size)
+        } finally {
+            query.set(scheduled)
+            WorkManagerImpl.setDelegate(original)
+        }
     }
 
     @Test
@@ -336,6 +406,10 @@ class BackgroundRuntimeTest {
                 it.state == WorkInfo.State.CANCELLED
             }
         )
+        configure(cooperative)
+
+        reconfigureWhileStarting(cooperative, enabled = true)
+        reconfigureWhileStarting(cooperative, enabled = false)
         configure(cooperative)
 
         val teardownWorker = worker(cooperative)
