@@ -16,6 +16,26 @@ test("docs changes do not wait for unrelated workflows", (t) => {
     checkResult(results(selected));
 });
 
+test("Android lint configuration does not build Ensu", (t) => {
+    for (const file of ["android/detekt.yml", "android/scripts/lint.sh"]) {
+        assert.deepEqual(select(t, [file]), ["android-lint", "repo-lint"]);
+    }
+});
+
+test("shared Android build inputs select Ensu", (t) => {
+    for (const file of [
+        "android/build.gradle.kts",
+        "android/settings.gradle.kts",
+        "android/gradle.properties",
+        "android/gradle/wrapper/gradle-wrapper.properties",
+        "android/gradle/verification-metadata.xml",
+        "android/gradlew",
+        "android/gradlew.bat",
+    ]) {
+        assert.ok(select(t, [file]).includes("ensu-android-build"), file);
+    }
+});
+
 test("shared build inputs select their consumers", (t) => {
     assert.deepEqual(select(t, [".github/actions/setup-flutter/action.yml"]), [
         "mobile-lint",

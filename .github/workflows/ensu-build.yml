@@ -350,7 +350,8 @@ jobs:
                   EOF
 
             - name: Build signed Android artifacts
-              run: ./gradlew -PversionCode="${BUILD_NUMBER}" :app:assembleRelease :app:bundleRelease
+              working-directory: android
+              run: ./gradlew -PversionCode="${BUILD_NUMBER}" :ensu:app:assembleRelease :ensu:app:bundleRelease
 
             - name: Prepare whatsnew
               run: |

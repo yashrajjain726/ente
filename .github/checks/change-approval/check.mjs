@@ -1,3 +1,4 @@
+import { checkAndroid } from "./android.mjs";
 import { readChanges } from "./changes.mjs";
 import { checkDependencies } from "./dependencies.mjs";
 import { checkFiles } from "./files.mjs";
@@ -15,4 +16,5 @@ writeReport({
     rust: checkRust(changes),
     swift: checkSwift(changes),
     web: checkWeb(changes),
+    android: checkAndroid(changes),
 });
