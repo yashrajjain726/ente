@@ -89,7 +89,7 @@ import {
 } from "ente-base/session-storage";
 import { savedAuthToken } from "ente-base/token";
 import type { Location } from "ente-base/types";
-import { ensureContactsReady } from "ente-contacts";
+import { initContacts, pullContacts } from "ente-contacts";
 import { DownloadStatusNotifications } from "ente-gallery/components/DownloadStatusNotifications";
 import { FullScreenDropZone } from "ente-gallery/components/FullScreenDropZone";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
@@ -522,17 +522,19 @@ const Page: React.FC = () => {
             setIsFirstLoad(getAndClearIsFirstLogin());
 
             const user = ensureLocalUser();
-            void ensureContactsReady(
+            void initContacts(
                 user.id,
                 session,
                 contactsGetDiff,
                 contactsGetProfilePicture,
-            ).catch((error: unknown) => {
-                log.warn(
-                    "[gallery] Failed to warm contacts display cache",
-                    error,
-                );
-            });
+            )
+                .then(pullContacts)
+                .catch((error: unknown) => {
+                    log.warn(
+                        "[gallery] Failed to warm contacts display cache",
+                        error,
+                    );
+                });
             const userDetails = await savedUserDetailsOrTriggerPull();
             dispatch({
                 type: "mount",

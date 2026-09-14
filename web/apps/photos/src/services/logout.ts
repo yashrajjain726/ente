@@ -4,6 +4,7 @@ import {
     logoutClearStateAgain,
 } from "ente-accounts/services/logout";
 import log from "ente-base/log";
+import { logoutContacts } from "ente-contacts";
 import { resetSaveGroups } from "ente-gallery/components/utils/save-groups";
 import { logoutFileViewerDataSource } from "ente-gallery/components/viewer/data-source";
 import { downloadManager } from "ente-gallery/services/download";
@@ -23,13 +24,15 @@ export const photosLogout = async () => {
     const ignoreError = (label: string, e: unknown) =>
         log.error(`Ignoring error during logout (${label})`, e);
 
+    // Session
+
     try {
         clearAuthenticatedSession();
     } catch (e) {
         ignoreError("Authenticated session", e);
     }
 
-    // Stop workers before clearing databases they may still access.
+    // Stop workers and schedulers before clearing persistent state.
     try {
         await terminateMLWorker();
     } catch (e) {
@@ -45,7 +48,11 @@ export const photosLogout = async () => {
         }
     }
 
+    // Remote logout and clear state
+
     await accountLogout();
+
+    // Photos services
 
     log.info("logout (photos)");
 
@@ -59,6 +66,12 @@ export const photosLogout = async () => {
         logoutSettings();
     } catch (e) {
         ignoreError("Settings", e);
+    }
+
+    try {
+        logoutContacts();
+    } catch (e) {
+        ignoreError("Contacts", e);
     }
 
     try {
@@ -109,6 +122,8 @@ export const photosLogout = async () => {
         ignoreError("File viewer", e);
     }
 
+    // Desktop
+
     if (electron) {
         try {
             await logoutAppLock();
@@ -128,6 +143,8 @@ export const photosLogout = async () => {
             ignoreError("Electron", e);
         }
     }
+
+    // Final sweep and reload
 
     // Clear again after in-flight work has had a chance to finish.
     await logoutClearStateAgain();
