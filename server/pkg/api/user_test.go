@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/ente/museum/ente"
@@ -81,6 +82,81 @@ func TestGetPublicKeyHandlerDoesNotLookupByUserID(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("unexpected status code: got %d want %d; body=%s", recorder.Code, http.StatusNotFound, recorder.Body.String())
 	}
+}
+
+func TestGetPublicKeysHandler(t *testing.T) {
+	handler, db := setupUserHandlerTest(t)
+	requesterUserID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       101,
+		Email:        "requester@ente.com",
+		CreationTime: 1,
+	})
+	targetUserID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       102,
+		Email:        "target@ente.com",
+		CreationTime: 1,
+	})
+	keyAttributes := setPublicKeyTestAttributes(t, handler, targetUserID)
+	router := gin.New()
+	router.POST("/users/public-keys", handler.GetPublicKeys)
+	request := func(t *testing.T, emails []string) *httptest.ResponseRecorder {
+		t.Helper()
+		body, err := json.Marshal(map[string][]string{"emails": emails})
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorder := httptest.NewRecorder()
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/users/public-keys",
+			strings.NewReader(string(body)),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Auth-User-ID", strconv.FormatInt(requesterUserID, 10))
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	t.Run("returns keys", func(t *testing.T) {
+		recorder := request(t, []string{" TARGET@ente.com "})
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		var response struct {
+			PublicKeys []string `json:"publicKeys"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		if len(response.PublicKeys) != 1 || response.PublicKeys[0] != keyAttributes.PublicKey {
+			t.Fatalf("public keys = %+v", response.PublicKeys)
+		}
+	})
+
+	t.Run("returns not found for a missing user", func(t *testing.T) {
+		recorder := request(t, []string{"missing@ente.com"})
+		if recorder.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("rejects normalized duplicates", func(t *testing.T) {
+		recorder := request(t, []string{"target@ente.com", " TARGET@ENTE.COM "})
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("rejects oversized batches", func(t *testing.T) {
+		emails := make([]string, ente.MaxPublicKeyBatchSize+1)
+		for index := range emails {
+			emails[index] = "target" + strconv.Itoa(index) + "@ente.com"
+		}
+		recorder := request(t, emails)
+		if recorder.Code != http.StatusRequestEntityTooLarge {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusRequestEntityTooLarge)
+		}
+	})
 }
 
 func setPublicKeyTestAttributes(t *testing.T, handler *UserHandler, userID int64) ente.KeyAttributes {
