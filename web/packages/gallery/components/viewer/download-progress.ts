@@ -9,7 +9,7 @@ export type DownloadProgressPhase =
 
 export interface DownloadProgressState {
     phase: DownloadProgressPhase;
-    pct: number | undefined;
+    precentage: number | undefined;
     loaded?: number;
     total?: number;
 }
@@ -20,30 +20,33 @@ export const downloadProgressState = (
     previous: DownloadProgressState | undefined,
 ): DownloadProgressState | undefined => {
     if (itemData.fetchFailed)
-        return { phase: "failed", pct: previous?.pct ?? 0 };
+        return { phase: "failed", precentage: previous?.precentage ?? 0 };
     if (!itemData.isContentLoading) return undefined;
 
     if (entry) {
         const { loaded, total } = entry;
         if (total !== undefined && total > 0) {
             if (loaded >= total)
-                return { phase: "decrypting", pct: 100, loaded, total };
+                return { phase: "decrypting", precentage: 100, loaded, total };
             if (loaded > 0)
                 return {
                     phase: "downloading",
-                    pct: Math.min(99, Math.floor((loaded * 100) / total)),
+                    precentage: Math.min(
+                        99,
+                        Math.floor((loaded * 100) / total),
+                    ),
                     loaded,
                     total,
                 };
-            return { phase: "preparing", pct: 0 };
+            return { phase: "preparing", precentage: 0 };
         }
         if (total === undefined && loaded > 0)
-            return { phase: "downloading", pct: undefined, loaded };
+            return { phase: "downloading", precentage: undefined, loaded };
     } else if (
         previous?.phase == "downloading" ||
         previous?.phase == "decrypting"
     ) {
-        return { phase: "decrypting", pct: 100 };
+        return { phase: "decrypting", precentage: 100 };
     }
-    return { phase: "preparing", pct: 0 };
+    return { phase: "preparing", precentage: 0 };
 };
