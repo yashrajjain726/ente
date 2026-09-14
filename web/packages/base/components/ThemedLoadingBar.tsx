@@ -29,7 +29,7 @@ export function ThemedLoadingBar({
         },
         complete: () => {
             clearTimeout(completionTimer.current);
-            setPhase("completing");
+            setPhase((phase) => (phase === "hidden" ? phase : "completing"));
             completionTimer.current = setTimeout(() => {
                 setPhase("hidden");
             }, completionDuration);
