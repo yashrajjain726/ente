@@ -3,7 +3,7 @@ use std::io::Write;
 use anyhow::{Context, Result};
 use chrono::{DateTime, SecondsFormat};
 use dialoguer::console::{Alignment, measure_text_width, pad_str};
-use ente_photos::collections::{Collection, Visibility};
+use ente_photos::{collections::Collection, files::File};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -48,20 +48,70 @@ impl TryFrom<Collection> for AlbumView {
     type Error = anyhow::Error;
 
     fn try_from(album: Collection) -> Result<Self> {
-        let updated_at = DateTime::from_timestamp_micros(album.updated_at_micros)
-            .context("album timestamp is outside the supported range")?
-            .to_rfc3339_opts(SecondsFormat::Micros, true);
+        let updated_at = timestamp(album.updated_at_micros)?;
         Ok(Self {
             id: album.id.to_string(),
             name: album.name,
             kind: album.kind.name(),
-            visibility: match album.visibility {
-                Visibility::Visible => "visible",
-                Visibility::Archived => "archived",
-                Visibility::Hidden => "hidden",
-            },
+            visibility: album.visibility.name(),
             owner_id: album.owner_id.to_string(),
             updated_at,
+        })
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileView<'a> {
+    id: String,
+    name: &'a str,
+    #[serde(rename = "type")]
+    kind: &'static str,
+    owner_id: String,
+    album_ids: Vec<String>,
+    created_at: String,
+    modified_at: String,
+    updated_at: String,
+    location: Option<LocationView>,
+    caption: Option<&'a str>,
+    hash: Option<&'a str>,
+    date_time: Option<&'a str>,
+    offset_time: Option<&'a str>,
+    duration_seconds: Option<u64>,
+    width: Option<u32>,
+    height: Option<u32>,
+    visibility: &'static str,
+}
+
+#[derive(Serialize)]
+struct LocationView {
+    latitude: f64,
+    longitude: f64,
+}
+
+impl<'a> FileView<'a> {
+    pub fn new(file: &'a File, album_ids: &[i64]) -> Result<Self> {
+        Ok(Self {
+            id: file.id.to_string(),
+            name: &file.name,
+            kind: file.kind.name(),
+            owner_id: file.owner_id.to_string(),
+            album_ids: album_ids.iter().map(i64::to_string).collect(),
+            created_at: timestamp(file.created_at_micros)?,
+            modified_at: timestamp(file.modified_at_micros)?,
+            updated_at: timestamp(file.updated_at_micros)?,
+            location: file.location.as_ref().map(|location| LocationView {
+                latitude: location.latitude,
+                longitude: location.longitude,
+            }),
+            caption: file.caption.as_deref(),
+            hash: file.hash.as_deref(),
+            date_time: file.date_time.as_deref(),
+            offset_time: file.offset_time.as_deref(),
+            duration_seconds: file.duration_seconds,
+            width: file.width,
+            height: file.height,
+            visibility: file.visibility.name(),
         })
     }
 }
@@ -107,7 +157,7 @@ pub fn accounts(accounts: &[AccountView<'_>]) -> Result<()> {
 }
 
 pub fn account(account: &AccountView<'_>) -> Result<()> {
-    let fields = [
+    write_fields(&[
         ("Name", escape_controls(account.name)),
         ("Email", escape_controls(account.email)),
         ("Host", escape_controls(account.host)),
@@ -117,21 +167,7 @@ pub fn account(account: &AccountView<'_>) -> Result<()> {
             if account.selected { "yes" } else { "no" }.to_owned(),
         ),
         ("ID", account.id.clone()),
-    ];
-    let width = fields
-        .iter()
-        .map(|(name, _)| measure_text_width(name))
-        .max()
-        .unwrap_or(0);
-    let mut stdout = std::io::stdout().lock();
-    for (name, value) in fields {
-        writeln!(
-            stdout,
-            "{}  {value}",
-            pad_str(name, width, Alignment::Left, None)
-        )?;
-    }
-    Ok(())
+    ])
 }
 
 pub fn albums(albums: &[AlbumView]) -> Result<()> {
@@ -159,6 +195,81 @@ pub fn albums(albums: &[AlbumView]) -> Result<()> {
     )
 }
 
+pub fn album(album: &AlbumView) -> Result<()> {
+    write_fields(&[
+        ("Name", escape_controls(&album.name)),
+        ("Type", album.kind.to_owned()),
+        ("Visibility", album.visibility.to_owned()),
+        ("Owner", album.owner_id.clone()),
+        ("Updated", album.updated_at.clone()),
+        ("ID", album.id.clone()),
+    ])
+}
+
+pub fn files(files: &[FileView<'_>]) -> Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    if files.is_empty() {
+        return writeln!(stdout, "No files.").map_err(Into::into);
+    }
+    let rows = files
+        .iter()
+        .map(|file| {
+            [
+                file.id.clone(),
+                escape_controls(file.name),
+                file.kind.to_owned(),
+                file.created_at.clone(),
+                file.album_ids.join(","),
+            ]
+        })
+        .collect::<Vec<_>>();
+    write_table(
+        &mut stdout,
+        ["ID", "NAME", "TYPE", "CREATED", "ALBUMS"],
+        &rows,
+    )
+}
+
+pub fn file(file: &FileView<'_>) -> Result<()> {
+    let mut fields = vec![
+        ("Name", escape_controls(file.name)),
+        ("Type", file.kind.to_owned()),
+        ("Visibility", file.visibility.to_owned()),
+        ("Created", file.created_at.clone()),
+        ("Modified", file.modified_at.clone()),
+        ("Updated", file.updated_at.clone()),
+        ("Owner", file.owner_id.clone()),
+        ("Albums", file.album_ids.join(", ")),
+        ("ID", file.id.clone()),
+    ];
+    for (label, value) in [
+        ("Caption", file.caption.map(escape_controls)),
+        (
+            "Location",
+            file.location
+                .as_ref()
+                .map(|l| format!("{}, {}", l.latitude, l.longitude)),
+        ),
+        ("Date/time", file.date_time.map(escape_controls)),
+        ("UTC offset", file.offset_time.map(escape_controls)),
+        ("Duration", file.duration_seconds.map(|s| format!("{s} s"))),
+        ("Width", file.width.map(|w| w.to_string())),
+        ("Height", file.height.map(|h| h.to_string())),
+        ("Hash", file.hash.map(escape_controls)),
+    ] {
+        if let Some(value) = value {
+            fields.push((label, value));
+        }
+    }
+    write_fields(&fields)
+}
+
+fn timestamp(micros: i64) -> Result<String> {
+    Ok(DateTime::from_timestamp_micros(micros)
+        .context("timestamp is outside the supported range")?
+        .to_rfc3339_opts(SecondsFormat::Micros, true))
+}
+
 fn products(account: &AccountView<'_>) -> String {
     let products = account
         .products
@@ -171,6 +282,23 @@ fn products(account: &AccountView<'_>) -> String {
     } else {
         products
     }
+}
+
+fn write_fields(fields: &[(&str, String)]) -> Result<()> {
+    let width = fields
+        .iter()
+        .map(|(name, _)| measure_text_width(name))
+        .max()
+        .unwrap_or(0);
+    let mut stdout = std::io::stdout().lock();
+    for (name, value) in fields {
+        writeln!(
+            stdout,
+            "{}  {value}",
+            pad_str(name, width, Alignment::Left, None)
+        )?;
+    }
+    Ok(())
 }
 
 fn write_table<const N: usize>(

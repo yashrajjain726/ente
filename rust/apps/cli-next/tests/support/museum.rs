@@ -2,7 +2,7 @@ use ente_accounts::{
     AccountsClient, AccountsClientConfig, AuthFlow, AuthFlowUi, AuthenticatedAccount,
     CreateAccountParams, OtpPurpose, SecondFactorMethod, TotpPurpose,
 };
-use ente_core::crypto::{PublicKey, blob, sealed, secretbox};
+use ente_core::crypto::{PublicKey, blob, sealed, secretbox, stream};
 use ente_test_support::{HARDCODED_OTT, Museum, TestResult};
 use uuid::Uuid;
 use zeroize::Zeroizing;
@@ -190,6 +190,10 @@ async fn exercise(origin: String) -> TestResult {
         json!({"visibility": 2}),
     )
     .await;
+    let original = b"original photo bytes from Museum";
+    let file_id = upload_file(&origin, &alice, album, &key, original)
+        .await
+        .to_string();
 
     let home = TestHome::new();
     login(&home, "photos", &alice_email, &["--host", &origin]);
@@ -232,12 +236,49 @@ async fn exercise(origin: String) -> TestResult {
             .local_minus_utc(),
         0
     );
+    for album in albums.as_array().unwrap() {
+        for selector in [
+            album["id"].as_str().unwrap(),
+            album["name"].as_str().unwrap(),
+        ] {
+            assert_eq!(home.json(&["photos", "album", "view", selector]), *album);
+        }
+    }
+    assert_eq!(
+        String::from_utf8(success(home.run(&["photos", "album", "view", "Monsoon 🌧"])).stdout)
+            .unwrap(),
+        format!(
+            "Name        Monsoon 🌧\nType        album\nVisibility  visible\nOwner       {alice_id}\nUpdated     {}\nID          {album}\n",
+            monsoon["updatedAt"].as_str().unwrap(),
+        ),
+    );
+    for selector in ["missing", "Monsoon", "monsoon 🌧"] {
+        let output = home.run(&["photos", "album", "view", selector, "--json"]);
+        assert!(failure(&output).contains("no album matches"));
+        assert!(output.stdout.is_empty());
+    }
     let human = String::from_utf8(success(home.run(&["photos", "album", "list"])).stdout).unwrap();
     assert!(human.starts_with("ID  "));
     let raw: Value =
         serde_json::from_slice(&success(home.run(&["photos", "api", "/collections/v2"])).stdout)
             .unwrap();
     assert!(raw["collections"].as_array().unwrap().iter().any(|a| a["id"] == album && a["encryptedName"].as_str().is_some_and(|s| !s.is_empty())));
+    let files = home.json(&["photos", "file", "list"]);
+    assert_eq!(files.as_array().unwrap().len(), 1);
+    assert_eq!(files[0]["id"], file_id);
+    assert_eq!(files[0]["name"], "original.jpg");
+    assert_eq!(files[0]["albumIds"], json!([album.to_string()]));
+    let output_dir = tempfile::tempdir().unwrap();
+    let output_path = output_dir.path().join("owned.jpg");
+    success(home.run(&[
+        "photos",
+        "file",
+        "download",
+        &file_id,
+        "--output",
+        output_path.to_str().unwrap(),
+    ]));
+    assert_eq!(fs::read(output_path).unwrap(), original);
 
     // Two origins with the same server user ID are still different accounts.
     let alias_origin = origin.replace("127.0.0.1", "localhost");
@@ -303,8 +344,41 @@ async fn exercise(origin: String) -> TestResult {
     assert_eq!(shared["name"], "Monsoon 🌧");
     assert_eq!(shared["ownerId"], alice_id);
     assert_eq!(shared["visibility"], "hidden");
+    assert_eq!(
+        home.json(&["photos", "album", "view", "Monsoon 🌧"]),
+        *shared
+    );
+    assert_eq!(
+        home.json(&["photos", "album", "view", "Monsoon 🌧", "--account", "work"]),
+        *monsoon,
+    );
+    let shared_file = home.json(&["photos", "file", "view", &file_id]);
+    assert_eq!(shared_file["ownerId"], alice_id);
+    let output_path = output_dir.path().join("shared.jpg");
+    success(home.run(&[
+        "photos",
+        "file",
+        "download",
+        &file_id,
+        "--output",
+        output_path.to_str().unwrap(),
+    ]));
+    assert_eq!(fs::read(output_path).unwrap(), original);
 
     login(&home, "photos", &alice_email, &["--host", &origin]);
+    for selector in ["Monsoon 🌧", &album.to_string()] {
+        let (conflict, _) = create_album(&origin, &alice, selector, "album").await;
+        let output = home.run(&["photos", "album", "view", selector, "--json"]);
+        let error = failure(&output);
+        assert!(error.contains("is ambiguous"));
+        assert!(error.contains(&format!("{album}  \"Monsoon 🌧\"")));
+        assert!(error.contains(&format!("{conflict}  {selector:?}")));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            home.json(&["photos", "album", "view", &conflict.to_string()])["id"],
+            conflict.to_string(),
+        );
+    }
     let state = home.read_vault();
     assert_eq!(state["accounts"].as_array().unwrap().len(), 3);
     assert_eq!(state["selected"], first_id);
@@ -431,6 +505,68 @@ async fn create_album(
             "nameDecryptionNonce": b64::encode(encrypted_name.nonce.as_bytes()), "type": kind, "attributes": {"version": 1}
         })).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
     (response["collection"]["id"].as_i64().unwrap(), key)
+}
+
+async fn upload_file(
+    origin: &str,
+    owner: &AuthenticatedAccount,
+    album: i64,
+    collection_key: &Key,
+    original: &[u8],
+) -> i64 {
+    let client = reqwest::Client::new();
+    let token = b64::encode_url_safe(&owner.secrets.token);
+    let urls: Value = client
+        .get(format!("{origin}/files/upload-urls"))
+        .header("x-auth-token", &token)
+        .header("x-client-package", "io.ente.photos")
+        .query(&[("count", 2)])
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let key = Key::generate();
+    let wrapped = secretbox::encrypt(key.as_bytes(), collection_key);
+    let mut encrypted = Vec::new();
+    let header =
+        stream::encrypt_file(&mut std::io::Cursor::new(original), &mut encrypted, &key).unwrap();
+    let thumbnail = blob::encrypt(b"thumbnail", &key).unwrap();
+    for (index, bytes) in [&encrypted, &thumbnail.encrypted_data]
+        .into_iter()
+        .enumerate()
+    {
+        client
+            .put(urls["urls"][index]["url"].as_str().unwrap())
+            .body(bytes.clone())
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+    }
+    let metadata = blob::encrypt_json(
+        &json!({
+            "title": "original.jpg", "fileType": 0, "creationTime": 1_700_000_000_000_000i64,
+            "modificationTime": 1_700_000_000_000_000i64
+        }),
+        &key,
+    )
+    .unwrap();
+    let result: Value = client.post(format!("{origin}/files"))
+        .header("x-auth-token", &token).header("x-client-package", "io.ente.photos")
+        .json(&json!({
+            "collectionID": album, "encryptedKey": b64::encode(&wrapped.encrypted_data),
+            "keyDecryptionNonce": b64::encode(wrapped.nonce.as_bytes()),
+            "file": {"objectKey": urls["urls"][0]["objectKey"], "decryptionHeader": b64::encode(header.as_bytes())},
+            "thumbnail": {"objectKey": urls["urls"][1]["objectKey"], "decryptionHeader": b64::encode(thumbnail.decryption_header.as_bytes())},
+            "metadata": {"encryptedData": b64::encode(&metadata.encrypted_data),
+                "decryptionHeader": b64::encode(metadata.decryption_header.as_bytes())}
+        })).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
+    result["id"].as_i64().unwrap()
 }
 
 async fn set_album_metadata(

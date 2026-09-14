@@ -1,7 +1,7 @@
 use ente_collections::open_collection_key;
 use ente_core::{
     Session, b64,
-    crypto::{self, Header, Nonce, blob, secretbox},
+    crypto::{self, Header, Key, Nonce, blob, secretbox},
     http,
 };
 use serde::Deserialize;
@@ -13,6 +13,7 @@ const HIDDEN_VISIBILITY: u8 = 2;
 #[derive(Debug)]
 pub struct Collection {
     pub id: i64,
+    pub key: Key,
     pub name: String,
     pub kind: Kind,
     pub visibility: Visibility,
@@ -42,6 +43,16 @@ pub enum Visibility {
     Visible,
     Archived,
     Hidden,
+}
+
+impl Visibility {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Visible => "visible",
+            Self::Archived => "archived",
+            Self::Hidden => "hidden",
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -123,6 +134,7 @@ pub async fn list(session: &Session) -> Result<Vec<Collection>, Error> {
             };
             Ok(Collection {
                 id: c.id,
+                key,
                 name,
                 kind: match c.kind.as_str() {
                     "favorites" => Kind::Favorites,

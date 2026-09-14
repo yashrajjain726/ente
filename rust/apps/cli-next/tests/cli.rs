@@ -31,6 +31,9 @@ fn reads_do_not_initialize_storage() {
             vec!["accounts", "list", "--json"],
             vec!["accounts", "view", "missing"],
             vec!["photos", "album", "list"],
+            vec!["photos", "album", "view", "missing"],
+            vec!["photos", "file", "list"],
+            vec!["photos", "file", "view", "missing"],
             vec!["photos", "api", "/users/details/v2"],
         ] {
             let output = home
@@ -102,7 +105,7 @@ fn deleted_collections_are_filtered_before_decryption() {
             }]})
             .to_string(),
         )
-        .expect(2)
+        .expect(3)
         .create();
     let home = TestHome::new();
     home.seed(&server.url());
@@ -111,6 +114,7 @@ fn deleted_collections_are_filtered_before_decryption() {
         success(home.run(&["photos", "album", "list"])).stdout,
         b"No albums.\n"
     );
+    assert!(failure(&home.run(&["photos", "album", "view", "12"])).contains("no album matches"));
     request.assert();
 }
 
@@ -718,6 +722,9 @@ fn failure(output: &Output) -> String {
     assert!(!output.status.success(), "command unexpectedly succeeded");
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
+
+#[path = "support/files.rs"]
+mod files;
 
 #[cfg(feature = "museum")]
 #[path = "support/museum.rs"]

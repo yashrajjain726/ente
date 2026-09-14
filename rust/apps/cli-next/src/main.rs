@@ -2,6 +2,7 @@ mod api;
 mod args;
 mod login;
 mod output;
+mod photos;
 mod vault;
 
 use std::{
@@ -12,16 +13,14 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use ente_core::{b64, crypto::Key};
-use ente_photos::collections;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use zeroize::Zeroizing;
 
 use args::{
-    AccountCommand, AlbumCommand, Cli, Command, KeyCommand, PhotosCommand, Product, SessionCommand,
-    VaultCommand,
+    AccountCommand, Cli, Command, KeyCommand, PhotosCommand, Product, SessionCommand, VaultCommand,
 };
-use output::{AccountView, AlbumView};
+use output::AccountView;
 use vault::{State, Vault};
 
 #[tokio::main(flavor = "current_thread")]
@@ -47,11 +46,12 @@ async fn run(cli: Cli) -> Result<()> {
         }
         Command::Photos {
             selector,
-            command:
-                PhotosCommand::Album {
-                    command: AlbumCommand::List,
-                },
-        } => album_list(selector.account.as_deref(), json).await,
+            command: PhotosCommand::Album { command },
+        } => photos::album(command, selector.account.as_deref(), json).await,
+        Command::Photos {
+            selector,
+            command: PhotosCommand::File { album, command },
+        } => photos::file(command, album.as_deref(), selector.account.as_deref(), json).await,
         Command::Accounts { command } => account_command(command, json).await,
         Command::Vault {
             command:
@@ -68,22 +68,6 @@ fn vault_key(json_output: bool) -> Result<()> {
         output::json(&json!({ "key": key.as_str() }))
     } else {
         writeln!(std::io::stdout(), "{}", key.as_str()).map_err(Into::into)
-    }
-}
-
-async fn album_list(selected: Option<&str>, json_output: bool) -> Result<()> {
-    let state = State::load()?;
-    let account = &state.accounts[state.resolve(selected)?];
-    let session = api::session(account, Product::Photos)?;
-    let albums = collections::list(&session)
-        .await?
-        .into_iter()
-        .map(AlbumView::try_from)
-        .collect::<Result<Vec<_>>>()?;
-    if json_output {
-        output::json(&albums)
-    } else {
-        output::albums(&albums)
     }
 }
 

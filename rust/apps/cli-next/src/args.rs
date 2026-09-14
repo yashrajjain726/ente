@@ -78,6 +78,18 @@ pub enum PhotosCommand {
         #[command(subcommand)]
         command: AlbumCommand,
     },
+    #[command(about = "Manage files")]
+    File {
+        #[arg(
+            long,
+            global = true,
+            value_name = "ALBUM",
+            help = "Limit to an album ID or exact name"
+        )]
+        album: Option<String>,
+        #[command(subcommand)]
+        command: FileCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -148,6 +160,29 @@ pub struct ApiArgs {
 pub enum AlbumCommand {
     #[command(about = "List your albums, including shared and hidden ones")]
     List,
+    #[command(about = "Show an album")]
+    View {
+        #[arg(help = "Album ID or exact name")]
+        album: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum FileCommand {
+    #[command(about = "List files, including shared and hidden ones")]
+    List,
+    #[command(about = "Show a file's metadata")]
+    View {
+        #[arg(help = "File ID or exact name")]
+        file: String,
+    },
+    #[command(about = "Download an original; Live Photos are saved as ZIP archives")]
+    Download {
+        #[arg(help = "File ID or exact name")]
+        file: String,
+        #[arg(long, value_name = "PATH", help = "Write to this new file")]
+        output: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
