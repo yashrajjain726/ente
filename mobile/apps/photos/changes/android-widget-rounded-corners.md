@@ -1,1 +1,0 @@
-- Fixed square corners on home screen widgets on Android 12 and newer.
