@@ -17,6 +17,7 @@ import "package:photos/models/memory_lane/memory_lane_models.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/services/memory_lane/memory_lane_cache_service.dart";
 import "package:photos/services/memory_lane/memory_lane_service.dart";
 import "package:photos/services/memory_share_service.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -59,6 +60,7 @@ class MemoryLanePageV2 extends StatefulWidget {
   final bool isActive;
   final VoidCallback? onNextMemory;
   final VoidCallback? onPreviousMemory;
+  final bool isFromMemoriesStrip;
 
   const MemoryLanePageV2({
     required this.personId,
@@ -67,6 +69,7 @@ class MemoryLanePageV2 extends StatefulWidget {
     this.isActive = true,
     this.onNextMemory,
     this.onPreviousMemory,
+    this.isFromMemoriesStrip = false,
     super.key,
   });
 
@@ -91,6 +94,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   _decodedEntries = {};
   final List<EnteFile> _files = [];
   int i = 0;
+  bool _hasMarkedScheduleSeen = false;
+  MemoryLaneSchedule? _schedule;
 
   @override
   void initState() {
@@ -133,6 +138,15 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
 
   Future<void> _loadMemoryLane() async {
     try {
+      if (widget.isFromMemoriesStrip) {
+        final schedule = await MemoryLaneCacheService.instance
+            .getCurrentMemoriesStripSchedule();
+        if (!mounted) return;
+        if (schedule?.personID == widget.personId &&
+            schedule?.isCluster == widget.isCluster) {
+          _schedule = schedule;
+        }
+      }
       final timeline = await MemoryLaneService.instance.getTimeline(
         widget.personId,
         isCluster: widget.isCluster,
@@ -302,7 +316,10 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
       _useFastTransition = fastTransition;
     }
     i = index;
-    if (index != _entries.length - 1) return;
+    if (index != _entries.length - 1) {
+      _hasMarkedScheduleSeen = false;
+      return;
+    }
     final entryKey = _currentEntryKey;
     unawaited(
       _chunkinator!.get(_entries[index]).then((bytes) async {
@@ -310,11 +327,20 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
             !mounted ||
             !widget.isActive ||
             _currentEntryKey != entryKey ||
-            ModalRoute.of(context)?.isCurrent != true ||
-            localSettings.hasSeenMemoryLane(widget.personId)) {
+            ModalRoute.of(context)?.isCurrent != true) {
           return;
         }
-        await localSettings.markMemoryLaneSeen(widget.personId);
+        final markScheduleSeen = !_hasMarkedScheduleSeen;
+        _hasMarkedScheduleSeen = true;
+        if (!localSettings.hasSeenMemoryLane(widget.personId)) {
+          await localSettings.markMemoryLaneSeen(widget.personId);
+        }
+        final schedule = _schedule;
+        if (markScheduleSeen && schedule != null) {
+          await MemoryLaneCacheService.instance.markScheduleCompletelySeen(
+            schedule,
+          );
+        }
       }),
     );
   }

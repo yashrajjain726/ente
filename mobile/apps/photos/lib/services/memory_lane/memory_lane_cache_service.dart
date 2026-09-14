@@ -113,6 +113,29 @@ class MemoryLaneCacheService {
     });
   }
 
+  Future<void> markScheduleCompletelySeen(MemoryLaneSchedule schedule) async {
+    await _ensureInitialized();
+    await _lock.synchronized(() async {
+      final currentCache = await _loadCacheUnsafe();
+      final current = currentCache.memoriesStripSchedule[schedule.personID];
+      if (current == null ||
+          current.beginShowingAt != schedule.beginShowingAt ||
+          current.isCluster != schedule.isCluster) {
+        return;
+      }
+      _cache = currentCache.copyWithMemoriesStripScheduleEntry(
+        current.personID,
+        MemoryLaneSchedule(
+          personID: current.personID,
+          isCluster: current.isCluster,
+          beginShowingAt: current.beginShowingAt,
+          lastCompletelySeenAt: DateTime.now().microsecondsSinceEpoch,
+        ),
+      );
+      await _writeCacheUnsafe();
+    });
+  }
+
   Future<void> removeMemoriesStripSchedule(String personId) async {
     await _ensureInitialized();
     await _lock.synchronized(() async {
