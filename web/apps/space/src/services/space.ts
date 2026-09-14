@@ -1268,6 +1268,11 @@ export const loadCurrentSpacePost = async (
 export const loadCurrentSpacePostAssetURL: SpacePostAssetURLLoader = async (
     asset,
 ) => {
+    const cachedURL = await cachedSpaceMediaBlobURLIfPresent(
+        postAssetCacheKey(asset),
+    );
+    if (cachedURL) return cachedURL;
+
     const profile = await loadExistingSpaceProfile();
     const ctx = await ensureCurrentSpaceContext();
     try {

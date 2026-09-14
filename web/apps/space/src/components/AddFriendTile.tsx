@@ -122,7 +122,7 @@ export const SpaceAddFriendTile: React.FC<SpaceAddFriendTileProps> = ({
                     sx={{
                         alignItems: "center",
                         appearance: "none",
-                        bgcolor: spaceSurface,
+                        bgcolor: "#303034",
                         border: 0,
                         borderRadius: "inherit",
                         color: "#65656D",

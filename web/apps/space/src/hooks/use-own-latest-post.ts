@@ -1,44 +1,56 @@
 import log from "ente-base/log";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { savedSpaceOwnedSpaces } from "services/persistent-session";
 import { loadCachedOwnLatestPost } from "services/post-cache";
+import { loadExistingSpaceId } from "services/profile";
 import {
-    deleteCurrentPost,
     loadCurrentSpaceProfilePostsPage,
-    updateCurrentPostCaption,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 
-export const useOwnLatestPost = (spaceId: string | undefined) => {
-    const { postPublication, setPostPublication } = useSpaceAppState();
+export const useOwnLatestPost = () => {
+    const { postPublication } = useSpaceAppState();
     const isPublishingPost = postPublication?.phase == "posting";
     const [ownLatestPost, setOwnLatestPost] = useState<SpacePost>();
-    const [ownPostsVersion, setOwnPostsVersion] = useState(0);
     const [isOwnLatestPostLoading, setIsOwnLatestPostLoading] = useState(true);
     const [isOwnLatestPostUnavailable, setIsOwnLatestPostUnavailable] =
         useState(false);
 
     useEffect(() => {
-        setOwnLatestPost(undefined);
         setIsOwnLatestPostLoading(true);
         setIsOwnLatestPostUnavailable(false);
-        if (!spaceId || isPublishingPost) return;
+        if (isPublishingPost) return;
 
         let cancelled = false;
+        const isCancelled = () => cancelled;
         let cachedPost: SpacePost | undefined;
-        void loadCachedOwnLatestPost(spaceId)
-            .then((post) => {
-                if (cancelled) return;
-                cachedPost = post;
-                if (post) {
-                    setOwnLatestPost(post);
+        void (async () => {
+            const cachedSpaceId = savedSpaceOwnedSpaces()?.[0]?.spaceId;
+            if (cachedSpaceId) {
+                cachedPost = await loadCachedOwnLatestPost(cachedSpaceId);
+                if (isCancelled()) return;
+                if (cachedPost) {
+                    setOwnLatestPost(cachedPost);
                     setIsOwnLatestPostLoading(false);
                 }
-                return loadCurrentSpaceProfilePostsPage(spaceId, spaceId);
-            })
-            .then((page) => {
-                if (!cancelled && page) setOwnLatestPost(page.items[0]);
-            })
+            }
+
+            const spaceId = await loadExistingSpaceId();
+            if (isCancelled()) return;
+            if (cachedPost?.spaceId != spaceId) {
+                cachedPost = undefined;
+                setOwnLatestPost(undefined);
+                setIsOwnLatestPostLoading(true);
+            }
+            if (!spaceId) return;
+
+            const page = await loadCurrentSpaceProfilePostsPage(
+                spaceId,
+                spaceId,
+            );
+            if (!isCancelled()) setOwnLatestPost(page.items[0]);
+        })()
             .catch((error: unknown) => {
                 log.error("Failed to load own latest Space post", error);
                 if (!cancelled && !cachedPost)
@@ -50,59 +62,12 @@ export const useOwnLatestPost = (spaceId: string | undefined) => {
         return () => {
             cancelled = true;
         };
-    }, [spaceId, ownPostsVersion, isPublishingPost]);
-
-    const deleteOwnPost = useCallback(
-        async (postId: number) => {
-            if (!spaceId) throw new Error("Missing space.");
-
-            await deleteCurrentPost(spaceId, postId);
-            if (
-                ownLatestPost?.postId == postId ||
-                postPublication?.post.postId == postId
-            ) {
-                setPostPublication((current) =>
-                    current?.post.postId == postId ? null : current,
-                );
-                setOwnLatestPost(undefined);
-                setIsOwnLatestPostLoading(true);
-                setOwnPostsVersion((version) => version + 1);
-            }
-        },
-        [spaceId, ownLatestPost?.postId, postPublication, setPostPublication],
-    );
-
-    const updateOwnPostCaption = useCallback(
-        async (postId: number, caption: string) => {
-            if (!spaceId) throw new Error("Missing space.");
-
-            await updateCurrentPostCaption(spaceId, postId, caption);
-            setPostPublication((current) =>
-                current?.post.postId == postId
-                    ? {
-                          ...current,
-                          post: {
-                              ...current.post,
-                              caption: caption.trim() || undefined,
-                          },
-                      }
-                    : current,
-            );
-            setOwnLatestPost((post) =>
-                post?.postId == postId
-                    ? { ...post, caption: caption.trim() || undefined }
-                    : post,
-            );
-        },
-        [spaceId, setPostPublication],
-    );
+    }, [isPublishingPost]);
 
     return {
         ownLatestPost: postPublication?.post ?? ownLatestPost,
         isOwnLatestPostLoading: !postPublication && isOwnLatestPostLoading,
         isOwnLatestPostUnavailable:
             !postPublication && isOwnLatestPostUnavailable,
-        deleteOwnPost,
-        updateOwnPostCaption,
     };
 };

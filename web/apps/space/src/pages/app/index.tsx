@@ -66,9 +66,7 @@ const Page: React.FC = () => {
         ownLatestPost,
         isOwnLatestPostLoading,
         isOwnLatestPostUnavailable,
-        deleteOwnPost,
-        updateOwnPostCaption,
-    } = useOwnLatestPost(spaceId);
+    } = useOwnLatestPost();
     const [unreadPosts, setUnreadPosts] = useState<SpacePost[]>([]);
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isLatestPostsLoading, setIsLatestPostsLoading] = useState(true);
@@ -345,9 +343,7 @@ const Page: React.FC = () => {
                           }
                         : undefined
                 }
-                onDeletePost={deleteOwnPost}
-                onUpdatePostCaption={updateOwnPostCaption}
-                onOpenFriend={(friendID, username) => {
+                onOpenFriend={(friendID, username, section) => {
                     const friend = friends.find(
                         (candidate) =>
                             candidate.id == friendID ||
@@ -355,9 +351,11 @@ const Page: React.FC = () => {
                     );
                     const friendUsername = username || friend?.username;
                     if (friendUsername) {
+                        const query = section ? "?section=latest" : "";
                         void router.push(
-                            spaceRoutes.friendPage,
-                            spaceRoutes.friend(friendUsername),
+                            `${spaceRoutes.friendPage}${query}`,
+                            `${spaceRoutes.friend(friendUsername)}${query}`,
+                            { scroll: section != "latest" },
                         );
                     }
                 }}
@@ -425,12 +423,18 @@ const Page: React.FC = () => {
                     );
                     await refreshUnreadStatus(profile.spaceId);
                 }}
+                onOpenOwnPost={() =>
+                    void router.push(
+                        `${spaceRoutes.profile}?section=latest`,
+                        undefined,
+                        { scroll: false },
+                    )
+                }
                 onOpenProfile={
                     profile
                         ? () => void router.push(spaceRoutes.profile)
                         : undefined
                 }
-                onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onReplyToPost={
                     profile?.spaceId
                         ? (

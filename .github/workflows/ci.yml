@@ -69,6 +69,11 @@ jobs:
         if: ${{ contains(fromJSON(needs.select.outputs.jobs), 'repo-lint') }}
         uses: ./.github/workflows/repo-lint.yml
 
+    rust-cli-test:
+        needs: select
+        if: ${{ contains(fromJSON(needs.select.outputs.jobs), 'rust-cli-test') }}
+        uses: ./.github/workflows/rust-cli-test.yml
+
     rust-lint:
         needs: select
         if: ${{ contains(fromJSON(needs.select.outputs.jobs), 'rust-lint') }}
@@ -103,6 +108,7 @@ jobs:
             - mobile-lint
             - mobile-podfile-lock
             - repo-lint
+            - rust-cli-test
             - rust-lint
             - rust-test
             - server-lint

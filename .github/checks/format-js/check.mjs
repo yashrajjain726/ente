@@ -28,6 +28,7 @@ try {
             write ? "--write" : "--check",
             ".github/{checks,scripts}/**/*.{js,cjs,mjs}",
             "**/{checks,scripts}/**/*.{js,cjs,mjs}",
+            "!mobile/apps/auth/assets/simple-icons/**",
         ],
         { cwd: root, stdio: "inherit" },
     );
