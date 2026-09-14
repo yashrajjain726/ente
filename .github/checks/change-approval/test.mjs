@@ -595,6 +595,10 @@ test("existing guardrails modified or deleted", (t) => {
         {
             ".github/scripts/x.mjs": "",
             ".github/workflows/x.yml": "on: push\n",
+            "apple/.swift-format": "{}\n",
+            "apple/.swiftlint.yml": "only_rules: []\n",
+            "apple/Package.swift": "// swift-tools-version: 6.0\n",
+            "apple/scripts/lint.sh": "swift format lint --strict\n",
             "mobile/checks/x/check.rb": "",
             "rust/checks/x/check.py": "",
             "web/apps/x/eslint.config.mjs": "",
@@ -603,6 +607,10 @@ test("existing guardrails modified or deleted", (t) => {
         {
             ".github/scripts/x.mjs": "export {};\n",
             ".github/workflows/x.yml": "on: pull_request\n",
+            "apple/.swift-format": null,
+            "apple/.swiftlint.yml": "only_rules: [empty_count]\n",
+            "apple/Package.swift": "// swift-tools-version: 6.1\n",
+            "apple/scripts/lint.sh": "swift format lint\n",
             "mobile/checks/x/check.rb": "\n",
             "rust/checks/x/check.py": "\n",
             "web/apps/x/eslint.config.mjs": null,
@@ -612,7 +620,7 @@ test("existing guardrails modified or deleted", (t) => {
     );
     assert.equal(
         output,
-        "6 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
+        "10 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `apple/.swift-format`\n- `apple/.swiftlint.yml`\n- `apple/Package.swift`\n- `apple/scripts/lint.sh`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
     );
 });
 

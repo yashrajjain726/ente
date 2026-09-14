@@ -5,6 +5,7 @@ const routineBinary = (file) =>
     file.includes("Assets.xcassets/");
 const guardrailDirs = [
     ".github/",
+    "apple/scripts/",
     "mobile/checks/",
     "mobile/scripts/",
     "rust/checks/",
@@ -15,6 +16,9 @@ const guardrailDirs = [
     "web/packages/build-config/",
 ];
 const guardrailFiles = new Set([
+    "apple/Package.swift",
+    ".swift-format",
+    ".swiftlint.yml",
     "eslint.config.mjs",
     ".prettierrc.json",
     "analysis_options.yaml",
@@ -37,6 +41,7 @@ export function checkFiles({ files }) {
             ({ path, added }) =>
                 !added &&
                 (guardrailDirs.some((dir) => path.startsWith(dir)) ||
+                    guardrailFiles.has(path) ||
                     guardrailFiles.has(basename(path))),
         ),
         ...files.filter(
