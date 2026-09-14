@@ -1,4 +1,9 @@
-import { decryptStreamBytes, decryptStreamChunk } from "ente-base/crypto";
+import {
+    decryptStreamBytes,
+    decryptStreamChunk,
+    initChunkDecryption,
+} from "ente-base/crypto";
+import type { SodiumStateAddress } from "ente-base/crypto/types";
 import {
     createDownloadManager,
     NetworkDownloadError,
@@ -12,7 +17,10 @@ vi.mock("ente-base/crypto", () => ({
     decryptStreamBytes: vi.fn(),
     initChunkDecryption: vi
         .fn()
-        .mockResolvedValue({ pullState: 0, decryptionChunkSize: 2 }),
+        .mockResolvedValue({
+            pullState: { name: "test-state" },
+            decryptionChunkSize: 2,
+        }),
     decryptStreamChunk: vi.fn((data: Uint8Array<ArrayBuffer>) =>
         Promise.resolve(data),
     ),
@@ -132,7 +140,7 @@ describe("download byte progress", () => {
         expect(manager.fileDownloadProgressSnapshot().has(file.id)).toBe(false);
     });
 
-    test("notifies for every chunk and EOF, retaining 100% until decryption settles", async () => {
+    test("reports chunk progress and retains 100% until decryption settles", async () => {
         const body = new ReadableStream<Uint8Array>({
             start(controller) {
                 controller.enqueue(new Uint8Array([1, 2]));
@@ -159,16 +167,22 @@ describe("download byte progress", () => {
         });
         const download = manager.fileStream(file);
         await decrypting.promise;
-        expect(updates).toEqual([
-            { loaded: 2, total: 6 },
-            { loaded: 4, total: 6 },
-            { loaded: 6, total: 6 },
-            { loaded: 6, total: 6 },
-        ]);
+        expect(updates).toEqual(
+            expect.arrayContaining([
+                { loaded: 2, total: 6 },
+                { loaded: 4, total: 6 },
+                { loaded: 6, total: 6 },
+            ]),
+        );
+        expect(updates).not.toContain(undefined);
+        expect(manager.fileDownloadProgressSnapshot().get(file.id)).toEqual({
+            loaded: 6,
+            total: 6,
+        });
         decrypted.resolve(new Uint8Array([1, 2, 3]));
         await download;
-        expect(updates).toHaveLength(5);
-        expect(updates[4]).toBeUndefined();
+        expect(updates.at(-1)).toBeUndefined();
+        expect(manager.fileDownloadProgressSnapshot().has(file.id)).toBe(false);
         expect(new Set(snapshots).size).toBe(snapshots.length);
         expect(snapshots.map((snapshot) => snapshot.get(file.id))).toEqual([
             undefined,
@@ -248,4 +262,145 @@ describe("download byte progress", () => {
             );
         },
     );
+});
+
+describe("download consumer compatibility", () => {
+    test.each([
+        ["fragmented chunks", [[1], [2], [3], [4], [5]]],
+        ["multiple chunks per read", [[1, 2, 3, 4, 5]]],
+        ["empty network chunks", [[], [1, 2], [], [3, 4, 5]]],
+        ["exact chunk boundary", [[1, 2, 3, 4]]],
+        ["empty stream", []],
+    ] as const)("emits decrypted video bytes with %s", async (_, chunks) => {
+        vi.mocked(decryptStreamChunk).mockClear();
+        vi.mocked(initChunkDecryption).mockClear();
+        const pullState: SodiumStateAddress = { name: "video-test-state" };
+        vi.mocked(initChunkDecryption).mockResolvedValueOnce({
+            pullState,
+            decryptionChunkSize: 2,
+        });
+        const encryptedBytes = new Uint8Array(chunks.flat());
+        const expectedChunks = [];
+        for (let i = 0; i < encryptedBytes.length; i += 2) {
+            const chunk = encryptedBytes.slice(i, i + 2);
+            expectedChunks.push([chunk, pullState]);
+            vi.mocked(decryptStreamChunk).mockResolvedValueOnce(
+                chunk.map((byte) => byte + 10),
+            );
+        }
+        const manager = managerFor(
+            new Response(
+                new ReadableStream({
+                    start(controller) {
+                        for (const chunk of chunks)
+                            controller.enqueue(new Uint8Array(chunk));
+                        controller.close();
+                    },
+                }),
+            ),
+        );
+        const stream = await manager.fileStream({
+            ...file,
+            metadata: { ...file.metadata, fileType: FileType.video },
+        });
+        const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+        expect(bytes).toEqual(encryptedBytes.map((byte) => byte + 10));
+        expect(initChunkDecryption).toHaveBeenCalledExactlyOnceWith(
+            file.file.decryptionHeader,
+            file.key,
+        );
+        expect(vi.mocked(decryptStreamChunk).mock.calls).toEqual(
+            expectedChunks,
+        );
+        expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
+    });
+
+    test.each([FileType.image, FileType.livePhoto])(
+        "preserves buffered bytes and keys for type %s",
+        async (fileType) => {
+            const bytes = new Uint8Array([9, 1, 2, 3, 9]);
+            const manager = managerFor(
+                new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(bytes.subarray(1, 3));
+                            controller.enqueue(bytes.subarray(3, 4));
+                            controller.close();
+                        },
+                    }),
+                ),
+            );
+            vi.mocked(decryptStreamBytes).mockResolvedValueOnce(
+                new Uint8Array([4, 5]),
+            );
+            const stream = await manager.fileStream({
+                ...file,
+                metadata: { ...file.metadata, fileType },
+            });
+            expect(decryptStreamBytes).toHaveBeenLastCalledWith(
+                {
+                    encryptedData: new Uint8Array([1, 2, 3]),
+                    decryptionHeader: file.file.decryptionHeader,
+                },
+                file.key,
+            );
+            expect(
+                new Uint8Array(await new Response(stream).arrayBuffer()),
+            ).toEqual(new Uint8Array([4, 5]));
+            expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
+        },
+    );
+
+    test.each([FileType.image, FileType.livePhoto, FileType.video])(
+        "preserves crypto errors and clears progress for type %s",
+        async (fileType) => {
+            const error = new Error("invalid ciphertext");
+            if (fileType === FileType.video)
+                vi.mocked(decryptStreamChunk).mockRejectedValueOnce(error);
+            else vi.mocked(decryptStreamBytes).mockRejectedValueOnce(error);
+            const manager = managerFor(new Response(new Uint8Array([1, 2, 3])));
+            await expect(
+                manager
+                    .fileStream({
+                        ...file,
+                        metadata: { ...file.metadata, fileType },
+                    })
+                    .then((stream) => new Response(stream).arrayBuffer()),
+            ).rejects.toBe(error);
+            expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
+        },
+    );
+
+    test("preserves initialization errors", async () => {
+        const error = new Error("invalid header");
+        vi.mocked(initChunkDecryption).mockRejectedValueOnce(error);
+        const manager = managerFor(new Response(new Uint8Array([1, 2])));
+        await expect(
+            manager.fileStream({
+                ...file,
+                metadata: { ...file.metadata, fileType: FileType.video },
+            }),
+        ).rejects.toBe(error);
+        expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
+    });
+
+    test("forwards background options and wraps transport failures", async () => {
+        const error = new Error("offline");
+        const downloadFile = vi.fn().mockRejectedValue(error);
+        const manager = createDownloadManager({
+            downloadFile,
+            downloadThumbnail: vi.fn(),
+            renderableImageBlob: vi.fn(),
+            playableVideoURL: vi.fn(),
+        });
+        const opts = { background: true };
+        await expect(manager.fileStream(file, opts)).rejects.toMatchObject({
+            error,
+        });
+        expect(downloadFile).toHaveBeenCalledWith(file, opts);
+        await expect(manager.fileStream(file)).rejects.toBeInstanceOf(
+            NetworkDownloadError,
+        );
+        expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
+    });
 });
