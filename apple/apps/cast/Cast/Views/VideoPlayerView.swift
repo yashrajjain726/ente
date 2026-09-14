@@ -92,7 +92,9 @@ struct VideoPlayerView: View {
                     tryVideoFallback(originalURL: tempURL)
                 }
             } catch {
-                logger.error("Failed to set up video player: \(error.localizedDescription)")
+                logger.error(
+                    "Failed to set up video player: \(error.localizedDescription, privacy: .public)"
+                )
                 await MainActor.run {
                     showErrorState()
                 }
@@ -116,7 +118,8 @@ struct VideoPlayerView: View {
                     setupPlayer()
                 }
             } catch {
-                logger.error("Video fallback failed: \(error.localizedDescription)")
+                logger.error(
+                    "Video fallback failed: \(error.localizedDescription, privacy: .public)")
                 showErrorState()
             }
         }
@@ -131,7 +134,8 @@ struct VideoPlayerView: View {
                 timer.invalidate()
             case .failed:
                 if let error = playerItem.error {
-                    logger.error("Video player failed: \(error.localizedDescription)")
+                    logger.error(
+                        "Video player failed: \(error.localizedDescription, privacy: .public)")
                 }
                 timer.invalidate()
                 Task { @MainActor in
@@ -155,7 +159,8 @@ struct VideoPlayerView: View {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            logger.error("Failed to set up audio session: \(error.localizedDescription)")
+            logger.error(
+                "Failed to set up audio session: \(error.localizedDescription, privacy: .public)")
         }
 
         setupPlayerObservers()
@@ -185,7 +190,8 @@ struct VideoPlayerView: View {
             if let error = notification
                 .userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             {
-                logger.error("Video playback failed: \(error.localizedDescription)")
+                logger.error(
+                    "Video playback failed: \(error.localizedDescription, privacy: .public)")
             }
         }
 
@@ -295,7 +301,9 @@ struct VideoPlayerView: View {
                 options: .notifyOthersOnDeactivation,
             )
         } catch {
-            logger.error("Failed to deactivate audio session: \(error.localizedDescription)")
+            logger.error(
+                "Failed to deactivate audio session: \(error.localizedDescription, privacy: .public)"
+            )
         }
 
         player = nil

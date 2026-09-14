@@ -20,11 +20,11 @@ private final class CastRustLogSink: RustLogSink, @unchecked Sendable {
     func log(level: RustLogLevel, target: String, message: String) {
         switch level {
         case .error:
-            logger.error("[\(target)] \(message)")
+            logger.error("[\(target, privacy: .public)] \(message, privacy: .public)")
         case .warn:
-            logger.warning("[\(target)] \(message)")
+            logger.warning("[\(target, privacy: .public)] \(message, privacy: .public)")
         case .info:
-            logger.info("[\(target)] \(message)")
+            logger.info("[\(target, privacy: .public)] \(message, privacy: .public)")
         }
     }
 }

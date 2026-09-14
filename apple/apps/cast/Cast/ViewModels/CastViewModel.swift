@@ -294,7 +294,6 @@ class CastViewModel: ObservableObject {
     }
 
     private func handleError(_ message: String) {
-        logger.error("Cast session failed: \(message)")
         currentView = .error
         errorMessage = message
         statusMessage = ""
@@ -302,6 +301,7 @@ class CastViewModel: ObservableObject {
     }
 
     private func handleNetworkError(_ error: Error) {
+        logger.error("Cast session failed: \(error.localizedDescription, privacy: .public)")
         handleError("An error occurred: \(error.localizedDescription)")
 
         let sessionID = sessionID

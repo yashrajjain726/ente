@@ -176,7 +176,8 @@ class RealSlideshowService: ObservableObject {
             logger.info("Slideshow started with \(fileCount) slides")
 
         } catch {
-            logger.error("Failed to start slideshow: \(error.localizedDescription)")
+            logger.error(
+                "Failed to start slideshow: \(error.localizedDescription, privacy: .public)")
             await MainActor.run {
                 self.error = "Failed to load slideshow: \(error.localizedDescription)"
             }
@@ -253,7 +254,7 @@ class RealSlideshowService: ObservableObject {
             }
         } catch {
             guard storedCastPayload == castPayload else { return }
-            logger.error("Failed to fetch files: \(error.localizedDescription)")
+            logger.error("Failed to fetch files: \(error.localizedDescription, privacy: .public)")
             hasCompletedInitialFetch = false
             self.error = "Failed to load files: \(error.localizedDescription)"
         }
@@ -406,7 +407,9 @@ class RealSlideshowService: ObservableObject {
                         }
                     }
                 } catch {
-                    logger.error("Failed to process file metadata: \(error.localizedDescription)")
+                    logger.error(
+                        "Failed to process file metadata: \(error.localizedDescription, privacy: .public)"
+                    )
                 }
             }
         }
@@ -503,7 +506,8 @@ class RealSlideshowService: ObservableObject {
 
         } catch {
             guard storedCastPayload == payload else { return }
-            logger.error("Failed to load slideshow item: \(error.localizedDescription)")
+            logger.error(
+                "Failed to load slideshow item: \(error.localizedDescription, privacy: .public)")
 
             await MainActor.run {
                 slideLoadingProgress = 0.0
@@ -547,7 +551,8 @@ class RealSlideshowService: ObservableObject {
 
             } catch {
                 logger.error(
-                    "Failed to extract Live Photo components: \(error.localizedDescription)")
+                    "Failed to extract Live Photo components: \(error.localizedDescription, privacy: .public)"
+                )
                 currentImageData = data
                 currentVideoData = nil
                 currentVideoURL = nil
@@ -578,7 +583,9 @@ class RealSlideshowService: ObservableObject {
                 currentVideoData = nil
                 prepareVideoPlayer(url: url)
             } catch {
-                logger.error("Failed to save temporary video file: \(error.localizedDescription)")
+                logger.error(
+                    "Failed to save temporary video file: \(error.localizedDescription, privacy: .public)"
+                )
                 currentVideoURL = nil
             }
         } else {
@@ -658,7 +665,9 @@ class RealSlideshowService: ObservableObject {
 
             } catch {
                 guard storedCastPayload == payload else { return }
-                logger.error("Failed to load next slideshow item: \(error.localizedDescription)")
+                logger.error(
+                    "Failed to load next slideshow item: \(error.localizedDescription, privacy: .public)"
+                )
                 currentFileIndex = (currentFileIndex + 1) % allFiles.count
                 retryCount += 1
             }
@@ -824,7 +833,8 @@ class RealSlideshowService: ObservableObject {
             {
                 // fetchFilesBatch already handled this error.
             } else {
-                logger.error("Periodic diff check failed: \(error.localizedDescription)")
+                logger.error(
+                    "Periodic diff check failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
