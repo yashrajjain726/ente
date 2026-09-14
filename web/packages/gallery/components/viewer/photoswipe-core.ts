@@ -864,7 +864,7 @@ export class FileViewerPhotoSwipe<
             let progressRing: SVGCircleElement;
             let progressBar: HTMLElement;
             let fill: HTMLElement;
-            let precentage: HTMLElement;
+            let percentageEl: HTMLElement;
             let status: HTMLElement;
             let separator: HTMLElement;
             let size: HTMLElement;
@@ -902,10 +902,10 @@ export class FileViewerPhotoSwipe<
                 const state = rememberDownloadProgress();
 
                 const failed = state?.phase == "failed";
-                const precentageText =
-                    state?.precentage === undefined
+                const percentageText =
+                    state?.percentage === undefined
                         ? ""
-                        : `${state.precentage}%`;
+                        : `${state.percentage}%`;
                 const statusText = state
                     ? t(
                           {
@@ -926,15 +926,15 @@ export class FileViewerPhotoSwipe<
                               })
                             : `${formattedByteSize(state.loaded, 1)} / ${formattedByteSize(state.total, 1)}`
                         : "";
-                setText(precentage, precentageText);
+                setText(percentageEl, percentageText);
                 setText(status, statusText);
                 setText(size, sizeText);
                 setText(retry, t("retry"));
                 size.hidden = !sizeText;
                 separator.hidden = !(sizeText || failed);
                 retry.hidden = !failed;
-                fill.style.width = `${Math.max(state?.precentage ?? 0, 1)}%`;
-                progressRing.style.strokeDashoffset = `${100 - (state?.precentage ?? 0)}`;
+                fill.style.width = `${Math.max(state?.percentage ?? 0, 1)}%`;
+                progressRing.style.strokeDashoffset = `${100 - (state?.percentage ?? 0)}`;
                 for (const [element, prefix] of [
                     [progressText, "pswp__ente-progress-text"],
                     [progressValue, "pswp__ente-progress-overlay"],
@@ -948,7 +948,7 @@ export class FileViewerPhotoSwipe<
                     element.classList.toggle(`${prefix}--failed`, failed);
                     element.classList.toggle(
                         `${prefix}--indeterminate`,
-                        !!state && state.precentage === undefined,
+                        !!state && state.percentage === undefined,
                     );
                 }
                 setAttribute(
@@ -964,13 +964,13 @@ export class FileViewerPhotoSwipe<
                 setAttribute(
                     progressValue,
                     "aria-valuenow",
-                    state?.precentage?.toString(),
+                    state?.percentage?.toString(),
                 );
                 setAttribute(
                     progressValue,
                     "aria-valuetext",
                     [
-                        precentageText,
+                        percentageText,
                         !(compactProgress.matches && sizeText) && statusText,
                         !compactProgress.matches && (sizeText || failed) && "·",
                         sizeText,
@@ -1022,7 +1022,7 @@ export class FileViewerPhotoSwipe<
                 onInit: (element) => {
                     progressValue = element;
                     progressRing = element.querySelector("circle")!;
-                    precentage = element.querySelector<HTMLElement>(
+                    percentageEl = element.querySelector<HTMLElement>(
                         ".pswp__ente-progress-pct",
                     )!;
                     element.setAttribute("role", "progressbar");

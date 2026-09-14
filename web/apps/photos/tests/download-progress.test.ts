@@ -12,18 +12,18 @@ describe("downloadProgressState", () => {
         );
         expect(downloaded).toEqual({
             phase: "decrypting",
-            precentage: 100,
+            percentage: 100,
             loaded: 100,
             total: 100,
         });
         const tail = downloadProgressState(loading, undefined, downloaded);
-        expect(tail).toEqual({ phase: "decrypting", precentage: 100 });
+        expect(tail).toEqual({ phase: "decrypting", percentage: 100 });
         expect(downloadProgressState(loading, undefined, tail)).toEqual(tail);
     });
 
     test("prepares HLS auto video without a download entry, then hides", () => {
         const preparing = downloadProgressState(loading, undefined, undefined);
-        expect(preparing).toEqual({ phase: "preparing", precentage: 0 });
+        expect(preparing).toEqual({ phase: "preparing", percentage: 0 });
         expect(downloadProgressState({}, undefined, preparing)).toBeUndefined();
     });
 
@@ -32,18 +32,18 @@ describe("downloadProgressState", () => {
             downloadProgressState(
                 {},
                 { loaded: 30, total: 100 },
-                { phase: "downloading", precentage: 30 },
+                { phase: "downloading", percentage: 30 },
             ),
         ).toBeUndefined();
         expect(
             downloadProgressState({}, undefined, {
                 phase: "failed",
-                precentage: 70,
+                percentage: 70,
             }),
         ).toBeUndefined();
     });
 
-    test("clamps ciphertext exceeding the plaintext size fallback", () => {
+    test("shows decrypting when downloaded bytes exceed the reported total", () => {
         expect(
             downloadProgressState(
                 loading,
@@ -52,7 +52,7 @@ describe("downloadProgressState", () => {
             ),
         ).toEqual({
             phase: "decrypting",
-            precentage: 100,
+            percentage: 100,
             loaded: 117,
             total: 100,
         });
@@ -66,7 +66,7 @@ describe("downloadProgressState", () => {
         );
         expect(state).toEqual({
             phase: "downloading",
-            precentage: undefined,
+            percentage: undefined,
             loaded: 30,
         });
         const completed = downloadProgressState(
@@ -76,7 +76,7 @@ describe("downloadProgressState", () => {
         );
         expect(downloadProgressState(loading, undefined, completed)).toEqual({
             phase: "decrypting",
-            precentage: 100,
+            percentage: 100,
         });
     });
 
@@ -87,35 +87,35 @@ describe("downloadProgressState", () => {
             undefined,
         );
         const removed = downloadProgressState(loading, undefined, downloading);
-        expect(removed).toEqual({ phase: "downloading", precentage: 42 });
+        expect(removed).toEqual({ phase: "downloading", percentage: 42 });
         expect(
             downloadProgressState({ fetchFailed: true }, undefined, removed),
-        ).toEqual({ phase: "failed", precentage: 42 });
+        ).toEqual({ phase: "failed", percentage: 42 });
     });
 
     test("failure takes precedence and keeps the previous percentage", () => {
         expect(
             downloadProgressState({ fetchFailed: true }, undefined, {
                 phase: "downloading",
-                precentage: 42,
+                percentage: 42,
             }),
-        ).toEqual({ phase: "failed", precentage: 42 });
+        ).toEqual({ phase: "failed", percentage: 42 });
         expect(
             downloadProgressState(
                 { ...loading, fetchFailed: true },
                 { loaded: 100, total: 100 },
                 undefined,
             ),
-        ).toEqual({ phase: "failed", precentage: 0 });
+        ).toEqual({ phase: "failed", percentage: 0 });
     });
 
     test("retry ignores the previous failed percentage", () => {
         expect(
             downloadProgressState(loading, undefined, {
                 phase: "failed",
-                precentage: 42,
+                percentage: 42,
             }),
-        ).toEqual({ phase: "preparing", precentage: 0 });
+        ).toEqual({ phase: "preparing", percentage: 0 });
     });
 
     test("opens on an in-flight download without previous state", () => {
@@ -127,7 +127,7 @@ describe("downloadProgressState", () => {
             ),
         ).toEqual({
             phase: "downloading",
-            precentage: 30,
+            percentage: 30,
             loaded: 30,
             total: 100,
         });
@@ -140,13 +140,13 @@ describe("downloadProgressState", () => {
                 { loaded: 0, total: 100 },
                 undefined,
             ),
-        ).toEqual({ phase: "preparing", precentage: 0 });
+        ).toEqual({ phase: "preparing", percentage: 0 });
         expect(
             downloadProgressState(
                 loading,
                 { loaded: 9999, total: 10000 },
                 undefined,
-            )?.precentage,
+            )?.percentage,
         ).toBe(99);
     });
 });
