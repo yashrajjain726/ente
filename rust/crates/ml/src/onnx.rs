@@ -312,7 +312,6 @@ fn build_next_session(
                     model_namespace,
                     attempt,
                     validation,
-                    gpu_options,
                 );
             }
             #[cfg(not(any(target_os = "android", target_os = "linux", target_os = "windows")))]
@@ -320,7 +319,7 @@ fn build_next_session(
         }
 
         let coreml_cache_dir = attempt.coreml_cache_dir().map(Path::to_path_buf);
-        match build_and_validate_session(model_path, attempt, validation, gpu_options) {
+        match build_and_validate_session(model_path, attempt, validation) {
             Ok(session) => {
                 if let Some(cache_dir) = coreml_cache_dir {
                     coreml_cache::finalize(&cache_dir, model_path);
@@ -386,7 +385,6 @@ fn build_and_validate_session(
     model_path: &str,
     attempt: providers::ProviderAttempt,
     _validation: AccelerationValidation,
-    gpu_options: Option<&GpuOptions>,
 ) -> MlResult<Session> {
     #[cfg(any(
         target_os = "android",
@@ -397,7 +395,7 @@ fn build_and_validate_session(
     ))]
     let execution_provider = attempt.execution_provider();
 
-    let session = match providers::build_session(model_path, attempt, gpu_options) {
+    let session = match providers::build_session(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
             #[cfg(any(
@@ -438,7 +436,6 @@ fn build_webgpu_session_with_canary(
     model_namespace: &str,
     attempt: providers::ProviderAttempt,
     validation: AccelerationValidation,
-    gpu_options: Option<&GpuOptions>,
 ) -> MlResult<LoadedSession> {
     // Fail closed: without a durable failure record, a crash during the
     // attempt would go unnoticed and the crash loop protection would be lost.
@@ -477,7 +474,7 @@ fn build_webgpu_session_with_canary(
             }
         }
     }
-    let mut session = match providers::build_session(model_path, attempt, gpu_options) {
+    let mut session = match providers::build_session(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
             record_provider_attempt_failure(
@@ -639,6 +636,24 @@ fn model_file_label(model_path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{ExecutionMode, ExecutionProvider, OnnxSession, provider_attempt_failure_message};
+
+    #[test]
+    fn unvalidated_acceleration_does_not_enable_ocr_gpu_options() {
+        let indexing = OnnxSession::new("model.onnx", "indexing", ExecutionMode::PlatformDefault);
+        assert!(indexing.gpu_options.is_none());
+        assert_eq!(
+            indexing.validation,
+            super::AccelerationValidation::GoldenRequired
+        );
+
+        let scanner = indexing.with_unvalidated_acceleration();
+        assert!(scanner.gpu_options.is_none());
+        assert_eq!(
+            scanner.validation,
+            super::AccelerationValidation::Unvalidated
+        );
+        assert_eq!(scanner.mode, ExecutionMode::PlatformDefault);
+    }
 
     fn first_run_canary(temp: &tempfile::TempDir) -> super::webgpu::ArmedCanary {
         let model = temp.path().join("model.onnx");
