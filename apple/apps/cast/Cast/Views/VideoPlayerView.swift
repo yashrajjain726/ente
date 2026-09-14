@@ -35,11 +35,14 @@ struct VideoPlayerView: View {
             } else {
                 VStack(spacing: 24) {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Color(
-                            red: 29 / 255,
-                            green: 185 / 255,
-                            blue: 84 / 255,
-                        )))
+                        .progressViewStyle(
+                            CircularProgressViewStyle(
+                                tint: Color(
+                                    red: 29 / 255,
+                                    green: 185 / 255,
+                                    blue: 84 / 255,
+                                ))
+                        )
                         .scaleEffect(2.0)
 
                     Text("Loading video...")
@@ -211,12 +214,14 @@ struct VideoPlayerView: View {
         }
     }
 
-    private func createTemporaryVideoFile(from data: Data,
-                                          suggestedExtension: String? = nil) async throws -> URL
-    {
+    private func createTemporaryVideoFile(
+        from data: Data,
+        suggestedExtension: String? = nil
+    ) async throws -> URL {
         let tempDirectory = FileManager.default.temporaryDirectory
         let fileExtension = detectVideoExtension(from: data) ?? suggestedExtension ?? "mp4"
-        let tempURL = tempDirectory
+        let tempURL =
+            tempDirectory
             .appendingPathComponent("cast_video_\(UUID().uuidString).\(fileExtension)")
 
         try data.write(to: tempURL)
@@ -237,11 +242,11 @@ struct VideoPlayerView: View {
 
             // MP4/MOV formats (most compatible with AVPlayer)
             if headerBytes.count >= 12 {
-                let ftyp = headerBytes.subdata(in: 4 ..< 8)
+                let ftyp = headerBytes.subdata(in: 4..<8)
                 if ftyp == Data("ftyp".utf8) {
-                    let brand = headerBytes.subdata(in: 8 ..< 12)
-                    if brand == Data("mp41".utf8) || brand == Data("mp42".utf8) ||
-                        brand == Data("isom".utf8) || brand == Data("M4V ".utf8)
+                    let brand = headerBytes.subdata(in: 8..<12)
+                    if brand == Data("mp41".utf8) || brand == Data("mp42".utf8)
+                        || brand == Data("isom".utf8) || brand == Data("M4V ".utf8)
                     {
                         return "mp4"
                     } else if brand == Data("qt  ".utf8) {
@@ -253,7 +258,7 @@ struct VideoPlayerView: View {
             // Check for H.264 NAL units (common in MP4)
             if headerBytes.count >= 4 {
                 if signature[0] == 0x00, signature[1] == 0x00, signature[2] == 0x00,
-                   signature[3] == 0x01
+                    signature[3] == 0x01
                 {
                     return "mp4"
                 }
@@ -261,7 +266,7 @@ struct VideoPlayerView: View {
 
             // AVI format (less compatible with tvOS)
             if signature == Data("RIFF".utf8), headerBytes.count >= 12 {
-                let aviSignature = headerBytes.subdata(in: 8 ..< 12)
+                let aviSignature = headerBytes.subdata(in: 8..<12)
                 if aviSignature == Data("AVI ".utf8) {
                     return "avi"
                 }

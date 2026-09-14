@@ -51,8 +51,10 @@ class RealSlideshowService: ObservableObject {
 
     private var didDisplayFirstFile: Bool = false
 
-    private var baseURL = APIEndpoint.current.absoluteString
-    private let castDownloadURL = "https://cast-albums.ente.com/download"
+    private var baseURL = APIEndpoint.current
+    // Fixed, valid URL literal.
+    // swift-format-ignore: NeverForceUnwrap
+    private let castDownloadURL = URL(string: "https://cast-albums.ente.com/download/")!
 
     private let verboseFileLogging = false
     private let verboseDecryptionLogging = false
@@ -140,7 +142,7 @@ class RealSlideshowService: ObservableObject {
         ScreenSaverManager.preventScreenSaver()
 
         await clearExpiredTokenState()
-        baseURL = APIEndpoint.current.absoluteString
+        baseURL = APIEndpoint.current
         storedCastPayload = castPayload
         if error != nil {
             error = nil
@@ -295,12 +297,16 @@ class RealSlideshowService: ObservableObject {
         startPeriodicDiffPolling()
     }
 
-    private func fetchFilesBatch(castPayload: CastPayload,
-                                 sinceTime: Int64) async throws
+    private func fetchFilesBatch(
+        castPayload: CastPayload,
+        sinceTime: Int64
+    ) async throws
         -> (files: [[String: Any]], hasMore: Bool, latestUpdateTime: Int64)
     {
         guard storedCastPayload == castPayload else { throw CancellationError() }
-        let url = URL(string: "\(baseURL)/cast/diff?sinceTime=\(sinceTime)")!
+        let url = baseURL.appendingPathComponent("cast/diff").appending(queryItems: [
+            URLQueryItem(name: "sinceTime", value: String(sinceTime))
+        ])
 
         var request = URLRequest(url: url)
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
@@ -327,7 +333,7 @@ class RealSlideshowService: ObservableObject {
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let diff = json["diff"] as? [[String: Any]]
+            let diff = json["diff"] as? [[String: Any]]
         else {
             throw CastError.networkError("Invalid JSON response")
         }
@@ -348,8 +354,10 @@ class RealSlideshowService: ObservableObject {
     private func processDiffBatch(_ items: [[String: Any]], castPayload: CastPayload) async {
         let wasEmpty = allFiles.isEmpty
         var currentFileChanged = false
-        let originalCurrentFile = currentFileIndex < allFiles
-            .count ? allFiles[currentFileIndex] : nil
+        let originalCurrentFile =
+            currentFileIndex
+                < allFiles
+                .count ? allFiles[currentFileIndex] : nil
 
         for item in items {
             guard storedCastPayload == castPayload else { return }
@@ -376,7 +384,7 @@ class RealSlideshowService: ObservableObject {
                     if index < currentFileIndex, currentFileIndex > 0 {
                         currentFileIndex -= 1
                     } else if index == currentFileIndex, currentFileIndex >= allFiles.count,
-                              !allFiles.isEmpty
+                        !allFiles.isEmpty
                     {
                         currentFileIndex = 0
                     }
@@ -487,7 +495,8 @@ class RealSlideshowService: ObservableObject {
 
     private func displaySlideAtCurrentIndex() async {
         guard currentFileIndex >= 0, currentFileIndex < allFiles.count,
-              let payload = storedCastPayload else { return }
+            let payload = storedCastPayload
+        else { return }
 
         await MainActor.run {
             currentSlideIndex = currentFileIndex
@@ -590,7 +599,8 @@ class RealSlideshowService: ObservableObject {
                 if let existing = videoTempFiles[file.id] {
                     url = existing
                 } else {
-                    let fileExtension = file.title.components(separatedBy: ".").last?
+                    let fileExtension =
+                        file.title.components(separatedBy: ".").last?
                         .lowercased() ?? "mp4"
                     let tmpURL = FileManager.default.temporaryDirectory
                         .appendingPathComponent(
@@ -636,7 +646,8 @@ class RealSlideshowService: ObservableObject {
         slideStartTime = Date()
         slideTimeRemaining = duration
 
-        slideTimer = Timer
+        slideTimer =
+            Timer
             .scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, self.isPlaying, !self.isPaused else { return }
@@ -697,7 +708,8 @@ class RealSlideshowService: ObservableObject {
         }
 
         await MainActor.run {
-            self.error = "Unable to load any slides. All files may be corrupted or have decryption issues."
+            self.error =
+                "Unable to load any slides. All files may be corrupted or have decryption issues."
         }
     }
 
@@ -705,7 +717,7 @@ class RealSlideshowService: ObservableObject {
         guard let payload = storedCastPayload else { return }
         Task {
             let prefetchCount = min(3, allFiles.count)
-            for i in 1 ... prefetchCount {
+            for i in 1...prefetchCount {
                 guard storedCastPayload == payload else { return }
                 let prefetchIndex = (currentFileIndex + i) % allFiles.count
 
@@ -723,8 +735,9 @@ class RealSlideshowService: ObservableObject {
                     prefetchCache[prefetchIndex] = data
 
                     if prefetchCache.count > 5 {
-                        let oldKeys = Array(prefetchCache.keys.sorted()
-                            .prefix(prefetchCache.count - 5))
+                        let oldKeys = Array(
+                            prefetchCache.keys.sorted()
+                                .prefix(prefetchCache.count - 5))
                         for key in oldKeys {
                             prefetchCache.removeValue(forKey: key)
                         }
@@ -776,7 +789,7 @@ class RealSlideshowService: ObservableObject {
                 guard let self else { return }
                 self.videoCurrentTime = CMTimeGetSeconds(time)
                 if let duration = self.videoPlayer?.currentItem?.duration.seconds,
-                   duration.isFinite
+                    duration.isFinite
                 {
                     self.videoDuration = duration
                 }
@@ -851,7 +864,7 @@ class RealSlideshowService: ObservableObject {
 
         } catch {
             if let castError = error as? CastError,
-               case .serverError(401, _) = castError
+                case .serverError(401, _) = castError
             {
                 // fetchFilesBatch already handled this error.
             } else {
@@ -886,10 +899,13 @@ class RealSlideshowService: ObservableObject {
 
     private func downloadEncryptedFile(castPayload: CastPayload, fileID: Int) async throws -> Data {
         guard storedCastPayload == castPayload else { throw CancellationError() }
-        let isProduction = baseURL == APIEndpoint.production.absoluteString
-        let url = isProduction
-            ? URL(string: "\(castDownloadURL)/?fileID=\(fileID)")!
-            : URL(string: baseURL)!.appendingPathComponent("cast/files/download/v3/\(fileID)")
+        let isProduction = baseURL.absoluteString == APIEndpoint.production.absoluteString
+        let url =
+            isProduction
+            ? castDownloadURL.appending(queryItems: [
+                URLQueryItem(name: "fileID", value: String(fileID))
+            ])
+            : baseURL.appendingPathComponent("cast/files/download/v3/\(fileID)")
 
         var request = URLRequest(url: url)
         request.setValue(castPayload.castToken, forHTTPHeaderField: "X-Cast-Access-Token")
@@ -904,9 +920,10 @@ class RealSlideshowService: ObservableObject {
         )
     }
 
-    private func download(_ request: URLRequest, castPayload: CastPayload,
-                          fileID: Int) async throws -> Data
-    {
+    private func download(
+        _ request: URLRequest, castPayload: CastPayload,
+        fileID: Int
+    ) async throws -> Data {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard storedCastPayload == castPayload else { throw CancellationError() }
 
@@ -918,7 +935,7 @@ class RealSlideshowService: ObservableObject {
             let snippet = (String(data: data, encoding: .utf8) ?? "").prefix(160)
             print("Download error [\(httpResponse.statusCode)] fileID=\(fileID): \(snippet)")
             if httpResponse.statusCode == 401,
-               request.value(forHTTPHeaderField: "X-Cast-Access-Token") != nil
+                request.value(forHTTPHeaderField: "X-Cast-Access-Token") != nil
             {
                 await handleUnauthorizedError()
                 throw CastError.serverError(
@@ -937,9 +954,10 @@ class RealSlideshowService: ObservableObject {
 
     private struct FileURL: Decodable { let url: URL }
 
-    private func downloadAndDecryptFileContent(castPayload: CastPayload,
-                                               file: CastFile) async throws -> Data
-    {
+    private func downloadAndDecryptFileContent(
+        castPayload: CastPayload,
+        file: CastFile
+    ) async throws -> Data {
         let stopping = await MainActor.run { isStopping }
         if stopping {
             throw CastError.networkError("Service is stopping")
@@ -983,17 +1001,18 @@ class RealSlideshowService: ObservableObject {
         return decryptedData
     }
 
-    private func decryptFileMetadata(item: [String: Any],
-                                     collectionKey: String) async throws -> CastFile?
-    {
+    private func decryptFileMetadata(
+        item: [String: Any],
+        collectionKey: String
+    ) async throws -> CastFile? {
         guard let id = item["id"] as? Int,
-              let encryptedKey = item["encryptedKey"] as? String,
-              let keyDecryptionNonce = item["keyDecryptionNonce"] as? String,
-              let metadataDict = item["metadata"] as? [String: Any],
-              let encryptedMetadata = metadataDict["encryptedData"] as? String,
-              let metadataHeader = metadataDict["decryptionHeader"] as? String,
-              let fileDict = item["file"] as? [String: Any],
-              let fileDecryptionHeader = fileDict["decryptionHeader"] as? String
+            let encryptedKey = item["encryptedKey"] as? String,
+            let keyDecryptionNonce = item["keyDecryptionNonce"] as? String,
+            let metadataDict = item["metadata"] as? [String: Any],
+            let encryptedMetadata = metadataDict["encryptedData"] as? String,
+            let metadataHeader = metadataDict["decryptionHeader"] as? String,
+            let fileDict = item["file"] as? [String: Any],
+            let fileDecryptionHeader = fileDict["decryptionHeader"] as? String
         else {
             print("Missing required fields for file \(item["id"] ?? "unknown")")
             return nil
@@ -1036,12 +1055,13 @@ class RealSlideshowService: ObservableObject {
         }
     }
 
-    private func decryptFileKey(encryptedKey: String, nonce: String,
-                                collectionKey: String) throws -> Data
-    {
+    private func decryptFileKey(
+        encryptedKey: String, nonce: String,
+        collectionKey: String
+    ) throws -> Data {
         guard let encryptedKeyData = Data(base64Encoded: encryptedKey),
-              let nonceData = Data(base64Encoded: nonce),
-              let collectionKeyData = Data(base64Encoded: collectionKey)
+            let nonceData = Data(base64Encoded: nonce),
+            let collectionKeyData = Data(base64Encoded: collectionKey)
         else {
             throw CastError.decryptionError("Invalid base64 in file key decryption")
         }
@@ -1057,11 +1077,12 @@ class RealSlideshowService: ObservableObject {
         }
     }
 
-    private func decryptMetadata(encryptedData: String, decryptionHeader: String,
-                                 fileKey: Data) throws -> Data
-    {
+    private func decryptMetadata(
+        encryptedData: String, decryptionHeader: String,
+        fileKey: Data
+    ) throws -> Data {
         guard let encryptedBytes = Data(base64Encoded: encryptedData),
-              let headerBytes = Data(base64Encoded: decryptionHeader)
+            let headerBytes = Data(base64Encoded: decryptionHeader)
         else {
             throw CastError.decryptionError("Invalid base64 in metadata decryption")
         }
@@ -1079,14 +1100,16 @@ class RealSlideshowService: ObservableObject {
             print("Metadata decrypted using Rust crypto: \(decryptedData.count) bytes")
             return decryptedData
         } catch {
-            throw CastError
+            throw
+                CastError
                 .decryptionError("XChaCha20-Poly1305 decryption failed for metadata: \(error)")
         }
     }
 
-    private func decryptFileContent(encryptedData: Data, fileKey: Data,
-                                    decryptionHeader: String) throws -> Data
-    {
+    private func decryptFileContent(
+        encryptedData: Data, fileKey: Data,
+        decryptionHeader: String
+    ) throws -> Data {
         guard let headerBytes = Data(base64Encoded: decryptionHeader) else {
             throw CastError.decryptionError("Invalid base64 in file decryption header")
         }
@@ -1184,7 +1207,8 @@ func extractZipUsingFoundation(zipURL: URL, to destinationURL: URL) throws {
 func extractLivePhotoComponents(from zipData: Data) throws -> LivePhotoComponents {
     let tempDirectory = FileManager.default.temporaryDirectory
     let zipURL = tempDirectory.appendingPathComponent("livephoto_\(UUID().uuidString).zip")
-    let extractDirectory = tempDirectory
+    let extractDirectory =
+        tempDirectory
         .appendingPathComponent("livephoto_extract_\(UUID().uuidString)")
 
     defer {
@@ -1221,9 +1245,7 @@ func extractLivePhotoComponents(from zipData: Data) throws -> LivePhotoComponent
         }
 
         while let fileURL = enumerator?.nextObject() as? URL {
-            if (try? fileURL.resourceValues(forKeys: Set(resourceKeys)).isDirectory) ==
-                true
-            {
+            if (try? fileURL.resourceValues(forKeys: Set(resourceKeys)).isDirectory) == true {
                 continue
             }
             let filename = fileURL.lastPathComponent
@@ -1253,22 +1275,19 @@ func extractLivePhotoComponents(from zipData: Data) throws -> LivePhotoComponent
                 if let guessImage = contents.first(where: { $0.pathExtension.isEmpty }) {
                     imageData = try? Data(contentsOf: guessImage)
                     imagePath = guessImage
-                    if imageData !=
-                        nil
-                    {
+                    if imageData != nil {
                         print("Heuristic image pick: \(guessImage.lastPathComponent)")
                     }
                 }
             }
             if videoData == nil {
-                if let guessVideo = contents
+                if let guessVideo =
+                    contents
                     .first(where: { ["bin", "dat"].contains($0.pathExtension.lowercased()) })
                 {
                     videoData = try? Data(contentsOf: guessVideo)
                     videoPath = guessVideo
-                    if videoData !=
-                        nil
-                    {
+                    if videoData != nil {
                         print("Heuristic video pick: \(guessVideo.lastPathComponent)")
                     }
                 }
@@ -1276,7 +1295,8 @@ func extractLivePhotoComponents(from zipData: Data) throws -> LivePhotoComponent
         }
 
         if imageData == nil, videoData == nil {
-            throw CastError
+            throw
+                CastError
                 .decryptionError("No valid image or video components found in live photo zip")
         }
 

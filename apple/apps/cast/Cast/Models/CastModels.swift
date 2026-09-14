@@ -75,7 +75,7 @@ struct CastFile: Codable, Equatable {
     let encryptedKey: String
     let keyDecryptionNonce: String
     let fileDecryptionHeader: String
-    let hash: String? // BLAKE2b hash for file content verification
+    let hash: String?  // BLAKE2b hash for file content verification
 
     var isImage: Bool {
         !isVideo && !isLivePhoto
@@ -83,11 +83,11 @@ struct CastFile: Codable, Equatable {
 }
 
 struct FileMetadata {
-    let fileType: Int // 0 = image, 1 = video, 2 = livePhoto
-    let title: String // filename with extension
-    let creationTime: Int64 // microseconds since epoch
+    let fileType: Int  // 0 = image, 1 = video, 2 = livePhoto
+    let title: String  // filename with extension
+    let creationTime: Int64  // microseconds since epoch
     let modificationTime: Int64
-    let hash: String? // BLAKE2b hash for file content verification
+    let hash: String?  // BLAKE2b hash for file content verification
 
     var isImage: Bool {
         fileType == 0

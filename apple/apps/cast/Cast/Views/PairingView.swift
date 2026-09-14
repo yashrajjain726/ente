@@ -23,13 +23,17 @@ struct PairingView: View {
                         VStack(spacing: 0) {
                             VStack(spacing: -5) {
                                 Text("Ready to")
-                                    .font(FontUtils
-                                        .montserratExtraBold(size: geometry.size.width * 0.035))
+                                    .font(
+                                        FontUtils
+                                            .montserratExtraBold(size: geometry.size.width * 0.035)
+                                    )
                                     .foregroundColor(.white)
 
                                 Text("Connect?")
-                                    .font(FontUtils
-                                        .montserratExtraBold(size: geometry.size.width * 0.065))
+                                    .font(
+                                        FontUtils
+                                            .montserratExtraBold(size: geometry.size.width * 0.065)
+                                    )
                                     .foregroundColor(.white)
                             }
                             .padding(.top, geometry.size.height * 0.06)
@@ -40,11 +44,13 @@ struct PairingView: View {
                             ZStack {
                                 // Reserve six characters so the box does not resize.
                                 Text(deviceCode.isEmpty ? "000000" : deviceCode)
-                                    .font(.system(
-                                        size: geometry.size.width * 0.09,
-                                        weight: .heavy,
-                                        design: .monospaced,
-                                    ))
+                                    .font(
+                                        .system(
+                                            size: geometry.size.width * 0.09,
+                                            weight: .heavy,
+                                            design: .monospaced,
+                                        )
+                                    )
                                     .tracking(geometry.size.width * 0.015)
                                     .opacity(0)
 
@@ -55,11 +61,13 @@ struct PairingView: View {
                                         .scaleEffect(1.8)
                                 } else {
                                     Text(deviceCode)
-                                        .font(.system(
-                                            size: geometry.size.width * 0.09,
-                                            weight: .heavy,
-                                            design: .monospaced,
-                                        ))
+                                        .font(
+                                            .system(
+                                                size: geometry.size.width * 0.09,
+                                                weight: .heavy,
+                                                design: .monospaced,
+                                            )
+                                        )
                                         .tracking(geometry.size.width * 0.015)
                                         .foregroundColor(.white)
                                         .scaleEffect(pulseScale)
@@ -116,15 +124,19 @@ struct PairingView: View {
                                 Image("ducky_camera")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(width: geometry.size.width * 0.27,
-                                           height: geometry.size.width * 0.27)
-                                    .offset(x: geometry.size.width * 0.18,
-                                            y: geometry.size.height * 0.18)
+                                    .frame(
+                                        width: geometry.size.width * 0.27,
+                                        height: geometry.size.width * 0.27
+                                    )
+                                    .offset(
+                                        x: geometry.size.width * 0.18,
+                                        y: geometry.size.height * 0.18)
                             }
                         }
                     }
-                    .frame(width: geometry.size.width * 0.8,
-                           height: geometry.size.height * 0.85)
+                    .frame(
+                        width: geometry.size.width * 0.8,
+                        height: geometry.size.height * 0.85)
 
                     Spacer()
                         .frame(width: geometry.size.width * 0.15)
@@ -167,8 +179,9 @@ struct InstructionStep: View {
             ZStack {
                 Circle()
                     .fill(Color(red: 0 / 255, green: 150 / 255, blue: 51 / 255))
-                    .frame(width: geometry.size.width * 0.035,
-                           height: geometry.size.width * 0.035)
+                    .frame(
+                        width: geometry.size.width * 0.035,
+                        height: geometry.size.width * 0.035)
 
                 Image(systemName: icon)
                     .font(.system(size: geometry.size.width * 0.015, weight: .medium))

@@ -13,9 +13,7 @@ actor ThreadSafeFileCache {
         self.maxBytes = maxBytes
         self.shrinkTargetBytes = shrinkTargetBytes
 
-        let documentsPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
-            .first!
-        cacheDirectory = documentsPath.appendingPathComponent("EnteFileCache")
+        cacheDirectory = URL.cachesDirectory.appendingPathComponent("EnteFileCache")
         metadataURL = cacheDirectory.appendingPathComponent("cache_metadata.json")
 
         try? FileManager.default.createDirectory(
@@ -24,7 +22,7 @@ actor ThreadSafeFileCache {
         )
 
         guard let metadataData = try? Data(contentsOf: metadataURL),
-              let metadata = try? JSONDecoder().decode(CacheMetadata.self, from: metadataData)
+            let metadata = try? JSONDecoder().decode(CacheMetadata.self, from: metadataData)
         else {
             return
         }
@@ -38,7 +36,7 @@ actor ThreadSafeFileCache {
             let fileURL = cacheDirectory.appendingPathComponent("\(fileID).cache")
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
-                   let fileSize = attributes[.size] as? Int
+                    let fileSize = attributes[.size] as? Int
                 {
                     loadedBytes += fileSize
                     validFileIDs.append(fileID)
