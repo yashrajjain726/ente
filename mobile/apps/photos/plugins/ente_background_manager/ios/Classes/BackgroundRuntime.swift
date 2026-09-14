@@ -141,6 +141,12 @@ final class BackgroundRuntime: NSObject {
         return
       }
       let identifiers = enabled ? Set(parsed.map(\.identifier)) : []
+      let owned = Set(registrations.keys)
+        .union(configuration.tasks.map(\.identifier))
+        .union((configuration.submitted ?? []).map(\.identifier))
+      for identifier in owned.subtracting(identifiers) {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+      }
       let next = StoredConfiguration(
         enabled: enabled, tasks: parsed,
         submitted: configuration.submitted?.filter { identifiers.contains($0.identifier) })
@@ -168,10 +174,6 @@ final class BackgroundRuntime: NSObject {
         let pending = Dictionary(
           requests.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
         let desired = self.configuration.enabled ? self.configuration.tasks : []
-        let identifiers = Set(desired.map(\.identifier))
-        for identifier in self.registrations.keys where !identifiers.contains(identifier) {
-          BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
-        }
         var failure: Error?
         for task in desired {
           if pending[task.identifier] != nil && (self.configuration.submitted ?? []).contains(task)
