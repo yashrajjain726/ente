@@ -7,9 +7,10 @@ import { t } from "i18next";
 import React, { useRef } from "react";
 
 export const CollectionDialogSearchField: React.FC<{
+    placeholder?: string;
     value: string;
     onChange: (value: string) => void;
-}> = ({ value, onChange }) => {
+}> = ({ value, onChange, placeholder = t("albums_search_hint") }) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleClear = () => {
@@ -24,7 +25,7 @@ export const CollectionDialogSearchField: React.FC<{
                 inputRef={inputRef}
                 fullWidth
                 autoFocus
-                placeholder={t("albums_search_hint")}
+                placeholder={placeholder}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 sx={searchInputSx}
