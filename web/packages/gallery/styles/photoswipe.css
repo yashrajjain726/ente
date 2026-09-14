@@ -44,6 +44,14 @@
     pointer-events: auto;
 }
 
+.pswp-ente .pswp__preloader--active .pswp__icn {
+    opacity: 0.4;
+}
+
+.pswp-ente .pswp__preloader {
+    transform: translate(-2px, 2px);
+}
+
 .pswp-ente .pswp__error {
     position: relative;
     overflow: hidden;

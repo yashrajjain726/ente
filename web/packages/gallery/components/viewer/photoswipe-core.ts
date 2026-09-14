@@ -839,11 +839,20 @@ export class FileViewerPhotoSwipe<
             const ui = pswp.ui!;
 
             ui.uiElementsData.find((e) => e.name == "zoom")!.order = 6;
-            const preloaderIndex = ui.uiElementsData.findIndex(
+            const preloader = ui.uiElementsData.find(
                 (e) => e.name == "preloader",
-            );
-            if (preloaderIndex != -1)
-                ui.uiElementsData.splice(preloaderIndex, 1);
+            )!;
+            preloader.order = 10;
+            const initPreloader = preloader.onInit!;
+            preloader.onInit = (element, pswp) => {
+                initPreloader(element, pswp);
+                pswp.on("change", () => {
+                    element.style.display =
+                        currSlideData().fileType == FileType.video
+                            ? "none"
+                            : "";
+                });
+            };
 
             const lastProgressByFileID = new Map<
                 number,
@@ -877,6 +886,7 @@ export class FileViewerPhotoSwipe<
             const rememberDownloadProgress = () => {
                 if (progressClosed || !pswp.currSlide) return;
                 const itemData = currSlideData();
+                if (itemData.fileType != FileType.video) return;
                 const { fileID } = itemData;
                 const state = downloadProgressState(
                     itemData,
@@ -930,6 +940,10 @@ export class FileViewerPhotoSwipe<
                     [progressValue, "pswp__ente-progress-overlay"],
                     [progressBar, "pswp__ente-progress-bar"],
                 ] as const) {
+                    element.style.display =
+                        currSlideData().fileType == FileType.video
+                            ? ""
+                            : "none";
                     element.classList.toggle(`${prefix}--active`, !!state);
                     element.classList.toggle(`${prefix}--failed`, failed);
                     element.classList.toggle(
