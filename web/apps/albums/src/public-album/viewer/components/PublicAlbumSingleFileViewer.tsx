@@ -243,8 +243,6 @@ export const PublicAlbumSingleFileViewer: React.FC<
                 ".pswp__ente-progress-text",
             );
             if (progress && progressHostRef.current) {
-                // Move the existing control so its progress updates and Retry
-                // handler stay attached while it participates in header layout.
                 progressElement = progress;
                 progressParent = progress.parentElement;
                 progressHostRef.current.replaceChildren(progress);

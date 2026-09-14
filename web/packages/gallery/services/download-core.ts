@@ -116,7 +116,6 @@ export class DownloadManagerCore {
             try {
                 listener();
             } catch (e) {
-                // A UI observer must not interrupt the download stream.
                 log.error("Failed to notify download progress listener", e);
             }
         });
@@ -392,7 +391,6 @@ export class DownloadManagerCore {
                     }
                 },
                 cancel: (reason: unknown) => {
-                    // An in-flight read or decryption may settle after cancel.
                     cancelled = true;
                     this.setFileDownloadProgress(file.id, undefined);
                     return reader.cancel(reason);
