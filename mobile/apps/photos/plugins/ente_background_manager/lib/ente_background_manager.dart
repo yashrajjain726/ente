@@ -10,6 +10,8 @@ enum BackgroundStopReason { foreground, budget, requested, system }
 
 enum BackgroundTaskResult { completed, skipped, stopped, failed }
 
+enum BackgroundOutcome { skipped, stopped, failed, forcedTeardown }
+
 class BackgroundTaskConfig {
   const BackgroundTaskConfig({
     required this.identifier,
@@ -115,12 +117,12 @@ class BackgroundTaskStopped implements Exception {
 class BackgroundTaskOutcome {
   BackgroundTaskOutcome._(Map<Object?, Object?> data)
     : identifier = data["identifier"]! as String,
-      outcome = data["outcome"]! as String,
+      outcome = BackgroundOutcome.values.byName(data["outcome"]! as String),
       reason = data["reason"] as String?,
       error = data["error"] as String?;
 
   final String identifier;
-  final String outcome;
+  final BackgroundOutcome outcome;
   final String? reason;
   final String? error;
 }

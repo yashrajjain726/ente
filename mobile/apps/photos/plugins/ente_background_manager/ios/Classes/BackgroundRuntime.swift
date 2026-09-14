@@ -174,9 +174,11 @@ final class BackgroundRuntime: NSObject {
         let pending = Dictionary(
           requests.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
         let desired = self.configuration.enabled ? self.configuration.tasks : []
+        let submitted = self.configuration.submitted ?? []
         var failure: Error?
         for task in desired {
-          if pending[task.identifier] != nil && (self.configuration.submitted ?? []).contains(task)
+          if pending[task.identifier] != nil,
+            submitted.contains(where: { $0.hasSameSchedule(as: task) })
           {
             continue
           }

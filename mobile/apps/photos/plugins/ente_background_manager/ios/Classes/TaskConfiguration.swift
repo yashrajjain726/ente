@@ -13,6 +13,12 @@ struct TaskConfiguration: Codable, Equatable {
   let foregroundStopTimeoutMs: Int64?
   let callbackHandle: Int64
 
+  func hasSameSchedule(as other: TaskConfiguration) -> Bool {
+    identifier == other.identifier && kind == other.kind && frequencyMs == other.frequencyMs
+      && initialDelayMs == other.initialDelayMs && requiresNetwork == other.requiresNetwork
+      && requiresCharging == other.requiresCharging
+  }
+
   init(_ data: [String: Any], callbackHandle: Int64) throws {
     guard let identifier = data["identifier"] as? String, !identifier.isEmpty,
       let kind = data["kind"] as? String, ["refresh", "processing"].contains(kind),

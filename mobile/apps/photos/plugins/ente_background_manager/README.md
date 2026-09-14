@@ -14,17 +14,23 @@ The package is part of the mobile workspace. Photos does not depend on or initia
 - `BackgroundManager.stopActiveRun` requests stopping of the current invocation and completes after retirement. It preserves future registrations and is an immediate no-op when idle. Use it from the foreground; a background callback should return after cleanup instead of awaiting its own retirement.
 - `BackgroundManager.scheduledTasks` queries native registrations. A pending registration is not a guarantee that the OS will run it.
 
+`BackgroundTaskOutcome.outcome` is a `BackgroundOutcome`: `skipped`, `stopped`, `failed`, or `forcedTeardown`. Its `reason` is a native diagnostic string; Android system stops may include a WorkManager stop-reason code as `system:N`, while the task receives `BackgroundStopReason.system`. Errors from the Dart executor contain the exception type name; native failures may include a platform error message.
+
 Task configuration supports refresh/processing kind, frequency, initial delay, supported native constraints, and two optional durations. `runBudget` requests cooperative stopping from native entry, including engine startup. `foregroundStopTimeout` starts force teardown after the first foreground arrival. Omission disables the corresponding timer; zero acts immediately and negative durations are rejected. Android supports periodic flex and device-idle constraints. iOS supports network/power constraints only for processing tasks; unsupported combinations are rejected.
 
 iOS configurations accept at most one refresh task and ten processing tasks, including when scheduling is disabled. Configurations exceeding these limits fail before changing stored settings, pending schedules, or active work. [Apple limits each app to one pending refresh request and ten pending processing requests](https://developer.apple.com/documentation/backgroundtasks/bgtaskscheduler/submit(_:)).
 
-Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer's native/FFI operations. Destroying a Flutter engine does not establish that those operations have stopped.
+A scheduling failure rejects the `configure` future. iOS also emits a `failed` outcome with reason `schedule` for each task that failed scheduling; Android stops at the first error and reports it through the future.
+
+Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer's native/FFI operations. Destroying a Flutter engine does not establish that those operations have stopped. Teardown can block the main thread while synchronous Dart/FFI work finishes. The timeout starts teardown; it does not bound how long teardown takes.
 
 ## Native lifecycle
 
 Each platform has one process-local runtime. Admission checks backend eligibility, the active execution slot, and native foreground visibility before creating an engine. Busy or foreground deliveries finish as skips. Every admitted run captures its configuration and dispatcher binding and uses a fresh engine. On Android, a stop received during Flutter initialization retires the run before creating an engine.
 
 The native eligibility callback controls whether work may run; it preserves future schedules when eligibility is temporarily false. Scheduling follows the configured enablement and task identifiers. iOS stores the last successfully submitted policy for each task, so a later configuration call or normal delivery can apply unfinished updates after a process restart. Older stored configurations without this submission record are reconciled once. When reconfigured, iOS cancels this plugin's removed identifiers before replacing their saved configuration, including identifiers the app no longer registers after an update. Android tags its native requests so later configuration calls can find and cancel removed tasks even if an earlier cancellation was interrupted. Neither platform retries automatically.
+
+Changing only the budget, foreground grace, or dispatcher preserves a pending iOS request's timing. Changes to frequency, initial delay, task kind, or supported scheduling constraints still replace the pending request.
 
 The slot remains occupied during startup, execution, cleanup, and teardown. Native callbacks and timers are tied to a unique invocation. Foreground entry always requests stopping, including during startup. Stops remain latched; repeated visibility changes cannot revive a task or extend its grace. A callback returning `completed` after a stop request is reported as `stopped`. Configuration updates affect later runs only.
 
