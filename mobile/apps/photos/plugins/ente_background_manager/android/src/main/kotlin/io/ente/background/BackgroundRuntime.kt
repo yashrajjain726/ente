@@ -32,6 +32,8 @@ internal object BackgroundRuntime {
     private const val PREFERENCES = "ente_background_manager"
     private const val CONFIGURATION = "configuration"
     private const val TASK_DATA = "task"
+    private const val WORK_TAG = "io.ente.background"
+    private const val IDENTIFIER_TAG_PREFIX = "io.ente.background.task:"
     private val main = Handler(Looper.getMainLooper())
     private val scheduler = Executors.newSingleThreadExecutor()
     private val observers = LinkedHashSet<BackgroundManagerPlugin>()
@@ -173,8 +175,21 @@ internal object BackgroundRuntime {
                 val manager = WorkManager.getInstance(app)
                 val selected =
                     if (enabled) configurations.map { it.identifier }.toSet() else emptySet()
+                val existingIdentifiers =
+                    manager
+                        .getWorkInfosByTag(WORK_TAG)
+                        .get()
+                        .filterNot { it.state.isFinished }
+                        .flatMap { it.tags }
+                        .filter { it.startsWith(IDENTIFIER_TAG_PREFIX) }
+                        .map { it.removePrefix(IDENTIFIER_TAG_PREFIX) }
+                        .toMutableSet()
                 for (index in 0 until previousTasks.length()) {
-                    val identifier = previousTasks.getJSONObject(index).getString("identifier")
+                    existingIdentifiers.add(
+                        previousTasks.getJSONObject(index).getString("identifier")
+                    )
+                }
+                for (identifier in existingIdentifiers) {
                     if (identifier !in selected && identifier != activeIdentifier) {
                         manager.cancelUniqueWork(identifier).result.get()
                     }
@@ -198,6 +213,8 @@ internal object BackgroundRuntime {
                                 )
                         val request =
                             builder
+                                .addTag(WORK_TAG)
+                                .addTag(IDENTIFIER_TAG_PREFIX + configuration.identifier)
                                 .setInitialDelay(
                                     configuration.initialDelayMs,
                                     TimeUnit.MILLISECONDS,

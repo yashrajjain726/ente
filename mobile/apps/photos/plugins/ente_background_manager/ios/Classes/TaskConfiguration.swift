@@ -57,6 +57,7 @@ struct TaskConfiguration: Codable, Equatable {
 struct StoredConfiguration: Codable {
   var enabled: Bool
   var tasks: [TaskConfiguration]
+  var submitted: [TaskConfiguration]? = nil
 
   static func load() -> StoredConfiguration {
     guard let data = UserDefaults.standard.data(forKey: "ente_background_manager"),

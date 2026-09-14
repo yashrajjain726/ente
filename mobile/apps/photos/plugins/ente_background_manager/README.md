@@ -16,7 +16,7 @@ The package is part of the mobile workspace. Photos does not depend on or initia
 
 Task configuration supports refresh/processing kind, frequency, initial delay, supported native constraints, and two optional durations. `runBudget` requests cooperative stopping from native entry, including engine startup. `foregroundStopTimeout` starts force teardown after the first foreground arrival. Omission disables the corresponding timer; zero acts immediately and negative durations are rejected. Android supports periodic flex and device-idle constraints. iOS supports network/power constraints only for processing tasks; unsupported combinations are rejected.
 
-iOS configurations accept at most one refresh task, including when scheduling is disabled. Configurations exceeding this limit fail before changing stored settings, pending schedules, or active work. [Apple limits each app to one pending refresh request and ten pending processing requests](https://developer.apple.com/documentation/backgroundtasks/bgtaskscheduler/submit(_:)).
+iOS configurations accept at most one refresh task and ten processing tasks, including when scheduling is disabled. Configurations exceeding these limits fail before changing stored settings, pending schedules, or active work. [Apple limits each app to one pending refresh request and ten pending processing requests](https://developer.apple.com/documentation/backgroundtasks/bgtaskscheduler/submit(_:)).
 
 Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer's native/FFI operations. Destroying a Flutter engine does not establish that those operations have stopped.
 
@@ -24,7 +24,7 @@ Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer'
 
 Each platform has one process-local runtime. Admission checks backend eligibility, the active execution slot, and native foreground visibility before creating an engine. Busy or foreground deliveries finish as skips. Every admitted run captures its configuration and dispatcher binding and uses a fresh engine. On Android, a stop received during Flutter initialization retires the run before creating an engine.
 
-The native eligibility callback controls whether work may run; it preserves future schedules when eligibility is temporarily false. Scheduling follows the configured enablement and task identifiers. On iOS, failed schedule updates remain pending for a later configuration call or normal delivery to apply them; the plugin does not retry automatically.
+The native eligibility callback controls whether work may run; it preserves future schedules when eligibility is temporarily false. Scheduling follows the configured enablement and task identifiers. iOS stores the last successfully submitted policy for each task, so a later configuration call or normal delivery can apply unfinished updates after a process restart. Older stored configurations without this submission record are reconciled once. Android tags its native requests so later configuration calls can find and cancel removed tasks even if an earlier cancellation was interrupted. Neither platform retries automatically.
 
 The slot remains occupied during startup, execution, cleanup, and teardown. Native callbacks and timers are tied to a unique invocation. Foreground entry always requests stopping, including during startup. Stops remain latched; repeated visibility changes cannot revive a task or extend its grace. A callback returning `completed` after a stop request is reported as `stopped`. Configuration updates affect later runs only.
 

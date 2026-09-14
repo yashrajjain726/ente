@@ -7,6 +7,8 @@ import android.os.SystemClock
 import androidx.work.Configuration
 import androidx.work.Data
 import androidx.work.ListenableWorker
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import io.flutter.FlutterInjector
@@ -312,6 +314,29 @@ class BackgroundRuntimeTest {
         assertFalse(afterHandlerFailure.isDone)
         complete(afterHandlerFailureChannel, afterHandlerFailureReady)
         assertEquals(ListenableWorker.Result.success(), afterHandlerFailure.get())
+
+        val removedRun = worker(cooperative).startWork()
+        val removedChannel = bootstrap()
+        val removedReady = removedChannel.call("ready") as Map<*, *>
+        val replacementPolicy = cooperative.copy(identifier = "test.replacement")
+        configure(replacementPolicy)
+        assertFalse(removedRun.isDone)
+        assertTrue(removedChannel.sent.isEmpty())
+        val manager = WorkManager.getInstance(app)
+        assertTrue(
+            manager.getWorkInfosForUniqueWork(cooperative.identifier).get().any {
+                !it.state.isFinished
+            }
+        )
+        complete(removedChannel, removedReady)
+        assertEquals(ListenableWorker.Result.success(), removedRun.get())
+        configure(replacementPolicy)
+        assertTrue(
+            manager.getWorkInfosForUniqueWork(cooperative.identifier).get().all {
+                it.state == WorkInfo.State.CANCELLED
+            }
+        )
+        configure(cooperative)
 
         val teardownWorker = worker(cooperative)
         var teardownCompletions = 0

@@ -18,7 +18,6 @@ final class BackgroundRuntime: NSObject {
   private var installed = false
   private var reconciling = false
   private var scheduleRevision = 0
-  private var changedTasks = Set<String>()
   private var configurationResults: [FlutterResult] = []
 
   private final class Run {
@@ -134,11 +133,18 @@ final class BackgroundRuntime: NSObject {
             code: "configuration", message: "iOS supports at most one refresh task", details: nil))
         return
       }
-      let next = StoredConfiguration(enabled: enabled, tasks: parsed)
-      try next.save()
-      for task in parsed where !configuration.tasks.contains(task) {
-        changedTasks.insert(task.identifier)
+      guard parsed.filter({ $0.kind == "processing" }).count <= 10 else {
+        result(
+          FlutterError(
+            code: "configuration", message: "iOS supports at most ten processing tasks",
+            details: nil))
+        return
       }
+      let identifiers = enabled ? Set(parsed.map(\.identifier)) : []
+      let next = StoredConfiguration(
+        enabled: enabled, tasks: parsed,
+        submitted: configuration.submitted?.filter { identifiers.contains($0.identifier) })
+      try next.save()
       configuration = next
       if !enabled { requestStop() }
       configurationResults.append(result)
@@ -166,15 +172,15 @@ final class BackgroundRuntime: NSObject {
         for identifier in self.registrations.keys where !identifiers.contains(identifier) {
           BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
         }
-        self.changedTasks.formIntersection(identifiers)
         var failure: Error?
         for task in desired {
-          if pending[task.identifier] != nil && !self.changedTasks.contains(task.identifier) {
+          if pending[task.identifier] != nil && (self.configuration.submitted ?? []).contains(task)
+          {
             continue
           }
           do {
             try self.submit(task, delayMs: task.initialDelayMs)
-            self.changedTasks.remove(task.identifier)
+            try self.recordSubmitted(task)
           } catch {
             failure = error
             self.report(
@@ -211,6 +217,14 @@ final class BackgroundRuntime: NSObject {
     try BGTaskScheduler.shared.submit(request)
   }
 
+  private func recordSubmitted(_ task: TaskConfiguration) throws {
+    if (configuration.submitted ?? []).contains(task) { return }
+    var next = configuration
+    next.submitted = (next.submitted ?? []).filter { $0.identifier != task.identifier } + [task]
+    try next.save()
+    configuration = next
+  }
+
   func scheduledTasks(_ result: @escaping FlutterResult) {
     BGTaskScheduler.shared.getPendingTaskRequests { requests in
       DispatchQueue.main.async {
@@ -236,7 +250,7 @@ final class BackgroundRuntime: NSObject {
     }
     do {
       try submit(policy, delayMs: policy.frequencyMs)
-      changedTasks.remove(task.identifier)
+      try recordSubmitted(policy)
     } catch {
       report(
         identifier: task.identifier, outcome: "failed", reason: "schedule",
