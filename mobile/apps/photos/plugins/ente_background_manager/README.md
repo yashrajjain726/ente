@@ -16,6 +16,8 @@ The package is part of the mobile workspace. Photos does not depend on or initia
 
 Task configuration supports refresh/processing kind, frequency, initial delay, supported native constraints, and two optional durations. `runBudget` requests cooperative stopping from native entry, including engine startup. `foregroundStopTimeout` starts force teardown after the first foreground arrival. Omission disables the corresponding timer; zero acts immediately and negative durations are rejected. Android supports periodic flex and device-idle constraints. iOS supports network/power constraints only for processing tasks; unsupported combinations are rejected.
 
+iOS configurations accept at most one refresh task, including when scheduling is disabled. Configurations exceeding this limit fail before changing stored settings, pending schedules, or active work. [Apple limits each app to one pending refresh request and ten pending processing requests](https://developer.apple.com/documentation/backgroundtasks/bgtaskscheduler/submit(_:)).
+
 Before supplying `foregroundStopTimeout`, validate the lifetime of the consumer's native/FFI operations. Destroying a Flutter engine does not establish that those operations have stopped.
 
 ## Native lifecycle

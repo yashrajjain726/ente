@@ -127,10 +127,18 @@ final class BackgroundRuntime: NSObject {
         guard registrations[task.identifier] == (task.kind == "processing") else {
           throw TaskConfiguration.ConfigurationError.unregisteredIdentifier
         }
-        if !configuration.tasks.contains(task) { changedTasks.insert(task.identifier) }
+      }
+      guard parsed.filter({ $0.kind == "refresh" }).count <= 1 else {
+        result(
+          FlutterError(
+            code: "configuration", message: "iOS supports at most one refresh task", details: nil))
+        return
       }
       let next = StoredConfiguration(enabled: enabled, tasks: parsed)
       try next.save()
+      for task in parsed where !configuration.tasks.contains(task) {
+        changedTasks.insert(task.identifier)
+      }
       configuration = next
       if !enabled { requestStop() }
       configurationResults.append(result)
