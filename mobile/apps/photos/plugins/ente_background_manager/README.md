@@ -4,7 +4,7 @@ A Flutter plugin for native background scheduling and headless task execution. A
 
 ## Integration status
 
-The package is part of the mobile workspace. Photos does not depend on or initialize it yet; app integration is a separate change.
+Photos selects this plugin when `flagService.internalUser` is enabled. Other users retain the existing Workmanager integration. The app coordinates schedule migration and uses the existing process lock to exclude overlapping background work across backends. Foreground stopping is cooperative; Photos does not configure forced engine teardown.
 
 ## Consumer interface
 
