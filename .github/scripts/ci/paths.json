@@ -3,6 +3,8 @@
     "dependency-review": [
         "**/Cargo.lock",
         "**/Cargo.toml",
+        "**/Package.resolved",
+        "**/Package.swift",
         "**/go.mod",
         "**/go.sum",
         "**/package-lock.json",
