@@ -596,6 +596,15 @@ body:has(
     transition-delay: 400ms;
 }
 
+@media (width >= 450px) {
+    .pswp-ente.pswp--one-slide
+        .pswp__ente-progress-text:not(.pswp__ente-progress-text--failed),
+    .pswp-ente.pswp--one-slide:has(.pswp__ente-progress-text--failed)
+        .pswp__error {
+        margin-inline-start: 44px;
+    }
+}
+
 .pswp-ente .pswp__ente-progress-status,
 .pswp-ente .pswp__ente-progress-size {
     min-width: 0;
@@ -720,7 +729,21 @@ body:has(
 }
 
 @media (width < 450px) {
-    .pswp-ente .pswp__ente-progress-text::before {
+    .pswp-ente:not(.pswp-ente-public-album).pswp--one-slide
+        .pswp__ente-progress-text:not(.pswp__ente-progress-text--failed),
+    .pswp-ente:not(.pswp-ente-public-album).pswp--one-slide:has(
+            .pswp__ente-progress-text--failed
+        )
+        .pswp__error {
+        margin-inline-start: 10px;
+
+        @media (width < 350px) {
+            margin-inline-start: 4px;
+        }
+    }
+
+    .pswp-ente:not(.pswp--one-slide) .pswp__ente-progress-text::before,
+    .pswp-ente-public-album .pswp__ente-progress-text::before {
         content: "·";
         flex-shrink: 0;
         color: rgb(255 255 255 / 0.4);
