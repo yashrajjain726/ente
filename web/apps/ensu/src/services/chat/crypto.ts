@@ -3,11 +3,6 @@ import * as wasmCrypto from "ente-ensu-wasm";
 
 type TauriCoreModule = typeof import("@tauri-apps/api/core");
 
-export interface EncryptedChatPayload {
-    encryptedData: string;
-    header: string;
-}
-
 const tauriInvoke = async <T>(
     ...args: Parameters<TauriCoreModule["invoke"]>
 ) => {
@@ -35,7 +30,7 @@ export const generateChatKey = async () =>
 export const encryptChatPayload = async (
     payload: unknown,
     chatKeyB64: string,
-): Promise<EncryptedChatPayload> => {
+): Promise<wasmCrypto.EncryptedChatPayload> => {
     const value = JSON.stringify(payload);
     if (isTauriRuntime()) {
         return tauriInvoke("chat_crypto_encrypt_payload", {
@@ -46,7 +41,7 @@ export const encryptChatPayload = async (
 };
 
 export const decryptChatPayload = async (
-    { encryptedData, header }: EncryptedChatPayload,
+    { encryptedData, header }: wasmCrypto.EncryptedChatPayload,
     chatKeyB64: string,
 ): Promise<unknown> => {
     const value = isTauriRuntime()

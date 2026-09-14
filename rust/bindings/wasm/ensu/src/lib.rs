@@ -1,9 +1,14 @@
+use serde::Serialize;
+use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Crypto(#[from] ente_ensu_crypto::Error),
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
 }
 
 impl From<Error> for JsValue {
@@ -12,20 +17,11 @@ impl From<Error> for JsValue {
     }
 }
 
-#[wasm_bindgen]
-pub struct EncryptedChatPayload(ente_ensu_crypto::EncryptedChatPayload);
-
-#[wasm_bindgen]
-impl EncryptedChatPayload {
-    #[wasm_bindgen(getter, js_name = encryptedData)]
-    pub fn encrypted_data(&self) -> String {
-        self.0.encrypted_data.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn header(&self) -> String {
-        self.0.header.clone()
-    }
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptedChatPayload {
+    encrypted_data: String,
+    header: String,
 }
 
 #[wasm_bindgen(js_name = generateChatKey)]
@@ -34,10 +30,17 @@ pub fn generate_chat_key() -> String {
 }
 
 #[wasm_bindgen(js_name = encryptChatPayload)]
-pub fn encrypt_chat_payload(value: &str, key_b64: &str) -> Result<EncryptedChatPayload, Error> {
-    ente_ensu_crypto::encrypt_payload(value, key_b64)
-        .map(EncryptedChatPayload)
-        .map_err(Into::into)
+pub fn encrypt_chat_payload(
+    value: &str,
+    key_b64: &str,
+) -> Result<<EncryptedChatPayload as Tsify>::JsType, Error> {
+    let payload = ente_ensu_crypto::encrypt_payload(value, key_b64)?;
+    EncryptedChatPayload {
+        encrypted_data: payload.encrypted_data,
+        header: payload.header,
+    }
+    .into_js()
+    .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = decryptChatPayload)]

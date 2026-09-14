@@ -8,7 +8,10 @@ crate-type = ["cdylib"]
 [dependencies]
 ente-cast.workspace = true
 ente-wasm-lib.workspace = true
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
 thiserror.workspace = true
+tsify.workspace = true
 wasm-bindgen.workspace = true
 
 [lints]

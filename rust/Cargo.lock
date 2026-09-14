@@ -2422,7 +2422,10 @@ version = "0.0.0"
 dependencies = [
  "ente-cast",
  "ente-wasm-lib",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.18",
+ "tsify",
  "wasm-bindgen",
 ]
 
@@ -2561,7 +2564,10 @@ version = "0.0.0"
 dependencies = [
  "ente-ensu-crypto",
  "ente-wasm-lib",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.18",
+ "tsify",
  "wasm-bindgen",
 ]
 

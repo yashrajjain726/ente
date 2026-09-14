@@ -7,6 +7,7 @@
     },
     "devDependencies": {
         "ente-build-config": "*",
+        "ente-cast-wasm": "*",
         "ente-legacy-wasm": "*",
         "ente-locker-wasm": "*",
         "ente-photos-wasm": "*",
