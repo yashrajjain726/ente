@@ -384,9 +384,10 @@ impl VecDb {
         path: &Path,
         dims: usize,
         storage: Option<StorageKind>,
-        metric: DistanceMetric,
+        metric: Option<DistanceMetric>,
     ) -> Result<Self, VecDbError> {
         let storage = storage.unwrap_or(StorageKind::I8);
+        let metric = metric.unwrap_or(DistanceMetric::Cosine);
         let key = registry_key_for(path)?;
         let slot = path_slot(&key);
         let mut guard = lock_slot(&slot);
@@ -457,9 +458,10 @@ impl VecDb {
         path: &Path,
         dims: usize,
         storage: Option<StorageKind>,
-        metric: DistanceMetric,
+        metric: Option<DistanceMetric>,
     ) -> Result<Self, VecDbError> {
         let storage = storage.unwrap_or(StorageKind::I8);
+        let metric = metric.unwrap_or(DistanceMetric::Cosine);
         let resolved = registry_key_for(path).unwrap_or_else(|_| path.to_path_buf());
         if let Some(slot) = existing_path_slot(&resolved) {
             let observed = lock_slot(&slot).live.as_ref().and_then(Weak::upgrade);
@@ -1789,21 +1791,65 @@ mod tests {
     const TOMBSTONE_RECORD_LEN: u64 = 3 + 5 + 4;
 
     #[test]
+    fn omitted_metric_requires_cosine_for_creation_and_every_reopen() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("cosine");
+        let reader = VecDb::open_read_only(&path, 32, None, None).unwrap();
+        assert_eq!(reader.stats().unwrap().metric, DistanceMetric::Cosine);
+        assert_eq!(reader.stats().unwrap().storage, StorageKind::I8);
+        assert!(!path.exists());
+        drop(reader);
+        let db = VecDb::open(&path, 32, None, None).unwrap();
+        db.add("kept", &seeded_unit_vector(1, 32)).unwrap();
+        db.flush().unwrap();
+        let verify = || {
+            for open in [VecDb::open, VecDb::open_read_only] {
+                let reopened = open(&path, 32, None, None).unwrap();
+                assert_eq!(reopened.stats().unwrap().metric, DistanceMetric::Cosine);
+                assert!(reopened.contains("kept"));
+                let explicit = open(&path, 32, None, Some(DistanceMetric::Cosine)).unwrap();
+                assert!(explicit.contains("kept"));
+            }
+        };
+        verify();
+        drop(db);
+        verify();
+        let dot_path = dir.path().join("inner-product");
+        let db = VecDb::open(&dot_path, 32, None, Some(DistanceMetric::InnerProduct)).unwrap();
+        let reject = || {
+            let before = fs::read(&dot_path).unwrap();
+            for open in [VecDb::open, VecDb::open_read_only] {
+                assert!(matches!(
+                    open(&dot_path, 32, None, None),
+                    Err(VecDbError::MetricMismatch {
+                        expected: DistanceMetric::Cosine,
+                        actual: DistanceMetric::InnerProduct
+                    })
+                ));
+            }
+            assert_eq!(fs::read(&dot_path).unwrap(), before);
+        };
+        reject();
+        drop(db);
+        reject();
+    }
+
+    #[test]
     fn omitted_storage_requires_i8_for_creation_and_every_reopen() {
         let dir = TempDir::new().unwrap();
         for metric in [DistanceMetric::Cosine, DistanceMetric::InnerProduct] {
             let path = dir.path().join(metric.to_string());
-            let reader = VecDb::open_read_only(&path, 32, None, metric).unwrap();
+            let reader = VecDb::open_read_only(&path, 32, None, Some(metric)).unwrap();
             assert_eq!(reader.stats().unwrap().storage, StorageKind::I8);
             assert_eq!(reader.stats().unwrap().metric, metric);
             assert!(!path.exists());
             drop(reader);
-            let db = VecDb::open(&path, 32, None, metric).unwrap();
+            let db = VecDb::open(&path, 32, None, Some(metric)).unwrap();
             db.add("kept", &seeded_unit_vector(1, 32)).unwrap();
             db.flush().unwrap();
             let verify = || {
                 for open in [VecDb::open, VecDb::open_read_only] {
-                    let reopened = open(&path, 32, None, metric).unwrap();
+                    let reopened = open(&path, 32, None, Some(metric)).unwrap();
                     assert_eq!(reopened.stats().unwrap().storage, StorageKind::I8);
                     assert_eq!(reopened.stats().unwrap().metric, metric);
                     assert!(reopened.contains("kept"));
@@ -1813,12 +1859,12 @@ mod tests {
             drop(db);
             verify();
             let f32_path = dir.path().join(format!("f32-{metric}"));
-            let db = VecDb::open(&f32_path, 32, Some(StorageKind::F32), metric).unwrap();
+            let db = VecDb::open(&f32_path, 32, Some(StorageKind::F32), Some(metric)).unwrap();
             let reject = || {
                 let before = fs::read(&f32_path).unwrap();
                 for open in [VecDb::open, VecDb::open_read_only] {
                     assert!(matches!(
-                        open(&f32_path, 32, None, metric),
+                        open(&f32_path, 32, None, Some(metric)),
                         Err(VecDbError::StorageMismatch {
                             expected: StorageKind::I8,
                             actual: StorageKind::F32
@@ -1834,7 +1880,7 @@ mod tests {
         let path = dir.path().join("invalid");
         for open in [VecDb::open, VecDb::open_read_only] {
             assert!(matches!(
-                open(&path, 8, None, DistanceMetric::Cosine),
+                open(&path, 8, None, Some(DistanceMetric::Cosine)),
                 Err(VecDbError::InvalidDimensions {
                     dims: 8,
                     storage: StorageKind::I8
@@ -1858,21 +1904,21 @@ mod tests {
                     DistanceMetric::Cosine => DistanceMetric::InnerProduct,
                     DistanceMetric::InnerProduct => DistanceMetric::Cosine,
                 };
-                let db = VecDb::open(&path, 32, Some(storage), metric).unwrap();
+                let db = VecDb::open(&path, 32, Some(storage), Some(metric)).unwrap();
                 db.add("kept", &seeded_unit_vector(1, 32)).unwrap();
                 db.flush().unwrap();
                 let verify = |live: Option<&VecDb>| {
                     let before = fs::read(&path).unwrap();
                     let snapshot_before = fs::read(snapshot_path(&path)).unwrap();
                     for open in [VecDb::open, VecDb::open_read_only] {
-                        assert!(matches!(open(&path, 32, Some(other_storage), metric),
+                        assert!(matches!(open(&path, 32, Some(other_storage), Some(metric)),
                             Err(VecDbError::StorageMismatch { expected, actual })
                                 if expected == other_storage && actual == storage));
-                        assert!(matches!(open(&path, 32, Some(storage), other_metric),
+                        assert!(matches!(open(&path, 32, Some(storage), Some(other_metric)),
                             Err(VecDbError::MetricMismatch { expected, actual })
                                 if expected == other_metric && actual == metric));
                         assert!(matches!(
-                            open(&path, 64, Some(storage), metric),
+                            open(&path, 64, Some(storage), Some(metric)),
                             Err(VecDbError::DimensionMismatch {
                                 expected: 64,
                                 actual: 32
@@ -1880,7 +1926,7 @@ mod tests {
                         ));
                         assert_eq!(fs::read(&path).unwrap(), before);
                         assert_eq!(fs::read(snapshot_path(&path)).unwrap(), snapshot_before);
-                        let reopened = open(&path, 32, Some(storage), metric).unwrap();
+                        let reopened = open(&path, 32, Some(storage), Some(metric)).unwrap();
                         assert_eq!(reopened.stats().unwrap().storage, storage);
                         assert_eq!(reopened.stats().unwrap().metric, metric);
                         assert!(reopened.contains("kept"));
@@ -1907,7 +1953,8 @@ mod tests {
                     if incomplete {
                         fs::write(&path, [1, 2, 3]).unwrap();
                     }
-                    let reader = VecDb::open_read_only(&path, dims, Some(storage), metric).unwrap();
+                    let reader =
+                        VecDb::open_read_only(&path, dims, Some(storage), Some(metric)).unwrap();
                     let stats = reader.stats().unwrap();
                     assert_eq!(stats.dims, dims);
                     assert_eq!(stats.storage, storage);
@@ -1923,13 +1970,13 @@ mod tests {
                         assert!(!path.exists());
                     }
                     drop(reader);
-                    let writer = VecDb::open(&path, dims, Some(storage), metric).unwrap();
+                    let writer = VecDb::open(&path, dims, Some(storage), Some(metric)).unwrap();
                     assert_eq!(writer.stats().unwrap().storage, storage);
                     assert_eq!(writer.stats().unwrap().metric, metric);
                     writer.add("kept", &seeded_unit_vector(1, dims)).unwrap();
                     drop(writer);
                     let reopened =
-                        VecDb::open_read_only(&path, dims, Some(storage), metric).unwrap();
+                        VecDb::open_read_only(&path, dims, Some(storage), Some(metric)).unwrap();
                     assert!(reopened.contains("kept"));
                     assert_eq!(reopened.stats().unwrap().metric, metric);
                 }
@@ -1938,7 +1985,12 @@ mod tests {
         for open in [VecDb::open, VecDb::open_read_only] {
             let path = dir.path().join("invalid");
             assert!(matches!(
-                open(&path, 8, Some(StorageKind::I8), DistanceMetric::Cosine),
+                open(
+                    &path,
+                    8,
+                    Some(StorageKind::I8),
+                    Some(DistanceMetric::Cosine)
+                ),
                 Err(VecDbError::InvalidDimensions {
                     dims: 8,
                     storage: StorageKind::I8
@@ -1956,7 +2008,7 @@ mod tests {
                 &dir.path().join(storage.to_string()),
                 32,
                 Some(storage),
-                DistanceMetric::Cosine,
+                Some(DistanceMetric::Cosine),
             )
             .unwrap();
             let vector = |x, y| {
@@ -2038,7 +2090,7 @@ mod tests {
         for storage in [StorageKind::F32, StorageKind::I8] {
             for metric in [DistanceMetric::Cosine, DistanceMetric::InnerProduct] {
                 let path = dir.path().join(format!("{storage}-{metric}"));
-                let db = VecDb::open(&path, 32, Some(storage), metric).unwrap();
+                let db = VecDb::open(&path, 32, Some(storage), Some(metric)).unwrap();
                 let mut vector = vec![0.0; 32];
                 vector[0] = 1.0;
                 db.add("removed", &vector).unwrap();
@@ -2082,15 +2134,17 @@ mod tests {
                     if !snapshot {
                         remove_snapshot(&path).unwrap();
                     }
-                    assert_score(&VecDb::open_read_only(&path, 32, Some(storage), metric).unwrap());
-                    assert_score(&VecDb::open(&path, 32, Some(storage), metric).unwrap());
+                    assert_score(
+                        &VecDb::open_read_only(&path, 32, Some(storage), Some(metric)).unwrap(),
+                    );
+                    assert_score(&VecDb::open(&path, 32, Some(storage), Some(metric)).unwrap());
                 }
-                let db = VecDb::open(&path, 32, Some(storage), metric).unwrap();
+                let db = VecDb::open(&path, 32, Some(storage), Some(metric)).unwrap();
                 db.reset().unwrap();
                 db.add("kept", &vector).unwrap();
                 assert_score(&db);
                 drop(db);
-                assert_score(&VecDb::open(&path, 32, Some(storage), metric).unwrap());
+                assert_score(&VecDb::open(&path, 32, Some(storage), Some(metric)).unwrap());
             }
         }
     }
@@ -2102,7 +2156,7 @@ mod tests {
             &dir.path().join("db"),
             8,
             Some(StorageKind::F32),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         for magnitude in [f32::MAX, f32::MIN_POSITIVE, f32::from_bits(1)] {
@@ -2178,7 +2232,13 @@ mod tests {
     }
 
     fn open_writer(path: &Path) -> VecDb {
-        VecDb::open(path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap()
+        VecDb::open(
+            path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap()
     }
 
     fn generation_of(path: &Path) -> [u8; 16] {
@@ -2316,9 +2376,13 @@ mod tests {
         db.flush().unwrap();
         assert_eq!(db.stats().unwrap().records_since_snapshot, 0);
         drop(db);
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         let reopened = open_writer(&path);
         let mut index = 0;
         for query in &queries {
@@ -2473,11 +2537,21 @@ mod tests {
         let log_bytes = fs::read(path).unwrap();
         let snapshot_bytes = snapshot_exists(path).then(|| fs::read(snapshot_path(path)).unwrap());
         assert!(matches!(
-            VecDb::open(path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(
+                path,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::Corrupt(_))
         ));
         assert!(matches!(
-            VecDb::open_read_only(path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open_read_only(
+                path,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::Corrupt(_))
         ));
         assert_eq!(fs::read(path).unwrap(), log_bytes);
@@ -2724,9 +2798,13 @@ mod tests {
         let last_start = bytes.len() - ADD_RECORD_LEN as usize;
         bytes[last_start + 10] ^= 0x01;
         fs::write(&path, &bytes).unwrap();
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert_eq!(read_only.len(), 3);
         assert!(!read_only.contains("key-3"));
         drop(read_only);
@@ -2755,11 +2833,11 @@ mod tests {
         fs::write(&path, &bytes).unwrap();
         let snapshot_bytes = fs::read(snapshot_path(&path)).unwrap();
         assert!(matches!(
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(&path, DIMS, Some(StorageKind::F32), Some(DistanceMetric::Cosine)),
             Err(VecDbError::Corrupt(message)) if message.contains("version")
         ));
         assert!(matches!(
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), Some(DistanceMetric::Cosine)),
             Err(VecDbError::Corrupt(message)) if message.contains("version")
         ));
         assert_eq!(fs::read(&path).unwrap(), bytes);
@@ -2847,8 +2925,13 @@ mod tests {
         let path = dir.path().join("db");
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 3, 120)).unwrap();
-        let joined =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let joined = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(Arc::ptr_eq(&db.shared, &joined.shared));
         assert_eq!(joined.len(), 3);
         joined.add("joined", &seeded_unit_vector(9, DIMS)).unwrap();
@@ -2869,8 +2952,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let first = open_writer(&path);
-        let second =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let second = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(Arc::ptr_eq(&first.shared, &second.shared));
         let via_first = seeded_unit_vector(11, DIMS);
         let via_second = seeded_unit_vector(22, DIMS);
@@ -2885,7 +2973,7 @@ mod tests {
         assert!(first.contains("via-second"));
         assert_eq!(first.len(), 2);
         assert!(matches!(
-            VecDb::open(&path, DIMS + 8, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(&path, DIMS + 8, Some(StorageKind::F32), Some(DistanceMetric::Cosine)),
             Err(VecDbError::DimensionMismatch {
                 expected,
                 actual
@@ -2903,14 +2991,23 @@ mod tests {
         fs::hard_link(&path, &alias).unwrap();
         let bytes = fs::read(&path).unwrap();
         assert!(matches!(
-            VecDb::open(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(
+                &alias,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::Locked(_))
         ));
         assert_eq!(fs::read(&path).unwrap(), bytes);
         let second = open_writer(&path);
-        let reader =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let reader = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         first.add("first", &basis_vector(0)).unwrap();
         second.add("second", &basis_vector(1)).unwrap();
         assert!(reader.contains("first"));
@@ -2936,7 +3033,12 @@ mod tests {
         fs::hard_link(&path, &alias).unwrap();
         for name in [&path, &alias] {
             assert!(matches!(
-                VecDb::open(name, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+                VecDb::open(
+                    name,
+                    DIMS,
+                    Some(StorageKind::F32),
+                    Some(DistanceMetric::Cosine)
+                ),
                 Err(VecDbError::Locked(_))
             ));
         }
@@ -2946,7 +3048,7 @@ mod tests {
                 &alias,
                 I8_DIMS,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             )
             .unwrap()
             .is_empty()
@@ -2969,14 +3071,18 @@ mod tests {
             .as_str()
         {
             "blocked" => {
-                let result =
-                    VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine);
+                let result = VecDb::open(
+                    &path,
+                    DIMS,
+                    Some(StorageKind::F32),
+                    Some(DistanceMetric::Cosine),
+                );
                 assert!(matches!(result, Err(VecDbError::Locked(_))));
                 let reader = VecDb::open_read_only(
                     &path,
                     DIMS,
                     Some(StorageKind::F32),
-                    DistanceMetric::Cosine,
+                    Some(DistanceMetric::Cosine),
                 )
                 .unwrap();
                 assert!(reader.contains("first"));
@@ -3023,9 +3129,13 @@ mod tests {
         assert_eq!(first.len(), 1);
         drop(first);
         run_hard_link_writer_process(&alias, "write");
-        let reader =
-            VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let reader = VecDb::open_read_only(
+            &alias,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert_eq!(reader.len(), 2);
         assert!(reader.contains("first"));
         assert!(reader.contains("next"));
@@ -3055,14 +3165,19 @@ mod tests {
                 }
                 assert_eq!(fs::metadata(&alias).unwrap().nlink(), 1);
                 assert!(matches!(
-                    VecDb::open(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+                    VecDb::open(
+                        &alias,
+                        DIMS,
+                        Some(StorageKind::F32),
+                        Some(DistanceMetric::Cosine)
+                    ),
                     Err(VecDbError::Locked(_))
                 ));
                 let reader = VecDb::open_read_only(
                     &alias,
                     DIMS,
                     Some(StorageKind::F32),
-                    DistanceMetric::Cosine,
+                    Some(DistanceMetric::Cosine),
                 )
                 .unwrap();
                 assert!(reader.contains("first"));
@@ -3089,16 +3204,25 @@ mod tests {
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 10, 800)).unwrap();
         fs::hard_link(&path, &alias).unwrap();
-        let observer =
-            VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let observer = VecDb::open_read_only(
+            &alias,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert_eq!(observer.len(), 10);
         compact(&db.shared, &mut db.shared.writer_half()).unwrap();
         assert_eq!(db.len(), 10);
         fs::remove_file(&alias).unwrap();
         fs::hard_link(&path, &alias).unwrap();
         assert!(matches!(
-            VecDb::open(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(
+                &alias,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::Locked(_))
         ));
         db.reset().unwrap();
@@ -3106,7 +3230,12 @@ mod tests {
         fs::remove_file(&alias).unwrap();
         fs::hard_link(&path, &alias).unwrap();
         assert!(matches!(
-            VecDb::open(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(
+                &alias,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::Locked(_))
         ));
         assert_eq!(db.len(), 1);
@@ -3125,7 +3254,7 @@ mod tests {
             &dotted,
             DIMS,
             Some(StorageKind::F32),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert!(Arc::ptr_eq(&first.shared, &second.shared));
@@ -3140,8 +3269,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let first = open_writer(&path);
-        let second =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let second = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         first.add("kept", &seeded_unit_vector(3, DIMS)).unwrap();
         drop(first);
         assert!(second.contains("kept"));
@@ -3155,8 +3289,13 @@ mod tests {
         assert_eq!(reopened.len(), 2);
         assert!(reopened.contains("kept"));
         assert!(reopened.contains("still-open"));
-        let again =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let again = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(Arc::ptr_eq(&reopened.shared, &again.shared));
     }
 
@@ -3180,7 +3319,7 @@ mod tests {
                             &path,
                             DIMS,
                             Some(StorageKind::F32),
-                            DistanceMetric::Cosine,
+                            Some(DistanceMetric::Cosine),
                         )
                         .unwrap();
                         assert!(db.contains("seed"));
@@ -3327,7 +3466,12 @@ mod tests {
             let opener = {
                 let path = path.clone();
                 thread::spawn(move || {
-                    VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
+                    VecDb::open(
+                        &path,
+                        DIMS,
+                        Some(StorageKind::F32),
+                        Some(DistanceMetric::Cosine),
+                    )
                 })
             };
             thread::sleep(Duration::from_millis(5));
@@ -3399,7 +3543,12 @@ mod tests {
         fs::create_dir(&path).unwrap();
         let key = registry_key_for(&path).unwrap();
         assert!(matches!(
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(
+                &path,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::Io { .. })
         ));
         assert!(!registry().contains_key(&key));
@@ -3451,9 +3600,13 @@ mod tests {
         let path = dir.path().join("db");
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 3, 130)).unwrap();
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(Arc::ptr_eq(&db.shared, &read_only.shared));
         assert_eq!(read_only.len(), 3);
         assert!(read_only.contains("key-1"));
@@ -3476,9 +3629,13 @@ mod tests {
         ));
         assert!(matches!(read_only.flush(), Err(VecDbError::ReadOnly)));
         assert!(matches!(read_only.reset(), Err(VecDbError::ReadOnly)));
-        let another =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let another = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(matches!(another.delete(), Err(VecDbError::ReadOnly)));
         assert!(db.contains("later"));
         assert!(path.exists());
@@ -3489,8 +3646,13 @@ mod tests {
         const DIMS: usize = I8_DIMS;
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("absent");
-        let db = VecDb::open_read_only(&path, DIMS, Some(StorageKind::I8), DistanceMetric::Cosine)
-            .unwrap();
+        let db = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::I8),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert_eq!(db.len(), 0);
         assert!(db.is_empty());
         assert!(!db.contains("anything"));
@@ -3525,9 +3687,13 @@ mod tests {
         let db = open_writer(&path);
         db.add("kept", &seeded_unit_vector(3, DIMS)).unwrap();
         drop(db);
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         let vector = seeded_unit_vector(4, DIMS);
         assert!(matches!(
             read_only.add("x", &vector),
@@ -3563,9 +3729,13 @@ mod tests {
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 100, 140)).unwrap();
         drop(db);
-        let snapshot_view =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let snapshot_view = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert_eq!(snapshot_view.len(), 100);
         let db = open_writer(&path);
         assert!(!Arc::ptr_eq(&snapshot_view.shared, &db.shared));
@@ -3582,15 +3752,23 @@ mod tests {
         assert!(snapshot_view.contains("key-5"));
         assert!(!snapshot_view.contains("fresh"));
         assert_own_nearest(&snapshot_view, "key-5", &seeded_unit_vector(145, DIMS));
-        let live_view =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let live_view = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(Arc::ptr_eq(&live_view.shared, &db.shared));
         assert!(live_view.contains("fresh"));
         drop(db);
-        let fresh_view =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let fresh_view = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert_eq!(fresh_view.len(), 69);
         assert!(!fresh_view.contains("key-5"));
         assert!(fresh_view.contains("fresh"));
@@ -4091,7 +4269,7 @@ mod tests {
             &path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert!(db.is_empty());
@@ -4484,8 +4662,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
         let first = open_writer(&path);
-        let second =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let second = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         bulk_add(&first, &bulk_entries(0, 10, 220)).unwrap();
         assert_eq!(second.len(), 10);
         second.reset().unwrap();
@@ -4661,11 +4844,20 @@ mod tests {
         let first = open_writer(&path);
         bulk_add(&first, &bulk_entries(0, 5, 400)).unwrap();
         first.flush().unwrap();
-        let survivor =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
-        let observer =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let survivor = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
+        let observer = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         first.delete().unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
@@ -4722,8 +4914,13 @@ mod tests {
         let barrier = Arc::new(Barrier::new(READERS + 2));
         let mut readers = Vec::new();
         for reader_index in 0..READERS {
-            let handle =
-                VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+            let handle = VecDb::open(
+                &path,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine),
+            )
+            .unwrap();
             let stop = Arc::clone(&stop);
             let barrier = Arc::clone(&barrier);
             let expected = Arc::clone(&expected);
@@ -4746,8 +4943,13 @@ mod tests {
             }));
         }
         let flusher = {
-            let handle =
-                VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+            let handle = VecDb::open(
+                &path,
+                DIMS,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine),
+            )
+            .unwrap();
             let stop = Arc::clone(&stop);
             let barrier = Arc::clone(&barrier);
             thread::spawn(move || {
@@ -4867,7 +5069,7 @@ mod tests {
             &path,
             DIMS,
             Some(StorageKind::F32),
-            DistanceMetric::InnerProduct,
+            Some(DistanceMetric::InnerProduct),
         )
         .unwrap();
         let unit = seeded_unit_vector(1, DIMS);
@@ -4901,7 +5103,7 @@ mod tests {
             &path,
             DIMS,
             Some(StorageKind::F32),
-            DistanceMetric::InnerProduct,
+            Some(DistanceMetric::InnerProduct),
         )
         .unwrap();
         assert_eq!(reopened.len(), live);
@@ -4912,7 +5114,13 @@ mod tests {
     fn cosine_indexes_keep_taking_vectors_off_the_unit_sphere() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("db");
-        let db = VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let db = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         let half = scaled(&seeded_unit_vector(1, DIMS), 0.5);
         db.add("half", &half).unwrap();
         let batch: Vec<(String, Vec<f32>)> = bulk_entries(10, 3, 200)
@@ -5214,9 +5422,13 @@ mod tests {
         assert_eq!(db.len(), 1);
         assert!(!db.contains("x"));
         assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(matches!(
             read_only.bulk_add(&keys, &vectors),
             Err(VecDbError::LengthMismatch { .. })
@@ -5231,11 +5443,20 @@ mod tests {
         bulk_add(&first, &bulk_entries(0, 5, 950)).unwrap();
         first.flush().unwrap();
         fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
-        let survivor =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
-        let observer =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let survivor = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
+        let observer = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         VecDb::purge(&path).unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
@@ -5339,8 +5560,13 @@ mod tests {
         let alias = dir.path().join("alias");
         let via_path = open_writer(&path);
         std::os::unix::fs::symlink(&path, &alias).unwrap();
-        let via_alias =
-            VecDb::open(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let via_alias = VecDb::open(
+            &alias,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         via_path
             .add("through-real", &seeded_unit_vector(5, DIMS))
             .unwrap();
@@ -5352,9 +5578,13 @@ mod tests {
         assert_eq!(via_path.len(), 2);
         assert!(lock_path(&path).exists());
         assert!(!lock_path(&alias).exists());
-        let read_alias =
-            VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_alias = VecDb::open_read_only(
+            &alias,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         via_path.add("late", &seeded_unit_vector(7, DIMS)).unwrap();
         assert!(read_alias.contains("late"));
     }
@@ -5500,7 +5730,13 @@ mod tests {
         let opener = {
             let path = path.clone();
             thread::spawn(move || {
-                VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap()
+                VecDb::open(
+                    &path,
+                    DIMS,
+                    Some(StorageKind::F32),
+                    Some(DistanceMetric::Cosine),
+                )
+                .unwrap()
             })
         };
         let key = registry_key_for(&path).unwrap();
@@ -5514,7 +5750,7 @@ mod tests {
                     &path,
                     DIMS,
                     Some(StorageKind::F32),
-                    DistanceMetric::Cosine,
+                    Some(DistanceMetric::Cosine),
                 )
                 .unwrap();
             }
@@ -5535,8 +5771,13 @@ mod tests {
             expected_stored
         );
         assert!(!opener.is_finished());
-        let writer =
-            VecDb::open(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let writer = VecDb::open(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(Arc::ptr_eq(&writer.shared, &joined.shared));
         let adder = {
             let vector = replacement.clone();
@@ -5691,9 +5932,13 @@ mod tests {
             assert_eq!(db.get_attrs("removed"), None);
             assert_eq!(db.get_attrs("recycled").unwrap(), sample_attrs(22));
         };
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         verify(&read_only);
         drop(read_only);
         let reopened = open_writer(&path);
@@ -5833,9 +6078,13 @@ mod tests {
             vec![Some(sample_attrs(7)), None, None, None]
         );
         assert_eq!(db.get_attrs("x").unwrap(), sample_attrs(7));
-        let read_only =
-            VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32), DistanceMetric::Cosine)
-                .unwrap();
+        let read_only = VecDb::open_read_only(
+            &path,
+            DIMS,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         assert!(matches!(
             read_only.bulk_add_with_attrs(&keys, &vectors, &[None]),
             Err(VecDbError::LengthMismatch { .. })
@@ -5891,7 +6140,13 @@ mod tests {
     }
 
     fn open_i8(path: &Path) -> VecDb {
-        VecDb::open(path, I8_DIMS, Some(StorageKind::I8), DistanceMetric::Cosine).unwrap()
+        VecDb::open(
+            path,
+            I8_DIMS,
+            Some(StorageKind::I8),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap()
     }
 
     fn stored_vectors(db: &VecDb) -> Vec<(String, StoredVector)> {
@@ -5945,10 +6200,21 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let narrow = dir.path().join("narrow");
         let wide = dir.path().join("wide");
-        let live = VecDb::open(&narrow, 8, Some(StorageKind::F32), DistanceMetric::Cosine).unwrap();
+        let live = VecDb::open(
+            &narrow,
+            8,
+            Some(StorageKind::F32),
+            Some(DistanceMetric::Cosine),
+        )
+        .unwrap();
         live.add("n", &seeded_unit_vector(1, 8)).unwrap();
         assert!(matches!(
-            VecDb::open(&narrow, 8, Some(StorageKind::I8), DistanceMetric::Cosine),
+            VecDb::open(
+                &narrow,
+                8,
+                Some(StorageKind::I8),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::I8,
                 actual: StorageKind::F32
@@ -5956,7 +6222,12 @@ mod tests {
         ));
         drop(live);
         assert!(matches!(
-            VecDb::open(&narrow, 8, Some(StorageKind::I8), DistanceMetric::Cosine),
+            VecDb::open(
+                &narrow,
+                8,
+                Some(StorageKind::I8),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::I8,
                 actual: StorageKind::F32
@@ -5967,19 +6238,29 @@ mod tests {
                 &wide,
                 I8_DIMS,
                 Some(StorageKind::F32),
-                DistanceMetric::Cosine,
+                Some(DistanceMetric::Cosine),
             )
             .unwrap(),
         );
         assert!(matches!(
-            VecDb::open(&wide, 8, Some(StorageKind::I8), DistanceMetric::Cosine),
+            VecDb::open(
+                &wide,
+                8,
+                Some(StorageKind::I8),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::I8,
                 actual: StorageKind::F32
             })
         ));
         assert!(matches!(
-            VecDb::open(&wide, 8, Some(StorageKind::F32), DistanceMetric::Cosine),
+            VecDb::open(
+                &wide,
+                8,
+                Some(StorageKind::F32),
+                Some(DistanceMetric::Cosine)
+            ),
             Err(VecDbError::DimensionMismatch {
                 expected: 8,
                 actual: I8_DIMS
@@ -5991,7 +6272,7 @@ mod tests {
                 &dir.path().join("i8"),
                 8,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::DimensionMismatch {
                 expected: 8,
@@ -6003,7 +6284,7 @@ mod tests {
                 &dir.path().join("fresh"),
                 8,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::InvalidDimensions {
                 dims: 8,
@@ -6022,7 +6303,7 @@ mod tests {
             &f32_path,
             I8_DIMS,
             Some(StorageKind::F32),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         f32_db.add("f", &seeded_unit_vector(1, I8_DIMS)).unwrap();
@@ -6032,7 +6313,7 @@ mod tests {
                 &f32_path,
                 I8_DIMS,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::I8,
@@ -6043,7 +6324,7 @@ mod tests {
             &f32_path,
             I8_DIMS,
             Some(StorageKind::F32),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert!(Arc::ptr_eq(&verified.shared, &f32_db.shared));
@@ -6054,7 +6335,7 @@ mod tests {
                 &f32_path,
                 I8_DIMS,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::I8,
@@ -6066,7 +6347,7 @@ mod tests {
                 &f32_path,
                 I8_DIMS,
                 Some(StorageKind::F32),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             )
             .unwrap()
             .stats()
@@ -6078,7 +6359,7 @@ mod tests {
             &i8_path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         let vector = seeded_unit_vector(2, I8_DIMS);
@@ -6088,7 +6369,7 @@ mod tests {
             &i8_path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert!(Arc::ptr_eq(&joined.shared, &i8_db.shared));
@@ -6098,7 +6379,7 @@ mod tests {
                 &i8_path,
                 I8_DIMS,
                 Some(StorageKind::F32),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::F32,
@@ -6109,7 +6390,7 @@ mod tests {
             &i8_path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert!(Arc::ptr_eq(&read_alias.shared, &i8_db.shared));
@@ -6123,7 +6404,7 @@ mod tests {
             &i8_path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert_eq!(standalone.stats().unwrap().storage, StorageKind::I8);
@@ -6135,7 +6416,7 @@ mod tests {
                 &i8_path,
                 I8_DIMS,
                 Some(StorageKind::F32),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::StorageMismatch {
                 expected: StorageKind::F32,
@@ -6146,7 +6427,7 @@ mod tests {
             &i8_path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         assert_eq!(detected.stats().unwrap().storage, StorageKind::I8);
@@ -6157,7 +6438,7 @@ mod tests {
                 &dir.path().join("narrow"),
                 16,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             ),
             Err(VecDbError::InvalidDimensions {
                 dims: 16,
@@ -6169,7 +6450,7 @@ mod tests {
                 &dir.path().join("narrow"),
                 16,
                 Some(StorageKind::F32),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             )
             .is_ok()
         );
@@ -6178,7 +6459,7 @@ mod tests {
                 &dir.path().join("absent"),
                 I8_DIMS,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine
+                Some(DistanceMetric::Cosine)
             )
             .unwrap()
             .stats()
@@ -6318,7 +6599,7 @@ mod tests {
             &path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         verify(&read_only);
@@ -6327,7 +6608,7 @@ mod tests {
             &path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         verify(&with_snapshot);
@@ -6337,7 +6618,7 @@ mod tests {
             &path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         verify(&rebuilt);
@@ -6376,7 +6657,7 @@ mod tests {
                 &split_path,
                 I8_DIMS,
                 Some(StorageKind::I8),
-                DistanceMetric::Cosine,
+                Some(DistanceMetric::Cosine),
             )
             .unwrap();
             assert_eq!(db.stats().unwrap().storage, StorageKind::I8);
@@ -6387,7 +6668,7 @@ mod tests {
             &split_path,
             I8_DIMS,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         let whole = open_i8(&whole_path);
@@ -6417,14 +6698,14 @@ mod tests {
             &dir.path().join("f32"),
             dims,
             Some(StorageKind::F32),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         let i8_db = VecDb::open(
             &dir.path().join("i8"),
             dims,
             Some(StorageKind::I8),
-            DistanceMetric::Cosine,
+            Some(DistanceMetric::Cosine),
         )
         .unwrap();
         let entries: Vec<(String, Vec<f32>)> = (0..200u64)

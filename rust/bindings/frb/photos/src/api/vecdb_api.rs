@@ -192,7 +192,7 @@ impl VecDb {
         file_path: String,
         dimensions: u32,
         storage: Option<VecDbStorage>,
-        metric: VecDbMetric,
+        metric: Option<VecDbMetric>,
     ) -> Result<Self, RustVecDbError> {
         let path = Path::new(&file_path);
         let dims = dimensions as usize;
@@ -200,7 +200,7 @@ impl VecDb {
             path,
             dims,
             storage.map(to_engine_storage),
-            to_engine_metric(metric),
+            metric.map(to_engine_metric),
         )?;
         Ok(Self { inner })
     }
@@ -209,14 +209,14 @@ impl VecDb {
         file_path: String,
         dimensions: u32,
         storage: Option<VecDbStorage>,
-        metric: VecDbMetric,
+        metric: Option<VecDbMetric>,
     ) -> Result<Self, RustVecDbError> {
         Ok(Self {
             inner: vecdb::VecDb::open_read_only(
                 Path::new(&file_path),
                 dimensions as usize,
                 storage.map(to_engine_storage),
-                to_engine_metric(metric),
+                metric.map(to_engine_metric),
             )?,
         })
     }
@@ -452,9 +452,25 @@ mod tests {
     }
 
     #[test]
-    fn omitted_storage_defaults_to_i8_with_a_required_metric() {
+    fn omitted_metric_defaults_to_cosine() {
         let dir = TestDir::create();
-        let db = VecDb::new(dir.db_path(), 32, None, VecDbMetric::InnerProduct).unwrap();
+        let db = VecDb::new(dir.db_path(), 32, None, None).unwrap();
+        assert!(matches!(
+            db.get_index_stats().unwrap().metric,
+            VecDbMetric::Cosine
+        ));
+        drop(db);
+        let reader = VecDb::open_read_only(dir.db_path(), 32, None, None).unwrap();
+        assert!(matches!(
+            reader.get_index_stats().unwrap().metric,
+            VecDbMetric::Cosine
+        ));
+    }
+
+    #[test]
+    fn omitted_storage_defaults_to_i8() {
+        let dir = TestDir::create();
+        let db = VecDb::new(dir.db_path(), 32, None, Some(VecDbMetric::InnerProduct)).unwrap();
         assert!(matches!(
             db.get_index_stats().unwrap().storage,
             VecDbStorage::I8
@@ -465,7 +481,8 @@ mod tests {
         ));
         drop(db);
         let reader =
-            VecDb::open_read_only(dir.db_path(), 32, None, VecDbMetric::InnerProduct).unwrap();
+            VecDb::open_read_only(dir.db_path(), 32, None, Some(VecDbMetric::InnerProduct))
+                .unwrap();
         assert!(matches!(
             reader.get_index_stats().unwrap().storage,
             VecDbStorage::I8
@@ -477,13 +494,13 @@ mod tests {
                 dir.db_path(),
                 32,
                 Some(VecDbStorage::F32),
-                VecDbMetric::Cosine,
+                Some(VecDbMetric::Cosine),
             )
             .unwrap(),
         );
         for open in [VecDb::new, VecDb::open_read_only] {
             assert!(matches!(
-                open(dir.db_path(), 32, None, VecDbMetric::Cosine),
+                open(dir.db_path(), 32, None, Some(VecDbMetric::Cosine)),
                 Err(RustVecDbError::StorageMismatch { .. })
             ));
         }
@@ -506,24 +523,24 @@ mod tests {
             ),
         ] {
             let dir = TestDir::create();
-            let db = VecDb::new(dir.db_path(), 32, Some(storage), metric).unwrap();
+            let db = VecDb::new(dir.db_path(), 32, Some(storage), Some(metric)).unwrap();
             db.add_vector(key("kept"), unit_axis(32)).unwrap();
             db.flush().unwrap();
             let verify = || {
                 assert!(matches!(
-                    VecDb::open_read_only(dir.db_path(), 32, Some(wrong_storage), metric),
+                    VecDb::open_read_only(dir.db_path(), 32, Some(wrong_storage), Some(metric)),
                     Err(RustVecDbError::StorageMismatch { .. })
                 ));
                 assert!(matches!(
-                    VecDb::open_read_only(dir.db_path(), 32, Some(storage), wrong_metric),
+                    VecDb::open_read_only(dir.db_path(), 32, Some(storage), Some(wrong_metric)),
                     Err(RustVecDbError::MetricMismatch { .. })
                 ));
                 assert!(matches!(
-                    VecDb::open_read_only(dir.db_path(), 64, Some(storage), metric),
+                    VecDb::open_read_only(dir.db_path(), 64, Some(storage), Some(metric)),
                     Err(RustVecDbError::DimensionMismatch { .. })
                 ));
                 let reader =
-                    VecDb::open_read_only(dir.db_path(), 32, Some(storage), metric).unwrap();
+                    VecDb::open_read_only(dir.db_path(), 32, Some(storage), Some(metric)).unwrap();
                 assert_eq!(reader.get_index_stats().unwrap().live_count, 1);
                 assert!(matches!(
                     reader.add_vector(key("no"), unit_axis(32)),
@@ -543,7 +560,7 @@ mod tests {
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -555,7 +572,7 @@ mod tests {
                 dir.db_path(),
                 32,
                 Some(VecDbStorage::I8),
-                VecDbMetric::InnerProduct
+                Some(VecDbMetric::InnerProduct)
             ),
             Err(RustVecDbError::MetricMismatch { .. })
         ));
@@ -565,7 +582,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::InnerProduct,
+            Some(VecDbMetric::InnerProduct),
         )
         .unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
@@ -579,14 +596,14 @@ mod tests {
         db.flush().unwrap();
         drop(db);
         assert!(matches!(
-            VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32), VecDbMetric::Cosine),
+            VecDb::new(dir.db_path(), DIMS, Some(VecDbStorage::F32), Some(VecDbMetric::Cosine)),
             Err(RustVecDbError::MetricMismatch { message }) if message.contains("cosine") && message.contains("inner product")
         ));
         let db = VecDb::new(
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::InnerProduct,
+            Some(VecDbMetric::InnerProduct),
         )
         .unwrap();
         assert!(matches!(
@@ -606,7 +623,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
@@ -645,7 +662,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert_eq!(read_only.get_index_stats().unwrap().live_count, 3);
@@ -673,7 +690,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         let error = db
@@ -690,7 +707,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
@@ -720,7 +737,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.bulk_add_vectors(
@@ -792,7 +809,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.bulk_add_vectors(
@@ -852,7 +869,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.bulk_add_vectors(
@@ -896,7 +913,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         let attrs = vec![
@@ -994,7 +1011,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
@@ -1022,7 +1039,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         db.add_vector(key("a"), basis(0)).unwrap();
@@ -1039,7 +1056,7 @@ mod tests {
             dir.db_path(),
             DIMS,
             Some(VecDbStorage::F32),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert_eq!(reopened.get_index_stats().unwrap().live_count, 0);
@@ -1065,7 +1082,7 @@ mod tests {
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -1098,7 +1115,7 @@ mod tests {
                 dir.db_path(),
                 32,
                 Some(VecDbStorage::F32),
-                VecDbMetric::Cosine
+                Some(VecDbMetric::Cosine)
             ),
             Err(RustVecDbError::StorageMismatch { .. })
         ));
@@ -1106,7 +1123,7 @@ mod tests {
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -1120,7 +1137,7 @@ mod tests {
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -1130,14 +1147,14 @@ mod tests {
         assert_eq!(read_only.get_index_stats().unwrap().live_count, 3);
         drop(read_only);
         assert!(matches!(
-            VecDb::new(dir.db_path(), 32, Some(VecDbStorage::F32), VecDbMetric::Cosine),
+            VecDb::new(dir.db_path(), 32, Some(VecDbStorage::F32), Some(VecDbMetric::Cosine)),
             Err(RustVecDbError::StorageMismatch { message }) if message.contains("f32") && message.contains("i8")
         ));
         let reopened = VecDb::new(
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -1155,7 +1172,7 @@ mod tests {
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -1166,7 +1183,7 @@ mod tests {
             dir.db_path(),
             32,
             Some(VecDbStorage::I8),
-            VecDbMetric::Cosine,
+            Some(VecDbMetric::Cosine),
         )
         .unwrap();
         assert!(matches!(
@@ -1178,13 +1195,13 @@ mod tests {
                 dir.db_path(),
                 32,
                 Some(VecDbStorage::F32),
-                VecDbMetric::Cosine
+                Some(VecDbMetric::Cosine)
             ),
             Err(RustVecDbError::StorageMismatch { .. })
         ));
         let other = TestDir::create();
         assert!(matches!(
-            VecDb::new(other.db_path(), DIMS, Some(VecDbStorage::I8), VecDbMetric::Cosine),
+            VecDb::new(other.db_path(), DIMS, Some(VecDbStorage::I8), Some(VecDbMetric::Cosine)),
             Err(RustVecDbError::InvalidDimensions { message }) if message.contains("i8") && message.contains("32")
         ));
         assert!(!PathBuf::from(other.db_path()).exists());
@@ -1193,7 +1210,7 @@ mod tests {
                 other.db_path(),
                 DIMS,
                 Some(VecDbStorage::F32),
-                VecDbMetric::Cosine
+                Some(VecDbMetric::Cosine)
             )
             .is_ok()
         );
