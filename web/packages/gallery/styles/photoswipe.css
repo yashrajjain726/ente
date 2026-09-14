@@ -543,7 +543,7 @@ body:has(
     transition-delay: 0ms;
 }
 
-.pswp.pswp-ente .pswp__ente-progress-bar--active {
+.pswp-ente.pswp--ui-visible .pswp__ente-progress-bar--active {
     opacity: 1;
     transition-delay: 400ms;
 }
@@ -659,7 +659,7 @@ body:has(
     transition: opacity 160ms linear;
 }
 
-.pswp.pswp-ente .pswp__ente-progress-overlay--active {
+.pswp-ente.pswp--ui-visible .pswp__ente-progress-overlay--active {
     opacity: 1;
     visibility: visible;
     transition-delay: 400ms;
