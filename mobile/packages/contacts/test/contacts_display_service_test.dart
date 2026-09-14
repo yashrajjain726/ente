@@ -261,7 +261,7 @@ ContactRecord _contact({
   updatedAt: updatedAt,
 );
 
-class FakeContacts {
+class FakeContacts extends Fake implements ContactsApi {
   static const _key = WrappedRootContactKey(
     encryptedKey: 'enc-key',
     header: 'enc-header',
@@ -280,22 +280,13 @@ class FakeContacts {
   ContactsService service(
     SharedPreferences preferences,
     ContactsDatabase database,
-  ) => ContactsService(
-    preferences: preferences,
-    database: database,
-    createContact: createContact,
-    getDiff: getDiff,
-    getProfilePicture: getProfilePicture,
-    updateContact: (_, _, _) => throw UnimplementedError(),
-    deleteContact: (_) => throw UnimplementedError(),
-    setAttachment: (_, _, _, _) => throw UnimplementedError(),
-    deleteAttachment: (_, _, _) => throw UnimplementedError(),
-  );
+  ) => ContactsService(preferences: preferences, database: database, api: this);
 
-  Future<ContactRecordOutput> createContact(
+  @override
+  Future<ContactRecordOutput> createContact({
     WrappedRootContactKey? wrappedRootContactKey,
-    ContactData data,
-  ) async {
+    required ContactData data,
+  }) async {
     return ContactRecordOutput(
       record: ContactRecord(
         id: 'ct_created',
@@ -311,11 +302,12 @@ class FakeContacts {
     );
   }
 
-  Future<ContactDiffOutput> getDiff(
+  @override
+  Future<ContactDiffOutput> getDiff({
     WrappedRootContactKey? wrappedRootContactKey,
-    int sinceTime,
-    int limit,
-  ) async {
+    required int sinceTime,
+    required int limit,
+  }) async {
     getDiffCalls += 1;
     final barrier = diffBarrier;
     if (barrier != null) {
@@ -335,10 +327,11 @@ class FakeContacts {
     return ContactDiffOutput(records: first, wrappedRootContactKey: _key);
   }
 
-  Future<ProfilePictureOutput> getProfilePicture(
+  @override
+  Future<ProfilePictureOutput> getProfilePicture({
     WrappedRootContactKey? wrappedRootContactKey,
-    String contactId,
-  ) async {
+    required String contactId,
+  }) async {
     getProfilePictureCalls += 1;
     final barrier = profilePictureBarrier;
     if (barrier != null) {

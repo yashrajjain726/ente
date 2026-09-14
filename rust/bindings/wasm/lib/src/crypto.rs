@@ -1,4 +1,6 @@
 use ente_core::{b64, crypto};
+use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::EncryptedBox;
@@ -12,6 +14,8 @@ pub enum Error {
     Crypto(#[from] crypto::Error),
     #[error(transparent)]
     Decode(#[from] b64::DecodeError),
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
 }
 
 impl Error {
@@ -21,19 +25,11 @@ impl Error {
             _ => None,
         }
     }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
 }
 
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        crate::js_error(&error, error.name())
     }
 }
 
@@ -43,14 +39,25 @@ pub fn crypto_generate_key() -> String {
 }
 
 #[wasm_bindgen(js_name = cryptoEncryptBox)]
-pub fn crypto_encrypt_box(data_b64: &str, key_b64: &str) -> Result<EncryptedBox, Error> {
+pub fn crypto_encrypt_box(
+    data_b64: &str,
+    key_b64: &str,
+) -> Result<<EncryptedBox as Tsify>::JsType, Error> {
     crypto_encrypt_box_bytes(&b64::decode(data_b64)?, key_b64)
 }
 
 #[wasm_bindgen(js_name = cryptoEncryptBoxBytes)]
-pub fn crypto_encrypt_box_bytes(data: &[u8], key_b64: &str) -> Result<EncryptedBox, Error> {
+pub fn crypto_encrypt_box_bytes(
+    data: &[u8],
+    key_b64: &str,
+) -> Result<<EncryptedBox as Tsify>::JsType, Error> {
     let key = b64::decode(key_b64)?;
-    Ok(crypto::secretbox::encrypt(data, &crypto::Key::try_from_slice(&key)?).into())
+    EncryptedBox::from(crypto::secretbox::encrypt(
+        data,
+        &crypto::Key::try_from_slice(&key)?,
+    ))
+    .into_js()
+    .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = cryptoDecryptBox)]

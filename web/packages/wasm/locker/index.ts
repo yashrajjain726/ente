@@ -1,5 +1,4 @@
 import { wrap } from "comlink";
-import { readAndFree } from "ente-utils/wasm";
 import { workerReady } from "ente-utils/worker";
 import type { FileLinkWorker } from "./file-link.worker";
 import type {
@@ -16,10 +15,7 @@ export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
 
 export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
-    readAndFree(session.encryptWithRecoveryKey(dataB64), (box) => ({
-        encryptedData: box.encryptedData,
-        nonce: box.nonce,
-    }));
+    session.encryptWithRecoveryKey(dataB64);
 
 export const openCollectionKey = async (
     session: Session,
@@ -106,16 +102,10 @@ export const openFileLinkSecret = async (
 export const generateKey = async () => (await wasm()).cryptoGenerateKey();
 
 export const encryptBox = async (dataB64: string, keyB64: string) =>
-    readAndFree((await wasm()).cryptoEncryptBox(dataB64, keyB64), (box) => ({
-        encryptedData: box.encryptedData,
-        nonce: box.nonce,
-    }));
+    (await wasm()).cryptoEncryptBox(dataB64, keyB64);
 
 export const encryptBoxBytes = async (data: Uint8Array, keyB64: string) =>
-    readAndFree((await wasm()).cryptoEncryptBoxBytes(data, keyB64), (box) => ({
-        encryptedData: box.encryptedData,
-        nonce: box.nonce,
-    }));
+    (await wasm()).cryptoEncryptBoxBytes(data, keyB64);
 
 export const decryptBox = async (
     box: EncryptedBox,
@@ -138,10 +128,7 @@ export const decryptBoxBytes = async (
     );
 
 export const encryptBlob = async (data: Uint8Array, keyB64: string) =>
-    readAndFree((await wasm()).cryptoEncryptBlob(data, keyB64), (blob) => ({
-        encryptedData: blob.encryptedData,
-        decryptionHeader: blob.decryptionHeader,
-    }));
+    (await wasm()).cryptoEncryptBlob(data, keyB64);
 
 export const decryptMetadataJSON = async (
     blob: EncryptedBlob,
@@ -190,16 +177,7 @@ export const createStreamDecryptor = async (
 export const encryptFileStreamWithKey = async (
     dataB64: string,
     keyB64: string,
-) =>
-    readAndFree(
-        (await wasm()).cryptoEncryptStreamWithKey(dataB64, keyB64),
-        (file) => ({
-            // wasm-bindgen copies returned bytes into a new ArrayBuffer.
-            encryptedData: file.encryptedData as Uint8Array<ArrayBuffer>,
-            decryptionHeader: file.decryptionHeader,
-            md5Hash: file.md5Hash,
-        }),
-    );
+) => (await wasm()).cryptoEncryptStreamWithKey(dataB64, keyB64);
 
 const toB64String = (value: Uint8Array | string): string => {
     if (typeof value == "string") return value;

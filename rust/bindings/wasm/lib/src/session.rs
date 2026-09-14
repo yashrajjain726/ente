@@ -6,6 +6,7 @@ use ente_core::{
     http::{ApiConfig, Auth},
 };
 use serde::Deserialize;
+use serde_wasm_bindgen as swb;
 use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
 
@@ -17,6 +18,8 @@ pub enum Error {
     Accounts(#[from] ente_accounts::Error),
     #[error(transparent)]
     Input(#[from] tsify::Error),
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
     #[error(transparent)]
     Http(#[from] ente_core::http::Error),
     #[error(transparent)]
@@ -34,19 +37,11 @@ impl Error {
             _ => None,
         }
     }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
 }
 
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        crate::js_error(&error, error.name())
     }
 }
 
@@ -140,8 +135,16 @@ impl Session {
 #[wasm_bindgen]
 impl Session {
     #[wasm_bindgen(js_name = encryptWithRecoveryKey)]
-    pub fn encrypt_with_recovery_key(&self, data_b64: &str) -> Result<EncryptedBox, Error> {
-        Ok(crypto::secretbox::encrypt(&b64::decode(data_b64)?, &self.0.recovery_key).into())
+    pub fn encrypt_with_recovery_key(
+        &self,
+        data_b64: &str,
+    ) -> Result<<EncryptedBox as Tsify>::JsType, Error> {
+        EncryptedBox::from(crypto::secretbox::encrypt(
+            &b64::decode(data_b64)?,
+            &self.0.recovery_key,
+        ))
+        .into_js()
+        .map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = recoveryKeyMnemonic)]

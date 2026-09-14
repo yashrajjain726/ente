@@ -1,4 +1,3 @@
-import { readAndFree } from "ente-utils/wasm";
 import type {
     OpenSessionInput,
     Session,
@@ -13,10 +12,7 @@ export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
 
 export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
-    readAndFree(session.encryptWithRecoveryKey(dataB64), (box) => ({
-        encryptedData: box.encryptedData,
-        nonce: box.nonce,
-    }));
+    session.encryptWithRecoveryKey(dataB64);
 
 export const generateKey = async () => (await wasm()).cryptoGenerateKey();
 

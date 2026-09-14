@@ -1,5 +1,7 @@
 use ente_core::{b64, crypto};
 use md5::{Digest, Md5};
+use serde::Serialize;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use super::Error;
@@ -91,23 +93,27 @@ pub fn crypto_md5_base64(data: Vec<u8>) -> String {
     b64::encode(&digest)
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct EncryptedBlob {
-    #[wasm_bindgen(readonly, js_name = encryptedData)]
     pub encrypted_data: String,
-    #[wasm_bindgen(readonly, js_name = decryptionHeader)]
     pub decryption_header: String,
 }
 
 #[wasm_bindgen(js_name = cryptoEncryptBlob)]
-pub fn crypto_encrypt_blob(data: &[u8], key_b64: &str) -> Result<EncryptedBlob, Error> {
+pub fn crypto_encrypt_blob(
+    data: &[u8],
+    key_b64: &str,
+) -> Result<<EncryptedBlob as Tsify>::JsType, Error> {
     let key = b64::decode(key_b64)?;
 
     let out = crypto::blob::encrypt(data, &crypto::Key::try_from_slice(&key)?)?;
-    Ok(EncryptedBlob {
+    EncryptedBlob {
         encrypted_data: b64::encode(&out.encrypted_data),
         decryption_header: b64::encode(out.decryption_header.as_bytes()),
-    })
+    }
+    .into_js()
+    .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = cryptoDecryptBlob)]
@@ -144,13 +150,13 @@ pub fn crypto_decrypt_blob_legacy(
     )?)
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct EncryptedStreamResult {
-    #[wasm_bindgen(readonly, js_name = encryptedData)]
+    #[serde(serialize_with = "crate::types::serialize_bytes")]
+    #[tsify(type = "Uint8Array<ArrayBuffer>")]
     pub encrypted_data: Vec<u8>,
-    #[wasm_bindgen(readonly, js_name = decryptionHeader)]
     pub decryption_header: String,
-    #[wasm_bindgen(readonly, js_name = md5Hash)]
     pub md5_hash: String,
 }
 
@@ -158,7 +164,7 @@ pub struct EncryptedStreamResult {
 pub fn crypto_encrypt_stream_with_key(
     data_b64: &str,
     key_b64: &str,
-) -> Result<EncryptedStreamResult, Error> {
+) -> Result<<EncryptedStreamResult as Tsify>::JsType, Error> {
     let plaintext = b64::decode(data_b64)?;
     let key = crypto::Key::try_from_slice(&b64::decode(key_b64)?)?;
 
@@ -168,9 +174,11 @@ pub fn crypto_encrypt_stream_with_key(
     let header = crypto::stream::encrypt_file(&mut reader, &mut writer, &key)?;
     let (encrypted, md5) = writer.finalize();
 
-    Ok(EncryptedStreamResult {
+    EncryptedStreamResult {
         encrypted_data: encrypted,
         decryption_header: b64::encode(header.as_bytes()),
         md5_hash: b64::encode(&md5),
-    })
+    }
+    .into_js()
+    .map_err(Into::into)
 }

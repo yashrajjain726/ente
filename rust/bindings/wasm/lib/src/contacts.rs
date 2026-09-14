@@ -1,4 +1,4 @@
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use serde_wasm_bindgen as swb;
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
@@ -13,23 +13,9 @@ pub enum Error {
     Serde(#[from] swb::Error),
 }
 
-impl Error {
-    fn name(&self) -> Option<&'static str> {
-        None
-    }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
-}
-
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        crate::js_error(&error, None)
     }
 }
 
@@ -70,7 +56,7 @@ pub struct ContactsDiffOutput {
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfilePictureOutput {
-    #[serde(serialize_with = "serialize_bytes")]
+    #[serde(serialize_with = "crate::types::serialize_bytes")]
     #[tsify(type = "Uint8Array")]
     bytes: Vec<u8>,
     wrapped_root_contact_key: Option<WrappedRootContactKey>,
@@ -138,11 +124,4 @@ fn wrapped_root_contact_key(
             header,
         },
     )
-}
-
-fn serialize_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_bytes(bytes)
 }

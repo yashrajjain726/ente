@@ -1,30 +1,20 @@
 use ente_cast::ReceiverCredentials;
-use ente_wasm_lib as _;
+use serde::Serialize;
+use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Cast(#[from] ente_cast::Error),
-}
-
-impl Error {
-    fn name(&self) -> Option<&'static str> {
-        None
-    }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
 }
 
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        ente_wasm_lib::js_error(&error, None)
     }
 }
 
@@ -59,62 +49,35 @@ impl CastReceiver {
     }
 
     #[wasm_bindgen(js_name = openPayload)]
-    pub fn open_payload(&self, encrypted_payload: &str) -> Result<CastPayload, Error> {
-        Ok(self.inner.open_payload(encrypted_payload)?.into())
+    pub fn open_payload(
+        &self,
+        encrypted_payload: &str,
+    ) -> Result<<CastPayload as Tsify>::JsType, Error> {
+        let payload = self.inner.open_payload(encrypted_payload)?;
+        CastPayload {
+            collection_id: payload.collection_id,
+            cast_token: payload.cast_token,
+            collection_key: payload.collection_key,
+        }
+        .into_js()
+        .map_err(Into::into)
     }
 }
 
-#[wasm_bindgen]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct CastPayload {
-    inner: ente_cast::CastPayload,
+    #[serde(rename = "collectionID")]
+    collection_id: i64,
+    cast_token: String,
+    collection_key: String,
 }
 
-impl From<ente_cast::CastPayload> for CastPayload {
-    fn from(inner: ente_cast::CastPayload) -> Self {
-        Self { inner }
-    }
-}
-
-#[wasm_bindgen]
-impl CastPayload {
-    #[wasm_bindgen(getter, js_name = collectionID)]
-    pub fn collection_id(&self) -> i64 {
-        self.inner.collection_id
-    }
-
-    #[wasm_bindgen(getter, js_name = castToken)]
-    pub fn cast_token(&self) -> String {
-        self.inner.cast_token.clone()
-    }
-
-    #[wasm_bindgen(getter, js_name = collectionKey)]
-    pub fn collection_key(&self) -> String {
-        self.inner.collection_key.clone()
-    }
-}
-
-#[wasm_bindgen]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct PreparedCastPayload {
-    inner: ente_cast::PreparedCastPayload,
-}
-
-impl From<ente_cast::PreparedCastPayload> for PreparedCastPayload {
-    fn from(inner: ente_cast::PreparedCastPayload) -> Self {
-        Self { inner }
-    }
-}
-
-#[wasm_bindgen]
-impl PreparedCastPayload {
-    #[wasm_bindgen(getter, js_name = castToken)]
-    pub fn cast_token(&self) -> String {
-        self.inner.cast_token.clone()
-    }
-
-    #[wasm_bindgen(getter, js_name = encryptedPayload)]
-    pub fn encrypted_payload(&self) -> String {
-        self.inner.encrypted_payload.clone()
-    }
+    cast_token: String,
+    encrypted_payload: String,
 }
 
 #[wasm_bindgen(js_name = preparePayload)]
@@ -123,12 +86,17 @@ pub fn prepare_payload(
     pq_public_key: Option<String>,
     collection_id: i64,
     collection_key: &str,
-) -> Result<PreparedCastPayload, Error> {
-    Ok(ente_cast::prepare_payload(
+) -> Result<<PreparedCastPayload as Tsify>::JsType, Error> {
+    let payload = ente_cast::prepare_payload(
         public_key,
         pq_public_key.as_deref(),
         collection_id,
         collection_key,
-    )?
-    .into())
+    )?;
+    PreparedCastPayload {
+        cast_token: payload.cast_token,
+        encrypted_payload: payload.encrypted_payload,
+    }
+    .into_js()
+    .map_err(Into::into)
 }

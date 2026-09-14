@@ -46,7 +46,14 @@ shared-alias = { package = "shared", path = "crates/shared" }
     );
     write(
         "web/packages/wasm/app/package.json",
-        JSON.stringify({ name: "app-wasm" }),
+        JSON.stringify({
+            name: "app-wasm",
+            scripts: { build: "wasm-pack build" },
+        }),
+    );
+    write(
+        "web/packages/wasm/tests/package.json",
+        JSON.stringify({ name: "wasm-tests", scripts: { test: "vitest" } }),
     );
     crate(
         "bindings/wasm/app",
@@ -114,4 +121,14 @@ native-only = { path = "../../../crates/native-only" }
     assert.equal(result.status, 1);
     assert.match(result.stderr, /WASM coverage does not support negated paths/);
     assert.equal(result.stdout, "");
+    write(
+        "web/packages/wasm/app/package.json",
+        JSON.stringify({
+            name: "missing-wasm",
+            scripts: { build: "wasm-pack build" },
+        }),
+    );
+    result = run(["rust/**"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /no matching Cargo package for missing-wasm/);
 });

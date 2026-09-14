@@ -24,13 +24,7 @@ void main() {
     database = ContactsDatabase(directoryResolver: () async => tempDir);
     service = ContactsService(
       preferences: preferences,
-      createContact: remote.createContact,
-      getDiff: remote.getDiff,
-      updateContact: remote.updateContact,
-      deleteContact: remote.deleteContact,
-      setAttachment: remote.setAttachment,
-      deleteAttachment: remote.deleteAttachment,
-      getProfilePicture: remote.getProfilePicture,
+      api: remote,
       database: database,
     );
   });
@@ -282,7 +276,7 @@ void main() {
   });
 }
 
-class FakeContacts {
+class FakeContacts implements ContactsApi {
   static const _key = WrappedRootContactKey(
     encryptedKey: 'enc-key',
     header: 'enc-header',
@@ -299,10 +293,11 @@ class FakeContacts {
   int getProfilePictureCalls = 0;
   String nextAttachmentId = 'att_profile';
 
-  Future<ContactRecordOutput> createContact(
+  @override
+  Future<ContactRecordOutput> createContact({
     WrappedRootContactKey? wrappedRootContactKey,
-    ContactData data,
-  ) async {
+    required ContactData data,
+  }) async {
     final record = ContactRecord(
       id: 'ct_created',
       contactUserId: data.contactUserId,
@@ -317,7 +312,8 @@ class FakeContacts {
     return ContactRecordOutput(record: record, wrappedRootContactKey: _key);
   }
 
-  Future<void> deleteContact(String contactId) async {
+  @override
+  Future<void> deleteContact({required String contactId}) async {
     final existing = records[contactId];
     if (existing != null) {
       records[contactId] = ContactRecord(
@@ -333,11 +329,12 @@ class FakeContacts {
     }
   }
 
-  Future<ContactRecordOutput> deleteAttachment(
+  @override
+  Future<ContactRecordOutput> deleteAttachment({
     WrappedRootContactKey? wrappedRootContactKey,
-    String contactId,
-    AttachmentType attachmentType,
-  ) async {
+    required String contactId,
+    required AttachmentType attachmentType,
+  }) async {
     final existing = records[contactId]!;
     final updated = ContactRecord(
       id: existing.id,
@@ -357,11 +354,12 @@ class FakeContacts {
     return ContactRecordOutput(record: updated, wrappedRootContactKey: _key);
   }
 
-  Future<ContactDiffOutput> getDiff(
+  @override
+  Future<ContactDiffOutput> getDiff({
     WrappedRootContactKey? wrappedRootContactKey,
-    int sinceTime,
-    int limit,
-  ) async {
+    required int sinceTime,
+    required int limit,
+  }) async {
     lastWrappedRootContactKey = wrappedRootContactKey;
     diffSinceTimes.add(sinceTime);
     diffLimits.add(limit);
@@ -384,10 +382,11 @@ class FakeContacts {
     return ContactDiffOutput(records: first, wrappedRootContactKey: _key);
   }
 
-  Future<ProfilePictureOutput> getProfilePicture(
+  @override
+  Future<ProfilePictureOutput> getProfilePicture({
     WrappedRootContactKey? wrappedRootContactKey,
-    String contactId,
-  ) async {
+    required String contactId,
+  }) async {
     getProfilePictureCalls += 1;
     final picture = profilePictures[contactId];
     if (picture != null) {
@@ -400,12 +399,13 @@ class FakeContacts {
     );
   }
 
-  Future<ContactRecordOutput> setAttachment(
+  @override
+  Future<ContactRecordOutput> setAttachment({
     WrappedRootContactKey? wrappedRootContactKey,
-    String contactId,
-    AttachmentType attachmentType,
-    Uint8List attachmentBytes,
-  ) async {
+    required String contactId,
+    required AttachmentType attachmentType,
+    required List<int> attachmentBytes,
+  }) async {
     final existing = records[contactId]!;
     final updated = ContactRecord(
       id: existing.id,
@@ -418,16 +418,18 @@ class FakeContacts {
       updatedAt: existing.updatedAt + 1,
     );
     records[contactId] = updated;
-    attachments[nextAttachmentId] = attachmentBytes;
-    profilePictures[contactId] = attachmentBytes;
+    final bytes = Uint8List.fromList(attachmentBytes);
+    attachments[nextAttachmentId] = bytes;
+    profilePictures[contactId] = bytes;
     return ContactRecordOutput(record: updated, wrappedRootContactKey: _key);
   }
 
-  Future<ContactRecordOutput> updateContact(
+  @override
+  Future<ContactRecordOutput> updateContact({
     WrappedRootContactKey? wrappedRootContactKey,
-    String contactId,
-    ContactData data,
-  ) async {
+    required String contactId,
+    required ContactData data,
+  }) async {
     final existing = records[contactId]!;
     final updated = ContactRecord(
       id: existing.id,

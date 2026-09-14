@@ -2421,10 +2421,11 @@ name = "ente-cast-wasm"
 version = "0.0.0"
 dependencies = [
  "ente-cast",
- "ente-core",
  "ente-wasm-lib",
- "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.18",
+ "tsify",
  "wasm-bindgen",
 ]
 
@@ -2465,20 +2466,15 @@ dependencies = [
 name = "ente-contacts"
 version = "0.0.0"
 dependencies = [
- "ente-accounts",
  "ente-core",
  "ente-legacy",
  "ente-test-support",
- "hmac 0.13.0",
  "md-5 0.11.0",
  "mockito",
  "serde",
  "serde_json",
- "sha1 0.11.0",
  "thiserror 2.0.18",
  "tokio",
- "uuid",
- "zeroize",
 ]
 
 [[package]]
@@ -2566,11 +2562,12 @@ dependencies = [
 name = "ente-ensu-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-core",
  "ente-ensu-crypto",
  "ente-wasm-lib",
- "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.18",
+ "tsify",
  "wasm-bindgen",
 ]
 
@@ -2623,11 +2620,16 @@ version = "0.0.0"
 dependencies = [
  "ente-accounts",
  "ente-core",
+ "ente-test-support",
+ "hmac 0.13.0",
  "serde",
  "serde_json",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "thiserror 2.0.18",
+ "tokio",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -2637,7 +2639,6 @@ dependencies = [
  "ente-core",
  "ente-legacy",
  "ente-wasm-lib",
- "js-sys",
  "serde",
  "serde-wasm-bindgen",
  "thiserror 2.0.18",
@@ -2746,8 +2747,10 @@ dependencies = [
  "ente-core",
  "ente-paste",
  "ente-wasm-lib",
- "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror 2.0.18",
+ "tsify",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -2886,6 +2889,8 @@ name = "ente-test-support"
 version = "0.0.0"
 dependencies = [
  "dirs 5.0.1",
+ "ente-accounts",
+ "ente-core",
  "postgresql_embedded",
  "tokio",
  "uuid",

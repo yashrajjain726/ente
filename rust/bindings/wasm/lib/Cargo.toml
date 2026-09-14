@@ -3,14 +3,14 @@ name = "ente-wasm-lib"
 edition.workspace = true
 
 [features]
-accounts = ["dep:ente-accounts"]
+accounts = ["dep:ente-accounts", "dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
 collections = ["session", "dep:ente-collections"]
 contacts = [
     "session",
     "dep:ente-contacts",
     "dep:wasm-bindgen-futures",
 ]
-crypto = []
+crypto = ["dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
 crypto-file = ["crypto", "dep:md-5"]
 crypto-seal = ["crypto"]
 locker = ["session", "dep:ente-locker"]

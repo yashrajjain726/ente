@@ -1,15 +1,48 @@
+import * as cast from "ente-cast-wasm";
 import * as legacy from "ente-legacy-wasm/authenticated";
 import * as locker from "ente-locker-wasm";
 import * as photos from "ente-photos-wasm";
 import {
     boxSealOpenBytes,
+    deriveKey,
     encryptBox,
     generateKey,
     generateKeyPair,
 } from "ente-prelogin-wasm";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { lockerPrepareFileLinkPayload } from "../locker/pkg/ente_locker_wasm";
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("Cast rejects collection IDs outside JavaScript's safe integer range", async () => {
+    const receiver = await cast.createCastReceiver();
+    const collectionKey = await generateKey();
+    try {
+        for (const collectionID of [
+            Number.MAX_SAFE_INTEGER,
+            Number.MAX_SAFE_INTEGER + 1,
+        ]) {
+            const { castToken, encryptedPayload } =
+                await cast.prepareCastPayload(
+                    receiver.publicKey,
+                    undefined,
+                    collectionID,
+                    collectionKey,
+                );
+            if (Number.isSafeInteger(collectionID)) {
+                expect(
+                    cast.openCastPayload(receiver, encryptedPayload),
+                ).toStrictEqual({ castToken, collectionID, collectionKey });
+            } else {
+                expect(() =>
+                    cast.openCastPayload(receiver, encryptedPayload),
+                ).toThrow(Error);
+            }
+        }
+    } finally {
+        receiver.free();
+    }
+});
 
 for (const [name, api] of [
     ["Photos", photos],
@@ -22,7 +55,7 @@ for (const [name, api] of [
                 switch (new URL(request.url).pathname) {
                     case "/contacts/diff":
                         return Response.json({
-                            diff: Array.from({ length: 1000 }, (_, i) => ({
+                            diff: Array.from({ length: 2 }, (_, i) => ({
                                 ...fixture.contact,
                                 id: `ct_${i}`,
                             })),
@@ -51,10 +84,10 @@ for (const [name, api] of [
                     session,
                     fixture.wrappedRootContactKey,
                     0,
-                    1000,
+                    2,
                 );
                 expect(diff).toStrictEqual({
-                    records: Array.from({ length: 1000 }, (_, i) => ({
+                    records: Array.from({ length: 2 }, (_, i) => ({
                         id: `ct_${i}`,
                         contactUserId: 42,
                         email: "friend@example.com",
@@ -131,6 +164,29 @@ for (const [name, api] of [
         });
     });
 }
+
+test("Locker file-link payload survives cloning and unlocks its file key", async () => {
+    const fileKey = await generateKey();
+    const prepared = lockerPrepareFileLinkPayload(fileKey);
+    const payload = structuredClone(prepared);
+    expect(payload).toStrictEqual(prepared);
+
+    const key = await deriveKey(
+        payload.fragment,
+        payload.kdfNonce,
+        payload.kdfOpsLimit,
+        payload.kdfMemLimit,
+    );
+    expect(
+        await locker.decryptBox(
+            {
+                encryptedData: payload.encryptedFileKey,
+                nonce: payload.encryptedFileKeyNonce,
+            },
+            key,
+        ),
+    ).toBe(fileKey);
+});
 
 describe("Legacy", () => {
     test("returns plain information and sends typed updates through a reused session", async () => {

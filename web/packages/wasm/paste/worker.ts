@@ -1,5 +1,4 @@
 import { expose } from "comlink";
-import { readAndFree } from "ente-utils/wasm";
 import type { PasteClient as WasmPasteClient } from "./pkg/ente_paste_wasm";
 
 export class PasteWorker {
@@ -12,21 +11,11 @@ export class PasteWorker {
     }
 
     async create(pasteOrigin: string, text: string, password?: string) {
-        return readAndFree(
-            await (await this.client).create(pasteOrigin, text, password),
-            (paste) => ({
-                url: paste.url,
-                passwordRequired: paste.passwordRequired,
-            }),
-        );
+        return (await this.client).create(pasteOrigin, text, password);
     }
 
     async open(url: string) {
-        return readAndFree(await (await this.client).open(url), (paste) =>
-            paste.passwordRequired
-                ? { passwordRequired: true as const }
-                : { passwordRequired: false as const, text: paste.text! },
-        );
+        return (await this.client).open(url);
     }
 
     submitPassword = async (password: string) =>

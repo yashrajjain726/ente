@@ -1,15 +1,15 @@
 use crate::accounts::{Error as AccountsError, GeneratedKek};
 use ente_accounts::auth;
 use ente_core::{b64, crypto};
+use serde::Serialize;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct GeneratedSrpSetup {
-    #[wasm_bindgen(readonly, js_name = srpSalt)]
     pub srp_salt: String,
-    #[wasm_bindgen(readonly, js_name = srpVerifier)]
     pub srp_verifier: String,
-    #[wasm_bindgen(readonly, js_name = loginSubKey)]
     pub login_sub_key: String,
 }
 
@@ -32,23 +32,29 @@ pub fn auth_derive_srp_login_key(kek_b64: &str) -> Result<String, AccountsError>
 }
 
 #[wasm_bindgen(js_name = authGenerateSensitiveKek)]
-pub fn auth_generate_sensitive_kek(password: &str) -> Result<GeneratedKek, AccountsError> {
-    Ok(auth::generate_sensitive_kek(password)?.into())
+pub fn auth_generate_sensitive_kek(
+    password: &str,
+) -> Result<<GeneratedKek as Tsify>::JsType, AccountsError> {
+    GeneratedKek::from(auth::generate_sensitive_kek(password)?)
+        .into_js()
+        .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = authGenerateSrpSetup)]
 pub fn auth_generate_srp_setup(
     kek_b64: &str,
     srp_user_id: &str,
-) -> Result<GeneratedSrpSetup, AccountsError> {
+) -> Result<<GeneratedSrpSetup as Tsify>::JsType, AccountsError> {
     let kek =
         b64::decode(kek_b64).map_err(|e| ente_accounts::Error::Decode(format!("kek: {e}")))?;
     let generated = auth::generate_srp_setup(&kek, srp_user_id)?;
-    Ok(GeneratedSrpSetup {
+    GeneratedSrpSetup {
         srp_salt: b64::encode(&generated.srp_salt),
         srp_verifier: b64::encode(&generated.srp_verifier),
         login_sub_key: b64::encode(&generated.login_sub_key),
-    })
+    }
+    .into_js()
+    .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = authRecoveryKeyFromMnemonicOrHex)]
@@ -107,19 +113,21 @@ impl SrpSession {
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct CryptoKeyPair {
-    #[wasm_bindgen(readonly, js_name = publicKey)]
     pub public_key: String,
-    #[wasm_bindgen(readonly, js_name = privateKey)]
     pub private_key: String,
 }
 
 #[wasm_bindgen(js_name = cryptoGenerateKeyPair)]
-pub fn crypto_generate_key_pair() -> CryptoKeyPair {
+pub fn crypto_generate_key_pair() -> Result<<CryptoKeyPair as Tsify>::JsType, crate::crypto::Error>
+{
     let secret_key = crypto::SecretKey::generate();
     CryptoKeyPair {
         public_key: b64::encode(secret_key.public_key().as_bytes()),
         private_key: b64::encode(secret_key.as_bytes()),
     }
+    .into_js()
+    .map_err(Into::into)
 }

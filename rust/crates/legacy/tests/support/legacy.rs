@@ -8,11 +8,6 @@ use ente_legacy::{LegacyContactRecord, LegacyContactState, LegacyInfo, LegacyRec
 use crate::CLIENT_PACKAGE;
 use crate::support::auth::{self, TestAccount};
 
-pub struct LegacyPairState {
-    pub owner: TestAccount,
-    pub trusted: TestAccount,
-}
-
 pub struct LegacyPair {
     pub owner: TestAccount,
     pub trusted: TestAccount,
@@ -37,12 +32,11 @@ pub fn open_session(endpoint: &str, account: &TestAccount) -> Session {
     .unwrap()
 }
 
-pub async fn create_accepted_pair_state(
-    endpoint: &str,
-    recovery_notice_in_days: i32,
-) -> LegacyPairState {
+pub async fn create_accepted_pair(endpoint: &str, recovery_notice_in_days: i32) -> LegacyPair {
     let owner = auth::create_account_strict(endpoint, "legacy-owner", "LegacyOwner").await;
-    let trusted = auth::create_fixture_account(endpoint, "legacy-trusted").await;
+    let trusted = auth::create_fixture_account(endpoint, "legacy-trusted")
+        .await
+        .unwrap();
 
     let owner_session = open_session(endpoint, &owner);
     let trusted_session = open_session(endpoint, &trusted);
@@ -62,15 +56,6 @@ pub async fn create_accepted_pair_state(
     )
     .await
     .unwrap();
-
-    LegacyPairState { owner, trusted }
-}
-
-pub fn open_pair(endpoint: &str, state: &LegacyPairState) -> LegacyPair {
-    let owner = state.owner.clone();
-    let trusted = state.trusted.clone();
-    let owner_session = open_session(endpoint, &owner);
-    let trusted_session = open_session(endpoint, &trusted);
 
     LegacyPair {
         owner,

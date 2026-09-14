@@ -1,4 +1,7 @@
 use ente_core::{b64, crypto::Key};
+use serde::Serialize;
+use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::session::Session;
@@ -11,48 +14,43 @@ pub enum Error {
     Crypto(#[from] ente_core::crypto::Error),
     #[error(transparent)]
     Locker(#[from] ente_locker::Error),
-}
-
-impl Error {
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
 }
 
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        js_sys::Error::new(&error.message()).into()
+        crate::js_error(&error, None)
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct PreparedFileLinkPayload {
-    #[wasm_bindgen(readonly)]
-    pub fragment: String,
-    #[wasm_bindgen(readonly, js_name = encryptedFileKey)]
-    pub encrypted_file_key: String,
-    #[wasm_bindgen(readonly, js_name = encryptedFileKeyNonce)]
-    pub encrypted_file_key_nonce: String,
-    #[wasm_bindgen(readonly, js_name = kdfNonce)]
-    pub kdf_nonce: String,
-    #[wasm_bindgen(readonly, js_name = kdfMemLimit)]
-    pub kdf_mem_limit: u32,
-    #[wasm_bindgen(readonly, js_name = kdfOpsLimit)]
-    pub kdf_ops_limit: u32,
+    fragment: String,
+    encrypted_file_key: String,
+    encrypted_file_key_nonce: String,
+    kdf_nonce: String,
+    kdf_mem_limit: u32,
+    kdf_ops_limit: u32,
 }
 
 #[wasm_bindgen(js_name = lockerPrepareFileLinkPayload)]
-pub fn prepare_file_link_payload(file_key_b64: &str) -> Result<PreparedFileLinkPayload, Error> {
+pub fn prepare_file_link_payload(
+    file_key_b64: &str,
+) -> Result<<PreparedFileLinkPayload as Tsify>::JsType, Error> {
     let file_key = Key::try_from_slice(&b64::decode(file_key_b64)?)?;
     let (fragment, payload) = ente_locker::prepare_file_link_payload(&file_key)?;
-    Ok(PreparedFileLinkPayload {
+    PreparedFileLinkPayload {
         fragment,
         encrypted_file_key: payload.encrypted_file_key,
         encrypted_file_key_nonce: payload.encrypted_file_key_nonce,
         kdf_nonce: payload.kdf_nonce,
         kdf_mem_limit: payload.kdf_mem_limit,
         kdf_ops_limit: payload.kdf_ops_limit,
-    })
+    }
+    .into_js()
+    .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = lockerSealFileLinkSecret)]

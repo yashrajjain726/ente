@@ -6,11 +6,12 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-ente-core.workspace = true
 ente-ensu-crypto.workspace = true
 ente-wasm-lib.workspace = true
-js-sys.workspace = true
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
 thiserror.workspace = true
+tsify.workspace = true
 wasm-bindgen.workspace = true
 
 [lints]

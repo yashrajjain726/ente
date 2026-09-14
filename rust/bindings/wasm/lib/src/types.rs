@@ -1,12 +1,20 @@
 use ente_core::{b64, crypto};
-use wasm_bindgen::prelude::*;
+use serde::Serialize;
+use tsify::Tsify;
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct EncryptedBox {
-    #[wasm_bindgen(readonly, js_name = encryptedData)]
     pub encrypted_data: String,
-    #[wasm_bindgen(readonly)]
     pub nonce: String,
+}
+
+#[cfg(any(feature = "contacts", feature = "crypto-file"))]
+pub(crate) fn serialize_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_bytes(bytes)
 }
 
 impl From<crypto::secretbox::EncryptedBox> for EncryptedBox {
