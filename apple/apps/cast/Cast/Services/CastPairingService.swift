@@ -1,5 +1,8 @@
 import Foundation
+import OSLog
 import SwiftUI
+
+private let logger = Logger(subsystem: "io.ente.cast", category: "Pairing")
 
 @MainActor
 class CastSession: ObservableObject {
@@ -36,7 +39,7 @@ class CastSession: ObservableObject {
 
 @MainActor
 class RealCastPairingService {
-    private let baseURL = APIEndpoint.current.absoluteString
+    private let baseURL = APIEndpoint.current
     private var pollingTimer: Timer?
     private var isPolling: Bool = false
     private var isFetchingPayload: Bool = false
@@ -45,32 +48,18 @@ class RealCastPairingService {
     private let initialPollingInterval: TimeInterval = 2.0
     private let extendedPollingInterval: TimeInterval = 5.0
     private let pollingIntervalSwitchTime: TimeInterval = 60.0
-    private var hasLoggedIntervalSwitch: Bool = false
 
     private func getCurrentPollingInterval() -> TimeInterval {
         guard let startTime = pollingStartTime else { return initialPollingInterval }
         let elapsed = Date().timeIntervalSince(startTime)
-        let newInterval = elapsed >= pollingIntervalSwitchTime ? extendedPollingInterval :
-            initialPollingInterval
-
-        if elapsed >= pollingIntervalSwitchTime, newInterval == extendedPollingInterval,
-           !hasLoggedIntervalSwitch
-        {
-            print(
-                "Switched to extended polling interval (\(extendedPollingInterval)s) after \(Int(elapsed))s",
-            )
-            hasLoggedIntervalSwitch = true
-        }
-
-        return newInterval
+        return elapsed >= pollingIntervalSwitchTime
+            ? extendedPollingInterval : initialPollingInterval
     }
 
     func registerDevice() async throws -> CastDevice {
         let receiver = CastReceiver()
 
-        print("POST \(baseURL)/cast/device-info")
-
-        let url = URL(string: "\(baseURL)/cast/device-info")!
+        let url = baseURL.appendingPathComponent("cast/device-info")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -96,7 +85,7 @@ class RealCastPairingService {
 
         let deviceResponse = try JSONDecoder().decode(DeviceRegistrationResponse.self, from: data)
 
-        print("Device registered! Code from server: \(deviceResponse.deviceCode)")
+        logger.info("Device registered")
 
         return CastDevice(
             deviceCode: deviceResponse.deviceCode,
@@ -114,7 +103,6 @@ class RealCastPairingService {
         pollingTimer?.invalidate()
         isPolling = true
         pollingStartTime = Date()
-        hasLoggedIntervalSwitch = false
 
         scheduleNextPoll(device: device, onPayloadReceived: onPayloadReceived, onError: onError)
     }
@@ -127,7 +115,8 @@ class RealCastPairingService {
         guard isPolling, !hasDeliveredPayload else { return }
 
         let currentInterval = getCurrentPollingInterval()
-        pollingTimer = Timer
+        pollingTimer =
+            Timer
             .scheduledTimer(withTimeInterval: currentInterval, repeats: false) { [weak self] _ in
                 Task { @MainActor in
                     await self?.checkForPayload(
@@ -159,8 +148,7 @@ class RealCastPairingService {
         isFetchingPayload = true
         defer { isFetchingPayload = false }
         do {
-            let url = URL(string: "\(baseURL)/cast/cast-data/\(device.deviceCode)")!
-            print("GET \(url.absoluteString)")
+            let url = baseURL.appendingPathComponent("cast/cast-data/\(device.deviceCode)")
 
             let (data, response) = try await URLSession.shared.data(from: url)
 
@@ -194,7 +182,6 @@ class RealCastPairingService {
             onPayloadReceived(payload)
 
         } catch {
-            print("Polling error: \(error)")
             onError(error)
         }
     }

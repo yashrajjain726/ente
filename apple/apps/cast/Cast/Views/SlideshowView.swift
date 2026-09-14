@@ -1,5 +1,8 @@
+import OSLog
 import SwiftUI
 import UIKit
+
+private let logger = Logger(subsystem: "io.ente.cast", category: "SlideshowView")
 
 struct SlideshowView: View {
     let imageData: Data?
@@ -69,21 +72,23 @@ struct SlideshowView: View {
                         videoData: videoData,
                         suggestedFilename: slideshowService.currentFile?.title,
                     )
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 1.1).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity),
-                    ))
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 1.1).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity),
+                        ))
                 } else if isLivePhoto, isPlayingLivePhotoVideo,
-                          let liveVideoData = slideshowService.livePhotoVideoData
+                    let liveVideoData = slideshowService.livePhotoVideoData
                 {
                     VideoPlayerView(
                         videoData: liveVideoData,
                         suggestedFilename: slideshowService.currentFile?.title,
                     )
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 1.1).combined(with: .opacity),
-                        removal: .scale(scale: 0.9).combined(with: .opacity),
-                    ))
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 1.1).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity),
+                        ))
                 } else if let uiImage = mainUIImage {
                     ZStack {
                         if let prevImage = previousUIImage {
@@ -103,7 +108,7 @@ struct SlideshowView: View {
                             .opacity(imageOpacity)
                     }
                     .onAppear {
-                        animateImageIn(bytes: displayImageData?.count ?? 0, isLive: isLivePhoto)
+                        animateImageIn(bytes: displayImageData?.count ?? 0)
                     }
                     .onDisappear {
                         imageScale = 1.0
@@ -114,8 +119,9 @@ struct SlideshowView: View {
 
                 } else {
                     if let error = slideshowService.error,
-                       error.contains("No media files available") || error
-                       .contains("Empty file list")
+                        error.contains("No media files available")
+                            || error
+                                .contains("Empty file list")
                     {
                         EmptyState()
                     } else if slideshowService.totalSlides == 0, !slideshowService.isPlaying {
@@ -130,7 +136,7 @@ struct SlideshowView: View {
                 toastOverlay
             }
         }
-        .onChange(of: imageData) { newValue in
+        .onChange(of: imageData) { _, newValue in
             if let newData = newValue {
                 Task {
                     let decodedImage = decodedUIImage(from: newData)
@@ -150,7 +156,7 @@ struct SlideshowView: View {
                         }
 
                         displayImageData = newData
-                        animateImageIn(bytes: newData.count, isLive: isLivePhoto)
+                        animateImageIn(bytes: newData.count)
                     }
                 }
             }
@@ -183,7 +189,7 @@ struct SlideshowView: View {
                         imageOpacity = 1.0
                         previousImageOpacity = 0.0
                         displayImageData = initialImageData
-                        animateImageIn(bytes: initialImageData.count, isLive: isLivePhoto)
+                        animateImageIn(bytes: initialImageData.count)
                     }
                 }
             }
@@ -212,10 +218,11 @@ struct SlideshowView: View {
                 isPlaying: slideshowService.isPlaying,
                 isPaused: slideshowService.isPaused,
             )
-            .transition(.asymmetric(
-                insertion: .opacity.combined(with: .move(edge: .bottom)),
-                removal: .opacity,
-            ))
+            .transition(
+                .asymmetric(
+                    insertion: .opacity.combined(with: .move(edge: .bottom)),
+                    removal: .opacity,
+                ))
         }
     }
 
@@ -318,7 +325,6 @@ struct SlideshowView: View {
     private func decodedUIImage(from data: Data) -> UIImage? {
         imageDecodeFailed = false
         if let uiImage = UIImage(data: data) {
-            // Accessing cgImage forces decompression.
             if let cg = uiImage.cgImage {
                 return UIImage(
                     cgImage: cg,
@@ -329,12 +335,12 @@ struct SlideshowView: View {
             return uiImage
         } else {
             imageDecodeFailed = true
-            print("UIImage decode failed (bytes: \(data.count))")
+            logger.error("Image decoding failed (\(data.count) bytes)")
             return nil
         }
     }
 
-    private func animateImageIn(bytes: Int, isLive: Bool) {
+    private func animateImageIn(bytes: Int) {
         lastImageBytes = bytes
         imageScale = 1.0
 
@@ -342,8 +348,6 @@ struct SlideshowView: View {
             imageOpacity = 1.0
             previousImageOpacity = 0.0
         }
-
-        print("Displaying \(isLive ? "live" : "static") image (\(bytes) bytes)")
 
         Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
@@ -589,10 +593,11 @@ struct ActionFeedbackView: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.black.opacity(0.7))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(
-                    Color.white.opacity(0.2),
-                    lineWidth: 1,
-                )),
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16).stroke(
+                        Color.white.opacity(0.2),
+                        lineWidth: 1,
+                    )),
         )
         .transition(.scale.combined(with: .opacity))
     }
@@ -626,38 +631,14 @@ struct AppleStyleToast: View {
     }
 }
 
-class MockSlideshowService: ObservableObject {
-    @Published var currentFile: (title: String, isLivePhoto: Bool)? = (
-        title: "Sample Image",
-        isLivePhoto: false,
-    )
-    @Published var isPlaying: Bool = true
-    @Published var isPaused: Bool = false
-    @Published var livePhotoVideoData: Data? = nil
-
-    func togglePlayPause() {
-        isPaused.toggle()
-    }
-
-    func nextSlide() async {}
-    func previousSlide() async {}
-    func pause() {
-        isPaused = true
-    }
-
-    func resume() {
-        isPaused = false
-    }
-}
-
 #Preview {
     struct PreviewWrapper: View {
-        @StateObject private var slideshowService = MockSlideshowService()
+        @StateObject private var slideshowService = RealSlideshowService()
 
         var body: some View {
             SlideshowView(
                 imageData: nil,
-                slideshowService: slideshowService as! RealSlideshowService,
+                slideshowService: slideshowService,
             )
         }
     }

@@ -48,6 +48,10 @@ test("path filters cover root files, nested files, and dotfiles", (t) => {
         "Cargo.lock",
         "rust/Cargo.lock",
         "rust/.config/Cargo.lock",
+        "Package.resolved",
+        "Package.swift",
+        "apple/Package.resolved",
+        "apple/Package.swift",
     ]) {
         assert.ok(select(t, [file]).includes("dependency-review"), file);
     }

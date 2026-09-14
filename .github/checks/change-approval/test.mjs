@@ -595,6 +595,10 @@ test("existing guardrails modified or deleted", (t) => {
         {
             ".github/scripts/x.mjs": "",
             ".github/workflows/x.yml": "on: push\n",
+            "apple/.swift-format": "{}\n",
+            "apple/.swiftlint.yml": "only_rules: []\n",
+            "apple/Package.swift": "// swift-tools-version: 6.0\n",
+            "apple/scripts/lint.sh": "swift format lint --strict\n",
             "mobile/checks/x/check.rb": "",
             "rust/checks/x/check.py": "",
             "web/apps/x/eslint.config.mjs": "",
@@ -603,6 +607,10 @@ test("existing guardrails modified or deleted", (t) => {
         {
             ".github/scripts/x.mjs": "export {};\n",
             ".github/workflows/x.yml": "on: pull_request\n",
+            "apple/.swift-format": null,
+            "apple/.swiftlint.yml": "only_rules: [empty_count]\n",
+            "apple/Package.swift": "// swift-tools-version: 6.1\n",
+            "apple/scripts/lint.sh": "swift format lint\n",
             "mobile/checks/x/check.rb": "\n",
             "rust/checks/x/check.py": "\n",
             "web/apps/x/eslint.config.mjs": null,
@@ -612,7 +620,7 @@ test("existing guardrails modified or deleted", (t) => {
     );
     assert.equal(
         output,
-        "6 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
+        "10 guardrail files\n\n## Guardrail changes\n\n- `.github/scripts/x.mjs`\n- `.github/workflows/x.yml`\n- `apple/.swift-format`\n- `apple/.swiftlint.yml`\n- `apple/Package.swift`\n- `apple/scripts/lint.sh`\n- `mobile/checks/x/check.rb`\n- `rust/checks/x/check.py`\n- `web/apps/x/eslint.config.mjs`\n- `web/checks/x/check.mjs`\n\n",
     );
 });
 
@@ -628,6 +636,24 @@ test("new GitHub workflows, actions and policies need approval", (t) => {
     for (const file of Object.keys(files))
         assert.ok(summary.includes(`\`${file}\``));
     assert.match(scan(t, {}, files, { commit: false }), /^3 guardrail files\n/);
+});
+
+test("new lint and formatter configs need approval, including untracked files", (t) => {
+    const files = {
+        ".github/checks/new/.prettierrc.json": "{}\n",
+        "apple/apps/cast/.swift-format": "{}\n",
+        "apple/apps/cast/.swiftlint.yml": "only_rules: []\n",
+        "rust/crates/example/.rustfmt.toml": "max_width = 120\n",
+        "rust/rustfmt.toml": "max_width = 120\n",
+        "web/apps/photos/nested/.prettierrc.json": "{}\n",
+        "web/apps/photos/nested/eslint.config.mjs": "export default [];\n",
+    };
+    const { output, summary } = scan(t, {}, files, { ci: true });
+    assert.equal(output, 'categories=["guardrail files"]\n');
+    assert.match(summary, /^7 guardrail files\n/);
+    for (const file of Object.keys(files))
+        assert.ok(summary.includes(`\`${file}\``));
+    assert.match(scan(t, {}, files, { commit: false }), /^7 guardrail files\n/);
 });
 
 test("toolchain and registry config added, modified, or deleted", (t) => {
@@ -1042,6 +1068,42 @@ test("new Web directives are checked in uncommitted and untracked files", (t) =>
             scan(t, base, { "web/example.ts": source }, { commit: false }),
             /^1 Web lint policy file\n/,
         );
+});
+
+test("Swift lint directives in added lines need approval", (t) => {
+    const file = "apple/apps/cast/Example.swift";
+    for (const directive of [
+        "// swift-format-ignore",
+        "// swift-format-ignore: NeverForceUnwrap",
+        "// swift-format-ignore-file",
+        "// swiftlint:disable:next empty_count",
+        "// swiftlint:enable empty_count",
+    ]) {
+        const { output, summary } = scan(
+            t,
+            { [file]: "first()\n" },
+            { [file]: `${directive}\nfirst()\n` },
+            { ci: true },
+        );
+        assert.equal(output, 'categories=["Swift lint policy files"]\n');
+        assert.match(summary, /## Swift lint directives/);
+        assert.ok(summary.includes(`\`${file}\``));
+    }
+});
+
+test("Swift directive edits need approval; ordinary edits and removals do not", (t) => {
+    const file = "apple/apps/cast/Example.swift";
+    const before = "// swift-format-ignore: NeverForceUnwrap\nfirst()\n";
+    assert.match(
+        scan(
+            t,
+            { [file]: before },
+            { [file]: before.replace(": NeverForceUnwrap", "") },
+        ),
+        /^1 Swift lint policy file\n/,
+    );
+    for (const after of [before.replace("first", "second"), "first()\n", null])
+        assert.equal(scan(t, { [file]: before }, { [file]: after }), "");
 });
 
 test("checks started in a subdirectory inspect repository-wide changes", (t) => {

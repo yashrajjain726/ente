@@ -13,9 +13,7 @@ actor ThreadSafeFileCache {
         self.maxBytes = maxBytes
         self.shrinkTargetBytes = shrinkTargetBytes
 
-        let documentsPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
-            .first!
-        cacheDirectory = documentsPath.appendingPathComponent("EnteFileCache")
+        cacheDirectory = URL.cachesDirectory.appendingPathComponent("EnteFileCache")
         metadataURL = cacheDirectory.appendingPathComponent("cache_metadata.json")
 
         try? FileManager.default.createDirectory(
@@ -24,12 +22,10 @@ actor ThreadSafeFileCache {
         )
 
         guard let metadataData = try? Data(contentsOf: metadataURL),
-              let metadata = try? JSONDecoder().decode(CacheMetadata.self, from: metadataData)
+            let metadata = try? JSONDecoder().decode(CacheMetadata.self, from: metadataData)
         else {
             return
         }
-
-        print("Loading existing cache from disk - \(metadata.fileIDs.count) files")
 
         var loadedBytes = 0
         var validFileIDs: [Int] = []
@@ -38,7 +34,7 @@ actor ThreadSafeFileCache {
             let fileURL = cacheDirectory.appendingPathComponent("\(fileID).cache")
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
-                   let fileSize = attributes[.size] as? Int
+                    let fileSize = attributes[.size] as? Int
                 {
                     loadedBytes += fileSize
                     validFileIDs.append(fileID)
@@ -48,8 +44,6 @@ actor ThreadSafeFileCache {
 
         cacheOrder = validFileIDs
         totalBytes = loadedBytes
-
-        print("Loaded \(validFileIDs.count) cached files (\(loadedBytes) bytes) from disk")
 
         if validFileIDs.count != metadata.fileIDs.count {
             let metadata = CacheMetadata(fileIDs: cacheOrder, totalBytes: totalBytes)
@@ -93,10 +87,6 @@ actor ThreadSafeFileCache {
         enforceLimits()
 
         saveCacheMetadata()
-
-        print(
-            "Cached file \(fileID) content (\(data.count) bytes) - Cache size: \(cache.count) files",
-        )
     }
 
     func remove(_ fileID: Int) {
@@ -108,13 +98,10 @@ actor ThreadSafeFileCache {
             try? FileManager.default.removeItem(at: fileURL)
 
             saveCacheMetadata()
-
-            print("Removed cached content for file \(fileID) (\(removedData.count) bytes)")
         }
     }
 
     func clear() {
-        let clearedCount = cache.count
         cache.removeAll()
         cacheOrder.removeAll()
         totalBytes = 0
@@ -126,12 +113,6 @@ actor ThreadSafeFileCache {
         )
 
         try? FileManager.default.removeItem(at: metadataURL)
-
-        print("Cleared file content cache (\(clearedCount) files)")
-    }
-
-    func getStats() -> (count: Int, totalSize: Int) {
-        (count: cache.count, totalSize: totalBytes)
     }
 
     func getCachedFileIDs() -> [Int] {
@@ -149,15 +130,11 @@ actor ThreadSafeFileCache {
 
                 let fileURL = cacheDirectory.appendingPathComponent("\(oldest).cache")
                 try? FileManager.default.removeItem(at: fileURL)
-
-                print("Evicted file \(oldest) (\(data.count) bytes) to control cache size")
             }
         }
         totalBytes -= removedBytes
 
         saveCacheMetadata()
-
-        print("Cache GC complete: now \(cache.count) files, \(totalBytes) bytes")
     }
 
     private func saveCacheMetadata() {

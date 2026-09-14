@@ -1,7 +1,10 @@
 import AVFoundation
 import AVKit
+import OSLog
 import SwiftUI
 import UIKit
+
+private let logger = Logger(subsystem: "io.ente.cast", category: "VideoPlayer")
 
 struct VideoPlayerView: View {
     let videoData: Data
@@ -12,6 +15,7 @@ struct VideoPlayerView: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var toastIcon = ""
+    @State private var playerObservers: [NSObjectProtocol] = []
 
     init(videoData: Data, suggestedFilename: String? = nil) {
         self.videoData = videoData
@@ -35,11 +39,14 @@ struct VideoPlayerView: View {
             } else {
                 VStack(spacing: 24) {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Color(
-                            red: 29 / 255,
-                            green: 185 / 255,
-                            blue: 84 / 255,
-                        )))
+                        .progressViewStyle(
+                            CircularProgressViewStyle(
+                                tint: Color(
+                                    red: 29 / 255,
+                                    green: 185 / 255,
+                                    blue: 84 / 255,
+                                ))
+                        )
                         .scaleEffect(2.0)
 
                     Text("Loading video...")
@@ -67,33 +74,27 @@ struct VideoPlayerView: View {
                     suggestedExtension: suggestedExtension,
                 )
 
-                await MainActor.run {
-                    let asset = AVURLAsset(url: tempURL)
+                let asset = AVURLAsset(url: tempURL)
+                let isPlayable = try await asset.load(.isPlayable)
+                let hasVideoTracks = try await !asset.loadTracks(withMediaType: .video).isEmpty
 
-                    Task {
-                        let isPlayable = try await asset.load(.isPlayable)
-                        let hasVideoTracks = try await !asset.loadTracks(withMediaType: .video)
-                            .isEmpty
+                if isPlayable, hasVideoTracks {
+                    let playerItem = AVPlayerItem(url: tempURL)
+                    let player = AVPlayer(playerItem: playerItem)
 
-                        await MainActor.run {
-                            if isPlayable, hasVideoTracks {
-                                let playerItem = AVPlayerItem(url: tempURL)
-                                let player = AVPlayer(playerItem: playerItem)
+                    monitorPlayerItemStatus(playerItem)
 
-                                monitorPlayerItemStatus(playerItem)
+                    self.playerItem = playerItem
+                    self.player = player
 
-                                self.playerItem = playerItem
-                                self.player = player
-
-                                setupPlayer()
-                            } else {
-                                tryVideoFallback(originalURL: tempURL)
-                            }
-                        }
-                    }
+                    setupPlayer()
+                } else {
+                    tryVideoFallback(originalURL: tempURL)
                 }
             } catch {
-                print("Failed to setup video player: \(error)")
+                logger.error(
+                    "Failed to set up video player: \(error.localizedDescription, privacy: .public)"
+                )
                 await MainActor.run {
                     showErrorState()
                 }
@@ -117,7 +118,8 @@ struct VideoPlayerView: View {
                     setupPlayer()
                 }
             } catch {
-                print("Video fallback also failed: \(error)")
+                logger.error(
+                    "Video fallback failed: \(error.localizedDescription, privacy: .public)")
                 showErrorState()
             }
         }
@@ -132,8 +134,8 @@ struct VideoPlayerView: View {
                 timer.invalidate()
             case .failed:
                 if let error = playerItem.error {
-                    print("Video player failed with error: \(error)")
-                    print("Error details: \(error.localizedDescription)")
+                    logger.error(
+                        "Video player failed: \(error.localizedDescription, privacy: .public)")
                 }
                 timer.invalidate()
                 Task { @MainActor in
@@ -157,7 +159,8 @@ struct VideoPlayerView: View {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("Failed to set audio session: \(error)")
+            logger.error(
+                "Failed to set up audio session: \(error.localizedDescription, privacy: .public)")
         }
 
         setupPlayerObservers()
@@ -168,8 +171,9 @@ struct VideoPlayerView: View {
 
     private func setupPlayerObservers() {
         guard let player, let currentItem = player.currentItem else { return }
+        removePlayerObservers()
 
-        NotificationCenter.default.addObserver(
+        let playbackEnded = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: currentItem,
             queue: .main,
@@ -178,7 +182,7 @@ struct VideoPlayerView: View {
             player.play()
         }
 
-        NotificationCenter.default.addObserver(
+        let playbackFailed = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime,
             object: currentItem,
             queue: .main,
@@ -186,11 +190,12 @@ struct VideoPlayerView: View {
             if let error = notification
                 .userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             {
-                print("Video playback failed: \(error)")
+                logger.error(
+                    "Video playback failed: \(error.localizedDescription, privacy: .public)")
             }
         }
 
-        NotificationCenter.default.addObserver(
+        let willResignActive = NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification,
             object: nil,
             queue: .main,
@@ -198,7 +203,7 @@ struct VideoPlayerView: View {
             player.pause()
         }
 
-        NotificationCenter.default.addObserver(
+        let didBecomeActive = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main,
@@ -209,14 +214,17 @@ struct VideoPlayerView: View {
                 }
             }
         }
+        playerObservers = [playbackEnded, playbackFailed, willResignActive, didBecomeActive]
     }
 
-    private func createTemporaryVideoFile(from data: Data,
-                                          suggestedExtension: String? = nil) async throws -> URL
-    {
+    private func createTemporaryVideoFile(
+        from data: Data,
+        suggestedExtension: String? = nil
+    ) async throws -> URL {
         let tempDirectory = FileManager.default.temporaryDirectory
         let fileExtension = detectVideoExtension(from: data) ?? suggestedExtension ?? "mp4"
-        let tempURL = tempDirectory
+        let tempURL =
+            tempDirectory
             .appendingPathComponent("cast_video_\(UUID().uuidString).\(fileExtension)")
 
         try data.write(to: tempURL)
@@ -235,13 +243,12 @@ struct VideoPlayerView: View {
         if headerBytes.count >= 4 {
             let signature = headerBytes.prefix(4)
 
-            // MP4/MOV formats (most compatible with AVPlayer)
             if headerBytes.count >= 12 {
-                let ftyp = headerBytes.subdata(in: 4 ..< 8)
+                let ftyp = headerBytes.subdata(in: 4..<8)
                 if ftyp == Data("ftyp".utf8) {
-                    let brand = headerBytes.subdata(in: 8 ..< 12)
-                    if brand == Data("mp41".utf8) || brand == Data("mp42".utf8) ||
-                        brand == Data("isom".utf8) || brand == Data("M4V ".utf8)
+                    let brand = headerBytes.subdata(in: 8..<12)
+                    if brand == Data("mp41".utf8) || brand == Data("mp42".utf8)
+                        || brand == Data("isom".utf8) || brand == Data("M4V ".utf8)
                     {
                         return "mp4"
                     } else if brand == Data("qt  ".utf8) {
@@ -250,29 +257,25 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Check for H.264 NAL units (common in MP4)
             if headerBytes.count >= 4 {
                 if signature[0] == 0x00, signature[1] == 0x00, signature[2] == 0x00,
-                   signature[3] == 0x01
+                    signature[3] == 0x01
                 {
                     return "mp4"
                 }
             }
 
-            // AVI format (less compatible with tvOS)
             if signature == Data("RIFF".utf8), headerBytes.count >= 12 {
-                let aviSignature = headerBytes.subdata(in: 8 ..< 12)
+                let aviSignature = headerBytes.subdata(in: 8..<12)
                 if aviSignature == Data("AVI ".utf8) {
                     return "avi"
                 }
             }
 
-            // WebM format (limited support on tvOS)
             if signature == Data([0x1A, 0x45, 0xDF, 0xA3]) {
                 return "webm"
             }
 
-            // MKV format
             if signature == Data([0x1A, 0x45, 0xDF, 0xA3]) {
                 return "mkv"
             }
@@ -281,29 +284,16 @@ struct VideoPlayerView: View {
         return "mp4"
     }
 
+    private func removePlayerObservers() {
+        for observer in playerObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        playerObservers.removeAll()
+    }
+
     private func cleanup() {
         player?.pause()
-
-        NotificationCenter.default.removeObserver(
-            self,
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: nil,
-        )
-        NotificationCenter.default.removeObserver(
-            self,
-            name: .AVPlayerItemFailedToPlayToEndTime,
-            object: nil,
-        )
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIApplication.willResignActiveNotification,
-            object: nil,
-        )
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIApplication.didBecomeActiveNotification,
-            object: nil,
-        )
+        removePlayerObservers()
 
         do {
             try AVAudioSession.sharedInstance().setActive(
@@ -311,7 +301,9 @@ struct VideoPlayerView: View {
                 options: .notifyOthersOnDeactivation,
             )
         } catch {
-            print("Failed to deactivate audio session: \(error)")
+            logger.error(
+                "Failed to deactivate audio session: \(error.localizedDescription, privacy: .public)"
+            )
         }
 
         player = nil
