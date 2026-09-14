@@ -1,5 +1,8 @@
+import OSLog
 import SwiftUI
 import UIKit
+
+private let logger = Logger(subsystem: "io.ente.cast", category: "SlideshowView")
 
 struct SlideshowView: View {
     let imageData: Data?
@@ -105,7 +108,7 @@ struct SlideshowView: View {
                             .opacity(imageOpacity)
                     }
                     .onAppear {
-                        animateImageIn(bytes: displayImageData?.count ?? 0, isLive: isLivePhoto)
+                        animateImageIn(bytes: displayImageData?.count ?? 0)
                     }
                     .onDisappear {
                         imageScale = 1.0
@@ -153,7 +156,7 @@ struct SlideshowView: View {
                         }
 
                         displayImageData = newData
-                        animateImageIn(bytes: newData.count, isLive: isLivePhoto)
+                        animateImageIn(bytes: newData.count)
                     }
                 }
             }
@@ -186,7 +189,7 @@ struct SlideshowView: View {
                         imageOpacity = 1.0
                         previousImageOpacity = 0.0
                         displayImageData = initialImageData
-                        animateImageIn(bytes: initialImageData.count, isLive: isLivePhoto)
+                        animateImageIn(bytes: initialImageData.count)
                     }
                 }
             }
@@ -322,7 +325,6 @@ struct SlideshowView: View {
     private func decodedUIImage(from data: Data) -> UIImage? {
         imageDecodeFailed = false
         if let uiImage = UIImage(data: data) {
-            // Accessing cgImage forces decompression.
             if let cg = uiImage.cgImage {
                 return UIImage(
                     cgImage: cg,
@@ -333,12 +335,12 @@ struct SlideshowView: View {
             return uiImage
         } else {
             imageDecodeFailed = true
-            print("UIImage decode failed (bytes: \(data.count))")
+            logger.error("Image decoding failed (\(data.count) bytes)")
             return nil
         }
     }
 
-    private func animateImageIn(bytes: Int, isLive: Bool) {
+    private func animateImageIn(bytes: Int) {
         lastImageBytes = bytes
         imageScale = 1.0
 
@@ -346,8 +348,6 @@ struct SlideshowView: View {
             imageOpacity = 1.0
             previousImageOpacity = 0.0
         }
-
-        print("Displaying \(isLive ? "live" : "static") image (\(bytes) bytes)")
 
         Task {
             try? await Task.sleep(nanoseconds: 300_000_000)

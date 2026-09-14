@@ -1,6 +1,9 @@
 import Combine
+import OSLog
 import SwiftUI
 import UIKit
+
+private let logger = Logger(subsystem: "io.ente.cast", category: "Session")
 
 @MainActor
 class CastViewModel: ObservableObject {
@@ -291,7 +294,7 @@ class CastViewModel: ObservableObject {
     }
 
     private func handleError(_ message: String) {
-        print("Cast Error: \(message)")
+        logger.error("Cast session failed: \(message)")
         currentView = .error
         errorMessage = message
         statusMessage = ""

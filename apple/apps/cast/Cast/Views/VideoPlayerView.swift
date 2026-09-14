@@ -1,7 +1,10 @@
 import AVFoundation
 import AVKit
+import OSLog
 import SwiftUI
 import UIKit
+
+private let logger = Logger(subsystem: "io.ente.cast", category: "VideoPlayer")
 
 struct VideoPlayerView: View {
     let videoData: Data
@@ -89,7 +92,7 @@ struct VideoPlayerView: View {
                     tryVideoFallback(originalURL: tempURL)
                 }
             } catch {
-                print("Failed to setup video player: \(error)")
+                logger.error("Failed to set up video player: \(error.localizedDescription)")
                 await MainActor.run {
                     showErrorState()
                 }
@@ -113,7 +116,7 @@ struct VideoPlayerView: View {
                     setupPlayer()
                 }
             } catch {
-                print("Video fallback also failed: \(error)")
+                logger.error("Video fallback failed: \(error.localizedDescription)")
                 showErrorState()
             }
         }
@@ -128,8 +131,7 @@ struct VideoPlayerView: View {
                 timer.invalidate()
             case .failed:
                 if let error = playerItem.error {
-                    print("Video player failed with error: \(error)")
-                    print("Error details: \(error.localizedDescription)")
+                    logger.error("Video player failed: \(error.localizedDescription)")
                 }
                 timer.invalidate()
                 Task { @MainActor in
@@ -153,7 +155,7 @@ struct VideoPlayerView: View {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("Failed to set audio session: \(error)")
+            logger.error("Failed to set up audio session: \(error.localizedDescription)")
         }
 
         setupPlayerObservers()
@@ -183,7 +185,7 @@ struct VideoPlayerView: View {
             if let error = notification
                 .userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             {
-                print("Video playback failed: \(error)")
+                logger.error("Video playback failed: \(error.localizedDescription)")
             }
         }
 
@@ -235,7 +237,6 @@ struct VideoPlayerView: View {
         if headerBytes.count >= 4 {
             let signature = headerBytes.prefix(4)
 
-            // MP4/MOV formats (most compatible with AVPlayer)
             if headerBytes.count >= 12 {
                 let ftyp = headerBytes.subdata(in: 4..<8)
                 if ftyp == Data("ftyp".utf8) {
@@ -250,7 +251,6 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Check for H.264 NAL units (common in MP4)
             if headerBytes.count >= 4 {
                 if signature[0] == 0x00, signature[1] == 0x00, signature[2] == 0x00,
                     signature[3] == 0x01
@@ -259,7 +259,6 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // AVI format (less compatible with tvOS)
             if signature == Data("RIFF".utf8), headerBytes.count >= 12 {
                 let aviSignature = headerBytes.subdata(in: 8..<12)
                 if aviSignature == Data("AVI ".utf8) {
@@ -267,12 +266,10 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // WebM format (limited support on tvOS)
             if signature == Data([0x1A, 0x45, 0xDF, 0xA3]) {
                 return "webm"
             }
 
-            // MKV format
             if signature == Data([0x1A, 0x45, 0xDF, 0xA3]) {
                 return "mkv"
             }
@@ -298,7 +295,7 @@ struct VideoPlayerView: View {
                 options: .notifyOthersOnDeactivation,
             )
         } catch {
-            print("Failed to deactivate audio session: \(error)")
+            logger.error("Failed to deactivate audio session: \(error.localizedDescription)")
         }
 
         player = nil

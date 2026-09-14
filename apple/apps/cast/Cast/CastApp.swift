@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 
 @main
@@ -14,13 +15,16 @@ struct CastApp: App {
 }
 
 private final class CastRustLogSink: RustLogSink, @unchecked Sendable {
+    private let logger = Logger(subsystem: "io.ente.cast", category: "Rust")
+
     func log(level: RustLogLevel, target: String, message: String) {
-        let levelName =
-            switch level {
-            case .error: "error"
-            case .warn: "warn"
-            case .info: "info"
-            }
-        print("[\(levelName)][rust][\(target)] \(message)")
+        switch level {
+        case .error:
+            logger.error("[\(target)] \(message)")
+        case .warn:
+            logger.warning("[\(target)] \(message)")
+        case .info:
+            logger.info("[\(target)] \(message)")
+        }
     }
 }
