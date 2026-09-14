@@ -2702,7 +2702,6 @@ dependencies = [
  "tokio",
  "url",
  "usearch",
- "wide",
 ]
 
 [[package]]
