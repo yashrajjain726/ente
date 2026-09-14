@@ -52,7 +52,8 @@ function wasmPaths() {
     for (const path of globSync("web/packages/wasm/*/package.json", {
         cwd: root,
     })) {
-        const { name } = readJSON(resolve(root, path));
+        const { name, scripts } = readJSON(resolve(root, path));
+        if (!scripts?.build) continue;
         const pkg = byName.get(name);
         if (!pkg)
             throw new Error(`${path}: no matching Cargo package for ${name}`);
