@@ -18,6 +18,8 @@ Future<void> openAllMemoriesPage({
   required int initialPageIndex,
   MemoryLanePersonTimeline? memoryLane,
   PersonEntity? memoryLanePerson,
+  bool isFromMemoriesStrip = false,
+  bool isMemoryLaneSeen = false,
   BuildContext? context,
   int initialFileIndex = 0,
   bool isFromWidgetOrNotifications = false,
@@ -26,6 +28,8 @@ Future<void> openAllMemoriesPage({
     allMemories: allMemories,
     memoryLane: memoryLane,
     memoryLanePerson: memoryLanePerson,
+    isFromMemoriesStrip: isFromMemoriesStrip,
+    isMemoryLaneSeen: isMemoryLaneSeen,
     initialPageIndex: initialPageIndex,
     initialFileIndex: initialFileIndex,
     isFromWidgetOrNotifications: isFromWidgetOrNotifications,
@@ -57,6 +61,8 @@ class AllMemoriesPage extends StatefulWidget {
   final List<SmartMemory> allMemories;
   final MemoryLanePersonTimeline? memoryLane;
   final PersonEntity? memoryLanePerson;
+  final bool isFromMemoriesStrip;
+  final bool isMemoryLaneSeen;
   final bool isFromWidgetOrNotifications;
 
   const AllMemoriesPage({
@@ -65,6 +71,8 @@ class AllMemoriesPage extends StatefulWidget {
     required this.initialPageIndex,
     this.memoryLane,
     this.memoryLanePerson,
+    this.isFromMemoriesStrip = false,
+    this.isMemoryLaneSeen = false,
     this.initialFileIndex = 0,
     this.isFromWidgetOrNotifications = false,
   });
@@ -102,7 +110,9 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
     final memoryLane = widget.memoryLane;
     final hasSeenMemoryLane =
         memoryLane != null &&
-        localSettings.hasSeenMemoryLane(memoryLane.personId);
+        (widget.isFromMemoriesStrip
+            ? widget.isMemoryLaneSeen
+            : localSettings.hasSeenMemoryLane(memoryLane.personId));
     final pages = <MemoryPageWrapper>[];
     for (final smartMemory in widget.allMemories) {
       if (smartMemory.memories.isEmpty) continue;
@@ -151,6 +161,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
             personId: memoryLane.personId,
             isCluster: memoryLane.isCluster,
             person: widget.memoryLanePerson,
+            isFromMemoriesStrip: widget.isFromMemoriesStrip,
             isActive:
                 _pages[_activePageIndex].id ==
                 "memoryLane_${memoryLane.personId}",

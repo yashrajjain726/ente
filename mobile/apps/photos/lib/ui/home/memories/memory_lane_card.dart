@@ -4,11 +4,11 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/theme/colors.dart";
 import "package:flutter/material.dart";
-import "package:photos/service_locator.dart";
 import "package:photos/ui/home/memories/memory_card_constants.dart";
 
 class MemoryLaneCardWidget extends StatelessWidget {
   final String personId;
+  final bool isSeen;
   final Uint8List oldestFace;
   final Uint8List face;
   final String personName;
@@ -17,6 +17,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
 
   const MemoryLaneCardWidget({
     required this.personId,
+    required this.isSeen,
     required this.oldestFace,
     required this.face,
     required this.personName,
@@ -42,7 +43,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
         child: Container(
           width: size.width,
           height: size.height,
-          foregroundDecoration: localSettings.hasSeenMemoryLane(personId)
+          foregroundDecoration: isSeen
               ? const BoxDecoration(
                   color: Color(0xFFBFBFBF),
                   backgroundBlendMode: BlendMode.saturation,
@@ -102,9 +103,7 @@ class MemoryLaneCardWidget extends StatelessWidget {
                       inherit: false,
                       height: 16 / 14,
                       fontFamily: TextStyles.outfitFontFamily,
-                      color: localSettings.hasSeenMemoryLane(personId)
-                          ? textFaintDark
-                          : Colors.white,
+                      color: isSeen ? textFaintDark : Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
                     textAlign: TextAlign.left,
