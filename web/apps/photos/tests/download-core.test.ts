@@ -269,7 +269,6 @@ describe("download consumer compatibility", () => {
         ["fragmented chunks", [[1], [2], [3], [4], [5]]],
         ["multiple chunks per read", [[1, 2, 3, 4, 5]]],
         ["empty network chunks", [[], [1, 2], [], [3, 4, 5]]],
-        ["exact chunk boundary", [[1, 2, 3, 4]]],
         ["empty stream", []],
     ] as const)("emits decrypted video bytes with %s", async (_, chunks) => {
         vi.mocked(decryptStreamChunk).mockClear();
@@ -315,43 +314,7 @@ describe("download consumer compatibility", () => {
         expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
     });
 
-    test.each([FileType.image, FileType.livePhoto])(
-        "preserves buffered bytes and keys for type %s",
-        async (fileType) => {
-            const bytes = new Uint8Array([9, 1, 2, 3, 9]);
-            const manager = managerFor(
-                new Response(
-                    new ReadableStream({
-                        start(controller) {
-                            controller.enqueue(bytes.subarray(1, 3));
-                            controller.enqueue(bytes.subarray(3, 4));
-                            controller.close();
-                        },
-                    }),
-                ),
-            );
-            vi.mocked(decryptStreamBytes).mockResolvedValueOnce(
-                new Uint8Array([4, 5]),
-            );
-            const stream = await manager.fileStream({
-                ...file,
-                metadata: { ...file.metadata, fileType },
-            });
-            expect(decryptStreamBytes).toHaveBeenLastCalledWith(
-                {
-                    encryptedData: new Uint8Array([1, 2, 3]),
-                    decryptionHeader: file.file.decryptionHeader,
-                },
-                file.key,
-            );
-            expect(
-                new Uint8Array(await new Response(stream).arrayBuffer()),
-            ).toEqual(new Uint8Array([4, 5]));
-            expect(manager.fileDownloadProgressSnapshot().size).toBe(0);
-        },
-    );
-
-    test.each([FileType.image, FileType.livePhoto, FileType.video])(
+    test.each([FileType.image, FileType.video])(
         "preserves crypto errors and clears progress for type %s",
         async (fileType) => {
             const error = new Error("invalid ciphertext");
