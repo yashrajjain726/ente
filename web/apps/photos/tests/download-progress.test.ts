@@ -69,10 +69,28 @@ describe("downloadProgressState", () => {
             precentage: undefined,
             loaded: 30,
         });
-        expect(downloadProgressState(loading, undefined, state)).toEqual({
+        const completed = downloadProgressState(
+            loading,
+            { loaded: 30, total: 30 },
+            state,
+        );
+        expect(downloadProgressState(loading, undefined, completed)).toEqual({
             phase: "decrypting",
             precentage: 100,
         });
+    });
+
+    test("keeps partial progress when the entry is removed before failure", () => {
+        const downloading = downloadProgressState(
+            loading,
+            { loaded: 42, total: 100 },
+            undefined,
+        );
+        const removed = downloadProgressState(loading, undefined, downloading);
+        expect(removed).toEqual({ phase: "downloading", precentage: 42 });
+        expect(
+            downloadProgressState({ fetchFailed: true }, undefined, removed),
+        ).toEqual({ phase: "failed", precentage: 42 });
     });
 
     test("failure takes precedence and keeps the previous percentage", () => {

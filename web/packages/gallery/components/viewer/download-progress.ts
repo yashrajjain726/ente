@@ -46,7 +46,7 @@ export const downloadProgressState = (
         previous?.phase == "downloading" ||
         previous?.phase == "decrypting"
     ) {
-        return { phase: "decrypting", precentage: 100 };
+        return { phase: previous.phase, precentage: previous.precentage };
     }
     return { phase: "preparing", precentage: 0 };
 };
