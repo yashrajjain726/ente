@@ -1,4 +1,5 @@
 {
+    "android-lint": [".github/workflows/android-lint.yml", "android/**"],
     "apple-lint": [".github/workflows/apple-lint.yml", "apple/**"],
     "dependency-review": [
         "**/Cargo.lock",
@@ -27,6 +28,12 @@
     "docs-verify-build": [".github/workflows/docs-verify-build.yml", "docs/**"],
     "ensu-android-build": [
         ".github/workflows/ensu-android-build.yml",
+        "android/build.gradle.kts",
+        "android/settings.gradle.kts",
+        "android/gradle.properties",
+        "android/gradle/**",
+        "android/gradlew",
+        "android/gradlew.bat",
         "android/apps/ensu/**",
         "android/apps/ensu/rust/**",
         "rust/.cargo/config.toml",
