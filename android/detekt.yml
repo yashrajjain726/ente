@@ -1,57 +1,47 @@
 config:
-  validation: true
   warningsAsErrors: true
 
+complexity:
+  active: false
+
 coroutines:
-  active: true
   GlobalCoroutineUsage:
-    active: true
-  RedundantSuspendModifier:
-    active: true
-  SleepInsteadOfDelay:
     active: true
   SuspendFunSwallowedCancellation:
     active: true
 
-empty-blocks:
-  active: true
-  EmptyCatchBlock:
-    active: true
-
-exceptions:
-  active: true
-  RethrowCaughtException:
-    active: true
-  ReturnFromFinally:
-    active: true
-  ThrowingExceptionFromFinally:
-    active: true
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
 
 potential-bugs:
-  active: true
   CastToNullableType:
     active: true
   CharArrayToStringCall:
     active: true
   ElseCaseInsteadOfExhaustiveWhen:
     active: true
-  EqualsWithHashCodeExist:
-    active: true
-  IgnoredReturnValue:
-    active: true
-  ImplicitDefaultLocale:
-    active: true
-  InvalidRange:
-    active: true
   UnnecessaryNotNullCheck:
     active: true
-  UnnecessaryNotNullOperator:
-    active: true
-  UnnecessarySafeCall:
-    active: true
-  UnreachableCatchBlock:
-    active: true
-  UnreachableCode:
-    active: true
   UnsafeCallOnNullableType:
-    active: true
+    excludes: []
+
+style:
+  DestructuringDeclarationWithTooManyEntries:
+    active: false
+  ForbiddenComment:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  ThrowsCount:
+    active: false
+  UnusedPrivateFunction:
+    ignoreAnnotated: ['Preview']

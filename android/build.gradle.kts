@@ -21,7 +21,10 @@ allprojects {
     apply(plugin = "dev.detekt")
     extensions.configure<KtfmtExtension> { kotlinLangStyle() }
 
-    extensions.configure<DetektExtension> { config.setFrom(rootProject.file("detekt.yml")) }
+    extensions.configure<DetektExtension> {
+        buildUponDefaultConfig.set(true)
+        config.setFrom(rootProject.file("detekt.yml"))
+    }
 
     listOf("com.android.application", "com.android.library").forEach { id ->
         pluginManager.withPlugin(id) {
