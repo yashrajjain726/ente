@@ -37,6 +37,12 @@ type SharedCollection struct {
 	FromUserID   int64
 }
 
+type CollectionShareItem struct {
+	ToUserID     int64
+	EncryptedKey string
+	Role         ente.CollectionParticipantRole
+}
+
 func (repo *CollectionRepository) Create(c ente.Collection) (ente.Collection, error) {
 
 	if !ente.App(c.App).IsValidForCollection() {
@@ -518,6 +524,69 @@ func (repo *CollectionRepository) Share(
 	}
 	err = tx.Commit()
 	return stacktrace.Propagate(err, "")
+}
+
+func (repo *CollectionRepository) BatchShare(
+	ctx context.Context,
+	collectionID int64,
+	fromUserID int64,
+	shares []CollectionShareItem,
+	updationTime int64,
+) error {
+	toUserIDs := make([]int64, len(shares))
+	encryptedKeys := make([]string, len(shares))
+	roles := make([]string, len(shares))
+	for index, share := range shares {
+		toUserIDs[index] = share.ToUserID
+		encryptedKeys[index] = share.EncryptedKey
+		roles[index] = string(share.Role)
+	}
+
+	tx, err := repo.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, `INSERT INTO collection_shares
+			(collection_id, from_user_id, to_user_id, encrypted_key, updation_time, role_type, shared_at)
+		SELECT $1, $2, input.to_user_id, input.encrypted_key, $3, input.role, $3
+		FROM unnest($4::bigint[], $5::text[], $6::role_enum[])
+			AS input(to_user_id, encrypted_key, role)
+		ORDER BY input.to_user_id
+		ON CONFLICT (collection_id, from_user_id, to_user_id)
+		DO UPDATE SET
+			is_deleted = FALSE,
+			updation_time = EXCLUDED.updation_time,
+			role_type = EXCLUDED.role_type,
+			shared_at = CASE
+				WHEN collection_shares.is_deleted = TRUE THEN EXCLUDED.shared_at
+				ELSE collection_shares.shared_at
+			END`,
+		collectionID,
+		fromUserID,
+		updationTime,
+		pq.Array(toUserIDs),
+		pq.Array(encryptedKeys),
+		pq.Array(roles),
+	)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+
+	result, err := tx.ExecContext(ctx, `UPDATE collections SET updation_time = $1
+		WHERE collection_id = $2 AND is_deleted = FALSE`, updationTime, collectionID)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if updated == 0 {
+		return stacktrace.Propagate(ente.ErrCollectionDeleted, "")
+	}
+	return stacktrace.Propagate(tx.Commit(), "")
 }
 
 // ShareAutomatically creates a share without modifying a prior share.
