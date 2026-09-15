@@ -15,6 +15,8 @@ const (
 	ExpectedKDFStrength = int64(1073741824 * 4)
 )
 
+const MaxPublicKeyBatchSize = 10
+
 type User struct {
 	ID                 int64
 	Email              string `json:"email"`

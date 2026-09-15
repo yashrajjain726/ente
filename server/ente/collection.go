@@ -89,6 +89,8 @@ type AlterShareRequest struct {
 	Role         *CollectionParticipantRole `json:"role"`
 }
 
+const MaxBatchShareSize = 10
+
 type CollectionShareSource string
 
 const (

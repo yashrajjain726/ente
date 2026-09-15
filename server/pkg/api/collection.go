@@ -125,6 +125,22 @@ func (h *CollectionHandler) Share(c *gin.Context) {
 	})
 }
 
+func (h *CollectionHandler) BatchShare(c *gin.Context) {
+	var request struct {
+		Shares []ente.AlterShareRequest `json:"shares" binding:"required,dive"`
+	}
+	if err := handler.BindJSON(c, &request); err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	sharees, err := h.Controller.BatchShare(c, request.Shares)
+	if err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"sharees": sharees})
+}
+
 func (h *CollectionHandler) BulkShare(c *gin.Context) {
 	var request ente.BulkCollectionShareRequest
 	if err := handler.BindJSON(c, &request); err != nil {
