@@ -64,10 +64,19 @@ class SyncService {
     });
 
     Bus.instance.on<AccountConfiguredEvent>().listen((event) {
+      // This listener is only a transition hook for local-gallery -> online
+      // login. First import must have materialized local rows before remote
+      // sync can merge server files into them.
       if (!Configuration.instance.hasConfiguredAccount() ||
           isLocalGalleryMode) {
         _logger.info(
           "Account configured event ignored; account is not ready for online sync",
+        );
+        return;
+      }
+      if (!_localSyncService.hasCompletedFirstImport()) {
+        _logger.info(
+          "Account configured event ignored; first gallery import is not completed",
         );
         return;
       }

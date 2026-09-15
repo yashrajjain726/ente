@@ -105,14 +105,12 @@ class RemoteSyncService {
       return;
     }
     if (Platform.isIOS &&
-        !LocalSyncService.instance.hasCompletedFirstImport()) {
-      await permissionService.refreshPermissionState();
-      if (permissionService.hasGrantedPermissions()) {
-        _logger.info(
-          "Deferring remote sync until first gallery import completes",
-        );
-        return;
-      }
+        !LocalSyncService.instance.hasCompletedFirstImport() &&
+        permissionService.hasGrantedPermissions()) {
+      _logger.info(
+        "Deferring remote sync until first gallery import completes",
+      );
+      return;
     }
     if (_existingSync != null) {
       _logger.info("Remote sync already in progress, skipping");

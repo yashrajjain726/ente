@@ -51,10 +51,6 @@ class PermissionService {
     await _prefs.setString(kPermissionStateKey, state.toString());
   }
 
-  Future<void> refreshPermissionState() async {
-    await onUpdatePermission(await getPermissionState());
-  }
-
   Future<PermissionState> getPermissionState() {
     return PhotoManager.getPermissionState(
       requestOption: const PermissionRequestOption(
