@@ -17,6 +17,8 @@ import io.ente.ensu.bindings.reconcileKnowledgePack
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class AssetStore(context: Context) {
     private val appContext = context.applicationContext
@@ -69,13 +71,15 @@ class AssetStore(context: Context) {
     internal fun cleanupKnowledgeRevisions(stableId: String, activeIdentity: String) =
         cleanupObsoleteKnowledgePackRevisions(core, stableId, activeIdentity)
 
-    suspend fun estimateDownloadSize(asset: Asset): Long? = core.estimatedDownloadSize(asset)
+    suspend fun estimateDownloadSize(asset: Asset): Long? = withContext(Dispatchers.IO) {
+        core.estimatedDownloadSize(asset)
+    }
 
     suspend fun download(
         assets: List<Asset>,
         onProgress: (AssetDownloadProgress) -> Unit
-    ) {
-        if (assets.all { core.isDownloaded(it) }) return
+    ) = withContext(Dispatchers.IO) {
+        if (assets.all { core.isDownloaded(it) }) return@withContext
 
         val token = CancellationToken()
         val lease = AssetDownloadJobService.begin { token.cancel() }
