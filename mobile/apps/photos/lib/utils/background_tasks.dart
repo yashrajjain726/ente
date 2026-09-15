@@ -9,7 +9,9 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:permission_handler/permission_handler.dart";
+import "package:photos/db/upload_locks_db.dart";
 import "package:photos/main.dart";
+import "package:photos/module/upload/service/file_uploader.dart";
 import "package:photos/utils/bg_task_utils.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:workmanager/workmanager.dart" as legacy;
@@ -55,15 +57,20 @@ class BackgroundTasks {
     if (Platform.isIOS) await retireLegacySchedules();
     await _configureNative(enabled: true);
     _configuredNative = true;
-    if (Platform.isAndroid && !isProcessBg) {
+    if (!isProcessBg) {
+      await BackgroundManager.stopActiveRun();
       final acquired = await ProcessLockClient.instance.tryAcquire(
         name: "background_process",
         origin: "fg",
-        operation: "backgroundBackendChange",
+        operation: "backgroundRecovery",
       );
       if (acquired) {
         try {
-          await retireLegacySchedules();
+          await UploadLocksDB.instance.releaseLocksAcquiredByOwnerBefore(
+            ProcessType.background.toString(),
+            DateTime.now().microsecondsSinceEpoch,
+          );
+          if (Platform.isAndroid) await retireLegacySchedules();
         } finally {
           await ProcessLockClient.instance.release(name: "background_process");
         }
