@@ -29,7 +29,7 @@ import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
 import {
     isFriendRequestCanceledError,
-    spaceFriendLimitErrorMessage,
+    isSpaceFriendLimitError,
 } from "utils/friend-errors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -138,8 +138,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         React.useState(false);
-    const [friendLimitMessage, setFriendLimitMessage] =
-        React.useState<string>();
+    const [showFriendLimitToast, setShowFriendLimitToast] =
+        React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
     const [selectedFriendProfile, setSelectedFriendProfile] =
         React.useState<SpaceMessageConversation["friend"]>();
@@ -407,12 +407,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     friendRequestIdFromConversation(conversation),
                 );
             } catch (error: unknown) {
-                const limitMessage = spaceFriendLimitErrorMessage(
-                    error,
-                    conversation.friend.username,
-                );
-                if (limitMessage) {
-                    setFriendLimitMessage(limitMessage);
+                if (isSpaceFriendLimitError(error)) {
+                    setShowFriendLimitToast(true);
                     return;
                 }
                 if (!isFriendRequestCanceledError(error)) throw error;
@@ -851,10 +847,9 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     onClose={() => setShowFriendRequestCanceledToast(false)}
                 />
             )}
-            {friendLimitMessage && (
+            {showFriendLimitToast && (
                 <SpaceFriendLimitToast
-                    message={friendLimitMessage}
-                    onClose={() => setFriendLimitMessage(undefined)}
+                    onClose={() => setShowFriendLimitToast(false)}
                 />
             )}
         </>

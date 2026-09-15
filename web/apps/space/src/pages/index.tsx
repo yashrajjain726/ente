@@ -36,7 +36,7 @@ import {
 } from "services/space";
 import { useSpaceAppState, type OnboardingEntrySource } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
-import { spaceFriendLimitErrorMessage } from "utils/friend-errors";
+import { isSpaceFriendLimitError } from "utils/friend-errors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -333,7 +333,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     const [pendingInviteIntent, setPendingInviteIntent] =
         useState<SpaceInviteIntent>();
     const [isAddingFriend, setIsAddingFriend] = useState(false);
-    const [friendLimitMessage, setFriendLimitMessage] = useState<string>();
+    const [showFriendLimitToast, setShowFriendLimitToast] = useState(false);
     const publicPostItems = useMemo(
         () => profilePostItemsFromPosts(publicPosts),
         [publicPosts],
@@ -617,15 +617,11 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                 void router.push(spaceRoutes.home);
             } catch (error) {
                 setIsAddingFriend(false);
-                const limitMessage = spaceFriendLimitErrorMessage(
-                    error,
-                    invite.spaceUsername,
-                );
-                if (limitMessage) {
+                if (isSpaceFriendLimitError(error)) {
                     clearPendingSpaceInvite();
                     clearPendingSpaceInviteFriend();
                     clearPendingSpaceInviteIntent();
-                    setFriendLimitMessage(limitMessage);
+                    setShowFriendLimitToast(true);
                     return;
                 }
                 log.error("Failed to send friend request", error);
@@ -687,10 +683,9 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
                         }
                     />
                 )}
-                {friendLimitMessage && (
+                {showFriendLimitToast && (
                     <SpaceFriendLimitToast
-                        message={friendLimitMessage}
-                        onClose={() => setFriendLimitMessage(undefined)}
+                        onClose={() => setShowFriendLimitToast(false)}
                     />
                 )}
             </>
