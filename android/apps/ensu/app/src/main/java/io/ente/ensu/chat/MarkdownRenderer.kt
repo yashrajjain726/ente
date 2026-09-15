@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -117,7 +117,7 @@ fun MarkdownView(
                             }
                         }
                         MarkdownBlock.Divider -> {
-                            Divider(color = EnsuColor.border())
+                            HorizontalDivider(color = EnsuColor.border())
                             if (appendCursor) {
                                 TrailingCursor()
                             }

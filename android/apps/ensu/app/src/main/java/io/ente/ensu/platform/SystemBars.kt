@@ -14,6 +14,8 @@ fun ApplySystemBars(backgroundColor: Color) {
     val view = LocalView.current
     val isDark = isSystemInDarkTheme()
 
+    // These setters still control bar colors on older Android versions.
+    @Suppress("DEPRECATION")
     SideEffect {
         val window = (view.context as Activity).window
         window.statusBarColor = backgroundColor.toArgb()

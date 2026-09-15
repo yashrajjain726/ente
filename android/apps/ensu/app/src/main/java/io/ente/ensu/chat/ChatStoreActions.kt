@@ -441,7 +441,7 @@ internal class ChatStoreActions(
                 )
             }
 
-            if (sessionStillExists && currentSessionId != null) {
+            if (sessionStillExists) {
                 loadMessagesFromDb(currentSessionId)
                 rebuildChatState(currentSessionId)
             }
@@ -639,12 +639,12 @@ internal class ChatStoreActions(
             }
             val useKnowledge = knowledgeHistorySelection?.wasTrimmed == false
             val historySelection = if (useKnowledge) {
-                knowledgeHistorySelection ?: normalHistorySelection
+                knowledgeHistorySelection
             } else {
                 normalHistorySelection
             }
-            var activeCitations = if (useKnowledge) knowledgeContext?.sources.orEmpty() else emptyList()
-            val systemPrompt = if (useKnowledge) candidateSystemPrompt ?: normalSystemPrompt else normalSystemPrompt
+            var activeCitations = if (useKnowledge) knowledgeContext.sources else emptyList()
+            val systemPrompt = if (useKnowledge) candidateSystemPrompt else normalSystemPrompt
             val systemMessage = LlmMessage(
                 text = systemPrompt,
                 role = LlmMessageRole.System

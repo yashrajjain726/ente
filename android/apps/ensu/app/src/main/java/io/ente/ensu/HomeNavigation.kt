@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalAnimationApi::class)
-
 package io.ente.ensu
 
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -23,8 +20,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
-import com.google.accompanist.navigation.animation.AnimatedNavHost
-import com.google.accompanist.navigation.animation.composable
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import io.ente.ensu.chat.ChatView
 import io.ente.ensu.notes.NotesSettingsScreen
 import io.ente.ensu.settings.AdvancedSettingsDataStore
@@ -108,7 +105,7 @@ internal fun HomeNavigation(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            AnimatedNavHost(
+            NavHost(
                 navController = navController,
                 startDestination = HomeRoute.Chat,
                 modifier = Modifier.fillMaxSize()

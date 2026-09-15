@@ -92,6 +92,8 @@ class Haptics(
 
     private fun isHapticsEnabled(context: Context): Boolean {
         return try {
+            // The manual vibration fallback must honor the system haptics setting.
+            @Suppress("DEPRECATION")
             Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 1
         } catch (_: Throwable) {
             true

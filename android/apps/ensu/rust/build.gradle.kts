@@ -1,4 +1,5 @@
 import java.io.ByteArrayOutputStream
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.library")
@@ -115,9 +116,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
 
-    kotlinOptions {
-        jvmTarget = "17"
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        allWarningsAsErrors.set(true)
+        // TODO: Remove when UniFFI releases https://github.com/mozilla/uniffi-rs/pull/2949.
+        freeCompilerArgs.add("-Xwarning-level=UNUSED_EXPRESSION:warning")
     }
 }
 

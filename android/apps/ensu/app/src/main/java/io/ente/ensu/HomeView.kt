@@ -1,7 +1,4 @@
-@file:OptIn(
-    androidx.compose.animation.ExperimentalAnimationApi::class,
-    androidx.compose.material3.ExperimentalMaterial3Api::class
-)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package io.ente.ensu
 
@@ -47,7 +44,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import androidx.navigation.compose.rememberNavController
 import io.ente.ensu.chat.SessionDrawer
 import io.ente.ensu.components.ImageAttachmentPreviewDialog
 import io.ente.ensu.components.NativeChoiceDialog
@@ -88,7 +85,7 @@ fun HomeView(
     val drawerState = androidx.compose.material3.rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val navController = rememberAnimatedNavController()
+    val navController = rememberNavController()
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestStore by rememberUpdatedState(store)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
