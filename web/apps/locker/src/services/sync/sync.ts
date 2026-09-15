@@ -1,5 +1,4 @@
 import type { LockerCollection, LockerItem } from "@/types";
-import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
@@ -12,7 +11,6 @@ import {
 } from "../locker-cache";
 import {
     type StoredTrashFileRecord,
-    deleteCollectionRecords,
     deleteCollectionSinceTime,
     deleteFileRecords,
     deleteFileRecordsForCollection,
@@ -222,7 +220,6 @@ export const syncLockerState = async (): Promise<LockerHydratedState> => {
 
     let latestCollectionsSinceTime = snapshot.collectionsSinceTime;
     const changedCollections: EncryptedCollectionRecord[] = [];
-    const revokedCollectionIDs: number[] = [];
     const deletedCollectionIDs: number[] = [];
 
     for (const change of collectionChanges) {
@@ -230,15 +227,6 @@ export const syncLockerState = async (): Promise<LockerHydratedState> => {
             latestCollectionsSinceTime,
             change.updationTime,
         );
-        if (change.isDeleted && change.owner.id != ensureLocalUser().id) {
-            revokedCollectionIDs.push(change.id);
-            deletedCollectionIDs.push(change.id);
-            continue;
-        }
-
-        if (!("encryptedKey" in change)) {
-            throw new Error(`Incomplete owned collection change ${change.id}`);
-        }
         const record = await toEncryptedCollectionRecord(change);
         changedCollections.push(record);
         if (record.isDeleted) {
@@ -249,7 +237,6 @@ export const syncLockerState = async (): Promise<LockerHydratedState> => {
     if (changedCollections.length > 0) {
         await saveCollectionRecords(changedCollections);
     }
-    await deleteCollectionRecords(revokedCollectionIDs);
     for (const collectionID of deletedCollectionIDs) {
         await deleteFileRecordsForCollection(collectionID);
         await deleteCollectionSinceTime(collectionID);

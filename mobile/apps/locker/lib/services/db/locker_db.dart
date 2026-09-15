@@ -328,21 +328,25 @@ class LockerDB extends EnteBaseDatabase {
     await batch.commit();
   }
 
-  Future<void> deleteCollection(int collectionID) async {
+  Future<void> deleteCollection(Collection collection) async {
     final batch = _db.batch();
 
-    batch.delete(_collectionsTable, where: 'id = ?', whereArgs: [collectionID]);
+    batch.delete(
+      _collectionsTable,
+      where: 'id = ?',
+      whereArgs: [collection.id],
+    );
 
     batch.delete(
       _collectionFilesTable,
       where: 'collection_id = ?',
-      whereArgs: [collectionID],
+      whereArgs: [collection.id],
     );
 
     final filesInCollection = await _db.query(
       _collectionFilesTable,
       where: 'collection_id = ?',
-      whereArgs: [collectionID],
+      whereArgs: [collection.id],
     );
 
     for (final fileMap in filesInCollection) {
@@ -350,7 +354,7 @@ class LockerDB extends EnteBaseDatabase {
       final otherCollections = await _db.query(
         _collectionFilesTable,
         where: 'uploaded_file_id = ? AND collection_id != ?',
-        whereArgs: [uploadedFileId, collectionID],
+        whereArgs: [uploadedFileId, collection.id],
       );
 
       if (otherCollections.isEmpty) {
@@ -362,14 +366,7 @@ class LockerDB extends EnteBaseDatabase {
       }
     }
 
-    batch.delete(
-      _syncTimesTable,
-      where: 'key = ?',
-      whereArgs: ['collection_sync_time_$collectionID'],
-    );
-
     await batch.commit();
-    _collectionSyncTimesCache.remove(collectionID);
   }
 
   Future<List<Collection>> getCollections() async {

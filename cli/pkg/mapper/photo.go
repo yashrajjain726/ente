@@ -5,24 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-
 	"github.com/ente/cli/internal/api"
 	eCrypto "github.com/ente/cli/internal/crypto"
 	"github.com/ente/cli/pkg/model"
 	"github.com/ente/cli/pkg/model/export"
 	"github.com/ente/cli/pkg/secrets"
 	"github.com/ente/cli/utils/encoding"
+	"log"
 )
 
 func MapCollectionToAlbum(ctx context.Context, collection api.Collection, holder *secrets.KeyHolder) (*model.RemoteAlbum, error) {
+	var album model.RemoteAlbum
 	userID := ctx.Value("user_id").(int64)
-	album := model.RemoteAlbum{
-		ID:            collection.ID,
-		OwnerID:       collection.Owner.ID,
-		IsShared:      collection.Owner.ID != userID,
-		LastUpdatedAt: collection.UpdationTime,
-	}
+	album.OwnerID = collection.Owner.ID
+	album.ID = collection.ID
+	album.IsShared = collection.Owner.ID != userID
+	album.LastUpdatedAt = collection.UpdationTime
+	album.IsDeleted = collection.IsDeleted
 	collectionKey, err := holder.GetCollectionKey(ctx, collection)
 	if err != nil {
 		return nil, err

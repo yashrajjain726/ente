@@ -36,7 +36,6 @@ import { PromiseQueue } from "ente-utils/promise";
 import { nullToUndefined } from "ente-utils/transform";
 import i18n from "i18next";
 import { z } from "zod";
-import { deletedExportedCollectionIDs } from "./export-collection-state";
 
 const exportStoppedError = () => namedError("export_stopped", "export stopped");
 
@@ -1225,11 +1224,25 @@ const getRenamedExportedCollections = (
 const getDeletedExportedCollections = (
     collections: Collection[],
     exportRecord: ExportRecord,
-) =>
-    deletedExportedCollectionIDs(
-        collections.map(({ id }) => id),
-        exportRecord.collectionExportNames,
+) => {
+    if (!exportRecord?.collectionExportNames) {
+        return [];
+    }
+    const presentCollections = new Set(
+        collections.map((collection) => collection.id),
     );
+    const deletedExportedCollections = Object.keys(
+        exportRecord?.collectionExportNames,
+    )
+        .map(Number)
+        .filter((collectionID) => {
+            if (!presentCollections.has(collectionID)) {
+                return true;
+            }
+            return false;
+        });
+    return deletedExportedCollections;
+};
 
 const readOnDiskFileExportRecordIDs = async (
     files: EnteFile[],

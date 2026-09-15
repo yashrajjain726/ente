@@ -26,7 +26,6 @@ import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/force_reload_home_gallery_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
 import "package:photos/gateways/collections/collection_share_gateway.dart";
-import 'package:photos/gateways/collections/models/collection_change.dart';
 import 'package:photos/gateways/collections/models/collection_file_item.dart';
 import "package:photos/gateways/collections/models/collection_share.dart";
 import 'package:photos/gateways/collections/models/create_request.dart';
@@ -143,41 +142,23 @@ class CollectionsService {
 
     _logger.info("[COLLECTIONS] Starting sync");
 
-    final collectionChanges = await _fetchCollectionChanges(
+    final fetchedCollections = await _fetchCollections(
       lastCollectionUpdationTime,
     );
     _logger.info(
-      "[COLLECTIONS] Fetched ${collectionChanges.length} collection changes from API",
+      "[COLLECTIONS] Fetched ${fetchedCollections.length} collections from API",
     );
-    watch.log("remote fetch collections ${collectionChanges.length}");
+    watch.log("remote fetch collections ${fetchedCollections.length}");
 
-    if (collectionChanges.isEmpty) {
+    if (fetchedCollections.isEmpty) {
       await _ensureUncategorizedCollectionExists();
       return;
     }
     final updatedCollections = <Collection>[];
     int maxUpdationTime = lastCollectionUpdationTime;
+    final ownerID = _config.getUserID();
     bool shouldFireDeleteEvent = false;
-    for (final change in collectionChanges) {
-      maxUpdationTime = max(maxUpdationTime, change.updationTime);
-      if (change is RemoteCollectionDeletion) {
-        await _filesDB.deleteCollection(change.id);
-        await _cleanupSocialData(change.id);
-        await setCollectionSyncTime(change.id, null);
-        if (_collectionIDToCollections.containsKey(change.id)) {
-          shouldFireDeleteEvent = true;
-        }
-        await _db.deleteCollection(change.id);
-        _collectionIDToCollections.remove(change.id);
-        _cachedKeys.remove(change.id);
-        _localPathToCollectionID.removeWhere((_, id) => id == change.id);
-        _clearPublicCollectionState(change.id);
-        continue;
-      }
-
-      final collection = await _fromRemoteCollection(
-        (change as RemoteCollectionUpdate).data,
-      );
+    for (final collection in fetchedCollections) {
       if (collection.isDeleted) {
         await _filesDB.deleteCollection(collection.id);
         await _cleanupSocialData(collection.id);
@@ -186,9 +167,16 @@ class CollectionsService {
           shouldFireDeleteEvent = true;
         }
       }
-      // Keep owned deleted collections because their keys may be needed to
-      // decrypt trashed files.
-      updatedCollections.add(collection);
+      if (collection.isDeleted && ownerID != collection.owner.id) {
+        await _db.deleteCollection(collection.id);
+      } else {
+        // keep entry for deletedCollection as collectionKey may be used during
+        // trash file decryption
+        updatedCollections.add(collection);
+      }
+      maxUpdationTime = collection.updationTime > maxUpdationTime
+          ? collection.updationTime
+          : maxUpdationTime;
     }
 
     if (shouldFireDeleteEvent) {
@@ -205,14 +193,14 @@ class CollectionsService {
     watch.logAndReset("till DB insertion ${updatedCollections.length}");
     _logger.info("[COLLECTIONS] Updated ${updatedCollections.length} in DB");
 
-    for (final collection in updatedCollections) {
+    for (final collection in fetchedCollections) {
       _cacheLocalPathAndCollection(collection);
     }
 
     _logger.info("Collections synced");
-    watch.log("${updatedCollections.length} collection caches refreshed");
+    watch.log("${fetchedCollections.length} collection cached refreshed ");
 
-    if (collectionChanges.isNotEmpty) {
+    if (fetchedCollections.isNotEmpty) {
       Bus.instance.fire(ContactRelationshipsInvalidatedEvent());
       Bus.instance.fire(
         CollectionUpdatedEvent(
@@ -1544,15 +1532,21 @@ class CollectionsService {
     }
   }
 
-  Future<List<RemoteCollectionChange>> _fetchCollectionChanges(
-    int sinceTime,
-  ) async {
+  Future<List<Collection>> _fetchCollections(int sinceTime) async {
     try {
-      return await collectionsGateway.getAll(
+      final response = await collectionsGateway.getAll(
         sinceTime: sinceTime,
         source: AppLifecycleService.instance.isForeground ? "fg" : "bg",
-        currentUserID: _config.getUserID()!,
       );
+      final List<Collection> collections = [];
+      final c = response["collections"];
+      for (final collectionData in c) {
+        final Collection collection = await _fromRemoteCollection(
+          collectionData,
+        );
+        collections.add(collection);
+      }
+      return collections;
     } catch (e, s) {
       _logger.warning("Failed to fetch collections", e, s);
       if (e is DioException && e.response?.statusCode == 401) {

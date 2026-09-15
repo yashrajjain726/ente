@@ -28,26 +28,8 @@ export const RemoteCollection = z.object({
 
 export type RemoteCollection = z.infer<typeof RemoteCollection>;
 
-export const RemoteCollectionDeletionTombstone = z.object({
-    id: z.number(),
-    owner: z.object({ id: z.number() }),
-    updationTime: z.number(),
-    isDeleted: z.literal(true),
-});
-
-export type RemoteCollectionDeletionTombstone = z.infer<
-    typeof RemoteCollectionDeletionTombstone
->;
-
-export const RemoteCollectionChange = z.union([
-    RemoteCollection,
-    RemoteCollectionDeletionTombstone,
-]);
-
-export type RemoteCollectionChange = z.infer<typeof RemoteCollectionChange>;
-
 export const CollectionsResponse = z.object({
-    collections: z.array(RemoteCollectionChange),
+    collections: z.array(RemoteCollection),
 });
 
 const RemoteEncryptedMetadata = z.object({

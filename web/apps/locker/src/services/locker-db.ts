@@ -256,20 +256,6 @@ export const saveCollectionRecords = async (
     await tx.done;
 };
 
-export const deleteCollectionRecords = async (
-    collectionIDs: number[],
-    userID = ensureLocalUser().id,
-) => {
-    if (collectionIDs.length === 0) return;
-
-    const db = await resolveLockerDB(userID);
-    const tx = db.transaction("collections", "readwrite");
-    await Promise.all(
-        collectionIDs.map((collectionID) => tx.store.delete(collectionID)),
-    );
-    await tx.done;
-};
-
 export const saveCollectionsSinceTime = async (
     sinceTime: number,
     userID = ensureLocalUser().id,

@@ -13,7 +13,6 @@ import 'package:locker/core/errors.dart';
 import "package:locker/events/collections_updated_event.dart";
 import "package:locker/services/collections/collections_service.dart";
 import 'package:locker/services/collections/models/collection.dart';
-import 'package:locker/services/collections/models/collection_change.dart';
 import 'package:locker/services/collections/models/collection_file_item.dart';
 import 'package:locker/services/collections/models/collection_magic.dart';
 import 'package:locker/services/collections/models/diff.dart';
@@ -43,29 +42,21 @@ class CollectionApiClient {
     _db = LockerDB.instance;
   }
 
-  Future<List<CollectionChange>> getCollections(int sinceTime) async {
+  Future<List<Collection>> getCollections(int sinceTime) async {
     try {
       final response = await _enteDio.get(
         "/collections/v2",
         queryParameters: {"sinceTime": sinceTime},
       );
-      final List<CollectionChange> changes = [];
+      final List<Collection> collections = [];
       final c = response.data["collections"];
       for (final collectionData in c) {
-        if (isSharedCollectionDeletion(collectionData, _config.getUserID()!)) {
-          changes.add(
-            CollectionDeletion(
-              collectionData['id'] as int,
-              collectionData['updationTime'] as int,
-            ),
-          );
-        } else {
-          changes.add(
-            CollectionUpdate(await _fromRemoteCollection(collectionData)),
-          );
-        }
+        final Collection collection = await _fromRemoteCollection(
+          collectionData,
+        );
+        collections.add(collection);
       }
-      return changes;
+      return collections;
     } catch (e, s) {
       _logger.warning(e, s);
       if (e is DioException && e.response?.statusCode == 401) {
@@ -233,7 +224,7 @@ class CollectionApiClient {
   }
 
   Future<void> _handleCollectionDeletion(Collection collection) async {
-    await _db.deleteCollection(collection.id);
+    await _db.deleteCollection(collection);
     final deletedCollection = collection.copyWith(isDeleted: true);
     await _updateCollectionInDB(deletedCollection);
   }
@@ -314,7 +305,7 @@ class CollectionApiClient {
         "&collectionID=${collection.id}",
       );
       if (skipEventFiring) {
-        await _db.deleteCollection(collection.id);
+        await _db.deleteCollection(collection);
         final deletedCollection = collection.copyWith(isDeleted: true);
         await _updateCollectionInDB(deletedCollection);
       } else {
