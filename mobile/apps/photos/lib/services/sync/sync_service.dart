@@ -211,7 +211,11 @@ class SyncService {
       );
       return;
     }
-    _doSync().ignore();
+    final runningSync = _existingSync?.future;
+    if (runningSync != null) {
+      await runningSync;
+    }
+    await sync();
   }
 
   void onDeviceCollectionSet(Set<int> collectionIDs) {

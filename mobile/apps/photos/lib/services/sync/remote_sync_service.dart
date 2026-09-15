@@ -104,10 +104,9 @@ class RemoteSyncService {
       _logger.info("Skipping remote sync since account is not configured");
       return;
     }
-    if (!LocalSyncService.instance.hasCompletedFirstImport()) {
-      if (Platform.isIOS) {
-        await permissionService.refreshPermissionState();
-      }
+    if (Platform.isIOS &&
+        !LocalSyncService.instance.hasCompletedFirstImport()) {
+      await permissionService.refreshPermissionState();
       if (permissionService.hasGrantedPermissions()) {
         _logger.info(
           "Deferring remote sync until first gallery import completes",
