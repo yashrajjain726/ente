@@ -16,7 +16,7 @@ test("docs changes do not wait for unrelated workflows", (t) => {
     checkResult(results(selected));
 });
 
-test("Android lint configuration does not build Ensu", (t) => {
+test("Android lint configuration selects the lint workflow", (t) => {
     for (const file of ["android/detekt.yml", "android/scripts/lint.sh"]) {
         assert.deepEqual(select(t, [file]), ["android-lint", "repo-lint"]);
     }
@@ -43,10 +43,12 @@ test("shared build inputs select their consumers", (t) => {
         "repo-lint",
     ]);
     assert.deepEqual(select(t, ["rust/crates/core/src/lib.rs"]), [
+        "android-lint",
         "ensu-android-build",
         "ensu-ios-build",
         "mobile-lint",
         "repo-lint",
+        "rust-cli-test",
         "rust-lint",
         "rust-test",
         "web-lint",

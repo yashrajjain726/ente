@@ -33,15 +33,15 @@ import kotlinx.coroutines.launch
 class AppStore(
     context: Context,
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val chatRepository: ChatRepository,
-    private val llmProvider: LlmProvider,
+    chatRepository: ChatRepository,
+    llmProvider: LlmProvider,
     knowledgeProvider: KnowledgeProvider,
     val assetStore: AssetStore,
     val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
     val configDefaults: ConfigDefaults,
     private val logRepository: FileLogRepository,
-    private val clock: () -> Long = { System.currentTimeMillis() }
+    clock: () -> Long = { System.currentTimeMillis() }
 ) {
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()

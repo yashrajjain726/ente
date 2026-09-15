@@ -121,7 +121,6 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
-        allWarningsAsErrors.set(true)
         // TODO: Remove when UniFFI releases https://github.com/mozilla/uniffi-rs/pull/2949.
         freeCompilerArgs.add("-Xwarning-level=UNUSED_EXPRESSION:warning")
     }

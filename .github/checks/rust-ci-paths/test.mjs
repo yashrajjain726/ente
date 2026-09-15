@@ -8,8 +8,8 @@ import test from "node:test";
 const script = join(import.meta.dirname, "check.mjs");
 const pathsFile = ".github/scripts/ci/paths.json";
 
-test("Web CI covers transitive local WASM dependencies", (t) => {
-    const root = mkdtempSync(join(tmpdir(), "ente-wasm-ci-paths-"));
+test("CI covers transitive local Rust dependencies", (t) => {
+    const root = mkdtempSync(join(tmpdir(), "ente-rust-ci-paths-"));
     t.after(() => rmSync(root, { recursive: true }));
     const write = (path, content) => {
         mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -27,8 +27,8 @@ edition = "2024"
 ${dependencies}`,
         );
     };
-    const run = (patterns) => {
-        write(pathsFile, JSON.stringify({ "web-lint": patterns }));
+    const run = (patterns, workflow = "web-lint") => {
+        write(pathsFile, JSON.stringify({ [workflow]: patterns }));
         return spawnSync(process.execPath, [script, root], {
             encoding: "utf8",
         });
@@ -39,7 +39,7 @@ ${dependencies}`,
         `
 [workspace]
 resolver = "2"
-members = ["bindings/wasm/*", "crates/*"]
+members = ["bindings/wasm/*", "bindings/uniffi/*", "crates/*", "tools/*", "apps/*"]
 [workspace.dependencies]
 shared-alias = { package = "shared", path = "crates/shared" }
 `,
@@ -86,7 +86,28 @@ native-only = { path = "../../../crates/native-only" }
 `,
     );
 
+    crate(
+        "bindings/uniffi/app",
+        "app-native",
+        `[dependencies]
+native-only = { path = "../../../crates/native-only" }`,
+    );
+    crate(
+        "tools/codegen",
+        "codegen",
+        `[dependencies]
+builder = { path = "../../crates/builder" }`,
+    );
+
+    crate(
+        "apps/cli-next",
+        "cli",
+        `[dev-dependencies]
+test-only = { path = "../../crates/test-only" }`,
+    );
+
     const base = [
+        "rust/.cargo/config.toml",
         "rust/Cargo.lock",
         "rust/Cargo.toml",
         "rust/bindings/wasm/**",
@@ -107,7 +128,7 @@ native-only = { path = "../../../crates/native-only" }
         needed
             .map(
                 (path) =>
-                    `${pathsFile}: missing WASM dependency path ${JSON.stringify(path)}\n`,
+                    `${pathsFile}: web-lint missing Rust dependency path ${JSON.stringify(path)}\n`,
             )
             .join(""),
     );
@@ -117,9 +138,48 @@ native-only = { path = "../../../crates/native-only" }
         assert.equal(result.stdout, "");
         assert.equal(result.stderr, "");
     }
+    const nativeBase = [
+        "rust/.cargo/config.toml",
+        "rust/Cargo.lock",
+        "rust/Cargo.toml",
+        "rust/bindings/uniffi/**",
+        "rust/tools/codegen/**",
+    ];
+    result = run(nativeBase, "android-lint");
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(
+        result.stderr,
+        ["builder", "native-only"]
+            .map(
+                (name) =>
+                    `${pathsFile}: android-lint missing Rust dependency path "rust/crates/${name}/**"\n`,
+            )
+            .join(""),
+    );
+    result = run(
+        [...nativeBase, "rust/crates/builder/**", "rust/crates/native-only/**"],
+        "android-lint",
+    );
+    assert.equal(result.status, 0, result.stderr);
+
+    result = run(["rust/apps/cli-next/**", ...base], "rust-cli-test");
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(
+        result.stderr,
+        `${pathsFile}: rust-cli-test missing Rust dependency path "rust/crates/test-only/**"\n`,
+    );
+    result = run(
+        ["rust/apps/cli-next/**", "rust/crates/test-only/**", ...base],
+        "rust-cli-test",
+    );
+    assert.equal(result.status, 0, result.stderr);
+
     result = run([...base, ...needed, "!rust/crates/leaf/private/**"]);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /WASM coverage does not support negated paths/);
+    assert.match(
+        result.stderr,
+        /web-lint coverage does not support negated paths/,
+    );
     assert.equal(result.stdout, "");
     write(
         "web/packages/wasm/app/package.json",

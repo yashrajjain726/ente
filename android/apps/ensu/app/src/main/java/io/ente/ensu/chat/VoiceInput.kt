@@ -63,7 +63,7 @@ internal fun VoiceInputState.statusText(): String? = when (this) {
     VoiceInputState.Idle -> null
     VoiceInputState.Recording -> "Listening..."
     is VoiceInputState.Downloading -> {
-        val suffix = percent?.let { " ($it%)" } ?: ""
+        val suffix = percent?.let { " ($it%)" }.orEmpty()
         "Downloading voice model...$suffix"
     }
     VoiceInputState.Transcribing -> null
@@ -159,14 +159,14 @@ internal class VoiceTranscriptionController(
                     return@launch
                 }
                 Log.w(TAG, "Voice model download failed: ${error.message}", error)
-                state = VoiceInputState.Error(downloadErrorMessage())
+                state = VoiceInputState.Error(downloadErrorMessage)
             } catch (error: LlmException) {
                 if (error is LlmException.Cancelled) {
                     state = VoiceInputState.Idle
                     return@launch
                 }
                 Log.w(TAG, "Voice model download failed: ${error.message}", error)
-                state = VoiceInputState.Error(downloadErrorMessage())
+                state = VoiceInputState.Error(downloadErrorMessage)
             } catch (error: Throwable) {
                 Log.w(
                     TAG,
@@ -319,14 +319,14 @@ internal class VoiceTranscriptionController(
                 return@withMaintenanceSuspended
             }
             Log.w(TAG, "Voice model download failed: ${error.message}", error)
-            state = VoiceInputState.Error(downloadErrorMessage())
+            state = VoiceInputState.Error(downloadErrorMessage)
         } catch (error: LlmException) {
             if (error is LlmException.Cancelled) {
                 state = VoiceInputState.Idle
                 return@withMaintenanceSuspended
             }
             Log.w(TAG, "Voice model download failed: ${error.message}", error)
-            state = VoiceInputState.Error(downloadErrorMessage())
+            state = VoiceInputState.Error(downloadErrorMessage)
         } catch (error: Throwable) {
             Log.w(
                 TAG,
@@ -449,7 +449,7 @@ internal class VoiceTranscriptionController(
 
     private fun minimumRecordingBytes(sampleRate: Int): Int = sampleRate / 4 * bytesPerSample
 
-    private fun downloadErrorMessage(): String =
+    private val downloadErrorMessage =
         "Voice model download failed. Check your connection and try again."
 
     private fun transcriptionErrorMessage(error: TranscriptionException): String = when (error) {

@@ -316,9 +316,9 @@ private enum class InlineMarkdownStyle {
     Link
 }
 
-private sealed class InlineMarkdownSegment {
-    data class Text(val text: String, val style: InlineMarkdownStyle) : InlineMarkdownSegment()
-    data class Math(val latex: String) : InlineMarkdownSegment()
+private sealed interface InlineMarkdownSegment {
+    data class Text(val text: String, val style: InlineMarkdownStyle) : InlineMarkdownSegment
+    data class Math(val latex: String) : InlineMarkdownSegment
 }
 
 private data class InlineMathMatch(
@@ -683,19 +683,16 @@ private fun styleForInlineSegment(
 private fun colorForInlineSegment(
     baseColor: androidx.compose.ui.graphics.Color,
     inlineStyle: InlineMarkdownStyle
-): androidx.compose.ui.graphics.Color = when (inlineStyle) {
-    InlineMarkdownStyle.Link -> EnsuColor.accent()
-    else -> baseColor
-}
+): androidx.compose.ui.graphics.Color = if (inlineStyle == InlineMarkdownStyle.Link) EnsuColor.accent() else baseColor
 
-private sealed class MarkdownBlock {
-    data class Heading(val level: Int, val text: String) : MarkdownBlock()
-    data class Paragraph(val text: String) : MarkdownBlock()
-    data class BlockQuote(val text: String) : MarkdownBlock()
-    data class Code(val text: String) : MarkdownBlock()
-    data class Math(val text: String) : MarkdownBlock()
-    data class ListItems(val items: List<String>) : MarkdownBlock()
-    data object Divider : MarkdownBlock()
+private sealed interface MarkdownBlock {
+    data class Heading(val level: Int, val text: String) : MarkdownBlock
+    data class Paragraph(val text: String) : MarkdownBlock
+    data class BlockQuote(val text: String) : MarkdownBlock
+    data class Code(val text: String) : MarkdownBlock
+    data class Math(val text: String) : MarkdownBlock
+    data class ListItems(val items: List<String>) : MarkdownBlock
+    data object Divider : MarkdownBlock
 }
 
 private object MarkdownParser {
@@ -770,8 +767,8 @@ private object MarkdownParser {
         for (line in lines) {
             val trimmed = line.trim()
 
-            if (mathEndDelimiter != null) {
-                val endDelimiter = mathEndDelimiter!!
+            val endDelimiter = mathEndDelimiter
+            if (endDelimiter != null) {
                 if (trimmed == endDelimiter) {
                     flushMath()
                     continue

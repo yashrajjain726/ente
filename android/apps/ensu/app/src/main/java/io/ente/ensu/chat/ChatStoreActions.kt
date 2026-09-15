@@ -1328,12 +1328,6 @@ internal class ChatStoreActions(
         return text.trim()
     }
 
-    private fun trimToBudget(text: String, budget: Int): String {
-        if (budget <= 0) return ""
-        val maxChars = budget * 4
-        return if (text.length <= maxChars) text else text.takeLast(maxChars)
-    }
-
     private fun estimateTokens(text: String): Int {
         return max(1, text.length / 4)
     }

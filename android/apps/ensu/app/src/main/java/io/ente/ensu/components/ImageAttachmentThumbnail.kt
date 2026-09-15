@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -60,9 +59,9 @@ fun ImageAttachmentThumbnail(
     val maxHeight = maxOf(height, portraitHeight ?: height, squareSize ?: height)
     val targetWidthPx = with(density) { maxWidth.roundToPx() }
     val targetHeightPx = with(density) { maxHeight.roundToPx() }
-    val image by produceState<DecodedImage?>(initialValue = null, path, targetWidthPx, targetHeightPx) {
+    val image = produceState<DecodedImage?>(initialValue = null, path, targetWidthPx, targetHeightPx) {
         value = decodeSampledImage(path, targetWidthPx, targetHeightPx)
-    }
+    }.value
     val haptic = rememberHaptics()
     val shape = RoundedCornerShape(EnsuCornerRadius.card.dp)
     val resolvedWidth = when {
@@ -94,7 +93,7 @@ fun ImageAttachmentThumbnail(
     ) {
         if (image != null) {
             Image(
-                bitmap = image!!.bitmap,
+                bitmap = image.bitmap,
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -170,22 +169,22 @@ fun ImageAttachmentPreviewDialog(
         ) {
             val targetWidthPx = with(density) { maxWidth.roundToPx() }
             val targetHeightPx = with(density) { maxHeight.roundToPx() }
-            val image by produceState<DecodedImage?>(initialValue = null, path, targetWidthPx, targetHeightPx) {
+            val image = produceState<DecodedImage?>(initialValue = null, path, targetWidthPx, targetHeightPx) {
                 value = decodeSampledImage(path, targetWidthPx, targetHeightPx)
-            }
+            }.value
 
             if (image != null) {
                 val previewPadding = EnsuSpacing.md.dp
                 val availableWidth = maxOf(0.dp, maxWidth - previewPadding - previewPadding)
                 val availableHeight = maxOf(0.dp, maxHeight - previewPadding - previewPadding)
                 val (displayWidth, displayHeight) = fittedImageSize(
-                    bitmapWidth = image!!.bitmap.width,
-                    bitmapHeight = image!!.bitmap.height,
+                    bitmapWidth = image.bitmap.width,
+                    bitmapHeight = image.bitmap.height,
                     availableWidth = availableWidth,
                     availableHeight = availableHeight
                 )
                 Image(
-                    bitmap = image!!.bitmap,
+                    bitmap = image.bitmap,
                     contentDescription = contentDescription,
                     modifier = Modifier
                         .align(Alignment.Center)

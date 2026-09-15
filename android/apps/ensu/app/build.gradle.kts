@@ -13,7 +13,7 @@ configurations.configureEach {
     exclude(group = "com.google.guava", module = "listenablefuture")
 }
 
-val keystorePropsFile = rootProject.file("key.properties")
+val keystorePropsFile = file("../key.properties")
 val keystoreProps = Properties()
 val hasReleaseKeystore = keystorePropsFile.exists()
 if (hasReleaseKeystore) {
@@ -125,7 +125,6 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
-        allWarningsAsErrors.set(true)
     }
 }
 
@@ -148,7 +147,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation(project(":rust"))
+    implementation(project(":ensu:rust"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")

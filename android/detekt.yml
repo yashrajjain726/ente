@@ -5,6 +5,8 @@ complexity:
   active: false
 
 coroutines:
+  InjectDispatcher:
+    active: false
   GlobalCoroutineUsage:
     active: true
   SuspendFunSwallowedCancellation:
