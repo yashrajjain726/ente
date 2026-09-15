@@ -33,7 +33,10 @@ export const CollectionsResponse = z.object({
 });
 
 const RemoteEncryptedMetadata = z.object({
-    encryptedData: z.string(),
+    encryptedData: z
+        .string()
+        .nullish()
+        .transform((value) => value ?? ""),
     decryptionHeader: z.string(),
 });
 
