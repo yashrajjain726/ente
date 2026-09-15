@@ -22,12 +22,9 @@ import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
 import {
     isFriendRequestCanceledError,
-    spaceFriendLimitErrorMessage,
+    isSpaceFriendLimitError,
 } from "utils/friend-errors";
-import {
-    maximumSpaceFriendCount,
-    spaceFriendLimitMessage,
-} from "utils/friend-limits";
+import { maximumSpaceFriendCount } from "utils/friend-limits";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -46,8 +43,8 @@ const Page: React.FC = () => {
     const [isFriendsLoading, setIsFriendsLoading] = React.useState(true);
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
         React.useState(false);
-    const [friendLimitMessage, setFriendLimitMessage] =
-        React.useState<string>();
+    const [showFriendLimitToast, setShowFriendLimitToast] =
+        React.useState(false);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -164,7 +161,7 @@ const Page: React.FC = () => {
                         friends.length + sentRequestCount >=
                         maximumSpaceFriendCount
                     ) {
-                        setFriendLimitMessage(spaceFriendLimitMessage);
+                        setShowFriendLimitToast(true);
                         return;
                     }
 
@@ -174,14 +171,8 @@ const Page: React.FC = () => {
                             requestID,
                         );
                     } catch (error: unknown) {
-                        const limitMessage = spaceFriendLimitErrorMessage(
-                            error,
-                            friendRequests.find(
-                                (request) => request.requestId == requestID,
-                            )?.friend.username,
-                        );
-                        if (limitMessage) {
-                            setFriendLimitMessage(limitMessage);
+                        if (isSpaceFriendLimitError(error)) {
+                            setShowFriendLimitToast(true);
                             return;
                         }
                         if (!isFriendRequestCanceledError(error)) throw error;
@@ -263,10 +254,9 @@ const Page: React.FC = () => {
                     onClose={() => setShowFriendRequestCanceledToast(false)}
                 />
             )}
-            {friendLimitMessage && (
+            {showFriendLimitToast && (
                 <SpaceFriendLimitToast
-                    message={friendLimitMessage}
-                    onClose={() => setFriendLimitMessage(undefined)}
+                    onClose={() => setShowFriendLimitToast(false)}
                 />
             )}
         </>
