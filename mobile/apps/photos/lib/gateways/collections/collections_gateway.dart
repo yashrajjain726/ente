@@ -1,4 +1,5 @@
 import "package:dio/dio.dart";
+import "package:photos/gateways/collections/models/collection_change.dart";
 import "package:photos/gateways/collections/models/create_request.dart";
 import "package:photos/gateways/collections/models/metadata.dart";
 
@@ -95,15 +96,24 @@ class CollectionsGateway {
     );
   }
 
-  Future<Map<String, dynamic>> getAll({
+  Future<List<RemoteCollectionChange>> getAll({
     required int sinceTime,
     required String source,
+    required int currentUserID,
   }) async {
     final response = await _enteDio.get(
       "/collections/v2",
       queryParameters: {"sinceTime": sinceTime, "source": source},
     );
-    return response.data;
+    final collections = response.data['collections'] as List<dynamic>;
+    return collections
+        .map(
+          (data) => RemoteCollectionChange.fromMap(
+            Map<String, dynamic>.from(data as Map<dynamic, dynamic>),
+            currentUserID,
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> fetchPendingRemovalActions() async {

@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ente/cli/pkg/mapper"
-	"github.com/ente/cli/pkg/model"
-	"github.com/ente/cli/utils/encoding"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/ente/cli/pkg/mapper"
+	"github.com/ente/cli/pkg/model"
+	"github.com/ente/cli/utils/encoding"
 )
 
 func (c *ClICtrl) fetchRemoteCollections(ctx context.Context) error {
@@ -23,16 +24,31 @@ func (c *ClICtrl) fetchRemoteCollections(ctx context.Context) error {
 	}
 	maxUpdated := lastSyncTime
 	for _, collection := range collections {
-		if lastSyncTime == 0 && collection.IsDeleted {
-			continue
+		if collection.UpdationTime > maxUpdated {
+			maxUpdated = collection.UpdationTime
 		}
-		album, mapErr := mapper.MapCollectionToAlbum(ctx, collection, c.KeyHolder)
-		if mapErr != nil {
-			return mapErr
+
+		var album *model.RemoteAlbum
+		if collection.IsDeleted {
+			key := []byte(strconv.FormatInt(collection.ID, 10))
+			existing, err := c.GetValue(ctx, model.RemoteAlbums, key)
+			if err != nil {
+				return err
+			}
+			album, err = markRemoteAlbumDeleted(existing, collection.ID, collection.UpdationTime)
+			if err != nil {
+				return err
+			}
+			if album == nil {
+				continue
+			}
+		} else {
+			album, err = mapper.MapCollectionToAlbum(ctx, collection, c.KeyHolder)
+			if err != nil {
+				return err
+			}
 		}
-		if album.LastUpdatedAt > maxUpdated {
-			maxUpdated = album.LastUpdatedAt
-		}
+
 		albumJson := encoding.MustMarshalJSON(album)
 		putErr := c.PutValue(ctx, model.RemoteAlbums, []byte(strconv.FormatInt(album.ID, 10)), albumJson)
 		if putErr != nil {
@@ -46,6 +62,22 @@ func (c *ClICtrl) fetchRemoteCollections(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func markRemoteAlbumDeleted(existing []byte, collectionID, updationTime int64) (*model.RemoteAlbum, error) {
+	if len(existing) == 0 {
+		return nil, nil
+	}
+	var album model.RemoteAlbum
+	if err := json.Unmarshal(existing, &album); err != nil {
+		return nil, err
+	}
+	if album.ID != collectionID {
+		return nil, fmt.Errorf("stored album ID %d does not match tombstone ID %d", album.ID, collectionID)
+	}
+	album.IsDeleted = true
+	album.LastUpdatedAt = updationTime
+	return &album, nil
 }
 
 func (c *ClICtrl) fetchRemoteFiles(ctx context.Context) error {

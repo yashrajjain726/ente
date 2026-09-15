@@ -12,6 +12,7 @@ import {
     findUserUncategorizedCollection,
     maxAlbumDescriptionLength,
     RemoteCollection,
+    RemoteCollectionChange,
     RemotePublicURL,
     type Collection,
     type CollectionNewParticipantRole,
@@ -156,7 +157,7 @@ export const getCollectionByID = async (
 };
 
 const CollectionsResponse = z.object({
-    collections: z.array(RemoteCollection),
+    collections: z.array(RemoteCollectionChange),
 });
 
 export interface CollectionChange {

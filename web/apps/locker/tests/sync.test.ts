@@ -13,6 +13,7 @@ import {
 
 vi.mock("../src/services/locker-db", () => ({
     loadLockerSnapshotFromDB: vi.fn(),
+    deleteCollectionRecords: vi.fn(),
     saveCollectionRecords: vi.fn(),
     saveCollectionsSinceTime: vi.fn(),
     saveCollectionSinceTime: vi.fn(),
@@ -23,6 +24,9 @@ vi.mock("../src/services/locker-db", () => ({
     saveTrashFileRecords: vi.fn(),
     deleteTrashFileRecords: vi.fn(),
     saveTrashSinceTime: vi.fn(),
+}));
+vi.mock("ente-accounts/services/user", () => ({
+    ensureLocalUser: () => ({ id: 1 }),
 }));
 const { openCollectionKey, decryptMetadataJSON } = vi.hoisted(() => ({
     openCollectionKey: vi.fn(),
@@ -240,6 +244,94 @@ test("incremental sync paginates changed collections and trash, skipping up-to-d
     ).toBeLessThan(
         vi.mocked(db.saveCollectionSinceTime).mock.invocationCallOrder[0]!,
     );
+});
+
+test("collection changes remove foreign deletions and retain owned records", async () => {
+    const afterDeletion = {
+        ...snapshot(),
+        collections: new Map([[2, collection(2)]]),
+        files: [file(10, 2)],
+        collectionsSinceTime: 9,
+        collectionSinceTimeByID: new Map([[2, 20]]),
+    };
+    vi.mocked(db.loadLockerSnapshotFromDB)
+        .mockResolvedValueOnce(snapshot())
+        .mockResolvedValueOnce(afterDeletion)
+        .mockResolvedValueOnce(afterDeletion);
+    fetchMock
+        .mockResolvedValueOnce(
+            response({
+                collections: [
+                    {
+                        id: 1,
+                        owner: { id: 7, email: "" },
+                        encryptedKey: "legacy-key",
+                        type: "folder",
+                        updationTime: 9,
+                        isDeleted: true,
+                    },
+                    {
+                        id: 3,
+                        owner: { id: 7 },
+                        updationTime: 10,
+                        isDeleted: true,
+                        futureField: "ignored",
+                    },
+                    {
+                        id: 4,
+                        owner: { id: 1 },
+                        encryptedKey: "owned-key",
+                        type: "folder",
+                        updationTime: 11,
+                        isDeleted: true,
+                    },
+                    {
+                        id: 5,
+                        owner: { id: 1 },
+                        encryptedKey: "active-key",
+                        type: "folder",
+                        updationTime: 12,
+                        isDeleted: false,
+                    },
+                ],
+            }),
+        )
+        .mockResolvedValueOnce(response({ diff: [], hasMore: false }));
+
+    await syncLockerState();
+
+    expect(db.deleteCollectionRecords).toHaveBeenCalledExactlyOnceWith([1, 3]);
+    expect(db.deleteFileRecordsForCollection).toHaveBeenCalledTimes(3);
+    expect(db.deleteFileRecordsForCollection).toHaveBeenCalledWith(1);
+    expect(db.deleteFileRecordsForCollection).toHaveBeenCalledWith(3);
+    expect(db.deleteFileRecordsForCollection).toHaveBeenCalledWith(4);
+    expect(db.deleteCollectionSinceTime).toHaveBeenCalledTimes(3);
+    expect(db.deleteCollectionSinceTime).toHaveBeenCalledWith(1);
+    expect(db.deleteCollectionSinceTime).toHaveBeenCalledWith(3);
+    expect(db.deleteCollectionSinceTime).toHaveBeenCalledWith(4);
+    expect(db.saveCollectionRecords).toHaveBeenCalledExactlyOnceWith([
+        expect.objectContaining({
+            id: 4,
+            encryptedKey: "owned-key",
+            isDeleted: true,
+        }),
+        expect.objectContaining({
+            id: 5,
+            encryptedKey: "active-key",
+            isDeleted: false,
+        }),
+    ]);
+    expect(db.saveCollectionsSinceTime).toHaveBeenCalledExactlyOnceWith(12);
+    expect(openCollectionKey).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        "legacy-key",
+        expect.anything(),
+    );
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+        "/collections/v2?sinceTime=5",
+        "/trash/v2/diff?sinceTime=40",
+    ]);
 });
 
 test("failed file pagination does not persist a partial diff or advance its cursor", async () => {

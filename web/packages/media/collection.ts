@@ -136,6 +136,26 @@ export const RemoteCollection = z.looseObject({
 
 export type RemoteCollection = z.infer<typeof RemoteCollection>;
 
+export const RemoteCollectionDeletionTombstone = z.object({
+    id: z.number(),
+    owner: z.object({ id: z.number() }),
+    updationTime: z.number(),
+    isDeleted: z.literal(true),
+});
+
+export type RemoteCollectionDeletionTombstone = z.infer<
+    typeof RemoteCollectionDeletionTombstone
+>;
+
+const RemoteActiveCollection = RemoteCollection.extend({
+    isDeleted: z.literal(false).nullish().transform(nullToUndefined),
+});
+
+export const RemoteCollectionChange = z.union([
+    RemoteCollectionDeletionTombstone,
+    RemoteActiveCollection,
+]);
+
 export const decryptRemoteCollection = async (
     collection: RemoteCollection,
     collectionKey: string,

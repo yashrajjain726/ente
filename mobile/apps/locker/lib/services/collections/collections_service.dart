@@ -17,6 +17,7 @@ import 'package:locker/events/collections_updated_event.dart';
 import 'package:locker/events/user_details_refresh_event.dart';
 import "package:locker/services/collections/collections_api_client.dart";
 import 'package:locker/services/collections/models/collection.dart';
+import 'package:locker/services/collections/models/collection_change.dart';
 import "package:locker/services/collections/models/files_split.dart";
 import "package:locker/services/collections/models/public_url.dart";
 import 'package:locker/services/configuration.dart';
@@ -79,9 +80,10 @@ class CollectionService {
     final previousSyncTime = _db.getSyncTime();
     final shouldCheckFirstSyncCompletion = previousSyncTime == 0;
 
-    final updatedCollections = await CollectionApiClient.instance
-        .getCollections(previousSyncTime);
-    if (updatedCollections.isEmpty) {
+    final collectionChanges = await CollectionApiClient.instance.getCollections(
+      previousSyncTime,
+    );
+    if (collectionChanges.isEmpty) {
       if (shouldCheckFirstSyncCompletion) {
         final didMarkFirstSync = await _setFirstSyncCompleted();
         if (didMarkFirstSync) {
@@ -93,17 +95,29 @@ class CollectionService {
       _logger.info("No collections to sync.");
       return;
     }
-    await _db.updateCollections(updatedCollections);
-    for (final collection in updatedCollections) {
+    final persistedCollections = <Collection>[];
+    var latestUpdationTime = previousSyncTime;
+    for (final change in collectionChanges) {
+      latestUpdationTime = max(latestUpdationTime, change.updationTime);
+      if (change is CollectionDeletion) {
+        await _db.deleteCollection(change.id);
+        _collectionIDToCollections.remove(change.id);
+        continue;
+      }
+      final collection = (change as CollectionUpdate).collection;
+      persistedCollections.add(collection);
       _collectionIDToCollections[collection.id] = collection;
     }
-    await _db.setSyncTime(updatedCollections.last.updationTime);
+    if (persistedCollections.isNotEmpty) {
+      await _db.updateCollections(persistedCollections);
+    }
+    await _db.setSyncTime(latestUpdationTime);
     if (shouldCheckFirstSyncCompletion) {
       await _setFirstSyncCompleted();
     }
 
     final List<Future<bool>> fileFutures = [];
-    for (final collection in updatedCollections) {
+    for (final collection in persistedCollections) {
       if (collection.isDeleted) {
         continue;
       }
@@ -143,7 +157,7 @@ class CollectionService {
         "Skipping offline stale cleanup because one or more collection syncs failed",
       );
     }
-    if (updatedCollections.isNotEmpty) {
+    if (collectionChanges.isNotEmpty) {
       Bus.instance.fire(CollectionsUpdatedEvent('sync'));
     }
   }
