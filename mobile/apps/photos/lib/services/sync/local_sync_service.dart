@@ -79,6 +79,13 @@ class LocalSyncService {
     if (Platform.isIOS && Configuration.instance.hasConfiguredAccount()) {
       final hadPermission = permissionService.hasGrantedPermissions();
       await permissionService.refreshPermissionState();
+      if (permissionService.hasGrantedLimitedPermissions() &&
+          !hasCompletedFirstImport() &&
+          !backupPreferenceService.hasSelectedAnyBackupFolder &&
+          !backupPreferenceService.hasManualFolderSelection &&
+          !backupPreferenceService.hasSkippedOnboardingPermission) {
+        await backupPreferenceService.setSelectAllFoldersForBackup(true);
+      }
       if (!hadPermission && permissionService.hasGrantedPermissions()) {
         Bus.instance.fire(PermissionGrantedEvent());
       }
