@@ -1038,16 +1038,6 @@
       }
     }
   },
-  "deleteMultipleFilesDialogBody": "{count, plural, one{{count} item} other{{count} items}} will be deleted permanently.",
-  "@deleteMultipleFilesDialogBody": {
-    "description": "Confirmation message body for deleting multiple items",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "example": "3"
-      }
-    }
-  },
   "deleteNotSupportedForSharedFiles": "Delete is not supported for shared files",
   "deleteOnDeviceFiles": "Delete on device files",
   "deletePhotos": "Delete photos",
@@ -2103,6 +2093,15 @@
   },
   "itemsShowTheNumberOfDaysRemainingBeforePermanentDeletion": "Items show the number of days remaining before permanent deletion",
   "itemsStored": "Items stored",
+  "itemsWillBeDeletedFromAllCollections": "{count, plural, one{This item will be deleted from all collections. You can recover it from Trash.} other{These items will be deleted from all collections. You can recover them from Trash.}}",
+  "@itemsWillBeDeletedFromAllCollections": {
+    "description": "Confirmation message explaining that deleted items leave every collection and remain recoverable from Trash.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "itemsWillBeRemovedFromAlbum": "Selected items will be removed from this album",
   "itLooksLikeSomethingWentWrongPleaseRetryAfterSome": "It looks like something went wrong. Please retry after some time. If the error persists, please contact our support team.",
   "@itLooksLikeSomethingWentWrongPleaseRetryAfterSome": {
@@ -2675,6 +2674,7 @@
   "moveSelectedPhotosToOneDate": "Move selected photos to one date",
   "moveToAlbum": "Move to album",
   "moveToHiddenAlbum": "Move to hidden album",
+  "moveToTrashQuestion": "Move to Trash?",
   "movingFilesToAlbum": "Moving files to album...",
   "muteAudio": "Mute audio",
   "name": "Name",
@@ -4827,16 +4827,6 @@
   "yesDeleteCollections": "Yes, delete {count, plural, one{collection} other{collections}}",
   "@yesDeleteCollections": {
     "description": "Button label for confirming deletion of one or more collections",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "example": "3"
-      }
-    }
-  },
-  "yesDeleteFiles": "Yes, delete {count, plural, one{item} other{items}}",
-  "@yesDeleteFiles": {
-    "description": "Button label for confirming deletion of one or more items",
     "placeholders": {
       "count": {
         "type": "int",
