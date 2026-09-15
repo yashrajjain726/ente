@@ -76,6 +76,13 @@ class LocalSyncService {
   }
 
   Future<void> sync() async {
+    if (Platform.isIOS && Configuration.instance.hasConfiguredAccount()) {
+      final hadPermission = permissionService.hasGrantedPermissions();
+      await permissionService.refreshPermissionState();
+      if (!hadPermission && permissionService.hasGrantedPermissions()) {
+        Bus.instance.fire(PermissionGrantedEvent());
+      }
+    }
     if (!permissionService.hasGrantedPermissions()) {
       _logger.info("Skipping local sync since permission has not been granted");
       return;
