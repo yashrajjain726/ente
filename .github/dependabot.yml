@@ -15,3 +15,9 @@ updates:
         applies-to: "security-updates"
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/infra/workers"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
