@@ -3,7 +3,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use ente_vecdb::{VecDb, VecDbError};
+use ente_vecdb::{VecDb, VecDbError, validate_key};
 
 use super::{Error, IndexResult, Result, state};
 use crate::ml_db::{CLIP_EMBEDDING_DIMENSIONS, MlDb};
@@ -78,6 +78,10 @@ impl Index {
     }
 
     pub(super) fn accepts(self, key: &str, vector: &[f32]) -> bool {
+        if let Err(error) = validate_key(key) {
+            log::warn!("skipping {} vector {key:?}: {error}", self.name());
+            return false;
+        }
         if vector.is_empty() {
             return false;
         }
@@ -164,7 +168,7 @@ impl Slot {
             state::invalidate_lost_index(db, self.index, &self.path)?;
         }
         match VecDb::open(&self.path, self.index.dims(), None) {
-            Err(error) if is_header_mismatch(&error) => {
+            Err(error) if is_unusable(&error) => {
                 log::warn!("{}: {error}; purging the index", self.path.display());
                 state::mark_stale(db, self.index)?;
                 VecDb::purge(&self.path)?;
@@ -187,10 +191,12 @@ impl Slot {
     }
 }
 
-fn is_header_mismatch(error: &VecDbError) -> bool {
+fn is_unusable(error: &VecDbError) -> bool {
     matches!(
         error,
-        VecDbError::DimensionMismatch { .. } | VecDbError::StorageMismatch { .. }
+        VecDbError::Corrupt(_)
+            | VecDbError::DimensionMismatch { .. }
+            | VecDbError::StorageMismatch { .. }
     )
 }
 
@@ -203,15 +209,20 @@ fn unless_closed<T>(outcome: IndexResult<T>) -> Option<Result<T>> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::Path;
+
     use ente_vecdb::{OpenCost, StorageKind, VecDb};
 
     use super::Index;
     use crate::db::Connection;
     use crate::ml_db::CLIP_EMBEDDING_DIMENSIONS;
     use crate::ml_store::tests::{
-        DB_FILE, clips, index_path, live_count, lose_index_files, meta, one_hot, open,
+        DB_FILE, centroid, clips, index_path, live_count, lose_index_files, meta, one_hot, open,
+        pet,
     };
-    use crate::ml_store::{Error, FillOutcome, FillState, MlStore};
+    use crate::ml_store::{Error, FillOutcome, FillReport, FillState, MlStore, Species};
 
     #[test]
     fn index_positions_follow_the_all_order() {
@@ -258,6 +269,79 @@ mod tests {
         assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Stale);
         assert_eq!(store.stats(Index::Clip).unwrap().storage, StorageKind::I8);
         assert_eq!(live_count(&store, Index::Clip), 0);
+    }
+
+    fn corrupt_header(path: &Path) {
+        let mut bytes = fs::read(path).unwrap();
+        for byte in &mut bytes[..4] {
+            *byte ^= 0xFF;
+        }
+        fs::write(path, bytes).unwrap();
+    }
+
+    fn corrupt_log_body(path: &Path) {
+        let mut bytes = fs::read(path).unwrap();
+        let middle = bytes.len() / 2;
+        for byte in &mut bytes[middle..middle + 64] {
+            *byte ^= 0x5A;
+        }
+        fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn corrupt_index_files_are_purged_and_marked_stale() {
+        let corruptions: [fn(&Path); 2] = [corrupt_header, corrupt_log_body];
+        for corrupt in corruptions {
+            let (directory, store) = open();
+            store.db().insert_clip_rows(&clips(1..=50)).unwrap();
+            store.fill_clip_index(false).unwrap();
+            store.release().unwrap();
+            corrupt(&index_path(&directory, Index::Clip));
+
+            assert!(!store.contains(Index::Clip, "1").unwrap());
+            assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Stale);
+            assert_eq!(store.fill_clip_index(false).unwrap().indexed, 50);
+            assert!(store.contains(Index::Clip, "1").unwrap());
+            assert_eq!(live_count(&store, Index::Clip), 50);
+        }
+    }
+
+    #[test]
+    fn keys_vecdb_rejects_are_skipped_like_malformed_vectors() {
+        let (_directory, store) = open();
+        store.fill_cluster_centroid_index(false).unwrap();
+        let long_id = "k".repeat(257);
+        store
+            .cluster_summary_update(&HashMap::from([
+                centroid("", 1),
+                centroid(&long_id, 2),
+                centroid("c3", 3),
+            ]))
+            .unwrap();
+        assert_eq!(store.db().count_cluster_summaries().unwrap(), 3);
+        assert_eq!(live_count(&store, Index::ClusterCentroid), 1);
+        assert!(store.contains(Index::ClusterCentroid, "c3").unwrap());
+        assert_eq!(
+            store.fill_cluster_centroid_index(true).unwrap(),
+            FillReport {
+                outcome: FillOutcome::Completed,
+                rows: 3,
+                indexed: 1,
+                skipped: 2,
+                resumed: false
+            }
+        );
+        assert_eq!(live_count(&store, Index::ClusterCentroid), 1);
+
+        let dims = Index::PetFace(Species::Dog).dims();
+        store
+            .store_pet_face_embeddings(&[
+                pet("", Species::Dog, 1, dims),
+                pet("p", Species::Dog, 2, dims),
+            ])
+            .unwrap();
+        assert_eq!(live_count(&store, Index::PetFace(Species::Dog)), 1);
+        assert!(store.contains(Index::PetFace(Species::Dog), "p").unwrap());
     }
 
     #[test]
