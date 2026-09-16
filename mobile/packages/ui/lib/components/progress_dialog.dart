@@ -175,6 +175,10 @@ class ProgressDialog {
         if (identical(_route, route)) _route = null;
       }),
     );
+    final animation = route.animation;
+    do {
+      await WidgetsBinding.instance.endOfFrame;
+    } while (route.isActive && animation != null && animation.value == 0);
     if (_showLogs) debugPrint('ProgressDialog shown');
     return true;
   }
