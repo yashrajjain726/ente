@@ -1,3 +1,4 @@
+import { PhotosAuthShell } from "@/components/PhotosAuthShell";
 import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CircularProgress, styled } from "@mui/material";
@@ -14,6 +15,16 @@ import type { VerifyingPasskeyPresentationProps } from "ente-accounts/components
 import { t } from "i18next";
 import type React from "react";
 import { Trans } from "react-i18next";
+
+export function PasskeyVerificationPresentation(
+    props: VerifyingPasskeyPresentationProps,
+): React.JSX.Element {
+    return (
+        <PhotosAuthShell>
+            <PasskeyVerificationForm {...props} />
+        </PhotosAuthShell>
+    );
+}
 
 export function PasskeyVerificationForm({
     email,
