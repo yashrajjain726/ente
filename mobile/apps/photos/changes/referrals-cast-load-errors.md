@@ -1,1 +1,0 @@
-- Show load errors for Referrals and Cast sessions.

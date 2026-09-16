@@ -1,1 +1,0 @@
-- Removed quotation marks around captions in the file viewer.

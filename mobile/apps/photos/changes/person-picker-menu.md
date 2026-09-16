@@ -1,1 +1,0 @@
-- Updated the person picker app bar and sort menu, and fixed overflowing person names.

@@ -1,1 +1,0 @@
-- Added Slideshow to on-device albums.

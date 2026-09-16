@@ -1,1 +1,0 @@
-- Added separate mute controls for music and videos in Memories.
