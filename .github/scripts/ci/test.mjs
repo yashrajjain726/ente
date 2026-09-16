@@ -172,13 +172,13 @@ function select(t, files, before = []) {
     const cwd = mkdtempSync(join(tmpdir(), "ente-ci-"));
     t.after(() => rmSync(cwd, { recursive: true }));
     const git = (...args) =>
-        execFileSync("git", args, {
-            cwd,
-            encoding: "utf8",
-            input: "fixture\n",
-        }).trim();
+        execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
     git("init", "-q");
-    const blob = git("hash-object", "-w", "--stdin");
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+        cwd,
+        encoding: "utf8",
+        input: "fixture\n",
+    }).trim();
     const tree = (files) => {
         git("read-tree", "--empty");
         for (const file of files)
