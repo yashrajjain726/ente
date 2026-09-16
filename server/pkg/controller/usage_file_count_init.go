@@ -91,8 +91,10 @@ func (c *FileCountInitializer) initializeUser(userID int64) bool {
 			log.WithError(cleanupErr).WithField("user_id", userID).Error("Failed to find stale deleted file memberships")
 		}
 		cleaned := false
+		retryNow := len(fileIDs) < repo.StaleDeletedFileLimit
 		for _, fileID := range fileIDs {
 			if cleanupErr := c.TrashRepo.CleanUpDeletedFilesFromCollection(ctx, []int64{fileID}, userID); cleanupErr != nil {
+				retryNow = false
 				log.WithError(cleanupErr).WithFields(log.Fields{
 					"user_id": userID,
 					"file_id": fileID,
@@ -101,8 +103,15 @@ func (c *FileCountInitializer) initializeUser(userID int64) bool {
 				cleaned = true
 			}
 		}
+		if !cleaned || !retryNow {
+			log.WithError(err).WithField("user_id", userID).Warn("File count initialization ineligible")
+			return cleaned
+		}
+		initialized, err = c.UsageRepo.InitializeFileCounts(ctx, userID)
+	}
+	if errors.Is(err, repo.ErrFileCountIneligible) {
 		log.WithError(err).WithField("user_id", userID).Warn("File count initialization ineligible")
-		return cleaned
+		return false
 	}
 	if err != nil {
 		log.WithError(err).WithField("user_id", userID).Error("Failed to initialize file counts")
