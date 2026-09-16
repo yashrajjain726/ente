@@ -6,8 +6,8 @@ import dev.detekt.gradle.extensions.DetektExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
-    id("com.android.application") version "8.10.1" apply false
-    id("com.android.library") version "8.10.1" apply false
+    id("com.android.application") version "8.12.2" apply false
+    id("com.android.library") version "8.12.2" apply false
     id("com.ncorti.ktfmt.gradle") version "0.27.0"
     id("dev.detekt") version "2.0.0-alpha.6"
     id("org.jetbrains.kotlin.android") version "2.4.20" apply false
