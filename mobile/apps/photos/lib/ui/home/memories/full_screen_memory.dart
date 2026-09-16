@@ -1355,9 +1355,6 @@ class _MemoryViewerScrimsAndCaption extends StatelessWidget {
         final file = inheritedData.memories[safeIndex].file;
         final caption = file.caption;
         final captionText = caption == null || caption.isEmpty ? null : caption;
-        final captionStyle = component.TextStyles.mini.copyWith(
-          color: Colors.white.withValues(alpha: 0.8),
-        );
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -1432,20 +1429,13 @@ class _MemoryViewerScrimsAndCaption extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
                     onTap: () => unawaited(showDetailsSheet(context, file)),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('"', style: captionStyle),
-                        Flexible(
-                          child: Text(
-                            captionText,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: captionStyle,
-                          ),
-                        ),
-                        Text('"', style: captionStyle),
-                      ],
+                    child: Text(
+                      captionText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: component.TextStyles.mini.copyWith(
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
                     ),
                   ),
                 ),
