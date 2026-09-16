@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	ErrAlreadyFriends                 = errors.New("space users are already friends")
-	ErrSelfFriendship                 = errors.New("space users cannot friend themselves")
-	ErrSpaceFriendRequestLimitReached = errors.New("space friend request limit reached")
-	ErrSpaceFriendRequestStale        = errors.New("space friend request keys are stale")
+	ErrAlreadyFriends                     = errors.New("space users are already friends")
+	ErrSelfFriendship                     = errors.New("space users cannot friend themselves")
+	ErrSpaceFriendRequestLimitReached     = errors.New("space friend request limit reached")
+	ErrSpaceSentFriendRequestLimitReached = errors.New("space sent friend request limit reached")
+	ErrSpaceFriendRequestStale            = errors.New("space friend request keys are stale")
 )
 
 const MaxPendingFriendRequestsPerSpace = 100
@@ -207,6 +208,18 @@ func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID
 		return &reverse, false, true, stacktrace.Propagate(tx.Commit(), "")
 	case !errors.Is(err, sql.ErrNoRows):
 		return nil, false, false, stacktrace.Propagate(err, "")
+	}
+
+	var sentRequestCount int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM space_friend_requests
+		WHERE requester_space_id = $1
+	`, requesterSpaceID).Scan(&sentRequestCount); err != nil {
+		return nil, false, false, stacktrace.Propagate(err, "")
+	}
+	if sentRequestCount >= MaxPendingFriendRequestsPerSpace {
+		return nil, false, false, ErrSpaceSentFriendRequestLimitReached
 	}
 
 	var pendingRequestCount int
