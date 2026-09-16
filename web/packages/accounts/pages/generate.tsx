@@ -1,4 +1,7 @@
 import { Divider } from "@mui/material";
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { RecoveryKeyForm } from "ente-accounts/components/auth/RecoveryKeyForm";
+import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
 import {
     AccountsPageContents,
     AccountsPageFooter,
@@ -50,10 +53,17 @@ export interface GeneratePageProps {
 }
 
 const Page: React.FC<GeneratePageProps> = ({
-    passwordPresentation,
-    recoveryKeyPresentation,
+    passwordPresentation: explicitPasswordPresentation,
+    recoveryKeyPresentation: explicitRecoveryKeyPresentation,
     onRecoveryKeyClose,
 }) => {
+    const { Shell, recoveryKeyCloseDestination } = useAuthPageConfig();
+    const passwordPresentation =
+        explicitPasswordPresentation ??
+        (Shell ? ConfiguredPasswordPresentation : undefined);
+    const recoveryKeyPresentation =
+        explicitRecoveryKeyPresentation ??
+        (Shell ? ConfiguredRecoveryKeyPresentation : undefined);
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState("");
@@ -110,7 +120,7 @@ const Page: React.FC<GeneratePageProps> = ({
         if (onRecoveryKeyClose) {
             onRecoveryKeyClose();
         } else {
-            void router.push(appHomeRoute);
+            void router.push(recoveryKeyCloseDestination ?? appHomeRoute);
         }
     }
 
@@ -160,3 +170,25 @@ const Page: React.FC<GeneratePageProps> = ({
 };
 
 export default Page;
+
+function ConfiguredPasswordPresentation(
+    props: NewPasswordPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <SetPasswordForm {...props} />
+        </Shell>
+    );
+}
+
+function ConfiguredRecoveryKeyPresentation(
+    props: RecoveryKeyPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <RecoveryKeyForm {...props} />
+        </Shell>
+    );
+}

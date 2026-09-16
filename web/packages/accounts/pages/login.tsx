@@ -16,7 +16,8 @@ export interface LoginPageProps {
 }
 
 const Page: React.FC<LoginPageProps> = ({ presentation }) => {
-    const { Shell } = useAuthPageConfig();
+    const { Shell, LoginFrame, keepLoginLoadingOnRedirect } =
+        useAuthPageConfig();
     const Presentation =
         presentation ?? (Shell ? ConfiguredLoginPresentation : undefined);
     const [loading, setLoading] = useState(true);
@@ -24,22 +25,36 @@ const Page: React.FC<LoginPageProps> = ({ presentation }) => {
 
     const router = useRouter();
 
+    const refreshHost = useCallback(
+        () => void customAPIHost().then(setHost),
+        [],
+    );
+
     useEffect(() => {
-        void customAPIHost().then(setHost);
-        if (savedPartialLocalUser()?.email) void router.replace("/verify");
+        refreshHost();
+        if (savedPartialLocalUser()?.email) {
+            void router.replace("/verify");
+            if (keepLoginLoadingOnRedirect) return;
+        }
         setLoading(false);
-    }, [router]);
+    }, [router, refreshHost, keepLoginLoadingOnRedirect]);
 
     const onSignUp = useCallback(() => void router.push("/signup"), [router]);
 
-    return loading ? (
-        <LoadingIndicator />
-    ) : Presentation ? (
+    if (loading) return <LoadingIndicator />;
+
+    const contents = Presentation ? (
         <LoginContents {...{ host, onSignUp }} presentation={Presentation} />
     ) : (
         <AccountsPageContents>
             <LoginContents {...{ host, onSignUp }} />
         </AccountsPageContents>
+    );
+
+    return LoginFrame ? (
+        <LoginFrame onHostChanged={refreshHost}>{contents}</LoginFrame>
+    ) : (
+        contents
     );
 };
 

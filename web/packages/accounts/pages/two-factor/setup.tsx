@@ -1,4 +1,8 @@
 import { Paper, Stack, styled, Typography } from "@mui/material";
+import {
+    useAuthPageConfig,
+    type AuthPageConfig,
+} from "ente-accounts/components/auth/AuthPageProvider";
 import { CodeBlock } from "ente-accounts/components/CodeBlock";
 import { Verify2FACodeForm } from "ente-accounts/components/Verify2FACodeForm";
 import { appHomeRoute } from "ente-accounts/services/redirect";
@@ -18,14 +22,15 @@ import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 
 export interface TwoFactorSetupPageProps {
-    encryptWithRecoveryKey: (
-        data: string,
-    ) => Promise<{ encryptedData: string; nonce: string }>;
+    encryptWithRecoveryKey?: AuthPageConfig["encryptWithRecoveryKey"];
 }
 
 const Page: React.FC<TwoFactorSetupPageProps> = ({
-    encryptWithRecoveryKey,
+    encryptWithRecoveryKey: explicitEncryptWithRecoveryKey,
 }) => {
+    const config = useAuthPageConfig();
+    const encryptWithRecoveryKey =
+        explicitEncryptWithRecoveryKey ?? config.encryptWithRecoveryKey;
     const [twoFactorSecret, setTwoFactorSecret] = useState<
         TwoFactorSecret | undefined
     >();
@@ -37,6 +42,8 @@ const Page: React.FC<TwoFactorSetupPageProps> = ({
     }, []);
 
     const handleSubmit = async (otp: string) => {
+        if (!encryptWithRecoveryKey)
+            throw new Error("Two-factor setup encryption is not configured");
         await setupTwoFactorFinish(
             await encryptWithRecoveryKey(twoFactorSecret!.secretCode),
             otp,
