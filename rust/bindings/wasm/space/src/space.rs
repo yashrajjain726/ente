@@ -30,10 +30,6 @@ impl Error {
             Self::Space(ente_space::Error::SpaceSlugReserved) => Some("space_slug_reserved"),
             Self::Space(ente_space::Error::InvalidSpaceSlug) => Some("invalid_space_slug"),
             Self::Space(ente_space::Error::PostLimitReached) => Some("post_limit_reached"),
-            Self::Space(ente_space::Error::FriendLimitReached) => Some("friend_limit_reached"),
-            Self::Space(ente_space::Error::OtherFriendLimitReached) => {
-                Some("other_friend_limit_reached")
-            }
             Self::Space(ente_space::Error::ProfileNotFound) => Some("profile_not_found"),
             Self::Space(ente_space::Error::SelfFriendship) => Some("self_friendship"),
             Self::Space(ente_space::Error::FriendRequestLimitReached) => {
@@ -160,14 +156,6 @@ struct PostJs {
 struct PostPageJs {
     items: Vec<PostJs>,
     next_cursor: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HomePostPageJs {
-    items: Vec<PostJs>,
-    next_cursor: String,
-    sync_cursor: String,
 }
 
 #[derive(Serialize)]
@@ -467,26 +455,6 @@ async fn account_post_page_to_js(
     Ok(PostPageJs {
         items,
         next_cursor: page.next_cursor,
-    })
-}
-
-async fn account_home_post_page_to_js(
-    ctx: &AccountSpaceCtx,
-    page: ente_space::HomePostPage,
-) -> Result<HomePostPageJs, Error> {
-    let sync_cursor = page.sync_cursor;
-    let page = account_post_page_to_js(
-        ctx,
-        ente_space::PostPage {
-            items: page.items,
-            next_cursor: page.next_cursor,
-        },
-    )
-    .await?;
-    Ok(HomePostPageJs {
-        items: page.items,
-        next_cursor: page.next_cursor,
-        sync_cursor,
     })
 }
 
@@ -1011,19 +979,15 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    #[wasm_bindgen(js_name = listHomePosts)]
-    pub async fn list_home_posts(
+    #[wasm_bindgen(js_name = listFeed)]
+    pub async fn list_feed(
         &self,
         space_id: String,
-        after: Option<String>,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<JsValue, Error> {
-        let page = self
-            .inner
-            .list_home_posts(&space_id, after, cursor, limit)
-            .await?;
-        swb::to_value(&account_home_post_page_to_js(&self.inner, page).await?).map_err(Into::into)
+        let page = self.inner.list_feed(&space_id, cursor, limit).await?;
+        swb::to_value(&account_post_page_to_js(&self.inner, page).await?).map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = unreadStatus)]
