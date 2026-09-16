@@ -153,12 +153,10 @@ class _AlbumsItemWidgetState extends State<AlbumsItemWidget> {
 
   bool _canRemoveFrom(Collection collection) {
     if (collection.type == CollectionType.uncategorized ||
+        collection.type == CollectionType.favorites ||
         collection.isQuickLinkCollection() ||
         collection.isDefaultHidden()) {
       return false;
-    }
-    if (collection.type == CollectionType.favorites) {
-      return widget.file.ownerID == widget.currentUserID;
     }
     return widget.file.ownerID == widget.currentUserID ||
         CollectionsService.instance.canRemoveFilesFromAllParticipants(
@@ -173,25 +171,21 @@ class _AlbumsItemWidgetState extends State<AlbumsItemWidget> {
     final selectedFiles = SelectedFiles();
     selectedFiles.files.add(widget.file);
     final collectionActions = CollectionActions(CollectionsService.instance);
-    if (collection.type == CollectionType.favorites) {
-      await collectionActions.updateFavorites(context, [widget.file], false);
-    } else {
-      final removingOthersFile =
-          widget.file.ownerID != widget.currentUserID &&
-          CollectionsService.instance.canRemoveFilesFromAllParticipants(
-            collection,
-          );
-      await collectionActions.showRemoveFromCollectionSheetV2(
-        context,
-        collection,
-        selectedFiles,
-        removingOthersFile,
-        isHidden: collection.isHidden(),
-        body: removingOthersFile
-            ? null
-            : context.strings.itemWillBeRemovedFromThisFolder,
-      );
-    }
+    final removingOthersFile =
+        widget.file.ownerID != widget.currentUserID &&
+        CollectionsService.instance.canRemoveFilesFromAllParticipants(
+          collection,
+        );
+    await collectionActions.showRemoveFromCollectionSheetV2(
+      context,
+      collection,
+      selectedFiles,
+      removingOthersFile,
+      isHidden: collection.isHidden(),
+      body: removingOthersFile
+          ? null
+          : context.strings.itemWillBeRemovedFromThisFolder,
+    );
     if (mounted) setState(() {});
   }
 }
