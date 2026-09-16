@@ -281,21 +281,27 @@ class _AlbumVerticalListWidgetState extends State<AlbumVerticalListWidget> {
   Widget _getNewAlbumWidget(BuildContext context, int filesCount) {
     return NewAlbumListItemWidget(
       onTap: (context) async {
-        await _createNewAlbumOnTap(context, filesCount);
+        await _createNewAlbumOnTap(
+          context,
+          filesCount,
+          initialAlbumName: widget.searchQuery,
+        );
       },
     );
   }
 
   Future<void> _createNewAlbumOnTap(
     BuildContext context,
-    int filesCount,
-  ) async {
+    int filesCount, {
+    String initialAlbumName = "",
+  }) async {
     if (filesCount > 0) {
       final result = await showTextInputDialog(
         context,
         title: context.strings.albumTitle,
         submitButtonLabel: context.strings.ok,
         hintText: context.strings.enterAlbumName,
+        initialValue: initialAlbumName,
         onSubmit: (name) async {
           return await _nameAlbum(context, name);
         },
