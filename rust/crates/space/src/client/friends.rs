@@ -14,6 +14,7 @@ fn map_friend_mutation_error(error: http::Error) -> Error {
         http::Error::Api { code, .. } => match code.as_str() {
             "SPACE_SELF_FRIENDSHIP" => Error::SelfFriendship,
             "SPACE_FRIEND_REQUEST_LIMIT_REACHED" => Error::FriendRequestLimitReached,
+            "SPACE_SENT_FRIEND_REQUEST_LIMIT_REACHED" => Error::SentFriendRequestLimitReached,
             "SPACE_FRIEND_REQUEST_UNAVAILABLE" => Error::FriendRequestUnavailable,
             _ => error.into(),
         },

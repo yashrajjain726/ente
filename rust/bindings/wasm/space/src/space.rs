@@ -35,6 +35,9 @@ impl Error {
             Self::Space(ente_space::Error::FriendRequestLimitReached) => {
                 Some("friend_request_limit_reached")
             }
+            Self::Space(ente_space::Error::SentFriendRequestLimitReached) => {
+                Some("sent_friend_request_limit_reached")
+            }
             Self::Space(ente_space::Error::FriendRequestUnavailable) => {
                 Some("friend_request_unavailable")
             }
