@@ -9,7 +9,7 @@ const THREE_MONTHS_MILLIS: i64 = 90 * 24 * 60 * 60 * 1000;
 impl MlDb {
     pub fn put_repeated_text_embedding_cache(&self, query: &str, embedding: &[f64]) -> Result<()> {
         let embedding_bytes = encode_f32(embedding.iter().map(|value| *value as f32));
-        self.db.execute(
+        self.execute(
             r#"
             INSERT OR REPLACE INTO text_embeddings_cache (text_query, embedding, ml_version, created_at)
             VALUES (?, ?, ?, ?)
@@ -20,7 +20,7 @@ impl MlDb {
     }
 
     pub fn get_repeated_text_embedding_cache(&self, query: &str) -> Result<Option<Vec<f32>>> {
-        let results: Vec<(Vec<u8>, i64, i64)> = self.db.read_all(
+        let results: Vec<(Vec<u8>, i64, i64)> = self.read_all(
             r#"
             SELECT embedding, ml_version, created_at
             FROM text_embeddings_cache
@@ -38,7 +38,7 @@ impl MlDb {
                 return Ok(Some(decode_f32(embedding)));
             }
         }
-        self.db.execute(
+        self.execute(
             "DELETE FROM text_embeddings_cache WHERE text_query = ?",
             [query],
         )?;
@@ -50,7 +50,7 @@ impl MlDb {
         person_or_cluster_id: &str,
         face_id: &str,
     ) -> Result<()> {
-        self.db.execute(
+        self.execute(
             "INSERT OR REPLACE INTO face_cache (person_or_cluster_id, face_id) VALUES (?, ?)",
             [person_or_cluster_id, face_id],
         )?;
@@ -61,19 +61,18 @@ impl MlDb {
         &self,
         person_or_cluster_id: &str,
     ) -> Result<Option<String>> {
-        self.db
-            .read_optional(
-                "SELECT face_id FROM face_cache WHERE person_or_cluster_id = ?",
-                [person_or_cluster_id],
-            )
-            .map_err(Into::into)
+        self.read_optional(
+            "SELECT face_id FROM face_cache WHERE person_or_cluster_id = ?",
+            [person_or_cluster_id],
+        )
+        .map_err(Into::into)
     }
 
     pub fn remove_face_id_cached_for_person_or_cluster(
         &self,
         person_or_cluster_id: &str,
     ) -> Result<()> {
-        self.db.execute(
+        self.execute(
             "DELETE FROM face_cache WHERE person_or_cluster_id = ?",
             [person_or_cluster_id],
         )?;
@@ -91,8 +90,8 @@ fn now_millis() -> i64 {
 #[cfg(test)]
 pub(in crate::ml_db) mod tests {
     use super::MlDb;
-    use crate::db::Connection;
     use crate::ml_db::tests::{cases, check, open};
+    use rusqlite::Connection;
     use tempfile::TempDir;
 
     pub(in crate::ml_db) fn seed(db: &MlDb) {

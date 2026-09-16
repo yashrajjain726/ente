@@ -1,7 +1,9 @@
+mod migrations;
 mod queries;
 mod schema;
 mod vector_encoding;
 
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 use crate::db::{Database, OpenOptions};
@@ -26,7 +28,9 @@ pub use vector_encoding::{decode_evector, decode_f32, encode_evector, encode_f32
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Database(#[from] crate::db::Error),
+    Database(#[from] rusqlite::Error),
+    #[error("currentVersion({current}) cannot be greater than toVersion({target})")]
+    Downgrade { current: i64, target: i64 },
     #[error("{0}")]
     Codec(String),
     #[error(transparent)]
@@ -46,38 +50,43 @@ pub struct MlDb {
 impl MlDb {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
-            db: Database::open_with_options(
+            db: Database::open(
                 path,
-                &schema::MIGRATION_SCRIPTS,
-                OpenOptions { reader_count: 2 },
+                OpenOptions {
+                    reader_count: const { NonZeroUsize::new(2).unwrap() },
+                },
+                |connection| {
+                    connection.execute_batch(
+                        "PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 6291456;",
+                    )?;
+                    migrations::migrate(connection, &schema::MIGRATION_SCRIPTS)
+                },
             )?,
         })
     }
 
     pub fn clear_non_pet_tables(&self) -> Result<()> {
-        self.db
-            .execute_statements([
-                schema::DELETE_FACES,
-                schema::DELETE_FACE_CLUSTERS,
-                schema::DELETE_CLUSTER_PERSON,
-                schema::DELETE_CLUSTER_SUMMARY,
-                schema::DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING,
-                schema::DELETE_NOT_PERSON_FEEDBACK,
-                schema::DELETE_CLIP_EMBEDDINGS,
-                schema::DELETE_FILE_DATA,
-            ])
-            .map_err(Into::into)
+        self.execute_statements([
+            schema::DELETE_FACES,
+            schema::DELETE_FACE_CLUSTERS,
+            schema::DELETE_CLUSTER_PERSON,
+            schema::DELETE_CLUSTER_SUMMARY,
+            schema::DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING,
+            schema::DELETE_NOT_PERSON_FEEDBACK,
+            schema::DELETE_CLIP_EMBEDDINGS,
+            schema::DELETE_FILE_DATA,
+        ])
+        .map_err(Into::into)
     }
 
     pub fn clear_pet_tables(&self) -> Result<()> {
-        self.db
-            .execute_statements([
-                schema::DELETE_PET_FACES,
-                schema::DELETE_PET_BODIES,
-                schema::DELETE_PET_FACE_VECTOR_ID_MAPPING,
-                schema::DELETE_PET_BODY_VECTOR_ID_MAPPING,
-            ])
-            .map_err(Into::into)
+        self.execute_statements([
+            schema::DELETE_PET_FACES,
+            schema::DELETE_PET_BODIES,
+            schema::DELETE_PET_FACE_VECTOR_ID_MAPPING,
+            schema::DELETE_PET_BODY_VECTOR_ID_MAPPING,
+        ])
+        .map_err(Into::into)
     }
 }
 
@@ -90,7 +99,7 @@ mod tests {
     use super::queries::clip::tests::full_clip;
     use super::queries::{caches, clip, clusters, faces, filedata, persons, pets};
     use super::{Error, MlDb, TARGET_VERSION};
-    use crate::db::Connection;
+    use rusqlite::Connection;
     use tempfile::TempDir;
 
     type Query<T> = fn(&MlDb) -> Result<T, Error>;
@@ -255,6 +264,22 @@ mod tests {
     }
 
     #[test]
+    fn ml_connections_keep_existing_settings() {
+        let (_directory, db) = open();
+        let (synchronous, journal_size_limit): (i64, i64) = db
+            .db
+            .write(|connection| {
+                Ok((
+                    connection.pragma_query_value(None, "synchronous", |row| row.get(0))?,
+                    connection.pragma_query_value(None, "journal_size_limit", |row| row.get(0))?,
+                ))
+            })
+            .unwrap();
+        assert_eq!(synchronous, 1);
+        assert_eq!(journal_size_limit, 6291456);
+    }
+
+    #[test]
     fn ml_db_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<MlDb>();
@@ -319,7 +344,7 @@ mod tests {
             .pragma_update(None, "user_version", 16)
             .unwrap();
         match MlDb::open(&path) {
-            Err(Error::Database(crate::db::Error::Downgrade { current, target })) => {
+            Err(Error::Downgrade { current, target }) => {
                 assert_eq!(current, 16);
                 assert_eq!(target, 15);
             }

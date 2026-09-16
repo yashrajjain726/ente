@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
-use ente_photos::db;
 use ente_photos::ml_db;
 pub use ente_photos::ml_db::{
     ClipEmbedding, ClipRow, ClusterCentroidRow, ClusterSummary, EmbeddingVector,
@@ -27,7 +26,7 @@ impl From<ml_db::Error> for MlDbError {
     fn from(error: ml_db::Error) -> Self {
         let message = ente_core::error::chain(&error);
         match error {
-            ml_db::Error::Database(db::Error::Downgrade { .. }) => Self::Downgrade { message },
+            ml_db::Error::Downgrade { .. } => Self::Downgrade { message },
             _ => Self::Other { message },
         }
     }
@@ -845,5 +844,32 @@ impl MlDb {
             .get_file_ids_with_fd_data(data_type.as_deref())?
             .into_iter()
             .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MlDbError, ml_db};
+
+    #[test]
+    fn downgrade_errors_keep_the_bridge_variant_and_message() {
+        let error = MlDbError::from(ml_db::Error::Downgrade {
+            current: 16,
+            target: 15,
+        });
+        assert!(matches!(
+            error,
+            MlDbError::Downgrade { message }
+                if message == "currentVersion(16) cannot be greater than toVersion(15)"
+        ));
+    }
+
+    #[test]
+    fn other_errors_keep_the_bridge_variant_and_message() {
+        let error = MlDbError::from(ml_db::Error::InvalidArgument("invalid value".into()));
+        assert!(matches!(
+            error,
+            MlDbError::Other { message } if message == "invalid value"
+        ));
     }
 }
