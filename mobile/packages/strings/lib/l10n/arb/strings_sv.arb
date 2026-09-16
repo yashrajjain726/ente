@@ -2132,7 +2132,7 @@
     }
   },
   "legacy": "Arv",
-  "legacyAccounts": "Äldre konton",
+  "legacyAccounts": "Arvskonton",
   "legacyCongratulationsMessage": "Du har konfigurerat Legacy.\nBörja spara din viktiga information.",
   "legacyDesc": "Betrodda kontakter, Legacy-återställningsuppsättningar och planering för kontoåterställning",
   "legacyEmptyStateDescription": "Om du inte kan vara närvarande hjälper Legacy personer du tycker om att få åtkomst till din information i Locker.",
@@ -4388,7 +4388,7 @@
     }
   },
   "trashIsEmpty": "Papperskorgen är tom",
-  "trim": "Beskär",
+  "trim": "Trimma",
   "tripInYear": "Resa under {year}",
   "@tripInYear": {
     "placeholders": {
