@@ -22,9 +22,9 @@ This guide walks you through creating your first item in Ente Locker. You'll lea
 
 Document scanning is available in the Locker mobile app on Android and iOS.
 
-1. Tap the camera button on the home screen, or tap **+** and select **Document**
+1. Tap the camera button on the home screen
 2. Point the camera at a page. Locker can capture it automatically, or you can switch to **Manual** and tap the shutter button
-3. Scan any additional pages, then tap **Done**
+3. Scan any additional pages, then tap the check-mark button
 4. Review the pages. You can adjust the crop, rotate or delete a page, add another page, and rename the PDF
 5. Tap **Save to Ente**
 6. Leave collections unselected to use **Uncategorized**, or select one or more collections
