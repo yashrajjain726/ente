@@ -22,14 +22,27 @@ class ChangeLogStrings {
       return null;
     }
 
-    final entries = strings.entries
+    return strings.forAudience(
+      isLocalGallery: isLocalGallery,
+      isAndroid: isAndroid,
+    );
+  }
+
+  ChangeLogStrings? forAudience({
+    bool isLocalGallery = false,
+    required bool isAndroid,
+  }) {
+    final visibleEntries = entries
         .where((entry) => !entry.isAndroidOnly || isAndroid)
+        .where((entry) => !entry.isIOSOnly || !isAndroid)
         .where(
           (entry) =>
               isLocalGallery ? !entry.isOnlineOnly : !entry.isLocalGalleryOnly,
         )
         .toList(growable: false);
-    return entries.isEmpty ? null : ChangeLogStrings(entries: entries);
+    return visibleEntries.isEmpty
+        ? null
+        : ChangeLogStrings(entries: visibleEntries);
   }
 
   static bool hasContentForLocale(
@@ -49,1059 +62,892 @@ class ChangeLogStrings {
     'en': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Library sharing',
+          title: 'Preview strip in the viewer',
           description:
-              'Share your current and future albums with family members automatically. Head to Settings → Family, pick a member, and tap Share albums.',
+              'Thumbnails at the bottom of the viewer let you jump between photos and videos faster.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Share photos of a person',
+          description:
+              'Share photos of a person with a link that can automatically include new photos of them.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Faster, everywhere',
-          description:
-              'Search, the map, and gallery scrolling are faster on large libraries.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Location search',
-          description:
-              'You can now search by country and cities, with improved accuracy.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'System trash',
-          description:
-              'On Android 11 and newer, device photos deleted through Ente Photos move to the system trash and can be recovered from the app.',
+          title: 'Set photos as wallpaper',
+          description: 'Set a photo as your home screen, lock screen, or both.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Album descriptions',
+          title: 'Hold for 2× playback',
+          description: 'Press and hold a video to watch it at 2× speed.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'And more!',
           description:
-              'You can now add descriptions to albums that will reflect on shared links as well.',
+              'More efficient gallery scrolling and back buttons that are easier to tap.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'And more!',
+          description:
+              'More efficient gallery scrolling, back buttons that are easier to tap, and improved backups.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Album slideshows',
+          title: 'And more!',
           description:
-              'Convert your old tablet into a photo frame with album slideshows.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Edits that keep more',
-          description:
-              'Edited photos now keep key camera, date, and location details. JPEGs also retain their original quality when you only rotate or flip them.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Better video playback',
-          description:
-              'Double-tap either side of a video to seek five seconds. You can also choose a playback speed.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'and more!',
-          description:
-              "We've added some music to memories that we composed. Also, smart albums work better, freeing up space is more reliable, and backup status shows progress for each file.",
-          isOnlineOnly: true,
+              'More efficient gallery scrolling and back buttons that are easier to tap.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ca': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Compartició de la biblioteca',
+          title: 'Franja de previsualitzacions al visor',
           description:
-              "Comparteix automàticament els àlbums actuals i futurs amb els membres de la família. Ves a Configuració → Família, tria un membre i toca Comparteix àlbums.",
+              'Les miniatures de la part inferior del visor et permeten saltar més ràpidament entre fotos i vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Comparteix les fotos d’una persona',
+          description:
+              'Comparteix les fotos d’una persona amb un enllaç que pot incloure automàticament fotos noves seves.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Més ràpid, a tot arreu',
+          title: 'Estableix fotos com a fons de pantalla',
           description:
-              'La cerca, el mapa i el desplaçament per la galeria són més ràpids en biblioteques grans.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Cerca per ubicació',
-          description: 'Ara pots cercar per països i ciutats amb més precisió.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Paperera del sistema',
-          description:
-              "A Android 11 i versions posteriors, les fotos del dispositiu que suprimeixes amb Ente Photos es mouen a la paperera del sistema i es poden recuperar des de l'aplicació.",
+              'Estableix una foto com a fons de la pantalla d’inici, de bloqueig o de totes dues.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descripcions dels àlbums',
-          description:
-              'Ara pots afegir descripcions als àlbums, que també es mostraran als enllaços compartits.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: "Presentacions d'àlbums",
-          description:
-              "Converteix la teva tauleta antiga en un marc de fotos amb les presentacions d'àlbums.",
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Edicions que conserven més',
-          description:
-              'Les fotos editades ara conserven les dades clau de la càmera, la data i la ubicació. Els JPEG també mantenen la qualitat original quan només els rotes o els gires.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Millor reproducció de vídeo',
-          description:
-              "Toca dues vegades qualsevol costat d'un vídeo per avançar o retrocedir cinc segons. També pots triar la velocitat de reproducció.",
+          title: 'Mantén premut per reproduir a 2×',
+          description: 'Mantén premut un vídeo per veure’l a velocitat 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'I més coses!',
           description:
-              "Hem afegit als Records música composta per nosaltres. A més, els Àlbums intel·ligents funcionen millor, Allibera espai és més fiable i l'Estat de la còpia de seguretat mostra el progrés de cada fitxer.",
+              'Desplaçament més eficient per la galeria i botons Enrere més fàcils de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'I més coses!',
+          description:
+              'Desplaçament més eficient per la galeria, botons Enrere més fàcils de tocar i còpies de seguretat millorades.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'I més coses!',
+          description:
+              'Desplaçament més eficient per la galeria i botons Enrere més fàcils de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'cs': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Sdílení knihovny',
+          title: 'Pás náhledů v prohlížeči',
           description:
-              'Automaticky sdílejte svá současná i budoucí alba s členy rodiny. Přejděte do Nastavení → Rodina, vyberte člena a klepněte na Sdílet alba.',
+              'Miniatury ve spodní části prohlížeče umožňují rychleji přecházet mezi fotografiemi a videi.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sdílení fotografií osoby',
+          description:
+              'Sdílejte fotografie osoby pomocí odkazu, který může automaticky zahrnovat její nové fotografie.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Rychlejší všude',
+          title: 'Nastavení fotografií jako tapety',
           description:
-              'Vyhledávání, mapa a posouvání v galerii jsou u velkých knihoven rychlejší.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Vyhledávání podle polohy',
-          description:
-              'Nově můžete s vyšší přesností vyhledávat podle zemí a měst.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Systémový koš',
-          description:
-              'V systému Android 11 a novějším se fotografie v zařízení smazané prostřednictvím Ente Photos přesunou do systémového koše a lze je obnovit v aplikaci.',
+              'Nastavte fotografii jako tapetu domovské obrazovky, zamykací obrazovky nebo obou.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Popisy alb',
+          title: 'Podržením přehrajete 2× rychleji',
           description:
-              'Nyní můžete k albům přidávat popisy, které se zobrazí také ve sdílených odkazech.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Prezentace alb',
-          description:
-              'Proměňte starý tablet ve fotorámeček pomocí prezentací alb.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Úpravy, které zachovají více',
-          description:
-              'Upravené fotografie si nyní zachovají klíčové údaje o fotoaparátu, datu a poloze. Soubory JPEG si také zachovají původní kvalitu, pokud je pouze otočíte nebo překlopíte.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Lepší přehrávání videa',
-          description:
-              'Poklepáním na kteroukoli stranu videa se posunete o pět sekund vpřed nebo vzad. Můžete také zvolit rychlost přehrávání.',
+              'Stisknutím a podržením videa ho můžete sledovat 2× rychleji.',
         ),
         ChangeLogEntryStrings(
           title: 'A mnohem více!',
           description:
-              'Do Vzpomínek jsme přidali hudbu, kterou jsme sami složili. Chytrá alba navíc fungují lépe, funkce Uvolnit místo je spolehlivější a Stav zálohování zobrazuje průběh každého souboru.',
+              'Efektivnější posouvání v galerii a tlačítka Zpět, na která se snáze klepá.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'A mnohem více!',
+          description:
+              'Efektivnější posouvání v galerii, tlačítka Zpět, na která se snáze klepá, a vylepšené zálohování.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'A mnohem více!',
+          description:
+              'Efektivnější posouvání v galerii a tlačítka Zpět, na která se snáze klepá.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'de': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Bibliothek teilen',
+          title: 'Vorschauleiste in der Fotoansicht',
           description:
-              'Teile deine aktuellen und zukünftigen Alben automatisch mit Familienmitgliedern. Gehe zu Einstellungen → Familie, wähle ein Mitglied aus und tippe auf Alben teilen.',
+              'Über die Miniaturansichten am unteren Rand kannst du schneller zwischen Fotos und Videos wechseln.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Fotos einer Person teilen',
+          description:
+              'Teile die Fotos einer Person über einen Link, der neue Fotos von ihr automatisch aufnehmen kann.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Schneller, überall',
+          title: 'Fotos als Hintergrund festlegen',
           description:
-              'Suche, Karte und Scrollen in der Galerie sind bei großen Bibliotheken schneller.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Ortssuche',
-          description:
-              'Du kannst jetzt mit verbesserter Genauigkeit nach Ländern und Städten suchen.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Systempapierkorb',
-          description:
-              'Unter Android 11 und neuer werden Gerätefotos, die über Ente Photos gelöscht werden, in den Systempapierkorb verschoben und können in der App wiederhergestellt werden.',
+              'Lege ein Foto als Hintergrund für den Startbildschirm, den Sperrbildschirm oder beide fest.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albumbeschreibungen',
+          title: 'Für 2× Wiedergabe gedrückt halten',
           description:
-              'Du kannst Alben jetzt Beschreibungen hinzufügen, die auch in geteilten Links angezeigt werden.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Album-Diashows',
-          description:
-              'Verwandle dein altes Tablet mit Album-Diashows in einen digitalen Bilderrahmen.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Bearbeitungen, die mehr bewahren',
-          description:
-              'Bearbeitete Fotos behalten jetzt wichtige Kamera-, Datums- und Standortinformationen. JPEGs behalten außerdem ihre Originalqualität, wenn du sie nur drehst oder spiegelst.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Bessere Videowiedergabe',
-          description:
-              'Tippe doppelt auf eine der beiden Seiten eines Videos, um fünf Sekunden vor- oder zurückzuspringen. Du kannst auch die Wiedergabegeschwindigkeit wählen.',
+              'Halte ein Video gedrückt, um es mit 2× Geschwindigkeit anzusehen.',
         ),
         ChangeLogEntryStrings(
           title: 'Und mehr!',
           description:
-              'Wir haben den Erinnerungen von uns komponierte Musik hinzugefügt. Außerdem funktionieren Smart-Alben besser, Speicherplatz freigeben ist zuverlässiger und der Sicherungsstatus zeigt den Fortschritt jeder Datei an.',
+              'Effizienteres Scrollen in der Galerie und Zurück-Schaltflächen, die sich leichter antippen lassen.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Und mehr!',
+          description:
+              'Effizienteres Scrollen in der Galerie, Zurück-Schaltflächen, die sich leichter antippen lassen, und verbesserte Datensicherungen.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Und mehr!',
+          description:
+              'Effizienteres Scrollen in der Galerie und Zurück-Schaltflächen, die sich leichter antippen lassen.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'es': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Uso compartido de la biblioteca',
+          title: 'Tira de vistas previas en el visor',
           description:
-              'Comparte automáticamente tus álbumes actuales y futuros con tus familiares. Ve a Configuración → Familia, elige a un miembro y toca Compartir álbumes.',
+              'Las miniaturas de la parte inferior del visor te permiten saltar más rápido entre fotos y vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Compartir fotos de una persona',
+          description:
+              'Comparte las fotos de una persona con un enlace que puede incluir automáticamente nuevas fotos suyas.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Más rápido, en todas partes',
+          title: 'Usar fotos como fondo de pantalla',
           description:
-              'La búsqueda, el mapa y el desplazamiento por la galería son más rápidos en bibliotecas grandes.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Búsqueda por ubicación',
-          description:
-              'Ahora puedes buscar por países y ciudades con mayor precisión.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Papelera del sistema',
-          description:
-              'En Android 11 y versiones posteriores, las fotos del dispositivo que elimines mediante Ente Photos se mueven a la papelera del sistema y pueden recuperarse desde la aplicación.',
+              'Establece una foto como fondo de la pantalla de inicio, de la pantalla de bloqueo o de ambas.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descripciones de álbumes',
+          title: 'Mantén pulsado para reproducir a 2×',
           description:
-              'Ahora puedes añadir descripciones a los álbumes, que también se mostrarán en los enlaces compartidos.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Presentaciones de álbumes',
-          description:
-              'Convierte tu antigua tableta en un marco de fotos con las presentaciones de álbumes.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Ediciones que conservan más',
-          description:
-              'Las fotos editadas ahora conservan datos clave de la cámara, la fecha y la ubicación. Los archivos JPEG también mantienen su calidad original cuando solo los giras o volteas.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Mejor reproducción de vídeo',
-          description:
-              'Toca dos veces cualquiera de los lados de un vídeo para avanzar o retroceder cinco segundos. También puedes elegir la velocidad de reproducción.',
+              'Mantén pulsado un vídeo para verlo a una velocidad de 2×.',
         ),
         ChangeLogEntryStrings(
           title: '¡Y mucho más!',
           description:
-              'Hemos añadido a Recuerdos música compuesta por nosotros. Además, los Álbumes inteligentes funcionan mejor, Liberar espacio es más fiable y el Estado de la copia de seguridad muestra el progreso de cada archivo.',
+              'Desplazamiento más eficiente por la galería y botones Atrás más fáciles de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '¡Y mucho más!',
+          description:
+              'Desplazamiento más eficiente por la galería, botones Atrás más fáciles de tocar y copias de seguridad mejoradas.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '¡Y mucho más!',
+          description:
+              'Desplazamiento más eficiente por la galería y botones Atrás más fáciles de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'fr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Partage de la photothèque',
+          title: 'Bandeau d’aperçus dans la visionneuse',
           description:
-              'Partagez automatiquement vos albums actuels et futurs avec les membres de votre famille. Accédez à Paramètres → Famille, choisissez un membre et touchez Partager les albums.',
+              'Les vignettes au bas de la visionneuse vous permettent de passer plus rapidement d’une photo ou vidéo à l’autre.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Partager les photos d’une personne',
+          description:
+              'Partagez les photos d’une personne avec un lien qui peut inclure automatiquement ses nouvelles photos.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Plus rapide, partout',
+          title: 'Définir des photos comme fond d’écran',
           description:
-              'La recherche, la carte et le défilement dans la galerie sont plus rapides avec les grandes photothèques.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Recherche par lieu',
-          description:
-              'Vous pouvez désormais rechercher par pays et par ville avec une meilleure précision.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Corbeille du système',
-          description:
-              'Sous Android 11 et les versions ultérieures, les photos de l’appareil supprimées via Ente Photos sont placées dans la corbeille du système et peuvent être récupérées depuis l’application.',
+              'Définissez une photo comme fond de l’écran d’accueil, de l’écran de verrouillage ou des deux.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descriptions d’albums',
+          title: 'Maintenir pour lire à 2×',
           description:
-              'Vous pouvez désormais ajouter des descriptions aux albums. Elles apparaîtront également dans les liens partagés.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Diaporamas d’albums',
-          description:
-              'Transformez votre ancienne tablette en cadre photo grâce aux diaporamas d’albums.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Des modifications qui préservent davantage',
-          description:
-              'Les photos modifiées conservent désormais les principales informations relatives à l’appareil photo, à la date et au lieu. Les JPEG conservent également leur qualité d’origine lorsque vous les faites uniquement pivoter ou retourner.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Meilleure lecture vidéo',
-          description:
-              'Touchez deux fois l’un des côtés d’une vidéo pour avancer ou reculer de cinq secondes. Vous pouvez également choisir la vitesse de lecture.',
+              'Appuyez longuement sur une vidéo pour la regarder à vitesse 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'Et plus encore !',
           description:
-              'Nous avons ajouté aux Souvenirs de la musique composée par nos soins. De plus, les Albums intelligents fonctionnent mieux, Libérer de l’espace est plus fiable et l’État de la sauvegarde affiche la progression de chaque fichier.',
+              'Défilement plus efficace dans la galerie et boutons de retour plus faciles à toucher.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Et plus encore !',
+          description:
+              'Défilement plus efficace dans la galerie, boutons de retour plus faciles à toucher et sauvegardes améliorées.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Et plus encore !',
+          description:
+              'Défilement plus efficace dans la galerie et boutons de retour plus faciles à toucher.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'it': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Condivisione della libreria',
+          title: 'Striscia di anteprime nel visualizzatore',
           description:
-              'Condividi automaticamente gli album attuali e futuri con i membri della famiglia. Vai su Impostazioni → Famiglia, scegli un membro e tocca Condividi album.',
+              'Le miniature nella parte inferiore del visualizzatore ti consentono di passare più velocemente da una foto o un video all’altro.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Condividi le foto di una persona',
+          description:
+              'Condividi le foto di una persona con un link che può includere automaticamente le sue nuove foto.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Più veloce, ovunque',
+          title: 'Imposta foto come sfondo',
           description:
-              'La ricerca, la mappa e lo scorrimento della galleria sono più veloci nelle librerie di grandi dimensioni.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Ricerca per località',
-          description:
-              'Ora puoi effettuare ricerche per Paese e città con maggiore precisione.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Cestino di sistema',
-          description:
-              "Su Android 11 e versioni successive, le foto del dispositivo eliminate tramite Ente Photos vengono spostate nel cestino di sistema e possono essere recuperate dall'app.",
+              'Imposta una foto come sfondo della schermata Home, della schermata di blocco o di entrambe.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrizioni degli album',
-          description:
-              'Ora puoi aggiungere descrizioni agli album, che verranno visualizzate anche nei link condivisi.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Presentazioni degli album',
-          description:
-              'Trasforma il tuo vecchio tablet in una cornice digitale con le presentazioni degli album.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Modifiche che conservano di più',
-          description:
-              'Le foto modificate ora conservano i dati principali su fotocamera, data e luogo. Anche i JPEG mantengono la qualità originale quando li ruoti o li capovolgi soltanto.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Migliore riproduzione video',
-          description:
-              'Tocca due volte uno dei lati di un video per spostarti avanti o indietro di cinque secondi. Puoi anche scegliere la velocità di riproduzione.',
+          title: 'Tieni premuto per la riproduzione a 2×',
+          description: 'Tieni premuto un video per guardarlo a velocità 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'E non è tutto!',
           description:
-              "Abbiamo aggiunto ai Ricordi un po' di musica composta da noi. Inoltre, gli Album intelligenti funzionano meglio, Libera spazio è più affidabile e Stato backup mostra l'avanzamento di ogni file.",
+              'Scorrimento più efficiente della galleria e pulsanti Indietro più facili da toccare.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E non è tutto!',
+          description:
+              'Scorrimento più efficiente della galleria, pulsanti Indietro più facili da toccare e backup migliorati.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E non è tutto!',
+          description:
+              'Scorrimento più efficiente della galleria e pulsanti Indietro più facili da toccare.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ja': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'ライブラリ共有',
-          description:
-              '現在および今後作成するアルバムを家族と自動的に共有できます。［設定］→［ファミリー］でメンバーを選び、［アルバムを共有］をタップしてください。',
+          title: 'ビューアーのプレビューストリップ',
+          description: 'ビューアー下部のサムネイルから、写真やビデオへすばやく移動できます。',
+        ),
+        ChangeLogEntryStrings(
+          title: '人物の写真を共有',
+          description: '人物の写真をリンクで共有できます。リンクにはその人物の新しい写真を自動で追加できます。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'どこでも、より高速に',
-          description: '大規模なライブラリで、検索、地図、ギャラリーのスクロールが高速になりました。',
-        ),
-        ChangeLogEntryStrings(
-          title: '位置情報検索',
-          description: '国や都市で検索できるようになり、精度も向上しました。',
-        ),
-        ChangeLogEntryStrings(
-          title: 'システムのゴミ箱',
-          description:
-              'Android 11 以降では、Ente Photos から削除した端末上の写真はシステムのゴミ箱に移動し、アプリから復元できます。',
+          title: '写真を壁紙に設定',
+          description: '写真をホーム画面、ロック画面、またはその両方の壁紙に設定できます。',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'アルバムの説明',
-          description: 'アルバムに説明を追加できるようになりました。説明は共有リンクにも表示されます。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'アルバムのスライドショー',
-          description: 'アルバムのスライドショーを使えば、古いタブレットをフォトフレームとして活用できます。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'より多くの情報を残す編集',
-          description:
-              '編集した写真で、カメラ、撮影日、場所の重要な情報が保持されるようになりました。JPEGは、回転または反転のみを行った場合、元の画質も維持されます。',
-        ),
-        ChangeLogEntryStrings(
-          title: '動画再生の改善',
-          description: '動画の左右どちらかをダブルタップすると、5秒早送りまたは巻き戻しできます。再生速度も選べます。',
+          title: '長押しで2×再生',
+          description: 'ビデオを長押しすると、2×の速度で再生できます。',
         ),
         ChangeLogEntryStrings(
           title: 'ほかにも！',
-          description:
-              'Enteが作曲した音楽を思い出に追加しました。また、スマートアルバムの機能が向上し、「スペースを解放する」の信頼性が高まり、「バックアップの状態」でファイルごとの進捗を確認できるようになりました。',
+          description: 'ギャラリーのスクロール効率が向上し、「戻る」ボタンがタップしやすくなりました。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description: 'ギャラリーのスクロール効率が向上し、「戻る」ボタンがタップしやすくなり、バックアップも改善しました。',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description: 'ギャラリーのスクロール効率が向上し、「戻る」ボタンがタップしやすくなりました。',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'nl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Bibliotheek delen',
+          title: 'Voorbeeldstrook in de viewer',
           description:
-              'Deel je huidige en toekomstige albums automatisch met gezinsleden. Ga naar Instellingen → Familie, kies een lid en tik op Albums delen.',
+              "Miniaturen onderaan de viewer laten je sneller tussen foto's en video's springen.",
+        ),
+        ChangeLogEntryStrings(
+          title: "Foto's van een persoon delen",
+          description:
+              "Deel foto's van een persoon via een link die automatisch nieuwe foto's van die persoon kan bevatten.",
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Sneller, overal',
+          title: "Foto's als achtergrond instellen",
           description:
-              'Zoeken, de kaart en scrollen door de galerij zijn sneller bij grote bibliotheken.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Zoeken op locatie',
-          description: 'Je kunt nu nauwkeuriger zoeken op landen en steden.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Systeemprullenbak',
-          description:
-              "Op Android 11 en nieuwer worden apparaatfoto's die je via Ente Photos verwijdert naar de systeemprullenbak verplaatst en kun je ze vanuit de app herstellen.",
+              'Stel een foto in als achtergrond van je startscherm, vergrendelscherm of beide.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albumbeschrijvingen',
+          title: 'Vasthouden voor afspelen op 2×',
           description:
-              'Je kunt nu beschrijvingen aan albums toevoegen. Deze worden ook in gedeelde links weergegeven.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Diavoorstellingen van albums',
-          description:
-              'Verander je oude tablet in een fotolijst met diavoorstellingen van albums.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Bewerkingen die meer behouden',
-          description:
-              "Bewerkte foto's behouden nu belangrijke camera-, datum- en locatiegegevens. JPEG's behouden ook hun oorspronkelijke kwaliteit als je ze alleen roteert of omdraait.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'Betere videoweergave',
-          description:
-              'Dubbeltik aan een van beide kanten van een video om vijf seconden vooruit of terug te springen. Je kunt ook een afspeelsnelheid kiezen.',
+              'Houd een video ingedrukt om deze op 2× snelheid te bekijken.',
         ),
         ChangeLogEntryStrings(
           title: 'En meer!',
           description:
-              'We hebben muziek die we zelf hebben gecomponeerd aan Herinneringen toegevoegd. Ook werken Slimme albums beter, is Ruimte vrijmaken betrouwbaarder en toont Back-up status de voortgang per bestand.',
+              'Efficiënter scrollen door de galerij en terugknoppen die makkelijker zijn aan te tikken.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'En meer!',
+          description:
+              'Efficiënter scrollen door de galerij, terugknoppen die makkelijker zijn aan te tikken en verbeterde back-ups.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'En meer!',
+          description:
+              'Efficiënter scrollen door de galerij en terugknoppen die makkelijker zijn aan te tikken.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'no': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Deling av bibliotek',
+          title: 'Forhåndsvisningsstripe i visningen',
           description:
-              'Del nåværende og fremtidige album automatisk med familiemedlemmer. Gå til Innstillinger → Familie, velg et medlem og trykk på Del album.',
+              'Miniatyrbilder nederst i visningen gjør at du kan hoppe raskere mellom bilder og videoer.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Del bilder av en person',
+          description:
+              'Del bilder av en person med en lenke som automatisk kan ta med nye bilder av personen.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Raskere, overalt',
+          title: 'Bruk bilder som bakgrunn',
           description:
-              'Søk, kartet og rulling i galleriet er raskere for store biblioteker.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Stedssøk',
-          description:
-              'Du kan nå søke etter land og byer med bedre nøyaktighet.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Systemets papirkurv',
-          description:
-              'På Android 11 og nyere flyttes enhetsbilder som slettes gjennom Ente Photos, til systemets papirkurv og kan gjenopprettes fra appen.',
+              'Bruk et bilde som bakgrunn på startskjermen, låseskjermen eller begge.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albumbeskrivelser',
-          description:
-              'Du kan nå legge til beskrivelser i album. De vises også i delte lenker.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Lysbildefremvisning av album',
-          description:
-              'Gjør det gamle nettbrettet ditt om til en fotoramme med lysbildefremvisninger av album.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Redigeringer som beholder mer',
-          description:
-              'Redigerte bilder beholder nå viktige kamera-, dato- og plasseringsdetaljer. JPEG-filer beholder også originalkvaliteten når du bare roterer eller speilvender dem.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Bedre videoavspilling',
-          description:
-              'Dobbelttrykk på en av sidene i en video for å hoppe fem sekunder frem eller tilbake. Du kan også velge avspillingshastighet.',
+          title: 'Hold inne for 2× avspilling',
+          description: 'Trykk og hold på en video for å se den i 2× hastighet.',
         ),
         ChangeLogEntryStrings(
           title: 'Og mer!',
           description:
-              'Vi har lagt til musikk vi har komponert i Minner. Dessuten fungerer Smarte album bedre, Frigjør lagringsplass er mer pålitelig, og Status for sikkerhetskopi viser fremdriften for hver fil.',
+              'Mer effektiv rulling i galleriet og tilbakeknapper som er enklere å trykke på.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Og mer!',
+          description:
+              'Mer effektiv rulling i galleriet, tilbakeknapper som er enklere å trykke på og bedre sikkerhetskopiering.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Og mer!',
+          description:
+              'Mer effektiv rulling i galleriet og tilbakeknapper som er enklere å trykke på.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'pl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Udostępnianie biblioteki',
+          title: 'Pasek podglądu w przeglądarce',
           description:
-              'Automatycznie udostępniaj rodzinie swoje obecne i przyszłe albumy. Przejdź do Ustawienia → Rodzina, wybierz osobę i stuknij Udostępnij albumy.',
+              'Miniatury u dołu przeglądarki pozwalają szybciej przechodzić między zdjęciami i filmami.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Udostępnianie zdjęć osoby',
+          description:
+              'Udostępniaj zdjęcia osoby za pomocą linku, który może automatycznie uwzględniać jej nowe zdjęcia.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Szybciej wszędzie',
+          title: 'Ustawianie zdjęć jako tapety',
           description:
-              'Wyszukiwanie, mapa i przewijanie galerii działają szybciej przy dużych bibliotekach.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Wyszukiwanie według lokalizacji',
-          description:
-              'Teraz możesz wyszukiwać według krajów i miast z większą dokładnością.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Kosz systemowy',
-          description:
-              'W systemie Android 11 i nowszym zdjęcia z urządzenia usunięte za pośrednictwem Ente Photos trafiają do kosza systemowego i można je przywrócić w aplikacji.',
+              'Ustaw zdjęcie jako tapetę ekranu głównego, ekranu blokady lub obu.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Opisy albumów',
+          title: 'Przytrzymaj, aby odtwarzać 2× szybciej',
           description:
-              'Teraz możesz dodawać opisy do albumów. Będą one również widoczne w udostępnionych linkach.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Pokazy slajdów z albumów',
-          description:
-              'Zmień swój stary tablet w ramkę cyfrową dzięki pokazom slajdów z albumów.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Edycje, które zachowują więcej',
-          description:
-              'Edytowane zdjęcia zachowują teraz kluczowe informacje o aparacie, dacie i lokalizacji. Pliki JPEG zachowują również oryginalną jakość, gdy jedyną zmianą jest ich obrócenie lub odwrócenie.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Lepsze odtwarzanie filmów',
-          description:
-              'Stuknij dwukrotnie po dowolnej stronie filmu, aby przewinąć o pięć sekund do przodu lub do tyłu. Możesz też wybrać szybkość odtwarzania.',
+              'Naciśnij i przytrzymaj film, aby oglądać go 2× szybciej.',
         ),
         ChangeLogEntryStrings(
           title: 'I jeszcze więcej!',
           description:
-              'Do Wspomnień dodaliśmy skomponowaną przez nas muzykę. Ponadto Inteligentne albumy działają lepiej, funkcja Zwolnij miejsce jest bardziej niezawodna, a Status kopii zapasowej pokazuje postęp każdego pliku.',
+              'Wydajniejsze przewijanie galerii i łatwiejsze do naciśnięcia przyciski Wstecz.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'I jeszcze więcej!',
+          description:
+              'Wydajniejsze przewijanie galerii, łatwiejsze do naciśnięcia przyciski Wstecz i ulepszone tworzenie kopii zapasowych.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'I jeszcze więcej!',
+          description:
+              'Wydajniejsze przewijanie galerii i łatwiejsze do naciśnięcia przyciski Wstecz.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'pt_BR': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Compartilhamento da biblioteca',
+          title: 'Faixa de prévias no visualizador',
           description:
-              'Compartilhe automaticamente seus álbuns atuais e futuros com familiares. Acesse Opções → Família, escolha uma pessoa e toque em Compartilhar álbuns.',
+              'As miniaturas na parte inferior do visualizador permitem alternar mais rapidamente entre fotos e vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Compartilhe fotos de uma pessoa',
+          description:
+              'Compartilhe fotos de uma pessoa com um link que pode incluir automaticamente novas fotos dela.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mais rápido em todos os lugares',
+          title: 'Defina fotos como papel de parede',
           description:
-              'A pesquisa, o mapa e a rolagem da galeria estão mais rápidos em bibliotecas grandes.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Pesquisa por localização',
-          description:
-              'Agora você pode buscar por países e cidades com mais precisão.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Lixeira do sistema',
-          description:
-              'No Android 11 e versões mais recentes, as fotos do dispositivo excluídas por meio do Ente Photos são movidas para a lixeira do sistema e podem ser recuperadas no aplicativo.',
+              'Defina uma foto como papel de parede da tela inicial, da tela de bloqueio ou de ambas.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrições de álbuns',
+          title: 'Segure para reproduzir em 2×',
           description:
-              'Agora você pode adicionar descrições aos álbuns, que também serão exibidas nos links compartilhados.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Apresentações de slides dos álbuns',
-          description:
-              'Transforme seu tablet antigo em um porta-retrato com apresentações de slides dos álbuns.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Edições que preservam mais',
-          description:
-              'As fotos editadas agora preservam detalhes importantes da câmera, da data e da localização. Os JPEGs também mantêm a qualidade original quando você apenas os gira ou inverte.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Melhor reprodução de vídeo',
-          description:
-              'Toque duas vezes em um dos lados do vídeo para avançar ou voltar cinco segundos. Você também pode escolher a velocidade de reprodução.',
+              'Mantenha um vídeo pressionado para assisti-lo em velocidade 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'E muito mais!',
           description:
-              'Adicionamos às Memórias músicas que compusemos. Além disso, os Álbuns inteligentes funcionam melhor, Liberar espaço está mais confiável e o Estado do backup mostra o progresso de cada arquivo.',
+              'Rolagem mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Rolagem mais eficiente na galeria, botões Voltar mais fáceis de tocar e backups aprimorados.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Rolagem mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'pt_PT': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Partilha da biblioteca',
+          title: 'Faixa de pré-visualizações no visualizador',
           description:
-              'Partilhe automaticamente os seus álbuns atuais e futuros com familiares. Aceda a Definições → Família, escolha um membro e toque em Partilhar álbuns.',
+              'As miniaturas na parte inferior do visualizador permitem alternar mais rapidamente entre fotografias e vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Partilhar fotografias de uma pessoa',
+          description:
+              'Partilhe fotografias de uma pessoa através de uma ligação que pode incluir automaticamente novas fotografias dessa pessoa.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mais rápido em todo o lado',
+          title: 'Definir fotografias como fundo',
           description:
-              'A pesquisa, o mapa e o deslocamento na galeria são mais rápidos em bibliotecas grandes.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Pesquisa por localização',
-          description:
-              'Agora pode pesquisar por países e cidades com maior precisão.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Lixo do sistema',
-          description:
-              'No Android 11 e versões posteriores, as fotografias do dispositivo eliminadas através do Ente Photos são movidas para o lixo do sistema e podem ser recuperadas a partir da aplicação.',
+              'Defina uma fotografia como fundo do ecrã principal, do ecrã de bloqueio ou de ambos.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrições de álbuns',
-          description:
-              'Agora pode adicionar descrições aos álbuns, que também serão apresentadas nas ligações partilhadas.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Apresentações de diapositivos dos álbuns',
-          description:
-              'Transforme o seu tablet antigo numa moldura digital com apresentações de diapositivos dos álbuns.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Edições que preservam mais',
-          description:
-              'As fotografias editadas preservam agora detalhes importantes da câmara, da data e da localização. Os ficheiros JPEG também mantêm a qualidade original quando apenas os roda ou inverte.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Melhor reprodução de vídeo',
-          description:
-              'Toque duas vezes num dos lados do vídeo para avançar ou recuar cinco segundos. Também pode escolher a velocidade de reprodução.',
+          title: 'Manter premido para reproduzir a 2×',
+          description: 'Mantenha um vídeo premido para o ver à velocidade 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'E muito mais!',
           description:
-              'Adicionámos às Memórias música composta por nós. Além disso, os Álbuns inteligentes funcionam melhor, Libertar espaço é mais fiável e o Status da cópia de segurança mostra o progresso de cada ficheiro.',
+              'Deslocamento mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Deslocamento mais eficiente na galeria, botões Voltar mais fáceis de tocar e cópias de segurança melhoradas.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Deslocamento mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ro': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Partajarea bibliotecii',
+          title: 'Bandă de previzualizare în vizualizator',
           description:
-              'Partajează automat albumele actuale și viitoare cu membrii familiei. Accesează Setări → Familie, alege un membru și atinge Partajează albumele.',
+              'Miniaturile din partea de jos a vizualizatorului te ajută să treci mai repede între fotografii și videoclipuri.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Partajează fotografiile unei persoane',
+          description:
+              'Partajează fotografiile unei persoane cu un link care poate include automat fotografii noi cu aceasta.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mai rapid, oriunde',
+          title: 'Setează fotografii ca fundal',
           description:
-              'Căutarea, harta și derularea galeriei sunt mai rapide pentru bibliotecile mari.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Căutare după locație',
-          description:
-              'Acum poți căuta după țări și orașe cu o precizie mai bună.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Coșul de gunoi al sistemului',
-          description:
-              'Pe Android 11 și versiunile ulterioare, fotografiile de pe dispozitiv șterse prin Ente Photos sunt mutate în coșul de gunoi al sistemului și pot fi recuperate din aplicație.',
+              'Setează o fotografie ca fundal pentru ecranul principal, ecranul de blocare sau ambele.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrieri pentru albume',
+          title: 'Ține apăsat pentru redare la 2×',
           description:
-              'Acum poți adăuga descrieri albumelor, care vor apărea și în linkurile partajate.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Prezentări de diapozitive ale albumelor',
-          description:
-              'Transformă vechea tabletă într-o ramă foto cu prezentările de diapozitive ale albumelor.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Editări care păstrează mai mult',
-          description:
-              'Fotografiile editate păstrează acum detaliile esențiale despre cameră, dată și locație. Fișierele JPEG își păstrează și calitatea originală atunci când doar le rotești sau le răstorni.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Redare video îmbunătățită',
-          description:
-              'Atinge de două ori oricare dintre laturile unui videoclip pentru a derula înainte sau înapoi cu cinci secunde. De asemenea, poți alege viteza de redare.',
+              'Ține apăsat pe un videoclip pentru a-l viziona la viteza 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'Și altele!',
           description:
-              'Am adăugat în Amintiri muzică pe care am compus-o. În plus, Albumele inteligente funcționează mai bine, funcția „Eliberați spațiu” este mai fiabilă, iar „Stare copie de rezervă” afișează progresul fiecărui fișier.',
+              'Derulare mai eficientă în galerie și butoane Înapoi mai ușor de atins.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Și altele!',
+          description:
+              'Derulare mai eficientă în galerie, butoane Înapoi mai ușor de atins și copii de rezervă îmbunătățite.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Și altele!',
+          description:
+              'Derulare mai eficientă în galerie și butoane Înapoi mai ușor de atins.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ru': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Общий доступ к библиотеке',
+          title: 'Лента превью в режиме просмотра',
           description:
-              'Автоматически делитесь текущими и будущими альбомами с членами семьи. Откройте Настройки → Семья, выберите участника и нажмите Поделиться альбомами.',
+              'Миниатюры в нижней части экрана просмотра позволяют быстрее переходить между фото и видео.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Делитесь фотографиями человека',
+          description:
+              'Делитесь фотографиями человека по ссылке, в которую могут автоматически добавляться его новые фотографии.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Быстрее повсюду',
+          title: 'Устанавливайте фото как обои',
           description:
-              'Поиск, карта и прокрутка галереи стали быстрее для больших библиотек.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Поиск по местоположению',
-          description:
-              'Теперь можно с большей точностью искать по странам и городам.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Системная корзина',
-          description:
-              'На Android 11 и новее фотографии с устройства, удалённые через Ente Photos, перемещаются в системную корзину, и их можно восстановить в приложении.',
+              'Установите фотографию на главный экран, экран блокировки или на оба экрана.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Описания альбомов',
+          title: 'Удерживайте для воспроизведения 2×',
           description:
-              'Теперь к альбомам можно добавлять описания, которые также будут отображаться в общих ссылках.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Слайд-шоу альбомов',
-          description:
-              'Превратите старый планшет в цифровую фоторамку с помощью слайд-шоу альбомов.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Больше данных после редактирования',
-          description:
-              'Отредактированные фотографии теперь сохраняют важные данные о камере, дате и местоположении. Файлы JPEG также сохраняют исходное качество, если вы только поворачиваете или отражаете их.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Улучшенное воспроизведение видео',
-          description:
-              'Дважды коснитесь любой стороны видео, чтобы перемотать на пять секунд вперёд или назад. Также можно выбрать скорость воспроизведения.',
+              'Нажмите и удерживайте видео, чтобы смотреть его со скоростью 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'И многое другое!',
           description:
-              'Мы добавили во Воспоминания музыку, которую сочинили сами. Кроме того, Умные альбомы работают лучше, функция «Освободить место» стала надёжнее, а Статус резервного копирования показывает прогресс для каждого файла.',
+              'Более эффективная прокрутка галереи и кнопки «Назад», на которые проще нажимать.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'И многое другое!',
+          description:
+              'Более эффективная прокрутка галереи, кнопки «Назад», на которые проще нажимать, и улучшенное резервное копирование.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'И многое другое!',
+          description:
+              'Более эффективная прокрутка галереи и кнопки «Назад», на которые проще нажимать.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'tr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Kütüphane paylaşımı',
+          title: 'Fotoğraf görüntüleyicide önizleme şeridi',
           description:
-              'Mevcut ve gelecekteki albümlerinizi aile üyeleriyle otomatik olarak paylaşın. Ayarlar → Aile bölümüne gidin, bir üye seçin ve Albümleri paylaş seçeneğine dokunun.',
+              'Görüntüleyicinin altındaki küçük resimler, fotoğraflar ve videolar arasında daha hızlı geçiş yapmanızı sağlar.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Bir kişinin fotoğraflarını paylaşın',
+          description:
+              'Bir kişinin fotoğraflarını, o kişinin yeni fotoğraflarını otomatik olarak ekleyebilen bir bağlantıyla paylaşın.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Her yerde daha hızlı',
+          title: 'Fotoğrafları duvar kâğıdı yapın',
           description:
-              'Büyük kütüphanelerde arama, harita ve galeride kaydırma artık daha hızlı.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Konum arama',
-          description:
-              'Artık ülke ve şehirlere göre daha yüksek doğrulukla arama yapabilirsiniz.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Sistem çöp kutusu',
-          description:
-              'Android 11 ve sonraki sürümlerde, Ente Photos üzerinden silinen cihaz fotoğrafları sistem çöp kutusuna taşınır ve uygulamadan kurtarılabilir.',
+              'Bir fotoğrafı ana ekranınızın, kilit ekranınızın veya her ikisinin duvar kâğıdı olarak ayarlayın.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albüm açıklamaları',
+          title: '2× oynatma için basılı tutun',
           description:
-              'Artık albümlere açıklama ekleyebilirsiniz; bu açıklamalar paylaşılan bağlantılarda da gösterilir.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Albüm slayt gösterileri',
-          description:
-              'Albüm slayt gösterileriyle eski tabletinizi bir dijital fotoğraf çerçevesine dönüştürün.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Daha fazlasını koruyan düzenlemeler',
-          description:
-              "Düzenlenen fotoğraflar artık temel kamera, tarih ve konum ayrıntılarını koruyor. JPEG'ler de yalnızca döndürdüğünüzde veya çevirdiğinizde özgün kalitesini koruyor.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'Daha iyi video oynatma',
-          description:
-              'Beş saniye ileri veya geri atlamak için videonun iki yanından birine çift dokunun. Ayrıca oynatma hızını da seçebilirsiniz.',
+              'Bir videoyu 2× hızda izlemek için videoya basılı tutun.',
         ),
         ChangeLogEntryStrings(
           title: 'Ve daha fazlası!',
           description:
-              'Anılar’a bestesini bizim yaptığımız müzikler ekledik. Ayrıca Akıllı Albümler daha iyi çalışıyor, Boş alan açma daha güvenilir ve Yedekleme durumu her dosyanın ilerlemesini gösteriyor.',
+              'Galeride daha verimli kaydırma ve daha kolay dokunulan Geri düğmeleri.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ve daha fazlası!',
+          description:
+              'Galeride daha verimli kaydırma, daha kolay dokunulan Geri düğmeleri ve iyileştirilmiş yedeklemeler.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ve daha fazlası!',
+          description:
+              'Galeride daha verimli kaydırma ve daha kolay dokunulan Geri düğmeleri.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'uk': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Спільний доступ до бібліотеки',
+          title: 'Стрічка попереднього перегляду у вікні перегляду',
           description:
-              'Автоматично діліться поточними й майбутніми альбомами з членами родини. Відкрийте Налаштування → Сім’я, виберіть учасника й натисніть Поділитися альбомами.',
+              'Мініатюри внизу вікна перегляду дають змогу швидше переходити між фото й відео.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Діліться фотографіями людини',
+          description:
+              'Діліться фотографіями людини за посиланням, до якого можуть автоматично додаватися її нові фотографії.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Швидше всюди',
+          title: 'Установлюйте фото як шпалери',
           description:
-              'Пошук, мапа й прокручування галереї стали швидшими для великих бібліотек.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Пошук за розташуванням',
-          description:
-              'Тепер можна з більшою точністю шукати за країнами й містами.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Системний смітник',
-          description:
-              'На Android 11 і новіших версіях фотографії з пристрою, видалені через Ente Photos, переміщуються до системного смітника, і їх можна відновити в застосунку.',
+              'Установіть фотографію як шпалери головного екрана, екрана блокування або обох.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Описи альбомів',
+          title: 'Утримуйте для відтворення у 2×',
           description:
-              'Тепер до альбомів можна додавати описи, які також відображатимуться в спільних посиланнях.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Слайд-шоу альбомів',
-          description:
-              'Перетворіть старий планшет на цифрову фоторамку за допомогою слайд-шоу альбомів.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Редагування, що зберігають більше',
-          description:
-              'Відредаговані фотографії тепер зберігають ключові дані про камеру, дату й розташування. Файли JPEG також зберігають початкову якість, якщо ви лише обертаєте або віддзеркалюєте їх.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Покращене відтворення відео',
-          description:
-              'Двічі торкніться будь-якого боку відео, щоб перейти на п’ять секунд уперед або назад. Також можна вибрати швидкість відтворення.',
+              'Натисніть і утримуйте відео, щоб дивитися його зі швидкістю 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'І не тільки!',
           description:
-              'Ми додали до Спогадів музику, яку створили самі. Крім того, Розумні альбоми працюють краще, функція «Звільнити місце» стала надійнішою, а Стан резервного копіювання показує перебіг для кожного файлу.',
+              'Ефективніше прокручування галереї та кнопки «Назад», яких легше торкатися.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'І не тільки!',
+          description:
+              'Ефективніше прокручування галереї, кнопки «Назад», яких легше торкатися, і поліпшене резервне копіювання.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'І не тільки!',
+          description:
+              'Ефективніше прокручування галереї та кнопки «Назад», яких легше торкатися.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'vi': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Chia sẻ thư viện',
+          title: 'Dải xem trước trong trình xem',
           description:
-              'Tự động chia sẻ các album hiện tại và trong tương lai với thành viên gia đình. Vào Cài đặt → Gia đình, chọn một thành viên rồi nhấn Chia sẻ album.',
+              'Hình thu nhỏ ở cuối trình xem giúp bạn chuyển nhanh hơn giữa các ảnh và video.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Chia sẻ ảnh của một người',
+          description:
+              'Chia sẻ ảnh của một người bằng liên kết có thể tự động bao gồm ảnh mới của họ.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Nhanh hơn ở mọi nơi',
+          title: 'Đặt ảnh làm hình nền',
           description:
-              'Tìm kiếm, bản đồ và cuộn thư viện nhanh hơn trên các thư viện lớn.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Tìm kiếm vị trí',
-          description:
-              'Giờ đây, bạn có thể tìm kiếm theo quốc gia và thành phố với độ chính xác cao hơn.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Thùng rác hệ thống',
-          description:
-              'Trên Android 11 trở lên, ảnh trên thiết bị bị xóa qua Ente Photos sẽ được chuyển vào thùng rác hệ thống và có thể khôi phục trong ứng dụng.',
+              'Đặt một ảnh làm hình nền màn hình chính, màn hình khóa hoặc cả hai.',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mô tả album',
-          description:
-              'Giờ đây, bạn có thể thêm mô tả cho album. Mô tả cũng sẽ hiển thị trên các liên kết chia sẻ.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Trình chiếu album',
-          description:
-              'Biến chiếc máy tính bảng cũ thành khung ảnh với trình chiếu album.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Chỉnh sửa giữ lại nhiều hơn',
-          description:
-              'Ảnh đã chỉnh sửa giờ đây giữ lại các chi tiết quan trọng về máy ảnh, ngày chụp và vị trí. Tệp JPEG cũng giữ nguyên chất lượng gốc khi bạn chỉ xoay hoặc lật ảnh.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Phát video tốt hơn',
-          description:
-              'Nhấn đúp vào một trong hai bên video để tua tiến hoặc lùi năm giây. Bạn cũng có thể chọn tốc độ phát.',
+          title: 'Nhấn giữ để phát ở tốc độ 2×',
+          description: 'Nhấn và giữ video để xem ở tốc độ 2×.',
         ),
         ChangeLogEntryStrings(
           title: 'Và còn nhiều hơn thế!',
           description:
-              'Chúng tôi đã thêm vào Kỷ niệm một số bản nhạc do chính mình sáng tác. Ngoài ra, Album thông minh hoạt động tốt hơn, Giải phóng dung lượng đáng tin cậy hơn và Trạng thái sao lưu hiển thị tiến trình của từng tệp.',
+              'Cuộn thư viện hiệu quả hơn và các nút Quay lại dễ nhấn hơn.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Và còn nhiều hơn thế!',
+          description:
+              'Cuộn thư viện hiệu quả hơn, các nút Quay lại dễ nhấn hơn và tính năng sao lưu được cải thiện.',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Và còn nhiều hơn thế!',
+          description:
+              'Cuộn thư viện hiệu quả hơn và các nút Quay lại dễ nhấn hơn.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'zh_CN': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: '图库共享',
-          description: '自动与家人共享你当前和今后创建的相册。前往“设置”→“家庭”，选择一位成员，然后轻点“共享相册”。',
+          title: '查看器中的预览条',
+          description: '查看器底部的缩略图可让你更快地在照片和视频之间跳转。',
+        ),
+        ChangeLogEntryStrings(
+          title: '分享某个人的照片',
+          description: '通过链接分享某个人的照片，链接中可自动加入此人的新照片。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '处处更快',
-          description: '在大型图库中，搜索、地图和图库滚动都变得更快。',
-        ),
-        ChangeLogEntryStrings(
-          title: '位置搜索',
-          description: '现在可以按国家和城市搜索，准确度也有所提升。',
-        ),
-        ChangeLogEntryStrings(
-          title: '系统回收站',
-          description:
-              '在 Android 11 及更高版本中，通过 Ente Photos 删除的设备照片会移至系统回收站，并可在应用内恢复。',
+          title: '将照片设为壁纸',
+          description: '将照片设为主屏幕、锁定屏幕或两者的壁纸。',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '相册描述',
-          description: '现在可以为相册添加描述，描述也会显示在共享链接中。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '相册幻灯片',
-          description: '利用相册幻灯片，把你的旧平板变成电子相框。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '编辑后保留更多信息',
-          description: '编辑后的照片现在会保留相机、日期和位置等关键信息。仅旋转或翻转 JPEG 时，还会保留其原始画质。',
-        ),
-        ChangeLogEntryStrings(
-          title: '视频播放体验升级',
-          description: '双击视频任一侧，可前进或后退五秒。你还可以选择播放速度。',
+          title: '长按以2×速度播放',
+          description: '长按视频即可用2×速度观看。',
         ),
         ChangeLogEntryStrings(
           title: '还有更多！',
-          description:
-              '我们为“回忆”加入了一些由我们创作的音乐。此外，智能相册更加好用，“释放空间”更加可靠，“备份状态”会显示每个文件的进度。',
+          description: '图库滚动更高效，返回按钮更易于点击。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '还有更多！',
+          description: '图库滚动更高效，返回按钮更易于点击，备份也有所改进。',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '还有更多！',
+          description: '图库滚动更高效，返回按钮更易于点击。',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'zh_TW': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: '圖庫共享',
-          description: '自動與家人共享您目前和未來建立的相簿。前往「設定」→「家庭」，選擇一位成員，然後點一下「共享相簿」。',
+          title: '檢視器中的預覽列',
+          description: '檢視器底部的縮圖可讓您更快地在照片與影片之間切換。',
+        ),
+        ChangeLogEntryStrings(
+          title: '分享某個人的照片',
+          description: '透過連結分享某個人的照片，連結中可自動加入此人的新照片。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '處處更快速',
-          description: '在大型圖庫中，搜尋、地圖與圖庫捲動速度都變得更快。',
-        ),
-        ChangeLogEntryStrings(
-          title: '位置搜尋',
-          description: '現在可以依國家和城市搜尋，準確度也有所提升。',
-        ),
-        ChangeLogEntryStrings(
-          title: '系統垃圾桶',
-          description:
-              '在 Android 11 及更新版本中，透過 Ente Photos 刪除的裝置照片會移至系統垃圾桶，並可在應用程式中復原。',
+          title: '將照片設為桌布',
+          description: '將照片設為主畫面、鎖定畫面或兩者的桌布。',
           isAndroidOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '相簿描述',
-          description: '現在可以為相簿新增描述，描述也會顯示在共享連結中。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '相簿幻燈片',
-          description: '利用相簿幻燈片，將您的舊平板變成數位相框。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '編輯後保留更多資訊',
-          description: '編輯過的照片現在會保留相機、日期和位置等重要資訊。若只旋轉或翻轉 JPEG，還會保留原始畫質。',
-        ),
-        ChangeLogEntryStrings(
-          title: '更好的影片播放體驗',
-          description: '點兩下影片任一側，即可快轉或倒轉五秒。您也可以選擇播放速度。',
+          title: '長按以2×速度播放',
+          description: '長按影片即可用2×速度觀看。',
         ),
         ChangeLogEntryStrings(
           title: '還有更多！',
-          description:
-              '我們為「回憶」加入了一些由我們創作的音樂。此外，智慧相簿更加好用，「釋放空間」更加可靠，「備份狀態」會顯示每個檔案的進度。',
+          description: '圖片庫捲動更有效率，返回按鈕更容易點按。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
+          description: '圖片庫捲動更有效率，返回按鈕更容易點按，備份也有所改善。',
           isOnlineOnly: true,
+          isIOSOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
+          description: '圖片庫捲動更有效率，返回按鈕更容易點按。',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
@@ -1114,6 +960,7 @@ class ChangeLogEntryStrings {
   final bool isOnlineOnly;
   final bool isLocalGalleryOnly;
   final bool isAndroidOnly;
+  final bool isIOSOnly;
 
   const ChangeLogEntryStrings({
     required this.title,
@@ -1121,5 +968,7 @@ class ChangeLogEntryStrings {
     this.isOnlineOnly = false,
     this.isLocalGalleryOnly = false,
     this.isAndroidOnly = false,
-  }) : assert(!(isOnlineOnly && isLocalGalleryOnly));
+    this.isIOSOnly = false,
+  }) : assert(!(isOnlineOnly && isLocalGalleryOnly)),
+       assert(!(isAndroidOnly && isIOSOnly));
 }

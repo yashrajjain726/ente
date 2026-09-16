@@ -17,16 +17,33 @@ class UpdateService {
   static const kUpdateAvailableShownTimeKey = "update_available_shown_time_key";
   static const _updateNotificationsEnabledKey = "update_notifications_enabled";
   static const changeLogVersionKey = "update_change_log_key";
-  static const currentChangeLogVersion = 60;
+  static const currentChangeLogVersion = 61;
 
   LatestVersionInfo? _latestVersion;
   final _logger = Logger("UpdateService");
   final PackageInfo _packageInfo;
   final SharedPreferences _prefs;
+  final bool _isAndroid;
+  final bool Function(Locale locale, bool isLocalGallery, bool isAndroid)
+  _hasChangeLogContent;
 
-  UpdateService(SharedPreferences prefs, PackageInfo packageInfo)
-    : _prefs = prefs,
-      _packageInfo = packageInfo {
+  UpdateService(
+    SharedPreferences prefs,
+    PackageInfo packageInfo, {
+    bool? isAndroid,
+    bool Function(Locale locale, bool isLocalGallery, bool isAndroid)?
+    hasChangeLogContent,
+  }) : _prefs = prefs,
+       _packageInfo = packageInfo,
+       _isAndroid = isAndroid ?? Platform.isAndroid,
+       _hasChangeLogContent =
+           hasChangeLogContent ??
+           ((locale, isLocalGallery, isAndroid) =>
+               ChangeLogStrings.hasContentForLocale(
+                 locale,
+                 isLocalGallery: isLocalGallery,
+                 isAndroid: isAndroid,
+               )) {
     debugPrint("UpdateService constructor");
   }
 
@@ -53,11 +70,7 @@ class UpdateService {
       return ChangeLogAction.skip;
     }
 
-    return ChangeLogStrings.hasContentForLocale(
-          locale,
-          isLocalGallery: isLocalGallery,
-          isAndroid: Platform.isAndroid,
-        )
+    return _hasChangeLogContent(locale, isLocalGallery, _isAndroid)
         ? ChangeLogAction.show
         : ChangeLogAction.consumeWithoutShowing;
   }
