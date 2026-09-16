@@ -983,9 +983,6 @@ class _GalleryFileViewerBottomOverlay extends StatelessWidget {
     }
 
     final safePadding = MediaQuery.paddingOf(context);
-    final captionStyle = getEnteTextTheme(
-      context,
-    ).mini.copyWith(color: textBaseDark.withValues(alpha: 0.8));
     final filmstripInset = hasFilmstrip
         ? filmstripLayout.additionalBottomInset
         : 0.0;
@@ -1049,20 +1046,13 @@ class _GalleryFileViewerBottomOverlay extends StatelessWidget {
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(
                         onTap: () => showDetailsSheet(context, file),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('"', style: captionStyle),
-                            Flexible(
-                              child: Text(
-                                captionText,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: captionStyle,
-                              ),
-                            ),
-                            Text('"', style: captionStyle),
-                          ],
+                        child: Text(
+                          captionText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: getEnteTextTheme(context).mini.copyWith(
+                            color: textBaseDark.withValues(alpha: 0.8),
+                          ),
                         ),
                       ),
                     ),
