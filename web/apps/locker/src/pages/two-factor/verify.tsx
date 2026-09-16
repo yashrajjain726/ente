@@ -1,19 +1,10 @@
 import { LockerAuthShell } from "@/components/auth/LockerAuthShell";
 import { TwoFactorForm } from "ente-accounts/components/auth/TwoFactorForm";
-import AccountsTwoFactorVerifyPage, {
-    type TwoFactorVerifyPresentationProps,
-} from "ente-accounts/pages/two-factor/verify";
+import { withAuthPageShell } from "ente-accounts/components/auth/withAuthPageShell";
+import AccountsTwoFactorVerifyPage from "ente-accounts/pages/two-factor/verify";
 import type React from "react";
 
-function TwoFactorPresentation(
-    props: TwoFactorVerifyPresentationProps,
-): React.JSX.Element {
-    return (
-        <LockerAuthShell>
-            <TwoFactorForm {...props} />
-        </LockerAuthShell>
-    );
-}
+const TwoFactorPresentation = withAuthPageShell(TwoFactorForm, LockerAuthShell);
 
 function TwoFactorVerifyPage(): React.JSX.Element {
     return <AccountsTwoFactorVerifyPage presentation={TwoFactorPresentation} />;

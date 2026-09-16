@@ -1,18 +1,10 @@
 import { AuthShell } from "@/components/AuthShell";
 import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
-import type { NewPasswordPresentationProps } from "ente-accounts/components/NewPasswordForm";
+import { withAuthPageShell } from "ente-accounts/components/auth/withAuthPageShell";
 import AccountsChangePasswordPage from "ente-accounts/pages/change-password";
 import type React from "react";
 
-function ResetPasswordPresentation(
-    props: NewPasswordPresentationProps,
-): React.JSX.Element {
-    return (
-        <AuthShell>
-            <SetPasswordForm {...props} />
-        </AuthShell>
-    );
-}
+const ResetPasswordPresentation = withAuthPageShell(SetPasswordForm, AuthShell);
 
 function ChangePasswordPage(): React.JSX.Element {
     return (
