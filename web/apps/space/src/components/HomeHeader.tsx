@@ -14,7 +14,7 @@ import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
-const headerBackground = spaceSurface;
+const headerBackground = "#2C2C2E";
 const headerActionSize = spaceTouchTargetSize;
 const headerAvatarImageSize = 28;
 const headerChatCircleSize = 36;
