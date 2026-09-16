@@ -248,7 +248,7 @@ jobs:
                   path: rust/target
 
     photos-desktop-ensu-android:
-        # For desktop-lint.yml and ensu-android-build.yml.
+        # For desktop-lint.yml, android-lint.yml and ensu-android-build.yml.
         runs-on: ubuntu-latest
         steps:
             - name: Checkout

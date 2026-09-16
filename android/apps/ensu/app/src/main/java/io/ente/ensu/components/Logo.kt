@@ -23,23 +23,22 @@ fun Logo(
     height: Dp = 24.dp,
     horizontalPadding: Dp = 4.dp,
     verticalPadding: Dp = 2.dp,
-    tint: Color = EnsuColor.textPrimary()
+    tint: Color = EnsuColor.textPrimary(),
 ) {
     val imageHeight = height - verticalPadding * 2
     Box(
-        modifier = modifier
-            .height(height)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .height(height)
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(R.drawable.ensu_logo),
             contentDescription = "Ensu",
-            modifier = Modifier
-                .height(imageHeight)
-                .aspectRatio(906f / 255f),
+            modifier = Modifier.height(imageHeight).aspectRatio(906f / 255f),
             contentScale = ContentScale.Fit,
-            colorFilter = ColorFilter.tint(tint)
+            colorFilter = ColorFilter.tint(tint),
         )
     }
 }

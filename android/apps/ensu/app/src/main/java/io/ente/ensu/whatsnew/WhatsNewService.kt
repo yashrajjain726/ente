@@ -4,14 +4,15 @@ import android.content.Context
 
 data class PendingWhatsNew(
     val version: Int,
-    val entries: List<WhatsNewEntry>
+    val entries: List<WhatsNewEntry>,
 )
 
 class WhatsNewService(context: Context) {
-    private val preferences = context.getSharedPreferences(
-        PREFERENCES_NAME,
-        Context.MODE_PRIVATE
-    )
+    private val preferences =
+        context.getSharedPreferences(
+            PREFERENCES_NAME,
+            Context.MODE_PRIVATE,
+        )
 
     fun getPendingWhatsNew(): PendingWhatsNew? {
         if (!preferences.contains(KEY_SEEN_VERSION)) {
@@ -29,14 +30,12 @@ class WhatsNewService(context: Context) {
 
         return PendingWhatsNew(
             version = WhatsNewContent.VERSION,
-            entries = WhatsNewContent.entries
+            entries = WhatsNewContent.entries,
         )
     }
 
     fun markSeen() {
-        preferences.edit()
-            .putInt(KEY_SEEN_VERSION, WhatsNewContent.VERSION)
-            .apply()
+        preferences.edit().putInt(KEY_SEEN_VERSION, WhatsNewContent.VERSION).apply()
     }
 
     private companion object {

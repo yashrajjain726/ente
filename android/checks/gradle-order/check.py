@@ -157,10 +157,7 @@ def main(root):
     errors = []
     for directory, children, files in os.walk(root):
         relative = Path(directory).relative_to(root)
-        children[:] = sorted(
-            child for child in children
-            if child not in ("build", ".gradle") and relative / child != Path("apps/ensu")
-        )
+        children[:] = sorted(child for child in children if child not in ("build", ".gradle"))
         for name in sorted(files):
             if name.endswith(".gradle.kts"):
                 errors.extend(check((Path(directory) / name).read_text(), relative / name))

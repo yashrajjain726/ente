@@ -112,10 +112,10 @@ class GradleOrderTest(unittest.TestCase):
             }
         '''))
 
-    def test_cli_excludes_ensu_and_generated_files(self):
+    def test_cli_excludes_build_directories(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ["apps/ensu/build.gradle.kts", "build/build.gradle.kts", ".gradle/build.gradle.kts"]:
+            for name in ["build/build.gradle.kts", ".gradle/build.gradle.kts"]:
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('dependencies { api("z:lib:1"); api("a:lib:1") }')

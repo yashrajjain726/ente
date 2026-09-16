@@ -9,14 +9,15 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 internal suspend fun <T> runNotesRead(cancel: () -> Unit, read: () -> T): T = coroutineScope {
-    val worker = async(Dispatchers.IO) {
-        try {
-            read()
-        } catch (error: Exception) {
-            currentCoroutineContext().ensureActive()
-            throw error
+    val worker =
+        async(Dispatchers.IO) {
+            try {
+                read()
+            } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                throw error
+            }
         }
-    }
     try {
         worker.await()
     } finally {

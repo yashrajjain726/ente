@@ -36,9 +36,10 @@ import kotlin.math.roundToLong
 @Composable
 internal fun OverflowDialog(
     onTrim: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
-    val overflowMessage = "This conversation is too long for the model to process. Some older messages will be dropped to make room."
+    val overflowMessage =
+        "This conversation is too long for the model to process. Some older messages will be dropped to make room."
 
     AlertDialog(
         onDismissRequest = onCancel,
@@ -47,7 +48,7 @@ internal fun OverflowDialog(
             Text(
                 text = overflowMessage,
                 style = EnsuTypography.body,
-                color = EnsuColor.textPrimary()
+                color = EnsuColor.textPrimary(),
             )
         },
         confirmButton = {
@@ -56,11 +57,9 @@ internal fun OverflowDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) {
-                Text(text = "Cancel", color = EnsuColor.textMuted())
-            }
+            TextButton(onClick = onCancel) { Text(text = "Cancel", color = EnsuColor.textMuted()) }
         },
-        containerColor = EnsuColor.backgroundBase()
+        containerColor = EnsuColor.backgroundBase(),
     )
 }
 
@@ -69,9 +68,7 @@ private const val UNSUPPORTED_DEVICE_MESSAGE =
         "You can view existing chats, but can't send new messages."
 
 @Composable
-internal fun UnsupportedDeviceDialog(
-    onDismiss: () -> Unit
-) {
+internal fun UnsupportedDeviceDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = "Chat unavailable on this device", style = EnsuTypography.h3) },
@@ -79,7 +76,7 @@ internal fun UnsupportedDeviceDialog(
             Text(
                 text = UNSUPPORTED_DEVICE_MESSAGE,
                 style = EnsuTypography.body,
-                color = EnsuColor.textPrimary()
+                color = EnsuColor.textPrimary(),
             )
         },
         confirmButton = {
@@ -87,30 +84,29 @@ internal fun UnsupportedDeviceDialog(
                 Text(text = "Got it", color = EnsuColor.textPrimary())
             }
         },
-        containerColor = EnsuColor.backgroundBase()
+        containerColor = EnsuColor.backgroundBase(),
     )
 }
 
 @Composable
-internal fun UnsupportedChatInputNotice(
-    modifier: Modifier = Modifier
-) {
+internal fun UnsupportedChatInputNotice(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier
-            .padding(horizontal = EnsuSpacing.lg.dp, vertical = EnsuSpacing.md.dp)
-            .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.card.dp))
-            .padding(EnsuSpacing.md.dp)
+        modifier =
+            modifier
+                .padding(horizontal = EnsuSpacing.lg.dp, vertical = EnsuSpacing.md.dp)
+                .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.card.dp))
+                .padding(EnsuSpacing.md.dp)
     ) {
         Text(
             text = "Chat unavailable on this device",
             style = EnsuTypography.large,
-            color = EnsuColor.textPrimary()
+            color = EnsuColor.textPrimary(),
         )
         Text(
             text = UNSUPPORTED_DEVICE_MESSAGE,
             style = EnsuTypography.body,
             color = EnsuColor.textMuted(),
-            modifier = Modifier.padding(top = EnsuSpacing.xs.dp)
+            modifier = Modifier.padding(top = EnsuSpacing.xs.dp),
         )
     }
 }
@@ -121,31 +117,33 @@ internal fun DownloadToastOverlay(
     percent: Int,
     totalBytes: Long?,
     isLoading: Boolean,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val haptic = rememberHaptics()
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = EnsuSpacing.lg.dp),
-        contentAlignment = Alignment.TopCenter
+        modifier = Modifier.fillMaxWidth().padding(top = EnsuSpacing.lg.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
         val title = if (isLoading) "Loading model" else "Downloading model"
         val clamped = percent.coerceIn(0, 100)
-        val statusText = when {
-            isLoading -> status
-            totalBytes != null -> {
-                val downloadedBytes = (totalBytes * (clamped / 100f)).roundToLong()
-                "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}"
+        val statusText =
+            when {
+                isLoading -> status
+                totalBytes != null -> {
+                    val downloadedBytes = (totalBytes * (clamped / 100f)).roundToLong()
+                    "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}"
+                }
+                else -> status
             }
-            else -> status
-        }
         Column(
-            modifier = Modifier
-                .padding(horizontal = EnsuSpacing.lg.dp)
-                .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.toast.dp))
-                .padding(EnsuSpacing.lg.dp)
-                .fillMaxWidth()
+            modifier =
+                Modifier.padding(horizontal = EnsuSpacing.lg.dp)
+                    .background(
+                        EnsuColor.fillFaint(),
+                        RoundedCornerShape(EnsuCornerRadius.toast.dp),
+                    )
+                    .padding(EnsuSpacing.lg.dp)
+                    .fillMaxWidth()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text = title, style = EnsuTypography.large, color = EnsuColor.textPrimary())
@@ -155,19 +153,17 @@ internal fun DownloadToastOverlay(
                         haptic.perform(HapticFeedbackType.LongPress)
                         onCancel()
                     },
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(28.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .background(Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.size(22.dp).background(Color.White, CircleShape),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             painter = painterResource(HugeIcons.StopIcon),
                             contentDescription = "Cancel download",
                             modifier = Modifier.size(12.dp),
-                            tint = EnsuColor.stopButton
+                            tint = EnsuColor.stopButton,
                         )
                     }
                 }
@@ -177,14 +173,14 @@ internal fun DownloadToastOverlay(
                 progress = { clamped / 100f },
                 color = if (isLoading) EnsuColor.accent() else EnsuColor.accent(),
                 trackColor = EnsuColor.border(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
             Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = statusText,
                     style = EnsuTypography.small.copy(fontFeatureSettings = "tnum"),
-                    color = EnsuColor.textMuted()
+                    color = EnsuColor.textMuted(),
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(text = "$clamped%", style = EnsuTypography.mini, color = EnsuColor.textMuted())

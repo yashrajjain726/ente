@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -34,104 +34,107 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuCornerRadius
-import io.ente.ensu.designsystem.HugeIcons
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
+import io.ente.ensu.designsystem.HugeIcons
 
 @Composable
 fun MarkdownView(
     markdown: String,
     enableSelection: Boolean = true,
-    trailingCursor: Boolean = false
+    trailingCursor: Boolean = false,
 ) {
     val blocks = remember(markdown) { MarkdownParser.parse(markdown) }
-    val content = @Composable {
-        Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp)) {
-            blocks.forEachIndexed { index, block ->
-                key(index) {
-                    val appendCursor = trailingCursor && index == blocks.lastIndex
-                    when (block) {
-                        is MarkdownBlock.Heading -> {
-                            InlineMarkdownText(
-                                text = block.text,
-                                style = headingStyle(block.level),
-                                color = EnsuColor.textPrimary(),
-                                appendCursor = appendCursor
-                            )
-                        }
-                        is MarkdownBlock.Paragraph -> {
-                            InlineMarkdownText(
-                                text = block.text,
-                                style = EnsuTypography.message,
-                                color = EnsuColor.textPrimary(),
-                                appendCursor = appendCursor
-                            )
-                        }
-                        is MarkdownBlock.BlockQuote -> {
-                            BlockQuoteView(text = block.text, appendCursor = appendCursor)
-                        }
-                        is MarkdownBlock.Code -> {
-                            CodeBlockView(code = block.text)
-                            if (appendCursor) {
-                                TrailingCursor()
+    val content =
+        @Composable {
+            Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp)) {
+                blocks.forEachIndexed { index, block ->
+                    key(index) {
+                        val appendCursor = trailingCursor && index == blocks.lastIndex
+                        when (block) {
+                            is MarkdownBlock.Heading -> {
+                                InlineMarkdownText(
+                                    text = block.text,
+                                    style = headingStyle(block.level),
+                                    color = EnsuColor.textPrimary(),
+                                    appendCursor = appendCursor,
+                                )
                             }
-                        }
-                        is MarkdownBlock.Math -> {
-                            MathBlockView(text = block.text)
-                            if (appendCursor) {
-                                TrailingCursor()
+                            is MarkdownBlock.Paragraph -> {
+                                InlineMarkdownText(
+                                    text = block.text,
+                                    style = EnsuTypography.message,
+                                    color = EnsuColor.textPrimary(),
+                                    appendCursor = appendCursor,
+                                )
                             }
-                        }
-                        is MarkdownBlock.ListItems -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp)) {
-                                block.items.forEachIndexed { itemIndex, item ->
-                                    key(itemIndex) {
-                                        val itemCursor = appendCursor && itemIndex == block.items.lastIndex
-                                        Row(
-                                            verticalAlignment = Alignment.Top,
-                                            horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp)
-                                        ) {
-                                            Text(
-                                                text = "•",
-                                                style = EnsuTypography.message,
-                                                color = EnsuColor.textPrimary()
-                                            )
-                                            InlineMarkdownText(
-                                                text = item,
-                                                style = EnsuTypography.message,
-                                                color = EnsuColor.textPrimary(),
-                                                appendCursor = itemCursor
-                                            )
+                            is MarkdownBlock.BlockQuote -> {
+                                BlockQuoteView(text = block.text, appendCursor = appendCursor)
+                            }
+                            is MarkdownBlock.Code -> {
+                                CodeBlockView(code = block.text)
+                                if (appendCursor) {
+                                    TrailingCursor()
+                                }
+                            }
+                            is MarkdownBlock.Math -> {
+                                MathBlockView(text = block.text)
+                                if (appendCursor) {
+                                    TrailingCursor()
+                                }
+                            }
+                            is MarkdownBlock.ListItems -> {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp)
+                                ) {
+                                    block.items.forEachIndexed { itemIndex, item ->
+                                        key(itemIndex) {
+                                            val itemCursor =
+                                                appendCursor && itemIndex == block.items.lastIndex
+                                            Row(
+                                                verticalAlignment = Alignment.Top,
+                                                horizontalArrangement =
+                                                    Arrangement.spacedBy(EnsuSpacing.sm.dp),
+                                            ) {
+                                                Text(
+                                                    text = "•",
+                                                    style = EnsuTypography.message,
+                                                    color = EnsuColor.textPrimary(),
+                                                )
+                                                InlineMarkdownText(
+                                                    text = item,
+                                                    style = EnsuTypography.message,
+                                                    color = EnsuColor.textPrimary(),
+                                                    appendCursor = itemCursor,
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                        MarkdownBlock.Divider -> {
-                            Divider(color = EnsuColor.border())
-                            if (appendCursor) {
-                                TrailingCursor()
+                            MarkdownBlock.Divider -> {
+                                HorizontalDivider(color = EnsuColor.border())
+                                if (appendCursor) {
+                                    TrailingCursor()
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
     if (enableSelection) {
-        SelectionContainer {
-            content()
-        }
+        SelectionContainer { content() }
     } else {
         content()
     }
@@ -140,24 +143,19 @@ fun MarkdownView(
 @Composable
 private fun BlockQuoteView(text: String, appendCursor: Boolean = false) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)
-            .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.card.dp))
-            .padding(EnsuSpacing.cardPadding.dp)
+        modifier =
+            Modifier.fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.card.dp))
+                .padding(EnsuSpacing.cardPadding.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(3.dp)
-                .background(EnsuColor.border())
-        )
+        Box(modifier = Modifier.fillMaxHeight().width(3.dp).background(EnsuColor.border()))
         Spacer(modifier = Modifier.width(EnsuSpacing.sm.dp))
         InlineMarkdownText(
             text = text,
             style = EnsuTypography.message,
             color = EnsuColor.textPrimary(),
-            appendCursor = appendCursor
+            appendCursor = appendCursor,
         )
     }
 }
@@ -166,40 +164,40 @@ private fun BlockQuoteView(text: String, appendCursor: Boolean = false) {
 private fun CodeBlockView(code: String) {
     val clipboard = LocalClipboardManager.current
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.codeBlock.dp))
-            .border(1.dp, EnsuColor.border(), RoundedCornerShape(EnsuCornerRadius.codeBlock.dp))
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(
+                    EnsuColor.fillFaint(),
+                    RoundedCornerShape(EnsuCornerRadius.codeBlock.dp),
+                )
+                .border(1.dp, EnsuColor.border(), RoundedCornerShape(EnsuCornerRadius.codeBlock.dp))
     ) {
         Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(
-                    start = EnsuSpacing.cardPadding.dp,
-                    end = (EnsuSpacing.cardPadding + 32).dp,
-                    top = EnsuSpacing.cardPadding.dp,
-                    bottom = (EnsuSpacing.cardPadding + 32).dp
-                )
+            modifier =
+                Modifier.horizontalScroll(rememberScrollState())
+                    .padding(
+                        start = EnsuSpacing.cardPadding.dp,
+                        end = (EnsuSpacing.cardPadding + 32).dp,
+                        top = EnsuSpacing.cardPadding.dp,
+                        bottom = (EnsuSpacing.cardPadding + 32).dp,
+                    )
         ) {
             Text(
                 text = code,
                 style = EnsuTypography.code,
-                color = EnsuColor.textPrimary()
+                color = EnsuColor.textPrimary(),
             )
         }
 
         IconButton(
             onClick = { clipboard.setText(AnnotatedString(code)) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(EnsuSpacing.xs.dp)
-                .size(28.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).padding(EnsuSpacing.xs.dp).size(28.dp),
         ) {
             Icon(
                 painter = painterResource(HugeIcons.Copy01Icon),
                 contentDescription = "Copy code",
                 tint = EnsuColor.textMuted(),
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(16.dp),
             )
         }
     }
@@ -208,14 +206,17 @@ private fun CodeBlockView(code: String) {
 @Composable
 private fun MathBlockView(text: String) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.codeBlock.dp))
-            .border(1.dp, EnsuColor.border(), RoundedCornerShape(EnsuCornerRadius.codeBlock.dp))
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(
+                    EnsuColor.fillFaint(),
+                    RoundedCornerShape(EnsuCornerRadius.codeBlock.dp),
+                )
+                .border(1.dp, EnsuColor.border(), RoundedCornerShape(EnsuCornerRadius.codeBlock.dp))
     ) {
         LaTeXView(
             latex = text,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -225,30 +226,36 @@ private fun TrailingCursor() {
     Text(
         text = "▍",
         style = EnsuTypography.message,
-        color = EnsuColor.textPrimary()
+        color = EnsuColor.textPrimary(),
     )
 }
 
 private fun headingStyle(level: Int): TextStyle {
-    val size = when (level) {
-        1 -> 20.sp
-        2 -> 18.sp
-        else -> 16.sp
-    }
-    return EnsuTypography.message.copy(fontSize = size, fontWeight = FontWeight.SemiBold, lineHeight = (size.value + 6).sp)
+    val size =
+        when (level) {
+            1 -> 20.sp
+            2 -> 18.sp
+            else -> 16.sp
+        }
+    return EnsuTypography.message.copy(
+        fontSize = size,
+        fontWeight = FontWeight.SemiBold,
+        lineHeight = (size.value + 6).sp,
+    )
 }
 
 private data class InlineLinkMatch(
     val label: String,
-    val endIndexExclusive: Int
+    val endIndexExclusive: Int,
 )
 
 private fun markdownAnnotatedText(
     text: String,
     linkColor: androidx.compose.ui.graphics.Color,
-    appendCursor: Boolean = false
+    appendCursor: Boolean = false,
 ): AnnotatedString {
-    val pattern = Regex("""(\[[^\]\n]+\]\([^)]+\)|~~[^~\n]+~~|\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*)""")
+    val pattern =
+        Regex("""(\[[^\]\n]+\]\([^)]+\)|~~[^~\n]+~~|\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*)""")
     val codeFamily = EnsuTypography.code.fontFamily
     return buildAnnotatedString {
         var currentIndex = 0
@@ -266,7 +273,7 @@ private fun markdownAnnotatedText(
                         withStyle(
                             SpanStyle(
                                 color = linkColor,
-                                textDecoration = TextDecoration.Underline
+                                textDecoration = TextDecoration.Underline,
                             )
                         ) {
                             append(token.substring(1, labelEnd))
@@ -313,22 +320,22 @@ private enum class InlineMarkdownStyle {
     Italic,
     Code,
     Strikethrough,
-    Link
+    Link,
 }
 
-private sealed class InlineMarkdownSegment {
-    data class Text(val text: String, val style: InlineMarkdownStyle) : InlineMarkdownSegment()
-    data class Math(val latex: String) : InlineMarkdownSegment()
+private sealed interface InlineMarkdownSegment {
+    data class Text(val text: String, val style: InlineMarkdownStyle) : InlineMarkdownSegment
+
+    data class Math(val latex: String) : InlineMarkdownSegment
 }
 
 private data class InlineMathMatch(
     val latex: String,
-    val endIndexExclusive: Int
+    val endIndexExclusive: Int,
 )
 
-private val mathTokenPattern = Regex(
-    """(?<!\\)\$(?!\$)(?:[^$\n\\]|\\.)+?(?<!\\)\$(?!\$)|\\\((?:[^\n\\]|\\.)+?\\\)"""
-)
+private val mathTokenPattern =
+    Regex("""(?<!\\)\$(?!\$)(?:[^$\n\\]|\\.)+?(?<!\\)\$(?!\$)|\\\((?:[^\n\\]|\\.)+?\\\)""")
 
 private fun parseInlineMarkdownSegments(text: String): List<InlineMarkdownSegment> {
     val segments = mutableListOf<InlineMarkdownSegment>()
@@ -341,7 +348,7 @@ private fun parseInlineMarkdownSegments(text: String): List<InlineMarkdownSegmen
             segments.add(
                 InlineMarkdownSegment.Text(
                     text = buffer.toString(),
-                    style = currentStyle
+                    style = currentStyle,
                 )
             )
             buffer.clear()
@@ -410,7 +417,7 @@ private fun parseInlineMarkdownSegments(text: String): List<InlineMarkdownSegmen
                         segments.add(
                             InlineMarkdownSegment.Text(
                                 text = linkMatch.label,
-                                style = InlineMarkdownStyle.Link
+                                style = InlineMarkdownStyle.Link,
                             )
                         )
                         index = linkMatch.endIndexExclusive
@@ -471,7 +478,7 @@ private fun findInlineMathMatch(text: String, startIndex: Int): InlineMathMatch?
                 if (text[index + 1] == ')') {
                     return InlineMathMatch(
                         latex = text.substring(startIndex + 2, index),
-                        endIndexExclusive = index + 2
+                        endIndexExclusive = index + 2,
                     )
                 }
                 index += 2
@@ -496,15 +503,15 @@ private fun findInlineMathMatch(text: String, startIndex: Int): InlineMathMatch?
         }
         if (
             text[index] == '$' &&
-            text[index - 1] != '\\' &&
-            (index + 1 >= text.length || text[index + 1] != '$')
+                text[index - 1] != '\\' &&
+                (index + 1 >= text.length || text[index + 1] != '$')
         ) {
             if (index == startIndex + 1) {
                 return null
             }
             return InlineMathMatch(
                 latex = text.substring(startIndex + 1, index),
-                endIndexExclusive = index + 1
+                endIndexExclusive = index + 1,
             )
         }
         index += 1
@@ -551,7 +558,7 @@ private fun findInlineLinkMatch(text: String, startIndex: Int): InlineLinkMatch?
         if (char == ')') {
             return InlineLinkMatch(
                 label = label,
-                endIndexExclusive = index + 1
+                endIndexExclusive = index + 1,
             )
         }
         index += 1
@@ -588,8 +595,7 @@ private fun hasClosingSingleAsterisk(text: String, startIndex: Int): Boolean {
     return false
 }
 
-private fun hasInlineMath(text: String): Boolean =
-    mathTokenPattern.containsMatchIn(text)
+private fun hasInlineMath(text: String): Boolean = mathTokenPattern.containsMatchIn(text)
 
 private fun splitTextChunks(text: String): List<String> =
     Regex("""\s+|\S+\s*""").findAll(text).map { it.value }.toList()
@@ -600,17 +606,18 @@ private fun InlineMarkdownText(
     text: String,
     style: TextStyle,
     color: androidx.compose.ui.graphics.Color,
-    appendCursor: Boolean = false
+    appendCursor: Boolean = false,
 ) {
     if (!hasInlineMath(text)) {
         Text(
-            text = markdownAnnotatedText(
-                text = text,
-                linkColor = EnsuColor.accent(),
-                appendCursor = appendCursor
-            ),
+            text =
+                markdownAnnotatedText(
+                    text = text,
+                    linkColor = EnsuColor.accent(),
+                    appendCursor = appendCursor,
+                ),
             style = style,
-            color = color
+            color = color,
         )
         return
     }
@@ -620,16 +627,14 @@ private fun InlineMarkdownText(
         lines.forEachIndexed { lineIndex, line ->
             val isLastLine = lineIndex == lines.lastIndex
             val segments = parseInlineMarkdownSegments(line)
-            val cursorInline = appendCursor &&
-                isLastLine &&
-                segments.lastOrNull() is InlineMarkdownSegment.Text
-            val cursorStandalone = appendCursor &&
-                isLastLine &&
-                segments.lastOrNull() !is InlineMarkdownSegment.Text
+            val cursorInline =
+                appendCursor && isLastLine && segments.lastOrNull() is InlineMarkdownSegment.Text
+            val cursorStandalone =
+                appendCursor && isLastLine && segments.lastOrNull() !is InlineMarkdownSegment.Text
 
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(0.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 segments.forEachIndexed { segmentIndex, segment ->
                     when (segment) {
@@ -637,18 +642,19 @@ private fun InlineMarkdownText(
                             InlineLaTeXView(
                                 latex = segment.latex,
                                 modifier = Modifier.padding(top = 2.dp),
-                                fontSizeSp = style.fontSize.value
+                                fontSizeSp = style.fontSize.value,
                             )
                         }
                         is InlineMarkdownSegment.Text -> {
                             val chunks = splitTextChunks(segment.text)
                             chunks.forEachIndexed { chunkIndex, chunk ->
                                 val isLastChunk =
-                                    segmentIndex == segments.lastIndex && chunkIndex == chunks.lastIndex
+                                    segmentIndex == segments.lastIndex &&
+                                        chunkIndex == chunks.lastIndex
                                 Text(
                                     text = if (cursorInline && isLastChunk) "$chunk▍" else chunk,
                                     style = styleForInlineSegment(style, segment.style),
-                                    color = colorForInlineSegment(color, segment.style)
+                                    color = colorForInlineSegment(color, segment.style),
                                 )
                             }
                         }
@@ -659,7 +665,7 @@ private fun InlineMarkdownText(
                     Text(
                         text = "▍",
                         style = style,
-                        color = color
+                        color = color,
                     )
                 }
             }
@@ -669,33 +675,39 @@ private fun InlineMarkdownText(
 
 private fun styleForInlineSegment(
     baseStyle: TextStyle,
-    inlineStyle: InlineMarkdownStyle
-): TextStyle = when (inlineStyle) {
-    InlineMarkdownStyle.Normal -> baseStyle
-    InlineMarkdownStyle.Bold -> baseStyle.copy(fontWeight = FontWeight.SemiBold)
-    InlineMarkdownStyle.Italic -> baseStyle.copy(fontStyle = FontStyle.Italic)
-    InlineMarkdownStyle.Code -> baseStyle.copy(fontFamily = EnsuTypography.code.fontFamily)
-    InlineMarkdownStyle.Strikethrough -> baseStyle.copy(textDecoration = TextDecoration.LineThrough)
-    InlineMarkdownStyle.Link -> baseStyle.copy(textDecoration = TextDecoration.Underline)
-}
+    inlineStyle: InlineMarkdownStyle,
+): TextStyle =
+    when (inlineStyle) {
+        InlineMarkdownStyle.Normal -> baseStyle
+        InlineMarkdownStyle.Bold -> baseStyle.copy(fontWeight = FontWeight.SemiBold)
+        InlineMarkdownStyle.Italic -> baseStyle.copy(fontStyle = FontStyle.Italic)
+        InlineMarkdownStyle.Code -> baseStyle.copy(fontFamily = EnsuTypography.code.fontFamily)
+        InlineMarkdownStyle.Strikethrough ->
+            baseStyle.copy(textDecoration = TextDecoration.LineThrough)
+        InlineMarkdownStyle.Link -> baseStyle.copy(textDecoration = TextDecoration.Underline)
+    }
 
 @Composable
 private fun colorForInlineSegment(
     baseColor: androidx.compose.ui.graphics.Color,
-    inlineStyle: InlineMarkdownStyle
-): androidx.compose.ui.graphics.Color = when (inlineStyle) {
-    InlineMarkdownStyle.Link -> EnsuColor.accent()
-    else -> baseColor
-}
+    inlineStyle: InlineMarkdownStyle,
+): androidx.compose.ui.graphics.Color =
+    if (inlineStyle == InlineMarkdownStyle.Link) EnsuColor.accent() else baseColor
 
-private sealed class MarkdownBlock {
-    data class Heading(val level: Int, val text: String) : MarkdownBlock()
-    data class Paragraph(val text: String) : MarkdownBlock()
-    data class BlockQuote(val text: String) : MarkdownBlock()
-    data class Code(val text: String) : MarkdownBlock()
-    data class Math(val text: String) : MarkdownBlock()
-    data class ListItems(val items: List<String>) : MarkdownBlock()
-    data object Divider : MarkdownBlock()
+private sealed interface MarkdownBlock {
+    data class Heading(val level: Int, val text: String) : MarkdownBlock
+
+    data class Paragraph(val text: String) : MarkdownBlock
+
+    data class BlockQuote(val text: String) : MarkdownBlock
+
+    data class Code(val text: String) : MarkdownBlock
+
+    data class Math(val text: String) : MarkdownBlock
+
+    data class ListItems(val items: List<String>) : MarkdownBlock
+
+    data object Divider : MarkdownBlock
 }
 
 private object MarkdownParser {
@@ -770,8 +782,8 @@ private object MarkdownParser {
         for (line in lines) {
             val trimmed = line.trim()
 
-            if (mathEndDelimiter != null) {
-                val endDelimiter = mathEndDelimiter!!
+            val endDelimiter = mathEndDelimiter
+            if (endDelimiter != null) {
                 if (trimmed == endDelimiter) {
                     flushMath()
                     continue
@@ -789,11 +801,12 @@ private object MarkdownParser {
             }
 
             if (trimmed == "\\[" || trimmed == "$$" || trimmed == "[") {
-                val endDelimiter = when (trimmed) {
-                    "\\[" -> "\\]"
-                    "$$" -> "$$"
-                    else -> "]"
-                }
+                val endDelimiter =
+                    when (trimmed) {
+                        "\\[" -> "\\]"
+                        "$$" -> "$$"
+                        else -> "]"
+                    }
                 startMath(endDelimiter)
                 continue
             }
@@ -839,7 +852,9 @@ private object MarkdownParser {
                 continue
             }
 
-            if (trimmed.startsWith("# ") || trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
+            if (
+                trimmed.startsWith("# ") || trimmed.startsWith("## ") || trimmed.startsWith("### ")
+            ) {
                 flushParagraph()
                 flushList()
                 val level = trimmed.takeWhile { it == '#' }.length.coerceIn(1, 3)

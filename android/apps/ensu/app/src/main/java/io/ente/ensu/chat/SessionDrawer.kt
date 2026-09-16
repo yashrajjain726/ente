@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -14,15 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.RectangleShape
-
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,10 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuCornerRadius
-import io.ente.ensu.designsystem.HugeIcons
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
-import io.ente.ensu.chat.ChatSession
+import io.ente.ensu.designsystem.HugeIcons
 import kotlin.math.absoluteValue
 
 @Composable
@@ -57,34 +54,31 @@ fun SessionDrawer(
     selectedSessionId: String?,
     onSelectSession: (ChatSession) -> Unit,
     onDeleteSession: (ChatSession) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filteredSessions = remember(searchQuery, sessions) {
-        val query = searchQuery.trim()
-        if (query.isEmpty()) {
-            sessions
-        } else {
-            val lower = query.lowercase()
-            sessions.filter { session ->
-                session.title.lowercase().contains(lower) ||
-                    (session.lastMessagePreview?.lowercase()?.contains(lower) == true)
+    val filteredSessions =
+        remember(searchQuery, sessions) {
+            val query = searchQuery.trim()
+            if (query.isEmpty()) {
+                sessions
+            } else {
+                val lower = query.lowercase()
+                sessions.filter { session ->
+                    session.title.lowercase().contains(lower) ||
+                        (session.lastMessagePreview?.lowercase()?.contains(lower) == true)
+                }
             }
         }
-    }
 
     ModalDrawerSheet(
         drawerContainerColor = EnsuColor.backgroundBase(),
-        drawerShape = RectangleShape
+        drawerShape = RectangleShape,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars)
-        ) {
+        Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
             DrawerHeader(
                 searchQuery = searchQuery,
-                onSearchChange = { searchQuery = it }
+                onSearchChange = { searchQuery = it },
             )
 
             HorizontalDivider(color = EnsuColor.border())
@@ -94,14 +88,12 @@ fun SessionDrawer(
                 selectedSessionId = selectedSessionId,
                 onSelectSession = onSelectSession,
                 onDeleteSession = onDeleteSession,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
 
             HorizontalDivider(color = EnsuColor.border())
 
-            DrawerFooter(
-                onOpenSettings = onOpenSettings
-            )
+            DrawerFooter(onOpenSettings = onOpenSettings)
         }
     }
 }
@@ -109,19 +101,19 @@ fun SessionDrawer(
 @Composable
 private fun DrawerHeader(
     searchQuery: String,
-    onSearchChange: (String) -> Unit
+    onSearchChange: (String) -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EnsuColor.backgroundBase())
-            .padding(horizontal = EnsuSpacing.lg.dp, vertical = EnsuSpacing.md.dp)
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(EnsuColor.backgroundBase())
+                .padding(horizontal = EnsuSpacing.lg.dp, vertical = EnsuSpacing.md.dp)
     ) {
         DrawerSearchControls(
             query = searchQuery,
             onQueryChange = onSearchChange,
             onClearSearch = { onSearchChange("") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -131,26 +123,26 @@ private fun DrawerSearchControls(
     query: String,
     onQueryChange: (String) -> Unit,
     onClearSearch: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hasQuery = query.isNotBlank()
 
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         DrawerSearchField(
             query = query,
             onQueryChange = onQueryChange,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
 
         if (hasQuery) {
             DrawerSearchActionButton(
                 iconRes = HugeIcons.Cancel01Icon,
                 contentDescription = "Clear search",
-                onClick = onClearSearch
+                onClick = onClearSearch,
             )
         }
     }
@@ -160,7 +152,7 @@ private fun DrawerSearchControls(
 private fun DrawerSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
         value = query,
@@ -170,7 +162,7 @@ private fun DrawerSearchField(
             Text(
                 text = "Search chats",
                 style = EnsuTypography.body,
-                color = EnsuColor.textMuted()
+                color = EnsuColor.textMuted(),
             )
         },
         leadingIcon = {
@@ -178,18 +170,19 @@ private fun DrawerSearchField(
                 painter = painterResource(HugeIcons.Search01Icon),
                 contentDescription = "Search",
                 modifier = Modifier.size(18.dp),
-                tint = EnsuColor.textMuted()
+                tint = EnsuColor.textMuted(),
             )
         },
         singleLine = true,
         textStyle = EnsuTypography.body,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = EnsuColor.fillFaint(),
-            unfocusedContainerColor = EnsuColor.fillFaint(),
-            focusedIndicatorColor = EnsuColor.fillFaint(),
-            unfocusedIndicatorColor = EnsuColor.fillFaint()
-        ),
-        shape = RoundedCornerShape(EnsuCornerRadius.card.dp)
+        colors =
+            TextFieldDefaults.colors(
+                focusedContainerColor = EnsuColor.fillFaint(),
+                unfocusedContainerColor = EnsuColor.fillFaint(),
+                focusedIndicatorColor = EnsuColor.fillFaint(),
+                unfocusedIndicatorColor = EnsuColor.fillFaint(),
+            ),
+        shape = RoundedCornerShape(EnsuCornerRadius.card.dp),
     )
 }
 
@@ -197,19 +190,17 @@ private fun DrawerSearchField(
 private fun DrawerSearchActionButton(
     iconRes: Int,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
+        modifier = Modifier.size(36.dp).clip(CircleShape),
     ) {
         Icon(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,
             modifier = Modifier.size(18.dp),
-            tint = EnsuColor.textPrimary()
+            tint = EnsuColor.textPrimary(),
         )
     }
 }
@@ -220,20 +211,21 @@ private fun SessionGroups(
     selectedSessionId: String?,
     onSelectSession: (ChatSession) -> Unit,
     onDeleteSession: (ChatSession) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val grouped = remember(sessions) { sessions.groupBy { sessionGroupLabel(it.updatedAtMillis) } }
     val order = listOf("TODAY", "YESTERDAY", "THIS WEEK", "LAST WEEK", "THIS MONTH", "OLDER")
-    val orderedGroups = remember(grouped) {
-        order.mapNotNull { label ->
-            grouped[label]?.takeIf { it.isNotEmpty() }?.let { label to it }
+    val orderedGroups =
+        remember(grouped) {
+            order.mapNotNull { label ->
+                grouped[label]?.takeIf { it.isNotEmpty() }?.let { label to it }
+            }
         }
-    }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(vertical = EnsuSpacing.lg.dp),
-        verticalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp)
+        verticalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp),
     ) {
         orderedGroups.forEachIndexed { index, (label, groupSessions) ->
             item(key = "header_$label") {
@@ -245,7 +237,7 @@ private fun SessionGroups(
                         text = label,
                         style = EnsuTypography.tiny.copy(letterSpacing = 1.sp),
                         color = EnsuColor.textMuted(),
-                        modifier = Modifier.padding(horizontal = EnsuSpacing.lg.dp)
+                        modifier = Modifier.padding(horizontal = EnsuSpacing.lg.dp),
                     )
                 }
             }
@@ -255,7 +247,7 @@ private fun SessionGroups(
                     session = session,
                     isSelected = session.id == selectedSessionId,
                     onSelect = { onSelectSession(session) },
-                    onDelete = { onDeleteSession(session) }
+                    onDelete = { onDeleteSession(session) },
                 )
             }
         }
@@ -267,21 +259,21 @@ private fun SessionTile(
     session: ChatSession,
     isSelected: Boolean,
     onSelect: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(horizontal = EnsuSpacing.lg.dp, vertical = EnsuSpacing.sm.dp)
+        modifier =
+            Modifier.fillMaxWidth()
+                .clickable(onClick = onSelect)
+                .padding(horizontal = EnsuSpacing.lg.dp, vertical = EnsuSpacing.sm.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp)
+            horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.sm.dp),
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = session.title,
@@ -289,7 +281,7 @@ private fun SessionTile(
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                     color = EnsuColor.textPrimary(),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 val subtitle = session.lastMessagePreview ?: "Nothing here"
                 Text(
@@ -297,21 +289,21 @@ private fun SessionTile(
                     style = EnsuTypography.mini,
                     color = EnsuColor.textMuted(),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .clickable(onClick = onDelete),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier.size(36.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(onClick = onDelete),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painter = painterResource(HugeIcons.Delete01Icon),
                     contentDescription = "Delete",
                     modifier = Modifier.size(18.dp),
-                    tint = EnsuColor.textMuted()
+                    tint = EnsuColor.textMuted(),
                 )
             }
         }
@@ -319,28 +311,24 @@ private fun SessionTile(
 }
 
 @Composable
-private fun DrawerFooter(
-    onOpenSettings: () -> Unit
-) {
+private fun DrawerFooter(onOpenSettings: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenSettings)
-            .padding(EnsuSpacing.lg.dp),
+        modifier =
+            Modifier.fillMaxWidth().clickable(onClick = onOpenSettings).padding(EnsuSpacing.lg.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp)
+        horizontalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp),
     ) {
         Text(
             text = "Settings",
             style = EnsuTypography.body,
             color = EnsuColor.textPrimary(),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         Icon(
             painter = painterResource(HugeIcons.ArrowRight01Icon),
             contentDescription = "Settings",
             modifier = Modifier.size(18.dp),
-            tint = EnsuColor.textMuted()
+            tint = EnsuColor.textMuted(),
         )
     }
 }

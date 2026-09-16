@@ -24,9 +24,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuCornerRadius
-import io.ente.ensu.designsystem.HugeIcons
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
+import io.ente.ensu.designsystem.HugeIcons
 import io.ente.ensu.platform.rememberHaptics
 
 @Composable
@@ -36,57 +36,58 @@ fun AttachmentChip(
     iconRes: Int,
     isUploading: Boolean,
     onDelete: (() -> Unit)? = null,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
 ) {
     val haptic = rememberHaptics()
-    val clickModifier = if (onClick != null) {
-        Modifier.clickable {
-            haptic.perform(HapticFeedbackType.TextHandleMove)
-            onClick()
+    val clickModifier =
+        if (onClick != null) {
+            Modifier.clickable {
+                haptic.perform(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+        } else {
+            Modifier
         }
-    } else {
-        Modifier
-    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .widthIn(max = 220.dp)
-            .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.input.dp))
-            .then(clickModifier)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+        modifier =
+            Modifier.widthIn(max = 220.dp)
+                .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.input.dp))
+                .then(clickModifier)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
         Icon(
             painter = painterResource(iconRes),
             contentDescription = null,
             modifier = Modifier.size(14.dp),
-            tint = EnsuColor.textMuted()
+            tint = EnsuColor.textMuted(),
         )
         Spacer(modifier = Modifier.width(EnsuSpacing.sm.dp))
         Column(
             modifier = Modifier.widthIn(max = 160.dp),
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = name,
                 style = EnsuTypography.small,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = EnsuColor.textPrimary()
+                color = EnsuColor.textPrimary(),
             )
             Text(
                 text = size,
                 style = EnsuTypography.mini,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = EnsuColor.textMuted()
+                color = EnsuColor.textMuted(),
             )
         }
         if (isUploading) {
             Spacer(modifier = Modifier.width(EnsuSpacing.xs.dp))
             CircularProgressIndicator(
                 modifier = Modifier.size(12.dp),
-                strokeWidth = 2.dp
+                strokeWidth = 2.dp,
             )
         }
         if (onDelete != null) {
@@ -96,12 +97,12 @@ fun AttachmentChip(
                     haptic.perform(HapticFeedbackType.LongPress)
                     onDelete()
                 },
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             ) {
                 Icon(
                     painter = painterResource(HugeIcons.Cancel01Icon),
                     contentDescription = "Remove attachment",
-                    tint = EnsuColor.textMuted()
+                    tint = EnsuColor.textMuted(),
                 )
             }
         }

@@ -1,12 +1,12 @@
 package io.ente.ensu
 
 import android.app.Application
+import io.ente.ensu.assets.AssetStore
 import io.ente.ensu.bindings.RustLogLevel
 import io.ente.ensu.bindings.RustLogSink
 import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.bindings.initRustLogging
 import io.ente.ensu.bindings.transcriptionModelAsset
-import io.ente.ensu.assets.AssetStore
 import io.ente.ensu.knowledge.KnowledgeProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
@@ -20,7 +20,7 @@ class EnsuApplication : Application() {
         val transcription = transcriptionModelAsset()
         Transcriber(
             store.assetDir(transcription).absolutePath,
-            store.voiceActivityModelPath().absolutePath
+            store.voiceActivityModelPath().absolutePath,
         )
     }
 
@@ -30,15 +30,14 @@ class EnsuApplication : Application() {
     }
 }
 
-private class EnsuRustLogSink(
-    private val logRepository: FileLogRepository
-) : RustLogSink {
+private class EnsuRustLogSink(private val logRepository: FileLogRepository) : RustLogSink {
     override fun log(level: RustLogLevel, target: String, message: String) {
-        val mappedLevel = when (level) {
-            RustLogLevel.ERROR -> LogLevel.Error
-            RustLogLevel.WARN -> LogLevel.Warning
-            RustLogLevel.INFO -> LogLevel.Info
-        }
+        val mappedLevel =
+            when (level) {
+                RustLogLevel.ERROR -> LogLevel.Error
+                RustLogLevel.WARN -> LogLevel.Warning
+                RustLogLevel.INFO -> LogLevel.Info
+            }
         logRepository.log(mappedLevel, "[$target] $message", tag = "rust")
     }
 }

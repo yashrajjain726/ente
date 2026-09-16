@@ -1,29 +1,27 @@
 package io.ente.ensu
 
 import android.content.Context
-import io.ente.ensu.llm.ModelSettingsActions
-import io.ente.ensu.chat.AttachmentStoreActions
-import io.ente.ensu.chat.ChatStoreActions
-
-import io.ente.ensu.chat.ChatRepository
-import io.ente.ensu.device.ChatDeviceCapability
-import io.ente.ensu.bindings.Transcriber
-import io.ente.ensu.device.AndroidDeviceCapabilityProvider
-import io.ente.ensu.llm.DownloadPhase
-import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.assets.AssetStore
-import io.ente.ensu.logging.FileLogRepository
-import io.ente.ensu.chat.Attachment
-import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.bindings.ConfigDefaults
-import io.ente.ensu.logging.LogLevel
-import io.ente.ensu.notes.NotesStore
-import io.ente.ensu.settings.SessionPreferencesDataStore
-import io.ente.ensu.AppState
-import io.ente.ensu.settings.DeveloperSettingsState
-import io.ente.ensu.llm.ModelSettingsState
+import io.ente.ensu.bindings.Transcriber
+import io.ente.ensu.chat.Attachment
+import io.ente.ensu.chat.AttachmentStoreActions
+import io.ente.ensu.chat.ChatMessage
+import io.ente.ensu.chat.ChatRepository
+import io.ente.ensu.chat.ChatStoreActions
+import io.ente.ensu.device.AndroidDeviceCapabilityProvider
+import io.ente.ensu.device.ChatDeviceCapability
 import io.ente.ensu.knowledge.KnowledgeProvider
 import io.ente.ensu.knowledge.KnowledgeStore
+import io.ente.ensu.llm.DownloadPhase
+import io.ente.ensu.llm.LlmProvider
+import io.ente.ensu.llm.ModelSettingsActions
+import io.ente.ensu.llm.ModelSettingsState
+import io.ente.ensu.logging.FileLogRepository
+import io.ente.ensu.logging.LogLevel
+import io.ente.ensu.notes.NotesStore
+import io.ente.ensu.settings.DeveloperSettingsState
+import io.ente.ensu.settings.SessionPreferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,47 +31,51 @@ import kotlinx.coroutines.launch
 class AppStore(
     context: Context,
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val chatRepository: ChatRepository,
-    private val llmProvider: LlmProvider,
+    chatRepository: ChatRepository,
+    llmProvider: LlmProvider,
     knowledgeProvider: KnowledgeProvider,
     val assetStore: AssetStore,
     val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
     val configDefaults: ConfigDefaults,
     private val logRepository: FileLogRepository,
-    private val clock: () -> Long = { System.currentTimeMillis() }
+    clock: () -> Long = { System.currentTimeMillis() },
 ) {
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
 
-    val notesStore = NotesStore(context, llmProvider, logRepository).also { llmProvider.modelMaintenance = it }
+    val notesStore =
+        NotesStore(context, llmProvider, logRepository).also { llmProvider.modelMaintenance = it }
 
     private val messageStore = mutableMapOf<String, MutableList<ChatMessage>>()
     private val attachmentActions = AttachmentStoreActions(_state, messageStore)
-    private val knowledgeStore = KnowledgeStore(
-        context = context,
-        state = _state,
-        provider = knowledgeProvider,
-        datasets = configDefaults.knowledgeDatasets,
-        logRepository = logRepository
-    )
+    private val knowledgeStore =
+        KnowledgeStore(
+            context = context,
+            state = _state,
+            provider = knowledgeProvider,
+            datasets = configDefaults.knowledgeDatasets,
+            logRepository = logRepository,
+        )
     private val modelSettingsActions =
         ModelSettingsActions(_state, sessionPreferences, llmProvider, logRepository)
-    private val chatActions = ChatStoreActions(
-        state = _state,
-        sessionPreferences = sessionPreferences,
-        chatRepository = chatRepository,
-        llmProvider = llmProvider,
-        knowledgeProvider = knowledgeProvider,
-        clock = clock,
-        logRepository = logRepository,
-        messageStore = messageStore,
-        attachmentActions = attachmentActions,
-        modelSettingsActions = modelSettingsActions,
-        configDefaults = configDefaults,
-        notesStore = notesStore,
-        awaitKnowledgeReady = knowledgeStore::awaitEnabledPacksReady
-    )
+    private val chatActions =
+        ChatStoreActions(
+            state = _state,
+            sessionPreferences = sessionPreferences,
+            chatRepository = chatRepository,
+            llmProvider = llmProvider,
+            knowledgeProvider = knowledgeProvider,
+            clock = clock,
+            logRepository = logRepository,
+            messageStore = messageStore,
+            attachmentActions = attachmentActions,
+            modelSettingsActions = modelSettingsActions,
+            configDefaults = configDefaults,
+            notesStore = notesStore,
+            awaitKnowledgeReady = knowledgeStore::awaitEnabledPacksReady,
+        )
+
     fun bootstrap(scope: CoroutineScope) {
         notesStore.bootstrap(scope)
         chatActions.setScope(scope)
@@ -82,59 +84,64 @@ class AppStore(
         chatActions.bootstrap(scope)
         modelSettingsActions.refreshModelDownloadInfo()
         knowledgeStore.bootstrap(scope)
-        _state.value = _state.value.copy(
-            chat = _state.value.chat.copy(isModelStateKnown = true)
-        )
+        _state.value = _state.value.copy(chat = _state.value.chat.copy(isModelStateKnown = true))
     }
 
     fun refreshDeviceCapability(scope: CoroutineScope? = null) {
         val capability = deviceCapabilityProvider.chatCapability()
         val unsupported = capability is ChatDeviceCapability.UnsupportedLowMemory
-        _state.value = _state.value.copy(
-            chat = _state.value.chat.copy(
-                deviceCapability = capability,
-                showUnsupportedDeviceDialog = unsupported || _state.value.chat.showUnsupportedDeviceDialog,
-                isDownloading = if (unsupported) false else _state.value.chat.isDownloading,
-                downloadPercent = if (unsupported) null else _state.value.chat.downloadPercent,
-                downloadStatus = if (unsupported) null else _state.value.chat.downloadStatus,
-                downloadPhase = if (unsupported) null else _state.value.chat.downloadPhase,
-                hasRequestedModelDownload = if (unsupported) false else _state.value.chat.hasRequestedModelDownload,
-                editingMessageId = if (unsupported) null else _state.value.chat.editingMessageId,
-                messageText = if (unsupported) "" else _state.value.chat.messageText,
-                attachments = if (unsupported) emptyList() else _state.value.chat.attachments
+        _state.value =
+            _state.value.copy(
+                chat =
+                    _state.value.chat.copy(
+                        deviceCapability = capability,
+                        showUnsupportedDeviceDialog =
+                            unsupported || _state.value.chat.showUnsupportedDeviceDialog,
+                        isDownloading = if (unsupported) false else _state.value.chat.isDownloading,
+                        downloadPercent =
+                            if (unsupported) null else _state.value.chat.downloadPercent,
+                        downloadStatus =
+                            if (unsupported) null else _state.value.chat.downloadStatus,
+                        downloadPhase = if (unsupported) null else _state.value.chat.downloadPhase,
+                        hasRequestedModelDownload =
+                            if (unsupported) false else _state.value.chat.hasRequestedModelDownload,
+                        editingMessageId =
+                            if (unsupported) null else _state.value.chat.editingMessageId,
+                        messageText = if (unsupported) "" else _state.value.chat.messageText,
+                        attachments =
+                            if (unsupported) emptyList() else _state.value.chat.attachments,
+                    )
             )
-        )
         if (unsupported) {
             scope?.let { coroutineScope ->
-                coroutineScope.launch {
-                    sessionPreferences.setModelDownloadRequested(false)
-                }
+                coroutineScope.launch { sessionPreferences.setModelDownloadRequested(false) }
             }
         }
         logRepository.log(
             LogLevel.Info,
             "Chat device capability evaluated",
             details = "capability=$capability",
-            tag = "App"
+            tag = "App",
         )
     }
 
     fun dismissUnsupportedDeviceDialog() {
-        _state.value = _state.value.copy(
-            chat = _state.value.chat.copy(showUnsupportedDeviceDialog = false)
-        )
+        _state.value =
+            _state.value.copy(chat = _state.value.chat.copy(showUnsupportedDeviceDialog = false))
     }
 
     fun hydrateModelDownloadRequested(requested: Boolean) {
         if (!requested) return
-        _state.value = _state.value.copy(
-            chat = _state.value.chat.copy(
-                hasRequestedModelDownload = true,
-                isDownloading = true,
-                downloadStatus = "Resuming download...",
-                downloadPhase = DownloadPhase.Downloading
+        _state.value =
+            _state.value.copy(
+                chat =
+                    _state.value.chat.copy(
+                        hasRequestedModelDownload = true,
+                        isDownloading = true,
+                        downloadStatus = "Resuming download...",
+                        downloadPhase = DownloadPhase.Downloading,
+                    )
             )
-        )
     }
 
     fun createNewSession(): String = chatActions.createNewSession()
@@ -178,7 +185,8 @@ class AppStore(
 
     fun cancelKnowledgePackDownload(stableId: String) = knowledgeStore.cancel(stableId)
 
-    fun setKnowledgePackEnabled(stableId: String, enabled: Boolean) = knowledgeStore.setEnabled(stableId, enabled)
+    fun setKnowledgePackEnabled(stableId: String, enabled: Boolean) =
+        knowledgeStore.setEnabled(stableId, enabled)
 
     fun cancelDownload() {
         chatActions.cancelGenerationForDownload()
@@ -203,17 +211,14 @@ class AppStore(
     }
 
     fun unlockAdvancedSettings() {
-        updateDeveloperSettings(
-            _state.value.developerSettings.copy(isAdvancedUnlocked = true)
-        )
+        updateDeveloperSettings(_state.value.developerSettings.copy(isAdvancedUnlocked = true))
     }
 
     fun applyPersistedSettings(
         developerSettings: DeveloperSettingsState,
-        modelSettings: ModelSettingsState
+        modelSettings: ModelSettingsState,
     ) {
         _state.value = _state.value.copy(developerSettings = developerSettings)
         modelSettingsActions.hydratePersistedModelSettings(modelSettings)
     }
-
 }

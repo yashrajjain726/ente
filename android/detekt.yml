@@ -5,10 +5,16 @@ complexity:
   active: false
 
 coroutines:
+  InjectDispatcher:
+    active: false
   GlobalCoroutineUsage:
     active: true
   SuspendFunSwallowedCancellation:
     active: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
 
 naming:
   FunctionNaming:

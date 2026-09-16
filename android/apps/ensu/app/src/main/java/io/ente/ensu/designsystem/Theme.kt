@@ -51,7 +51,8 @@ object EnsuColor {
     val toastTextDark = Color(0xFF1A1A1A)
 
     @Composable
-    fun backgroundBase(): Color = if (isSystemInDarkTheme()) backgroundBaseDark else backgroundBaseLight
+    fun backgroundBase(): Color =
+        if (isSystemInDarkTheme()) backgroundBaseDark else backgroundBaseLight
 
     @Composable
     fun textPrimary(): Color = if (isSystemInDarkTheme()) textPrimaryDark else textPrimaryLight
@@ -59,23 +60,22 @@ object EnsuColor {
     @Composable
     fun textMuted(): Color = if (isSystemInDarkTheme()) textMutedDark else textMutedLight
 
-    @Composable
-    fun border(): Color = if (isSystemInDarkTheme()) borderDark else borderLight
+    @Composable fun border(): Color = if (isSystemInDarkTheme()) borderDark else borderLight
 
     @Composable
     fun fillFaint(): Color = if (isSystemInDarkTheme()) fillFaintDark else fillFaintLight
 
-    @Composable
-    fun accent(): Color = if (isSystemInDarkTheme()) accentDark else accentLight
+    @Composable fun accent(): Color = if (isSystemInDarkTheme()) accentDark else accentLight
+
+    @Composable fun action(): Color = if (isSystemInDarkTheme()) actionDark else actionLight
 
     @Composable
-    fun action(): Color = if (isSystemInDarkTheme()) actionDark else actionLight
+    fun userMessageText(): Color =
+        if (isSystemInDarkTheme()) userMessageTextDark else userMessageTextLight
 
     @Composable
-    fun userMessageText(): Color = if (isSystemInDarkTheme()) userMessageTextDark else userMessageTextLight
-
-    @Composable
-    fun toastBackground(): Color = if (isSystemInDarkTheme()) toastBackgroundDark else toastBackgroundLight
+    fun toastBackground(): Color =
+        if (isSystemInDarkTheme()) toastBackgroundDark else toastBackgroundLight
 
     @Composable
     fun toastText(): Color = if (isSystemInDarkTheme()) toastTextDark else toastTextLight
@@ -108,52 +108,131 @@ object EnsuCornerRadius {
 }
 
 object EnsuTypography {
-    private val serifFamily = FontFamily(
-        Font(R.font.dm_serif_text_regular, FontWeight.Medium),
-        Font(R.font.dm_serif_text_regular, FontWeight.SemiBold)
-    )
+    private val serifFamily =
+        FontFamily(
+            Font(R.font.dm_serif_text_regular, FontWeight.Medium),
+            Font(R.font.dm_serif_text_regular, FontWeight.SemiBold),
+        )
 
-    private val uiFamily = FontFamily(
-        Font(R.font.inter_regular, FontWeight.Normal),
-        Font(R.font.inter_medium, FontWeight.Medium),
-        Font(R.font.inter_semibold, FontWeight.SemiBold),
-        Font(R.font.inter_bold, FontWeight.Bold)
-    )
+    private val uiFamily =
+        FontFamily(
+            Font(R.font.inter_regular, FontWeight.Normal),
+            Font(R.font.inter_medium, FontWeight.Medium),
+            Font(R.font.inter_semibold, FontWeight.SemiBold),
+            Font(R.font.inter_bold, FontWeight.Bold),
+        )
 
     private val messageFamily = uiFamily
 
-    private val codeFamily = FontFamily(
-        Font(R.font.jetbrainsmono_regular, FontWeight.Normal)
-    )
+    private val codeFamily = FontFamily(Font(R.font.jetbrainsmono_regular, FontWeight.Normal))
 
-    val h1 = TextStyle(fontFamily = serifFamily, fontSize = 48.sp, fontWeight = FontWeight.Medium, lineHeight = 82.sp)
-    val h2 = TextStyle(fontFamily = serifFamily, fontSize = 32.sp, fontWeight = FontWeight.Medium, lineHeight = 39.sp)
-    val h3 = TextStyle(fontFamily = serifFamily, fontSize = 24.sp, fontWeight = FontWeight.Medium, lineHeight = 29.sp)
-    val large = TextStyle(fontFamily = serifFamily, fontSize = 18.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp)
+    val h1 =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 82.sp,
+        )
+    val h2 =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 39.sp,
+        )
+    val h3 =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 29.sp,
+        )
+    val large =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 22.sp,
+        )
 
-    val h1Bold = TextStyle(fontFamily = serifFamily, fontSize = 48.sp, fontWeight = FontWeight.SemiBold, lineHeight = 82.sp)
-    val h2Bold = TextStyle(fontFamily = serifFamily, fontSize = 32.sp, fontWeight = FontWeight.SemiBold, lineHeight = 39.sp)
-    val h3Bold = TextStyle(fontFamily = serifFamily, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, lineHeight = 29.sp)
+    val h1Bold =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 82.sp,
+        )
+    val h2Bold =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 39.sp,
+        )
+    val h3Bold =
+        TextStyle(
+            fontFamily = serifFamily,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 29.sp,
+        )
 
-    val body = TextStyle(fontFamily = uiFamily, fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp)
-    val small = TextStyle(fontFamily = uiFamily, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 17.sp)
-    val mini = TextStyle(fontFamily = uiFamily, fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 15.sp)
-    val tiny = TextStyle(fontFamily = uiFamily, fontSize = 10.sp, fontWeight = FontWeight.Medium, lineHeight = 12.sp)
+    val body =
+        TextStyle(
+            fontFamily = uiFamily,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 20.sp,
+        )
+    val small =
+        TextStyle(
+            fontFamily = uiFamily,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 17.sp,
+        )
+    val mini =
+        TextStyle(
+            fontFamily = uiFamily,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 15.sp,
+        )
+    val tiny =
+        TextStyle(
+            fontFamily = uiFamily,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 12.sp,
+        )
 
-    val message = TextStyle(fontFamily = messageFamily, fontSize = 15.sp, fontWeight = FontWeight.Normal, lineHeight = 22.sp)
-    val code = TextStyle(fontFamily = codeFamily, fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 19.sp)
+    val message =
+        TextStyle(
+            fontFamily = messageFamily,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal,
+            lineHeight = 22.sp,
+        )
+    val code =
+        TextStyle(
+            fontFamily = codeFamily,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Normal,
+            lineHeight = 19.sp,
+        )
 
-    val material = Typography(
-        bodyLarge = body,
-        bodyMedium = body,
-        bodySmall = small,
-        titleLarge = h2,
-        titleMedium = h3,
-        titleSmall = large,
-        labelLarge = small,
-        labelMedium = mini,
-        labelSmall = tiny
-    )
+    val material =
+        Typography(
+            bodyLarge = body,
+            bodyMedium = body,
+            bodySmall = small,
+            titleLarge = h2,
+            titleMedium = h3,
+            titleSmall = large,
+            labelLarge = small,
+            labelMedium = mini,
+            labelSmall = tiny,
+        )
 }
 
 @Composable
@@ -162,52 +241,43 @@ fun Theme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (isDark) darkEnsuColorScheme() else lightEnsuColorScheme(),
         typography = EnsuTypography.material,
-        content = content
+        content = content,
     )
 }
 
-private fun lightEnsuColorScheme(): ColorScheme = lightColorScheme(
-    primary = EnsuColor.accentLight,
-    onPrimary = Color.Black,
+private fun lightEnsuColorScheme(): ColorScheme =
+    lightColorScheme(
+        primary = EnsuColor.accentLight,
+        onPrimary = Color.Black,
+        secondary = EnsuColor.fillFaintLight,
+        onSecondary = EnsuColor.textPrimaryLight,
+        background = EnsuColor.backgroundBaseLight,
+        onBackground = EnsuColor.textPrimaryLight,
+        surface = EnsuColor.fillFaintLight,
+        onSurface = EnsuColor.textPrimaryLight,
 
-    secondary = EnsuColor.fillFaintLight,
-    onSecondary = EnsuColor.textPrimaryLight,
+        // Important for default M3 components (e.g. TextField placeholder/label colors).
+        // If not set, Material uses its default palette (purple-ish).
+        surfaceVariant = EnsuColor.fillFaintLight,
+        onSurfaceVariant = EnsuColor.textMutedLight,
+        outline = EnsuColor.borderLight,
+        outlineVariant = EnsuColor.borderLight,
+        error = EnsuColor.error,
+    )
 
-    background = EnsuColor.backgroundBaseLight,
-    onBackground = EnsuColor.textPrimaryLight,
-
-    surface = EnsuColor.fillFaintLight,
-    onSurface = EnsuColor.textPrimaryLight,
-
-    // Important for default M3 components (e.g. TextField placeholder/label colors).
-    // If not set, Material uses its default palette (purple-ish).
-    surfaceVariant = EnsuColor.fillFaintLight,
-    onSurfaceVariant = EnsuColor.textMutedLight,
-
-    outline = EnsuColor.borderLight,
-    outlineVariant = EnsuColor.borderLight,
-
-    error = EnsuColor.error
-)
-
-private fun darkEnsuColorScheme(): ColorScheme = darkColorScheme(
-    primary = EnsuColor.accentDark,
-    onPrimary = Color.Black,
-
-    secondary = EnsuColor.fillFaintDark,
-    onSecondary = EnsuColor.textPrimaryDark,
-
-    background = EnsuColor.backgroundBaseDark,
-    onBackground = EnsuColor.textPrimaryDark,
-
-    surface = EnsuColor.fillFaintDark,
-    onSurface = EnsuColor.textPrimaryDark,
-
-    surfaceVariant = EnsuColor.fillFaintDark,
-    onSurfaceVariant = EnsuColor.textMutedDark,
-
-    outline = EnsuColor.borderDark,
-    outlineVariant = EnsuColor.borderDark,
-
-    error = EnsuColor.error
-)
+private fun darkEnsuColorScheme(): ColorScheme =
+    darkColorScheme(
+        primary = EnsuColor.accentDark,
+        onPrimary = Color.Black,
+        secondary = EnsuColor.fillFaintDark,
+        onSecondary = EnsuColor.textPrimaryDark,
+        background = EnsuColor.backgroundBaseDark,
+        onBackground = EnsuColor.textPrimaryDark,
+        surface = EnsuColor.fillFaintDark,
+        onSurface = EnsuColor.textPrimaryDark,
+        surfaceVariant = EnsuColor.fillFaintDark,
+        onSurfaceVariant = EnsuColor.textMutedDark,
+        outline = EnsuColor.borderDark,
+        outlineVariant = EnsuColor.borderDark,
+        error = EnsuColor.error,
+    )
