@@ -23,7 +23,7 @@ private const val MAX_SCAN_ENTRIES = 250_000
 internal class AndroidNotesSource(
     private val resolver: ContentResolver,
     private val tree: Uri,
-    private val cancellation: NotesCancellationInterface
+    private val cancellation: NotesCancellationInterface,
 ) : NotesSource {
     @Volatile private var signal: CancellationSignal? = null
     private val activeRead = AtomicReference<FileChannel?>()
@@ -38,7 +38,7 @@ internal class AndroidNotesSource(
         val directory: Boolean,
         val size: Long?,
         val modified: Long?,
-        val virtual: Boolean
+        val virtual: Boolean,
     )
 
     fun cancel() {
@@ -53,33 +53,45 @@ internal class AndroidNotesSource(
     private fun uri(id: String) = DocumentsContract.buildDocumentUriUsingTree(tree, id)
 
     private fun query(target: Uri): List<Entry> = access { request ->
-        val columns = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE,
-            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-            DocumentsContract.Document.COLUMN_FLAGS
-        )
+        val columns =
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                DocumentsContract.Document.COLUMN_FLAGS,
+            )
         resolver.query(target, columns, null, null, null, request)?.use { cursor ->
             val entries = mutableListOf<Entry>()
             while (cursor.moveToNext()) {
                 request.throwIfCanceled()
                 if (entries.size % 64 == 0) cancellation.check()
-                if (entries.size >= MAX_SCAN_ENTRIES) throw NotesException.InvalidInput("The Notes folder contains too many entries")
-                val id = cursor.getString(0) ?: throw NotesException.SourceRead("Missing document identity")
-                val name = cursor.getString(1) ?: throw NotesException.SourceRead("Missing document name")
-                entries += Entry(
-                    id = id,
-                    name = name,
-                    directory = cursor.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR,
-                    size = if (cursor.isNull(3)) null else cursor.getLong(3).takeIf { it >= 0 },
-                    modified = if (cursor.isNull(4)) null else cursor.getLong(4).takeIf { it > 0 },
-                    virtual = !cursor.isNull(5) && cursor.getInt(5) and DocumentsContract.Document.FLAG_VIRTUAL_DOCUMENT != 0
-                )
+                if (entries.size >= MAX_SCAN_ENTRIES)
+                    throw NotesException.InvalidInput("The Notes folder contains too many entries")
+                val id =
+                    cursor.getString(0)
+                        ?: throw NotesException.SourceRead("Missing document identity")
+                val name =
+                    cursor.getString(1) ?: throw NotesException.SourceRead("Missing document name")
+                entries +=
+                    Entry(
+                        id = id,
+                        name = name,
+                        directory = cursor.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR,
+                        size = if (cursor.isNull(3)) null else cursor.getLong(3).takeIf { it >= 0 },
+                        modified =
+                            if (cursor.isNull(4)) null else cursor.getLong(4).takeIf { it > 0 },
+                        virtual =
+                            !cursor.isNull(5) &&
+                                cursor.getInt(5) and
+                                    DocumentsContract.Document.FLAG_VIRTUAL_DOCUMENT != 0,
+                    )
             }
             if (cursor.extras.containsKey(DocumentsContract.EXTRA_ERROR)) {
-                throw NotesException.SourceRead("Could not load the complete Notes folder. Please try again.")
+                throw NotesException.SourceRead(
+                    "Could not load the complete Notes folder. Please try again."
+                )
             }
             if (cursor.extras.getBoolean(DocumentsContract.EXTRA_LOADING, false)) {
                 throw NotesException.SourceRead("The folder is still loading. Please try again.")
@@ -88,9 +100,8 @@ internal class AndroidNotesSource(
         } ?: throw NotesException.SourceRead("Could not read the Notes folder")
     }
 
-    private fun children(id: String): Map<String, Entry> = directories.getOrPut(id) {
-        queryChildren(id)
-    }
+    private fun children(id: String): Map<String, Entry> =
+        directories.getOrPut(id) { queryChildren(id) }
 
     private fun queryChildren(id: String): Map<String, Entry> {
         val entries = query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, id))
@@ -105,7 +116,8 @@ internal class AndroidNotesSource(
         tree.authority == other.tree.authority && rootId == other.rootId
 
     fun root(): Entry =
-        query(uri(rootId)).singleOrNull()?.takeIf { it.directory } ?: throw NotesException.Unavailable()
+        query(uri(rootId)).singleOrNull()?.takeIf { it.directory }
+            ?: throw NotesException.Unavailable()
 
     fun contains(other: AndroidNotesSource): Boolean {
         if (tree.authority != other.tree.authority) return false
@@ -119,7 +131,8 @@ internal class AndroidNotesSource(
             if (id == other.rootId) return true
             if (!seen.add(id)) throw NotesException.SourceRead("Ambiguous directory structure")
             for (child in children(id).values) {
-                if (++count > MAX_SCAN_ENTRIES) throw NotesException.InvalidInput("The Notes folder contains too many entries")
+                if (++count > MAX_SCAN_ENTRIES)
+                    throw NotesException.InvalidInput("The Notes folder contains too many entries")
                 if (child.id == other.rootId) return true
                 if (child.directory) pending.add(child.id)
             }
@@ -138,9 +151,11 @@ internal class AndroidNotesSource(
         while (pending.isNotEmpty()) {
             cancellation.check()
             val (directory, prefix) = pending.removeFirst()
-            if (!seen.add(directory)) throw NotesException.SourceRead("Ambiguous directory structure")
+            if (!seen.add(directory))
+                throw NotesException.SourceRead("Ambiguous directory structure")
             for (child in children(directory).values) {
-                if (++entries > MAX_SCAN_ENTRIES) throw NotesException.InvalidInput("The Notes folder contains too many entries")
+                if (++entries > MAX_SCAN_ENTRIES)
+                    throw NotesException.InvalidInput("The Notes folder contains too many entries")
                 if (child.name.startsWith(".")) continue
                 if (!child.directory && (child.virtual || !supported(child.name))) continue
                 if (child.name.contains("/")) continue
@@ -154,13 +169,18 @@ internal class AndroidNotesSource(
                     pending.add(child.id to "$id/")
                 } else {
                     if (child.size != null && child.size > limits.maxSourceBytes.toLong()) continue
-                    val size = child.size ?: try {
-                        bytes(child.id).size.toLong()
-                    } catch (_: TooLarge) {
-                        continue
-                    }
+                    val size =
+                        child.size
+                            ?: try {
+                                bytes(child.id).size.toLong()
+                            } catch (_: TooLarge) {
+                                continue
+                            }
                     total += size
-                    if (documents.size.toULong() >= limits.maxCollectionDocuments || total.toULong() > limits.maxCollectionSourceBytes) {
+                    if (
+                        documents.size.toULong() >= limits.maxCollectionDocuments ||
+                            total.toULong() > limits.maxCollectionSourceBytes
+                    ) {
                         throw NotesException.InvalidInput("The Notes folder is too large to index")
                     }
                     documents += NotesDocument(id, size.toULong(), child.modified)
@@ -179,13 +199,19 @@ internal class AndroidNotesSource(
         for ((index, name) in parts.withIndex()) {
             if (name.startsWith(".")) throw NotesException.SourceChanged()
             val expected = children(directory)[name] ?: throw NotesException.SourceChanged()
-            val entry = query(uri(expected.id)).singleOrNull() ?: throw NotesException.SourceChanged()
-            if (entry.id != expected.id || entry.name != expected.name || entry.directory != expected.directory) {
+            val entry =
+                query(uri(expected.id)).singleOrNull() ?: throw NotesException.SourceChanged()
+            if (
+                entry.id != expected.id ||
+                    entry.name != expected.name ||
+                    entry.directory != expected.directory
+            ) {
                 throw NotesException.SourceChanged()
             }
             expectedPath += entry.id
             if (index == parts.lastIndex) {
-                if (entry.directory || entry.virtual || !supported(name)) throw NotesException.SourceChanged()
+                if (entry.directory || entry.virtual || !supported(name))
+                    throw NotesException.SourceChanged()
                 if (!verifyPath(entry.id, expectedPath)) {
                     verifyListedPath(expectedPath, parts)
                 }
@@ -201,8 +227,11 @@ internal class AndroidNotesSource(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !supportsPath) return false
         return access {
             try {
-                val path = DocumentsContract.findDocumentPath(resolver, uri(id))
-                    ?: throw NotesException.SourceRead("Could not verify the note location. Please try again.")
+                val path =
+                    DocumentsContract.findDocumentPath(resolver, uri(id))
+                        ?: throw NotesException.SourceRead(
+                            "Could not verify the note location. Please try again."
+                        )
                 if (path.path != expected) throw NotesException.SourceChanged()
                 true
             } catch (_: UnsupportedOperationException) {
@@ -221,11 +250,12 @@ internal class AndroidNotesSource(
 
     override fun readDocument(documentId: String): NotesRead {
         val before = resolve(documentId)
-        val bytes = try {
-            bytes(before.id)
-        } catch (_: TooLarge) {
-            throw NotesException.SourceChanged()
-        }
+        val bytes =
+            try {
+                bytes(before.id)
+            } catch (_: TooLarge) {
+                throw NotesException.SourceChanged()
+            }
         val after = resolve(documentId)
         if (before != after || (after.size != null && after.size != bytes.size.toLong())) {
             throw NotesException.SourceChanged()
@@ -234,8 +264,9 @@ internal class AndroidNotesSource(
     }
 
     private fun bytes(id: String): ByteArray = access { request ->
-        val descriptor = resolver.openAssetFileDescriptor(uri(id), "r", request)
-            ?: throw NotesException.SourceRead("Could not read the note")
+        val descriptor =
+            resolver.openAssetFileDescriptor(uri(id), "r", request)
+                ?: throw NotesException.SourceRead("Could not read the note")
         descriptor.use {
             cancellation.check()
             it.createInputStream().use { input ->
@@ -246,7 +277,8 @@ internal class AndroidNotesSource(
                     val output = ByteArrayOutputStream()
                     val buffer = ByteArray(8192)
                     val destination = ByteBuffer.wrap(buffer)
-                    var remaining = descriptor.declaredLength.takeIf { length -> length >= 0 } ?: Long.MAX_VALUE
+                    var remaining =
+                        descriptor.declaredLength.takeIf { length -> length >= 0 } ?: Long.MAX_VALUE
                     while (remaining > 0) {
                         cancellation.check()
                         destination.clear()
@@ -295,5 +327,7 @@ internal class AndroidNotesSource(
     }
 
     private class TooLarge : Exception()
-    private fun supported(name: String) = name.endsWith(".md", true) || name.endsWith(".markdown", true)
+
+    private fun supported(name: String) =
+        name.endsWith(".md", true) || name.endsWith(".markdown", true)
 }

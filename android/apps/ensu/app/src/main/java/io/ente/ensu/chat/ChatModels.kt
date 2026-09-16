@@ -4,7 +4,7 @@ import java.util.UUID
 
 enum class MessageAuthor {
     User,
-    Assistant
+    Assistant,
 }
 
 data class ChatMessage(
@@ -18,19 +18,19 @@ data class ChatMessage(
     val isInterrupted: Boolean = false,
     val isSynthetic: Boolean = false,
     val tokensPerSecond: Double? = null,
-    val branchCount: Int = 1
+    val branchCount: Int = 1,
 )
 
 data class ChatSession(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
     val lastMessagePreview: String? = null,
-    val updatedAtMillis: Long
+    val updatedAtMillis: Long,
 )
 
 enum class AttachmentType {
     Image,
-    Document
+    Document,
 }
 
 const val MaxImageAttachmentsPerMessage = 2
@@ -41,7 +41,7 @@ data class Attachment(
     val sizeBytes: Long,
     val type: AttachmentType,
     val localPath: String? = null,
-    val isUploading: Boolean = false
+    val isUploading: Boolean = false,
 )
 
 const val SessionTitleMaxLength = 40
@@ -60,8 +60,5 @@ private val TitleLineBreakRegex = Regex("[\r\n\t]+")
 private val TitleWhitespaceRegex = Regex("\\s+")
 
 internal fun sanitizeTitleText(text: String): String {
-    return text
-        .replace(TitleLineBreakRegex, " ")
-        .replace(TitleWhitespaceRegex, " ")
-        .trim()
+    return text.replace(TitleLineBreakRegex, " ").replace(TitleWhitespaceRegex, " ").trim()
 }

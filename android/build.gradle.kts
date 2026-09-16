@@ -27,12 +27,8 @@ allprojects {
         ignoredBuildTypes.set(listOf("release"))
     }
 
-    tasks.withType<KtfmtBaseTask>().configureEach {
-        exclude("**/io/ente/ensu/bindings/ensu.kt")
-    }
-    tasks.withType<Detekt>().configureEach {
-        exclude("**/io/ente/ensu/bindings/ensu.kt")
-    }
+    tasks.withType<KtfmtBaseTask>().configureEach { exclude("**/io/ente/ensu/bindings/ensu.kt") }
+    tasks.withType<Detekt>().configureEach { exclude("**/io/ente/ensu/bindings/ensu.kt") }
 
     listOf("com.android.application", "com.android.library").forEach { id ->
         pluginManager.withPlugin(id) {

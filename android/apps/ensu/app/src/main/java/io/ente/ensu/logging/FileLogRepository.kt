@@ -2,13 +2,6 @@ package io.ente.ensu.logging
 
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -20,10 +13,17 @@ import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class FileLogRepository(
     private val context: Context,
-    private val maxLogFiles: Int = 5
+    private val maxLogFiles: Int = 5,
 ) {
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -39,15 +39,22 @@ class FileLogRepository(
         pruneOldLogFiles()
     }
 
-    fun log(level: LogLevel, message: String, details: String? = null, tag: String? = null, throwable: Throwable? = null) {
+    fun log(
+        level: LogLevel,
+        message: String,
+        details: String? = null,
+        tag: String? = null,
+        throwable: Throwable? = null,
+    ) {
         val resolvedTag = tag ?: "ensu"
-        val entry = buildLogEntry(
-            level = level,
-            message = message,
-            details = details,
-            tag = resolvedTag,
-            throwable = throwable
-        )
+        val entry =
+            buildLogEntry(
+                level = level,
+                message = message,
+                details = details,
+                tag = resolvedTag,
+                throwable = throwable,
+            )
 
         // Also mirror to Logcat.
         when (level) {
@@ -76,57 +83,67 @@ class FileLogRepository(
 
     fun listLogFiles(): List<File> {
         ensureLogDir()
-        return logsDir.listFiles()
+        return logsDir
+            .listFiles()
             ?.filter { it.isFile && it.name.endsWith(".txt") }
             ?.sortedBy { it.name }
             .orEmpty()
     }
 
-    suspend fun readLogText(file: File): String = withContext(Dispatchers.IO) {
-        writeMutex.withLock {
-            if (!file.exists()) return@withLock ""
-            runCatching { file.readText() }.getOrDefault("")
+    suspend fun readLogText(file: File): String =
+        withContext(Dispatchers.IO) {
+            writeMutex.withLock {
+                if (!file.exists()) return@withLock ""
+                runCatching { file.readText() }.getOrDefault("")
+            }
         }
-    }
 
     fun todayLogFile(): File {
         val name = "${dateFormatter.format(Date())}.txt"
         return File(logsDir, name)
     }
 
-    suspend fun readTodayLogText(): String = withContext(Dispatchers.IO) {
-        writeMutex.withLock {
-            val file = todayLogFile()
-            if (!file.exists()) return@withLock ""
-            runCatching { file.readText() }.getOrDefault("")
-        }
-    }
-
-    suspend fun readTodayEntries(): List<LogEntry> = withContext(Dispatchers.IO) {
-        parseLogEntries(readTodayLogText()).reversed()
-    }
-
-    suspend fun createLogsZip(outputDir: File = context.cacheDir): File = withContext(Dispatchers.IO) {
-        ensureLogDir()
-        pruneOldLogFiles()
-
-        val now = Date()
-        val out = File(outputDir, "ensu-logs-${dateFormatter.format(now)}-${System.currentTimeMillis()}.zip")
-        if (out.exists()) out.delete()
-
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(out))).use { zipOut ->
-            logsDir.listFiles()?.sortedBy { it.name }?.forEach { file ->
-                if (!file.isFile) return@forEach
-                val entry = ZipEntry(file.name)
-                zipOut.putNextEntry(entry)
-                BufferedInputStream(FileInputStream(file)).use { input ->
-                    input.copyTo(zipOut)
-                }
-                zipOut.closeEntry()
+    suspend fun readTodayLogText(): String =
+        withContext(Dispatchers.IO) {
+            writeMutex.withLock {
+                val file = todayLogFile()
+                if (!file.exists()) return@withLock ""
+                runCatching { file.readText() }.getOrDefault("")
             }
         }
-        out
-    }
+
+    suspend fun readTodayEntries(): List<LogEntry> =
+        withContext(Dispatchers.IO) { parseLogEntries(readTodayLogText()).reversed() }
+
+    suspend fun createLogsZip(outputDir: File = context.cacheDir): File =
+        withContext(Dispatchers.IO) {
+            ensureLogDir()
+            pruneOldLogFiles()
+
+            val now = Date()
+            val out =
+                File(
+                    outputDir,
+                    "ensu-logs-${dateFormatter.format(now)}-${System.currentTimeMillis()}.zip",
+                )
+            if (out.exists()) out.delete()
+
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(out))).use { zipOut ->
+                logsDir
+                    .listFiles()
+                    ?.sortedBy { it.name }
+                    ?.forEach { file ->
+                        if (!file.isFile) return@forEach
+                        val entry = ZipEntry(file.name)
+                        zipOut.putNextEntry(entry)
+                        BufferedInputStream(FileInputStream(file)).use { input ->
+                            input.copyTo(zipOut)
+                        }
+                        zipOut.closeEntry()
+                    }
+            }
+            out
+        }
 
     private fun ensureLogDir() {
         if (!logsDir.exists()) {
@@ -135,15 +152,21 @@ class FileLogRepository(
     }
 
     private fun pruneOldLogFiles() {
-        val files = logsDir.listFiles()?.toList().orEmpty()
-            .filter { it.isFile && it.name.endsWith(".txt") }
-            .mapNotNull { file ->
-                val name = file.name.removeSuffix(".txt")
-                val date = runCatching { dateFormatter.parse(name) }.getOrNull() ?: return@mapNotNull null
-                file to date.time
-            }
-            .sortedBy { it.second }
-            .map { it.first }
+        val files =
+            logsDir
+                .listFiles()
+                ?.toList()
+                .orEmpty()
+                .filter { it.isFile && it.name.endsWith(".txt") }
+                .mapNotNull { file ->
+                    val name = file.name.removeSuffix(".txt")
+                    val date =
+                        runCatching { dateFormatter.parse(name) }.getOrNull()
+                            ?: return@mapNotNull null
+                    file to date.time
+                }
+                .sortedBy { it.second }
+                .map { it.first }
 
         if (files.size <= maxLogFiles) return
         val toDelete = files.take(files.size - maxLogFiles)
@@ -168,11 +191,12 @@ class FileLogRepository(
                 entries.add(
                     LogEntry(
                         id = UUID.randomUUID().toString(),
-                        timestampMillis = runCatching { lineTimestampFormatter.parse(timestamp)?.time }
-                            .getOrNull() ?: System.currentTimeMillis(),
+                        timestampMillis =
+                            runCatching { lineTimestampFormatter.parse(timestamp)?.time }
+                                .getOrNull() ?: System.currentTimeMillis(),
                         level = parseLevel(level),
                         tag = tag,
-                        message = message
+                        message = message,
                     )
                 )
             } else {
@@ -187,7 +211,7 @@ class FileLogRepository(
                             timestampMillis = System.currentTimeMillis(),
                             level = LogLevel.Info,
                             tag = "Log",
-                            message = line
+                            message = line,
                         )
                     )
                 }
@@ -196,17 +220,20 @@ class FileLogRepository(
         return entries
     }
 
-    private fun levelToken(level: LogLevel): String = when (level) {
-        LogLevel.Info -> "INFO"
-        LogLevel.Warning -> "WARN"
-        LogLevel.Error -> "ERROR"
-    }
+    private fun levelToken(level: LogLevel): String =
+        when (level) {
+            LogLevel.Info -> "INFO"
+            LogLevel.Warning -> "WARN"
+            LogLevel.Error -> "ERROR"
+        }
 
-    private fun parseLevel(token: String): LogLevel = when (token.uppercase()) {
-        "WARN", "WARNING" -> LogLevel.Warning
-        "ERROR" -> LogLevel.Error
-        else -> LogLevel.Info
-    }
+    private fun parseLevel(token: String): LogLevel =
+        when (token.uppercase()) {
+            "WARN",
+            "WARNING" -> LogLevel.Warning
+            "ERROR" -> LogLevel.Error
+            else -> LogLevel.Info
+        }
 
     companion object {
         private val logLineRegex = Regex("\\[(.+?)]\\[(.+?)] \\[(.+?)] (.*)")

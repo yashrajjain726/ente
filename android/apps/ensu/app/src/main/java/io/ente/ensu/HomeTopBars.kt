@@ -6,13 +6,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -32,7 +32,7 @@ internal fun TopBar(
     modelDownloadStatus: String?,
     modelDownloadPercent: Int?,
     onOpenDrawer: () -> Unit,
-    onNewChat: () -> Unit
+    onNewChat: () -> Unit,
 ) {
     val titleText = sessionTitle?.takeIf { it.isNotBlank() } ?: "New Chat"
 
@@ -45,7 +45,7 @@ internal fun TopBar(
                     text = titleText,
                     style = EnsuTypography.h3Bold.copy(fontSize = 20.sp, lineHeight = 24.sp),
                     color = EnsuColor.textPrimary(),
-                    maxLines = 1
+                    maxLines = 1,
                 )
             }
         },
@@ -53,7 +53,7 @@ internal fun TopBar(
             IconButton(onClick = onOpenDrawer) {
                 Icon(
                     painter = painterResource(HugeIcons.Menu01Icon),
-                    contentDescription = "Menu"
+                    contentDescription = "Menu",
                 )
             }
         },
@@ -64,7 +64,7 @@ internal fun TopBar(
             if (showModelProgress) {
                 ModelProgressIndicator(
                     isLoading = isLoading,
-                    progressPercent = modelDownloadPercent
+                    progressPercent = modelDownloadPercent,
                 )
             }
 
@@ -74,15 +74,15 @@ internal fun TopBar(
 
             IconButton(
                 onClick = onNewChat,
-                modifier = Modifier.padding(end = EnsuSpacing.sm.dp)
+                modifier = Modifier.padding(end = EnsuSpacing.sm.dp),
             ) {
                 Icon(
                     painter = painterResource(HugeIcons.PlusSignIcon),
-                    contentDescription = "New chat"
+                    contentDescription = "New chat",
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = EnsuColor.backgroundBase())
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = EnsuColor.backgroundBase()),
     )
 }
 
@@ -90,7 +90,7 @@ internal fun TopBar(
 private fun ModelProgressIndicator(
     isLoading: Boolean,
     progressPercent: Int?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val indicatorModifier = modifier.size(16.dp)
     val clamped = progressPercent?.coerceIn(0, 100)
@@ -100,14 +100,14 @@ private fun ModelProgressIndicator(
             modifier = indicatorModifier,
             color = EnsuColor.action(),
             trackColor = EnsuColor.border(),
-            strokeWidth = 2.dp
+            strokeWidth = 2.dp,
         )
     } else {
         CircularProgressIndicator(
             modifier = indicatorModifier,
             color = EnsuColor.action(),
             trackColor = EnsuColor.border(),
-            strokeWidth = 2.dp
+            strokeWidth = 2.dp,
         )
     }
 }
@@ -115,28 +115,38 @@ private fun ModelProgressIndicator(
 @Composable
 internal fun SimpleTopBar(title: String, onBack: () -> Unit) {
     TopAppBar(
-        title = { Text(text = title, style = EnsuTypography.h3Bold.copy(fontSize = 20.sp, lineHeight = 24.sp)) },
+        title = {
+            Text(
+                text = title,
+                style = EnsuTypography.h3Bold.copy(fontSize = 20.sp, lineHeight = 24.sp),
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
                     painter = painterResource(HugeIcons.ArrowLeft01Icon),
-                    contentDescription = "Back"
+                    contentDescription = "Back",
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = EnsuColor.backgroundBase())
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = EnsuColor.backgroundBase()),
     )
 }
 
 @Composable
 internal fun LogsTopBar(onBack: () -> Unit, onShare: () -> Unit) {
     TopAppBar(
-        title = { Text(text = "Logs", style = EnsuTypography.h3Bold.copy(fontSize = 20.sp, lineHeight = 24.sp)) },
+        title = {
+            Text(
+                text = "Logs",
+                style = EnsuTypography.h3Bold.copy(fontSize = 20.sp, lineHeight = 24.sp),
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
                     painter = painterResource(HugeIcons.ArrowLeft01Icon),
-                    contentDescription = "Back"
+                    contentDescription = "Back",
                 )
             }
         },
@@ -145,10 +155,10 @@ internal fun LogsTopBar(onBack: () -> Unit, onShare: () -> Unit) {
                 Icon(
                     painter = painterResource(HugeIcons.Upload01Icon),
                     contentDescription = "Share",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = EnsuColor.backgroundBase())
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = EnsuColor.backgroundBase()),
     )
 }

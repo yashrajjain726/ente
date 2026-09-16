@@ -2,7 +2,9 @@ package io.ente.ensu.llm
 
 interface ModelMaintenance {
     fun suspendMaintenance(): AutoCloseable
+
     suspend fun awaitMaintenance()
+
     fun modelReadinessChanged()
 }
 

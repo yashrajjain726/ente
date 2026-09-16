@@ -27,17 +27,16 @@ fun LaTeXView(latex: String, modifier: Modifier = Modifier) {
     AndroidView(
         factory = { context ->
             LatexContainerView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+                layoutParams =
+                    ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
                 update(latex, textColor.toArgb(), fontSizePx, paddingPx)
             }
         },
-        update = { view ->
-            view.update(latex, textColor.toArgb(), fontSizePx, paddingPx)
-        },
-        modifier = modifier
+        update = { view -> view.update(latex, textColor.toArgb(), fontSizePx, paddingPx) },
+        modifier = modifier,
     )
 }
 
@@ -45,7 +44,7 @@ fun LaTeXView(latex: String, modifier: Modifier = Modifier) {
 fun InlineLaTeXView(
     latex: String,
     modifier: Modifier = Modifier,
-    fontSizeSp: Float = 15f
+    fontSizeSp: Float = 15f,
 ) {
     val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) EnsuColor.textPrimaryDark else EnsuColor.textPrimaryLight
@@ -55,17 +54,16 @@ fun InlineLaTeXView(
     AndroidView(
         factory = { context ->
             InlineLatexContainerView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+                layoutParams =
+                    ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
                 update(latex, textColor.toArgb(), fontSizePx, paddingPx)
             }
         },
-        update = { view ->
-            view.update(latex, textColor.toArgb(), fontSizePx, paddingPx)
-        },
-        modifier = modifier
+        update = { view -> view.update(latex, textColor.toArgb(), fontSizePx, paddingPx) },
+        modifier = modifier,
     )
 }
 
@@ -78,15 +76,15 @@ private class InlineLatexContainerView(context: Context) : FrameLayout(context) 
             mathView,
             LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
         )
         addView(
             fallbackView,
             LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
         )
         fallbackView.visibility = View.GONE
     }
@@ -104,7 +102,7 @@ private class InlineLatexContainerView(context: Context) : FrameLayout(context) 
         mathView.setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
         MathViewCompat.setMathTextAlignment(
             mathView,
-            MTMathView.MTTextAlignment.KMTTextAlignmentLeft
+            MTMathView.MTTextAlignment.KMTTextAlignmentLeft,
         )
         MathViewCompat.setDisplayErrorInline(mathView, false)
 
@@ -129,15 +127,15 @@ private class LatexContainerView(context: Context) : FrameLayout(context) {
             mathView,
             LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
         )
         addView(
             fallbackView,
             LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
         )
         fallbackView.visibility = View.GONE
     }
@@ -155,7 +153,7 @@ private class LatexContainerView(context: Context) : FrameLayout(context) {
         mathView.setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
         MathViewCompat.setMathTextAlignment(
             mathView,
-            MTMathView.MTTextAlignment.KMTTextAlignmentLeft
+            MTMathView.MTTextAlignment.KMTTextAlignmentLeft,
         )
         MathViewCompat.setDisplayErrorInline(mathView, false)
 
@@ -222,17 +220,17 @@ private fun countMatches(text: String, regex: Regex): Int {
 
 private fun environmentsBalanced(text: String): Boolean {
     val beginMatches = runCatching {
-        LatexRegex.beginEnvironment
-            .findAll(text)
-            .map { it.groupValues[1] }
-            .toList()
-    }.getOrElse { return false }
+        LatexRegex.beginEnvironment.findAll(text).map { it.groupValues[1] }.toList()
+    }
+        .getOrElse {
+            return false
+        }
     val endMatches = runCatching {
-        LatexRegex.endEnvironment
-            .findAll(text)
-            .map { it.groupValues[1] }
-            .toList()
-    }.getOrElse { return false }
+        LatexRegex.endEnvironment.findAll(text).map { it.groupValues[1] }.toList()
+    }
+        .getOrElse {
+            return false
+        }
     if (beginMatches.size != endMatches.size) {
         return false
     }

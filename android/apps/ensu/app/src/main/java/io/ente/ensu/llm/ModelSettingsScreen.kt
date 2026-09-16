@@ -32,11 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.ente.ensu.bindings.ModelRuntimeSurface
+import io.ente.ensu.bindings.resolveModelPolicy
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
-import io.ente.ensu.bindings.ModelRuntimeSurface
-import io.ente.ensu.bindings.resolveModelPolicy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,64 +44,68 @@ fun ModelSettingsScreen(
     totalMemoryBytes: Long?,
     state: ModelSettingsState,
     onSave: (ModelSettingsState) -> Unit,
-    onReset: () -> Unit
+    onReset: () -> Unit,
 ) {
     val context = LocalContext.current
-    val modelChoices = remember(totalMemoryBytes) {
-        val modelPolicy = resolveModelPolicy(
-            surface = ModelRuntimeSurface.ANDROID,
-            totalMemoryBytes = totalMemoryBytes?.toULong()
-        )
-        listOf(
-            ModelChoice(
-                id = DEFAULT_OPTION_ID,
-                title = modelPolicy.defaultModel.title,
-                isDefault = true
-            )
-        ) + modelPolicy.visibleModels
-            .filter { it.id != modelPolicy.defaultModel.id }
-            .map { preset ->
-                ModelChoice(
-                    id = preset.id,
-                    title = preset.title
+    val modelChoices =
+        remember(totalMemoryBytes) {
+            val modelPolicy =
+                resolveModelPolicy(
+                    surface = ModelRuntimeSurface.ANDROID,
+                    totalMemoryBytes = totalMemoryBytes?.toULong(),
                 )
-            }
-    }
+            listOf(
+                ModelChoice(
+                    id = DEFAULT_OPTION_ID,
+                    title = modelPolicy.defaultModel.title,
+                    isDefault = true,
+                )
+            ) +
+                modelPolicy.visibleModels
+                    .filter { it.id != modelPolicy.defaultModel.id }
+                    .map { preset ->
+                        ModelChoice(
+                            id = preset.id,
+                            title = preset.title,
+                        )
+                    }
+        }
 
-    var selectedModelId by remember(state) {
-        mutableStateOf(initialSelectionId(state, modelChoices))
-    }
+    var selectedModelId by
+        remember(state) { mutableStateOf(initialSelectionId(state, modelChoices)) }
     var contextLength by remember(state) { mutableStateOf(state.contextLength) }
     var maxTokens by remember(state) { mutableStateOf(state.maxTokens) }
     var temperature by remember(state) { mutableStateOf(state.temperature) }
-    var showAdvancedLimits by remember(state) {
-        mutableStateOf(
-            state.contextLength.isNotBlank() ||
-                state.maxTokens.isNotBlank() ||
-                state.temperature.isNotBlank()
-        )
-    }
+    var showAdvancedLimits by
+        remember(state) {
+            mutableStateOf(
+                state.contextLength.isNotBlank() ||
+                    state.maxTokens.isNotBlank() ||
+                    state.temperature.isNotBlank()
+            )
+        }
     var isModelMenuExpanded by remember { mutableStateOf(false) }
 
-    val selectedModel = modelChoices.firstOrNull { it.id == selectedModelId } ?: modelChoices.first()
+    val selectedModel =
+        modelChoices.firstOrNull { it.id == selectedModelId } ?: modelChoices.first()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(EnsuSpacing.pageHorizontal.dp)
+        modifier =
+            Modifier.fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(EnsuSpacing.pageHorizontal.dp)
     ) {
         SectionHeader("Select model")
         Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
         Text(
             text = "Choose a built-in model.",
             style = EnsuTypography.small,
-            color = EnsuColor.textMuted()
+            color = EnsuColor.textMuted(),
         )
         Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
         ExposedDropdownMenuBox(
             expanded = isModelMenuExpanded,
-            onExpandedChange = { isModelMenuExpanded = !isModelMenuExpanded }
+            onExpandedChange = { isModelMenuExpanded = !isModelMenuExpanded },
         ) {
             OutlinedTextField(
                 value = selectedModel.title,
@@ -111,14 +115,12 @@ fun ModelSettingsScreen(
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = isModelMenuExpanded)
                 },
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth()
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
             )
 
             ExposedDropdownMenu(
                 expanded = isModelMenuExpanded,
-                onDismissRequest = { isModelMenuExpanded = false }
+                onDismissRequest = { isModelMenuExpanded = false },
             ) {
                 modelChoices.forEach { choice ->
                     DropdownMenuItem(
@@ -126,7 +128,7 @@ fun ModelSettingsScreen(
                         onClick = {
                             selectedModelId = choice.id
                             isModelMenuExpanded = false
-                        }
+                        },
                     )
                 }
             }
@@ -137,55 +139,71 @@ fun ModelSettingsScreen(
             title = "Advanced limits",
             expanded = showAdvancedLimits,
             collapsedHint = "Context length, output, temperature",
-            onToggle = { showAdvancedLimits = !showAdvancedLimits }
+            onToggle = { showAdvancedLimits = !showAdvancedLimits },
         )
         AnimatedVisibility(showAdvancedLimits) {
             Column {
                 Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
                 Row {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Context length", style = EnsuTypography.small, color = EnsuColor.textMuted())
+                        Text(
+                            text = "Context length",
+                            style = EnsuTypography.small,
+                            color = EnsuColor.textMuted(),
+                        )
                         Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
                         OutlinedTextField(
                             value = contextLength,
                             onValueChange = { contextLength = it },
                             placeholder = { Text(text = "8192") },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
                     Spacer(modifier = Modifier.width(EnsuSpacing.md.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Max output", style = EnsuTypography.small, color = EnsuColor.textMuted())
+                        Text(
+                            text = "Max output",
+                            style = EnsuTypography.small,
+                            color = EnsuColor.textMuted(),
+                        )
                         Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
                         OutlinedTextField(
                             value = maxTokens,
                             onValueChange = { maxTokens = it },
                             placeholder = { Text(text = "2048") },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
-                Text(text = "Temperature", style = EnsuTypography.small, color = EnsuColor.textMuted())
+                Text(
+                    text = "Temperature",
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted(),
+                )
                 Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
                 OutlinedTextField(
                     value = temperature,
                     onValueChange = { temperature = it },
                     placeholder = { Text(text = "0.7") },
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
 
                 Spacer(modifier = Modifier.height(EnsuSpacing.sm.dp))
-                Text(text = "Leave blank to use model defaults", style = EnsuTypography.small, color = EnsuColor.textMuted())
+                Text(
+                    text = "Leave blank to use model defaults",
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted(),
+                )
                 Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
                 Text(
                     text = "Values below 0.35 or above 0.7 are clamped automatically.",
                     style = EnsuTypography.small,
-                    color = EnsuColor.textMuted()
+                    color = EnsuColor.textMuted(),
                 )
             }
         }
@@ -196,39 +214,46 @@ fun ModelSettingsScreen(
 
         Button(
             onClick = {
-                val savedState = state.copy(
-                    modelId = selectedModel.id.takeUnless { selectedModel.isDefault }.orEmpty(),
-                    contextLength = contextLength,
-                    maxTokens = maxTokens,
-                    temperature = temperature
-                )
+                val savedState =
+                    state.copy(
+                        modelId = selectedModel.id.takeUnless { selectedModel.isDefault }.orEmpty(),
+                        contextLength = contextLength,
+                        maxTokens = maxTokens,
+                        temperature = temperature,
+                    )
                 onSave(savedState)
                 Toast.makeText(context, "Model settings saved", Toast.LENGTH_SHORT).show()
             },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = EnsuColor.accent())
+            colors = ButtonDefaults.buttonColors(containerColor = EnsuColor.accent()),
         ) {
             Text(text = "Save Model Settings", style = EnsuTypography.body)
         }
 
         Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
 
-        TextButton(onClick = {
-            onReset()
-            selectedModelId = DEFAULT_OPTION_ID
-            contextLength = ""
-            maxTokens = ""
-            temperature = ""
-            Toast.makeText(context, "Model settings reset", Toast.LENGTH_SHORT).show()
-        }) {
-            Text(text = "Reset to defaults", style = EnsuTypography.body, color = EnsuColor.action())
+        TextButton(
+            onClick = {
+                onReset()
+                selectedModelId = DEFAULT_OPTION_ID
+                contextLength = ""
+                maxTokens = ""
+                temperature = ""
+                Toast.makeText(context, "Model settings reset", Toast.LENGTH_SHORT).show()
+            }
+        ) {
+            Text(
+                text = "Reset to defaults",
+                style = EnsuTypography.body,
+                color = EnsuColor.action(),
+            )
         }
 
         Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
         Text(
             text = "Changes apply the next time the model loads.",
             style = EnsuTypography.small,
-            color = EnsuColor.textMuted()
+            color = EnsuColor.textMuted(),
         )
     }
 }
@@ -243,14 +268,18 @@ private fun ExpandButton(
     title: String,
     expanded: Boolean,
     collapsedHint: String,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
 ) {
     TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(text = title, style = EnsuTypography.body, color = EnsuColor.action())
             if (!expanded) {
                 Spacer(modifier = Modifier.height(EnsuSpacing.xs.dp))
-                Text(text = collapsedHint, style = EnsuTypography.small, color = EnsuColor.textMuted())
+                Text(
+                    text = collapsedHint,
+                    style = EnsuTypography.small,
+                    color = EnsuColor.textMuted(),
+                )
             }
         }
     }
@@ -259,12 +288,12 @@ private fun ExpandButton(
 private data class ModelChoice(
     val id: String,
     val title: String,
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
 )
 
 private fun initialSelectionId(
     state: ModelSettingsState,
-    choices: List<ModelChoice>
+    choices: List<ModelChoice>,
 ): String {
     return choices.firstOrNull { it.id == state.modelId }?.id ?: DEFAULT_OPTION_ID
 }

@@ -2,11 +2,11 @@ package io.ente.ensu.components
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +21,7 @@ fun BranchSwitcher(
     currentIndex: Int,
     totalCount: Int,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     if (totalCount <= 1) return
 
@@ -34,7 +34,7 @@ fun BranchSwitcher(
             },
             enabled = currentIndex > 1,
             modifier = Modifier.size(36.dp),
-            contentPadding = ButtonDefaults.TextButtonContentPadding
+            contentPadding = ButtonDefaults.TextButtonContentPadding,
         ) {
             Text(text = "<", style = EnsuTypography.small, color = EnsuColor.textMuted())
         }
@@ -42,7 +42,7 @@ fun BranchSwitcher(
         Text(
             text = "${currentIndex}/${totalCount}",
             style = EnsuTypography.small.copy(fontFeatureSettings = "tnum"),
-            color = EnsuColor.textMuted()
+            color = EnsuColor.textMuted(),
         )
         Spacer(modifier = Modifier.width(4.dp))
         TextButton(
@@ -52,7 +52,7 @@ fun BranchSwitcher(
             },
             enabled = currentIndex < totalCount,
             modifier = Modifier.size(36.dp),
-            contentPadding = ButtonDefaults.TextButtonContentPadding
+            contentPadding = ButtonDefaults.TextButtonContentPadding,
         ) {
             Text(text = ">", style = EnsuTypography.small, color = EnsuColor.textMuted())
         }

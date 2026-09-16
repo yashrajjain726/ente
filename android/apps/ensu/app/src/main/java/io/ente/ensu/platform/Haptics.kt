@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalView
 
 class Haptics(
     private val context: Context,
-    private val view: View
+    private val view: View,
 ) {
     fun perform(type: HapticFeedbackType) {
         val feedback = mapToHapticConstant(type)
@@ -28,14 +28,16 @@ class Haptics(
 
         if (!shouldForceVibrationFallback() && view.performHapticFeedback(feedback)) return
 
-        val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator ?: return
-        val effect = when (type) {
-            HapticFeedbackType.LongPress -> VibrationEffect.EFFECT_HEAVY_CLICK
-            else -> VibrationEffect.EFFECT_TICK
-        }
+        val vibrator =
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator ?: return
+        val effect =
+            when (type) {
+                HapticFeedbackType.LongPress -> VibrationEffect.EFFECT_HEAVY_CLICK
+                else -> VibrationEffect.EFFECT_TICK
+            }
         vibrator.vibrate(
             VibrationEffect.createPredefined(effect),
-            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH)
+            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH),
         )
     }
 
@@ -64,7 +66,5 @@ class Haptics(
 fun rememberHaptics(): Haptics {
     val context = LocalContext.current
     val view = LocalView.current
-    return remember(context, view) {
-        Haptics(context, view)
-    }
+    return remember(context, view) { Haptics(context, view) }
 }

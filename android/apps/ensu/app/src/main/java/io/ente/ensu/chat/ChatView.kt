@@ -40,21 +40,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.assets.AssetStore
+import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.device.ChatDeviceCapability
-import io.ente.ensu.chat.Attachment
-import io.ente.ensu.chat.AttachmentType
-import io.ente.ensu.chat.ChatMessage
-import io.ente.ensu.chat.ChatState
-import kotlinx.coroutines.delay
 
 @Composable
 fun ChatView(
@@ -76,7 +71,7 @@ fun ChatView(
     onStartDownload: (Boolean) -> Unit,
     onDismissUnsupportedDeviceDialog: () -> Unit,
     onOverflowTrim: () -> Unit,
-    onOverflowCancel: () -> Unit
+    onOverflowCancel: () -> Unit,
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -85,73 +80,79 @@ fun ChatView(
     val latestOnMessageChange by rememberUpdatedState(onMessageChange)
     val sessionKey = chatState.currentSessionId ?: "new-session"
     val latestSessionKey by rememberUpdatedState(sessionKey)
-    val unsupportedCapability = chatState.deviceCapability as? ChatDeviceCapability.UnsupportedLowMemory
+    val unsupportedCapability =
+        chatState.deviceCapability as? ChatDeviceCapability.UnsupportedLowMemory
     val isChatUnsupported = unsupportedCapability != null
     var pendingVoiceSessionKey by remember { mutableStateOf<String?>(null) }
-    val voiceController = rememberVoiceTranscriptionController(
-        assetStore = assetStore,
-        transcriber = transcriber,
-        onTranscript = { transcript ->
-            latestOnMessageChange(appendVoiceTranscript(latestMessageText, transcript))
-        }
-    )
+    val voiceController =
+        rememberVoiceTranscriptionController(
+            assetStore = assetStore,
+            transcriber = transcriber,
+            onTranscript = { transcript ->
+                latestOnMessageChange(appendVoiceTranscript(latestMessageText, transcript))
+            },
+        )
 
-    val editingMessage by remember(chatState.editingMessageId, chatState.messages) {
-        derivedStateOf {
-            chatState.editingMessageId?.let { editingId ->
-                chatState.messages.firstOrNull { it.id == editingId }
-            }
-        }
-    }
-    val canStartVoiceInput = !chatState.isGenerating &&
-        !chatState.isDownloading &&
-        chatState.isModelDownloaded &&
-        !isChatUnsupported &&
-        editingMessage == null
-    val latestCanStartVoiceInput by rememberUpdatedState(canStartVoiceInput)
-
-    val microphonePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        val requestedSessionKey = pendingVoiceSessionKey
-        pendingVoiceSessionKey = null
-        if (granted) {
-            if (requestedSessionKey != null) {
-                voiceController.startRecording {
-                    latestSessionKey == requestedSessionKey && latestCanStartVoiceInput
+    val editingMessage by
+        remember(chatState.editingMessageId, chatState.messages) {
+            derivedStateOf {
+                chatState.editingMessageId?.let { editingId ->
+                    chatState.messages.firstOrNull { it.id == editingId }
                 }
             }
-        } else {
-            voiceController.onPermissionDenied()
         }
-    }
+    val canStartVoiceInput =
+        !chatState.isGenerating &&
+            !chatState.isDownloading &&
+            chatState.isModelDownloaded &&
+            !isChatUnsupported &&
+            editingMessage == null
+    val latestCanStartVoiceInput by rememberUpdatedState(canStartVoiceInput)
 
-    val showDownloadOnboarding by remember(
-        chatState.isModelDownloaded,
-        chatState.isModelStateKnown,
-        chatState.isGenerating,
-        isChatUnsupported
-    ) {
-        derivedStateOf {
-            chatState.isModelStateKnown &&
-                !chatState.isModelDownloaded &&
-                !chatState.isGenerating &&
-                !isChatUnsupported
+    val microphonePermissionLauncher =
+        rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) {
+            granted ->
+            val requestedSessionKey = pendingVoiceSessionKey
+            pendingVoiceSessionKey = null
+            if (granted) {
+                if (requestedSessionKey != null) {
+                    voiceController.startRecording {
+                        latestSessionKey == requestedSessionKey && latestCanStartVoiceInput
+                    }
+                }
+            } else {
+                voiceController.onPermissionDenied()
+            }
         }
-    }
+
+    val showDownloadOnboarding by
+        remember(
+            chatState.isModelDownloaded,
+            chatState.isModelStateKnown,
+            chatState.isGenerating,
+            isChatUnsupported,
+        ) {
+            derivedStateOf {
+                chatState.isModelStateKnown &&
+                    !chatState.isModelDownloaded &&
+                    !chatState.isGenerating &&
+                    !isChatUnsupported
+            }
+        }
 
     val focusManager = LocalFocusManager.current
     var didAutoFocusInput by remember { mutableStateOf(false) }
     var focusRequestId by remember { mutableStateOf(0) }
     var wasDrawerOpen by remember { mutableStateOf(false) }
 
-    val shouldAutoFocusInput = chatState.isModelDownloaded &&
-        !showDownloadOnboarding &&
-        !isChatUnsupported &&
-        !chatState.isDownloading &&
-        !chatState.isGenerating &&
-        !didAutoFocusInput &&
-        !isDrawerOpen
+    val shouldAutoFocusInput =
+        chatState.isModelDownloaded &&
+            !showDownloadOnboarding &&
+            !isChatUnsupported &&
+            !chatState.isDownloading &&
+            !chatState.isGenerating &&
+            !didAutoFocusInput &&
+            !isDrawerOpen
 
     LaunchedEffect(shouldAutoFocusInput, isDrawerOpen) {
         if (isDrawerOpen) {
@@ -168,11 +169,12 @@ fun ChatView(
         }
 
         if (wasDrawerOpen) {
-            val shouldRestoreFocus = chatState.isModelDownloaded &&
-                !showDownloadOnboarding &&
-                !isChatUnsupported &&
-                !chatState.isDownloading &&
-                !chatState.isGenerating
+            val shouldRestoreFocus =
+                chatState.isModelDownloaded &&
+                    !showDownloadOnboarding &&
+                    !isChatUnsupported &&
+                    !chatState.isDownloading &&
+                    !chatState.isGenerating
             if (shouldRestoreFocus) {
                 focusRequestId += 1
             }
@@ -186,36 +188,37 @@ fun ChatView(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
-        ) {
+        Column(modifier = Modifier.fillMaxSize().imePadding()) {
             AnimatedContent(
                 targetState = sessionKey,
-                modifier = Modifier
-                    .weight(1f),
+                modifier = Modifier.weight(1f),
                 transitionSpec = {
-                    val enter = fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                        slideInVertically(animationSpec = tween(320, easing = FastOutSlowInEasing)) {
-                            it / 12
-                        }
-                    val exit = fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                        slideOutVertically(animationSpec = tween(320, easing = FastOutSlowInEasing)) {
-                            -it / 12
-                        }
+                    val enter =
+                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                            slideInVertically(
+                                animationSpec = tween(320, easing = FastOutSlowInEasing)
+                            ) {
+                                it / 12
+                            }
+                    val exit =
+                        fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                            slideOutVertically(
+                                animationSpec = tween(320, easing = FastOutSlowInEasing)
+                            ) {
+                                -it / 12
+                            }
                     enter.togetherWith(exit)
                 },
-                label = "session-change"
+                label = "session-change",
             ) { targetSessionKey ->
                 key(targetSessionKey) {
                     MessageList(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(
-                                start = EnsuSpacing.pageHorizontal.dp,
-                                end = EnsuSpacing.pageHorizontal.dp
-                            ),
+                        modifier =
+                            Modifier.fillMaxSize()
+                                .padding(
+                                    start = EnsuSpacing.pageHorizontal.dp,
+                                    end = EnsuSpacing.pageHorizontal.dp,
+                                ),
                         messages = chatState.messages,
                         streamingResponse = chatState.streamingResponse,
                         streamingParentId = chatState.streamingParentId,
@@ -233,7 +236,7 @@ fun ChatView(
                         onRetryMessage = onRetryMessage,
                         onBranchChange = onBranchChange,
                         onOpenAttachment = onOpenAttachment,
-                        onStartDownload = onStartDownload
+                        onStartDownload = onStartDownload,
                     )
                 }
             }
@@ -241,29 +244,29 @@ fun ChatView(
             if (chatState.overflowDialog != null) {
                 OverflowDialog(
                     onTrim = onOverflowTrim,
-                    onCancel = onOverflowCancel
+                    onCancel = onOverflowCancel,
                 )
             }
 
             if (unsupportedCapability != null) {
                 UnsupportedChatInputNotice(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .background(EnsuColor.backgroundBase())
-                        .onGloballyPositioned { coords ->
-                            inputBarHeightDp = with(density) { coords.size.height.toDp() }
-                        }
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .navigationBarsPadding()
+                            .background(EnsuColor.backgroundBase())
+                            .onGloballyPositioned { coords ->
+                                inputBarHeightDp = with(density) { coords.size.height.toDp() }
+                            }
                 )
             } else if (chatState.isModelStateKnown && !showDownloadOnboarding) {
                 MessageInput(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .background(EnsuColor.backgroundBase())
-                        .onGloballyPositioned { coords ->
-                            inputBarHeightDp = with(density) { coords.size.height.toDp() }
-                        },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .navigationBarsPadding()
+                            .background(EnsuColor.backgroundBase())
+                            .onGloballyPositioned { coords ->
+                                inputBarHeightDp = with(density) { coords.size.height.toDp() }
+                            },
                     messageText = chatState.messageText,
                     attachments = chatState.attachments,
                     editingMessage = editingMessage,
@@ -284,74 +287,77 @@ fun ChatView(
                         if (voiceController.state.isRecording) {
                             voiceController.stopAndTranscribe()
                         } else {
-                            val hasMicrophonePermission = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.RECORD_AUDIO
-                            ) == PackageManager.PERMISSION_GRANTED
+                            val hasMicrophonePermission =
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO,
+                                ) == PackageManager.PERMISSION_GRANTED
                             if (canStartVoiceInput && hasMicrophonePermission) {
                                 val requestedSessionKey = sessionKey
                                 voiceController.startRecording {
-                                    latestSessionKey == requestedSessionKey && latestCanStartVoiceInput
+                                    latestSessionKey == requestedSessionKey &&
+                                        latestCanStartVoiceInput
                                 }
                             } else if (canStartVoiceInput) {
                                 pendingVoiceSessionKey = sessionKey
-                                microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                microphonePermissionLauncher.launch(
+                                    Manifest.permission.RECORD_AUDIO
+                                )
                             }
                         }
                     },
-                    focusRequestId = focusRequestId
+                    focusRequestId = focusRequestId,
                 )
             }
         }
 
         if (chatState.showUnsupportedDeviceDialog && unsupportedCapability != null) {
-            UnsupportedDeviceDialog(
-                onDismiss = onDismissUnsupportedDeviceDialog
-            )
+            UnsupportedDeviceDialog(onDismiss = onDismissUnsupportedDeviceDialog)
         }
 
         val imeVisible = WindowInsets.ime.getBottom(density) > 0
         if (imeVisible && inputBarHeightDp > 0.dp) {
             IconButton(
                 onClick = { focusManager.clearFocus() },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .imePadding()
-                    .padding(
-                        end = EnsuSpacing.pageHorizontal.dp,
-                        bottom = inputBarHeightDp + EnsuSpacing.sm.dp
-                    )
-                    .background(
-                        color = EnsuColor.fillFaint(),
-                        shape = CircleShape
-                    )
+                modifier =
+                    Modifier.align(Alignment.BottomEnd)
+                        .imePadding()
+                        .padding(
+                            end = EnsuSpacing.pageHorizontal.dp,
+                            bottom = inputBarHeightDp + EnsuSpacing.sm.dp,
+                        )
+                        .background(
+                            color = EnsuColor.fillFaint(),
+                            shape = CircleShape,
+                        ),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = "Dismiss keyboard",
                     modifier = Modifier.padding(7.dp),
-                    tint = EnsuColor.textPrimary()
+                    tint = EnsuColor.textPrimary(),
                 )
             }
         }
 
         val status = chatState.downloadStatus
         val isLoading = status?.contains("Loading", ignoreCase = true) == true
-        val showToast by remember(status, chatState.isDownloading, showDownloadOnboarding, isLoading) {
-            derivedStateOf {
-                !showDownloadOnboarding &&
-                    status != null &&
-                    chatState.isDownloading &&
-                    !isLoading
+        val showToast by
+            remember(status, chatState.isDownloading, showDownloadOnboarding, isLoading) {
+                derivedStateOf {
+                    !showDownloadOnboarding &&
+                        status != null &&
+                        chatState.isDownloading &&
+                        !isLoading
+                }
             }
-        }
         if (showToast) {
             DownloadToastOverlay(
                 status = status ?: "",
                 percent = chatState.downloadPercent ?: 0,
                 totalBytes = chatState.modelDownloadSizeBytes,
                 isLoading = isLoading,
-                onCancel = onCancelDownload
+                onCancel = onCancelDownload,
             )
         }
     }

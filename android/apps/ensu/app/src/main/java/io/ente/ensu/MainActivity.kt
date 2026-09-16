@@ -20,10 +20,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
-            navigationBarStyle = SystemBarStyle.auto(
-                EnsuColor.backgroundBaseLight.toArgb(),
-                EnsuColor.backgroundBaseDark.toArgb()
-            )
+            navigationBarStyle =
+                SystemBarStyle.auto(
+                    EnsuColor.backgroundBaseLight.toArgb(),
+                    EnsuColor.backgroundBaseDark.toArgb(),
+                )
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -32,10 +33,10 @@ class MainActivity : ComponentActivity() {
             Theme {
                 val appViewModel: AppViewModel = viewModel()
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(EnsuColor.backgroundBase())
-                        .safeDrawingPadding()
+                    modifier =
+                        Modifier.fillMaxSize()
+                            .background(EnsuColor.backgroundBase())
+                            .safeDrawingPadding()
                 ) {
                     App(appViewModel = appViewModel)
                 }

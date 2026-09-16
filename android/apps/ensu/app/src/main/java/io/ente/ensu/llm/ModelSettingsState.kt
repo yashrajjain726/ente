@@ -5,5 +5,5 @@ data class ModelSettingsState(
     val contextLength: String = "",
     val maxTokens: String = "",
     val temperature: String = "",
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
 )

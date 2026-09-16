@@ -1,11 +1,11 @@
 package io.ente.ensu
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -15,28 +15,25 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import io.ente.ensu.chat.ChatView
-import io.ente.ensu.notes.NotesSettingsScreen
-import io.ente.ensu.settings.AdvancedSettingsDataStore
-import io.ente.ensu.designsystem.EnsuColor
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.AttachmentType
-import io.ente.ensu.bindings.ConfigDefaults
-import io.ente.ensu.AppState
-import io.ente.ensu.AppStore
+import io.ente.ensu.chat.ChatView
+import io.ente.ensu.designsystem.EnsuColor
+import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.llm.ModelSettingsScreen
 import io.ente.ensu.logging.LogViewerScreen
+import io.ente.ensu.notes.NotesSettingsScreen
+import io.ente.ensu.settings.AdvancedSettingsDataStore
+import io.ente.ensu.settings.KnowledgeSettingsScreen
 import io.ente.ensu.settings.SettingsScreen
 import io.ente.ensu.settings.SystemPromptSettingsScreen
-import io.ente.ensu.settings.KnowledgeSettingsScreen
-import io.ente.ensu.device.isChatSupported
 
 @Composable
 internal fun HomeNavigation(
@@ -55,7 +52,7 @@ internal fun HomeNavigation(
     onNewChat: () -> Unit,
     onShowLogShareDialog: () -> Unit,
     onAttachmentSelected: (AttachmentType) -> Unit,
-    onOpenAttachment: (Attachment) -> Unit
+    onOpenAttachment: (Attachment) -> Unit,
 ) {
     Scaffold(
         containerColor = EnsuColor.backgroundBase(),
@@ -70,7 +67,7 @@ internal fun HomeNavigation(
                             modelDownloadStatus = appState.chat.downloadStatus,
                             modelDownloadPercent = appState.chat.downloadPercent,
                             onOpenDrawer = onOpenDrawer,
-                            onNewChat = onNewChat
+                            onNewChat = onNewChat,
                         )
                         androidx.compose.material3.HorizontalDivider(color = EnsuColor.border())
                     }
@@ -78,7 +75,7 @@ internal fun HomeNavigation(
                 HomeRoute.Logs -> {
                     LogsTopBar(
                         onBack = { navController.popBackStack() },
-                        onShare = onShowLogShareDialog
+                        onShare = onShowLogShareDialog,
                     )
                 }
                 HomeRoute.ModelSettings -> {
@@ -98,24 +95,20 @@ internal fun HomeNavigation(
                 }
                 else -> Unit
             }
-        }
+        },
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             NavHost(
                 navController = navController,
                 startDestination = HomeRoute.Chat,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             ) {
                 composable(
                     route = HomeRoute.Chat,
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
                     ChatView(
                         chatState = appState.chat,
@@ -138,7 +131,7 @@ internal fun HomeNavigation(
                         },
                         onDismissUnsupportedDeviceDialog = store::dismissUnsupportedDeviceDialog,
                         onOverflowTrim = store::confirmOverflowTrim,
-                        onOverflowCancel = store::cancelOverflowDialog
+                        onOverflowCancel = store::cancelOverflowDialog,
                     )
                 }
                 composable(
@@ -146,7 +139,7 @@ internal fun HomeNavigation(
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
                     SettingsScreen(
                         buildVersion = appVersion,
@@ -155,12 +148,14 @@ internal fun HomeNavigation(
                         onOpenKnowledge = { navController.navigate(HomeRoute.Knowledge) },
                         onOpenNotes = { navController.navigate(HomeRoute.Notes) },
                         onOpenModelSettings = { navController.navigate(HomeRoute.ModelSettings) },
-                        onOpenSystemPromptSettings = { navController.navigate(HomeRoute.SystemPromptSettings) },
+                        onOpenSystemPromptSettings = {
+                            navController.navigate(HomeRoute.SystemPromptSettings)
+                        },
                         onUnlockAdvanced = {
                             store.unlockAdvancedSettings()
                             advancedSettingsDataStore.persistUnlockAdvancedSettings()
                         },
-                        onSignIn = onSignIn
+                        onSignIn = onSignIn,
                     )
                 }
                 composable(
@@ -168,7 +163,7 @@ internal fun HomeNavigation(
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
                     NotesSettingsScreen(store.notesStore)
                 }
@@ -177,14 +172,14 @@ internal fun HomeNavigation(
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
                     KnowledgeSettingsScreen(
                         state = appState.knowledge,
                         packDownloadsAllowed = appState.chat.deviceCapability.isChatSupported(),
                         onDownloadOrUpdate = store::downloadOrUpdateKnowledgePack,
                         onCancel = store::cancelKnowledgePackDownload,
-                        onSetEnabled = store::setKnowledgePackEnabled
+                        onSetEnabled = store::setKnowledgePackEnabled,
                     )
                 }
                 composable(
@@ -192,18 +187,16 @@ internal fun HomeNavigation(
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
-                    LogViewerScreen(
-                        logRepository = logRepository
-                    )
+                    LogViewerScreen(logRepository = logRepository)
                 }
                 composable(
                     route = HomeRoute.ModelSettings,
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
                     ModelSettingsScreen(
                         totalMemoryBytes = appState.chat.deviceCapability.totalMemoryBytes,
@@ -215,7 +208,7 @@ internal fun HomeNavigation(
                         onReset = {
                             store.resetModelSettings()
                             advancedSettingsDataStore.persistResetModelSettings()
-                        }
+                        },
                     )
                 }
                 composable(
@@ -223,7 +216,7 @@ internal fun HomeNavigation(
                     enterTransition = { forwardEnter() },
                     exitTransition = { forwardExit() },
                     popEnterTransition = { backEnter() },
-                    popExitTransition = { backExit() }
+                    popExitTransition = { backExit() },
                 ) {
                     SystemPromptSettingsScreen(
                         defaultPromptBody = configDefaults.mobileSystemPromptBody,
@@ -240,7 +233,7 @@ internal fun HomeNavigation(
                             store.updateDeveloperSettings(updated)
                             advancedSettingsDataStore.persistSystemPrompt("")
                             navController.popBackStack()
-                        }
+                        },
                     )
                 }
             }
@@ -261,23 +254,23 @@ internal object HomeRoute {
 internal fun AnimatedContentTransitionScope<NavBackStackEntry>.forwardEnter() =
     slideInHorizontally(
         initialOffsetX = { it },
-        animationSpec = tween(220)
+        animationSpec = tween(220),
     ) + fadeIn(animationSpec = tween(90))
 
 internal fun AnimatedContentTransitionScope<NavBackStackEntry>.forwardExit() =
     slideOutHorizontally(
         targetOffsetX = { -it },
-        animationSpec = tween(220)
+        animationSpec = tween(220),
     ) + fadeOut(animationSpec = tween(90))
 
 internal fun AnimatedContentTransitionScope<NavBackStackEntry>.backEnter() =
     slideInHorizontally(
         initialOffsetX = { -it },
-        animationSpec = tween(220)
+        animationSpec = tween(220),
     ) + fadeIn(animationSpec = tween(90))
 
 internal fun AnimatedContentTransitionScope<NavBackStackEntry>.backExit() =
     slideOutHorizontally(
         targetOffsetX = { it },
-        animationSpec = tween(220)
+        animationSpec = tween(220),
     ) + fadeOut(animationSpec = tween(90))

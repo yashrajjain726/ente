@@ -5,13 +5,12 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import io.ente.ensu.settings.DeveloperSettingsState
 import io.ente.ensu.llm.ModelSettingsState
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -19,26 +18,29 @@ private val Context.advancedSettingsPreferences by preferencesDataStore("ensu_ad
 
 data class AdvancedSettingsSnapshot(
     val developerSettings: DeveloperSettingsState = DeveloperSettingsState(),
-    val modelSettings: ModelSettingsState = ModelSettingsState()
+    val modelSettings: ModelSettingsState = ModelSettingsState(),
 )
 
 class AdvancedSettingsDataStore(private val context: Context) {
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val settingsFlow: Flow<AdvancedSettingsSnapshot> = context.advancedSettingsPreferences.data.map { prefs ->
-        AdvancedSettingsSnapshot(
-            developerSettings = DeveloperSettingsState(
-                isAdvancedUnlocked = prefs[Keys.advancedUnlocked] ?: false,
-                systemPrompt = prefs[Keys.systemPrompt].orEmpty()
-            ),
-            modelSettings = ModelSettingsState(
-                modelId = prefs[Keys.modelId].orEmpty(),
-                contextLength = prefs[Keys.contextLength].orEmpty(),
-                maxTokens = prefs[Keys.maxTokens].orEmpty(),
-                temperature = prefs[Keys.temperature].orEmpty()
+    val settingsFlow: Flow<AdvancedSettingsSnapshot> =
+        context.advancedSettingsPreferences.data.map { prefs ->
+            AdvancedSettingsSnapshot(
+                developerSettings =
+                    DeveloperSettingsState(
+                        isAdvancedUnlocked = prefs[Keys.advancedUnlocked] ?: false,
+                        systemPrompt = prefs[Keys.systemPrompt].orEmpty(),
+                    ),
+                modelSettings =
+                    ModelSettingsState(
+                        modelId = prefs[Keys.modelId].orEmpty(),
+                        contextLength = prefs[Keys.contextLength].orEmpty(),
+                        maxTokens = prefs[Keys.maxTokens].orEmpty(),
+                        temperature = prefs[Keys.temperature].orEmpty(),
+                    ),
             )
-        )
-    }
+        }
 
     suspend fun migrateLegacyModelSelection(
         migrate: suspend (legacyModelUrl: String?, legacyMmprojUrl: String?) -> String?
@@ -61,27 +63,19 @@ class AdvancedSettingsDataStore(private val context: Context) {
     }
 
     suspend fun unlockAdvancedSettings() {
-        context.advancedSettingsPreferences.edit { prefs ->
-            prefs[Keys.advancedUnlocked] = true
-        }
+        context.advancedSettingsPreferences.edit { prefs -> prefs[Keys.advancedUnlocked] = true }
     }
 
     fun persistUnlockAdvancedSettings() {
-        persistenceScope.launch {
-            unlockAdvancedSettings()
-        }
+        persistenceScope.launch { unlockAdvancedSettings() }
     }
 
     suspend fun saveSystemPrompt(value: String) {
-        context.advancedSettingsPreferences.edit { prefs ->
-            prefs[Keys.systemPrompt] = value
-        }
+        context.advancedSettingsPreferences.edit { prefs -> prefs[Keys.systemPrompt] = value }
     }
 
     fun persistSystemPrompt(value: String) {
-        persistenceScope.launch {
-            saveSystemPrompt(value)
-        }
+        persistenceScope.launch { saveSystemPrompt(value) }
     }
 
     suspend fun saveModelSettings(settings: ModelSettingsState) {
@@ -94,9 +88,7 @@ class AdvancedSettingsDataStore(private val context: Context) {
     }
 
     fun persistModelSettings(settings: ModelSettingsState) {
-        persistenceScope.launch {
-            saveModelSettings(settings)
-        }
+        persistenceScope.launch { saveModelSettings(settings) }
     }
 
     suspend fun resetModelSettings() {
@@ -109,9 +101,7 @@ class AdvancedSettingsDataStore(private val context: Context) {
     }
 
     fun persistResetModelSettings() {
-        persistenceScope.launch {
-            resetModelSettings()
-        }
+        persistenceScope.launch { resetModelSettings() }
     }
 
     companion object {
