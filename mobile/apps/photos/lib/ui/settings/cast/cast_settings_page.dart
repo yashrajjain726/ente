@@ -1,9 +1,9 @@
 import "dart:math";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/loading_widget.dart";
-import "package:ente_ui/utils/dialog_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
@@ -12,10 +12,28 @@ import "package:photos/gateways/cast/cast_gateway.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/relative_time_formatter.dart";
 
 class CastSettingsPage extends StatelessWidget {
-  const CastSettingsPage({super.key});
+  const CastSettingsPage({required this.initialSessions, super.key});
+
+  final List<CastInfo> initialSessions;
+
+  static Future<void> open(BuildContext context) async {
+    late final List<CastInfo> sessions;
+    try {
+      sessions = await CastGateway(
+        NetworkClient.instance.enteDio,
+      ).getAllCastSessions();
+    } catch (error) {
+      if (!context.mounted) return;
+      await showGenericErrorDialog(context: context, error: error);
+      return;
+    }
+    if (!context.mounted) return;
+    await routeToPage(context, CastSettingsPage(initialSessions: sessions));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +44,7 @@ class CastSettingsPage extends StatelessWidget {
       children: [
         CastSessionsList(
           showTitle: false,
+          initialSessions: initialSessions,
           fallback: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -86,7 +105,20 @@ class _CastSessionsListState extends State<CastSessionsList> {
           return const Center(child: EnteLoadingWidget());
         }
         if (snapshot.hasError) {
-          throw snapshot.error!;
+          logger.severe(
+            "Failed to load Cast sessions",
+            snapshot.error,
+            snapshot.stackTrace,
+          );
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 80),
+            child: Center(
+              child: Text(
+                l10n.oopsSomethingWentWrong,
+                style: TextStyles.body.copyWith(color: colors.textLight),
+              ),
+            ),
+          );
         }
         if (!snapshot.hasData || snapshot.data == null) {
           logger.severe("No data returned by get all cast sessions.");

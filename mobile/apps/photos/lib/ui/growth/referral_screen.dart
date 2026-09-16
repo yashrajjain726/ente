@@ -11,24 +11,39 @@ import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/growth/apply_code_sheet.dart";
 import "package:photos/ui/growth/referral_code_widget.dart";
 import "package:photos/ui/growth/storage_details_screen.dart";
+import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 import "package:tuple/tuple.dart";
 
 class ReferralScreen extends StatefulWidget {
-  const ReferralScreen({super.key});
+  const ReferralScreen({this.initialData, super.key});
 
-  @override
-  State<ReferralScreen> createState() => _ReferralScreenState();
-}
+  final Tuple2<ReferralView, UserDetails>? initialData;
 
-class _ReferralScreenState extends State<ReferralScreen> {
-  void _safeUIUpdate() {
-    if (mounted) {
-      setState(() {});
+  static Future<void> open(
+    BuildContext context, {
+    bool showLoadingDialog = false,
+  }) async {
+    final dialog = showLoadingDialog
+        ? createProgressDialog(context, context.strings.pleaseWait)
+        : null;
+    if (dialog != null) await dialog.show();
+
+    late final Tuple2<ReferralView, UserDetails> data;
+    try {
+      data = await _fetchData();
+    } catch (error) {
+      if (dialog != null) await dialog.hide();
+      if (!context.mounted) return;
+      await showGenericErrorDialog(context: context, error: error);
+      return;
     }
+    if (dialog != null) await dialog.hide();
+    if (!context.mounted) return;
+    await routeToPage(context, ReferralScreen(initialData: data));
   }
 
-  Future<Tuple2<ReferralView, UserDetails>> _fetchData() async {
+  static Future<Tuple2<ReferralView, UserDetails>> _fetchData() async {
     UserDetails? cachedUserDetails = UserService.instance
         .getCachedUserDetails();
     cachedUserDetails ??= await UserService.instance.getUserDetailsV2(
@@ -39,10 +54,37 @@ class _ReferralScreenState extends State<ReferralScreen> {
   }
 
   @override
+  State<ReferralScreen> createState() => _ReferralScreenState();
+}
+
+class _ReferralScreenState extends State<ReferralScreen> {
+  late Future<Tuple2<ReferralView, UserDetails>> _dataFuture;
+  Tuple2<ReferralView, UserDetails>? _initialData;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialData = widget.initialData;
+    _dataFuture = widget.initialData == null
+        ? ReferralScreen._fetchData()
+        : Future.value(widget.initialData!);
+  }
+
+  void _safeUIUpdate() {
+    if (mounted) {
+      setState(() {
+        _initialData = null;
+        _dataFuture = ReferralScreen._fetchData();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
     return FutureBuilder<Tuple2<ReferralView, UserDetails>>(
-      future: _fetchData(),
+      future: _dataFuture,
+      initialData: _initialData,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           return SettingsPageScaffold(
