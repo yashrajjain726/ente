@@ -3,9 +3,11 @@ use std::path::Path;
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-pub use rusqlite;
-
-use rusqlite::{Connection, OpenFlags, Result, Transaction, TransactionBehavior};
+use rusqlite::OpenFlags;
+pub use rusqlite::{
+    Connection, Error, OptionalExtension, Params, Result, Row, ToSql, Transaction,
+    TransactionBehavior, params_from_iter, types::FromSql,
+};
 
 const BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 

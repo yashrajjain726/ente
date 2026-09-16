@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use super::helpers::{
     MAX_SQL_BIND_PARAMS_PER_QUERY, bind_placeholders, group_into, optional_parameter, pair,
 };
-use rusqlite::{Result as SqliteResult, Row, ToSql, params_from_iter};
+use crate::db::{Result as SqliteResult, Row, ToSql, params_from_iter};
 
 use super::clip::CLIP_ML_VERSION;
 use super::pets::PET_ML_VERSION;

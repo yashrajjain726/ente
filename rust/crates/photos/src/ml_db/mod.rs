@@ -6,7 +6,7 @@ mod vector_encoding;
 use std::num::NonZeroUsize;
 use std::path::Path;
 
-use crate::db::{Database, OpenOptions};
+use crate::db::{self, Database, OpenOptions};
 
 pub use queries::clip::{
     CLIP_EMBEDDING_BYTES_LENGTH, CLIP_EMBEDDING_DIMENSIONS, CLIP_ML_VERSION, ClipEmbedding,
@@ -28,7 +28,7 @@ pub use vector_encoding::{decode_evector, decode_f32, encode_evector, encode_f32
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Database(#[from] rusqlite::Error),
+    Database(#[from] db::Error),
     #[error("currentVersion({current}) cannot be greater than toVersion({target})")]
     Downgrade { current: i64, target: i64 },
     #[error("{0}")]
@@ -99,7 +99,7 @@ mod tests {
     use super::queries::clip::tests::full_clip;
     use super::queries::{caches, clip, clusters, faces, filedata, persons, pets};
     use super::{Error, MlDb, TARGET_VERSION};
-    use rusqlite::Connection;
+    use crate::db::Connection;
     use tempfile::TempDir;
 
     type Query<T> = fn(&MlDb) -> Result<T, Error>;

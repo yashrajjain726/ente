@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 
-use rusqlite::{
-    OptionalExtension, Params, Result, Row, ToSql, TransactionBehavior, params_from_iter,
-    types::FromSql,
+use crate::db::{
+    FromSql, OptionalExtension, Params, Result, Row, ToSql, TransactionBehavior, params_from_iter,
 };
 
 use crate::ml_db::MlDb;

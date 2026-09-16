@@ -90,8 +90,8 @@ fn now_millis() -> i64 {
 #[cfg(test)]
 pub(in crate::ml_db) mod tests {
     use super::MlDb;
+    use crate::db::Connection;
     use crate::ml_db::tests::{cases, check, open};
-    use rusqlite::Connection;
     use tempfile::TempDir;
 
     pub(in crate::ml_db) fn seed(db: &MlDb) {

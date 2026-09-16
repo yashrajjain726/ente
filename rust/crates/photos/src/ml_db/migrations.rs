@@ -1,4 +1,4 @@
-use rusqlite::{Connection, TransactionBehavior};
+use crate::db::{Connection, TransactionBehavior};
 
 use super::{Error, Result};
 
@@ -37,8 +37,7 @@ mod tests {
     use std::sync::Barrier;
     use std::thread;
 
-    use crate::db::{Database, OpenOptions};
-    use rusqlite::Connection;
+    use crate::db::{Connection, Database, OpenOptions, Result as SqliteResult};
 
     use super::migrate;
     use crate::ml_db::{Error, Result};
@@ -112,7 +111,7 @@ mod tests {
                 .unwrap()
                 .query_map((), |row| row.get::<_, String>(0))
                 .unwrap()
-                .collect::<rusqlite::Result<Vec<_>>>()
+                .collect::<SqliteResult<Vec<_>>>()
                 .unwrap();
             assert_eq!(version, 1);
             assert_eq!(columns, ["id"]);

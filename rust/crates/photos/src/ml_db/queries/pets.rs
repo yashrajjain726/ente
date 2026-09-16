@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 use super::helpers::{bind_placeholders, pair};
-use rusqlite::{Result as SqliteResult, Row, params_from_iter};
+use crate::db::{Result as SqliteResult, Row, params_from_iter};
 
 use super::unique_in_order;
 use crate::ml_db::{MlDb, Result};

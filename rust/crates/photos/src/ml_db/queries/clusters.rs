@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use super::helpers::{
     MAX_SQL_BIND_PARAMS_PER_QUERY, bind_placeholders, group_into, optional_parameter, pair,
 };
-use rusqlite::{Result as SqliteResult, Row, params_from_iter};
+use crate::db::{Result as SqliteResult, Row, params_from_iter};
 
 use super::faces::{file_id_from_face_id, is_bad_face_for_clustering};
 use super::unique_in_order;
