@@ -1,3 +1,5 @@
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { LoginForm } from "ente-accounts/components/auth/LoginForm";
 import { AccountsPageContents } from "ente-accounts/components/layouts/centered-paper";
 import {
     LoginContents,
@@ -13,7 +15,10 @@ export interface LoginPageProps {
     presentation?: React.ComponentType<LoginPresentationProps>;
 }
 
-const Page: React.FC<LoginPageProps> = ({ presentation: Presentation }) => {
+const Page: React.FC<LoginPageProps> = ({ presentation }) => {
+    const { Shell } = useAuthPageConfig();
+    const Presentation =
+        presentation ?? (Shell ? ConfiguredLoginPresentation : undefined);
     const [loading, setLoading] = useState(true);
     const [host, setHost] = useState<string | undefined>(undefined);
 
@@ -39,3 +44,15 @@ const Page: React.FC<LoginPageProps> = ({ presentation: Presentation }) => {
 };
 
 export default Page;
+
+function ConfiguredLoginPresentation(
+    props: LoginPresentationProps,
+): React.JSX.Element {
+    // The page selects this presentation only when a shell is configured.
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <LoginForm {...props} />
+        </Shell>
+    );
+}

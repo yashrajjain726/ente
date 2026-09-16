@@ -1,9 +1,11 @@
+import { authPageConfig } from "@/auth-page-config";
 import { LockerHead } from "@/components/LockerHead";
 import { lockerLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
+import { AuthPageProvider } from "ente-accounts/components/auth/AuthPageProvider";
 import {
     isSavedUserTokenMismatch,
     savedLocalUser,
@@ -71,14 +73,16 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             <AttributedMiniDialog {...miniDialogProps} />
 
             <BaseContext value={baseContext}>
-                {!isI18nReady ? (
-                    <LoadingIndicator />
-                ) : (
-                    <>
-                        {isChangingRoute && <TranslucentLoadingOverlay />}
-                        <Component {...pageProps} />
-                    </>
-                )}
+                <AuthPageProvider value={authPageConfig}>
+                    {!isI18nReady ? (
+                        <LoadingIndicator />
+                    ) : (
+                        <>
+                            {isChangingRoute && <TranslucentLoadingOverlay />}
+                            <Component {...pageProps} />
+                        </>
+                    )}
+                </AuthPageProvider>
             </BaseContext>
         </ThemeProvider>
     );

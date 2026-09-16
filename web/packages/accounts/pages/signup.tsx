@@ -1,3 +1,5 @@
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { SignUpForm } from "ente-accounts/components/auth/SignUpForm";
 import { AccountsPageContents } from "ente-accounts/components/layouts/centered-paper";
 import {
     SignUpContents,
@@ -18,7 +20,13 @@ export interface SignUpPageProps {
     presentation?: ComponentType<SignUpPresentationProps>;
 }
 
-const Page: React.FC<SignUpPageProps> = ({ presentation }) => {
+const Page: React.FC<SignUpPageProps> = ({
+    presentation: explicitPresentation,
+}) => {
+    const { Shell } = useAuthPageConfig();
+    const presentation =
+        explicitPresentation ??
+        (Shell ? ConfiguredSignUpPresentation : undefined);
     const [loading, setLoading] = useState(true);
     const [host, setHost] = useState<string | undefined>(undefined);
 
@@ -44,3 +52,15 @@ const Page: React.FC<SignUpPageProps> = ({ presentation }) => {
 };
 
 export default Page;
+
+function ConfiguredSignUpPresentation(
+    props: SignUpPresentationProps,
+): React.JSX.Element {
+    // The page selects this presentation only when a shell is configured.
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <SignUpForm {...props} />
+        </Shell>
+    );
+}
