@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::num::NonZeroUsize;
 
 use crate::db::{self, FromSql, Params, Row, ToSql, params_from_iter};
 
@@ -79,11 +78,10 @@ impl MlDb {
         &self,
         sql: &str,
         ids: &[I],
-        chunk_size: NonZeroUsize,
         mut map: impl FnMut(&Row<'_>) -> db::Result<T>,
     ) -> Result<C> {
         let mut rows = Vec::new();
-        for chunk in ids.chunks(chunk_size.get()) {
+        for chunk in ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY) {
             let sql = expand_in_clause(sql, chunk.len());
             let chunk_rows: Vec<T> = self.read_all(&sql, params_from_iter(chunk), &mut map)?;
             rows.extend(chunk_rows);
@@ -179,7 +177,6 @@ pub(super) fn group_into<K: Eq + Hash, V, C: FromIterator<V>>(
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
-    use std::num::NonZeroUsize;
 
     use crate::db::{Database, OpenOptions};
 
@@ -298,55 +295,29 @@ mod tests {
     #[test]
     fn chunked_reads_query_each_chunk_in_order() {
         let (_directory, db) = open();
-        db.write_batch_atomic("INSERT INTO items (id) VALUES (?)", (1..=7).map(|id| [id]))
-            .unwrap();
-        let ids: Vec<i64> = (1..=7).collect();
-        let one_at_a_time: Vec<i64> = db
-            .read_chunked_in(
-                "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
-                &ids,
-                NonZeroUsize::MIN,
-                |row| Ok(row.get(0)?),
-            )
-            .unwrap();
-        assert_eq!(one_at_a_time, ids);
+        let boundary = MAX_SQL_BIND_PARAMS_PER_QUERY as i64;
+        db.write_batch_atomic(
+            "INSERT INTO items (id) VALUES (?)",
+            [1, 2, boundary - 1, boundary, boundary + 1].map(|id| [id]),
+        )
+        .unwrap();
+        let ids: Vec<i64> = (0..=boundary + 1).collect();
         let by_chunk: Vec<i64> = db
             .read_chunked_in(
                 "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
                 &ids,
-                const { NonZeroUsize::new(3).unwrap() },
                 |row| Ok(row.get(0)?),
             )
             .unwrap();
-        assert_eq!(by_chunk, [3, 2, 1, 6, 5, 4, 7]);
-        let single_chunk: Vec<i64> = db
-            .read_chunked_in(
-                "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
-                &ids,
-                const { NonZeroUsize::new(10).unwrap() },
-                |row| Ok(row.get(0)?),
-            )
-            .unwrap();
-        assert_eq!(single_chunk, [7, 6, 5, 4, 3, 2, 1]);
+        assert_eq!(by_chunk, [boundary - 1, 2, 1, boundary + 1, boundary]);
         let none: Vec<i64> = db
             .read_chunked_in(
                 "SELECT id FROM missing_table WHERE id IN ({})",
                 &Vec::<i64>::new(),
-                const { NonZeroUsize::new(3).unwrap() },
                 |row| Ok(row.get(0)?),
             )
             .unwrap();
         assert!(none.is_empty());
-        let many: Vec<i64> = (0..=MAX_SQL_BIND_PARAMS_PER_QUERY as i64).collect();
-        let found: HashSet<i64> = db
-            .read_chunked_in(
-                "SELECT id FROM items WHERE id IN ({})",
-                &many,
-                const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
-                |row| Ok(row.get(0)?),
-            )
-            .unwrap();
-        assert_eq!(found, HashSet::from([1, 2, 3, 4, 5, 6, 7]));
     }
 
     #[test]

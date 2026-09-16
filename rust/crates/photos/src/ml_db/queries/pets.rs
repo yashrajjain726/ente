@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::num::NonZeroUsize;
 
 use super::helpers::{bind_placeholders, pair};
 use crate::db::{Result as SqliteResult, Row, params_from_iter};
@@ -308,12 +307,7 @@ impl MlDb {
             self.write_batch_atomic(insert_sql, unique_ids.iter().map(|id| [id]))?;
         }
         let select_sql = select_prefix.to_owned() + " ({})";
-        self.read_chunked_in(
-            &select_sql,
-            &unique_ids,
-            const { NonZeroUsize::new(800).unwrap() },
-            pair,
-        )
+        self.read_chunked_in(&select_sql, &unique_ids, pair)
     }
 }
 

@@ -1,9 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroUsize;
 
-use super::helpers::{
-    MAX_SQL_BIND_PARAMS_PER_QUERY, bind_placeholders, group_into, optional_parameter, pair,
-};
+use super::helpers::{bind_placeholders, group_into, optional_parameter, pair};
 use crate::db::{Result as SqliteResult, Row, params_from_iter};
 
 use super::faces::{file_id_from_face_id, is_bad_face_for_clustering};
@@ -97,7 +94,6 @@ impl MlDb {
         let rows: Vec<(String, String)> = self.read_chunked_in(
             "SELECT cluster_id, face_id FROM face_clusters WHERE cluster_id IN ({})",
             &cluster_id_list,
-            const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
             pair,
         )?;
         Ok(group_into(rows))
@@ -166,7 +162,6 @@ impl MlDb {
         self.read_chunked_in(
             "SELECT face_id, cluster_id FROM face_clusters where face_id IN ({})",
             face_ids,
-            const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
             pair,
         )
     }
@@ -240,7 +235,6 @@ impl MlDb {
                 WHERE cluster_id IN ({})
                 "#,
             &unique_cluster_ids,
-            const { NonZeroUsize::new(800).unwrap() },
             pair,
         )
     }
