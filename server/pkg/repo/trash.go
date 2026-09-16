@@ -20,7 +20,7 @@ const (
 	TrashDiffLimit      = 2500
 
 	TrashBatchSize        = 1000
-	staleDeletedFileLimit = 10
+	StaleDeletedFileLimit = 10
 
 	EmptyTrashQueueItemSeparator = "::"
 )
@@ -253,7 +253,7 @@ func (t *TrashRepository) GetStaleDeletedFileIDs(ctx context.Context, userID int
 		JOIN trash t ON t.file_id = f.file_id
 		WHERE c.owner_id = $1 AND f.owner_id = $1 AND t.user_id = $1
 			AND t.is_deleted = TRUE AND t.is_restored = FALSE
-		LIMIT $2`, userID, staleDeletedFileLimit)
+		LIMIT $2`, userID, StaleDeletedFileLimit)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

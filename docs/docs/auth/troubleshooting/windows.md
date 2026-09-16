@@ -1,11 +1,24 @@
 ---
-title: Unable to login on Windows Desktop
-description: Troubleshooting when you are not able to login or register on Ente Auth app on Windows
+title: Windows troubleshooting
+description: Troubleshoot Windows Hello and login errors in Ente Auth
 ---
 
-# Windows Login Error
+# Windows Troubleshooting
 
-### HandshakeException: Handshake error in client
+## Windows Hello Prompt Does Not Appear
+
+Ente Auth uses Windows Hello when an action requires system authentication.
+
+If Ente Auth asks you to authenticate but Windows does not display a security
+prompt:
+
+1. Open **Windows Settings → Accounts → Sign-in options**.
+2. Verify that your Windows Hello PIN is configured and works.
+3. If Windows reports a PIN as configured but it does not work, use the Windows
+   PIN recovery options to reset or recreate it.
+4. Restart Ente Auth and try again.
+
+## HandshakeException During Login
 
 This error usually happens when the Trusted Root certificates on your Windows machine are outdated.
 

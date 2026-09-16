@@ -401,8 +401,8 @@ export const sidebar = [
                         link: "/auth/troubleshooting/linux-system-auth",
                     },
                     {
-                        text: "Windows login",
-                        link: "/auth/troubleshooting/windows-login",
+                        text: "Windows",
+                        link: "/auth/troubleshooting/windows",
                     },
                 ],
             },

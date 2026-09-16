@@ -12,7 +12,6 @@ import {
     encryptFileStreamWithKey,
     generateKey,
 } from "../index";
-import { cryptoDecryptBlob } from "../pkg/ente_locker_wasm.js";
 
 test.each([
     new Uint8Array(),
@@ -72,7 +71,7 @@ test("encrypted file bytes are uploadable with their MD5 and header", async () =
     }
 });
 
-test("metadata wrapper reads legacy JSON after a stream_truncated error", async () => {
+test("metadata accepts legacy records without a final tag", async () => {
     const metadata = { title: "Zoë 🦋" };
     const encryptor = await createStreamEncryptor();
 
@@ -83,18 +82,14 @@ test("metadata wrapper reads legacy JSON after a stream_truncated error", async 
         );
         const { key, decryptionHeader } = encryptor;
 
-        expect(() =>
-            cryptoDecryptBlob(
-                Buffer.from(encryptedData).toString("base64"),
-                decryptionHeader,
-                key,
-            ),
-        ).toThrow(expect.objectContaining({ name: "stream_truncated" }));
-
         expect(
             await decryptMetadataJSON(
-                { encryptedData, decryptionHeader },
-                Buffer.from(key, "base64"),
+                {
+                    encryptedData:
+                        Buffer.from(encryptedData).toString("base64"),
+                    decryptionHeader,
+                },
+                key,
             ),
         ).toStrictEqual(metadata);
     } finally {

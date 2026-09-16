@@ -52,7 +52,28 @@ func (c *CollectionController) GetDiffV2(ctx *gin.Context, cID int64, userID int
 			diff[idx].IsDeleted = true
 		}
 	}
+	scrubDeletedFiles(diff)
 	return diff, hasMore, nil
+}
+
+func scrubDeletedFiles(files []ente.File) {
+	for idx := range files {
+		file := &files[idx]
+		if !file.IsDeleted {
+			continue
+		}
+		files[idx] = ente.File{
+			ID:                file.ID,
+			OwnerID:           file.OwnerID,
+			CollectionID:      file.CollectionID,
+			CollectionOwnerID: file.CollectionOwnerID,
+			Metadata: ente.FileAttributes{
+				EncryptedData: "-",
+			},
+			IsDeleted:    true,
+			UpdationTime: file.UpdationTime,
+		}
+	}
 }
 
 // Never split a version across pages. Results may be smaller or larger than

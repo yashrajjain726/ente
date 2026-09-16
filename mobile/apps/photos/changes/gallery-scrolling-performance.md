@@ -1,0 +1,1 @@
+- Gallery scrolling performance improvements.

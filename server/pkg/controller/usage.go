@@ -52,7 +52,10 @@ func GetLockerLimitsForTier(isPaid bool) LockerLimits {
 }
 
 func (c *UsageController) CanUploadFile(ctx context.Context, userID int64, size *int64, app ente.App) error {
-	if app != ente.Locker && (size == nil || *size < hundredMBInBytes) {
+	if app == ente.Locker {
+		return c.canUploadFile(ctx, userID, size, app)
+	}
+	if size == nil || *size < hundredMBInBytes {
 		c.mu.Lock()
 		canUpload, ok := c.UploadResultCache[userID]
 		c.mu.Unlock()

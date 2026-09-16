@@ -202,7 +202,7 @@ struct UserMessageBubbleView: View {
                     Text(message.text)
                         .font(EnsuTypography.message)
                         .foregroundStyle(EnsuColor.userMessageText)
-                        .lineSpacing(EnsuLineHeight.spacing(fontSize: 15, lineHeight: 1.7))
+                        .lineSpacing(EnsuLineHeight.spacing(fontSize: 15, lineHeight: 22.0 / 15))
                         .multilineTextAlignment(.leading)
                         .textSelection(.enabled)
                 }
@@ -651,7 +651,7 @@ struct TodoListCardView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(items, id: \.self) { item in
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .top, spacing: EnsuSpacing.sm) {
                         Circle()
                             .fill(EnsuColor.accent)
@@ -678,6 +678,8 @@ struct TodoListCardView: View {
 struct MarkdownView: View {
     let blocks: [MarkdownBlock]
     var showCursor: Bool = false
+
+    private let messageLineSpacing = EnsuLineHeight.spacing(fontSize: 15, lineHeight: 22.0 / 15)
 
     var body: some View {
         let lastKind = blocks.last?.kind
@@ -724,7 +726,7 @@ struct MarkdownView: View {
                         markdownText(displayText)
                             .font(EnsuTypography.message)
                             .foregroundStyle(EnsuColor.textPrimary)
-                            .lineSpacing(EnsuLineHeight.spacing(fontSize: 15, lineHeight: 1.7))
+                            .lineSpacing(messageLineSpacing)
                     }
                 case .blockquote(let text):
                     let displayText = showCursor && isLast ? text + StreamingCursor.glyph : text
@@ -740,8 +742,8 @@ struct MarkdownView: View {
                         }
                         : items
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(resolvedItems, id: \.self) { item in
+                    VStack(alignment: .leading, spacing: EnsuSpacing.md) {
+                        ForEach(Array(resolvedItems.enumerated()), id: \.offset) { _, item in
                             HStack(alignment: .top, spacing: EnsuSpacing.sm) {
                                 Text("•")
                                     .font(EnsuTypography.message)
@@ -756,6 +758,7 @@ struct MarkdownView: View {
                                     markdownText(item)
                                         .font(EnsuTypography.message)
                                         .foregroundStyle(EnsuColor.textPrimary)
+                                        .lineSpacing(messageLineSpacing)
                                 }
                             }
                         }

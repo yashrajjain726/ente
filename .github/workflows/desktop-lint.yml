@@ -33,7 +33,13 @@ jobs:
               with:
                   workspaces: rust
                   shared-key: photos-desktop-ensu-android
+                  cache-targets: false
                   save-if: false
+
+            - name: Restore Rust target
+              uses: ./.github/actions/restore-rust-target
+              with:
+                  shared-key: photos-desktop-ensu-android
 
             - run: npm run codegen:napi
 

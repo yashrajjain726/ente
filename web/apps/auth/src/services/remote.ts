@@ -1,5 +1,5 @@
 import { codeFromURIString, type Code } from "@/services/code";
-import { decryptBox, decryptMetadataJSON } from "ente-base/crypto";
+import { decryptBox, decryptMetadataJSON } from "ente-auth-wasm";
 import {
     authenticatedRequestHeaders,
     ensureOk,

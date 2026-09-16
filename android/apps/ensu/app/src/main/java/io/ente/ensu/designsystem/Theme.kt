@@ -211,7 +211,7 @@ object EnsuTypography {
             fontFamily = messageFamily,
             fontSize = 15.sp,
             fontWeight = FontWeight.Normal,
-            lineHeight = 26.sp,
+            lineHeight = 22.sp,
         )
     val code =
         TextStyle(

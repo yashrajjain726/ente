@@ -3,7 +3,7 @@ import {
     subscribeMainWindowFocus,
 } from "ente-base/electron";
 import log from "ente-base/log";
-import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-base/session";
+import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-new/photos/services/account-keys";
 import {
     appLockSnapshot,
     clearAutoLockBlurSuppression,

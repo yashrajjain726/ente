@@ -147,6 +147,12 @@ jobs:
               if: matrix.platform.rust-target == 'universal-apple-darwin'
               run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
+            - name: Setup Rust cache
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              with:
+                  workspaces: rust
+                  shared-key: ensu-desktop
+
             - name: Install web dependencies
               working-directory: web
               run: npm ci

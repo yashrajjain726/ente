@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.agog.mathdisplay.MTMathView
 import io.ente.ensu.designsystem.EnsuColor
@@ -22,7 +23,7 @@ fun LaTeXView(latex: String, modifier: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) EnsuColor.textPrimaryDark else EnsuColor.textPrimaryLight
     val paddingPx = with(LocalDensity.current) { EnsuSpacing.cardPadding.dp.roundToPx() }
-    val fontSizePx = 16f * LocalDensity.current.density
+    val fontSizePx = with(LocalDensity.current) { 16.sp.toPx() }
 
     AndroidView(
         factory = { context ->
@@ -48,7 +49,7 @@ fun InlineLaTeXView(
 ) {
     val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) EnsuColor.textPrimaryDark else EnsuColor.textPrimaryLight
-    val fontSizePx = fontSizeSp * LocalDensity.current.density
+    val fontSizePx = with(LocalDensity.current) { fontSizeSp.sp.toPx() }
     val paddingPx = with(LocalDensity.current) { 2.dp.roundToPx() }
 
     AndroidView(

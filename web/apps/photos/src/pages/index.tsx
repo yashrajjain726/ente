@@ -14,13 +14,11 @@ import {
 } from "ente-base/join-album";
 import log from "ente-base/log";
 import { customAPIHost } from "ente-base/origins";
-import {
-    masterKeyFromSession,
-    updateSessionFromElectronSafeStorageIfNeeded,
-} from "ente-base/session";
+import { haveMasterKeyInSession } from "ente-base/session-storage";
 import { savedAuthToken } from "ente-base/token";
 import { canAccessIndexedDB } from "ente-gallery/services/files-db";
 import { DevSettings } from "ente-new/photos/components/DevSettings";
+import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-new/photos/services/account-keys";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -95,7 +93,7 @@ const Page: React.FC = () => {
             }
 
             await updateSessionFromElectronSafeStorageIfNeeded();
-            if ((await masterKeyFromSession()) && (await savedAuthToken())) {
+            if (haveMasterKeyInSession() && (await savedAuthToken())) {
                 await router.push("/gallery");
             } else if (savedPartialLocalUser()?.email) {
                 await router.push("/verify");
