@@ -117,7 +117,6 @@ type deletedSharedCollectionOwner struct {
 	Email string `json:"email"`
 }
 
-// The compatibility fields can be removed after released clients accept ID-only tombstones.
 type deletedSharedCollection struct {
 	ID           int64                        `json:"id"`
 	Owner        deletedSharedCollectionOwner `json:"owner"`
