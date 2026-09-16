@@ -1,19 +1,11 @@
 import { logoutClearStateAgain } from "ente-accounts/services/logout";
 import { logoutContacts } from "ente-contacts";
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { openAuthenticatedSession } from "../src/services/authenticated-session";
 import { lockerLogout } from "../src/services/logout";
 
-const {
-    apiOrigin,
-    encryptBoxWithRecoveryKey,
-    generateKey,
-    openSession,
-    accountLogout,
-} = vi.hoisted(() => ({
+const { apiOrigin, openSession, accountLogout } = vi.hoisted(() => ({
     apiOrigin: vi.fn<() => Promise<string>>(),
-    encryptBoxWithRecoveryKey: vi.fn(),
-    generateKey: vi.fn(),
     openSession: vi.fn(() =>
         Promise.resolve({ free: vi.fn(), updateAuthToken: vi.fn() }),
     ),
@@ -52,19 +44,19 @@ vi.mock("ente-accounts/services/logout", () => ({
     accountLogout,
     logoutClearStateAgain: vi.fn(),
 }));
-vi.mock("ente-locker-wasm", () => ({
-    encryptBoxWithRecoveryKey,
-    generateKey,
-    openSession,
-}));
+vi.mock("ente-locker-wasm", () => ({ openSession }));
 vi.mock("ente-legacy-wasm/authenticated", () => ({ openSession }));
 vi.mock("../src/services/locker-db", () => ({ clearLockerDB: vi.fn() }));
+
+afterEach(() => vi.unstubAllGlobals());
 
 test("logout rejects pending sessions while account cleanup is pending", async () => {
     const origin = Promise.withResolvers<string>();
     const accountCleanup = Promise.withResolvers<undefined>();
     apiOrigin.mockReturnValue(origin.promise);
     accountLogout.mockReturnValue(accountCleanup.promise);
+    const replace = vi.fn();
+    vi.stubGlobal("window", { location: { replace } });
 
     const opening = openAuthenticatedSession(1, "token", "key");
     const loggingOut = lockerLogout();
@@ -75,10 +67,12 @@ test("logout rejects pending sessions while account cleanup is pending", async (
             "Authenticated session was cleared",
         );
         expect(openSession).not.toHaveBeenCalled();
+        expect(replace).not.toHaveBeenCalled();
     } finally {
         accountCleanup.resolve(undefined);
         await loggingOut;
     }
     expect(logoutContacts).toHaveBeenCalledOnce();
     expect(logoutClearStateAgain).toHaveBeenCalledOnce();
+    expect(replace).toHaveBeenCalledExactlyOnceWith("/login");
 });

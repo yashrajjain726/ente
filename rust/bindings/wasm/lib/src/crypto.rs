@@ -5,6 +5,8 @@ use wasm_bindgen::prelude::*;
 
 use crate::EncryptedBox;
 
+#[cfg(feature = "crypto-blob")]
+mod blob;
 #[cfg(feature = "crypto-file")]
 mod file;
 

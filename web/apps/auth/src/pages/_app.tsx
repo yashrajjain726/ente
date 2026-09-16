@@ -1,9 +1,9 @@
+import { authLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
-import { accountLogout } from "ente-accounts/services/logout";
 import { staticAppTitle } from "ente-base/app";
 import { CustomHead } from "ente-base/components/Head";
 import {
@@ -35,9 +35,7 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
         logStartupBanner(savedLocalUser()?.id);
     }, []);
 
-    const logout = useCallback(() => {
-        void accountLogout().then(() => window.location.replace("/"));
-    }, []);
+    const logout = useCallback(() => void authLogout(), []);
 
     const baseContext = useMemo(
         () => deriveBaseContext({ logout, showMiniDialog }),

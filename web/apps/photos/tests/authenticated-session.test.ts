@@ -46,7 +46,9 @@ vi.mock("ente-accounts/services/user", () => ({
     ensureLocalUser: () => ({ id: 1 }),
     ensureSavedKeyAttributes: () => keyAttributes,
 }));
-vi.mock("ente-base/session", () => ({ masterKeyFromSession }));
+vi.mock("ente-new/photos/services/account-keys", () => ({
+    masterKeyFromSession,
+}));
 vi.mock("ente-base/token", () => ({ savedAuthToken }));
 vi.mock("ente-new/photos/services/collection", () => ({
     bindCollectionKeyOpener,
