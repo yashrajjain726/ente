@@ -61,7 +61,7 @@ export const SpaceMobileBestToast: React.FC = () => {
             >
                 <HugeiconsIcon
                     icon={SmartPhone01Icon}
-                    size={22}
+                    size={20}
                     strokeWidth={1.8}
                 />
             </Box>

@@ -1,6 +1,7 @@
 import {
     FavouriteIcon,
     MultiplicationSignIcon,
+    Tick02Icon,
     UserAdd02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -516,25 +517,6 @@ const scheduleScrollPageToTop = () => {
     };
 };
 
-const usePostingDotCount = (isPosting: boolean) => {
-    const [dotCount, setDotCount] = useState(1);
-
-    React.useEffect(() => {
-        if (!isPosting) {
-            setDotCount(1);
-            return;
-        }
-
-        const intervalID = window.setInterval(() => {
-            setDotCount((count) => (count % 3) + 1);
-        }, 500);
-
-        return () => window.clearInterval(intervalID);
-    }, [isPosting]);
-
-    return dotCount;
-};
-
 interface FeedLikeButtonProps {
     isLiked: boolean;
     onClick: () => void;
@@ -680,7 +662,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const rootRef = React.useRef<HTMLElement | null>(null);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
-    const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
     const thumbHashDataURL = React.useMemo(
         () => thumbHashDataURLFromBase64(thumbHash),
@@ -913,7 +894,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) fit-content(50%)`,
                     lineHeight: "20px",
                     mb: "10px",
-                    px: "6px",
+                    px: "4px",
                 }}
             >
                 <Box
@@ -922,20 +903,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     aria-label={authorProfileLabel}
                     onClick={openAuthor}
                     sx={{
-                        alignItems: "center",
+                        alignItems: "flex-end",
                         appearance: "none",
                         bgcolor: "transparent",
                         border: 0,
-                        borderRadius: "50%",
                         cursor: canOpenAuthor ? "pointer" : "default",
                         display: "flex",
                         flexShrink: 0,
-                        height: feedAvatarSize,
+                        height: spaceTouchTargetSize,
                         justifyContent: "center",
+                        mt: `${feedAvatarSize - spaceTouchTargetSize}px`,
+                        mx: `${(feedAvatarSize - spaceTouchTargetSize) / 2}px`,
                         overflow: "visible",
                         p: 0,
                         position: "relative",
-                        width: feedAvatarSize,
+                        width: spaceTouchTargetSize,
                         "&:focus-visible": {
                             outline: `2px solid ${green}`,
                             outlineOffset: 2,
@@ -947,7 +929,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         sx={{
                             bgcolor: "rgba(255, 255, 255, 0.2)",
                             borderRadius: "50%",
-                            inset: 0,
+                            bottom: 0,
+                            height: feedAvatarSize,
+                            width: feedAvatarSize,
                             position: "absolute",
                             zIndex: 0,
                         }}
@@ -1009,6 +993,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     {timestampStatus ? (
                         <Box
                             component="span"
+                            role="status"
                             aria-label={
                                 timestampStatus == "posting"
                                     ? "Posting"
@@ -1037,29 +1022,40 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                         : "nowrap",
                             }}
                         >
-                            {timestampStatus == "posted" ? (
-                                <Box component="span">Posted</Box>
-                            ) : timestampStatus == "post-limit" ? (
+                            {timestampStatus == "post-limit" ? (
                                 <Box component="span">
                                     Post limit reached. Please contact support.
                                 </Box>
                             ) : timestampStatus == "failed" ? (
                                 <Box component="span">Failed</Box>
                             ) : (
-                                <>
-                                    <Box component="span">Posting</Box>
-                                    <Box
-                                        component="span"
-                                        aria-hidden
-                                        sx={{
-                                            display: "inline-block",
-                                            textAlign: "left",
-                                            width: 12,
-                                        }}
-                                    >
-                                        {".".repeat(postingDotCount)}
-                                    </Box>
-                                </>
+                                <Box
+                                    component="span"
+                                    aria-hidden
+                                    sx={{
+                                        alignItems: "center",
+                                        display: "flex",
+                                        height: 16,
+                                        justifyContent: "center",
+                                        width: 16,
+                                    }}
+                                >
+                                    {timestampStatus == "posting" ? (
+                                        <SpaceLoadingSpinner
+                                            ariaLabel="Posting"
+                                            color="transparent"
+                                            size={14}
+                                            trackColor={feedTimestampForeground}
+                                        />
+                                    ) : (
+                                        <HugeiconsIcon
+                                            icon={Tick02Icon}
+                                            color={green}
+                                            size={16}
+                                            strokeWidth={3}
+                                        />
+                                    )}
+                                </Box>
                             )}
                         </Box>
                     ) : (
@@ -1217,7 +1213,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         gridTemplateColumns: "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
                         mt: "8px",
-                        px: "6px",
                         width: "100%",
                     }}
                 >
@@ -1392,7 +1387,7 @@ const InviteFriendsToast: React.FC<InviteFriendsToastProps> = ({
         animateEntrance
         closeLabel="Close invite prompt"
         icon={
-            <HugeiconsIcon icon={UserAdd02Icon} size={24} strokeWidth={1.9} />
+            <HugeiconsIcon icon={UserAdd02Icon} size={20} strokeWidth={1.9} />
         }
         message="Invite your friends"
         onClose={onClose}
