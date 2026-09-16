@@ -235,17 +235,10 @@ class _AlbumChip extends StatelessWidget {
   }
 }
 
-class _RemoveAlbumButton extends StatefulWidget {
+class _RemoveAlbumButton extends StatelessWidget {
   const _RemoveAlbumButton({required this.onTap});
 
   final Future<void> Function() onTap;
-
-  @override
-  State<_RemoveAlbumButton> createState() => _RemoveAlbumButtonState();
-}
-
-class _RemoveAlbumButtonState extends State<_RemoveAlbumButton> {
-  bool _isExecuting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -254,15 +247,12 @@ class _RemoveAlbumButtonState extends State<_RemoveAlbumButton> {
       message: context.strings.removeFromAlbum,
       child: Semantics(
         button: true,
-        enabled: !_isExecuting,
         label: context.strings.removeFromAlbum,
         child: MouseRegion(
-          cursor: _isExecuting
-              ? SystemMouseCursors.basic
-              : SystemMouseCursors.click,
+          cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: _isExecuting ? () {} : _handleTap,
+            onTap: onTap,
             child: SizedBox.square(
               dimension: 24,
               child: Center(
@@ -288,14 +278,5 @@ class _RemoveAlbumButtonState extends State<_RemoveAlbumButton> {
         ),
       ),
     );
-  }
-
-  Future<void> _handleTap() async {
-    setState(() => _isExecuting = true);
-    try {
-      await widget.onTap();
-    } finally {
-      if (mounted) setState(() => _isExecuting = false);
-    }
   }
 }
