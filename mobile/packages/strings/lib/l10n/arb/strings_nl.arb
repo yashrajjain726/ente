@@ -119,6 +119,7 @@
     },
     "description": "Number of participants in an album, including the album owner."
   },
+  "albumsOnDevicePermissionFeatureAllowAccessFaceRecognition": "Geef Ente toegang tot je foto's om ze met gezichtsherkenning te ordenen",
   "albumTitle": "Albumtitel",
   "albumUpdated": "Album bijgewerkt",
   "algorithm": "Algoritme",
