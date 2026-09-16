@@ -302,9 +302,6 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
             } else if (snapshot.hasData) {
               final collections = snapshot.data as List<Collection>;
               _removeIncomingCollections(collections);
-              final shouldShowCreateAlbum =
-                  widget.showOptionToCreateNewAlbum && _searchQuery.isEmpty;
-
               List<Collection> recentCollections = [];
               if (_searchQuery.isEmpty && !_showOnlyHiddenCollections) {
                 recentCollections = CollectionsService.instance
@@ -338,6 +335,10 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
                         )
                         .toList()
                   : collections;
+              final shouldShowCreateAlbum =
+                  widget.showOptionToCreateNewAlbum &&
+                  (_searchQuery.isEmpty ||
+                      (searchResults.isEmpty && sharedCollections.isEmpty));
               return LayoutBuilder(
                 builder: (context, constraints) {
                   return OverflowBox(
