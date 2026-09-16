@@ -1,1 +1,0 @@
-- Fixed image and video viewer status bar styles. (@r4khul)

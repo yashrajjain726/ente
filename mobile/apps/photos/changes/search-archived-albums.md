@@ -1,1 +1,0 @@
-- Show archived albums in Albums search results.

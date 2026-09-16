@@ -1,1 +1,0 @@
-- Made back buttons easier to tap without changing their appearance or spacing.

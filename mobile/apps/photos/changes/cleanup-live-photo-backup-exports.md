@@ -1,1 +1,0 @@
-- Fixed device storage buildup caused by temporary Live Photo videos left behind during backup on iOS.
