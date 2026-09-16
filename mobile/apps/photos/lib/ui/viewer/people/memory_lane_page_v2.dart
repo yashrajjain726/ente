@@ -83,7 +83,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   final _logger = Logger("MemoryLanePageV2");
   Timer? _playbackTimer;
   Object? _playbackToken;
-  bool _wasPlayingBeforeTouch = false;
   int? _photoPointer;
   bool _useFastTransition = false;
   late final Future<void> _memoryLaneLoaded;
@@ -239,9 +238,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   void _onPhotoPointerEnd(PointerEvent event) {
     if (event.pointer != _photoPointer) return;
     _photoPointer = null;
-    final wasPlaying = _wasPlayingBeforeTouch;
-    _wasPlayingBeforeTouch = false;
-    if (wasPlaying) unawaited(_play(i, fastTransition: true));
+    unawaited(_play(i, fastTransition: true));
   }
 
   Future<Uint8List?> _loadEntry(MemoryLaneEntry entry, EnteFile file) async {
@@ -555,7 +552,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                         onPointerDown: (event) {
                           if (_photoPointer != null || !widget.isActive) return;
                           _photoPointer = event.pointer;
-                          _wasPlayingBeforeTouch = _playbackToken != null;
                           _pause();
                         },
                         onPointerUp: _onPhotoPointerEnd,
