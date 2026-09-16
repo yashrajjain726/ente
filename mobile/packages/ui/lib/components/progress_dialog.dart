@@ -178,8 +178,6 @@ class ProgressDialog {
     final animation = route.animation;
     do {
       await WidgetsBinding.instance.endOfFrame;
-      // DialogRoute's first frame can be fully transparent. Let a visible
-      // frame paint before callers can start synchronous work.
     } while (route.isActive && animation != null && animation.value == 0);
     if (_showLogs) debugPrint('ProgressDialog shown');
     return true;
