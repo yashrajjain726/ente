@@ -26,7 +26,7 @@ mod tests {
     use std::sync::Barrier;
     use std::thread;
 
-    use crate::db::{Connection, Database, OpenOptions, Result as SqliteResult};
+    use crate::db::{self, Connection, Database, OpenOptions};
 
     use super::migrate;
     use crate::ml_db::{Error, Result};
@@ -101,7 +101,7 @@ mod tests {
                 .unwrap()
                 .query_map((), |row| Ok(row.get::<_, String>(0)?))
                 .unwrap()
-                .collect::<SqliteResult<Vec<_>>>()
+                .collect::<db::Result<Vec<_>>>()
                 .unwrap();
             assert_eq!(version, 1);
             assert_eq!(columns, ["id"]);

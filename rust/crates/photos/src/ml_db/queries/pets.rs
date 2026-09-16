@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::helpers::{bind_placeholders, pair};
-use crate::db::{Result as SqliteResult, Row, params_from_iter};
+use crate::db::{self, Row, params_from_iter};
 
 use super::unique_in_order;
 use crate::ml_db::{MlDb, Result};
@@ -311,7 +311,7 @@ impl MlDb {
     }
 }
 
-fn read_pet_face(row: &Row<'_>) -> SqliteResult<PetFaceRow> {
+fn read_pet_face(row: &Row<'_>) -> db::Result<PetFaceRow> {
     Ok(PetFaceRow {
         file_id: row.get("file_id")?,
         pet_face_id: row.get("pet_face_id")?,
@@ -325,7 +325,7 @@ fn read_pet_face(row: &Row<'_>) -> SqliteResult<PetFaceRow> {
     })
 }
 
-fn read_pet_body(row: &Row<'_>) -> SqliteResult<PetBodyRow> {
+fn read_pet_body(row: &Row<'_>) -> db::Result<PetBodyRow> {
     Ok(PetBodyRow {
         file_id: row.get("file_id")?,
         pet_body_id: row.get("pet_body_id")?,

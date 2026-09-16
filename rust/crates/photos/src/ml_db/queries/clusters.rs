@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::helpers::{bind_placeholders, group_into, optional_parameter, pair};
-use crate::db::{Result as SqliteResult, Row, params_from_iter};
+use crate::db::{self, Row, params_from_iter};
 
 use super::faces::{file_id_from_face_id, is_bad_face_for_clustering};
 use super::unique_in_order;
@@ -406,7 +406,7 @@ pub(super) fn file_id_to_cluster_ids(
     Ok(result)
 }
 
-fn read_cluster_summary(row: &Row<'_>) -> SqliteResult<(String, ClusterSummary)> {
+fn read_cluster_summary(row: &Row<'_>) -> db::Result<(String, ClusterSummary)> {
     Ok((
         row.get("cluster_id")?,
         ClusterSummary {
@@ -416,7 +416,7 @@ fn read_cluster_summary(row: &Row<'_>) -> SqliteResult<(String, ClusterSummary)>
     ))
 }
 
-fn read_cluster_centroid(row: &Row<'_>) -> SqliteResult<ClusterCentroidRow> {
+fn read_cluster_centroid(row: &Row<'_>) -> db::Result<ClusterCentroidRow> {
     Ok(ClusterCentroidRow {
         cluster_id: row.get(0)?,
         avg: row.get(1)?,
