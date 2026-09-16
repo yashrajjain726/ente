@@ -1,7 +1,6 @@
 import {
     FavouriteIcon,
     MultiplicationSignIcon,
-    Tick02Icon,
     UserAdd02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -54,21 +53,17 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 const homeBackground = spaceAppBackgroundColor;
 
 const green = "#08C225";
-const feedCardBackground = "#2C2C2E";
 const feedAccentBackground = "#263D2C";
 const feedAccentBackgroundHover = "#2C4B32";
-const feedActionBackground = "#3A3A3E";
-const feedActionBackgroundHover = "#47474C";
-const feedLikeForeground = "#E4E4E8";
-const feedTimestampForeground = "#A7A7AE";
+const feedActionBackground = "#363639";
+const feedActionForeground = "#DEDEDE";
+const feedTimestampForeground = "#C8C8C8";
 const feedSkeletonElementBackground = spaceSurfaceHover;
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
 const dangerColor = "#F63A3A";
-const feedAvatarSize = 25;
+const feedAvatarSize = 38;
 const feedLikeActionSize = spaceTouchTargetSize;
-const feedCardRadius = 16;
-const feedFooterInset = 8;
 const feedActionIconSize = 20;
 const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
@@ -346,7 +341,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
                     sx={{
                         boxSizing: "border-box",
                         minWidth: 0,
-                        pb: "28px",
+                        pb: "24px",
                         position: "relative",
                         width: "100%",
                     }}
@@ -512,6 +507,25 @@ const scheduleScrollPageToTop = () => {
     };
 };
 
+const usePostingDotCount = (isPosting: boolean) => {
+    const [dotCount, setDotCount] = useState(1);
+
+    React.useEffect(() => {
+        if (!isPosting) {
+            setDotCount(1);
+            return;
+        }
+
+        const intervalID = window.setInterval(() => {
+            setDotCount((count) => (count % 3) + 1);
+        }, 500);
+
+        return () => window.clearInterval(intervalID);
+    }, [isPosting]);
+
+    return dotCount;
+};
+
 interface FeedLikeButtonProps {
     isLiked: boolean;
     onClick: () => void;
@@ -541,7 +555,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
                 bgcolor: isLiked ? feedAccentBackground : feedActionBackground,
                 border: 0,
                 borderRadius: "50%",
-                color: isLiked ? green : feedLikeForeground,
+                color: isLiked ? green : feedActionForeground,
                 cursor: "pointer",
                 display: "inline-flex",
                 flexShrink: 0,
@@ -560,7 +574,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
                 "&:hover": {
                     bgcolor: isLiked
                         ? feedAccentBackgroundHover
-                        : feedActionBackgroundHover,
+                        : spaceControlBackgroundHover,
                 },
                 "@media (prefers-reduced-motion: reduce)": {
                     animation: "none",
@@ -588,7 +602,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
                 <HugeiconsIcon
                     fill={isLiked ? green : "none"}
                     icon={FavouriteIcon}
-                    primaryColor={isLiked ? green : feedLikeForeground}
+                    primaryColor={isLiked ? green : feedActionForeground}
                     size={feedActionIconSize}
                     strokeWidth={2}
                 />
@@ -650,6 +664,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const rootRef = React.useRef<HTMLElement | null>(null);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
+    const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
     const thumbHashDataURL = React.useMemo(
         () => thumbHashDataURLFromBase64(thumbHash),
@@ -863,8 +878,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
             ref={rootRef}
             component="article"
             sx={{
-                bgcolor: feedCardBackground,
-                borderRadius: `${feedCardRadius}px`,
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
@@ -875,206 +888,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
         >
             <Box
                 sx={{
-                    alignItems: "center",
-                    boxSizing: "border-box",
-                    color: textBase,
-                    display: "grid",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    gap: "8px",
-                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) fit-content(50%)`,
-                    lineHeight: "20px",
-                    minHeight: 52,
-                    px: "12px",
-                    py: "4px",
-                }}
-            >
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={authorProfileLabel}
-                    onClick={openAuthor}
-                    sx={{
-                        alignItems: "center",
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        cursor: canOpenAuthor ? "pointer" : "default",
-                        display: "flex",
-                        flexShrink: 0,
-                        height: spaceTouchTargetSize,
-                        justifyContent: "center",
-                        mx: `${(feedAvatarSize - spaceTouchTargetSize) / 2}px`,
-                        overflow: "visible",
-                        p: 0,
-                        position: "relative",
-                        width: spaceTouchTargetSize,
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    <Box
-                        aria-hidden
-                        sx={{
-                            bgcolor: "rgba(255, 255, 255, 0.2)",
-                            borderRadius: "50%",
-                            height: feedAvatarSize,
-                            width: feedAvatarSize,
-                            position: "absolute",
-                            zIndex: 0,
-                        }}
-                    />
-                    {isAvatarReady ? (
-                        <Box
-                            key={displayAvatarUrl ?? "default-avatar"}
-                            sx={{
-                                ...avatarFadeSx,
-                                borderRadius: "50%",
-                                height: feedAvatarSize,
-                                overflow: "hidden",
-                                position: "relative",
-                                width: feedAvatarSize,
-                                zIndex: 1,
-                            }}
-                        >
-                            <SpaceAvatarImage
-                                src={displayAvatarUrl}
-                                borderRadius="50%"
-                            />
-                        </Box>
-                    ) : null}
-                </Box>
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={authorProfileLabel}
-                    onClick={openAuthor}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        color: "inherit",
-                        cursor: canOpenAuthor ? "pointer" : "default",
-                        display: "block",
-                        fontFamily: "inherit",
-                        fontSize: 14,
-                        fontWeight: 650,
-                        justifySelf: "start",
-                        lineHeight: "18px",
-                        maxWidth: "100%",
-                        minWidth: 0,
-                        overflow: "hidden",
-                        p: 0,
-                        textAlign: "left",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        "&:focus-visible": {
-                            borderRadius: "4px",
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    {firstName}
-                </Box>
-                <Box sx={{ minWidth: 0, textAlign: "right" }}>
-                    {timestampStatus ? (
-                        <Box
-                            component="span"
-                            role="status"
-                            aria-label={
-                                timestampStatus == "posting"
-                                    ? "Posting"
-                                    : timestampStatus == "post-limit"
-                                      ? "Post limit reached. Please contact support."
-                                      : timestampStatus == "failed"
-                                        ? "Failed"
-                                        : "Posted"
-                            }
-                            sx={{
-                                alignItems: "center",
-                                color:
-                                    timestampStatus == "failed" ||
-                                    timestampStatus == "post-limit"
-                                        ? dangerColor
-                                        : feedTimestampForeground,
-                                display: "flex",
-                                fontSize: 12,
-                                fontWeight: 500,
-                                justifyContent: "flex-end",
-                                lineHeight: "16px",
-                                minHeight: 16,
-                                whiteSpace:
-                                    timestampStatus == "post-limit"
-                                        ? "normal"
-                                        : "nowrap",
-                            }}
-                        >
-                            {timestampStatus == "post-limit" ? (
-                                <Box component="span">
-                                    Post limit reached. Please contact support.
-                                </Box>
-                            ) : timestampStatus == "failed" ? (
-                                <Box component="span">Failed</Box>
-                            ) : (
-                                <Box
-                                    component="span"
-                                    aria-hidden
-                                    sx={{
-                                        alignItems: "center",
-                                        display: "flex",
-                                        height: 16,
-                                        justifyContent: "center",
-                                        width: 16,
-                                    }}
-                                >
-                                    {timestampStatus == "posting" ? (
-                                        <SpaceLoadingSpinner
-                                            ariaLabel="Posting"
-                                            color="transparent"
-                                            size={14}
-                                            trackColor={feedTimestampForeground}
-                                        />
-                                    ) : (
-                                        <HugeiconsIcon
-                                            icon={Tick02Icon}
-                                            color={green}
-                                            size={16}
-                                            strokeWidth={3}
-                                        />
-                                    )}
-                                </Box>
-                            )}
-                        </Box>
-                    ) : (
-                        <Box
-                            component="time"
-                            dateTime={new Date(timestampMs).toISOString()}
-                            sx={{
-                                alignItems: "center",
-                                color: feedTimestampForeground,
-                                display: "flex",
-                                fontSize: 12,
-                                fontWeight: 500,
-                                height: 16,
-                                justifyContent: "flex-end",
-                                lineHeight: "16px",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {dateLabel}
-                        </Box>
-                    )}
-                </Box>
-            </Box>
-            <Box
-                sx={{
                     aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
                     bgcolor: "transparent",
-                    borderRadius: showFooter
-                        ? 0
-                        : `0 0 ${feedCardRadius}px ${feedCardRadius}px`,
+                    borderRadius: isOwnPost ? "16px" : "16px 16px 0 0",
                     maxWidth: "100%",
                     minWidth: 0,
                     overflow: "hidden",
@@ -1190,6 +1006,223 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         </Box>
                     )}
                 </Box>
+                <Box
+                    aria-hidden
+                    sx={{
+                        background:
+                            "linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0))",
+                        filter: "blur(12px)",
+                        height: 100,
+                        left: -12,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: -12,
+                        top: -12,
+                        zIndex: 1,
+                    }}
+                />
+                <Box
+                    sx={{
+                        alignItems: "center",
+                        boxSizing: "border-box",
+                        color: "#FFFFFF",
+                        display: "grid",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        gap: "8px",
+                        gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr)`,
+                        left: 12,
+                        lineHeight: "20px",
+                        minHeight: 32,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: 12,
+                        top: 12,
+                        zIndex: 2,
+                    }}
+                >
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={authorProfileLabel}
+                        onClick={openAuthor}
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            borderRadius: "50%",
+                            cursor: canOpenAuthor ? "pointer" : "default",
+                            display: "flex",
+                            flexShrink: 0,
+                            height: spaceTouchTargetSize,
+                            justifyContent: "center",
+                            mx: `${(feedAvatarSize - spaceTouchTargetSize) / 2}px`,
+                            overflow: "visible",
+                            p: 0,
+                            pointerEvents: "auto",
+                            position: "relative",
+                            width: spaceTouchTargetSize,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <Box
+                            aria-hidden
+                            sx={{
+                                bgcolor: "rgba(255, 255, 255, 0.2)",
+                                borderRadius: "50%",
+                                height: feedAvatarSize,
+                                width: feedAvatarSize,
+                                position: "absolute",
+                                zIndex: 0,
+                            }}
+                        />
+                        {isAvatarReady ? (
+                            <Box
+                                key={displayAvatarUrl ?? "default-avatar"}
+                                sx={{
+                                    ...avatarFadeSx,
+                                    borderRadius: "50%",
+                                    height: feedAvatarSize,
+                                    overflow: "hidden",
+                                    position: "relative",
+                                    width: feedAvatarSize,
+                                    zIndex: 1,
+                                }}
+                            >
+                                <SpaceAvatarImage
+                                    src={displayAvatarUrl}
+                                    borderRadius="50%"
+                                />
+                            </Box>
+                        ) : null}
+                        <Box
+                            aria-hidden
+                            sx={{
+                                border: "1px solid rgba(255, 255, 255, 0.16)",
+                                borderRadius: "50%",
+                                boxShadow: "0 1px 4px rgba(0, 0, 0, 0.24)",
+                                height: feedAvatarSize,
+                                width: feedAvatarSize,
+                                pointerEvents: "none",
+                                position: "absolute",
+                                zIndex: 2,
+                            }}
+                        />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={authorProfileLabel}
+                            onClick={openAuthor}
+                            sx={{
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: "inherit",
+                                cursor: canOpenAuthor ? "pointer" : "default",
+                                display: "block",
+                                fontFamily: "inherit",
+                                fontSize: 14,
+                                fontWeight: 650,
+                                lineHeight: "18px",
+                                maxWidth: "100%",
+                                minWidth: 0,
+                                overflow: "hidden",
+                                p: 0,
+                                pointerEvents: "auto",
+                                textAlign: "left",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                "&:focus-visible": {
+                                    borderRadius: "4px",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            {firstName}
+                        </Box>
+                        {timestampStatus ? (
+                            <Box
+                                component="span"
+                                role="status"
+                                aria-label={
+                                    timestampStatus == "posting"
+                                        ? "Posting"
+                                        : timestampStatus == "post-limit"
+                                          ? "Post limit reached. Please contact support."
+                                          : timestampStatus == "failed"
+                                            ? "Failed"
+                                            : "Posted"
+                                }
+                                sx={{
+                                    alignItems: "center",
+                                    color:
+                                        timestampStatus == "failed" ||
+                                        timestampStatus == "post-limit"
+                                            ? dangerColor
+                                            : feedTimestampForeground,
+                                    display: "flex",
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    lineHeight: "16px",
+                                    minHeight: 16,
+                                    whiteSpace:
+                                        timestampStatus == "post-limit"
+                                            ? "normal"
+                                            : "nowrap",
+                                }}
+                            >
+                                {timestampStatus == "posted" ? (
+                                    <Box component="span">Posted</Box>
+                                ) : timestampStatus == "post-limit" ? (
+                                    <Box component="span">
+                                        Post limit reached. Please contact
+                                        support.
+                                    </Box>
+                                ) : timestampStatus == "failed" ? (
+                                    <Box component="span">Failed</Box>
+                                ) : (
+                                    <>
+                                        <Box component="span">Posting</Box>
+                                        <Box
+                                            component="span"
+                                            aria-hidden
+                                            sx={{
+                                                display: "inline-block",
+                                                textAlign: "left",
+                                                width: 12,
+                                            }}
+                                        >
+                                            {".".repeat(postingDotCount)}
+                                        </Box>
+                                    </>
+                                )}
+                            </Box>
+                        ) : (
+                            <Box
+                                component="time"
+                                dateTime={new Date(timestampMs).toISOString()}
+                                sx={{
+                                    alignItems: "center",
+                                    color: feedTimestampForeground,
+                                    display: "flex",
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    height: 16,
+                                    lineHeight: "16px",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {dateLabel}
+                            </Box>
+                        )}
+                    </Box>
+                </Box>
                 {!isPostUnavailable && displayCaption && (
                     <FeedPhotoCaption caption={displayCaption} />
                 )}
@@ -1198,12 +1231,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 <Box
                     sx={{
                         alignItems: "center",
+                        bgcolor: spaceSurface,
+                        borderRadius: "0 0 16px 16px",
                         boxSizing: "border-box",
                         display: "grid",
-                        gap: "8px",
+                        gap: "6px",
                         gridTemplateColumns: "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
-                        p: `${feedFooterInset}px`,
+                        p: "8px",
                         width: "100%",
                     }}
                 >
@@ -1217,8 +1252,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             appearance: "none",
                             bgcolor: feedActionBackground,
                             border: 0,
-                            borderRadius: "999px",
-                            color: "#D0D0D6",
+                            borderRadius: "12px",
+                            color: "#C4C4C8",
                             cursor: canOpenPhoto ? "pointer" : "default",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
@@ -1244,7 +1279,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 outlineOffset: 2,
                             },
                             "&:not(:disabled):hover": {
-                                bgcolor: feedActionBackgroundHover,
+                                bgcolor: spaceControlBackgroundHover,
+                                color: textBase,
                             },
                         }}
                     >
@@ -1816,7 +1852,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 112px)",
                         px: feedHorizontalPadding,
-                        pt: showFeedCards ? "20px" : "8px",
+                        pt: showFeedCards ? "16px" : "8px",
                         width: "100%",
                     }}
                 >
