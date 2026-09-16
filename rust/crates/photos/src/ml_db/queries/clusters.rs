@@ -48,11 +48,7 @@ impl MlDb {
         &self,
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
-        self.write_batches_committing_each(
-            UPSERT_FACE_CLUSTER,
-            const { NonZeroUsize::new(500).unwrap() },
-            face_id_to_cluster_id.iter(),
-        )
+        self.write_batch_atomic(UPSERT_FACE_CLUSTER, face_id_to_cluster_id.iter())
     }
 
     pub fn cluster_id_to_face_count(&self) -> Result<HashMap<String, i64>> {
@@ -184,7 +180,7 @@ impl MlDb {
         &self,
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
-        self.write_batch_atomic(UPSERT_FACE_CLUSTER, face_id_to_cluster_id.iter())
+        self.update_face_id_to_cluster_id(face_id_to_cluster_id)
     }
 
     pub fn remove_face_id_to_cluster_id(
@@ -265,9 +261,8 @@ impl MlDb {
         &self,
         summary: &HashMap<String, ClusterSummary>,
     ) -> Result<()> {
-        self.write_batches_committing_each(
+        self.write_batch_atomic(
             UPSERT_CLUSTER_SUMMARY,
-            const { NonZeroUsize::new(400).unwrap() },
             summary
                 .iter()
                 .map(|(cluster_id, summary)| (cluster_id, &summary.avg, summary.count)),

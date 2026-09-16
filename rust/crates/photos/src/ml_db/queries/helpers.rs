@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 
-use crate::db::{self, FromSql, Params, Row, ToSql, TransactionBehavior, params_from_iter};
+use crate::db::{self, FromSql, Params, Row, ToSql, params_from_iter};
 
 use crate::ml_db::{MlDb, Result};
 
@@ -140,31 +140,6 @@ impl MlDb {
                 let mut statement = transaction.prepare_cached(sql)?;
                 for parameters in parameter_sets {
                     statement.execute(parameters)?;
-                }
-                Ok(())
-            })
-            .map_err(Into::into)
-    }
-
-    pub(in crate::ml_db) fn write_batches_committing_each<P: Params>(
-        &self,
-        sql: &str,
-        batch_size: NonZeroUsize,
-        parameter_sets: impl IntoIterator<Item = P>,
-    ) -> Result<()> {
-        self.db
-            .write(|connection| {
-                let mut parameter_sets = parameter_sets.into_iter().peekable();
-                while parameter_sets.peek().is_some() {
-                    let transaction =
-                        connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-                    {
-                        let mut statement = transaction.prepare_cached(sql)?;
-                        for parameters in parameter_sets.by_ref().take(batch_size.get()) {
-                            statement.execute(parameters)?;
-                        }
-                    }
-                    transaction.commit()?;
                 }
                 Ok(())
             })
@@ -317,122 +292,6 @@ mod tests {
             db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
                 .unwrap(),
             0
-        );
-    }
-
-    #[test]
-    fn batched_writes_commit_each_completed_batch() {
-        let (_directory, db) = open();
-        db.write_batches_committing_each(
-            "INSERT INTO missing_table VALUES (?)",
-            const { NonZeroUsize::new(2).unwrap() },
-            Vec::<[i64; 1]>::new(),
-        )
-        .unwrap();
-        assert!(
-            db.write_batches_committing_each(
-                "INSERT INTO items (id) VALUES (?)",
-                const { NonZeroUsize::new(2).unwrap() },
-                [[1], [2], [3], [4], [1]]
-            )
-            .is_err()
-        );
-        assert_eq!(
-            db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
-                .unwrap(),
-            [1, 2, 3, 4]
-        );
-        assert!(
-            db.write_batches_committing_each(
-                "INSERT INTO items (id) VALUES (?)",
-                const { NonZeroUsize::new(2).unwrap() },
-                [[5], [6], [7], [5], [8]]
-            )
-            .is_err()
-        );
-        assert_eq!(
-            db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
-                .unwrap(),
-            [1, 2, 3, 4, 5, 6]
-        );
-        db.write_batches_committing_each(
-            "INSERT INTO items (id) VALUES (?)",
-            const { NonZeroUsize::new(2).unwrap() },
-            [[7], [8], [9]],
-        )
-        .unwrap();
-        assert_eq!(
-            db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
-                .unwrap(),
-            [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        );
-        assert!(
-            db.write_batches_committing_each(
-                "INSERT INTO items (id) VALUES (?)",
-                NonZeroUsize::MIN,
-                [[10], [11], [10]],
-            )
-            .is_err()
-        );
-        assert_eq!(
-            db.read_column::<Vec<i64>, _, _>("SELECT id FROM items ORDER BY id", ())
-                .unwrap(),
-            (1..=11).collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn batched_writes_hold_the_writer_between_commits() {
-        use std::sync::mpsc::{self, RecvTimeoutError};
-        use std::thread;
-        use std::time::Duration;
-
-        let (_directory, db) = open();
-        thread::scope(|scope| {
-            let (between_tx, between_rx) = mpsc::channel();
-            let (release_tx, release_rx) = mpsc::channel();
-            let db = &db;
-            scope.spawn(move || {
-                db.write_batches_committing_each(
-                    "INSERT INTO items VALUES (?)",
-                    NonZeroUsize::MIN,
-                    (1..=2).map(|id| {
-                        if id == 2 {
-                            between_tx.send(()).unwrap();
-                            release_rx.recv().unwrap();
-                        }
-                        [id]
-                    }),
-                )
-                .unwrap();
-            });
-            between_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-            let committed_count = db
-                .read_value::<i64>("SELECT COUNT(*) FROM items", ())
-                .unwrap();
-            let (started_tx, started_rx) = mpsc::channel();
-            let (finished_tx, finished_rx) = mpsc::channel();
-            scope.spawn(move || {
-                started_tx.send(()).unwrap();
-                finished_tx
-                    .send(db.execute("INSERT INTO items VALUES (3)", ()))
-                    .unwrap();
-            });
-            started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-            let was_blocked = matches!(
-                finished_rx.recv_timeout(Duration::from_millis(100)),
-                Err(RecvTimeoutError::Timeout)
-            );
-            release_tx.send(()).unwrap();
-            let result = finished_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-            assert_eq!(committed_count, 1);
-            assert!(was_blocked);
-            assert_eq!(result.unwrap(), 1);
-        });
-        assert_eq!(
-            db.read_value::<i64>("SELECT COUNT(*) FROM items", ())
-                .unwrap(),
-            3
         );
     }
 

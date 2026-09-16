@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroUsize;
 
 use super::helpers::{
     MAX_SQL_BIND_PARAMS_PER_QUERY, bind_placeholders, group_into, optional_parameter, pair,
@@ -75,9 +74,8 @@ const UPSERT_FACE: &str = r#"
 
 impl MlDb {
     pub fn bulk_insert_faces(&self, faces: &[FaceRow]) -> Result<()> {
-        self.write_batches_committing_each(
+        self.write_batch_atomic(
             UPSERT_FACE,
-            const { NonZeroUsize::new(500).unwrap() },
             faces.iter().map(|face| {
                 (
                     face.file_id,

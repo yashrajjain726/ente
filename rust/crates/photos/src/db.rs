@@ -3,8 +3,8 @@ use std::path::Path;
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use rusqlite::{OpenFlags, OptionalExtension};
-pub use rusqlite::{Params, Row, ToSql, TransactionBehavior, params_from_iter, types::FromSql};
+use rusqlite::{OpenFlags, OptionalExtension, TransactionBehavior};
+pub use rusqlite::{Params, Row, ToSql, params_from_iter, types::FromSql};
 
 const BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -54,11 +54,10 @@ impl Connection {
         Ok(self.0.pragma_update(None, name, value)?)
     }
 
-    pub fn transaction_with_behavior(
-        &mut self,
-        behavior: TransactionBehavior,
-    ) -> Result<Transaction<'_>> {
-        Ok(Transaction(self.0.transaction_with_behavior(behavior)?))
+    pub fn immediate_transaction(&mut self) -> Result<Transaction<'_>> {
+        Ok(Transaction(self.0.transaction_with_behavior(
+            TransactionBehavior::Immediate,
+        )?))
     }
 }
 
@@ -187,8 +186,7 @@ impl Database {
         write: impl FnOnce(&Transaction<'_>) -> Result<T>,
     ) -> Result<T> {
         self.write(|connection| {
-            let transaction =
-                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let transaction = connection.immediate_transaction()?;
             let result = write(&transaction)?;
             transaction.commit()?;
             Ok(result)
@@ -281,9 +279,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use super::{
-        Connection, Database, Error, OpenOptions, Result, TransactionBehavior, lock, open_reader,
-    };
+    use super::{Connection, Database, Error, OpenOptions, Result, lock, open_reader};
 
     fn open() -> (tempfile::TempDir, Database) {
         let directory = tempfile::tempdir().unwrap();
@@ -475,21 +471,21 @@ mod tests {
             .unwrap();
         let counts = db
             .read(|connection| {
-                let transaction =
-                    connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-                let before: i64 =
-                    transaction
-                        .query_row("SELECT COUNT(*) FROM items", (), |row| Ok(row.get(0)?))?;
+                connection.execute_batch("BEGIN")?;
+                let before: i64 = connection.query_row(
+                    "SELECT COUNT(*) FROM items",
+                    (),
+                    |row| Ok(row.get(0)?),
+                )?;
                 db.write(|writer| writer.execute("INSERT INTO items VALUES (?)", [2]))?;
-                let after: i64 =
-                    transaction
-                        .query_row("SELECT COUNT(*) FROM items", (), |row| Ok(row.get(0)?))?;
+                let after: i64 = connection
+                    .query_row("SELECT COUNT(*) FROM items", (), |row| Ok(row.get(0)?))?;
                 assert!(
-                    transaction
+                    connection
                         .execute("INSERT INTO items VALUES (?)", [3])
                         .is_err()
                 );
-                transaction.commit()?;
+                connection.execute_batch("COMMIT")?;
                 Ok((before, after))
             })
             .unwrap();

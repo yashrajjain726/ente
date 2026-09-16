@@ -1,4 +1,4 @@
-use crate::db::{Connection, TransactionBehavior};
+use crate::db::Connection;
 
 use super::{Error, Result};
 
@@ -10,7 +10,7 @@ pub(super) fn migrate(connection: &mut Connection, scripts: &[&str]) -> Result<(
         return Ok(());
     }
 
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let transaction = connection.immediate_transaction()?;
     let current: i64 = transaction.pragma_query_value("user_version", |row| Ok(row.get(0)?))?;
     check_not_downgrade(current, target)?;
     if current == target {

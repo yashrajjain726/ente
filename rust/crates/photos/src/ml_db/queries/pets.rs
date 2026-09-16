@@ -88,9 +88,8 @@ const UPSERT_PET_BODY: &str = r#"
 
 impl MlDb {
     pub fn bulk_insert_pet_faces(&self, pet_faces: &[PetFaceRow]) -> Result<()> {
-        self.write_batches_committing_each(
+        self.write_batch_atomic(
             UPSERT_PET_FACE,
-            const { NonZeroUsize::new(500).unwrap() },
             pet_faces.iter().map(|pet_face| {
                 (
                     pet_face.file_id,
@@ -108,9 +107,8 @@ impl MlDb {
     }
 
     pub fn bulk_insert_pet_bodies(&self, pet_bodies: &[PetBodyRow]) -> Result<()> {
-        self.write_batches_committing_each(
+        self.write_batch_atomic(
             UPSERT_PET_BODY,
-            const { NonZeroUsize::new(500).unwrap() },
             pet_bodies.iter().map(|pet_body| {
                 (
                     pet_body.file_id,
@@ -134,9 +132,8 @@ impl MlDb {
         if pet_face_id_to_vector_id.is_empty() {
             return Ok(());
         }
-        self.write_batches_committing_each(
+        self.write_batch_atomic(
             "UPDATE pet_faces SET face_vector_id = ? WHERE pet_face_id = ?",
-            const { NonZeroUsize::new(500).unwrap() },
             pet_face_id_to_vector_id
                 .iter()
                 .map(|(pet_face_id, vector_id)| (vector_id, pet_face_id)),
@@ -150,9 +147,8 @@ impl MlDb {
         if pet_body_id_to_vector_id.is_empty() {
             return Ok(());
         }
-        self.write_batches_committing_each(
+        self.write_batch_atomic(
             "UPDATE pet_bodies SET body_vector_id = ? WHERE pet_body_id = ?",
-            const { NonZeroUsize::new(500).unwrap() },
             pet_body_id_to_vector_id
                 .iter()
                 .map(|(pet_body_id, vector_id)| (vector_id, pet_body_id)),
