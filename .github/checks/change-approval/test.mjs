@@ -656,6 +656,35 @@ test("new lint and formatter configs need approval, including untracked files", 
     assert.match(scan(t, {}, files, { commit: false }), /^7 guardrail files\n/);
 });
 
+test("suppression lists need approval when added, edited, or deleted", (t) => {
+    const files = {
+        "web/apps/photos/eslint-suppressions.json": "{}\n",
+        "web/packages/new/nested/eslint-suppressions.json": "{}\n",
+        "rust/checks/lint-exceptions/suppressions.json": "{}\n",
+        "web/checks/lint-exceptions/suppressions.json": "{}\n",
+    };
+    for (const [before, after] of [
+        [{}, files],
+        [
+            files,
+            Object.fromEntries(
+                Object.keys(files).map((path) => [path, '{"changed": {}}\n']),
+            ),
+        ],
+        [
+            files,
+            Object.fromEntries(Object.keys(files).map((path) => [path, null])),
+        ],
+    ]) {
+        const { output, summary } = scan(t, before, after, { ci: true });
+        assert.equal(output, 'categories=["guardrail files"]\n');
+        assert.match(summary, /4 guardrail files/);
+        for (const file of Object.keys(files))
+            assert.ok(summary.includes(`\`${file}\``));
+    }
+    assert.match(scan(t, {}, files, { commit: false }), /^4 guardrail files\n/);
+});
+
 test("Android lint configurations need approval when added, edited, or deleted", (t) => {
     const files = {
         "android/build.gradle.kts": "",
