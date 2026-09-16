@@ -44,8 +44,8 @@ export const formattedStorageByteSize = (
 
     quantity = Number(quantity.toFixed(1));
 
-    // Storage displays above 10 GB omit fractional precision.
-    if (bytes >= 10 * 1024 * 1024 * 1024) {
+    // Keep fractional TB values so usage does not look like a full quota.
+    if (bytes >= 10 * 1024 * 1024 * 1024 && unit != "tb") {
         if (options?.round) {
             quantity = Math.ceil(quantity);
         } else {
