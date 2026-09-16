@@ -588,8 +588,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                           onLongPress: () {},
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: screenSize.width * 0.01,
-                              vertical: screenSize.height * 0.01,
+                              horizontal: screenSize.width * 0.08,
+                              vertical: screenSize.height * 0.02,
                             ),
                             child: Align(
                               child: AspectRatio(
