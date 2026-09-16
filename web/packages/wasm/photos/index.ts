@@ -1,4 +1,5 @@
 import type {
+    EncryptedBox,
     OpenSessionInput,
     Session,
     WrappedRootContactKey,
@@ -15,6 +16,12 @@ export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
     session.encryptWithRecoveryKey(dataB64);
 
 export const generateKey = async () => (await wasm()).cryptoGenerateKey();
+
+export const encryptBox = async (dataB64: string, keyB64: string) =>
+    (await wasm()).cryptoEncryptBox(dataB64, keyB64);
+
+export const decryptBox = async (box: EncryptedBox, keyB64: string) =>
+    (await wasm()).cryptoDecryptBox(box.encryptedData, box.nonce, keyB64);
 
 export const contactsGetDiff = async (
     session: Session,

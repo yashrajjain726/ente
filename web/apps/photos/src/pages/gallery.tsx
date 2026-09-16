@@ -82,7 +82,6 @@ import { subscribeMainWindowFocus } from "ente-base/electron";
 import { isNamedError } from "ente-base/error";
 import { hasPendingAlbumToJoin } from "ente-base/join-album";
 import log from "ente-base/log";
-import { masterKeyFromSession } from "ente-base/session";
 import {
     clearSessionStorage,
     haveMasterKeyInSession,
@@ -105,6 +104,7 @@ import {
     useSettingsSnapshot,
     useUserDetailsSnapshot,
 } from "ente-new/photos/components/utils/use-snapshot";
+import { masterKeyFromSession } from "ente-new/photos/services/account-keys";
 import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
 import {
     addToCollection,

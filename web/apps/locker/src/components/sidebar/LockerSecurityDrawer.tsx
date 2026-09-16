@@ -1,4 +1,4 @@
-import { generatePasskeyRecovery } from "@/services/authenticated-session";
+import { generatePasskeyRecovery } from "@/services/recovery-key";
 import {
     ComputerPhoneSyncIcon,
     Key01Icon,

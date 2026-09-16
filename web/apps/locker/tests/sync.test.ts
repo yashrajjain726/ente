@@ -180,8 +180,12 @@ test("incremental sync paginates changed collections and trash, skipping up-to-d
             response({
                 diff: [
                     {
-                        ...remoteFile,
                         id: 13,
+                        collectionID: 1,
+                        encryptedKey: "",
+                        keyDecryptionNonce: "",
+                        file: { decryptionHeader: "" },
+                        metadata: { decryptionHeader: "" },
                         updationTime: 35,
                         isDeleted: true,
                     },

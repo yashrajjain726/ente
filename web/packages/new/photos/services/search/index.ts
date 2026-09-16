@@ -1,11 +1,11 @@
 import { ensureLocalUser } from "ente-accounts/services/user";
 import log from "ente-base/log";
-import { ensureMasterKeyFromSession } from "ente-base/session";
 import { ComlinkWorker } from "ente-base/worker/comlink-worker";
 import { uniqueFilesByID } from "ente-gallery/utils/file";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
+import { ensureMasterKeyFromSession } from "ente-new/photos/services/account-keys";
 import i18n, { t } from "i18next";
 import { clipMatches, isMLEnabled, isMLSupported } from "../ml";
 import type { NamedPerson } from "../ml/people";

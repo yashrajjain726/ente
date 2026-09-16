@@ -85,6 +85,9 @@ class _AlbumsTabState extends State<AlbumsTab>
   final ValueNotifier<List<Collection>?> _receivedCollections = ValueNotifier(
     null,
   );
+  final ValueNotifier<List<Collection>?> _archivedCollections = ValueNotifier(
+    null,
+  );
   final ValueNotifier<bool> _shouldShowDeleteEmptyAlbums = ValueNotifier(false);
   late final ValueNotifier<AlbumViewType> _viewType = ValueNotifier(
     localSettings.albumViewType(),
@@ -174,6 +177,7 @@ class _AlbumsTabState extends State<AlbumsTab>
       _enteCollections.value = null;
       _sharedCollections.value = null;
       _receivedCollections.value = null;
+      _archivedCollections.value = null;
     });
     _tabChangedEvent = Bus.instance.on<TabChangedEvent>().listen(
       _handleTabChanged,
@@ -239,10 +243,15 @@ class _AlbumsTabState extends State<AlbumsTab>
       _enteCollections.value = <Collection>[];
       _sharedCollections.value = <Collection>[];
       _receivedCollections.value = <Collection>[];
+      _archivedCollections.value = <Collection>[];
       _shouldShowDeleteEmptyAlbums.value = false;
       return;
     }
-    await Future.wait([_loadEnteCollections(), _loadSharedCollections()]);
+    await Future.wait([
+      _loadEnteCollections(),
+      _loadSharedCollections(),
+      _loadArchivedCollections(),
+    ]);
   }
 
   _AlbumsFilter get _effectiveFilter =>
@@ -291,6 +300,15 @@ class _AlbumsTabState extends State<AlbumsTab>
     if (!mounted) return;
     _sharedCollections.value = shared.outgoing;
     _receivedCollections.value = shared.incoming;
+  }
+
+  Future<void> _loadArchivedCollections() async {
+    final collections = await CollectionsService.instance
+        .getArchivedCollection();
+    final sortedCollections = await CollectionsService.instance
+        .orderCollectionsForAlbums(collections);
+    if (!mounted) return;
+    _archivedCollections.value = sortedCollections;
   }
 
   void _selectFilter(_AlbumsFilter filter, BuildContext filterContext) {
@@ -513,6 +531,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     final enteCollections = _enteCollections.value;
     final sharedCollections = _sharedCollections.value;
     final receivedCollections = _receivedCollections.value;
+    final archivedCollections = _archivedCollections.value;
     final filteredEnteCollections = enteCollections == null
         ? null
         : _filterCollectionsByQuery(enteCollections);
@@ -522,14 +541,19 @@ class _AlbumsTabState extends State<AlbumsTab>
     final filteredReceivedCollections = receivedCollections == null
         ? null
         : _filterCollectionsByQuery(receivedCollections);
+    final filteredArchivedCollections = archivedCollections == null
+        ? null
+        : _filterCollectionsByQuery(archivedCollections);
     final hasRemoteCollections =
         (filteredEnteCollections?.isNotEmpty ?? false) ||
         (filteredSharedCollections?.isNotEmpty ?? false) ||
-        (filteredReceivedCollections?.isNotEmpty ?? false);
+        (filteredReceivedCollections?.isNotEmpty ?? false) ||
+        (filteredArchivedCollections?.isNotEmpty ?? false);
     final hasFinishedLoadingRemoteCollections =
         enteCollections != null &&
         sharedCollections != null &&
-        receivedCollections != null;
+        receivedCollections != null &&
+        archivedCollections != null;
     final shouldShowDeviceSearchState =
         hasFinishedLoadingRemoteCollections && !hasRemoteCollections;
 
@@ -563,6 +587,11 @@ class _AlbumsTabState extends State<AlbumsTab>
           title: strings.receivedAlbumsLabel,
           tag: "album_search_received",
           collections: filteredReceivedCollections,
+        ),
+        ..._buildCollectionSearchSectionSlivers(
+          title: strings.archive,
+          tag: "album_search_archive",
+          collections: filteredArchivedCollections,
         ),
         const SliverToBoxAdapter(
           child: SizedBox(height: _kContentBottomPadding),
@@ -773,6 +802,7 @@ class _AlbumsTabState extends State<AlbumsTab>
     _enteCollections.dispose();
     _sharedCollections.dispose();
     _receivedCollections.dispose();
+    _archivedCollections.dispose();
     _shouldShowDeleteEmptyAlbums.dispose();
     _viewType.dispose();
     _sortKey.dispose();
@@ -1008,6 +1038,7 @@ class _AlbumsTabState extends State<AlbumsTab>
                     _enteCollections,
                     _sharedCollections,
                     _receivedCollections,
+                    _archivedCollections,
                     _shouldShowDeleteEmptyAlbums,
                     _viewType,
                     _sortKey,

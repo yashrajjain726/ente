@@ -37,9 +37,7 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
         logStartupBanner(savedLocalUser()?.id);
     }, []);
 
-    const logout = useCallback(() => {
-        void lockerLogout().then(() => window.location.replace("/login"));
-    }, []);
+    const logout = useCallback(() => void lockerLogout(), []);
 
     useEffect(() => {
         void isSavedUserTokenMismatch()

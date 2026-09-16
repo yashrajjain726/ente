@@ -243,16 +243,20 @@ impl VecDb {
         Ok(self.inner.bulk_add_with_attrs(&keys, &vectors, &attrs)?)
     }
 
-    pub fn get_attrs(&self, key: String) -> Option<Vec<VecDbAttr>> {
-        self.inner.get_attrs(&key).map(to_api_attrs)
+    pub fn get_attrs(&self, key: String) -> Result<Option<Vec<VecDbAttr>>, RustVecDbError> {
+        Ok(self.inner.get_attrs(&key)?.map(to_api_attrs))
     }
 
-    pub fn bulk_get_attrs(&self, keys: Vec<String>) -> Vec<Option<Vec<VecDbAttr>>> {
-        self.inner
-            .bulk_get_attrs(&keys)
+    pub fn bulk_get_attrs(
+        &self,
+        keys: Vec<String>,
+    ) -> Result<Vec<Option<Vec<VecDbAttr>>>, RustVecDbError> {
+        Ok(self
+            .inner
+            .bulk_get_attrs(&keys)?
             .into_iter()
             .map(|entry| entry.map(to_api_attrs))
-            .collect()
+            .collect())
     }
 
     pub fn approx_search_vectors_within_similarity(
@@ -333,8 +337,14 @@ impl VecDb {
             .collect())
     }
 
-    pub fn bulk_get_vectors(&self, keys: Vec<String>) -> Vec<Option<Vec<f32>>> {
-        keys.iter().map(|key| self.inner.get(key)).collect()
+    pub fn bulk_get_vectors(
+        &self,
+        keys: Vec<String>,
+    ) -> Result<Vec<Option<Vec<f32>>>, RustVecDbError> {
+        Ok(keys
+            .iter()
+            .map(|key| self.inner.get(key))
+            .collect::<Result<_, _>>()?)
     }
 
     pub fn bulk_remove_vectors(&self, keys: Vec<String>) -> Result<u32, RustVecDbError> {
@@ -484,7 +494,7 @@ mod tests {
         db.bulk_add_vectors(vec![key("b"), key("c")], vec![basis(1), basis(2)])
             .unwrap();
         assert_eq!(
-            db.bulk_get_vectors(vec![key("c"), key("missing")]),
+            db.bulk_get_vectors(vec![key("c"), key("missing")]).unwrap(),
             vec![Some(basis(2)), None]
         );
         let matches = db.search(basis(0), Some(2), None, true, None).unwrap();
@@ -748,7 +758,7 @@ mod tests {
             },
         ];
         db.add_vector_with_attrs(key("a"), basis(0), attrs).unwrap();
-        let fetched = db.get_attrs(key("a")).unwrap();
+        let fetched = db.get_attrs(key("a")).unwrap().unwrap();
         assert_eq!(fetched.len(), 4);
         assert!(matches!(
             &fetched[0],
@@ -779,7 +789,9 @@ mod tests {
             ],
         )
         .unwrap();
-        let bulk = db.bulk_get_attrs(vec![key("b"), key("c"), key("missing")]);
+        let bulk = db
+            .bulk_get_attrs(vec![key("b"), key("c"), key("missing")])
+            .unwrap();
         assert_eq!(bulk.len(), 3);
         assert!(matches!(
             bulk[0].as_deref(),
@@ -788,7 +800,7 @@ mod tests {
         assert!(bulk[1].is_none());
         assert!(bulk[2].is_none());
         db.add_vector(key("a"), basis(0)).unwrap();
-        assert!(db.get_attrs(key("a")).is_none());
+        assert!(db.get_attrs(key("a")).unwrap().is_none());
         assert!(matches!(
             db.add_vector_with_attrs(
                 key("a"),
@@ -885,7 +897,7 @@ mod tests {
         let max_abs = vector
             .iter()
             .fold(0.0f32, |acc, value| acc.max(value.abs()));
-        let fetched = db.bulk_get_vectors(vec![key("a"), key("missing")]);
+        let fetched = db.bulk_get_vectors(vec![key("a"), key("missing")]).unwrap();
         assert!(fetched[1].is_none());
         for (restored, original) in fetched[0].as_ref().unwrap().iter().zip(&vector) {
             assert!((restored - original).abs() <= max_abs / 254.0 + 1.0e-6);

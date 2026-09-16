@@ -618,30 +618,38 @@ impl VecDb {
         Ok(count)
     }
 
-    pub fn contains(&self, key: &str) -> bool {
-        self.shared.state_read().arena.slot_of_key(key).is_some()
+    pub fn contains(&self, key: &str) -> Result<bool, VecDbError> {
+        Ok(self.open_state()?.arena.slot_of_key(key).is_some())
     }
 
-    pub fn get(&self, key: &str) -> Option<Vec<f32>> {
-        let st = self.shared.state_read();
-        let slot = st.arena.slot_of_key(key)?;
-        Some(st.arena.vector_values(slot))
+    pub fn get(&self, key: &str) -> Result<Option<Vec<f32>>, VecDbError> {
+        let st = self.open_state()?;
+        Ok(st
+            .arena
+            .slot_of_key(key)
+            .map(|slot| st.arena.vector_values(slot)))
     }
 
-    pub fn get_attrs(&self, key: &str) -> Option<Vec<Attribute>> {
-        let st = self.shared.state_read();
-        let slot = st.arena.slot_of_key(key)?;
-        st.attrs.get(slot).map(<[Attribute]>::to_vec)
+    pub fn get_attrs(&self, key: &str) -> Result<Option<Vec<Attribute>>, VecDbError> {
+        let st = self.open_state()?;
+        Ok(st
+            .arena
+            .slot_of_key(key)
+            .and_then(|slot| st.attrs.get(slot).map(<[Attribute]>::to_vec)))
     }
 
-    pub fn bulk_get_attrs(&self, keys: &[String]) -> Vec<Option<Vec<Attribute>>> {
-        let st = self.shared.state_read();
-        keys.iter()
+    pub fn bulk_get_attrs(
+        &self,
+        keys: &[String],
+    ) -> Result<Vec<Option<Vec<Attribute>>>, VecDbError> {
+        let st = self.open_state()?;
+        Ok(keys
+            .iter()
             .map(|key| {
                 let slot = st.arena.slot_of_key(key)?;
                 st.attrs.get(slot).map(<[Attribute]>::to_vec)
             })
-            .collect()
+            .collect())
     }
 
     pub fn search(&self, query: &[f32], params: &SearchParams) -> Result<Vec<Match>, VecDbError> {
@@ -882,12 +890,19 @@ impl VecDb {
         })
     }
 
-    pub fn len(&self) -> usize {
-        self.shared.state_read().arena.live_count()
+    pub fn len(&self) -> Result<usize, VecDbError> {
+        Ok(self.open_state()?.arena.live_count())
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.shared.state_read().arena.is_empty()
+    pub fn is_empty(&self) -> Result<bool, VecDbError> {
+        Ok(self.open_state()?.arena.is_empty())
+    }
+
+    fn open_state(&self) -> Result<RwLockReadGuard<'_, SearchState>, VecDbError> {
+        self.shared.ensure_open()?;
+        let st = self.shared.state_read();
+        self.shared.ensure_open()?;
+        Ok(st)
     }
 
     fn writable_half(&self) -> Result<MutexGuard<'_, WriterHalf>, VecDbError> {
@@ -1750,7 +1765,7 @@ mod tests {
             for open in [VecDb::open, VecDb::open_read_only] {
                 let reopened = open(&path, 32, None).unwrap();
                 assert_eq!(reopened.stats().unwrap().storage, StorageKind::I8);
-                assert!(reopened.contains("kept"));
+                assert!(reopened.contains("kept").unwrap());
             }
         };
         verify();
@@ -1817,7 +1832,7 @@ mod tests {
                     assert_eq!(fs::read(snapshot_path(&path)).unwrap(), snapshot_before);
                     let reopened = open(&path, 32, Some(storage)).unwrap();
                     assert_eq!(reopened.stats().unwrap().storage, storage);
-                    assert!(reopened.contains("kept"));
+                    assert!(reopened.contains("kept").unwrap());
                     if let Some(live) = live {
                         assert!(Arc::ptr_eq(&live.shared, &reopened.shared));
                     }
@@ -1843,7 +1858,7 @@ mod tests {
                 let stats = reader.stats().unwrap();
                 assert_eq!(stats.dims, dims);
                 assert_eq!(stats.storage, storage);
-                assert!(reader.is_empty());
+                assert!(reader.is_empty().unwrap());
                 assert!(matches!(
                     reader.add("no", &seeded_unit_vector(1, dims)),
                     Err(VecDbError::ReadOnly)
@@ -1859,7 +1874,7 @@ mod tests {
                 writer.add("kept", &seeded_unit_vector(1, dims)).unwrap();
                 drop(writer);
                 let reopened = VecDb::open_read_only(&path, dims, Some(storage)).unwrap();
-                assert!(reopened.contains("kept"));
+                assert!(reopened.contains("kept").unwrap());
                 assert_eq!(reopened.stats().unwrap().storage, storage);
             }
         }
@@ -1950,7 +1965,7 @@ mod tests {
                         .all(|found| found.distance == 1.0)
                 );
             }
-            assert_eq!(db.get("aligned").unwrap(), vector(2.0, 0.0));
+            assert_eq!(db.get("aligned").unwrap().unwrap(), vector(2.0, 0.0));
         }
     }
 
@@ -2137,6 +2152,27 @@ mod tests {
         assert!(matches[0].distance.abs() < 1.0e-3);
     }
 
+    fn assert_key_reads_open(db: &VecDb, key: &str, live: usize) {
+        assert_eq!(db.len().unwrap(), live);
+        assert!(!db.is_empty().unwrap());
+        assert!(db.contains(key).unwrap());
+        assert!(db.get(key).unwrap().is_some());
+        assert!(db.get_attrs(key).unwrap().is_none());
+        assert_eq!(db.bulk_get_attrs(&[key.to_string()]).unwrap(), vec![None]);
+    }
+
+    fn assert_key_reads_closed(db: &VecDb) {
+        assert!(matches!(db.contains("key-0"), Err(VecDbError::Closed)));
+        assert!(matches!(db.get("key-0"), Err(VecDbError::Closed)));
+        assert!(matches!(db.get_attrs("key-0"), Err(VecDbError::Closed)));
+        assert!(matches!(
+            db.bulk_get_attrs(&["key-0".to_string()]),
+            Err(VecDbError::Closed)
+        ));
+        assert!(matches!(db.len(), Err(VecDbError::Closed)));
+        assert!(matches!(db.is_empty(), Err(VecDbError::Closed)));
+    }
+
     fn search_shapes(allowed: Vec<String>) -> Vec<SearchParams> {
         vec![
             SearchParams {
@@ -2190,14 +2226,17 @@ mod tests {
         let db = open_writer(&path);
         bulk_add(&db, &bulk_entries(0, 150, 100)).unwrap();
         db.add("probe", &probe).unwrap();
-        assert_eq!(db.len(), 151);
-        assert!(!db.is_empty());
-        assert!(db.contains("probe"));
-        assert!(db.contains("key-42"));
-        assert!(!db.contains("key-999"));
-        assert_eq!(db.get("probe").unwrap(), probe);
-        assert_eq!(db.get("key-7").unwrap(), seeded_unit_vector(107, DIMS));
-        assert!(db.get("missing").is_none());
+        assert_eq!(db.len().unwrap(), 151);
+        assert!(!db.is_empty().unwrap());
+        assert!(db.contains("probe").unwrap());
+        assert!(db.contains("key-42").unwrap());
+        assert!(!db.contains("key-999").unwrap());
+        assert_eq!(db.get("probe").unwrap().unwrap(), probe);
+        assert_eq!(
+            db.get("key-7").unwrap().unwrap(),
+            seeded_unit_vector(107, DIMS)
+        );
+        assert!(db.get("missing").unwrap().is_none());
         let stats = db.stats().unwrap();
         assert_eq!(stats.live_count, 151);
         assert_eq!(stats.dead_count, 0);
@@ -2239,8 +2278,8 @@ mod tests {
                 index += 1;
             }
         }
-        assert_eq!(reopened.len(), 151);
-        assert_eq!(read_only.len(), 151);
+        assert_eq!(reopened.len().unwrap(), 151);
+        assert_eq!(read_only.len().unwrap(), 151);
     }
 
     #[test]
@@ -2306,10 +2345,10 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 6, 40)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 10);
+        assert_eq!(reopened.len().unwrap(), 10);
         for index in 0..4u64 {
             assert_eq!(
-                reopened.get(&format!("solo-{index}")).unwrap(),
+                reopened.get(&format!("solo-{index}")).unwrap().unwrap(),
                 seeded_unit_vector(index, DIMS)
             );
         }
@@ -2326,16 +2365,16 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 6, 60)).unwrap();
         fs::copy(&path, &copy).unwrap();
         let copied = open_writer(&copy);
-        assert_eq!(copied.len(), 6);
+        assert_eq!(copied.len().unwrap(), 6);
         for index in 0..6 {
             assert_eq!(
-                copied.get(&format!("key-{index}")).unwrap(),
+                copied.get(&format!("key-{index}")).unwrap().unwrap(),
                 seeded_unit_vector(60 + index as u64, DIMS)
             );
         }
         db.add("late", &seeded_unit_vector(999, DIMS)).unwrap();
-        assert!(db.contains("late"));
-        assert!(!copied.contains("late"));
+        assert!(db.contains("late").unwrap());
+        assert!(!copied.contains("late").unwrap());
     }
 
     #[test]
@@ -2350,7 +2389,7 @@ mod tests {
         bytes.extend_from_slice(&[0xFF; 41]);
         fs::write(&path, &bytes).unwrap();
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 4);
+        assert_eq!(reopened.len().unwrap(), 4);
         assert_own_nearest(&reopened, "key-1", &seeded_unit_vector(21, DIMS));
         drop(reopened);
         assert_eq!(fs::metadata(&path).unwrap().len(), clean_len);
@@ -2369,8 +2408,8 @@ mod tests {
         bytes.extend_from_slice(&[1, 6, 0, b'a', b'b']);
         fs::write(&path, &bytes).unwrap();
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 4);
-        assert!(reopened.contains("key-3"));
+        assert_eq!(reopened.len().unwrap(), 4);
+        assert!(reopened.contains("key-3").unwrap());
         drop(reopened);
         assert_eq!(fs::metadata(&path).unwrap().len(), clean_len);
     }
@@ -2408,8 +2447,8 @@ mod tests {
         assert_corrupt_open_preserves(&path);
         fs::write(&path, &clean).unwrap();
         let recovered = open_writer(&path);
-        assert_eq!(recovered.len(), 2);
-        assert!(recovered.contains("second"));
+        assert_eq!(recovered.len().unwrap(), 2);
+        assert!(recovered.contains("second").unwrap());
     }
 
     #[test]
@@ -2532,7 +2571,7 @@ mod tests {
         assert_corrupt_open_preserves(&path);
         fs::write(&path, &clean).unwrap();
         let recovered = open_writer(&path);
-        assert_eq!(recovered.len(), 5);
+        assert_eq!(recovered.len().unwrap(), 5);
         assert_own_nearest(&recovered, "key-1", &seeded_unit_vector(301, DIMS));
     }
 
@@ -2565,7 +2604,7 @@ mod tests {
         assert_corrupt_open_preserves(&path);
         assert!(!snapshot_exists(&path));
         fs::write(&path, &clean).unwrap();
-        assert_eq!(open_writer(&path).len(), 4);
+        assert_eq!(open_writer(&path).len().unwrap(), 4);
     }
 
     #[test]
@@ -2613,13 +2652,13 @@ mod tests {
         bytes[last_start + 10] ^= 0x01;
         fs::write(&path, &bytes).unwrap();
         let read_only = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
-        assert_eq!(read_only.len(), 3);
-        assert!(!read_only.contains("key-3"));
+        assert_eq!(read_only.len().unwrap(), 3);
+        assert!(!read_only.contains("key-3").unwrap());
         drop(read_only);
         assert_eq!(fs::read(&path).unwrap(), bytes);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 3);
-        assert!(!reopened.contains("key-3"));
+        assert_eq!(reopened.len().unwrap(), 3);
+        assert!(!reopened.contains("key-3").unwrap());
         assert_own_nearest(&reopened, "key-2", &seeded_unit_vector(382, DIMS));
         drop(reopened);
         assert_eq!(fs::metadata(&path).unwrap().len(), last_start as u64);
@@ -2651,7 +2690,7 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), bytes);
         assert_eq!(fs::read(snapshot_path(&path)).unwrap(), snapshot_bytes);
         fs::write(&path, &clean).unwrap();
-        assert_eq!(open_writer(&path).len(), 3);
+        assert_eq!(open_writer(&path).len().unwrap(), 3);
     }
 
     #[test]
@@ -2664,7 +2703,7 @@ mod tests {
         drop(db);
         fs::remove_file(snapshot_path(&path)).unwrap();
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 8);
+        assert_eq!(reopened.len().unwrap(), 8);
         assert_own_nearest(&reopened, "key-5", &seeded_unit_vector(55, DIMS));
         assert!(snapshot_exists(&path));
     }
@@ -2680,14 +2719,14 @@ mod tests {
         let stale_snapshot = fs::read(snapshot_path(&path)).unwrap();
         fs::remove_file(&path).unwrap();
         let db = open_writer(&path);
-        assert!(db.is_empty());
+        assert!(db.is_empty().unwrap());
         db.add("fresh", &seeded_unit_vector(1, DIMS)).unwrap();
         drop(db);
         fs::write(snapshot_path(&path), &stale_snapshot).unwrap();
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1);
-        assert!(reopened.contains("fresh"));
-        assert!(!reopened.contains("key-0"));
+        assert_eq!(reopened.len().unwrap(), 1);
+        assert!(reopened.contains("fresh").unwrap());
+        assert!(!reopened.contains("key-0").unwrap());
         assert_own_nearest(&reopened, "fresh", &seeded_unit_vector(1, DIMS));
     }
 
@@ -2703,7 +2742,7 @@ mod tests {
         bytes[20] ^= 0x5A;
         fs::write(snapshot_path(&path), &bytes).unwrap();
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 5);
+        assert_eq!(reopened.len().unwrap(), 5);
         assert_own_nearest(&reopened, "key-4", &seeded_unit_vector(94, DIMS));
     }
 
@@ -2718,13 +2757,13 @@ mod tests {
         fs::write(temp_sibling(&path), [0xAB; 100]).unwrap();
         let db = open_writer(&path);
         assert!(!temp_sibling(&path).exists());
-        assert_eq!(db.len(), 5);
+        assert_eq!(db.len().unwrap(), 5);
         drop(db);
         fs::copy(&path, temp_sibling(&path)).unwrap();
         let db = open_writer(&path);
         assert!(!temp_sibling(&path).exists());
-        assert_eq!(db.len(), 5);
-        assert!(db.contains("key-2"));
+        assert_eq!(db.len().unwrap(), 5);
+        assert!(db.contains("key-2").unwrap());
     }
 
     #[test]
@@ -2735,9 +2774,9 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 3, 120)).unwrap();
         let joined = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(Arc::ptr_eq(&db.shared, &joined.shared));
-        assert_eq!(joined.len(), 3);
+        assert_eq!(joined.len().unwrap(), 3);
         joined.add("joined", &seeded_unit_vector(9, DIMS)).unwrap();
-        assert!(db.contains("joined"));
+        assert!(db.contains("joined").unwrap());
         assert!(matches!(
             WriterLock::acquire(&path),
             Err(VecDbError::Locked(_))
@@ -2745,8 +2784,8 @@ mod tests {
         drop(db);
         drop(joined);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 4);
-        assert!(reopened.contains("joined"));
+        assert_eq!(reopened.len().unwrap(), 4);
+        assert!(reopened.contains("joined").unwrap());
     }
 
     #[test]
@@ -2759,15 +2798,15 @@ mod tests {
         let via_first = seeded_unit_vector(11, DIMS);
         let via_second = seeded_unit_vector(22, DIMS);
         first.add("via-first", &via_first).unwrap();
-        assert!(second.contains("via-first"));
-        assert_eq!(second.get("via-first").unwrap(), via_first);
+        assert!(second.contains("via-first").unwrap());
+        assert_eq!(second.get("via-first").unwrap().unwrap(), via_first);
         assert_eq!(
             second.search(&via_first, &limit_params(1)).unwrap()[0].key,
             "via-first"
         );
         second.add("via-second", &via_second).unwrap();
-        assert!(first.contains("via-second"));
-        assert_eq!(first.len(), 2);
+        assert!(first.contains("via-second").unwrap());
+        assert_eq!(first.len().unwrap(), 2);
         assert!(matches!(
             VecDb::open(&path, DIMS + 8, Some(StorageKind::F32)),
             Err(VecDbError::DimensionMismatch {
@@ -2795,14 +2834,14 @@ mod tests {
         let reader = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         first.add("first", &basis_vector(0)).unwrap();
         second.add("second", &basis_vector(1)).unwrap();
-        assert!(reader.contains("first"));
-        assert!(reader.contains("second"));
+        assert!(reader.contains("first").unwrap());
+        assert!(reader.contains("second").unwrap());
         drop(reader);
         drop(second);
         drop(first);
         let reopened = open_writer(&path);
-        assert!(reopened.contains("first"));
-        assert!(reopened.contains("second"));
+        assert!(reopened.contains("first").unwrap());
+        assert!(reopened.contains("second").unwrap());
     }
 
     #[cfg(unix)]
@@ -2827,10 +2866,11 @@ mod tests {
             VecDb::open_read_only(&alias, I8_DIMS, Some(StorageKind::I8))
                 .unwrap()
                 .is_empty()
+                .unwrap()
         );
         drop(holder);
         let writer = open_writer(&alias);
-        assert!(writer.is_empty());
+        assert!(writer.is_empty().unwrap());
         writer.add("first", &basis_vector(0)).unwrap();
     }
 
@@ -2849,11 +2889,11 @@ mod tests {
                 let result = VecDb::open(&path, DIMS, Some(StorageKind::F32));
                 assert!(matches!(result, Err(VecDbError::Locked(_))));
                 let reader = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
-                assert!(reader.contains("first"));
+                assert!(reader.contains("first").unwrap());
             }
             "write" => {
                 let writer = open_writer(&path);
-                assert!(writer.contains("first"));
+                assert!(writer.contains("first").unwrap());
                 writer.add("next", &basis_vector(1)).unwrap();
             }
             action => panic!("unexpected hard-link test action: {action}"),
@@ -2890,13 +2930,13 @@ mod tests {
         first.add("first", &basis_vector(0)).unwrap();
         fs::hard_link(&path, &alias).unwrap();
         run_hard_link_writer_process(&alias, "blocked");
-        assert_eq!(first.len(), 1);
+        assert_eq!(first.len().unwrap(), 1);
         drop(first);
         run_hard_link_writer_process(&alias, "write");
         let reader = VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32)).unwrap();
-        assert_eq!(reader.len(), 2);
-        assert!(reader.contains("first"));
-        assert!(reader.contains("next"));
+        assert_eq!(reader.len().unwrap(), 2);
+        assert!(reader.contains("first").unwrap());
+        assert!(reader.contains("next").unwrap());
     }
 
     #[cfg(unix)]
@@ -2927,17 +2967,17 @@ mod tests {
                     Err(VecDbError::Locked(_))
                 ));
                 let reader = VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32)).unwrap();
-                assert!(reader.contains("first"));
+                assert!(reader.contains("first").unwrap());
                 drop(reader);
                 run_hard_link_writer_process(&alias, "blocked");
                 first.add("after", &basis_vector(2)).unwrap();
                 drop(first);
                 run_hard_link_writer_process(&alias, "write");
                 let reopened = open_writer(&alias);
-                assert_eq!(reopened.len(), 3);
-                assert!(reopened.contains("first"));
-                assert!(reopened.contains("after"));
-                assert!(reopened.contains("next"));
+                assert_eq!(reopened.len().unwrap(), 3);
+                assert!(reopened.contains("first").unwrap());
+                assert!(reopened.contains("after").unwrap());
+                assert!(reopened.contains("next").unwrap());
             }
         }
     }
@@ -2952,9 +2992,9 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 10, 800)).unwrap();
         fs::hard_link(&path, &alias).unwrap();
         let observer = VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32)).unwrap();
-        assert_eq!(observer.len(), 10);
+        assert_eq!(observer.len().unwrap(), 10);
         compact(&db.shared, &mut db.shared.writer_half()).unwrap();
-        assert_eq!(db.len(), 10);
+        assert_eq!(db.len().unwrap(), 10);
         fs::remove_file(&alias).unwrap();
         fs::hard_link(&path, &alias).unwrap();
         assert!(matches!(
@@ -2969,8 +3009,8 @@ mod tests {
             VecDb::open(&alias, DIMS, Some(StorageKind::F32)),
             Err(VecDbError::Locked(_))
         ));
-        assert_eq!(db.len(), 1);
-        assert_eq!(observer.len(), 10);
+        assert_eq!(db.len().unwrap(), 1);
+        assert_eq!(observer.len().unwrap(), 10);
     }
 
     #[test]
@@ -2985,8 +3025,8 @@ mod tests {
         assert!(Arc::ptr_eq(&first.shared, &second.shared));
         let vector = seeded_unit_vector(5, DIMS);
         first.add("shared", &vector).unwrap();
-        assert!(second.contains("shared"));
-        assert_eq!(second.get("shared").unwrap(), vector);
+        assert!(second.contains("shared").unwrap());
+        assert_eq!(second.get("shared").unwrap().unwrap(), vector);
     }
 
     #[test]
@@ -2997,7 +3037,7 @@ mod tests {
         let second = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
         first.add("kept", &seeded_unit_vector(3, DIMS)).unwrap();
         drop(first);
-        assert!(second.contains("kept"));
+        assert!(second.contains("kept").unwrap());
         second
             .add("still-open", &seeded_unit_vector(4, DIMS))
             .unwrap();
@@ -3005,9 +3045,9 @@ mod tests {
         let key = registry_key_for(&path).unwrap();
         assert!(!registry().contains_key(&key));
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 2);
-        assert!(reopened.contains("kept"));
-        assert!(reopened.contains("still-open"));
+        assert_eq!(reopened.len().unwrap(), 2);
+        assert!(reopened.contains("kept").unwrap());
+        assert!(reopened.contains("still-open").unwrap());
         let again = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(Arc::ptr_eq(&reopened.shared, &again.shared));
     }
@@ -3029,7 +3069,7 @@ mod tests {
                     barrier.wait();
                     for _ in 0..CYCLES {
                         let db = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
-                        assert!(db.contains("seed"));
+                        assert!(db.contains("seed").unwrap());
                         drop(db);
                     }
                 })
@@ -3039,7 +3079,7 @@ mod tests {
             churner.join().unwrap();
         }
         let reopened = open_writer(&path);
-        assert!(reopened.contains("seed"));
+        assert!(reopened.contains("seed").unwrap());
     }
 
     #[test]
@@ -3133,7 +3173,7 @@ mod tests {
         reopened
             .add("fresh", &seeded_unit_vector(78, DIMS))
             .unwrap();
-        assert_eq!(reopened.len(), 1);
+        assert_eq!(reopened.len().unwrap(), 1);
         assert!(lock_slot(&slot).holds_live());
     }
 
@@ -3151,7 +3191,7 @@ mod tests {
         assert!(lock_slot(&slot).live.is_none());
         let fresh = open_writer(&path);
         fresh.add("anew", &seeded_unit_vector(79, DIMS)).unwrap();
-        assert_eq!(fresh.len(), 1);
+        assert_eq!(fresh.len().unwrap(), 1);
     }
 
     #[test]
@@ -3181,7 +3221,7 @@ mod tests {
             reopened
                 .add("fresh", &seeded_unit_vector(81, DIMS))
                 .unwrap();
-            assert_eq!(reopened.len(), 1);
+            assert_eq!(reopened.len().unwrap(), 1);
         }
     }
 
@@ -3221,7 +3261,7 @@ mod tests {
             .collect();
         let other = open_writer(&other_path);
         other.add("other", &seeded_unit_vector(1, DIMS)).unwrap();
-        assert_eq!(other.len(), 1);
+        assert_eq!(other.len().unwrap(), 1);
         drop(build_in_progress);
         let handles: Vec<VecDb> = stalled_openers
             .into_iter()
@@ -3232,8 +3272,8 @@ mod tests {
         handles[0]
             .add("stalled", &seeded_unit_vector(2, DIMS))
             .unwrap();
-        assert!(handles[1].contains("stalled"));
-        assert!(!other.contains("stalled"));
+        assert!(handles[1].contains("stalled").unwrap());
+        assert!(!other.contains("stalled").unwrap());
     }
 
     #[test]
@@ -3267,9 +3307,9 @@ mod tests {
         db.add("post", &seeded_unit_vector(7, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 57);
-        assert!(reopened.contains("post"));
-        assert!(!reopened.contains("key-0"));
+        assert_eq!(reopened.len().unwrap(), 57);
+        assert!(reopened.contains("post").unwrap());
+        assert!(!reopened.contains("key-0").unwrap());
     }
 
     #[test]
@@ -3285,8 +3325,8 @@ mod tests {
         ));
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1);
-        assert!(reopened.contains("fresh"));
+        assert_eq!(reopened.len().unwrap(), 1);
+        assert!(reopened.contains("fresh").unwrap());
     }
 
     #[test]
@@ -3297,12 +3337,12 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 3, 130)).unwrap();
         let read_only = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(Arc::ptr_eq(&db.shared, &read_only.shared));
-        assert_eq!(read_only.len(), 3);
-        assert!(read_only.contains("key-1"));
+        assert_eq!(read_only.len().unwrap(), 3);
+        assert!(read_only.contains("key-1").unwrap());
         let later = seeded_unit_vector(9, DIMS);
         db.add("later", &later).unwrap();
-        assert!(read_only.contains("later"));
-        assert_eq!(read_only.get("later").unwrap(), later);
+        assert!(read_only.contains("later").unwrap());
+        assert_eq!(read_only.get("later").unwrap().unwrap(), later);
         assert_own_nearest(&read_only, "later", &later);
         assert!(matches!(
             read_only.add("x", &later),
@@ -3320,7 +3360,7 @@ mod tests {
         assert!(matches!(read_only.reset(), Err(VecDbError::ReadOnly)));
         let another = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(matches!(another.delete(), Err(VecDbError::ReadOnly)));
-        assert!(db.contains("later"));
+        assert!(db.contains("later").unwrap());
         assert!(path.exists());
     }
 
@@ -3330,10 +3370,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("absent");
         let db = VecDb::open_read_only(&path, DIMS, Some(StorageKind::I8)).unwrap();
-        assert_eq!(db.len(), 0);
-        assert!(db.is_empty());
-        assert!(!db.contains("anything"));
-        assert!(db.get("anything").is_none());
+        assert_eq!(db.len().unwrap(), 0);
+        assert!(db.is_empty().unwrap());
+        assert!(!db.contains("anything").unwrap());
+        assert!(db.get("anything").unwrap().is_none());
         assert!(
             db.search(&seeded_unit_vector(1, DIMS), &limit_params(3))
                 .unwrap()
@@ -3387,7 +3427,7 @@ mod tests {
         ));
         assert!(matches!(read_only.flush(), Err(VecDbError::ReadOnly)));
         assert!(matches!(read_only.reset(), Err(VecDbError::ReadOnly)));
-        assert!(read_only.contains("kept"));
+        assert!(read_only.contains("kept").unwrap());
         assert!(matches!(read_only.delete(), Err(VecDbError::ReadOnly)));
         assert!(path.exists());
     }
@@ -3400,7 +3440,7 @@ mod tests {
         bulk_add(&db, &bulk_entries(0, 100, 140)).unwrap();
         drop(db);
         let snapshot_view = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
-        assert_eq!(snapshot_view.len(), 100);
+        assert_eq!(snapshot_view.len().unwrap(), 100);
         let db = open_writer(&path);
         assert!(!Arc::ptr_eq(&snapshot_view.shared, &db.shared));
         let generation_before = generation_of(&path);
@@ -3408,22 +3448,22 @@ mod tests {
             assert!(db.remove(&format!("key-{index}")).unwrap());
         }
         assert_ne!(generation_of(&path), generation_before);
-        assert_eq!(db.len(), 68);
+        assert_eq!(db.len().unwrap(), 68);
         assert_eq!(db.stats().unwrap().dead_count, 0);
         db.add("fresh", &seeded_unit_vector(7, DIMS)).unwrap();
         assert_own_nearest(&db, "key-50", &seeded_unit_vector(190, DIMS));
-        assert_eq!(snapshot_view.len(), 100);
-        assert!(snapshot_view.contains("key-5"));
-        assert!(!snapshot_view.contains("fresh"));
+        assert_eq!(snapshot_view.len().unwrap(), 100);
+        assert!(snapshot_view.contains("key-5").unwrap());
+        assert!(!snapshot_view.contains("fresh").unwrap());
         assert_own_nearest(&snapshot_view, "key-5", &seeded_unit_vector(145, DIMS));
         let live_view = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(Arc::ptr_eq(&live_view.shared, &db.shared));
-        assert!(live_view.contains("fresh"));
+        assert!(live_view.contains("fresh").unwrap());
         drop(db);
         let fresh_view = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
-        assert_eq!(fresh_view.len(), 69);
-        assert!(!fresh_view.contains("key-5"));
-        assert!(fresh_view.contains("fresh"));
+        assert_eq!(fresh_view.len().unwrap(), 69);
+        assert!(!fresh_view.contains("key-5").unwrap());
+        assert!(fresh_view.contains("fresh").unwrap());
     }
 
     #[test]
@@ -3439,8 +3479,8 @@ mod tests {
         let query = basis_vector(0);
         assert_own_nearest(&db, "near", &query);
         db.add("near", &negated(&basis_vector(0))).unwrap();
-        assert_eq!(db.len(), 11);
-        assert_eq!(db.get("near").unwrap(), negated(&basis_vector(0)));
+        assert_eq!(db.len().unwrap(), 11);
+        assert_eq!(db.get("near").unwrap().unwrap(), negated(&basis_vector(0)));
         let checks = |db: &VecDb| {
             assert_ne!(db.search(&query, &limit_params(1)).unwrap()[0].key, "near");
             let exact = SearchParams {
@@ -3460,7 +3500,10 @@ mod tests {
         checks(&db);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.get("near").unwrap(), negated(&basis_vector(0)));
+        assert_eq!(
+            reopened.get("near").unwrap().unwrap(),
+            negated(&basis_vector(0))
+        );
         checks(&reopened);
     }
 
@@ -3476,9 +3519,9 @@ mod tests {
         assert_own_nearest(&db, "key-4", &query);
         assert!(db.remove("key-4").unwrap());
         assert!(!db.remove("key-4").unwrap());
-        assert_eq!(db.len(), 9);
-        assert!(!db.contains("key-4"));
-        assert!(db.get("key-4").is_none());
+        assert_eq!(db.len().unwrap(), 9);
+        assert!(!db.contains("key-4").unwrap());
+        assert!(db.get("key-4").unwrap().is_none());
         assert_eq!(db.stats().unwrap().dead_count, 2);
         assert_ne!(db.search(&query, &limit_params(1)).unwrap()[0].key, "key-4");
         let exact_all = SearchParams {
@@ -3501,11 +3544,11 @@ mod tests {
         };
         assert!(db.search(&query, &filtered).unwrap().is_empty());
         db.add("key-4", &basis_vector(4)).unwrap();
-        assert_eq!(db.len(), 10);
+        assert_eq!(db.len().unwrap(), 10);
         assert_own_nearest(&db, "key-4", &query);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 10);
+        assert_eq!(reopened.len().unwrap(), 10);
         assert_own_nearest(&reopened, "key-4", &query);
     }
 
@@ -3525,9 +3568,9 @@ mod tests {
             "nope".to_string(),
         ];
         assert_eq!(db.bulk_remove(&removals).unwrap(), 2);
-        assert_eq!(db.len(), 3);
-        assert!(!db.contains("key-1"));
-        assert!(!db.contains("key-3"));
+        assert_eq!(db.len().unwrap(), 3);
+        assert!(!db.contains("key-1").unwrap());
+        assert!(!db.contains("key-3").unwrap());
         assert_eq!(
             db.stats().unwrap().log_bytes,
             log_bytes + 2 * TOMBSTONE_RECORD_LEN
@@ -3709,9 +3752,9 @@ mod tests {
             }
         };
         let verify = |db: &VecDb| {
-            assert_eq!(db.len(), 90);
+            assert_eq!(db.len().unwrap(), 90);
             for index in 90..120 {
-                assert!(!db.contains(&format!("key-{index}")));
+                assert!(!db.contains(&format!("key-{index}")).unwrap());
             }
             for index in 0..90u64 {
                 assert_own_nearest(db, &format!("key-{index}"), &live_vector(index));
@@ -3755,9 +3798,9 @@ mod tests {
         }
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1042);
-        assert!(!reopened.contains("key-0"));
-        assert!(reopened.contains("key-58"));
+        assert_eq!(reopened.len().unwrap(), 1042);
+        assert!(!reopened.contains("key-0").unwrap());
+        assert!(reopened.contains("key-58").unwrap());
     }
 
     #[test]
@@ -3840,7 +3883,7 @@ mod tests {
             assert!(st.graph.is_none());
             assert_eq!(st.arena.slot_count(), 180);
         }
-        assert_eq!(db.len(), 180);
+        assert_eq!(db.len().unwrap(), 180);
         assert_eq!(db.search(&query, &approx).unwrap(), expected);
         assert_eq!(db.search(&query, &exact).unwrap(), expected);
         assert_eq!(
@@ -3856,12 +3899,12 @@ mod tests {
         for index in 0..200i64 {
             let key = format!("key-{index}");
             if index % 9 == 0 && index <= 171 {
-                assert!(!db.contains(&key));
-                assert_eq!(db.get_attrs(&key), None);
+                assert!(!db.contains(&key).unwrap());
+                assert_eq!(db.get_attrs(&key).unwrap(), None);
             } else if index % 3 == 0 {
-                assert_eq!(db.get_attrs(&key).unwrap(), sample_attrs(index));
+                assert_eq!(db.get_attrs(&key).unwrap().unwrap(), sample_attrs(index));
             } else {
-                assert_eq!(db.get_attrs(&key), None);
+                assert_eq!(db.get_attrs(&key).unwrap(), None);
             }
         }
     }
@@ -3880,10 +3923,10 @@ mod tests {
         drop(db);
         fs::write(snapshot_path(&path), &stale_snapshot).unwrap();
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 56);
+        assert_eq!(reopened.len().unwrap(), 56);
         for index in 64..120u64 {
             assert_eq!(
-                reopened.get(&format!("key-{index}")).unwrap(),
+                reopened.get(&format!("key-{index}")).unwrap().unwrap(),
                 seeded_unit_vector(210 + index, DIMS)
             );
         }
@@ -3902,12 +3945,12 @@ mod tests {
         let partial = [0x45u8, 0x56, 0x44, 0x42, 0x01, 0x00, 0x00];
         fs::write(&path, partial).unwrap();
         let db = open_writer(&path);
-        assert!(db.is_empty());
+        assert!(db.is_empty().unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, 32);
         db.add("fresh", &seeded_unit_vector(11, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1);
+        assert_eq!(reopened.len().unwrap(), 1);
         assert_own_nearest(&reopened, "fresh", &seeded_unit_vector(11, DIMS));
     }
 
@@ -3918,7 +3961,7 @@ mod tests {
         let partial = [0x45u8, 0x56, 0x44, 0x42, 0x01, 0x00, 0x00];
         fs::write(&path, partial).unwrap();
         let db = VecDb::open_read_only(&path, I8_DIMS, Some(StorageKind::I8)).unwrap();
-        assert!(db.is_empty());
+        assert!(db.is_empty().unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, 0);
         assert_eq!(fs::read(&path).unwrap(), partial);
         assert!(!snapshot_exists(&path));
@@ -3999,11 +4042,11 @@ mod tests {
             WriterLock::acquire(&path),
             Err(VecDbError::Locked(_))
         ));
-        assert_eq!(db.len(), 4);
+        assert_eq!(db.len().unwrap(), 4);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 4);
-        assert!(reopened.contains("after"));
+        assert_eq!(reopened.len().unwrap(), 4);
+        assert!(reopened.contains("after").unwrap());
     }
 
     #[test]
@@ -4029,13 +4072,13 @@ mod tests {
             let mut half = db.shared.writer_half();
             restore_writer_mode(&db.shared, &mut half, lock, None, 0, checkpoint).unwrap();
         }
-        assert!(db.contains("foreign"));
+        assert!(db.contains("foreign").unwrap());
         assert_own_nearest(&db, "foreign", &basis_vector(1));
         db.add("after", &basis_vector(2)).unwrap();
         db.flush().unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 3);
+        assert_eq!(reopened.len().unwrap(), 3);
         assert_own_nearest(&reopened, "foreign", &basis_vector(1));
     }
 
@@ -4065,14 +4108,14 @@ mod tests {
             let mut half = db.shared.writer_half();
             restore_writer_mode(&db.shared, &mut half, lock, None, 0, checkpoint).unwrap();
         }
-        assert!(!db.contains("first"));
+        assert!(!db.contains("first").unwrap());
         assert_own_nearest(&db, "other", &basis_vector(1));
         db.add("after", &basis_vector(2)).unwrap();
         db.flush().unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 2);
-        assert!(!reopened.contains("first"));
+        assert_eq!(reopened.len().unwrap(), 2);
+        assert!(!reopened.contains("first").unwrap());
         assert_own_nearest(&reopened, "other", &basis_vector(1));
     }
 
@@ -4105,8 +4148,8 @@ mod tests {
         foreign.add("after", &basis_vector(2)).unwrap();
         drop(foreign);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 3);
-        assert!(!reopened.contains("lost"));
+        assert_eq!(reopened.len().unwrap(), 3);
+        assert!(!reopened.contains("lost").unwrap());
         assert_own_nearest(&reopened, "after", &basis_vector(2));
     }
 
@@ -4177,9 +4220,9 @@ mod tests {
         db.add("more", &seeded_unit_vector(2, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 2);
-        assert!(reopened.contains("seed"));
-        assert!(reopened.contains("more"));
+        assert_eq!(reopened.len().unwrap(), 2);
+        assert!(reopened.contains("seed").unwrap());
+        assert!(reopened.contains("more").unwrap());
     }
 
     #[test]
@@ -4208,10 +4251,10 @@ mod tests {
         assert_ne!(generation_of(&path), generation_before);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 37);
-        assert!(reopened.contains("probe"));
-        assert!(reopened.contains("key-64"));
-        assert!(!reopened.contains("key-0"));
+        assert_eq!(reopened.len().unwrap(), 37);
+        assert!(reopened.contains("probe").unwrap());
+        assert!(reopened.contains("key-64").unwrap());
+        assert!(!reopened.contains("key-0").unwrap());
     }
 
     #[test]
@@ -4231,9 +4274,9 @@ mod tests {
         assert_eq!(db.stats().unwrap().records_since_snapshot, 36);
         drop(db);
         let blocked = open_writer(&path);
-        assert_eq!(blocked.len(), 36);
-        assert!(blocked.contains("key-64"));
-        assert!(!blocked.contains("key-0"));
+        assert_eq!(blocked.len().unwrap(), 36);
+        assert!(blocked.contains("key-64").unwrap());
+        assert!(!blocked.contains("key-0").unwrap());
         assert_eq!(blocked.stats().unwrap().records_since_snapshot, 36);
         fs::remove_dir(snapshot_path(&path)).unwrap();
         blocked.flush().unwrap();
@@ -4241,7 +4284,7 @@ mod tests {
         assert!(snapshot_exists(&path));
         drop(blocked);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 36);
+        assert_eq!(reopened.len().unwrap(), 36);
         assert_own_nearest(&reopened, "key-99", &seeded_unit_vector(970 + 99, DIMS));
     }
 
@@ -4254,7 +4297,7 @@ mod tests {
         drop(db);
         fs::create_dir(snapshot_path(&path)).unwrap();
         let db = open_writer(&path);
-        assert_eq!(db.len(), 5);
+        assert_eq!(db.len().unwrap(), 5);
         assert_own_nearest(&db, "key-2", &seeded_unit_vector(302, DIMS));
         assert!(matches!(db.flush(), Err(VecDbError::Io { .. })));
         drop(db);
@@ -4272,7 +4315,7 @@ mod tests {
         db.flush().unwrap();
         let generation_before = generation_of(&path);
         db.reset().unwrap();
-        assert!(db.is_empty());
+        assert!(db.is_empty().unwrap());
         assert!(!snapshot_exists(&path));
         assert_ne!(generation_of(&path), generation_before);
         assert_eq!(fs::metadata(&path).unwrap().len(), 32);
@@ -4292,9 +4335,9 @@ mod tests {
         assert_own_nearest(&db, "again", &seeded_unit_vector(2, DIMS));
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1);
-        assert!(reopened.contains("again"));
-        assert!(!reopened.contains("key-0"));
+        assert_eq!(reopened.len().unwrap(), 1);
+        assert!(reopened.contains("again").unwrap());
+        assert!(!reopened.contains("key-0").unwrap());
     }
 
     #[test]
@@ -4304,14 +4347,14 @@ mod tests {
         let first = open_writer(&path);
         let second = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
         bulk_add(&first, &bulk_entries(0, 10, 220)).unwrap();
-        assert_eq!(second.len(), 10);
+        assert_eq!(second.len().unwrap(), 10);
         second.reset().unwrap();
-        assert!(first.is_empty());
-        assert!(!first.contains("key-0"));
+        assert!(first.is_empty().unwrap());
+        assert!(!first.contains("key-0").unwrap());
         let fresh = seeded_unit_vector(6, DIMS);
         first.add("fresh", &fresh).unwrap();
-        assert!(second.contains("fresh"));
-        assert_eq!(second.len(), 1);
+        assert!(second.contains("fresh").unwrap());
+        assert_eq!(second.len().unwrap(), 1);
         assert_own_nearest(&second, "fresh", &fresh);
     }
 
@@ -4324,9 +4367,9 @@ mod tests {
         fs::create_dir(snapshot_path(&path)).unwrap();
         assert!(matches!(db.reset(), Err(VecDbError::Io { .. })));
         assert!(!path.exists());
-        assert!(db.is_empty());
-        assert_eq!(db.len(), 0);
-        assert!(!db.contains("key-0"));
+        assert!(db.is_empty().unwrap());
+        assert_eq!(db.len().unwrap(), 0);
+        assert!(!db.contains("key-0").unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, 0);
         let vector = seeded_unit_vector(1, DIMS);
         assert!(matches!(db.add("x", &vector), Err(VecDbError::ReadOnly)));
@@ -4334,7 +4377,7 @@ mod tests {
         drop(db);
         fs::remove_dir(snapshot_path(&path)).unwrap();
         let reopened = open_writer(&path);
-        assert!(reopened.is_empty());
+        assert!(reopened.is_empty().unwrap());
     }
 
     #[cfg(unix)]
@@ -4352,15 +4395,15 @@ mod tests {
         let Err(VecDbError::Io { .. }) = outcome else {
             return;
         };
-        assert_eq!(db.len(), 5);
-        assert!(db.contains("key-0"));
+        assert_eq!(db.len().unwrap(), 5);
+        assert!(db.contains("key-0").unwrap());
         assert_eq!(db.stats().unwrap().records_since_snapshot, 5);
         db.add("after", &seeded_unit_vector(6, DIMS)).unwrap();
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 6);
-        assert!(reopened.contains("key-4"));
-        assert!(reopened.contains("after"));
+        assert_eq!(reopened.len().unwrap(), 6);
+        assert!(reopened.contains("key-4").unwrap());
+        assert!(reopened.contains("after").unwrap());
     }
 
     #[test]
@@ -4382,17 +4425,17 @@ mod tests {
             let mut half = db.shared.writer_half();
             recover_after_failed_reset(&db.shared, &mut half, lock, old_checkpoint, 5);
         }
-        assert!(db.is_empty());
-        assert!(!db.contains("key-0"));
+        assert!(db.is_empty().unwrap());
+        assert!(!db.contains("key-0").unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, 32);
         assert_eq!(db.stats().unwrap().records_since_snapshot, 0);
         db.add("fresh", &seeded_unit_vector(7, DIMS)).unwrap();
-        assert_eq!(db.len(), 1);
+        assert_eq!(db.len().unwrap(), 1);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1);
-        assert!(reopened.contains("fresh"));
-        assert!(!reopened.contains("key-0"));
+        assert_eq!(reopened.len().unwrap(), 1);
+        assert!(reopened.contains("fresh").unwrap());
+        assert!(!reopened.contains("key-0").unwrap());
     }
 
     #[test]
@@ -4427,7 +4470,7 @@ mod tests {
             fs::metadata(lock_path(&path)).unwrap().ino()
         };
         let reopened = open_writer(&path);
-        assert!(reopened.is_empty());
+        assert!(reopened.is_empty().unwrap());
         assert!(matches!(
             WriterLock::acquire(&path),
             Err(VecDbError::Locked(_))
@@ -4440,8 +4483,8 @@ mod tests {
         reopened.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
         drop(reopened);
         let third = open_writer(&path);
-        assert_eq!(third.len(), 1);
-        assert!(third.contains("fresh"));
+        assert_eq!(third.len().unwrap(), 1);
+        assert!(third.contains("fresh").unwrap());
         assert!(lock_path(&path).exists());
     }
 
@@ -4480,6 +4523,9 @@ mod tests {
         first.flush().unwrap();
         let survivor = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
         let observer = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
+        assert_key_reads_open(&first, "key-0", 5);
+        assert_key_reads_open(&survivor, "key-0", 5);
+        assert_key_reads_open(&observer, "key-0", 5);
         first.delete().unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
@@ -4510,14 +4556,13 @@ mod tests {
             observer.search(&query, &limit_params(3)),
             Err(VecDbError::Closed)
         ));
-        assert_eq!(survivor.len(), 0);
-        assert!(!survivor.contains("key-0"));
-        assert!(survivor.get("key-0").is_none());
+        assert_key_reads_closed(&survivor);
+        assert_key_reads_closed(&observer);
         assert!(matches!(survivor.delete(), Err(VecDbError::Closed)));
         let fresh = open_writer(&path);
-        assert!(fresh.is_empty());
+        assert!(fresh.is_empty().unwrap());
         fresh.add("anew", &query).unwrap();
-        assert_eq!(fresh.len(), 1);
+        assert_key_reads_open(&fresh, "anew", 1);
     }
 
     #[test]
@@ -4547,7 +4592,7 @@ mod tests {
                 loop {
                     let found = handle.search(&query, &limit_params(8)).unwrap();
                     for entry in &found {
-                        let vector = handle.get(&entry.key).unwrap();
+                        let vector = handle.get(&entry.key).unwrap().unwrap();
                         assert_eq!(&vector, expected.get(&entry.key).unwrap());
                     }
                     iterations += 1;
@@ -4581,13 +4626,13 @@ mod tests {
         for reader in readers {
             let (handle, iterations) = reader.join().unwrap();
             assert!(iterations > 0);
-            assert_eq!(handle.len(), 50 + BULK);
-            assert!(handle.contains("key-0"));
-            assert!(handle.contains(&format!("key-{}", BULK - 1)));
-            assert!(handle.contains("key-10000"));
+            assert_eq!(handle.len().unwrap(), 50 + BULK);
+            assert!(handle.contains("key-0").unwrap());
+            assert!(handle.contains(&format!("key-{}", BULK - 1)).unwrap());
+            assert!(handle.contains("key-10000").unwrap());
         }
         assert!(flusher.join().unwrap() > 0);
-        assert_eq!(writer.len(), 50 + BULK);
+        assert_eq!(writer.len().unwrap(), 50 + BULK);
         assert_eq!(writer.stats().unwrap().live_count, 50 + BULK);
     }
 
@@ -4634,8 +4679,8 @@ mod tests {
         assert_eq!(stats.dead_count, 0);
         assert_eq!(stats.live_count, 270);
         assert_eq!(db.search(&query, &exact).unwrap(), before);
-        assert!(!db.contains("key-0"));
-        assert!(db.contains("key-30"));
+        assert!(!db.contains("key-0").unwrap());
+        assert!(db.contains("key-30").unwrap());
     }
 
     #[test]
@@ -4652,7 +4697,7 @@ mod tests {
                 db.add("bad", &bad),
                 Err(VecDbError::InvalidVector(_))
             ));
-            assert!(!db.contains("bad"));
+            assert!(!db.contains("bad").unwrap());
         }
         let mut infected = bulk_entries(10, 3, 200);
         infected[1].1[0] = f32::INFINITY;
@@ -4660,15 +4705,15 @@ mod tests {
             bulk_add(&db, &infected),
             Err(VecDbError::InvalidVector(_))
         ));
-        assert_eq!(db.len(), 1);
-        assert!(!db.contains("key-10"));
-        assert!(!db.contains("key-12"));
+        assert_eq!(db.len().unwrap(), 1);
+        assert!(!db.contains("key-10").unwrap());
+        assert!(!db.contains("key-12").unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.len(), 1);
-        assert!(reopened.contains("key-0"));
-        assert!(!reopened.contains("bad"));
+        assert_eq!(reopened.len().unwrap(), 1);
+        assert!(reopened.contains("key-0").unwrap());
+        assert!(!reopened.contains("bad").unwrap());
     }
 
     #[test]
@@ -4683,8 +4728,8 @@ mod tests {
             .map(|(key, vector)| (key, scaled(&vector, 0.5)))
             .collect();
         bulk_add(&db, &batch).unwrap();
-        assert!(db.contains("half"));
-        assert_eq!(db.len(), 4);
+        assert!(db.contains("half").unwrap());
+        assert_eq!(db.len().unwrap(), 4);
     }
 
     #[test]
@@ -4974,8 +5019,8 @@ mod tests {
                 vectors: 1
             })
         ));
-        assert_eq!(db.len(), 1);
-        assert!(!db.contains("x"));
+        assert_eq!(db.len().unwrap(), 1);
+        assert!(!db.contains("x").unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
         let read_only = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(matches!(
@@ -4994,6 +5039,9 @@ mod tests {
         fs::write(temp_sibling(&path), [7u8; 10]).unwrap();
         let survivor = VecDb::open(&path, DIMS, Some(StorageKind::F32)).unwrap();
         let observer = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
+        assert_key_reads_open(&first, "key-0", 5);
+        assert_key_reads_open(&survivor, "key-0", 5);
+        assert_key_reads_open(&observer, "key-0", 5);
         VecDb::purge(&path).unwrap();
         assert!(!path.exists());
         assert!(!snapshot_exists(&path));
@@ -5030,11 +5078,14 @@ mod tests {
             Err(VecDbError::Closed)
         ));
         assert!(matches!(first.stats(), Err(VecDbError::Closed)));
+        assert_key_reads_closed(&first);
+        assert_key_reads_closed(&survivor);
+        assert_key_reads_closed(&observer);
         assert!(matches!(survivor.delete(), Err(VecDbError::Closed)));
         let fresh = open_writer(&path);
-        assert!(fresh.is_empty());
+        assert!(fresh.is_empty().unwrap());
         fresh.add("anew", &query).unwrap();
-        assert_eq!(fresh.len(), 1);
+        assert_key_reads_open(&fresh, "anew", 1);
     }
 
     #[test]
@@ -5060,9 +5111,9 @@ mod tests {
         VecDb::purge(&never_created).unwrap();
         assert!(lock_path(&never_created).exists());
         let fresh = open_writer(&path);
-        assert!(fresh.is_empty());
+        assert!(fresh.is_empty().unwrap());
         fresh.add("fresh", &seeded_unit_vector(3, DIMS)).unwrap();
-        assert_eq!(fresh.len(), 1);
+        assert_eq!(fresh.len().unwrap(), 1);
     }
 
     #[test]
@@ -5104,14 +5155,14 @@ mod tests {
         via_alias
             .add("through-alias", &seeded_unit_vector(6, DIMS))
             .unwrap();
-        assert!(via_path.contains("through-alias"));
-        assert!(via_alias.contains("through-real"));
-        assert_eq!(via_path.len(), 2);
+        assert!(via_path.contains("through-alias").unwrap());
+        assert!(via_alias.contains("through-real").unwrap());
+        assert_eq!(via_path.len().unwrap(), 2);
         assert!(lock_path(&path).exists());
         assert!(!lock_path(&alias).exists());
         let read_alias = VecDb::open_read_only(&alias, DIMS, Some(StorageKind::F32)).unwrap();
         via_path.add("late", &seeded_unit_vector(7, DIMS)).unwrap();
-        assert!(read_alias.contains("late"));
+        assert!(read_alias.contains("late").unwrap());
     }
 
     #[cfg(unix)]
@@ -5209,7 +5260,7 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), log_before);
         assert_eq!(fs::read(snapshot_path(&path)).unwrap(), snapshot_before);
         db.add("after", &seeded_unit_vector(7, DIMS)).unwrap();
-        assert!(db.contains("after"));
+        assert!(db.contains("after").unwrap());
         assert_own_nearest(&db, "after", &seeded_unit_vector(7, DIMS));
     }
 
@@ -5291,14 +5342,14 @@ mod tests {
                 writer
             })
         };
-        assert_eq!(joined.get("key-0").unwrap(), entries[0].1);
+        assert_eq!(joined.get("key-0").unwrap().unwrap(), entries[0].1);
         assert!(!adder.is_finished());
         assert!(!opener.is_finished());
         drop(pin);
         let opened = opener.join().unwrap();
         assert!(snapshot_exists(&path));
         let writer = adder.join().unwrap();
-        assert_eq!(writer.get("key-0").unwrap(), replacement);
+        assert_eq!(writer.get("key-0").unwrap().unwrap(), replacement);
         {
             let st = joined.shared.state_read();
             assert_eq!(
@@ -5350,23 +5401,23 @@ mod tests {
         let db = open_writer(&dir.path().join("db"));
         let vector = seeded_unit_vector(1, DIMS);
         db.add_with_attrs("k", &vector, &sample_attrs(1)).unwrap();
-        assert_eq!(db.get_attrs("k").unwrap(), sample_attrs(1));
-        assert_eq!(db.get("k").unwrap(), vector);
+        assert_eq!(db.get_attrs("k").unwrap().unwrap(), sample_attrs(1));
+        assert_eq!(db.get("k").unwrap().unwrap(), vector);
         db.add_with_attrs("k", &vector, &[attr("only", AttrValue::Bool(true))])
             .unwrap();
         assert_eq!(
-            db.get_attrs("k").unwrap(),
+            db.get_attrs("k").unwrap().unwrap(),
             vec![attr("only", AttrValue::Bool(true))]
         );
         db.add("k", &vector).unwrap();
-        assert_eq!(db.get_attrs("k"), None);
+        assert_eq!(db.get_attrs("k").unwrap(), None);
         db.add_with_attrs("k", &vector, &sample_attrs(2)).unwrap();
-        assert_eq!(db.get_attrs("k").unwrap(), sample_attrs(2));
+        assert_eq!(db.get_attrs("k").unwrap().unwrap(), sample_attrs(2));
         db.add_with_attrs("k", &vector, &[]).unwrap();
-        assert_eq!(db.get_attrs("k"), None);
+        assert_eq!(db.get_attrs("k").unwrap(), None);
         db.add("plain", &vector).unwrap();
-        assert_eq!(db.get_attrs("plain"), None);
-        assert_eq!(db.get_attrs("missing"), None);
+        assert_eq!(db.get_attrs("plain").unwrap(), None);
+        assert_eq!(db.get_attrs("missing").unwrap(), None);
         assert!(matches!(
             db.add_with_attrs(
                 "k",
@@ -5389,22 +5440,22 @@ mod tests {
         db.add_with_attrs("a", &vector, &sample_attrs(10)).unwrap();
         db.add_with_attrs("b", &vector, &sample_attrs(11)).unwrap();
         assert!(db.remove("a").unwrap());
-        assert_eq!(db.get_attrs("a"), None);
+        assert_eq!(db.get_attrs("a").unwrap(), None);
         db.add("c", &vector).unwrap();
         assert_eq!(db.shared.state_read().arena.slot_of_key("c"), Some(0));
-        assert_eq!(db.get_attrs("c"), None);
+        assert_eq!(db.get_attrs("c").unwrap(), None);
         assert!(db.remove("b").unwrap());
         db.add_with_attrs("d", &vector, &sample_attrs(12)).unwrap();
         assert_eq!(db.shared.state_read().arena.slot_of_key("d"), Some(1));
-        assert_eq!(db.get_attrs("d").unwrap(), sample_attrs(12));
+        assert_eq!(db.get_attrs("d").unwrap().unwrap(), sample_attrs(12));
         db.add("a", &vector).unwrap();
-        assert_eq!(db.get_attrs("a"), None);
+        assert_eq!(db.get_attrs("a").unwrap(), None);
         drop(db);
         let reopened = open_writer(&path);
-        assert_eq!(reopened.get_attrs("a"), None);
-        assert_eq!(reopened.get_attrs("b"), None);
-        assert_eq!(reopened.get_attrs("c"), None);
-        assert_eq!(reopened.get_attrs("d").unwrap(), sample_attrs(12));
+        assert_eq!(reopened.get_attrs("a").unwrap(), None);
+        assert_eq!(reopened.get_attrs("b").unwrap(), None);
+        assert_eq!(reopened.get_attrs("c").unwrap(), None);
+        assert_eq!(reopened.get_attrs("d").unwrap().unwrap(), sample_attrs(12));
     }
 
     #[test]
@@ -5431,11 +5482,11 @@ mod tests {
         db.flush().unwrap();
         drop(db);
         let verify = |db: &VecDb| {
-            assert_eq!(db.get_attrs("plain"), None);
-            assert_eq!(db.get_attrs("rich").unwrap(), ordered);
-            assert_eq!(db.get_attrs("cleared"), None);
-            assert_eq!(db.get_attrs("removed"), None);
-            assert_eq!(db.get_attrs("recycled").unwrap(), sample_attrs(22));
+            assert_eq!(db.get_attrs("plain").unwrap(), None);
+            assert_eq!(db.get_attrs("rich").unwrap().unwrap(), ordered);
+            assert_eq!(db.get_attrs("cleared").unwrap(), None);
+            assert_eq!(db.get_attrs("removed").unwrap(), None);
+            assert_eq!(db.get_attrs("recycled").unwrap().unwrap(), sample_attrs(22));
         };
         let read_only = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         verify(&read_only);
@@ -5466,13 +5517,13 @@ mod tests {
             for index in 64..120i64 {
                 let key = format!("key-{index}");
                 if index % 2 == 0 {
-                    assert_eq!(db.get_attrs(&key).unwrap(), sample_attrs(index));
+                    assert_eq!(db.get_attrs(&key).unwrap().unwrap(), sample_attrs(index));
                 } else {
-                    assert_eq!(db.get_attrs(&key), None);
+                    assert_eq!(db.get_attrs(&key).unwrap(), None);
                 }
             }
             for index in 0..64 {
-                assert_eq!(db.get_attrs(&format!("key-{index}")), None);
+                assert_eq!(db.get_attrs(&format!("key-{index}")).unwrap(), None);
             }
         };
         verify(&db);
@@ -5500,12 +5551,12 @@ mod tests {
         let verify = |db: &VecDb| {
             for index in 64..120i64 {
                 assert_eq!(
-                    db.get_attrs(&format!("key-{index}")).unwrap(),
+                    db.get_attrs(&format!("key-{index}")).unwrap().unwrap(),
                     sample_attrs(index)
                 );
             }
             for index in 0..64 {
-                assert_eq!(db.get_attrs(&format!("key-{index}")), None);
+                assert_eq!(db.get_attrs(&format!("key-{index}")).unwrap(), None);
             }
         };
         verify(&db);
@@ -5562,8 +5613,8 @@ mod tests {
             db.bulk_add_with_attrs(&keys, &vectors, &poisoned),
             Err(VecDbError::InvalidAttributes(_))
         ));
-        assert_eq!(db.len(), 1);
-        assert!(!db.contains("x"));
+        assert_eq!(db.len().unwrap(), 1);
+        assert!(!db.contains("x").unwrap());
         assert_eq!(db.stats().unwrap().log_bytes, log_bytes);
         let valid = vec![Some(sample_attrs(7)), None];
         db.bulk_add_with_attrs(&keys, &vectors, &valid).unwrap();
@@ -5573,10 +5624,11 @@ mod tests {
                 "missing".to_string(),
                 "y".to_string(),
                 "seed".to_string()
-            ]),
+            ])
+            .unwrap(),
             vec![Some(sample_attrs(7)), None, None, None]
         );
-        assert_eq!(db.get_attrs("x").unwrap(), sample_attrs(7));
+        assert_eq!(db.get_attrs("x").unwrap().unwrap(), sample_attrs(7));
         let read_only = VecDb::open_read_only(&path, DIMS, Some(StorageKind::F32)).unwrap();
         assert!(matches!(
             read_only.bulk_add_with_attrs(&keys, &vectors, &[None]),
@@ -5595,11 +5647,11 @@ mod tests {
         let vector = seeded_unit_vector(6, DIMS);
         db.add_with_attrs("k", &vector, &sample_attrs(30)).unwrap();
         db.reset().unwrap();
-        assert_eq!(db.get_attrs("k"), None);
+        assert_eq!(db.get_attrs("k").unwrap(), None);
         db.add("k", &vector).unwrap();
-        assert_eq!(db.get_attrs("k"), None);
+        assert_eq!(db.get_attrs("k").unwrap(), None);
         db.add_with_attrs("k", &vector, &sample_attrs(31)).unwrap();
-        assert_eq!(db.get_attrs("k").unwrap(), sample_attrs(31));
+        assert_eq!(db.get_attrs("k").unwrap().unwrap(), sample_attrs(31));
     }
 
     #[test]
@@ -5788,7 +5840,7 @@ mod tests {
         assert_eq!(VecDb::open_cost(&i8_path), OpenCost::Ready);
         let standalone = VecDb::open_read_only(&i8_path, I8_DIMS, Some(StorageKind::I8)).unwrap();
         assert_eq!(standalone.stats().unwrap().storage, StorageKind::I8);
-        assert!(standalone.contains("i"));
+        assert!(standalone.contains("i").unwrap());
         assert_own_nearest_i8(&standalone, "i", &vector);
         drop(standalone);
         assert!(matches!(
@@ -5800,7 +5852,7 @@ mod tests {
         ));
         let detected = VecDb::open(&i8_path, I8_DIMS, Some(StorageKind::I8)).unwrap();
         assert_eq!(detected.stats().unwrap().storage, StorageKind::I8);
-        assert!(detected.contains("i"));
+        assert!(detected.contains("i").unwrap());
         assert_own_nearest_i8(&detected, "i", &vector);
         assert!(matches!(
             VecDb::open(&dir.path().join("narrow"), 16, Some(StorageKind::I8)),
@@ -5837,8 +5889,8 @@ mod tests {
                 .collect();
         assert_same_stored(&logged_add_records(&path, I8_DIMS), &expected);
         assert_same_stored(&stored_vectors(&db), &expected);
-        assert_eq!(db.get_attrs("single").unwrap(), sample_attrs(1));
-        let restored = db.get("single").unwrap();
+        assert_eq!(db.get_attrs("single").unwrap().unwrap(), sample_attrs(1));
+        let restored = db.get("single").unwrap().unwrap();
         let StoredVector::I8 { scale, .. } = &expected[0].1 else {
             panic!("expected i8 storage");
         };
@@ -6031,7 +6083,7 @@ mod tests {
         assert!(i8_stats.approximate_memory_bytes < f32_stats.approximate_memory_bytes / 3);
         assert!(i8_stats.log_bytes < f32_stats.log_bytes / 3);
         let key = "key-7".to_string();
-        let restored = i8_db.get(&key).unwrap();
+        let restored = i8_db.get(&key).unwrap().unwrap();
         let original = &entries[7].1;
         let max_abs = original
             .iter()
@@ -6039,7 +6091,7 @@ mod tests {
         for (original, restored) in original.iter().zip(&restored) {
             assert!((original - restored).abs() <= max_abs / 254.0 + 1.0e-6);
         }
-        assert_eq!(f32_db.get(&key).unwrap(), *original);
+        assert_eq!(f32_db.get(&key).unwrap().unwrap(), *original);
         assert_own_nearest_i8(&i8_db, &key, original);
         i8_db.reset().unwrap();
         assert_eq!(i8_db.stats().unwrap().storage, StorageKind::I8);

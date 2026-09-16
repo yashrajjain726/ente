@@ -140,7 +140,7 @@ object EnsuTypography {
     val mini = TextStyle(fontFamily = uiFamily, fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 15.sp)
     val tiny = TextStyle(fontFamily = uiFamily, fontSize = 10.sp, fontWeight = FontWeight.Medium, lineHeight = 12.sp)
 
-    val message = TextStyle(fontFamily = messageFamily, fontSize = 15.sp, fontWeight = FontWeight.Normal, lineHeight = 26.sp)
+    val message = TextStyle(fontFamily = messageFamily, fontSize = 15.sp, fontWeight = FontWeight.Normal, lineHeight = 22.sp)
     val code = TextStyle(fontFamily = codeFamily, fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 19.sp)
 
     val material = Typography(

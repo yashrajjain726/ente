@@ -676,5 +676,6 @@ func (c *CollectionController) GetPublicDiff(ctx *gin.Context, sinceTime int64) 
 			diff[idx].IsDeleted = true
 		}
 	}
+	scrubDeletedFiles(diff)
 	return diff, hasMore, nil
 }

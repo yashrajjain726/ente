@@ -29,11 +29,31 @@ interface SessionStorageCrypto {
     generateKey: () => Promise<string>;
 }
 
+export const readMasterKeyFromSession = async (
+    decryptBox: SessionStorageCrypto["decryptBox"],
+) => {
+    const value = sessionStorage.getItem("encryptionKey");
+    if (!value) return undefined;
+
+    const { encryptedData, key, nonce } = SessionKeyData.parse(
+        JSON.parse(value),
+    );
+    return decryptBox({ encryptedData, nonce }, key);
+};
+
 export const createSessionStorage = ({
     decryptBox,
     encryptBox,
     generateKey,
 }: SessionStorageCrypto) => {
+    const masterKeyFromSession = () => readMasterKeyFromSession(decryptBox);
+
+    const ensureMasterKeyFromSession = async () => {
+        const key = await masterKeyFromSession();
+        if (!key) throw new Error("Master key not found in session");
+        return key;
+    };
+
     const sessionKeyData = async (keyData: string): Promise<SessionKeyData> => {
         const key = await generateKey();
         const box = await encryptBox(keyData, key);
@@ -45,22 +65,6 @@ export const createSessionStorage = ({
             keyName,
             JSON.stringify(await sessionKeyData(keyData)),
         );
-    };
-
-    const masterKeyFromSession = async () => {
-        const value = sessionStorage.getItem("encryptionKey");
-        if (!value) return undefined;
-
-        const { encryptedData, key, nonce } = SessionKeyData.parse(
-            JSON.parse(value),
-        );
-        return decryptBox({ encryptedData, nonce }, key);
-    };
-
-    const ensureMasterKeyFromSession = async () => {
-        const key = await masterKeyFromSession();
-        if (!key) throw new Error("Master key not found in session");
-        return key;
     };
 
     const saveMasterKeyInSessionAndSafeStore = async (masterKey: string) => {
