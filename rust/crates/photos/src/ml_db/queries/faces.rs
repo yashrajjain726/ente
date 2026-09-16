@@ -14,11 +14,11 @@ use crate::ml_db::{Error, MlDb, Result};
 
 pub const FACE_ML_VERSION: i64 = 1;
 
-pub const LAPLACIAN_HARD_THRESHOLD: f64 = 10.0;
-pub const LAPLACIAN_SOFT_THRESHOLD: f64 = 50.0;
-pub const LAPLACIAN_VERY_SOFT_THRESHOLD: f64 = 200.0;
-pub const MINIMUM_QUALITY_FACE_SCORE: f64 = 0.80;
-pub const MEDIUM_QUALITY_FACE_SCORE: f64 = 0.85;
+const LAPLACIAN_HARD_THRESHOLD: f64 = 10.0;
+const LAPLACIAN_SOFT_THRESHOLD: f64 = 50.0;
+const LAPLACIAN_VERY_SOFT_THRESHOLD: f64 = 200.0;
+const MINIMUM_QUALITY_FACE_SCORE: f64 = 0.80;
+const MEDIUM_QUALITY_FACE_SCORE: f64 = 0.85;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FaceRow {
@@ -93,7 +93,6 @@ impl MlDb {
                 )
             }),
         )
-        .map_err(Into::into)
     }
 
     pub fn face_indexed_file_ids(&self, minimum_ml_version: i64) -> Result<HashMap<i64, i64>> {
@@ -102,7 +101,6 @@ impl MlDb {
             [minimum_ml_version],
             pair,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_face_indexed_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
@@ -110,7 +108,6 @@ impl MlDb {
             "SELECT COUNT(DISTINCT file_id) as count FROM faces WHERE ml_version >= ?",
             [minimum_ml_version],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_face_embeddings_for_cluster(
@@ -133,7 +130,6 @@ impl MlDb {
         let mut parameters: Vec<&dyn ToSql> = vec![&cluster_id];
         parameters.extend(optional_parameter(&limit));
         self.read_column(&sql, parameters.as_slice())
-            .map_err(Into::into)
     }
 
     pub fn get_face_embeddings_for_clusters(
@@ -372,17 +368,14 @@ impl MlDb {
             "SELECT COUNT(*) as count FROM faces WHERE score > ? AND blur > ?",
             (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_errored_face_count(&self) -> Result<i64> {
         self.read_value("SELECT COUNT(*) as count FROM faces WHERE score < 0", ())
-            .map_err(Into::into)
     }
 
     pub fn get_errored_file_ids(&self) -> Result<HashSet<i64>> {
         self.read_column("SELECT DISTINCT file_id FROM faces WHERE score < 0", ())
-            .map_err(Into::into)
     }
 
     pub fn prune_resolved_face_error_results(&self, file_ids: &[i64]) -> Result<()> {
@@ -404,7 +397,6 @@ impl MlDb {
                 "#,
             file_ids,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_file_ids_with_error_results(&self, file_ids: &[i64]) -> Result<HashSet<i64>> {
@@ -450,7 +442,6 @@ impl MlDb {
 
     pub fn delete_face_index_for_files(&self, file_ids: &[i64]) -> Result<()> {
         self.execute_chunked_in("DELETE FROM faces WHERE file_id IN ({})", file_ids)
-            .map_err(Into::into)
     }
 
     pub fn delete_unclustered_face_index_for_files(&self, file_ids: &[i64]) -> Result<()> {
@@ -469,7 +460,6 @@ impl MlDb {
                 "#,
             file_ids,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_clustered_or_faceless_file_count(&self) -> Result<i64> {
@@ -505,7 +495,6 @@ impl MlDb {
                 "#,
             (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_all_file_ids_of_face_ids_not_in_any_cluster(&self) -> Result<HashSet<i64>> {
@@ -519,7 +508,6 @@ impl MlDb {
                 "#,
             (),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_all_files_associated_with_all_clusters(
@@ -538,7 +526,6 @@ impl MlDb {
             bind_placeholders(except_clusters.len())
         );
         self.read_column(&sql, params_from_iter(except_clusters))
-            .map_err(Into::into)
     }
 
     pub fn get_fully_indexed_file_ids(&self, include_pets: bool) -> Result<HashSet<i64>> {
@@ -559,11 +546,14 @@ impl MlDb {
             parameters.push(PET_ML_VERSION);
         }
         self.read_column(&sql, params_from_iter(parameters))
-            .map_err(Into::into)
     }
 }
 
-pub fn is_bad_face_for_clustering(face_score: f64, blur_value: f64, is_sideways: bool) -> bool {
+pub(super) fn is_bad_face_for_clustering(
+    face_score: f64,
+    blur_value: f64,
+    is_sideways: bool,
+) -> bool {
     face_score < MINIMUM_QUALITY_FACE_SCORE
         || blur_value < LAPLACIAN_SOFT_THRESHOLD
         || (blur_value < LAPLACIAN_VERY_SOFT_THRESHOLD && face_score < MEDIUM_QUALITY_FACE_SCORE)

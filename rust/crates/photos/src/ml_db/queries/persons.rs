@@ -34,7 +34,6 @@ impl MlDb {
                 "#,
             (),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_person_ignored_clusters(&self, person_id: &str) -> Result<HashSet<String>> {
@@ -57,7 +56,6 @@ impl MlDb {
 
     pub fn get_person_to_rejected_suggestions(&self) -> Result<HashMap<String, HashSet<String>>> {
         self.read_grouped("SELECT person_id, cluster_id FROM not_person_feedback", ())
-            .map_err(Into::into)
     }
 
     pub fn get_person_cluster_ids(&self, person_id: &str) -> Result<HashSet<String>> {
@@ -65,7 +63,6 @@ impl MlDb {
             "SELECT cluster_id FROM cluster_person WHERE person_id = ?",
             [person_id],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_persons_cluster_ids(&self, person_ids: &[String]) -> Result<HashSet<String>> {
@@ -75,7 +72,6 @@ impl MlDb {
             const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
             |row| Ok(row.get(0)?),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_person_to_cluster_id_to_face_ids(&self) -> Result<PersonToClusterIdToFaceIds> {
@@ -103,7 +99,6 @@ impl MlDb {
 
     pub fn get_person_to_cluster_ids(&self) -> Result<HashMap<String, HashSet<String>>> {
         self.read_grouped("SELECT person_id, cluster_id FROM cluster_person", ())
-            .map_err(Into::into)
     }
 
     pub fn get_face_id_to_person_id_for_faces(
@@ -122,7 +117,6 @@ impl MlDb {
             const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
             pair,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_cluster_id_to_face_ids_for_person(
@@ -139,7 +133,6 @@ impl MlDb {
                 "#,
             [person_id],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_face_ids_for_person(&self, person_id: &str) -> Result<HashSet<String>> {
@@ -153,7 +146,6 @@ impl MlDb {
                 "#,
             [person_id],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_face_ids_for_person_ordered_by_score(
@@ -175,7 +167,6 @@ impl MlDb {
                 "#,
             (person_id, limit),
         )
-        .map_err(Into::into)
     }
 
     pub fn remove_person(&self, person_id: &str) -> Result<()> {
@@ -209,7 +200,6 @@ impl MlDb {
                 .iter()
                 .map(|(cluster_id, person_id)| (person_id, cluster_id)),
         )
-        .map_err(Into::into)
     }
 
     pub fn capture_not_person_feedback(&self, person_id: &str, cluster_id: &str) -> Result<()> {
@@ -227,7 +217,6 @@ impl MlDb {
                 .iter()
                 .map(|(cluster_id, person_id)| (person_id, cluster_id)),
         )
-        .map_err(Into::into)
     }
 
     pub fn remove_not_person_feedback(&self, person_id: &str, cluster_id: &str) -> Result<()> {
@@ -261,7 +250,6 @@ impl MlDb {
             [person_id],
             pair,
         )
-        .map_err(Into::into)
         .and_then(file_id_to_cluster_ids)
     }
 
@@ -271,7 +259,6 @@ impl MlDb {
             (),
             |row| Ok((row.get(1)?, row.get(0)?)),
         )
-        .map_err(Into::into)
     }
 
     pub fn drop_faces_feedback_tables(&self) -> Result<()> {
@@ -281,7 +268,6 @@ impl MlDb {
             CREATE_CLUSTER_PERSON_TABLE,
             CREATE_NOT_PERSON_FEEDBACK_TABLE,
         ])
-        .map_err(Into::into)
     }
 
     pub fn get_file_ids_of_person_id(&self, person_id: &str) -> Result<Vec<i64>> {
@@ -297,7 +283,6 @@ impl MlDb {
                 "#,
             [person_id],
         )
-        .map_err(Into::into)
     }
 }
 

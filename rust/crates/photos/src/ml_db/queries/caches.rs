@@ -20,7 +20,7 @@ impl MlDb {
     }
 
     pub fn get_repeated_text_embedding_cache(&self, query: &str) -> Result<Option<Vec<f32>>> {
-        let results: Vec<(Vec<u8>, i64, i64)> = self.read_all(
+        let cached: Option<(Vec<u8>, i64, i64)> = self.read_optional(
             r#"
             SELECT embedding, ml_version, created_at
             FROM text_embeddings_cache
@@ -29,14 +29,12 @@ impl MlDb {
             [query],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )?;
-        if results.is_empty() {
+        let Some((embedding, ml_version, created_at)) = cached else {
             return Ok(None);
-        }
+        };
         let three_months_ago = now_millis() - THREE_MONTHS_MILLIS;
-        for (embedding, ml_version, created_at) in &results {
-            if *ml_version == CLIP_ML_VERSION && *created_at > three_months_ago {
-                return Ok(Some(decode_f32(embedding)));
-            }
+        if ml_version == CLIP_ML_VERSION && created_at > three_months_ago {
+            return Ok(Some(decode_f32(&embedding)));
         }
         self.execute(
             "DELETE FROM text_embeddings_cache WHERE text_query = ?",
@@ -64,8 +62,8 @@ impl MlDb {
         self.read_optional(
             "SELECT face_id FROM face_cache WHERE person_or_cluster_id = ?",
             [person_or_cluster_id],
+            |row| Ok(row.get(0)?),
         )
-        .map_err(Into::into)
     }
 
     pub fn remove_face_id_cached_for_person_or_cluster(

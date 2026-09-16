@@ -45,7 +45,6 @@ impl MlDb {
 
     pub fn clip_indexed_file_with_version(&self) -> Result<HashMap<i64, i64>> {
         self.read_all("SELECT file_id , ml_version FROM clip", (), pair)
-            .map_err(Into::into)
     }
 
     pub fn get_clip_indexed_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
@@ -53,7 +52,6 @@ impl MlDb {
             "SELECT COUNT(DISTINCT file_id) as count FROM clip WHERE ml_version >= ?",
             [minimum_ml_version],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_clip_vectorizable_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
@@ -66,7 +64,6 @@ impl MlDb {
                 "#,
             [minimum_ml_version, CLIP_EMBEDDING_BYTES_LENGTH],
         )
-        .map_err(Into::into)
     }
 
     pub fn insert_clip_rows(&self, embeddings: &[ClipEmbedding]) -> Result<()> {
@@ -81,22 +78,18 @@ impl MlDb {
             "INSERT OR REPLACE INTO clip (file_id, embedding, ml_version) values(?, ?, ?)",
             embeddings.iter().map(clip_row),
         )
-        .map_err(Into::into)
     }
 
     pub fn delete_clip_rows(&self, file_ids: &[i64]) -> Result<()> {
         self.execute_chunked_in("DELETE FROM clip WHERE file_id IN ({})", file_ids)
-            .map_err(Into::into)
     }
 
     pub fn delete_all_clip_rows(&self) -> Result<()> {
         self.execute_statements([schema::DELETE_CLIP_EMBEDDINGS])
-            .map_err(Into::into)
     }
 
     pub fn count_clip_rows(&self) -> Result<i64> {
         self.read_value("SELECT COUNT(file_id) as total FROM clip", ())
-            .map_err(Into::into)
     }
 
     pub fn get_clip_rows_page(&self, limit: i64, offset: i64) -> Result<Vec<ClipRow>> {
@@ -110,7 +103,6 @@ impl MlDb {
                 })
             },
         )
-        .map_err(Into::into)
     }
 }
 

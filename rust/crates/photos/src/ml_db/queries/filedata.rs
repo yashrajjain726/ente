@@ -44,7 +44,6 @@ impl MlDb {
                 )
             }),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_file_ids_vid_preview(&self) -> Result<HashMap<i64, PreviewInfo>> {
@@ -61,7 +60,6 @@ impl MlDb {
                 ))
             },
         )
-        .map_err(Into::into)
     }
 
     pub fn get_file_ids_with_fd_data(&self, data_type: Option<&str>) -> Result<HashSet<i64>> {
@@ -70,7 +68,6 @@ impl MlDb {
             Some(_) => "SELECT file_id FROM filedata WHERE type = ?",
         };
         self.read_column(sql, optional_parameter(&data_type).as_slice())
-            .map_err(Into::into)
     }
 }
 

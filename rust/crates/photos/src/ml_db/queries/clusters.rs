@@ -53,7 +53,6 @@ impl MlDb {
             const { NonZeroUsize::new(500).unwrap() },
             face_id_to_cluster_id.iter(),
         )
-        .map_err(Into::into)
     }
 
     pub fn cluster_id_to_face_count(&self) -> Result<HashMap<String, i64>> {
@@ -67,7 +66,6 @@ impl MlDb {
             (),
             pair,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_bad_face_singleton_cluster_ids(&self) -> Result<HashSet<String>> {
@@ -113,13 +111,12 @@ impl MlDb {
         self.read_optional(
             "SELECT cluster_id FROM face_clusters WHERE face_id = ?",
             [face_id],
+            |row| Ok(row.get(0)?),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_all_cluster_id_to_face_ids(&self) -> Result<HashMap<String, Vec<String>>> {
         self.read_grouped("SELECT cluster_id, face_id FROM face_clusters", ())
-            .map_err(Into::into)
     }
 
     pub fn get_face_ids_for_cluster(&self, cluster_id: &str) -> Result<Vec<String>> {
@@ -127,7 +124,6 @@ impl MlDb {
             "SELECT face_id FROM face_clusters WHERE face_clusters.cluster_id = ?",
             [cluster_id],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_face_ids_for_cluster_ordered_by_score(
@@ -147,7 +143,6 @@ impl MlDb {
                 "#,
             (cluster_id, limit),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_blur_values_for_cluster(&self, cluster_id: &str) -> Result<Vec<f64>> {
@@ -178,12 +173,10 @@ impl MlDb {
             const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
             pair,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_file_id_to_cluster_ids(&self) -> Result<HashMap<i64, HashSet<String>>> {
         self.read_all("SELECT cluster_id, face_id FROM face_clusters", (), pair)
-            .map_err(Into::into)
             .and_then(file_id_to_cluster_ids)
     }
 
@@ -192,7 +185,6 @@ impl MlDb {
         face_id_to_cluster_id: &HashMap<String, String>,
     ) -> Result<()> {
         self.write_batch_atomic(UPSERT_FACE_CLUSTER, face_id_to_cluster_id.iter())
-            .map_err(Into::into)
     }
 
     pub fn remove_face_id_to_cluster_id(
@@ -203,7 +195,6 @@ impl MlDb {
             "DELETE FROM face_clusters WHERE face_id = ? AND cluster_id = ?",
             face_id_to_cluster_id.iter(),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_file_id_to_cluster_id_set_for_cluster(
@@ -215,7 +206,6 @@ impl MlDb {
             bind_placeholders(cluster_ids.len())
         );
         self.read_all(&sql, params_from_iter(cluster_ids), pair)
-            .map_err(Into::into)
             .and_then(file_id_to_cluster_ids)
     }
 
@@ -230,7 +220,6 @@ impl MlDb {
                 "#,
             [cluster_id],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_cluster_centroid_vector_id_map(
@@ -258,7 +247,6 @@ impl MlDb {
             const { NonZeroUsize::new(800).unwrap() },
             pair,
         )
-        .map_err(Into::into)
     }
 
     pub fn delete_cluster_centroid_vector_id_mapping(&self, cluster_id: &str) -> Result<()> {
@@ -271,7 +259,6 @@ impl MlDb {
 
     pub fn clear_cluster_centroid_vector_id_mappings(&self) -> Result<()> {
         self.execute_statements([DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING])
-            .map_err(Into::into)
     }
 
     pub fn upsert_cluster_summary_rows(
@@ -285,7 +272,6 @@ impl MlDb {
                 .iter()
                 .map(|(cluster_id, summary)| (cluster_id, &summary.avg, summary.count)),
         )
-        .map_err(Into::into)
     }
 
     pub fn delete_cluster_summary_row(&self, cluster_id: &str) -> Result<()> {
@@ -313,7 +299,6 @@ impl MlDb {
             optional_parameter(&min_cluster_size).as_slice(),
             read_cluster_summary,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_cluster_to_cluster_summary(
@@ -325,12 +310,10 @@ impl MlDb {
             bind_placeholders(cluster_ids.len())
         );
         self.read_all(&sql, params_from_iter(cluster_ids), read_cluster_summary)
-            .map_err(Into::into)
     }
 
     pub fn count_cluster_summaries(&self) -> Result<i64> {
         self.read_value("SELECT COUNT(cluster_id) as total FROM cluster_summary", ())
-            .map_err(Into::into)
     }
 
     pub fn get_cluster_summary_page(
@@ -356,7 +339,6 @@ impl MlDb {
                 read_cluster_centroid,
             ),
         }
-        .map_err(Into::into)
     }
 
     pub fn reset_cluster_tables(&self, faces: bool) -> Result<()> {
@@ -384,7 +366,6 @@ impl MlDb {
             CREATE_FACE_CLUSTERS_TABLE,
             FC_CLUSTER_ID_INDEX,
         ]))
-        .map_err(Into::into)
     }
 
     pub fn get_clusters_for_memory_lane(

@@ -13,17 +13,12 @@ pub use queries::clip::{
     ClipRow, EmbeddingVector,
 };
 pub use queries::clusters::{ClusterCentroidRow, ClusterSummary};
-pub use queries::faces::{
-    FACE_ML_VERSION, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding,
-    LAPLACIAN_HARD_THRESHOLD, LAPLACIAN_SOFT_THRESHOLD, LAPLACIAN_VERY_SOFT_THRESHOLD,
-    MEDIUM_QUALITY_FACE_SCORE, MINIMUM_QUALITY_FACE_SCORE, is_bad_face_for_clustering,
-};
+pub use queries::faces::{FACE_ML_VERSION, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding};
 pub use queries::filedata::{FdStatus, PreviewInfo};
 pub use queries::persons::PersonToClusterIdToFaceIds;
 pub use queries::pets::{
     PET_ML_VERSION, PetBodyRow, PetBodyVectorRow, PetFaceRow, PetFaceVectorRow, PetRowsForFiles,
 };
-pub use vector_encoding::{decode_evector, decode_f32, encode_evector, encode_f32};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -33,8 +28,6 @@ pub enum Error {
     Downgrade { current: i64, target: i64 },
     #[error("{0}")]
     Codec(String),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
     #[error("{0}")]
     InvalidArgument(String),
 }
@@ -76,7 +69,6 @@ impl MlDb {
             schema::DELETE_CLIP_EMBEDDINGS,
             schema::DELETE_FILE_DATA,
         ])
-        .map_err(Into::into)
     }
 
     pub fn clear_pet_tables(&self) -> Result<()> {
@@ -86,7 +78,6 @@ impl MlDb {
             schema::DELETE_PET_FACE_VECTOR_ID_MAPPING,
             schema::DELETE_PET_BODY_VECTOR_ID_MAPPING,
         ])
-        .map_err(Into::into)
     }
 }
 

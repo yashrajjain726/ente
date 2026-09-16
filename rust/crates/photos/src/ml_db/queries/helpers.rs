@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 
-use crate::db::{FromSql, Params, Result, Row, ToSql, TransactionBehavior, params_from_iter};
+use crate::db::{self, FromSql, Params, Row, ToSql, TransactionBehavior, params_from_iter};
 
-use crate::ml_db::MlDb;
+use crate::ml_db::{MlDb, Result};
 
 pub(super) const MAX_SQL_BIND_PARAMS_PER_QUERY: usize = 10000;
 
@@ -13,13 +13,15 @@ impl MlDb {
         &self,
         sql: &str,
         parameters: P,
-        map: impl FnMut(&Row<'_>) -> Result<T>,
+        map: impl FnMut(&Row<'_>) -> db::Result<T>,
     ) -> Result<C> {
-        self.db.read(|connection| {
-            let mut statement = connection.prepare_cached(sql)?;
-            let rows = statement.query_map(parameters, map)?;
-            rows.collect::<Result<C>>()
-        })
+        self.db
+            .read(|connection| {
+                let mut statement = connection.prepare_cached(sql)?;
+                let rows = statement.query_map(parameters, map)?;
+                rows.collect::<db::Result<C>>()
+            })
+            .map_err(Into::into)
     }
 
     pub(in crate::ml_db) fn read_column<C: FromIterator<T>, T: FromSql, P: Params>(
@@ -49,23 +51,28 @@ impl MlDb {
         sql: &str,
         parameters: impl Params,
     ) -> Result<T> {
-        self.db.read(|connection| {
-            connection
-                .prepare_cached(sql)?
-                .query_row(parameters, |row| Ok(row.get(0)?))
-        })
+        self.db
+            .read(|connection| {
+                connection
+                    .prepare_cached(sql)?
+                    .query_row(parameters, |row| Ok(row.get(0)?))
+            })
+            .map_err(Into::into)
     }
 
-    pub(in crate::ml_db) fn read_optional<T: FromSql>(
+    pub(in crate::ml_db) fn read_optional<T>(
         &self,
         sql: &str,
         parameters: impl Params,
+        map: impl FnOnce(&Row<'_>) -> db::Result<T>,
     ) -> Result<Option<T>> {
-        self.db.read(|connection| {
-            connection
-                .prepare_cached(sql)?
-                .query_optional(parameters, |row| Ok(row.get(0)?))
-        })
+        self.db
+            .read(|connection| {
+                connection
+                    .prepare_cached(sql)?
+                    .query_optional(parameters, map)
+            })
+            .map_err(Into::into)
     }
 
     pub(in crate::ml_db) fn read_chunked_in<C: FromIterator<T>, T, I: ToSql>(
@@ -73,7 +80,7 @@ impl MlDb {
         sql: &str,
         ids: &[I],
         chunk_size: NonZeroUsize,
-        mut map: impl FnMut(&Row<'_>) -> Result<T>,
+        mut map: impl FnMut(&Row<'_>) -> db::Result<T>,
     ) -> Result<C> {
         let mut rows = Vec::new();
         for chunk in ids.chunks(chunk_size.get()) {
@@ -87,6 +94,7 @@ impl MlDb {
     pub(in crate::ml_db) fn execute(&self, sql: &str, parameters: impl Params) -> Result<usize> {
         self.db
             .write(|connection| connection.prepare_cached(sql)?.execute(parameters))
+            .map_err(Into::into)
     }
 
     pub(in crate::ml_db) fn execute_chunked_in<I: ToSql>(
@@ -97,25 +105,29 @@ impl MlDb {
         if ids.is_empty() {
             return Ok(());
         }
-        self.db.write_transaction(|transaction| {
-            for chunk in ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY) {
-                let sql = expand_in_clause(sql, chunk.len());
-                transaction.execute(&sql, params_from_iter(chunk))?;
-            }
-            Ok(())
-        })
+        self.db
+            .write_transaction(|transaction| {
+                for chunk in ids.chunks(MAX_SQL_BIND_PARAMS_PER_QUERY) {
+                    let sql = expand_in_clause(sql, chunk.len());
+                    transaction.execute(&sql, params_from_iter(chunk))?;
+                }
+                Ok(())
+            })
+            .map_err(Into::into)
     }
 
     pub(in crate::ml_db) fn execute_statements<'a>(
         &self,
         statements: impl IntoIterator<Item = &'a str>,
     ) -> Result<()> {
-        self.db.write_transaction(|transaction| {
-            for statement in statements {
-                transaction.execute_batch(statement)?;
-            }
-            Ok(())
-        })
+        self.db
+            .write_transaction(|transaction| {
+                for statement in statements {
+                    transaction.execute_batch(statement)?;
+                }
+                Ok(())
+            })
+            .map_err(Into::into)
     }
 
     pub(in crate::ml_db) fn write_batch_atomic<P: Params>(
@@ -123,13 +135,15 @@ impl MlDb {
         sql: &str,
         parameter_sets: impl IntoIterator<Item = P>,
     ) -> Result<()> {
-        self.db.write_transaction(|transaction| {
-            let mut statement = transaction.prepare_cached(sql)?;
-            for parameters in parameter_sets {
-                statement.execute(parameters)?;
-            }
-            Ok(())
-        })
+        self.db
+            .write_transaction(|transaction| {
+                let mut statement = transaction.prepare_cached(sql)?;
+                for parameters in parameter_sets {
+                    statement.execute(parameters)?;
+                }
+                Ok(())
+            })
+            .map_err(Into::into)
     }
 
     pub(in crate::ml_db) fn write_batches_committing_each<P: Params>(
@@ -138,21 +152,23 @@ impl MlDb {
         batch_size: NonZeroUsize,
         parameter_sets: impl IntoIterator<Item = P>,
     ) -> Result<()> {
-        self.db.write(|connection| {
-            let mut parameter_sets = parameter_sets.into_iter().peekable();
-            while parameter_sets.peek().is_some() {
-                let transaction =
-                    connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-                {
-                    let mut statement = transaction.prepare_cached(sql)?;
-                    for parameters in parameter_sets.by_ref().take(batch_size.get()) {
-                        statement.execute(parameters)?;
+        self.db
+            .write(|connection| {
+                let mut parameter_sets = parameter_sets.into_iter().peekable();
+                while parameter_sets.peek().is_some() {
+                    let transaction =
+                        connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                    {
+                        let mut statement = transaction.prepare_cached(sql)?;
+                        for parameters in parameter_sets.by_ref().take(batch_size.get()) {
+                            statement.execute(parameters)?;
+                        }
                     }
+                    transaction.commit()?;
                 }
-                transaction.commit()?;
-            }
-            Ok(())
-        })
+                Ok(())
+            })
+            .map_err(Into::into)
     }
 }
 
@@ -164,7 +180,7 @@ fn expand_in_clause(sql: &str, count: usize) -> String {
     sql.replacen("{}", &bind_placeholders(count), 1)
 }
 
-pub(super) fn pair<A: FromSql, B: FromSql>(row: &Row<'_>) -> Result<(A, B)> {
+pub(super) fn pair<A: FromSql, B: FromSql>(row: &Row<'_>) -> db::Result<(A, B)> {
     Ok((row.get(0)?, row.get(1)?))
 }
 

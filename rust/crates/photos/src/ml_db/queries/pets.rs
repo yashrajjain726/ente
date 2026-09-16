@@ -105,7 +105,6 @@ impl MlDb {
                 )
             }),
         )
-        .map_err(Into::into)
     }
 
     pub fn bulk_insert_pet_bodies(&self, pet_bodies: &[PetBodyRow]) -> Result<()> {
@@ -126,7 +125,6 @@ impl MlDb {
                 )
             }),
         )
-        .map_err(Into::into)
     }
 
     pub fn update_pet_face_vector_ids(
@@ -143,7 +141,6 @@ impl MlDb {
                 .iter()
                 .map(|(pet_face_id, vector_id)| (vector_id, pet_face_id)),
         )
-        .map_err(Into::into)
     }
 
     pub fn update_pet_body_vector_ids(
@@ -160,7 +157,6 @@ impl MlDb {
                 .iter()
                 .map(|(pet_body_id, vector_id)| (vector_id, pet_body_id)),
         )
-        .map_err(Into::into)
     }
 
     pub fn get_pet_faces_for_file_id(&self, file_upload_id: i64) -> Result<Vec<PetFaceRow>> {
@@ -169,7 +165,6 @@ impl MlDb {
             [file_upload_id],
             read_pet_face,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_pet_bodies_for_file_id(&self, file_upload_id: i64) -> Result<Vec<PetBodyRow>> {
@@ -178,7 +173,6 @@ impl MlDb {
             [file_upload_id],
             read_pet_body,
         )
-        .map_err(Into::into)
     }
 
     pub fn pet_indexed_file_ids(&self, minimum_ml_version: i64) -> Result<HashMap<i64, i64>> {
@@ -187,7 +181,6 @@ impl MlDb {
             [minimum_ml_version],
             pair,
         )
-        .map_err(Into::into)
     }
 
     pub fn get_pet_indexed_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
@@ -195,7 +188,6 @@ impl MlDb {
             "SELECT COUNT(DISTINCT file_id) as count FROM pet_faces WHERE ml_version >= ?",
             [minimum_ml_version],
         )
-        .map_err(Into::into)
     }
 
     pub fn get_pet_rows_for_files(&self, file_ids: &[i64]) -> Result<PetRowsForFiles> {
@@ -326,7 +318,6 @@ impl MlDb {
             const { NonZeroUsize::new(800).unwrap() },
             pair,
         )
-        .map_err(Into::into)
     }
 }
 
