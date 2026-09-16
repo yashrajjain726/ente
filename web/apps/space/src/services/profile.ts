@@ -44,11 +44,6 @@ interface SpaceAvatar {
 
 type SpaceCover = SpaceAvatar;
 
-interface CreatedSpace {
-    spaceId: string;
-    spaceSlug: string;
-}
-
 interface SpaceLookup {
     spaceId: string;
     spaceSlug: string;
@@ -511,11 +506,11 @@ export const saveSpaceProfile = async (
                 spaceSlug = updatedSlug.spaceSlug;
             }
         } else {
-            const created = (await ctx.createSpace(
+            const created = await ctx.createSpace(
                 username,
                 profilePayload,
                 referredBySpaceId?.trim() || undefined,
-            )) as CreatedSpace;
+            );
             spaceId = created.spaceId;
             spaceSlug = created.spaceSlug;
             const createdSpaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];

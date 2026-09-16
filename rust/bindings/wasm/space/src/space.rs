@@ -9,6 +9,7 @@ use ente_space::{
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -97,16 +98,16 @@ struct PostPhotoAssetOptionsJsInput {
     thumb_hash: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct CreatedSpaceJs {
+pub struct CreatedSpaceJs {
     space_id: String,
     space_slug: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct CreatedSpaceLinkJs {
+pub struct CreatedSpaceLinkJs {
     space_id: String,
     space_slug: String,
     access_key: String,
@@ -798,24 +799,32 @@ pub struct SpaceAccountCtxHandle {
 #[wasm_bindgen]
 impl SpaceAccountCtxHandle {
     #[wasm_bindgen(js_name = getOrCreateSpaceLink)]
-    pub async fn get_or_create_space_link(&self, space_id: String) -> Result<JsValue, Error> {
+    pub async fn get_or_create_space_link(
+        &self,
+        space_id: String,
+    ) -> Result<<CreatedSpaceLinkJs as Tsify>::JsType, Error> {
         let value = self.inner.get_or_create_space_link(&space_id).await?;
-        swb::to_value(&CreatedSpaceLinkJs {
+        CreatedSpaceLinkJs {
             space_id: value.space_id,
             space_slug: value.space_slug,
             access_key: value.access_key,
-        })
+        }
+        .into_js()
         .map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = rotateSpaceLink)]
-    pub async fn rotate_space_link(&self, space_id: String) -> Result<JsValue, Error> {
+    pub async fn rotate_space_link(
+        &self,
+        space_id: String,
+    ) -> Result<<CreatedSpaceLinkJs as Tsify>::JsType, Error> {
         let value = self.inner.rotate_space_link(&space_id).await?;
-        swb::to_value(&CreatedSpaceLinkJs {
+        CreatedSpaceLinkJs {
             space_id: value.space_id,
             space_slug: value.space_slug,
             access_key: value.access_key,
-        })
+        }
+        .into_js()
         .map_err(Into::into)
     }
 
@@ -825,8 +834,8 @@ impl SpaceAccountCtxHandle {
         space_slug: String,
         profile: String,
         referred_by_space_id: Option<String>,
-    ) -> Result<JsValue, Error> {
-        swb::to_value(&created_space_to_js(
+    ) -> Result<<CreatedSpaceJs as Tsify>::JsType, Error> {
+        created_space_to_js(
             self.inner
                 .create_space_with_referrer(
                     &space_slug,
@@ -834,7 +843,8 @@ impl SpaceAccountCtxHandle {
                     referred_by_space_id.as_deref(),
                 )
                 .await?,
-        ))
+        )
+        .into_js()
         .map_err(Into::into)
     }
 

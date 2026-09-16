@@ -247,12 +247,6 @@ export interface PublicSpaceLinkSession {
     unsubscribeWebPush: (endpoint: string) => Promise<void>;
 }
 
-export interface CurrentSpaceLink {
-    accessKey: string;
-    spaceId: string;
-    spaceSlug: string;
-}
-
 export type SpacePostAssetURLLoader = (
     asset: SpacePostAsset,
 ) => Promise<string>;
@@ -788,16 +782,12 @@ const withCurrentSpaceContext = async <T>(
 };
 
 export const getOrCreateCurrentSpaceLink = () =>
-    withCurrentSpaceContext(
-        async (ctx, spaceId) =>
-            (await ctx.getOrCreateSpaceLink(spaceId)) as CurrentSpaceLink,
+    withCurrentSpaceContext((ctx, spaceId) =>
+        ctx.getOrCreateSpaceLink(spaceId),
     );
 
 export const rotateCurrentSpaceLink = () =>
-    withCurrentSpaceContext(
-        async (ctx, spaceId) =>
-            (await ctx.rotateSpaceLink(spaceId)) as CurrentSpaceLink,
-    );
+    withCurrentSpaceContext((ctx, spaceId) => ctx.rotateSpaceLink(spaceId));
 
 const messageQuoteFromPostResponse = async (
     ctx: SpaceAccountCtxHandle,

@@ -2888,6 +2888,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "thiserror 2.0.18",
  "tokio",
+ "tsify",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
