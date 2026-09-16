@@ -878,6 +878,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
             ref={rootRef}
             component="article"
             sx={{
+                bgcolor: showFooter ? spaceSurface : "transparent",
+                borderRadius: "16px",
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
@@ -890,7 +892,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 sx={{
                     aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
                     bgcolor: "transparent",
-                    borderRadius: isOwnPost ? "16px" : "16px 16px 0 0",
+                    borderRadius: "16px",
                     maxWidth: "100%",
                     minWidth: 0,
                     overflow: "hidden",
@@ -1231,8 +1233,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 <Box
                     sx={{
                         alignItems: "center",
-                        bgcolor: spaceSurface,
-                        borderRadius: "0 0 16px 16px",
                         boxSizing: "border-box",
                         display: "grid",
                         gap: "6px",
