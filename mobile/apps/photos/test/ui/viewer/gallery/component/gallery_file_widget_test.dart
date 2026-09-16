@@ -8,10 +8,14 @@ import "package:photos/core/cache/thumbnail_in_memory_cache.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
+import "package:photos/models/selected_files.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/gallery/component/gallery_file_widget.dart";
+import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_context_state.dart";
+import "package:photos/ui/viewer/gallery/swipe_selection_wrapper.dart";
+import "package:photos/ui/viewer/gallery/swipe_to_select_helper.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 // A minimal valid 1x1 RGBA PNG.
@@ -106,6 +110,103 @@ void main() {
       ),
     );
   });
+
+  for (final startWithLongPress in [true, false]) {
+    testWidgets(
+      startWithLongPress
+          ? "long press starts swipe selection before crossing is enabled"
+          : "horizontal movement enables crossing for an existing selection",
+      (tester) async {
+        final files = List.generate(
+          3,
+          (index) => EnteFile()
+            ..generatedID = index + 10
+            ..fileType = FileType.image
+            ..title = "photo-$index.jpg",
+        );
+        final selectedFiles = SelectedFiles();
+        final swipeHelper = SwipeToSelectHelper(
+          allFiles: files,
+          selectedFiles: selectedFiles,
+        );
+        final swipeActive = ValueNotifier(false);
+        final controller = ScrollController();
+        if (!startWithLongPress) selectedFiles.selectAll({files.first});
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GalleryBoundariesProvider(
+              child: GalleryContextState(
+                sortOrderAsc: false,
+                child: SwipeSelectionWrapper(
+                  swipeHelper: swipeHelper,
+                  selectedFiles: selectedFiles,
+                  isEnabled: true,
+                  swipeActiveNotifier: swipeActive,
+                  scrollController: controller,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Row(
+                      children: files.map((file) {
+                        return SizedBox(
+                          width: 100,
+                          height: 100,
+                          child: GalleryFileWidget(
+                            file: file,
+                            selectedFiles: selectedFiles,
+                            limitSelectionToOne: false,
+                            tag: "selection_",
+                            photoGridSize: photoGridSizeDefault,
+                            currentUserID: null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final gesture = await tester.startGesture(
+          Offset(startWithLongPress ? 50 : 150, 50),
+        );
+        if (startWithLongPress) {
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(swipeHelper.isActive, isTrue);
+          expect(swipeActive.value, isFalse);
+        } else {
+          await gesture.moveBy(const Offset(20, 0));
+          // No pump: the same pointer event that activates swipe mode must
+          // reach the starting tile before the next widget rebuild.
+          expect(swipeActive.value, isTrue);
+          expect(swipeHelper.isActive, isTrue);
+          expect(selectedFiles.files, containsAll([files.first, files[1]]));
+        }
+        await gesture.moveTo(const Offset(250, 50));
+        expect(selectedFiles.files, containsAll(files));
+        await gesture.up();
+        await tester.pump();
+        expect(swipeActive.value, isFalse);
+        expect(swipeHelper.isActive, isFalse);
+
+        // A later vertical gallery drag must not reactivate swipe selection.
+        final scrollGesture = await tester.startGesture(const Offset(150, 50));
+        await scrollGesture.moveBy(const Offset(0, 30));
+        expect(swipeActive.value, isFalse);
+        expect(swipeHelper.isActive, isFalse);
+        expect(selectedFiles.files, containsAll(files));
+        await scrollGesture.up();
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 100));
+        swipeHelper.dispose();
+        selectedFiles.dispose();
+        swipeActive.dispose();
+        controller.dispose();
+      },
+    );
+  }
 
   testWidgets("a thumbnail tier change recreates the thumbnail loader", (
     tester,
