@@ -21,6 +21,19 @@ jobs:
             - name: Checkout
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+            - name: Restore Rust cache
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              with:
+                  workspaces: rust
+                  shared-key: rust-cli
+                  cache-targets: false
+                  save-if: false
+
+            - name: Restore Rust target
+              uses: ./.github/actions/restore-rust-target
+              with:
+                  shared-key: rust-cli
+
             - name: Run with disposable signing and storage
               run: |
                   umask 077
@@ -63,6 +76,19 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+            - name: Restore Rust cache
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              with:
+                  workspaces: rust
+                  shared-key: rust-cli
+                  cache-targets: false
+                  save-if: false
+
+            - name: Restore Rust target
+              uses: ./.github/actions/restore-rust-target
+              with:
+                  shared-key: rust-cli
 
             - name: Run with Windows Credential Manager
               run: python apps/cli-next/scripts/native-keyring.py test

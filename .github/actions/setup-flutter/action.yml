@@ -1,16 +1,23 @@
-name: "Setup Flutter"
-description: "Install the Flutter SDK version used by Ente CI"
+name: Setup Flutter
+description: Install the Flutter SDK version used by Ente CI
 
 runs:
-    using: "composite"
+    using: composite
     steps:
+        - id: cache
+          uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+              key: flutter-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/actions/setup-flutter/action.yml') }}
+              path: ${{ runner.tool_cache }}/flutter
+
         - shell: bash
           env:
               # Update every archive SHA below when changing this version:
               # https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json
               # https://storage.googleapis.com/flutter_infra_release/releases/releases_macos.json
               # https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json
-              FLUTTER_VERSION: "3.47.2"
+              FLUTTER_VERSION: 3.47.2
+              CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
           run: |
               set -euo pipefail
 
@@ -48,21 +55,29 @@ runs:
               archive_name="${archive##*/}"
               archive_path="$temp_dir/$archive_name"
 
-              curl --retry 3 --retry-all-errors -fsSL "$base_url/$archive" -o "$archive_path"
-              if [ "$RUNNER_OS" = macOS ]; then
-                  printf '%s  %s\n' "$archive_sha256" "$archive_path" | shasum -a 256 -c -
-              else
-                  printf '%s  %s\n' "$archive_sha256" "$archive_path" | sha256sum -c -
+              if [ "$CACHE_HIT" != true ]; then
+                  curl --retry 3 --retry-all-errors -fsSL "$base_url/$archive" -o "$archive_path"
+                  if [ "$RUNNER_OS" = macOS ]; then
+                      printf '%s  %s\n' "$archive_sha256" "$archive_path" | shasum -a 256 -c -
+                  else
+                      printf '%s  %s\n' "$archive_sha256" "$archive_path" | sha256sum -c -
+                  fi
+                  mkdir -p "$install_root"
+                  case "$archive_name" in
+                  *.zip) unzip -q -o "$archive_path" -d "$install_root" ;;
+                  *) tar xf "$archive_path" -C "$install_root" ;;
+                  esac
+                  rm -f "$archive_path"
               fi
-              mkdir -p "$install_root"
-              case "$archive_name" in
-              *.zip) unzip -q -o "$archive_path" -d "$install_root" ;;
-              *) tar xf "$archive_path" -C "$install_root" ;;
-              esac
-              rm -f "$archive_path"
 
               if [ "$RUNNER_OS" = Windows ]; then
                   cygpath -w "$flutter_root/bin" >>"$GITHUB_PATH"
               else
                   printf '%s\n' "$flutter_root/bin" >>"$GITHUB_PATH"
               fi
+
+        - if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
+          uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+              key: ${{ steps.cache.outputs.cache-primary-key }}
+              path: ${{ runner.tool_cache }}/flutter
