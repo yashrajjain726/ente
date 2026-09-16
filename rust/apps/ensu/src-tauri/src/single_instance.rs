@@ -26,15 +26,51 @@ pub fn plugin() -> TauriPlugin<tauri::Wry> {
                 Ok(())
             })
             .on_event(|app, event| {
-                if matches!(event, tauri::RunEvent::Ready) {
-                    let instance = app.state::<windows::Instance>();
-                    let app = app.clone();
-                    if let Err(error) = instance.listen(move || focus_main_window(&app)) {
-                        logging::log(
-                            "App",
-                            format!("failed to listen for activation error={error}"),
-                        );
+                let instance = app.state::<windows::Instance>();
+                match event {
+                    tauri::RunEvent::Ready => {
+                        let handle = app.clone();
+                        let result = instance
+                            .listen(move || {
+                                let app = handle.clone();
+                                if let Err(error) = handle.run_on_main_thread(move || {
+                                    if let Err(error) = app
+                                        .state::<windows::Instance>()
+                                        .activate(|| focus_main_window(&app))
+                                    {
+                                        logging::log(
+                                            "App",
+                                            format!(
+                                                "failed to acknowledge activation error={error}"
+                                            ),
+                                        );
+                                        app.exit(1);
+                                    }
+                                }) {
+                                    logging::log(
+                                        "App",
+                                        format!("failed to dispatch activation error={error}"),
+                                    );
+                                }
+                            })
+                            .and_then(|()| instance.activate(|| {}));
+                        if let Err(error) = result {
+                            logging::log(
+                                "App",
+                                format!("failed to listen for activation error={error}"),
+                            );
+                            app.exit(1);
+                        }
                     }
+                    tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                        instance.mark_exiting()
+                    }
+                    tauri::RunEvent::WindowEvent {
+                        label,
+                        event: tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed,
+                        ..
+                    } if label == "main" => instance.mark_exiting(),
+                    _ => {}
                 }
             })
             .build()
