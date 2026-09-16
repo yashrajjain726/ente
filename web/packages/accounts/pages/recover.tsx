@@ -1,3 +1,5 @@
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { RecoverAccountForm } from "ente-accounts/components/auth/RecoveryForm";
 import {
     AccountsPageContents,
     AccountsPageFooter,
@@ -38,7 +40,11 @@ export interface RecoverPageProps {
     presentation?: ComponentType<RecoverAccountPresentationProps>;
 }
 
-const Page: React.FC<RecoverPageProps> = ({ presentation: Presentation }) => {
+const Page: React.FC<RecoverPageProps> = ({ presentation }) => {
+    const { Shell } = useAuthPageConfig();
+    const Presentation =
+        presentation ??
+        (Shell ? ConfiguredRecoverAccountPresentation : undefined);
     const { showMiniDialog } = useBaseContext();
 
     const [keyAttributes, setKeyAttributes] = useState<
@@ -136,3 +142,14 @@ const Page: React.FC<RecoverPageProps> = ({ presentation: Presentation }) => {
 };
 
 export default Page;
+
+function ConfiguredRecoverAccountPresentation(
+    props: RecoverAccountPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell contentWidth={420}>
+            <RecoverAccountForm {...props} />
+        </Shell>
+    );
+}

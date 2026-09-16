@@ -1,3 +1,5 @@
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { TwoFactorForm } from "ente-accounts/components/auth/TwoFactorForm";
 import { Verify2FACodeForm } from "ente-accounts/components/Verify2FACodeForm";
 import {
     savedPartialLocalUser,
@@ -31,9 +33,10 @@ export interface TwoFactorVerifyPageProps {
     presentation?: ComponentType<TwoFactorVerifyPresentationProps>;
 }
 
-const Page: React.FC<TwoFactorVerifyPageProps> = ({
-    presentation: Presentation,
-}) => {
+const Page: React.FC<TwoFactorVerifyPageProps> = ({ presentation }) => {
+    const { Shell } = useAuthPageConfig();
+    const Presentation =
+        presentation ?? (Shell ? ConfiguredTwoFactorPresentation : undefined);
     const { logout } = useBaseContext();
 
     const [twoFactorSessionID, setTwoFactorSessionID] = useState("");
@@ -107,3 +110,14 @@ const Page: React.FC<TwoFactorVerifyPageProps> = ({
 };
 
 export default Page;
+
+function ConfiguredTwoFactorPresentation(
+    props: TwoFactorVerifyPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <TwoFactorForm {...props} />
+        </Shell>
+    );
+}

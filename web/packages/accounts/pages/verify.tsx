@@ -1,4 +1,7 @@
 import { Box, Typography } from "@mui/material";
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
+import { VerifyEmailForm } from "ente-accounts/components/auth/VerifyEmailForm";
 import {
     AccountsPageContents,
     AccountsPageFooter,
@@ -75,10 +78,20 @@ export interface VerifyPageProps {
 }
 
 const Page: React.FC<VerifyPageProps> = ({
-    presentation: Presentation,
-    passkeyPresentation,
-    secondFactorChoicePresentation,
+    presentation: explicitPresentation,
+    passkeyPresentation: explicitPasskeyPresentation,
+    secondFactorChoicePresentation: explicitSecondFactorChoicePresentation,
 }) => {
+    const { Shell, passkeyPresentation: configuredPasskeyPresentation } =
+        useAuthPageConfig();
+    const Presentation =
+        explicitPresentation ??
+        (Shell ? ConfiguredVerifyEmailPresentation : undefined);
+    const passkeyPresentation =
+        explicitPasskeyPresentation ?? configuredPasskeyPresentation;
+    const secondFactorChoicePresentation =
+        explicitSecondFactorChoicePresentation ??
+        (Shell ? SecondFactorChoiceDialog : undefined);
     const { logout, showMiniDialog } = useBaseContext();
 
     const [email, setEmail] = useState("");
@@ -310,3 +323,14 @@ const redirectionIfNeededOrEmail = async () => {
 
     return { email };
 };
+
+function ConfiguredVerifyEmailPresentation(
+    props: VerifyEmailPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <VerifyEmailForm {...props} />
+        </Shell>
+    );
+}

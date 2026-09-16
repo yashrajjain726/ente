@@ -1,4 +1,6 @@
 import { Divider } from "@mui/material";
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
 import {
     AccountsPageContents,
     AccountsPageFooter,
@@ -29,7 +31,13 @@ export interface ChangePasswordPageProps {
     resetPresentation?: ComponentType<NewPasswordPresentationProps>;
 }
 
-const Page: React.FC<ChangePasswordPageProps> = ({ resetPresentation }) => {
+const Page: React.FC<ChangePasswordPageProps> = ({
+    resetPresentation: explicitResetPresentation,
+}) => {
+    const { Shell } = useAuthPageConfig();
+    const resetPresentation =
+        explicitResetPresentation ??
+        (Shell ? ConfiguredResetPasswordPresentation : undefined);
     const [user, setUser] = useState<LocalUser | undefined>(undefined);
 
     const router = useRouter();
@@ -115,3 +123,14 @@ const PageContents: React.FC<PageContentsProps> = ({
         </AccountsPageContents>
     );
 };
+
+function ConfiguredResetPasswordPresentation(
+    props: NewPasswordPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <SetPasswordForm {...props} />
+        </Shell>
+    );
+}

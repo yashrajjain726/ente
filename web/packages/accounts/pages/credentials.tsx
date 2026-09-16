@@ -1,3 +1,9 @@
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import {
+    CredentialsForm,
+    PasswordForm,
+} from "ente-accounts/components/auth/CredentialsForm";
+import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import { AccountsPageContents } from "ente-accounts/components/layouts/centered-paper";
 import {
     AccountsPageFooterWithHost,
@@ -91,11 +97,23 @@ export interface CredentialsPageProps {
 }
 
 const Page: React.FC<CredentialsPageProps> = ({
-    presentation: Presentation,
-    passwordPresentation,
-    passkeyPresentation,
-    secondFactorChoicePresentation,
+    presentation: explicitPresentation,
+    passwordPresentation: explicitPasswordPresentation,
+    passkeyPresentation: explicitPasskeyPresentation,
+    secondFactorChoicePresentation: explicitSecondFactorChoicePresentation,
 }) => {
+    const { Shell, passkeyPresentation: configuredPasskeyPresentation } =
+        useAuthPageConfig();
+    const Presentation =
+        explicitPresentation ??
+        (Shell ? ConfiguredCredentialsPresentation : undefined);
+    const passkeyPresentation =
+        explicitPasskeyPresentation ?? configuredPasskeyPresentation;
+    const secondFactorChoicePresentation =
+        explicitSecondFactorChoicePresentation ??
+        (Shell ? SecondFactorChoiceDialog : undefined);
+    const passwordPresentation =
+        explicitPasswordPresentation ?? (Shell ? PasswordForm : undefined);
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState<string>("");
@@ -423,3 +441,14 @@ const Page: React.FC<CredentialsPageProps> = ({
 };
 
 export default Page;
+
+function ConfiguredCredentialsPresentation(
+    props: CredentialsPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell>
+            <CredentialsForm {...props} />
+        </Shell>
+    );
+}

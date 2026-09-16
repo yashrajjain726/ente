@@ -1,4 +1,6 @@
 import { Link } from "@mui/material";
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { RecoverTwoFactorForm } from "ente-accounts/components/auth/RecoveryForm";
 import {
     AccountsPageContents,
     AccountsPageFooter,
@@ -39,14 +41,18 @@ export interface TwoFactorRecoverPresentationProps {
 }
 
 export interface RecoverPageProps {
-    twoFactorType: TwoFactorType;
+    twoFactorType?: TwoFactorType;
     presentation?: ComponentType<TwoFactorRecoverPresentationProps>;
 }
 
 const Page: React.FC<RecoverPageProps> = ({
-    twoFactorType,
-    presentation: Presentation,
+    twoFactorType = "totp",
+    presentation,
 }) => {
+    const { Shell } = useAuthPageConfig();
+    const Presentation =
+        presentation ??
+        (Shell ? ConfiguredRecoverTwoFactorPresentation : undefined);
     const { logout, showMiniDialog, onGenericError } = useBaseContext();
 
     const [sessionID, setSessionID] = useState<string | undefined>(undefined);
@@ -169,3 +175,14 @@ const Page: React.FC<RecoverPageProps> = ({
 };
 
 export default Page;
+
+function ConfiguredRecoverTwoFactorPresentation(
+    props: TwoFactorRecoverPresentationProps,
+): React.JSX.Element {
+    const Shell = useAuthPageConfig().Shell!;
+    return (
+        <Shell contentWidth={420}>
+            <RecoverTwoFactorForm {...props} />
+        </Shell>
+    );
+}
