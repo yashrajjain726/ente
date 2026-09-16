@@ -1,4 +1,3 @@
-import java.io.ByteArrayOutputStream
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -22,13 +21,7 @@ if (hasReleaseKeystore) {
 val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
 fun capture(vararg cmd: String): String? = runCatching {
-    val out = ByteArrayOutputStream()
-    exec {
-        commandLine(*cmd)
-        standardOutput = out
-        errorOutput = ByteArrayOutputStream()
-    }
-    out.toString().trim()
+    providers.exec { commandLine(*cmd) }.standardOutput.asText.get().trim()
 }
     .getOrNull()
 

@@ -1,4 +1,3 @@
-import java.io.ByteArrayOutputStream
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -12,13 +11,7 @@ val debugJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/debug")
 val releaseJniLibsDir = layout.buildDirectory.dir("generated/jniLibs/release")
 
 fun capture(vararg cmd: String): String? = runCatching {
-    val out = ByteArrayOutputStream()
-    exec {
-        commandLine(*cmd)
-        standardOutput = out
-        errorOutput = ByteArrayOutputStream()
-    }
-    out.toString().trim()
+    providers.exec { commandLine(*cmd) }.standardOutput.asText.get().trim()
 }
     .getOrNull()
 
@@ -58,7 +51,7 @@ fun registerBuildRustJni(
     outputDir: Provider<Directory>,
     resolveAbis: () -> List<String>,
 ) =
-    tasks.register(taskName) {
+    tasks.register<Exec>(taskName) {
         val abis = resolveAbis()
 
         inputs.files(fileTree(file("../../../../rust")) { exclude("**/target/**") })
@@ -67,7 +60,7 @@ fun registerBuildRustJni(
         inputs.property("ndk", providers.provider { android.ndkVersion })
         outputs.dir(outputDir)
 
-        doLast {
+        doFirst {
             val version = android.ndkVersion
             val ndkDir = runCatching {
                 android.ndkDirectory
@@ -81,21 +74,19 @@ fun registerBuildRustJni(
             outDir.deleteRecursively()
             outDir.mkdirs()
 
-            exec {
-                workingDir = file("scripts")
-                commandLine(
-                    "bash",
-                    "./build-rust.sh",
-                    "--toolchain",
-                    toolchain.absolutePath,
-                    "--out-dir",
-                    outDir.absolutePath,
-                    *abis.toTypedArray(),
-                )
-                environment("ANDROID_NDK", ndkDir.absolutePath)
-                environment("ANDROID_NDK_ROOT", ndkDir.absolutePath)
-                environment("NDK_ROOT", ndkDir.absolutePath)
-            }
+            workingDir = file("scripts")
+            commandLine(
+                "bash",
+                "./build-rust.sh",
+                "--toolchain",
+                toolchain.absolutePath,
+                "--out-dir",
+                outDir.absolutePath,
+                *abis.toTypedArray(),
+            )
+            environment("ANDROID_NDK", ndkDir.absolutePath)
+            environment("ANDROID_NDK_ROOT", ndkDir.absolutePath)
+            environment("NDK_ROOT", ndkDir.absolutePath)
         }
     }
 
