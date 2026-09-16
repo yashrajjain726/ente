@@ -457,92 +457,104 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
             ),
             Scaffold(
               backgroundColor: Colors.transparent,
-              appBar: AppBar(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                iconTheme: const IconThemeData(color: Colors.white),
-                actionsIconTheme: const IconThemeData(color: Colors.white),
-                systemOverlayStyle: SystemUiOverlayStyle.light,
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Hero(
-                      tag: 'memory-lane-title-${widget.personId}',
-                      child: Text(
-                        title,
-                        style: darkTheme.textTheme.large.copyWith(
-                          inherit: false,
+              appBar: PreferredSize(
+                preferredSize: const Size.fromHeight(kToolbarHeight + 16),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: AppBar(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    iconTheme: const IconThemeData(color: Colors.white),
+                    actionsIconTheme: const IconThemeData(color: Colors.white),
+                    systemOverlayStyle: SystemUiOverlayStyle.light,
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Hero(
+                          tag: 'memory-lane-title-${widget.personId}',
+                          child: Text(
+                            title,
+                            style: darkTheme.textTheme.large.copyWith(
+                              inherit: false,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        if (file != null && creationTime != null)
+                          GestureDetector(
+                            onTap: () => _onDateTap(file),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  DateFormat.yMMMMd(
+                                    Localizations.localeOf(
+                                      context,
+                                    ).toLanguageTag(),
+                                  ).format(
+                                    DateTime.fromMicrosecondsSinceEpoch(
+                                      creationTime,
+                                    ),
+                                  ),
+                                  style: darkTheme.textTheme.small,
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    leadingWidth: 48 + screenSize.width * 0.04,
+                    actionsPadding: EdgeInsets.only(
+                      right: screenSize.width * 0.04,
+                    ),
+                    // TODO: Replace with an Ente component when it supports this pressed overlay.
+                    leading: Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: IconButton(
+                          tooltip: context.strings.close,
+                          style: IconButton.styleFrom(
+                            overlayColor: Colors.white.withValues(alpha: 0.08),
+                          ),
+                          icon: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedCancel01,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
                       ),
                     ),
-                    if (file != null && creationTime != null)
-                      GestureDetector(
-                        onTap: () => _onDateTap(file),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              DateFormat.yMMMMd(
-                                Localizations.localeOf(context).toLanguageTag(),
-                              ).format(
-                                DateTime.fromMicrosecondsSinceEpoch(
-                                  creationTime,
-                                ),
+                    actions: [
+                      if (widget.person != null &&
+                          flagService.enableMemoryShareLink &&
+                          !isLocalGalleryMode)
+                        // TODO: Replace with an Ente component when it supports this pressed overlay.
+                        SizedBox.square(
+                          dimension: 48,
+                          child: IconButton(
+                            tooltip: context.strings.shareLink,
+                            style: IconButton.styleFrom(
+                              overlayColor: Colors.white.withValues(
+                                alpha: 0.08,
                               ),
-                              style: darkTheme.textTheme.small,
                             ),
-                            const Icon(
-                              Icons.chevron_right,
-                              size: 16,
+                            icon: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedShare08,
                               color: Colors.white,
                             ),
-                          ],
+                            onPressed: _onShareTap,
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-                leadingWidth: 48 + screenSize.width * 0.04,
-                actionsPadding: EdgeInsets.only(right: screenSize.width * 0.04),
-                // TODO: Replace with an Ente component when it supports this pressed overlay.
-                leading: Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox.square(
-                    dimension: 48,
-                    child: IconButton(
-                      tooltip: context.strings.close,
-                      style: IconButton.styleFrom(
-                        overlayColor: Colors.white.withValues(alpha: 0.08),
-                      ),
-                      icon: const HugeIcon(
-                        icon: HugeIcons.strokeRoundedCancel01,
-                        color: Colors.white,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
+                    ],
                   ),
                 ),
-                actions: [
-                  if (widget.person != null &&
-                      flagService.enableMemoryShareLink &&
-                      !isLocalGalleryMode)
-                    // TODO: Replace with an Ente component when it supports this pressed overlay.
-                    SizedBox.square(
-                      dimension: 48,
-                      child: IconButton(
-                        tooltip: context.strings.shareLink,
-                        style: IconButton.styleFrom(
-                          overlayColor: Colors.white.withValues(alpha: 0.08),
-                        ),
-                        icon: const HugeIcon(
-                          icon: HugeIcons.strokeRoundedShare08,
-                          color: Colors.white,
-                        ),
-                        onPressed: _onShareTap,
-                      ),
-                    ),
-                ],
               ),
               body: SafeArea(
                 child: Column(
@@ -578,12 +590,12 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                           onLongPress: () {},
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: screenSize.width * 0.08,
-                              vertical: screenSize.height * 0.04,
+                              horizontal: screenSize.width * 0.01,
+                              vertical: screenSize.height * 0.01,
                             ),
                             child: Align(
                               child: AspectRatio(
-                                aspectRatio: 3 / 4,
+                                aspectRatio: 3 / 5,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(24),
                                   child: AnimatedSwitcher(
@@ -699,7 +711,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                     ),
                     ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: screenSize.height * 0.2,
+                        minHeight: screenSize.height * 0.1,
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -741,11 +753,11 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                 ),
                               ),
                             ),
-                            SizedBox(height: screenSize.height * 0.02),
+                            SizedBox(height: screenSize.height * 0.01),
                           ],
                           if (_entries.isNotEmpty)
                             ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 48),
+                              constraints: const BoxConstraints(minHeight: 32),
                               child: Padding(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: screenSize.width * 0.16,
