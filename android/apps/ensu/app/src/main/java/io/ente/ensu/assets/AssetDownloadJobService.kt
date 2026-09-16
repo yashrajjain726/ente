@@ -10,14 +10,13 @@ import android.content.Context
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class AssetDownloadJobService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
         synchronized(lock) {
             if (cancellations.isEmpty()) return false
             runningJob = this

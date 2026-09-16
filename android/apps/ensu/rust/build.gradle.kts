@@ -71,7 +71,10 @@ fun registerBuildRustJni(
             val version = android.ndkVersion
             val ndkDir = runCatching {
                 android.ndkDirectory
-            }.getOrElse { error("NDK $version is not installed. Run: sdkmanager \"ndk;$version\"") }
+            }
+                .getOrElse {
+                    error("NDK $version is not installed. Run: sdkmanager \"ndk;$version\"")
+                }
             val toolchain = ndkToolchain(ndkDir)
 
             val outDir = outputDir.get().asFile
@@ -142,11 +145,11 @@ tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(buildRus
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(buildRustJniRelease) }
 
 dependencies {
-    api("net.java.dev.jna:jna:5.18.1@aar")
     api("androidx.annotation:annotation:1.7.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     // Custom WebGPU/XNNPACK build; the Rust runtime dynamically loads its
     // libonnxruntime.so. Resolved from the Ivy repository declared in
     // settings.gradle.kts and SHA-256 pinned in android/gradle/verification-metadata.xml.
     api("io.ente.onnxruntime:onnxruntime-webgpu-android:1.28.1-r1@aar")
+    api("net.java.dev.jna:jna:5.18.1@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 }

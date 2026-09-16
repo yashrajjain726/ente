@@ -529,9 +529,18 @@ internal class ChatStoreActions(
                         }
                         if (!isActive()) return@launch
                         hits
+                    } catch (error: kotlinx.coroutines.CancellationException) {
+                        throw error
+                    } catch (_: LlmProvider.EmbeddingAssetInvalid) {
+                        embeddingAssetInvalid = true
+                        emptyList()
                     } catch (error: Throwable) {
-                        if (error is kotlinx.coroutines.CancellationException) return@launch
-                        embeddingAssetInvalid = error is LlmProvider.EmbeddingAssetInvalid
+                        logRepository.log(
+                            LogLevel.Warning,
+                            "Context retrieval failed",
+                            tag = "Chat",
+                            throwable = error,
+                        )
                         emptyList()
                     }
                 } else {
@@ -539,6 +548,8 @@ internal class ChatStoreActions(
                 }
 
             if (!isActive()) return@launch
+            var modelReady = false
+            var loadFailure: Throwable? = null
             try {
                 llmProvider.ensureModelReady(selection) { progress ->
                     if (!isActive()) return@ensureModelReady
@@ -558,41 +569,47 @@ internal class ChatStoreActions(
                         )
                     }
                 }
+                modelReady = true
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
             } catch (err: Throwable) {
-                val cancelled =
-                    err is kotlinx.coroutines.CancellationException ||
-                        err is LlmException.Cancelled ||
-                        err is AssetDownloadException.Cancelled
-                if (!isActive()) return@launch
-                streamingParentId = null
-                state.update { appState ->
-                    appState.copy(
-                        chat =
-                            appState.chat.copy(
-                                isGenerating = false,
-                                isDownloading = false,
-                                streamingParentId = null,
-                                downloadPercent = null,
-                                downloadStatus = if (cancelled) "Download cancelled" else null,
-                                downloadPhase = null,
-                                hasRequestedModelDownload =
-                                    if (cancelled) false
-                                    else appState.chat.hasRequestedModelDownload,
-                            )
-                    )
+                loadFailure = err
+            } finally {
+                if (!modelReady && isActive()) {
+                    val cancelled =
+                        loadFailure == null ||
+                            loadFailure is LlmException.Cancelled ||
+                            loadFailure is AssetDownloadException.Cancelled
+                    streamingParentId = null
+                    state.update { appState ->
+                        appState.copy(
+                            chat =
+                                appState.chat.copy(
+                                    isGenerating = false,
+                                    isDownloading = false,
+                                    streamingParentId = null,
+                                    downloadPercent = null,
+                                    downloadStatus = if (cancelled) "Download cancelled" else null,
+                                    downloadPhase = null,
+                                    hasRequestedModelDownload =
+                                        if (cancelled) false
+                                        else appState.chat.hasRequestedModelDownload,
+                                )
+                        )
+                    }
+                    modelSettingsActions.refreshModelDownloadInfo()
+                    if (!cancelled) {
+                        logRepository.log(
+                            LogLevel.Error,
+                            "Model load failed",
+                            details = loadFailure.message,
+                            tag = "Model",
+                            throwable = loadFailure,
+                        )
+                    }
                 }
-                modelSettingsActions.refreshModelDownloadInfo()
-                if (!cancelled) {
-                    logRepository.log(
-                        LogLevel.Error,
-                        "Model load failed",
-                        details = err.message,
-                        tag = "Model",
-                        throwable = err,
-                    )
-                }
-                return@launch
             }
+            if (!modelReady) return@launch
 
             if (!isActive()) return@launch
 
@@ -690,6 +707,8 @@ internal class ChatStoreActions(
 
             val buffer = StringBuilder()
             var tokenCount = 0
+            var totalTimeMs: Long? = null
+            var interrupted = true
 
             try {
                 val generate: suspend () -> io.ente.ensu.llm.GenerationSummary = {
@@ -714,12 +733,8 @@ internal class ChatStoreActions(
                 val summary =
                     try {
                         generate()
-                    } catch (error: Throwable) {
-                        if (
-                            error is LlmException.PromptTooLong &&
-                                buffer.isEmpty() &&
-                                activeCitations.isNotEmpty()
-                        ) {
+                    } catch (error: LlmException.PromptTooLong) {
+                        if (buffer.isEmpty() && activeCitations.isNotEmpty()) {
                             activeCitations = emptyList()
                             llmMessages =
                                 listOf(LlmMessage(normalSystemPrompt, LlmMessageRole.System)) +
@@ -735,28 +750,14 @@ internal class ChatStoreActions(
                         }
                     }
 
-                finishGeneration(
-                    sessionId,
-                    userMessage,
-                    buffer,
-                    tokenCount,
-                    summary.totalTimeMs,
-                    interrupted = false,
-                    shouldUpdateUi = isActive(),
-                    citations = activeCitations,
-                )
+                totalTimeMs = summary.totalTimeMs
+                interrupted = false
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
+            } catch (_: LlmException.Cancelled) {
+                interrupted = true
             } catch (err: Throwable) {
-                val interrupted = stopRequested || err is LlmException.Cancelled
-                finishGeneration(
-                    sessionId,
-                    userMessage,
-                    buffer,
-                    tokenCount,
-                    totalTimeMs = null,
-                    interrupted = interrupted,
-                    shouldUpdateUi = isActive(),
-                    citations = activeCitations,
-                )
+                interrupted = stopRequested
                 if (!interrupted) {
                     logRepository.log(
                         LogLevel.Error,
@@ -766,6 +767,17 @@ internal class ChatStoreActions(
                         throwable = err,
                     )
                 }
+            } finally {
+                finishGeneration(
+                    sessionId,
+                    userMessage,
+                    buffer,
+                    tokenCount,
+                    totalTimeMs,
+                    interrupted = interrupted,
+                    shouldUpdateUi = isActive(),
+                    citations = activeCitations,
+                )
             }
             if (embeddingAssetInvalid) modelSettingsActions.refreshModelDownloadInfo()
         }
@@ -1004,7 +1016,15 @@ internal class ChatStoreActions(
             ) { token ->
                 buffer.append(token)
             }
+        } catch (err: kotlinx.coroutines.CancellationException) {
+            throw err
         } catch (err: Throwable) {
+            logRepository.log(
+                LogLevel.Warning,
+                "Session summary failed",
+                tag = "Chat",
+                throwable = err,
+            )
             val fallbackSummary = summarizeQuestion(fallback)
             return if (fallbackSummary.isBlank()) null
             else sessionTitleFromText(fallbackSummary, fallback = fallback)

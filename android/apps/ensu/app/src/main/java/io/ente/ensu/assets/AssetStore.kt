@@ -16,7 +16,6 @@ import io.ente.ensu.bindings.needsAssetMigration
 import io.ente.ensu.bindings.reconcileKnowledgePack
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import java.io.File
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -98,10 +97,8 @@ class AssetStore(context: Context) {
                     },
                     token,
                 )
-            } catch (e: CancellationException) {
-                token.cancel()
-                throw e
             } finally {
+                token.cancel()
                 AssetDownloadJobService.end(lease)
             }
         }

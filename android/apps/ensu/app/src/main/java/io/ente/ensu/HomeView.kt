@@ -2,6 +2,7 @@
 
 package io.ente.ensu
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -38,11 +39,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.ente.ensu.bindings.ConfigDefaults
@@ -66,6 +67,7 @@ import io.ente.ensu.whatsnew.WhatsNewService
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -130,6 +132,8 @@ fun HomeView(
                             zipFile.inputStream().use { input -> input.copyTo(out) }
                         }
                         Toast.makeText(context, "Logs exported", Toast.LENGTH_SHORT).show()
+                    } catch (err: CancellationException) {
+                        throw err
                     } catch (err: Throwable) {
                         Toast.makeText(
                                 context,
@@ -158,6 +162,8 @@ fun HomeView(
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                     context.startActivity(Intent.createChooser(intent, "Share logs"))
+                } catch (err: CancellationException) {
+                    throw err
                 } catch (err: Throwable) {
                     Toast.makeText(
                             context,
@@ -454,6 +460,8 @@ private fun buildAttachmentFromUri(
             FileOutputStream(destination).use { output -> output.write(compressedBytes) }
             finalName = normalizedJpegAttachmentName(name ?: safeName)
         } else {
+            // Lint misses the close performed by use.
+            @SuppressLint("Recycle")
             val inputStream = resolver.openInputStream(uri) ?: return@runCatching null
             inputStream.use { input ->
                 FileOutputStream(destination).use { output -> input.copyTo(output) }
@@ -528,6 +536,8 @@ private fun openAttachment(context: Context, attachment: Attachment) {
     }
 }
 
+// Lint misses the close performed by use.
+@SuppressLint("Recycle")
 private fun queryDisplayName(resolver: android.content.ContentResolver, uri: Uri): String? {
     resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) {
@@ -538,6 +548,8 @@ private fun queryDisplayName(resolver: android.content.ContentResolver, uri: Uri
     return null
 }
 
+// Lint misses the close performed by use.
+@SuppressLint("Recycle")
 private fun querySize(resolver: android.content.ContentResolver, uri: Uri): Long? {
     resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) {

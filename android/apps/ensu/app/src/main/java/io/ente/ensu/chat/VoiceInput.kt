@@ -11,9 +11,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.ente.ensu.assets.AssetStore
 import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.LlmException
@@ -157,18 +157,14 @@ internal class VoiceTranscriptionController(
             } catch (error: TranscriptionException) {
                 Log.w(TAG, "Voice model preparation failed: ${error.message}", error)
                 state = VoiceInputState.Error(transcriptionErrorMessage(error))
+            } catch (_: AssetDownloadException.Cancelled) {
+                state = VoiceInputState.Idle
             } catch (error: AssetDownloadException) {
-                if (error is AssetDownloadException.Cancelled) {
-                    state = VoiceInputState.Idle
-                    return@launch
-                }
                 Log.w(TAG, "Voice model download failed: ${error.message}", error)
                 state = VoiceInputState.Error(downloadErrorMessage)
+            } catch (_: LlmException.Cancelled) {
+                state = VoiceInputState.Idle
             } catch (error: LlmException) {
-                if (error is LlmException.Cancelled) {
-                    state = VoiceInputState.Idle
-                    return@launch
-                }
                 Log.w(TAG, "Voice model download failed: ${error.message}", error)
                 state = VoiceInputState.Error(downloadErrorMessage)
             } catch (error: Throwable) {
@@ -316,18 +312,14 @@ internal class VoiceTranscriptionController(
             } catch (error: TranscriptionException) {
                 Log.w(TAG, "Voice transcription failed: ${error.message}", error)
                 state = VoiceInputState.Error(transcriptionErrorMessage(error))
+            } catch (_: AssetDownloadException.Cancelled) {
+                state = VoiceInputState.Idle
             } catch (error: AssetDownloadException) {
-                if (error is AssetDownloadException.Cancelled) {
-                    state = VoiceInputState.Idle
-                    return@withMaintenanceSuspended
-                }
                 Log.w(TAG, "Voice model download failed: ${error.message}", error)
                 state = VoiceInputState.Error(downloadErrorMessage)
+            } catch (_: LlmException.Cancelled) {
+                state = VoiceInputState.Idle
             } catch (error: LlmException) {
-                if (error is LlmException.Cancelled) {
-                    state = VoiceInputState.Idle
-                    return@withMaintenanceSuspended
-                }
                 Log.w(TAG, "Voice model download failed: ${error.message}", error)
                 state = VoiceInputState.Error(downloadErrorMessage)
             } catch (error: Throwable) {

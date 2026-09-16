@@ -35,6 +35,14 @@ allprojects {
             extensions.configure<CommonExtension<*, *, *, *, *, *>>("android") {
                 lint {
                     warningsAsErrors = true
+                    disable +=
+                        setOf(
+                            "ChromeOsAbiSupport",
+                            "GradleDependency",
+                            "IconLauncherShape",
+                            "UseKtx",
+                            "VectorPath",
+                        )
                     checkTestSources = true
                     checkDependencies = true
                 }

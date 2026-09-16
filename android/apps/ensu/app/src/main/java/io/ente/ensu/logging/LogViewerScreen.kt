@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,7 +49,6 @@ import io.ente.ensu.designsystem.EnsuTypography
 import io.ente.ensu.designsystem.HugeIcons
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 @Composable
 fun LogViewerScreen(logRepository: FileLogRepository) {
@@ -155,6 +155,8 @@ private fun NativeLogDetailsDialog(logEntry: LogEntry, onDismiss: () -> Unit) {
 
 @Composable
 private fun LogRow(logEntry: LogEntry, onOpenDetails: () -> Unit) {
+    val locale = LocalConfiguration.current.locales[0]
+    val logTimestampFormatter = remember(locale) { SimpleDateFormat("MMM d, h:mm:ss a", locale) }
     val hasDetails = !logEntry.details.isNullOrBlank()
 
     Column(
@@ -215,5 +217,3 @@ private fun levelColor(level: LogLevel): Color =
         LogLevel.Warning -> EnsuColor.accent()
         LogLevel.Error -> EnsuColor.error
     }
-
-private val logTimestampFormatter = SimpleDateFormat("MMM d, h:mm:ss a", Locale.getDefault())

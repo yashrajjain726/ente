@@ -1,5 +1,6 @@
 package io.ente.ensu.notes
 
+import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.net.Uri
 import android.os.Build
@@ -264,6 +265,8 @@ internal class AndroidNotesSource(
     }
 
     private fun bytes(id: String): ByteArray = access { request ->
+        // Lint misses the close performed by use.
+        @SuppressLint("Recycle")
         val descriptor =
             resolver.openAssetFileDescriptor(uri(id), "r", request)
                 ?: throw NotesException.SourceRead("Could not read the note")

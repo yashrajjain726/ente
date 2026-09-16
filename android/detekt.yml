@@ -12,6 +12,10 @@ coroutines:
   SuspendFunSwallowedCancellation:
     active: true
 
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+
 naming:
   FunctionNaming:
     ignoreAnnotated: ['Composable']

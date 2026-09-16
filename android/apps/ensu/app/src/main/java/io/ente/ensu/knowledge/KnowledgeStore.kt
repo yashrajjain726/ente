@@ -9,6 +9,7 @@ import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.KnowledgeDatasetConfig
 import io.ente.ensu.bindings.KnowledgeReconciliation
 import io.ente.ensu.bindings.KnowledgeReconciliationStatus
+import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
@@ -75,7 +76,7 @@ class KnowledgeStore(
             )
         }
         bootstrapJob = scope.launch {
-            val requestedEnabled = runCatching {
+            val requestedEnabled = runCatchingCancellable {
                 preferences.enabledDatasetIds.first()
             }
                 .getOrDefault(emptySet())
@@ -130,7 +131,7 @@ class KnowledgeStore(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
-                val reconciled = runCatching { provider.reconcile(dataset) }.getOrNull()
+                val reconciled = runCatchingCancellable { provider.reconcile(dataset) }.getOrNull()
                 updatePack(stableId) { current ->
                     (reconciled?.let { current.fromReconciliation(it, current.enabled) } ?: current)
                         .copy(
@@ -155,7 +156,7 @@ class KnowledgeStore(
         val ownerScope = scope ?: return
         val ownerJob = jobs[stableId]
         ownerScope.launch {
-            val result = runCatching { provider.cancel(dataset) }.getOrNull()
+            val result = runCatchingCancellable { provider.cancel(dataset) }.getOrNull()
             ownerJob?.join()
             if (jobs[stableId]?.isActive == true) return@launch
             updatePack(stableId) { current ->
@@ -193,7 +194,7 @@ class KnowledgeStore(
         dataset: KnowledgeDatasetConfig,
         enabled: Boolean,
     ) {
-        val result = runCatching { provider.reconcile(dataset) }
+        val result = runCatchingCancellable { provider.reconcile(dataset) }
         updatePack(dataset.stableId) { current ->
             result.fold(
                 onSuccess = { reconciliation ->

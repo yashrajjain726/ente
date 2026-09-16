@@ -11,6 +11,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -36,7 +37,13 @@ class KnowledgeProvider(private val assetStore: AssetStore) {
         lifecycleGate(dataset.stableId).withLock {
             val activeMutation = mutationGate.withLock { mutations[dataset.stableId] }
             if (activeMutation != null) {
-                val result = runCatching { activeMutation.task.await() }
+                val result =
+                    try {
+                        activeMutation.task.await()
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) currentCoroutineContext().ensureActive()
+                        null
+                    }
                 mutationGate.withLock {
                     if (
                         mutations[dataset.stableId] === activeMutation &&
@@ -45,7 +52,7 @@ class KnowledgeProvider(private val assetStore: AssetStore) {
                         mutations.remove(dataset.stableId)
                     }
                 }
-                result.getOrNull()?.let {
+                result?.let {
                     return@withLock it
                 }
                 currentCoroutineContext().ensureActive()
@@ -66,6 +73,7 @@ class KnowledgeProvider(private val assetStore: AssetStore) {
                             ownsMutation = true
                             val task =
                                 async(Dispatchers.IO) {
+                                    var completed = false
                                     try {
                                         assetStore.download(
                                             listOf(knowledgePackAsset(dataset.stableId))
@@ -82,15 +90,17 @@ class KnowledgeProvider(private val assetStore: AssetStore) {
                                             ) {
                                                 "Downloaded knowledge pack failed current revision validation"
                                             }
+                                            completed = true
                                             result
                                         }
-                                    } catch (error: Throwable) {
-                                        withContext(NonCancellable) {
-                                            indexGate.withLock {
-                                                runCatching { reconcileAndOpenLocked(dataset) }
+                                    } finally {
+                                        if (!completed) {
+                                            withContext(NonCancellable) {
+                                                indexGate.withLock {
+                                                    runCatching { reconcileAndOpenLocked(dataset) }
+                                                }
                                             }
                                         }
-                                        throw error
                                     }
                                 }
                             ActiveMutation(task).also { mutations[dataset.stableId] = it }
@@ -100,14 +110,9 @@ class KnowledgeProvider(private val assetStore: AssetStore) {
 
         try {
             mutation.task.await()
-        } catch (error: CancellationException) {
-            if (ownsMutation) mutation.task.cancel()
-            throw error
         } finally {
             withContext(NonCancellable) {
-                if (ownsMutation && !mutation.task.isCompleted) {
-                    mutation.task.join()
-                }
+                if (ownsMutation) mutation.task.cancelAndJoin()
                 mutationGate.withLock {
                     if (mutations[dataset.stableId] === mutation && mutation.task.isCompleted) {
                         mutations.remove(dataset.stableId)
@@ -119,8 +124,7 @@ class KnowledgeProvider(private val assetStore: AssetStore) {
 
     suspend fun cancel(dataset: KnowledgeDatasetConfig): KnowledgeReconciliation {
         val mutation = mutationGate.withLock { mutations[dataset.stableId] }
-        mutation?.task?.cancel()
-        runCatching { mutation?.task?.await() }
+        mutation?.task?.cancelAndJoin()
         mutationGate.withLock {
             if (mutations[dataset.stableId] === mutation) {
                 mutations.remove(dataset.stableId)

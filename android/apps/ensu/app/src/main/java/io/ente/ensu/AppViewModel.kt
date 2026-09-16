@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.config.loadConfigDefaults
+import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.LogLevel
@@ -66,12 +67,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         logRepository.log(LogLevel.Info, launchMessage, tag = "App")
 
         viewModelScope.launch {
-            runCatching {
+            runCatchingCancellable {
                 advancedSettingsDataStore.migrateLegacyModelSelection { url, mmproj ->
                     withContext(Dispatchers.IO) { assetStore.migrate(url, mmproj) }
                 }
             }
-            val initialSettings = runCatching {
+            val initialSettings = runCatchingCancellable {
                 advancedSettingsDataStore.settingsFlow.first()
             }
                 .getOrDefault(AdvancedSettingsSnapshot())
@@ -80,7 +81,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 modelSettings = initialSettings.modelSettings,
             )
             store.hydrateModelDownloadRequested(
-                runCatching { sessionPreferences.modelDownloadRequested.first() }
+                runCatchingCancellable { sessionPreferences.modelDownloadRequested.first() }
                     .getOrDefault(false)
             )
             store.bootstrap(viewModelScope)

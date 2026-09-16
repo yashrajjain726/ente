@@ -16,6 +16,7 @@ import io.ente.ensu.bindings.NotesProgressCallback
 import io.ente.ensu.bindings.NotesSummary
 import io.ente.ensu.bindings.notesLimits
 import io.ente.ensu.bindings.withNotesCollectionLabel
+import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.llm.ModelMaintenance
 import io.ente.ensu.llm.withMaintenanceSuspended
@@ -117,7 +118,9 @@ class NotesStore(
                         val summary = provider.inspect(record.id)
                         if (!summary.initialComplete) enqueue(record.id, immediate = true)
                         fromSummary(record, summary)
-                    } catch (e: NotesException.RebuildRequired) {
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: NotesException.RebuildRequired) {
                         enqueue(record.id, rebuild = true, immediate = true)
                         NoteCollectionState(record.id, record.label)
                     } catch (e: Exception) {
@@ -138,6 +141,8 @@ class NotesStore(
                 _state.value = NotesState(states)
                 loaded = true
                 scans.addAll(registrations.keys)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logRepository.log(
                     LogLevel.Error,
@@ -265,7 +270,7 @@ class NotesStore(
                     hits += provider.search(record.id, query)
                 } catch (error: CancellationException) {
                     throw error
-                } catch (error: NotesException.RebuildRequired) {
+                } catch (_: NotesException.RebuildRequired) {
                     enqueue(record.id, rebuild = true, immediate = true)
                     update(record.id) {
                         it.copy(status = NotesStatus.Pending, indexAvailable = false)
@@ -303,7 +308,7 @@ class NotesStore(
                     accepted++
                 } catch (error: CancellationException) {
                     throw error
-                } catch (error: NotesException.SourceChanged) {
+                } catch (_: NotesException.SourceChanged) {
                     enqueue(record.id, forced = setOf(note.documentId), immediate = true)
                 } catch (error: Exception) {
                     fail(record.id, error)
@@ -326,6 +331,8 @@ class NotesStore(
                     }
                 )
                 clearError()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val error =
                     when (e) {
@@ -404,6 +411,8 @@ class NotesStore(
         val job =
             owner.launch(start = CoroutineStart.LAZY) {
                 scans.remove(id)
+                var completed = false
+                var failure: Throwable? = null
                 try {
                     cancel.check()
                     if (snapshot == null) {
@@ -487,35 +496,47 @@ class NotesStore(
                             }
                         }
                     }
-                } catch (e: Exception) {
-                    when (e) {
-                        is NotesException.Cancelled,
-                        is CancellationException -> {
-                            if (snapshot == null) scans.add(id)
-                            val saved =
-                                withContext(NonCancellable) {
-                                    runCatching { provider.inspect(id) }.getOrNull()
-                                }
-                            update(id) {
-                                it.copy(
-                                    status = NotesStatus.Pending,
-                                    indexAvailable =
-                                        hadIndex &&
-                                            saved?.initialComplete == true &&
-                                            saved.documentCount > 0uL,
-                                )
-                            }
-                            if (e is CancellationException) throw e
-                        }
-                        is NotesException.RebuildRequired -> {
-                            if (snapshot == null) {
-                                enqueue(id, rebuild = true, immediate = true)
+                    completed = true
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    failure = error
+                } catch (error: Throwable) {
+                    failure = error
+                    throw error
+                } finally {
+                    if (!completed) {
+                        when (failure) {
+                            null,
+                            is NotesException.Cancelled -> {
+                                if (snapshot == null) scans.add(id)
+                                val saved =
+                                    withContext(NonCancellable) {
+                                        runCatchingCancellable { provider.inspect(id) }.getOrNull()
+                                    }
                                 update(id) {
-                                    it.copy(status = NotesStatus.Pending, indexAvailable = false)
+                                    it.copy(
+                                        status = NotesStatus.Pending,
+                                        indexAvailable =
+                                            hadIndex &&
+                                                saved?.initialComplete == true &&
+                                                saved.documentCount > 0uL,
+                                    )
                                 }
-                            } else fail(id, e)
+                            }
+                            is NotesException.RebuildRequired -> {
+                                if (snapshot == null) {
+                                    enqueue(id, rebuild = true, immediate = true)
+                                    update(id) {
+                                        it.copy(
+                                            status = NotesStatus.Pending,
+                                            indexAvailable = false,
+                                        )
+                                    }
+                                } else fail(id, failure)
+                            }
+                            is Exception -> fail(id, failure)
                         }
-                        else -> fail(id, e)
                     }
                 }
             }

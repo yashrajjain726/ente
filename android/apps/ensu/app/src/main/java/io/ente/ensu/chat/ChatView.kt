@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -142,7 +143,7 @@ fun ChatView(
 
     val focusManager = LocalFocusManager.current
     var didAutoFocusInput by remember { mutableStateOf(false) }
-    var focusRequestId by remember { mutableStateOf(0) }
+    var focusRequestId by remember { mutableIntStateOf(0) }
     var wasDrawerOpen by remember { mutableStateOf(false) }
 
     val shouldAutoFocusInput =
@@ -353,7 +354,7 @@ fun ChatView(
             }
         if (showToast) {
             DownloadToastOverlay(
-                status = status ?: "",
+                status = status.orEmpty(),
                 percent = chatState.downloadPercent ?: 0,
                 totalBytes = chatState.modelDownloadSizeBytes,
                 isLoading = isLoading,

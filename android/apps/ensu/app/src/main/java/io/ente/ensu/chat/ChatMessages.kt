@@ -42,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -80,7 +82,6 @@ import io.ente.ensu.notes.LocalNotesStore
 import io.ente.ensu.platform.rememberHaptics
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
@@ -143,10 +144,12 @@ internal fun MessageList(
     var didPerformStreamingStartHaptic by remember { mutableStateOf(false) }
     var shouldJumpToBottomOnLoad by remember { mutableStateOf(true) }
     var wasAtBottomBeforeResize by remember { mutableStateOf(true) }
-    var lastViewportHeight by remember { mutableStateOf(0) }
+    var lastViewportHeight by remember { mutableIntStateOf(0) }
     var lastUserMessageId by remember { mutableStateOf<String?>(null) }
-    var previousScrollIndex by remember { mutableStateOf(listState.firstVisibleItemIndex) }
-    var previousScrollOffset by remember { mutableStateOf(listState.firstVisibleItemScrollOffset) }
+    var previousScrollIndex by remember { mutableIntStateOf(listState.firstVisibleItemIndex) }
+    var previousScrollOffset by remember {
+        mutableIntStateOf(listState.firstVisibleItemScrollOffset)
+    }
     val isAtBottom by remember { derivedStateOf { !listState.canScrollForward } }
     val bottomItemIndex by
         remember(messages.size, isGenerating) {
@@ -949,13 +952,13 @@ private fun StreamingMessageBubble(
             )
         }
 
-        generatingDotsIndicator()
+        GeneratingDotsIndicator()
     }
 }
 
 @Composable
-private fun generatingDotsIndicator() {
-    var dotCount by remember { mutableStateOf(1) }
+private fun GeneratingDotsIndicator() {
+    var dotCount by remember { mutableIntStateOf(1) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -988,11 +991,11 @@ private fun hasVisibleStreamingContent(text: String): Boolean {
 
 @Composable
 private fun TimestampText(timestampMillis: Long) {
+    val locale = LocalConfiguration.current.locales[0]
+    val timestampFormatter = remember(locale) { SimpleDateFormat("h:mm a", locale) }
     Text(
         text = timestampFormatter.format(Date(timestampMillis)),
         style = EnsuTypography.mini,
         color = EnsuColor.textMuted(),
     )
 }
-
-private val timestampFormatter = SimpleDateFormat("h:mm a", Locale.getDefault())

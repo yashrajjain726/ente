@@ -18,6 +18,7 @@ import io.ente.ensu.bindings.knowledgeEmbeddingModelAsset
 import io.ente.ensu.bindings.llmAsset
 import io.ente.ensu.bindings.llmCancel
 import io.ente.ensu.bindings.llmInitBackend
+import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.device.requireChatSupported
 import io.ente.ensu.settings.IS_ENSU_PACKS_ENABLED
@@ -137,7 +138,7 @@ class LlmProvider(
     ): GenerationSummary = withModelContext {
         modelLoadMutex.withLock {
             deviceCapabilityProvider.chatCapability().requireChatSupported()
-            val context = loadedContext ?: throw IllegalStateException("Model context not loaded")
+            val context = checkNotNull(loadedContext) { "Model context not loaded" }
             currentJobId = null
             val mmprojPath =
                 if (imageFiles.isEmpty()) {
@@ -219,7 +220,7 @@ class LlmProvider(
 
     suspend fun prewarmImageInference(selection: LlmModelSelection) {
         withModelContext {
-            runCatching {
+            runCatchingCancellable {
                 modelLoadMutex.withLock {
                     val asset = chatAsset(selection)
                     if (!assetStore.isDownloaded(asset)) return@withLock
@@ -399,7 +400,7 @@ class LlmProvider(
             }
         }
         unloadModel()
-        throw lastError ?: IllegalStateException("Failed to load model")
+        throw (lastError ?: error("Failed to load model"))
     }
 
     private fun generateStreamWithCallback(

@@ -7,6 +7,7 @@ import io.ente.ensu.bindings.AssetDownloadException
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ModelRuntimeSurface
 import io.ente.ensu.bindings.resolveEffectiveModelId
+import io.ente.ensu.coroutines.runCatchingCancellable
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
@@ -201,6 +202,8 @@ internal class ModelSettingsActions(
                     initialPercent = if (isDownloaded) null else 0,
                     initialStatus = if (isDownloaded) null else "Starting download...",
                 )
+            var completed = false
+            var downloadFailure: Throwable? = null
             try {
                 var retryCount = 0
                 while (true) {
@@ -235,6 +238,8 @@ internal class ModelSettingsActions(
                             }
                         }
                         break
+                    } catch (err: kotlinx.coroutines.CancellationException) {
+                        throw err
                     } catch (err: Throwable) {
                         if (!shouldRetryDownload(err, retryCount)) {
                             throw err
@@ -244,44 +249,54 @@ internal class ModelSettingsActions(
                         delay(retryDelayMs(retryCount))
                     }
                 }
+                completed = true
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
             } catch (err: Throwable) {
-                val cancelled =
-                    err is kotlinx.coroutines.CancellationException ||
-                        err is LlmException.Cancelled ||
-                        err is AssetDownloadException.Cancelled
-                val failureMessage =
-                    if (cancelled) {
-                        "Download cancelled"
-                    } else {
-                        userFacingDownloadError(err, isDownloaded)
-                    }
-                state.update { appState ->
-                    appState.copy(
-                        chat =
-                            appState.chat.copy(
-                                isDownloading = false,
-                                downloadPercent = null,
-                                downloadStatus = failureMessage,
-                                downloadPhase = if (cancelled) null else DownloadPhase.Failed,
-                                hasRequestedModelDownload = false,
-                            )
-                    )
-                }
-                persistModelDownloadRequested(false)
-                if (cancelled) {
-                    if (!isDownloaded) {
-                        logRepository.log(LogLevel.Info, "Model download cancelled", tag = "Model")
-                    }
-                } else {
-                    logRepository.log(
-                        LogLevel.Error,
-                        if (isDownloaded) "Model load failed" else "Model download failed",
-                        details = err.message,
-                        tag = "Model",
-                        throwable = err,
-                    )
-                }
+                downloadFailure = err
             } finally {
+                if (!completed) {
+                    val cancelled =
+                        downloadFailure == null ||
+                            downloadFailure is LlmException.Cancelled ||
+                            downloadFailure is AssetDownloadException.Cancelled
+                    val failureMessage =
+                        if (cancelled) {
+                            "Download cancelled"
+                        } else {
+                            userFacingDownloadError(downloadFailure, isDownloaded)
+                        }
+                    state.update { appState ->
+                        appState.copy(
+                            chat =
+                                appState.chat.copy(
+                                    isDownloading = false,
+                                    downloadPercent = null,
+                                    downloadStatus = failureMessage,
+                                    downloadPhase = if (cancelled) null else DownloadPhase.Failed,
+                                    hasRequestedModelDownload = false,
+                                )
+                        )
+                    }
+                    persistModelDownloadRequested(false)
+                    if (cancelled) {
+                        if (!isDownloaded) {
+                            logRepository.log(
+                                LogLevel.Info,
+                                "Model download cancelled",
+                                tag = "Model",
+                            )
+                        }
+                    } else {
+                        logRepository.log(
+                            LogLevel.Error,
+                            if (isDownloaded) "Model load failed" else "Model download failed",
+                            details = downloadFailure.message,
+                            tag = "Model",
+                            throwable = downloadFailure,
+                        )
+                    }
+                }
                 modelDownloadJob = null
                 refreshModelDownloadInfo()
             }
@@ -300,6 +315,8 @@ internal class ModelSettingsActions(
         scope.launch {
             try {
                 llmProvider.prewarmImageInference(selection)
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
             } catch (err: Throwable) {
                 logRepository.log(
                     LogLevel.Warning,
@@ -332,7 +349,7 @@ internal class ModelSettingsActions(
 
     private fun persistModelDownloadRequested(requested: Boolean) {
         scope?.launch {
-            runCatching {
+            runCatchingCancellable {
                 sessionPreferences.setModelDownloadRequested(requested)
             }
                 .onFailure { error ->
