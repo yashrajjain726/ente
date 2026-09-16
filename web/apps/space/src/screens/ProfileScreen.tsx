@@ -23,7 +23,6 @@ import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { SpaceFeedPostButton } from "components/FeedPostButton";
 import {
     SpaceFileViewer,
-    SpaceViewerPostBackdrop,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
@@ -122,7 +121,6 @@ interface SelectedProfilePost {
 
 interface PostMasonryTile {
     aspectRatio: number;
-    dimensions: ProfilePhotoDimensions;
     index: number;
     item: ProfilePostItem;
 }
@@ -166,7 +164,6 @@ const buildPostMasonrySections = (
         )!;
         section.tiles.push({
             aspectRatio: photoAspectRatio(dimensions),
-            dimensions,
             index,
             item,
         });
@@ -296,12 +293,10 @@ const ProfilePostLoadingIndicator: React.FC = () => (
 );
 
 interface ProfilePostTileProps {
-    dimensions: ProfilePhotoDimensions;
     displayName: string;
     flexGrow: number;
     imageUrl?: string;
     index: number;
-    isSingleItemRow: boolean;
     isUnavailable: boolean;
     item: ProfilePostItem;
     loadRootMargin: string;
@@ -312,12 +307,10 @@ interface ProfilePostTileProps {
 }
 
 const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
-    dimensions,
     displayName,
     flexGrow,
     imageUrl,
     index,
-    isSingleItemRow,
     isUnavailable: isPostUnavailable,
     item,
     loadRootMargin,
@@ -391,12 +384,12 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
             }}
             sx={{
                 appearance: "none",
-                aspectRatio: `${dimensions.width} / ${dimensions.height}`,
                 bgcolor: photoMasonryPlaceholderBackground,
                 border: 0,
                 cursor: imageUrl && !isUnavailable ? "pointer" : "default",
                 display: "block",
-                flex: isSingleItemRow ? "0 0 100%" : `${flexGrow} 1 0`,
+                flex: `${flexGrow} 1 0`,
+                height: "100%",
                 minWidth: 0,
                 opacity: 1,
                 overflow: "hidden",
@@ -563,8 +556,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
-    const [isDraftPostExitAnimating, setIsDraftPostExitAnimating] =
-        useState(false);
     const [isDraftPostExiting, setIsDraftPostExiting] = useState(false);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [isInviteLinkCopied, setIsInviteLinkCopied] = useState(false);
@@ -740,7 +731,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
     const closeSelectedPost = () => {
         activeLocalPostObjectUrlRef.current = null;
-        setIsDraftPostExitAnimating(false);
         setIsDraftPostExiting(false);
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
@@ -1092,8 +1082,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
 
     const renderPostTile = (
-        { aspectRatio, dimensions, index, item }: PostMasonryTile,
-        isSingleItemRow: boolean,
+        { aspectRatio, index, item }: PostMasonryTile,
         rowAspectRatio: number,
     ) => {
         const imageUrl = loadedPostImageURLFor(item);
@@ -1102,11 +1091,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <ProfilePostTile
                 key={`${item.id}-${index}`}
                 flexGrow={aspectRatio / rowAspectRatio}
-                dimensions={dimensions}
                 displayName={displayName}
                 imageUrl={imageUrl}
                 index={index}
-                isSingleItemRow={isSingleItemRow}
                 isUnavailable={isUnavailable}
                 item={item}
                 loadRootMargin={postImageLoadRootMargin}
@@ -1338,9 +1325,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 position: "relative",
             }}
         >
-            {selectedPost && (
-                <SpaceViewerPostBackdrop exiting={isDraftPostExitAnimating} />
-            )}
             <Box
                 sx={{
                     bgcolor: "transparent",
@@ -1912,28 +1896,25 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             overflow: "hidden",
                                         }}
                                     >
-                                        {rows.map((row) => {
-                                            const isSingleItemRow =
-                                                row.tiles.length == 1;
-                                            return (
-                                                <Box
-                                                    key={row.tiles[0]!.item.id}
-                                                    sx={{
-                                                        display: "flex",
-                                                        gap: photoMasonryGap,
-                                                        width: "100%",
-                                                    }}
-                                                >
-                                                    {row.tiles.map((tile) =>
-                                                        renderPostTile(
-                                                            tile,
-                                                            isSingleItemRow,
-                                                            row.aspectRatio,
-                                                        ),
-                                                    )}
-                                                </Box>
-                                            );
-                                        })}
+                                        {rows.map((row) => (
+                                            <Box
+                                                key={row.tiles[0]!.item.id}
+                                                sx={{
+                                                    display: "flex",
+                                                    flexShrink: 0,
+                                                    gap: photoMasonryGap,
+                                                    height: row.height,
+                                                    width: "100%",
+                                                }}
+                                            >
+                                                {row.tiles.map((tile) =>
+                                                    renderPostTile(
+                                                        tile,
+                                                        row.aspectRatio,
+                                                    ),
+                                                )}
+                                            </Box>
+                                        ))}
                                     </Box>
                                 </Box>
                             ))}
@@ -2049,9 +2030,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 ? onAddFriendForPostAction
                                 : undefined
                         }
-                        onDraftPostExitAnimationStart={() => {
-                            setIsDraftPostExitAnimating(true);
-                        }}
                         onDraftPostExitStart={() => setIsDraftPostExiting(true)}
                         onDraftPostPublished={() => {
                             void clearSelectedPostHistory("back").then(() =>

@@ -8,6 +8,13 @@ import {
 const photos = (ratios: number[]) =>
     ratios.map((aspectRatio, id) => ({ id, aspectRatio }));
 
+test("a portrait and landscape share a row at their allocated widths", () => {
+    const tiles = photos([3 / 4, 3 / 2]);
+    expect(profilePhotoRows(tiles, 363)).toEqual([
+        { aspectRatio: 2.25, height: 160, tiles },
+    ]);
+});
+
 test("short landscape rows split without changing photo dimensions", () => {
     const tiles = photos([4 / 3, 5 / 4, 7 / 4]);
     const rows = profilePhotoRows(tiles, 328);
@@ -51,14 +58,13 @@ test.each([288, 328, 358, 568])(
         expect(rows.flatMap(({ tiles }) => tiles)).toEqual(tiles);
         for (const row of rows) {
             const gaps = (row.tiles.length - 1) * profilePhotoGap;
-            const height = (width - gaps) / row.aspectRatio;
             expect(
                 row.tiles.reduce(
-                    (sum, tile) => sum + tile.aspectRatio * height,
+                    (sum, tile) => sum + tile.aspectRatio * row.height,
                     gaps,
                 ),
             ).toBeCloseTo(width);
-            expect(height).toBeGreaterThanOrEqual(
+            expect(row.height).toBeGreaterThanOrEqual(
                 Math.min(
                     profilePhotoMinRowHeight,
                     width / row.tiles[0]!.aspectRatio,

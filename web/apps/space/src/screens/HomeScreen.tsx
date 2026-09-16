@@ -8,10 +8,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import { SpaceActionToast } from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpaceCaptionText } from "components/CaptionText";
 import { SpaceFeedPostButton } from "components/FeedPostButton";
 import {
     SpaceFileViewer,
-    SpaceViewerPostBackdrop,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
@@ -54,18 +54,21 @@ import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 const homeBackground = spaceAppBackgroundColor;
 
 const green = "#08C225";
+const feedCardBackground = "#2C2C2E";
 const feedAccentBackground = "#263D2C";
 const feedAccentBackgroundHover = "#2C4B32";
-const feedActionBackground = "#242426";
-const feedActionBackgroundHover = "#303033";
-const feedLikeForeground = "#D1D1D6";
-const feedTimestampForeground = "#8E8E93";
+const feedActionBackground = "#3A3A3E";
+const feedActionBackgroundHover = "#47474C";
+const feedLikeForeground = "#E4E4E8";
+const feedTimestampForeground = "#A7A7AE";
 const feedSkeletonElementBackground = spaceSurfaceHover;
 const textBase = spaceText;
 const textSecondary = spaceTextMuted;
 const dangerColor = "#F63A3A";
-const feedAvatarSize = 24;
+const feedAvatarSize = 25;
 const feedLikeActionSize = spaceTouchTargetSize;
+const feedCardRadius = 16;
+const feedFooterInset = 8;
 const feedActionIconSize = 20;
 const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
@@ -80,21 +83,13 @@ const avatarFadeSx = {
     "@media (prefers-reduced-motion: reduce)": { animation: "none" },
 } as const;
 const feedPhotoCaptionTextSx = {
-    color: "#FFFFFF",
+    color: "#E6E6E6",
     fontFamily: '"Inter Variable", Inter, sans-serif',
     fontSize: 13,
-    fontWeight: 650,
-    lineHeight: "19px",
+    fontWeight: 600,
+    lineHeight: "21px",
     textAlign: "center",
     textWrap: "balance",
-} as const;
-const feedPhotoCaptionBubbleSx = {
-    bgcolor: "rgba(48, 48, 48, 0.79)",
-    borderRadius: "5px",
-    boxDecorationBreak: "clone",
-    px: "7px",
-    py: "2px",
-    WebkitBoxDecorationBreak: "clone",
 } as const;
 interface HomeScreenProps {
     feedItems: SpacePost[];
@@ -351,7 +346,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
                     sx={{
                         boxSizing: "border-box",
                         minWidth: 0,
-                        pb: "36px",
+                        pb: "28px",
                         position: "relative",
                         width: "100%",
                     }}
@@ -609,23 +604,16 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
             sx={{
                 ...feedPhotoCaptionTextSx,
                 bottom: 20,
-                display: "-webkit-box",
                 left: "50%",
                 maxWidth: "78%",
-                overflow: "hidden",
                 pointerEvents: "none",
                 position: "absolute",
-                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                 transform: "translateX(-50%)",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2,
                 width: "max-content",
                 zIndex: 2,
             }}
         >
-            <Box component="span" sx={feedPhotoCaptionBubbleSx}>
-                {caption}
-            </Box>
+            <SpaceCaptionText caption={caption} lineClamp={2} />
         </Box>
     );
 };
@@ -875,6 +863,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
             ref={rootRef}
             component="article"
             sx={{
+                bgcolor: feedCardBackground,
+                borderRadius: `${feedCardRadius}px`,
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
@@ -893,8 +883,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     gap: "8px",
                     gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) fit-content(50%)`,
                     lineHeight: "20px",
-                    mb: "10px",
-                    px: "4px",
+                    minHeight: 52,
+                    px: "12px",
+                    py: "4px",
                 }}
             >
                 <Box
@@ -903,7 +894,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     aria-label={authorProfileLabel}
                     onClick={openAuthor}
                     sx={{
-                        alignItems: "flex-end",
+                        alignItems: "center",
                         appearance: "none",
                         bgcolor: "transparent",
                         border: 0,
@@ -912,7 +903,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         flexShrink: 0,
                         height: spaceTouchTargetSize,
                         justifyContent: "center",
-                        mt: `${feedAvatarSize - spaceTouchTargetSize}px`,
                         mx: `${(feedAvatarSize - spaceTouchTargetSize) / 2}px`,
                         overflow: "visible",
                         p: 0,
@@ -929,7 +919,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         sx={{
                             bgcolor: "rgba(255, 255, 255, 0.2)",
                             borderRadius: "50%",
-                            bottom: 0,
                             height: feedAvatarSize,
                             width: feedAvatarSize,
                             position: "absolute",
@@ -1083,7 +1072,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 sx={{
                     aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
                     bgcolor: "transparent",
-                    borderRadius: "16px",
+                    borderRadius: showFooter
+                        ? 0
+                        : `0 0 ${feedCardRadius}px ${feedCardRadius}px`,
                     maxWidth: "100%",
                     minWidth: 0,
                     overflow: "hidden",
@@ -1209,10 +1200,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         alignItems: "center",
                         boxSizing: "border-box",
                         display: "grid",
-                        gap: "6px",
+                        gap: "8px",
                         gridTemplateColumns: "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
-                        mt: "8px",
+                        p: `${feedFooterInset}px`,
                         width: "100%",
                     }}
                 >
@@ -1226,8 +1217,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             appearance: "none",
                             bgcolor: feedActionBackground,
                             border: 0,
-                            borderRadius: "22px",
-                            color: "#B0B0B8",
+                            borderRadius: "999px",
+                            color: "#D0D0D6",
                             cursor: canOpenPhoto ? "pointer" : "default",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
@@ -1786,7 +1777,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 position: "relative",
             }}
         >
-            {selectedViewer && <SpaceViewerPostBackdrop />}
             <Box
                 sx={{
                     bgcolor: homeBackground,
@@ -1826,7 +1816,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         minWidth: 0,
                         pb: "calc(env(safe-area-inset-bottom) + 112px)",
                         px: feedHorizontalPadding,
-                        pt: showFeedCards ? "28px" : "8px",
+                        pt: showFeedCards ? "20px" : "8px",
                         width: "100%",
                     }}
                 >
