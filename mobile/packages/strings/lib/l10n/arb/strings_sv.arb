@@ -168,7 +168,7 @@
   "addToCollection": "Lägg till i samling",
   "addToEnte": "Lägg till i Ente",
   "addToHiddenAlbum": "Lägg till i dolt album",
-  "addToPerson": "Lägg till person",
+  "addToPerson": "Koppla till person",
   "@addToPerson": {
     "description": "Action label to add selected files to an existing person."
   },
@@ -941,7 +941,7 @@
   "deleteAlbum": "Radera album",
   "deleteAlbumDialog": "Radera även foton (och videor) närvarande i albumet från <bold>alla</bold> andra album som de är med i?",
   "deleteAlbumQuestion": "Radera det här albumet?",
-  "deleteAlbumsDialogBody": "Det här kommer att radera alla tomma album. Det här är användbart när du vill minsta skräpet i din albumlista.",
+  "deleteAlbumsDialogBody": "Det här kommer att radera alla tomma album. Det här är användbart när du vill minska röran i din albumlista.",
   "deleteAll": "Radera alla",
   "deleteCodeAuthMessage": "Autentisera för att radera kod",
   "deleteCodeMessage": "Vill du ta bort den här koden? Det går inte att ångra den här åtgärden.",
@@ -993,7 +993,7 @@
   "deleteFromEnte": "Radera från Ente",
   "deleteHiddenFilesFromDevice": "Radera dolda filer från enheten",
   "deleteHiddenFilesFromDeviceDescription": "Radera lokala kopior av dolda filer från din enhet",
-  "deleteItemCount": "{count, plural, one{Raderar {count} objekt} other{Raderar {count} objekt}}",
+  "deleteItemCount": "{count, plural, one{Radera {count} objekt} other{Radera {count} objekt}}",
   "@deleteItemCount": {
     "placeholders": {
       "count": {}
@@ -4550,7 +4550,7 @@
     "description": "Toast shown when info items fail to save due to hitting the file count limit"
   },
   "uploadFiles": "Ladda upp objekt",
-  "uploadFileTooLargeErrorBody": "Den här filer är större än den högst stödda uppladningsstorleken på 10 GB.",
+  "uploadFileTooLargeErrorBody": "Den här filen är större än den maximala uppladdningsstorleken på 10 GB.",
   "@uploadFileTooLargeErrorBody": {
     "description": "Body shown when uploads fail because the file exceeds the supported size"
   },
@@ -4856,11 +4856,11 @@
       }
     }
   },
-  "legacyKitSheetIntro": "Om jag inte kan vara närvarande eller förlorar åtkomst till mitt konto hjälper det här bladet dig att återställa dina foton, dokument och annat.",
+  "legacyKitSheetIntro": "Om jag inte kan vara närvarande eller förlorar åtkomst till mitt konto hjälper det här bladet dig att återställa mina foton, dokument och annat.",
   "@legacyKitSheetIntro": {
     "description": "Written in the voice of the account owner, addressed to the sheet holder"
   },
-  "legacyKitSheetHowToRecover": "Hur du återställer ditt konto",
+  "legacyKitSheetHowToRecover": "Hur du återställer mitt konto",
   "legacyKitSheetStepGetAnother": "Det här är {index} av {total} blad. Be {names} om deras – du behöver bara ett till.",
   "@legacyKitSheetStepGetAnother": {
     "description": "First recovery step. {names} is a list of the other sheet holders, already joined and emphasised",

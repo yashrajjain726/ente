@@ -1525,7 +1525,7 @@
       }
     }
   },
-  "memoryLaneAgeCaption": "{name} war {count, plural, one{ein Jahr alt} other{{age} Jahre alt}}",
+  "memoryLaneAgeCaption": "{name} war {count, plural, one{{age} Jahr alt} other{{age} Jahre alt}}",
   "@memoryLaneAgeCaption": {
     "description": "Memory Lane age caption. The age placeholder is rendered as a separate, larger text widget; count selects the plural form.",
     "placeholders": {
@@ -1905,7 +1905,7 @@
   "indexingPausedStatusDescription": "Die Indizierung ist pausiert. Sie wird automatisch fortgesetzt, wenn das Gerät bereit ist. Das Gerät wird als bereit angesehen, wenn sich der Akkustand, die Akkugesundheit und der thermische Zustand in einem gesunden Bereich befinden.",
   "informationDescription": "Speichere und teile Informationen mit deinen Liebsten.",
   "initialBackupCreated": "Initiale Sicherung erstellt!",
-  "inOrder": "In Bestellung",
+  "inOrder": "Der Reihe nach",
   "insecureDevice": "Unsicheres Gerät",
   "@insecureDevice": {
     "description": "Insecure device warning title"
@@ -2854,7 +2854,7 @@
   "photoGridSize": "Fotorastergröße",
   "photoLibraryAddPermissionRequired": "Ente benötigt die Berechtigung, um Fotos und Videos in Apple Fotos zu speichern. Sie können den Zugriff in den Einstellungen erlauben.",
   "photoLibraryAddPermissionRestricted": "Der Zugriff auf die Fotobibliothek ist auf diesem Gerät eingeschränkt.",
-  "photoOrder": "Fotobestellung",
+  "photoOrder": "Fotoreihenfolge",
   "photos": "Fotos",
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Von dir hinzugefügte Fotos werden vom Album entfernt",
   "photosAndVideosCount": "{count, plural, one{{formattedCount} Foto & Video} other{{formattedCount} Fotos & Videos}}",
@@ -4666,7 +4666,7 @@
   },
   "personShareFailedTitle": "Fotos konnten nicht geteilt werden",
   "personShareFailedBody": "Das geteilte Album konnte nicht erstellt werden. Deine Fotos und Auswahl sind unverändert. Bitte versuche es erneut.",
-  "personShareRollbackFailed": "Die Freigabe ist nicht abgeschlossen und das Album \"{name}\" konnte nicht entfernt werden. Es bleibt in den Alben und kann einen aktive öffentlichen Link haben. Überprüfe oder lösche es, bevor du es erneut versuchst. Deine Originalfotos sind sicher.",
+  "personShareRollbackFailed": "Die Freigabe ist nicht abgeschlossen und das Album \"{name}\" konnte nicht entfernt werden. Es bleibt in den Alben und kann einen aktiven öffentlichen Link haben. Überprüfe oder lösche es, bevor du es erneut versuchst. Deine Originalfotos sind sicher.",
   "@personShareRollbackFailed": {
     "placeholders": {
       "name": {
