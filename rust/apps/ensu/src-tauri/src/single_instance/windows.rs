@@ -12,8 +12,7 @@ use windows_sys::Win32::Security::Authorization::{
 use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
 use windows_sys::Win32::System::Threading::{
     CREATE_EVENT_MANUAL_RESET, CreateEventExW, CreateMutexExW, EVENT_MODIFY_STATE, INFINITE,
-    MUTEX_MODIFY_STATE, ResetEvent, SYNCHRONIZATION_SYNCHRONIZE, SetEvent, WaitForMultipleObjects,
-    WaitForSingleObject,
+    ResetEvent, SYNCHRONIZATION_SYNCHRONIZE, SetEvent, WaitForMultipleObjects, WaitForSingleObject,
 };
 
 pub(super) struct Instance {
@@ -31,14 +30,7 @@ impl Instance {
     pub(super) fn acquire(identifier: &str) -> io::Result<Option<Self>> {
         let ownership = named_handle(
             &format!("Local\\{identifier}.instance"),
-            |attrs, name| unsafe {
-                CreateMutexExW(
-                    attrs,
-                    name,
-                    0,
-                    SYNCHRONIZATION_SYNCHRONIZE | MUTEX_MODIFY_STATE,
-                )
-            },
+            |attrs, name| unsafe { CreateMutexExW(attrs, name, 0, SYNCHRONIZATION_SYNCHRONIZE) },
         )?;
         let activation = named_handle(
             &format!("Local\\{identifier}.activation"),
