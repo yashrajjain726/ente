@@ -83,7 +83,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   final _logger = Logger("MemoryLanePageV2");
   Timer? _playbackTimer;
   Object? _playbackToken;
-  bool _wasPlayingBeforeSeek = false;
   bool _wasPlayingBeforeTouch = false;
   int? _photoPointer;
   bool _useFastTransition = false;
@@ -237,28 +236,12 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     });
   }
 
-  void _onPlayPauseTap() {
-    if (_playbackToken != null) {
-      _pause();
-    } else if (i == _entries.length - 1) {
-      _play(0);
-    } else {
-      unawaited(_play(i));
-    }
-  }
-
   void _onPhotoPointerEnd(PointerEvent event) {
     if (event.pointer != _photoPointer) return;
     _photoPointer = null;
     final wasPlaying = _wasPlayingBeforeTouch;
     _wasPlayingBeforeTouch = false;
     if (wasPlaying) unawaited(_play(i, fastTransition: true));
-  }
-
-  void _onSeekEnd() {
-    final wasPlaying = _wasPlayingBeforeSeek;
-    _wasPlayingBeforeSeek = false;
-    if (wasPlaying) unawaited(_play(i));
   }
 
   Future<Uint8List?> _loadEntry(MemoryLaneEntry entry, EnteFile file) async {
@@ -790,61 +773,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                 child: Row(
                                   mainAxisAlignment: .center,
                                   children: [
-                                    // TODO: Replace with an Ente component.
-                                    IconButton(
-                                      style: ButtonStyle(
-                                        fixedSize: const WidgetStatePropertyAll(
-                                          Size.square(48),
-                                        ),
-                                        shape: const WidgetStatePropertyAll(
-                                          CircleBorder(),
-                                        ),
-                                        foregroundColor:
-                                            const WidgetStatePropertyAll(
-                                              Colors.white,
-                                            ),
-                                        overlayColor:
-                                            const WidgetStatePropertyAll(
-                                              Colors.transparent,
-                                            ),
-                                        backgroundColor:
-                                            WidgetStateProperty.resolveWith(
-                                              (states) =>
-                                                  Colors.white.withValues(
-                                                    alpha:
-                                                        states.contains(
-                                                          WidgetState.disabled,
-                                                        )
-                                                        ? 0.16
-                                                        : states.contains(
-                                                            WidgetState.pressed,
-                                                          )
-                                                        ? 0.36
-                                                        : states.contains(
-                                                            WidgetState.hovered,
-                                                          )
-                                                        ? 0.30
-                                                        : 0.24,
-                                                  ),
-                                            ),
-                                      ),
-                                      tooltip: _playbackToken != null
-                                          ? context
-                                                .strings
-                                                .facesTimelinePlaybackPause
-                                          : context
-                                                .strings
-                                                .facesTimelinePlaybackPlay,
-                                      onPressed: _onPlayPauseTap,
-                                      icon: HugeIcon(
-                                        icon: _playbackToken != null
-                                            ? HugeIcons.strokeRoundedPause
-                                            : HugeIcons.strokeRoundedPlay,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(width: screenSize.width * 0.03),
                                     Expanded(
                                       child: LayoutBuilder(
                                         builder: (context, constraints) {
@@ -873,25 +801,14 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                                         0,
                                                         _entries.length - 1,
                                                       );
-                                              if (_playbackToken != null) {
-                                                unawaited(
-                                                  _play(
-                                                    index,
-                                                    fastTransition: true,
-                                                  ),
-                                                );
-                                              } else {
-                                                setState(
-                                                  () => _selectEntry(
-                                                    index,
-                                                    fastTransition: true,
-                                                  ),
-                                                );
-                                              }
+                                              unawaited(
+                                                _play(
+                                                  index,
+                                                  fastTransition: true,
+                                                ),
+                                              );
                                             },
                                             onHorizontalDragStart: (details) {
-                                              _wasPlayingBeforeSeek =
-                                                  _playbackToken != null;
                                               _seekFromPosition(
                                                 details.localPosition.dx,
                                                 constraints.maxWidth,
@@ -903,8 +820,9 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                                   constraints.maxWidth,
                                                 ),
                                             onHorizontalDragEnd: (_) =>
-                                                _onSeekEnd(),
-                                            onHorizontalDragCancel: _onSeekEnd,
+                                                unawaited(_play(i)),
+                                            onHorizontalDragCancel: () =>
+                                                unawaited(_play(i)),
                                             child: Row(
                                               spacing: dotSpacing,
                                               children: List.generate(dotCount, (
