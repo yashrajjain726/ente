@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('show waits for a frame before completing', (tester) async {
+  testWidgets('show waits for a visible frame before completing', (
+    tester,
+  ) async {
     final context = await _pumpPage(tester);
     final dialog = _dialog(context, 'Pending');
     var completed = false;
@@ -14,6 +16,11 @@ void main() {
     await tester.idle();
     expect(completed, isFalse);
     await tester.pump();
+    expect(completed, isFalse);
+    expect(_dialogOpacity(tester), 0);
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(_dialogOpacity(tester), greaterThan(0));
     expect(await shown, isTrue);
 
     final hidden = dialog.hide();
@@ -102,6 +109,18 @@ void main() {
     expect(find.text('Page'), findsOneWidget);
     expect(find.byType(Dialog), findsNothing);
   });
+}
+
+double _dialogOpacity(WidgetTester tester) {
+  final transition = tester.widget<FadeTransition>(
+    find
+        .ancestor(
+          of: find.text('Pending'),
+          matching: find.byType(FadeTransition),
+        )
+        .last,
+  );
+  return transition.opacity.value;
 }
 
 ProgressDialog _dialog(BuildContext context, String message) {
