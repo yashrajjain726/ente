@@ -262,7 +262,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                     width: 24,
                 }}
             >
-                <HugeiconsIcon icon={icon} size={24} strokeWidth={1.9} />
+                <HugeiconsIcon icon={icon} size={20} strokeWidth={1.9} />
             </Box>
             <Box
                 sx={{

@@ -2103,7 +2103,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     icon={
                         <HugeiconsIcon
                             icon={Tick02Icon}
-                            size={22}
+                            size={20}
                             strokeWidth={1.8}
                         />
                     }

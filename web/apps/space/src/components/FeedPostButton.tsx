@@ -21,7 +21,6 @@ export const SpaceFeedPostButton: React.FC<SpaceFeedPostButtonProps> = ({
     showFirstPostPrompt = false,
 }) => (
     <Box
-        className="green-bg"
         component="button"
         type="button"
         aria-label={
