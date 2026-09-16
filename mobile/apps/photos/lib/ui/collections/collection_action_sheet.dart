@@ -19,7 +19,6 @@ import "package:photos/ui/actions/collection/collection_file_actions.dart";
 import "package:photos/ui/actions/collection/collection_sharing_actions.dart";
 import 'package:photos/ui/collections/album/vertical_list.dart';
 import "package:photos/ui/common/progress_dialog.dart";
-import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/separators_util.dart";
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -84,15 +83,7 @@ Future<void> showCollectionActionSheet(
   bool showOptionToCreateNewAlbum = true,
   List<String>? selectedPeople,
 }) {
-  final topPadding = MediaQuery.paddingOf(context).top;
-  final bottomPadding = MediaQuery.paddingOf(context).bottom;
-  final screenHeight = MediaQuery.sizeOf(context).height;
   const sheetHeaderHeight = 76.0;
-  final sheetTopGap = screenHeight * 0.20;
-  final height = max(
-    0.0,
-    screenHeight - topPadding - bottomPadding - sheetTopGap - sheetHeaderHeight,
-  );
   final filesCount = sharedFiles != null
       ? sharedFiles.length
       : selectedPeople != null
@@ -101,20 +92,37 @@ Future<void> showCollectionActionSheet(
 
   return showBottomSheetComponent<void>(
     context: context,
-    builder: (_) => BottomSheetComponent(
-      title: _actionName(context, actionType, filesCount),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      content: SizedBox(
-        height: height,
-        child: CollectionActionSheet(
-          selectedFiles: selectedFiles,
-          sharedFiles: sharedFiles,
-          actionType: actionType,
-          showOptionToCreateNewAlbum: showOptionToCreateNewAlbum,
-          selectedPeople: selectedPeople,
+    builder: (sheetContext) {
+      final mediaQuery = MediaQuery.of(sheetContext);
+      final availableHeight =
+          mediaQuery.size.height - mediaQuery.viewInsets.bottom;
+      final sheetTopGap = availableHeight * 0.20;
+      final height = max(
+        0.0,
+        availableHeight -
+            mediaQuery.padding.top -
+            mediaQuery.padding.bottom -
+            sheetTopGap -
+            sheetHeaderHeight,
+      );
+      return BottomSheetComponent(
+        title: _actionName(sheetContext, actionType, filesCount),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        isKeyboardAware: true,
+        content: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          height: height,
+          child: CollectionActionSheet(
+            selectedFiles: selectedFiles,
+            sharedFiles: sharedFiles,
+            actionType: actionType,
+            showOptionToCreateNewAlbum: showOptionToCreateNewAlbum,
+            selectedPeople: selectedPeople,
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -140,7 +148,6 @@ class CollectionActionSheet extends StatefulWidget {
 class _CollectionActionSheetState extends State<CollectionActionSheet> {
   late final bool _showOnlyHiddenCollections;
   late final bool _enableSelection;
-  static const int okButtonSize = 80;
   String _searchQuery = "";
   final _selectedCollections = <Collection>[];
   final _recentlyCreatedCollections = <Collection>[];
@@ -177,48 +184,44 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final isKeyboardUp = bottomInset > 100;
-    final double bottomPadding = max(
-      0,
-      bottomInset - (_enableSelection ? okButtonSize : 0),
-    );
-    return Padding(
-      padding: EdgeInsets.only(bottom: isKeyboardUp ? bottomPadding : 0),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 428),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    TextInputComponent(
-                      hintText: context.strings.searchByAlbumNameHint,
-                      prefix: HugeIcon(
-                        icon: HugeIcons.strokeRoundedSearch01,
-                        size: 18,
-                        color: context.componentColors.textLight,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value.trim();
-                        });
-                      },
-                      isClearable: true,
-                      shouldUnfocusOnClearOrSubmit: true,
+    final actionButtons = _actionButtons();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 428),
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  TextInputComponent(
+                    hintText: context.strings.searchByAlbumNameHint,
+                    prefix: HugeIcon(
+                      icon: HugeIcons.strokeRoundedSearch01,
+                      size: 18,
+                      color: context.componentColors.textLight,
                     ),
-                    _getCollectionItems(),
-                  ],
-                ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.trim();
+                      });
+                    },
+                    isClearable: true,
+                    shouldUnfocusOnClearOrSubmit: true,
+                  ),
+                  _getCollectionItems(),
+                ],
               ),
+            ),
+            if (actionButtons.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Column(children: [..._actionButtons()]),
+                padding: const EdgeInsets.only(
+                  top: Spacing.sm,
+                  bottom: Spacing.md,
+                ),
+                child: Column(children: actionButtons),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -226,14 +229,13 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
 
   List<Widget> _actionButtons() {
     final List<Widget> widgets = [];
-    if (_enableSelection) {
+    if (_enableSelection && _selectedCollections.isNotEmpty) {
       widgets.add(
         ButtonComponent(
           key: const ValueKey('add_button'),
           label: context.strings.add,
           shouldSurfaceExecutionStates: false,
           dismissModalOnSuccess: true,
-          isDisabled: _selectedCollections.isEmpty,
           onTap: () async {
             if (widget.selectedPeople != null) {
               final ProgressDialog dialog = createProgressDialog(
@@ -271,12 +273,6 @@ class _CollectionActionSheetState extends State<CollectionActionSheet> {
             );
             if (result) {
               if (!mounted) return;
-              showShortToast(
-                context,
-                context.strings.addedToAlbums(
-                  count: _selectedCollections.length,
-                ),
-              );
               widget.selectedFiles?.clearAll();
             }
           },
