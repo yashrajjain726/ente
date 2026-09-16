@@ -14,6 +14,7 @@ import {
     type SpaceActionPhase,
 } from "components/ActionFeedback";
 import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpaceCaptionText } from "components/CaptionText";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { spacePostLikePopDurationMs } from "components/post-like-animation";
 import { SpacePostReplyControls } from "components/PostReplyControls";
@@ -272,22 +273,14 @@ const resizeCaptionInput = (
 };
 
 const viewerCaptionTextSx = {
-    color: "#FFFFFF",
+    color: "#E6E6E6",
     fontFamily: '"Inter Variable", Inter, sans-serif',
     fontSize: 14,
-    fontWeight: 650,
-    lineHeight: "21px",
+    fontWeight: 600,
+    lineHeight: "23px",
     textAlign: "center",
     textWrap: "balance",
     whiteSpace: "pre-wrap",
-} as const;
-const viewerCaptionBubbleSx = {
-    bgcolor: "rgba(48, 48, 48, 0.79)",
-    borderRadius: "5px",
-    boxDecorationBreak: "clone",
-    px: "7px",
-    py: "2px",
-    WebkitBoxDecorationBreak: "clone",
 } as const;
 
 const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
@@ -305,15 +298,12 @@ const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
                 minWidth: 0,
                 overflowWrap: "break-word",
                 position: "fixed",
-                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                 transform: "translateX(-50%)",
                 width: "78vw",
                 zIndex: 2,
             }}
         >
-            <Box component="span" sx={viewerCaptionBubbleSx}>
-                {caption}
-            </Box>
+            <SpaceCaptionText caption={caption} />
         </Box>
     );
 };

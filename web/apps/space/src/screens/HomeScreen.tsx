@@ -8,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import { SpaceActionToast } from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpaceCaptionText } from "components/CaptionText";
 import { SpaceFeedPostButton } from "components/FeedPostButton";
 import {
     SpaceFileViewer,
@@ -79,21 +80,13 @@ const avatarFadeSx = {
     "@media (prefers-reduced-motion: reduce)": { animation: "none" },
 } as const;
 const feedPhotoCaptionTextSx = {
-    color: "#FFFFFF",
+    color: "#E6E6E6",
     fontFamily: '"Inter Variable", Inter, sans-serif',
     fontSize: 13,
-    fontWeight: 650,
-    lineHeight: "19px",
+    fontWeight: 600,
+    lineHeight: "21px",
     textAlign: "center",
     textWrap: "balance",
-} as const;
-const feedPhotoCaptionBubbleSx = {
-    bgcolor: "rgba(48, 48, 48, 0.79)",
-    borderRadius: "5px",
-    boxDecorationBreak: "clone",
-    px: "7px",
-    py: "2px",
-    WebkitBoxDecorationBreak: "clone",
 } as const;
 interface HomeScreenProps {
     feedItems: SpacePost[];
@@ -608,23 +601,16 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
             sx={{
                 ...feedPhotoCaptionTextSx,
                 bottom: 20,
-                display: "-webkit-box",
                 left: "50%",
                 maxWidth: "78%",
-                overflow: "hidden",
                 pointerEvents: "none",
                 position: "absolute",
-                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                 transform: "translateX(-50%)",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2,
                 width: "max-content",
                 zIndex: 2,
             }}
         >
-            <Box component="span" sx={feedPhotoCaptionBubbleSx}>
-                {caption}
-            </Box>
+            <SpaceCaptionText caption={caption} lineClamp={2} />
         </Box>
     );
 };
