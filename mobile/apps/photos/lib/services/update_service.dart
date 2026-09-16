@@ -23,27 +23,10 @@ class UpdateService {
   final _logger = Logger("UpdateService");
   final PackageInfo _packageInfo;
   final SharedPreferences _prefs;
-  final bool _isAndroid;
-  final bool Function(Locale locale, bool isLocalGallery, bool isAndroid)
-  _hasChangeLogContent;
 
-  UpdateService(
-    SharedPreferences prefs,
-    PackageInfo packageInfo, {
-    bool? isAndroid,
-    bool Function(Locale locale, bool isLocalGallery, bool isAndroid)?
-    hasChangeLogContent,
-  }) : _prefs = prefs,
-       _packageInfo = packageInfo,
-       _isAndroid = isAndroid ?? Platform.isAndroid,
-       _hasChangeLogContent =
-           hasChangeLogContent ??
-           ((locale, isLocalGallery, isAndroid) =>
-               ChangeLogStrings.hasContentForLocale(
-                 locale,
-                 isLocalGallery: isLocalGallery,
-                 isAndroid: isAndroid,
-               )) {
+  UpdateService(SharedPreferences prefs, PackageInfo packageInfo)
+    : _prefs = prefs,
+      _packageInfo = packageInfo {
     debugPrint("UpdateService constructor");
   }
 
@@ -70,7 +53,11 @@ class UpdateService {
       return ChangeLogAction.skip;
     }
 
-    return _hasChangeLogContent(locale, isLocalGallery, _isAndroid)
+    return ChangeLogStrings.hasContentForLocale(
+          locale,
+          isLocalGallery: isLocalGallery,
+          isAndroid: Platform.isAndroid,
+        )
         ? ChangeLogAction.show
         : ChangeLogAction.consumeWithoutShowing;
   }
