@@ -3,6 +3,7 @@ pub(super) mod clip;
 pub(super) mod clusters;
 pub(super) mod faces;
 pub(super) mod filedata;
+mod helpers;
 pub(super) mod persons;
 pub(super) mod pets;
 

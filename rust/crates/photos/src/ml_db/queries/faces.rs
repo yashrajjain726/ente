@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroUsize;
 
-use crate::db::{
-    MAX_SQL_BIND_PARAMS_PER_QUERY, Row, SqliteResult, ToSql, bind_placeholders, group_into,
-    optional_parameter, pair, params_from_iter,
+use super::helpers::{
+    MAX_SQL_BIND_PARAMS_PER_QUERY, bind_placeholders, group_into, optional_parameter, pair,
 };
+use crate::db::{self, Row, ToSql, params_from_iter};
 
 use super::clip::CLIP_ML_VERSION;
 use super::pets::PET_ML_VERSION;
@@ -14,11 +13,11 @@ use crate::ml_db::{Error, MlDb, Result};
 
 pub const FACE_ML_VERSION: i64 = 1;
 
-pub const LAPLACIAN_HARD_THRESHOLD: f64 = 10.0;
-pub const LAPLACIAN_SOFT_THRESHOLD: f64 = 50.0;
-pub const LAPLACIAN_VERY_SOFT_THRESHOLD: f64 = 200.0;
-pub const MINIMUM_QUALITY_FACE_SCORE: f64 = 0.80;
-pub const MEDIUM_QUALITY_FACE_SCORE: f64 = 0.85;
+const LAPLACIAN_HARD_THRESHOLD: f64 = 10.0;
+const LAPLACIAN_SOFT_THRESHOLD: f64 = 50.0;
+const LAPLACIAN_VERY_SOFT_THRESHOLD: f64 = 200.0;
+const MINIMUM_QUALITY_FACE_SCORE: f64 = 0.80;
+const MEDIUM_QUALITY_FACE_SCORE: f64 = 0.85;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FaceRow {
@@ -75,45 +74,38 @@ const UPSERT_FACE: &str = r#"
 
 impl MlDb {
     pub fn bulk_insert_faces(&self, faces: &[FaceRow]) -> Result<()> {
-        self.db
-            .write_batches_committing_each(
-                UPSERT_FACE,
-                const { NonZeroUsize::new(500).unwrap() },
-                faces.iter().map(|face| {
-                    (
-                        face.file_id,
-                        &face.face_id,
-                        &face.detection_json,
-                        encode_evector(&face.embedding),
-                        face.score,
-                        face.blur,
-                        face.is_sideways,
-                        face.image_height,
-                        face.image_width,
-                        face.ml_version,
-                    )
-                }),
-            )
-            .map_err(Into::into)
+        self.write_batch_atomic(
+            UPSERT_FACE,
+            faces.iter().map(|face| {
+                (
+                    face.file_id,
+                    &face.face_id,
+                    &face.detection_json,
+                    encode_evector(&face.embedding),
+                    face.score,
+                    face.blur,
+                    face.is_sideways,
+                    face.image_height,
+                    face.image_width,
+                    face.ml_version,
+                )
+            }),
+        )
     }
 
     pub fn face_indexed_file_ids(&self, minimum_ml_version: i64) -> Result<HashMap<i64, i64>> {
-        self.db
-            .read_all(
-                "SELECT file_id, ml_version FROM faces WHERE ml_version >= ?",
-                [minimum_ml_version],
-                pair,
-            )
-            .map_err(Into::into)
+        self.read_all(
+            "SELECT file_id, ml_version FROM faces WHERE ml_version >= ?",
+            [minimum_ml_version],
+            pair,
+        )
     }
 
     pub fn get_face_indexed_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
-        self.db
-            .read_value(
-                "SELECT COUNT(DISTINCT file_id) as count FROM faces WHERE ml_version >= ?",
-                [minimum_ml_version],
-            )
-            .map_err(Into::into)
+        self.read_value(
+            "SELECT COUNT(DISTINCT file_id) as count FROM faces WHERE ml_version >= ?",
+            [minimum_ml_version],
+        )
     }
 
     pub fn get_face_embeddings_for_cluster(
@@ -135,9 +127,7 @@ impl MlDb {
         );
         let mut parameters: Vec<&dyn ToSql> = vec![&cluster_id];
         parameters.extend(optional_parameter(&limit));
-        self.db
-            .read_column(&sql, parameters.as_slice())
-            .map_err(Into::into)
+        self.read_column(&sql, parameters.as_slice())
     }
 
     pub fn get_face_embeddings_for_clusters(
@@ -174,8 +164,7 @@ impl MlDb {
             let mut parameters: Vec<&dyn ToSql> =
                 cluster_chunk.iter().map(|id| id as &dyn ToSql).collect();
             parameters.extend(optional_parameter(&remaining_limit));
-            let rows: Vec<(String, Vec<u8>)> =
-                self.db.read_all(&sql, parameters.as_slice(), pair)?;
+            let rows: Vec<(String, Vec<u8>)> = self.read_all(&sql, parameters.as_slice(), pair)?;
             if let Some(remaining) = remaining_limit.as_mut() {
                 *remaining -= rows.len() as i64;
             }
@@ -199,7 +188,7 @@ impl MlDb {
             if let Some(avatar_file_id) = avatar_file_id {
                 file_ids.push(avatar_file_id);
             }
-            let cluster_ids: Vec<String> = self.db.read_column(
+            let cluster_ids: Vec<String> = self.read_column(
                 "SELECT cluster_id FROM cluster_person WHERE person_id = ?",
                 [person_id],
             )?;
@@ -222,8 +211,7 @@ impl MlDb {
                 cluster_ids.iter().map(|id| id as &dyn ToSql).collect();
             parameters.extend(file_ids.iter().map(|id| id as &dyn ToSql));
             let faces: Vec<StoredFace> =
-                self.db
-                    .read_all(&sql, parameters.as_slice(), read_stored_face)?;
+                self.read_all(&sql, parameters.as_slice(), read_stored_face)?;
             if !faces.is_empty() {
                 if let Some(avatar_file_id) = avatar_file_id
                     && let Some(face) = faces.iter().find(|face| face.row.file_id == avatar_file_id)
@@ -234,7 +222,7 @@ impl MlDb {
             }
         }
         if let Some(cluster_id) = cluster_id {
-            let face_ids: Vec<String> = self.db.read_column(
+            let face_ids: Vec<String> = self.read_column(
                 "SELECT face_id FROM face_clusters WHERE cluster_id = ?",
                 [cluster_id],
             )?;
@@ -245,7 +233,7 @@ impl MlDb {
             }
         }
         if person_id.is_none() && cluster_id.is_none() {
-            return Err(Error::InvalidArgument(
+            return Err(Error::Invalid(
                 "personID and clusterID cannot be null".to_string(),
             ));
         }
@@ -253,7 +241,7 @@ impl MlDb {
     }
 
     pub fn get_faces_for_given_file_id(&self, file_upload_id: i64) -> Result<Vec<FaceRow>> {
-        let faces: Vec<StoredFace> = self.db.read_all(
+        let faces: Vec<StoredFace> = self.read_all(
             "SELECT * FROM faces WHERE file_id = ?",
             [file_upload_id],
             read_stored_face,
@@ -264,7 +252,7 @@ impl MlDb {
     pub fn get_file_ids_to_faces_without_embedding(
         &self,
     ) -> Result<HashMap<i64, Vec<FaceWithoutEmbedding>>> {
-        let faces: Vec<FaceWithoutEmbedding> = self.db.read_all(
+        let faces: Vec<FaceWithoutEmbedding> = self.read_all(
             "SELECT face_id, file_id, score, detection, blur FROM faces",
             (),
             |row| {
@@ -291,7 +279,7 @@ impl MlDb {
         let mut offset = offset;
         let mut result = Vec::new();
         loop {
-            let rows: Vec<(String, Vec<u8>, f64, f64, i64)> = self.db.read_all(
+            let rows: Vec<(String, Vec<u8>, f64, f64, i64)> = self.read_all(
                 r#"
                 SELECT face_id, embedding, score, blur, is_sideways
                 FROM faces
@@ -367,41 +355,33 @@ impl MlDb {
             );
             let mut parameters: Vec<&dyn ToSql> = chunk.iter().map(|id| id as &dyn ToSql).collect();
             parameters.push(&remaining_limit);
-            let rows: Vec<(String, Vec<u8>)> =
-                self.db.read_all(&sql, parameters.as_slice(), pair)?;
+            let rows: Vec<(String, Vec<u8>)> = self.read_all(&sql, parameters.as_slice(), pair)?;
             result.extend(rows);
         }
         Ok(result)
     }
 
     pub fn get_total_face_count(&self) -> Result<i64> {
-        self.db
-            .read_value(
-                "SELECT COUNT(*) as count FROM faces WHERE score > ? AND blur > ?",
-                (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
-            )
-            .map_err(Into::into)
+        self.read_value(
+            "SELECT COUNT(*) as count FROM faces WHERE score > ? AND blur > ?",
+            (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
+        )
     }
 
     pub fn get_errored_face_count(&self) -> Result<i64> {
-        self.db
-            .read_value("SELECT COUNT(*) as count FROM faces WHERE score < 0", ())
-            .map_err(Into::into)
+        self.read_value("SELECT COUNT(*) as count FROM faces WHERE score < 0", ())
     }
 
     pub fn get_errored_file_ids(&self) -> Result<HashSet<i64>> {
-        self.db
-            .read_column("SELECT DISTINCT file_id FROM faces WHERE score < 0", ())
-            .map_err(Into::into)
+        self.read_column("SELECT DISTINCT file_id FROM faces WHERE score < 0", ())
     }
 
     pub fn prune_resolved_face_error_results(&self, file_ids: &[i64]) -> Result<()> {
         if file_ids.is_empty() {
             return Ok(());
         }
-        self.db
-            .execute_chunked_in(
-                r#"
+        self.execute_chunked_in(
+            r#"
                 DELETE FROM faces
                 WHERE file_id IN ({})
                     AND score < 0
@@ -413,9 +393,8 @@ impl MlDb {
                             AND successful.ml_version >= faces.ml_version
                     )
                 "#,
-                file_ids,
-            )
-            .map_err(Into::into)
+            file_ids,
+        )
     }
 
     pub fn get_file_ids_with_error_results(&self, file_ids: &[i64]) -> Result<HashSet<i64>> {
@@ -450,7 +429,7 @@ impl MlDb {
                     AND score < 0
                 "#
             );
-            let matches: Vec<i64> = self.db.read_column(
+            let matches: Vec<i64> = self.read_column(
                 &sql,
                 params_from_iter(chunk.iter().chain(chunk).chain(chunk)),
             )?;
@@ -460,18 +439,15 @@ impl MlDb {
     }
 
     pub fn delete_face_index_for_files(&self, file_ids: &[i64]) -> Result<()> {
-        self.db
-            .execute_chunked_in("DELETE FROM faces WHERE file_id IN ({})", file_ids)
-            .map_err(Into::into)
+        self.execute_chunked_in("DELETE FROM faces WHERE file_id IN ({})", file_ids)
     }
 
     pub fn delete_unclustered_face_index_for_files(&self, file_ids: &[i64]) -> Result<()> {
         if file_ids.is_empty() {
             return Ok(());
         }
-        self.db
-            .execute_chunked_in(
-                r#"
+        self.execute_chunked_in(
+            r#"
                 DELETE FROM faces
                 WHERE file_id IN ({})
                     AND NOT EXISTS (
@@ -480,25 +456,23 @@ impl MlDb {
                         WHERE face_clusters.face_id = faces.face_id
                     )
                 "#,
-                file_ids,
-            )
-            .map_err(Into::into)
+            file_ids,
+        )
     }
 
     pub fn get_clustered_or_faceless_file_count(&self) -> Result<i64> {
-        let clustered_face_ids: Vec<String> = self
-            .db
-            .read_column("SELECT face_id FROM face_clusters", ())?;
+        let clustered_face_ids: Vec<String> =
+            self.read_column("SELECT face_id FROM face_clusters", ())?;
         let clustered_file_ids = clustered_face_ids
             .iter()
             .map(|face_id| file_id_from_face_id(face_id))
             .collect::<Result<HashSet<i64>>>()?;
 
-        let bad_file_ids: HashSet<i64> = self.db.read_column(
+        let bad_file_ids: HashSet<i64> = self.read_column(
             "SELECT DISTINCT file_id FROM faces WHERE score <= ? OR blur <= ?",
             (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
         )?;
-        let good_file_ids: HashSet<i64> = self.db.read_column(
+        let good_file_ids: HashSet<i64> = self.read_column(
             "SELECT DISTINCT file_id FROM faces WHERE score > ? AND blur > ?",
             (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
         )?;
@@ -507,9 +481,8 @@ impl MlDb {
     }
 
     pub fn get_unclustered_face_count(&self) -> Result<i64> {
-        self.db
-            .read_value(
-                r#"
+        self.read_value(
+            r#"
                 SELECT COUNT(*) as count
                 FROM faces f
                 LEFT JOIN face_clusters fc
@@ -518,24 +491,21 @@ impl MlDb {
                     AND f.blur > ?
                     AND fc.face_id IS NULL
                 "#,
-                (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
-            )
-            .map_err(Into::into)
+            (MINIMUM_QUALITY_FACE_SCORE, LAPLACIAN_HARD_THRESHOLD),
+        )
     }
 
     pub fn get_all_file_ids_of_face_ids_not_in_any_cluster(&self) -> Result<HashSet<i64>> {
-        self.db
-            .read_column(
-                r#"
+        self.read_column(
+            r#"
                 SELECT DISTINCT file_id
                 FROM faces
                 LEFT JOIN face_clusters
                     ON faces.face_id = face_clusters.face_id
                 WHERE face_clusters.face_id IS NULL
                 "#,
-                (),
-            )
-            .map_err(Into::into)
+            (),
+        )
     }
 
     pub fn get_all_files_associated_with_all_clusters(
@@ -553,9 +523,7 @@ impl MlDb {
             "#,
             bind_placeholders(except_clusters.len())
         );
-        self.db
-            .read_column(&sql, params_from_iter(except_clusters))
-            .map_err(Into::into)
+        self.read_column(&sql, params_from_iter(except_clusters))
     }
 
     pub fn get_fully_indexed_file_ids(&self, include_pets: bool) -> Result<HashSet<i64>> {
@@ -575,13 +543,15 @@ impl MlDb {
             sql.push_str(" INTERSECT SELECT file_id FROM pet_faces WHERE ml_version >= ?");
             parameters.push(PET_ML_VERSION);
         }
-        self.db
-            .read_column(&sql, params_from_iter(parameters))
-            .map_err(Into::into)
+        self.read_column(&sql, params_from_iter(parameters))
     }
 }
 
-pub fn is_bad_face_for_clustering(face_score: f64, blur_value: f64, is_sideways: bool) -> bool {
+pub(super) fn is_bad_face_for_clustering(
+    face_score: f64,
+    blur_value: f64,
+    is_sideways: bool,
+) -> bool {
     face_score < MINIMUM_QUALITY_FACE_SCORE
         || blur_value < LAPLACIAN_SOFT_THRESHOLD
         || (blur_value < LAPLACIAN_VERY_SOFT_THRESHOLD && face_score < MEDIUM_QUALITY_FACE_SCORE)
@@ -590,7 +560,7 @@ pub fn is_bad_face_for_clustering(face_score: f64, blur_value: f64, is_sideways:
 
 pub(super) fn file_id_from_face_id(face_id: &str) -> Result<i64> {
     try_file_id_from_face_id(face_id)
-        .ok_or_else(|| Error::Codec(format!("Error parsing faceId: {face_id}")))
+        .ok_or_else(|| Error::Invalid(format!("Error parsing faceId: {face_id}")))
 }
 
 fn try_file_id_from_face_id(face_id: &str) -> Option<i64> {
@@ -612,7 +582,7 @@ impl StoredFace {
     }
 }
 
-fn read_stored_face(row: &Row<'_>) -> SqliteResult<StoredFace> {
+fn read_stored_face(row: &Row<'_>) -> db::Result<StoredFace> {
     Ok(StoredFace {
         row: FaceRow {
             file_id: row.get("file_id")?,
@@ -929,7 +899,7 @@ pub(in crate::ml_db) mod tests {
         assert_eq!(cover(9, Some("p9"), None, None), None);
         assert!(matches!(
             db.get_cover_face_for_person(1, None, None, None),
-            Err(Error::InvalidArgument(_))
+            Err(Error::Invalid(_))
         ));
     }
 
