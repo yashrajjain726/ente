@@ -41,7 +41,7 @@ type AssetsController struct {
 	auth       authDeps
 }
 
-func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.SpaceRecord, req models.PresignUploadRequest) (*models.PresignUploadResponse, error) {
+func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.SpaceRecord, req models.PresignUploadRequest, client string) (*models.PresignUploadResponse, error) {
 	purpose := uploadPurposePost
 	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) != "" {
 		purpose = strings.TrimSpace(*req.Purpose)
@@ -79,6 +79,8 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 		BucketID:     bucketID,
 		ExpectedSize: req.Size,
 		ExpiresAt:    timeutil.Microseconds() + int64(uploadTempObjectExpiry/time.Microsecond),
+		ContentMD5:   sql.NullString{String: contentMD5, Valid: true},
+		Client:       sql.NullString{String: client, Valid: client != ""},
 	})
 	if errors.Is(err, spacerepo.ErrSpaceUploadLimitReached) {
 		return nil, newSpaceUploadLimitError()
