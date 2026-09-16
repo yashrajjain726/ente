@@ -1,5 +1,5 @@
-import { decryptBox, encryptBox, generateKey } from "./crypto";
-import { createSessionStorage } from "./session-storage";
+import { createSessionStorage } from "ente-base/session-storage";
+import { decryptBox, encryptBox, generateKey } from "ente-photos-wasm";
 
 export const {
     ensureMasterKeyFromSession,

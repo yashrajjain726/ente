@@ -302,13 +302,17 @@ func (repo *FileRepository) Update(file ente.File, fileSize int64, thumbnailSize
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE object_keys 
-			SET object_key = $1, size = $2, datacenters = $3 WHERE file_id = $4 AND o_type = $5`,
+			SET object_key = $1, size = $2,
+				datacenters = CASE WHEN object_key = $1 THEN datacenters ELSE $3 END
+			WHERE file_id = $4 AND o_type = $5`,
 		file.File.ObjectKey, fileSize, dcsForNewEntry, file.ID, ente.FILE)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE object_keys 
-			SET object_key = $1, size = $2, datacenters = $3 WHERE file_id = $4 AND o_type = $5`,
+			SET object_key = $1, size = $2,
+				datacenters = CASE WHEN object_key = $1 THEN datacenters ELSE $3 END
+			WHERE file_id = $4 AND o_type = $5`,
 		file.Thumbnail.ObjectKey, thumbnailSize, dcsForNewEntry, file.ID, ente.THUMBNAIL)
 	if err != nil {
 		return stacktrace.Propagate(err, "")

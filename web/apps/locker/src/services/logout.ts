@@ -51,7 +51,8 @@ export const lockerLogout = async () => {
         ignoreError("Contacts", error);
     }
 
-    // Final sweep before the caller reloads
+    // Final sweep and reload
 
     await logoutClearStateAgain();
+    window.location.replace("/login");
 };

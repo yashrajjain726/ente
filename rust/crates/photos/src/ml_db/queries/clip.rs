@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::db::pair;
+use super::helpers::pair;
 use crate::ml_db::schema;
 use crate::ml_db::vector_encoding::{decode_f32, encode_f32};
 use crate::ml_db::{MlDb, Result};
@@ -32,8 +32,7 @@ pub struct ClipRow {
 impl MlDb {
     pub fn get_all_clip_vectors(&self) -> Result<Vec<EmbeddingVector>> {
         let rows: Vec<(i64, Vec<u8>)> =
-            self.db
-                .read_all("SELECT file_id, embedding FROM clip", (), pair)?;
+            self.read_all("SELECT file_id, embedding FROM clip", (), pair)?;
         Ok(rows
             .into_iter()
             .map(|(file_id, embedding)| EmbeddingVector {
@@ -45,81 +44,65 @@ impl MlDb {
     }
 
     pub fn clip_indexed_file_with_version(&self) -> Result<HashMap<i64, i64>> {
-        self.db
-            .read_all("SELECT file_id , ml_version FROM clip", (), pair)
-            .map_err(Into::into)
+        self.read_all("SELECT file_id , ml_version FROM clip", (), pair)
     }
 
     pub fn get_clip_indexed_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
-        self.db
-            .read_value(
-                "SELECT COUNT(DISTINCT file_id) as count FROM clip WHERE ml_version >= ?",
-                [minimum_ml_version],
-            )
-            .map_err(Into::into)
+        self.read_value(
+            "SELECT COUNT(DISTINCT file_id) as count FROM clip WHERE ml_version >= ?",
+            [minimum_ml_version],
+        )
     }
 
     pub fn get_clip_vectorizable_file_count(&self, minimum_ml_version: i64) -> Result<i64> {
-        self.db
-            .read_value(
-                r#"
+        self.read_value(
+            r#"
                 SELECT COUNT(DISTINCT file_id) as count
                 FROM clip
                 WHERE ml_version >= ?
                     AND LENGTH(embedding) = ?
                 "#,
-                [minimum_ml_version, CLIP_EMBEDDING_BYTES_LENGTH],
-            )
-            .map_err(Into::into)
+            [minimum_ml_version, CLIP_EMBEDDING_BYTES_LENGTH],
+        )
     }
 
     pub fn insert_clip_rows(&self, embeddings: &[ClipEmbedding]) -> Result<()> {
         if let [embedding] = embeddings {
-            self.db.execute(
+            self.execute(
                 "INSERT OR REPLACE INTO clip (file_id, embedding, ml_version) VALUES (?, ?, ?)",
                 clip_row(embedding),
             )?;
             return Ok(());
         }
-        self.db
-            .write_batch_atomic(
-                "INSERT OR REPLACE INTO clip (file_id, embedding, ml_version) values(?, ?, ?)",
-                embeddings.iter().map(clip_row),
-            )
-            .map_err(Into::into)
+        self.write_batch_atomic(
+            "INSERT OR REPLACE INTO clip (file_id, embedding, ml_version) values(?, ?, ?)",
+            embeddings.iter().map(clip_row),
+        )
     }
 
     pub fn delete_clip_rows(&self, file_ids: &[i64]) -> Result<()> {
-        self.db
-            .execute_chunked_in("DELETE FROM clip WHERE file_id IN ({})", file_ids)
-            .map_err(Into::into)
+        self.execute_chunked_in("DELETE FROM clip WHERE file_id IN ({})", file_ids)
     }
 
     pub fn delete_all_clip_rows(&self) -> Result<()> {
-        self.db
-            .execute_statements([schema::DELETE_CLIP_EMBEDDINGS])
-            .map_err(Into::into)
+        self.execute_statements([schema::DELETE_CLIP_EMBEDDINGS])
     }
 
     pub fn count_clip_rows(&self) -> Result<i64> {
-        self.db
-            .read_value("SELECT COUNT(file_id) as total FROM clip", ())
-            .map_err(Into::into)
+        self.read_value("SELECT COUNT(file_id) as total FROM clip", ())
     }
 
     pub fn get_clip_rows_page(&self, limit: i64, offset: i64) -> Result<Vec<ClipRow>> {
-        self.db
-            .read_all(
-                "SELECT file_id, embedding FROM clip ORDER BY file_id DESC LIMIT ? OFFSET ?",
-                [limit, offset],
-                |row| {
-                    Ok(ClipRow {
-                        file_id: row.get(0)?,
-                        embedding: row.get(1)?,
-                    })
-                },
-            )
-            .map_err(Into::into)
+        self.read_all(
+            "SELECT file_id, embedding FROM clip ORDER BY file_id DESC LIMIT ? OFFSET ?",
+            [limit, offset],
+            |row| {
+                Ok(ClipRow {
+                    file_id: row.get(0)?,
+                    embedding: row.get(1)?,
+                })
+            },
+        )
     }
 }
 

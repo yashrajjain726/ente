@@ -4,7 +4,6 @@ import { boxSeal, encryptBox, generateKey } from "ente-base/crypto";
 import { haveWindow } from "ente-base/env";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { ensureMasterKeyFromSession } from "ente-base/session";
 import { groupFilesByCollectionID } from "ente-gallery/utils/file";
 import {
     CollectionSubType,
@@ -32,6 +31,7 @@ import {
     createMagicMetadata,
     encryptMagicMetadata,
 } from "ente-media/magic-metadata";
+import { ensureMasterKeyFromSession } from "ente-new/photos/services/account-keys";
 import { batch, splitByPredicate } from "ente-utils/array";
 import { z } from "zod";
 import { batched, type UpdateMagicMetadataRequest } from "./file";

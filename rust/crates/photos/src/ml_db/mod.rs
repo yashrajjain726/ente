@@ -1,43 +1,36 @@
+mod migrations;
 mod queries;
 mod schema;
 mod vector_encoding;
 
+use std::num::NonZeroUsize;
 use std::path::Path;
 
-use crate::db::{Database, OpenOptions};
+use crate::db::{self, Database, OpenOptions};
 
 pub use queries::clip::{
     CLIP_EMBEDDING_BYTES_LENGTH, CLIP_EMBEDDING_DIMENSIONS, CLIP_ML_VERSION, ClipEmbedding,
     ClipRow, EmbeddingVector,
 };
 pub use queries::clusters::{ClusterCentroidRow, ClusterSummary};
-pub use queries::faces::{
-    FACE_ML_VERSION, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding,
-    LAPLACIAN_HARD_THRESHOLD, LAPLACIAN_SOFT_THRESHOLD, LAPLACIAN_VERY_SOFT_THRESHOLD,
-    MEDIUM_QUALITY_FACE_SCORE, MINIMUM_QUALITY_FACE_SCORE, is_bad_face_for_clustering,
-};
+pub use queries::faces::{FACE_ML_VERSION, FaceDbInfoForClustering, FaceRow, FaceWithoutEmbedding};
 pub use queries::filedata::{FdStatus, PreviewInfo};
 pub use queries::persons::PersonToClusterIdToFaceIds;
 pub use queries::pets::{
     PET_ML_VERSION, PetBodyRow, PetBodyVectorRow, PetFaceRow, PetFaceVectorRow, PetRowsForFiles,
 };
-pub use vector_encoding::{decode_evector, decode_f32, encode_evector, encode_f32};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Database(#[from] crate::db::Error),
+    Database(#[from] db::Error),
+    #[error("currentVersion({current}) cannot be greater than toVersion({target})")]
+    Downgrade { current: i64, target: i64 },
     #[error("{0}")]
-    Codec(String),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error("{0}")]
-    InvalidArgument(String),
+    Invalid(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub const TARGET_VERSION: i64 = schema::MIGRATION_SCRIPTS.len() as i64;
 
 pub struct MlDb {
     db: Database,
@@ -46,38 +39,41 @@ pub struct MlDb {
 impl MlDb {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
-            db: Database::open_with_options(
+            db: Database::open(
                 path,
-                &schema::MIGRATION_SCRIPTS,
-                OpenOptions { reader_count: 2 },
+                OpenOptions {
+                    reader_count: const { NonZeroUsize::new(2).unwrap() },
+                },
+                |connection| {
+                    connection.execute_batch(
+                        "PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 6291456;",
+                    )?;
+                    migrations::migrate(connection, &schema::MIGRATION_SCRIPTS)
+                },
             )?,
         })
     }
 
     pub fn clear_non_pet_tables(&self) -> Result<()> {
-        self.db
-            .execute_statements([
-                schema::DELETE_FACES,
-                schema::DELETE_FACE_CLUSTERS,
-                schema::DELETE_CLUSTER_PERSON,
-                schema::DELETE_CLUSTER_SUMMARY,
-                schema::DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING,
-                schema::DELETE_NOT_PERSON_FEEDBACK,
-                schema::DELETE_CLIP_EMBEDDINGS,
-                schema::DELETE_FILE_DATA,
-            ])
-            .map_err(Into::into)
+        self.execute_statements([
+            schema::DELETE_FACES,
+            schema::DELETE_FACE_CLUSTERS,
+            schema::DELETE_CLUSTER_PERSON,
+            schema::DELETE_CLUSTER_SUMMARY,
+            schema::DELETE_CLUSTER_CENTROID_VECTOR_ID_MAPPING,
+            schema::DELETE_NOT_PERSON_FEEDBACK,
+            schema::DELETE_CLIP_EMBEDDINGS,
+            schema::DELETE_FILE_DATA,
+        ])
     }
 
     pub fn clear_pet_tables(&self) -> Result<()> {
-        self.db
-            .execute_statements([
-                schema::DELETE_PET_FACES,
-                schema::DELETE_PET_BODIES,
-                schema::DELETE_PET_FACE_VECTOR_ID_MAPPING,
-                schema::DELETE_PET_BODY_VECTOR_ID_MAPPING,
-            ])
-            .map_err(Into::into)
+        self.execute_statements([
+            schema::DELETE_PET_FACES,
+            schema::DELETE_PET_BODIES,
+            schema::DELETE_PET_FACE_VECTOR_ID_MAPPING,
+            schema::DELETE_PET_BODY_VECTOR_ID_MAPPING,
+        ])
     }
 }
 
@@ -89,7 +85,7 @@ mod tests {
 
     use super::queries::clip::tests::full_clip;
     use super::queries::{caches, clip, clusters, faces, filedata, persons, pets};
-    use super::{Error, MlDb, TARGET_VERSION};
+    use super::{Error, MlDb, schema};
     use crate::db::Connection;
     use tempfile::TempDir;
 
@@ -112,7 +108,7 @@ mod tests {
     fn user_version(path: &Path) -> i64 {
         Connection::open(path)
             .unwrap()
-            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .pragma_query_value("user_version", |row| Ok(row.get(0)?))
             .unwrap()
     }
 
@@ -122,7 +118,7 @@ mod tests {
             .query_row(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_fcClusterID'",
                 (),
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap()
     }
@@ -226,7 +222,7 @@ mod tests {
         let row_count = |table: &str| -> i64 {
             connection
                 .query_row(&format!("SELECT COUNT(*) FROM {table}"), (), |row| {
-                    row.get(0)
+                    Ok(row.get(0)?)
                 })
                 .unwrap()
         };
@@ -255,6 +251,22 @@ mod tests {
     }
 
     #[test]
+    fn ml_connections_keep_existing_settings() {
+        let (_directory, db) = open();
+        let (synchronous, journal_size_limit): (i64, i64) = db
+            .db
+            .write(|connection| {
+                Ok((
+                    connection.pragma_query_value("synchronous", |row| Ok(row.get(0)?))?,
+                    connection.pragma_query_value("journal_size_limit", |row| Ok(row.get(0)?))?,
+                ))
+            })
+            .unwrap();
+        assert_eq!(synchronous, 1);
+        assert_eq!(journal_size_limit, 6291456);
+    }
+
+    #[test]
     fn ml_db_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<MlDb>();
@@ -265,7 +277,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("ente.ml.db");
         let _db = MlDb::open(&path).unwrap();
-        assert_eq!(TARGET_VERSION, 15);
+        assert_eq!(schema::MIGRATION_SCRIPTS.len(), 15);
         assert_eq!(user_version(&path), 15);
         let connection = Connection::open(&path).unwrap();
         for table in [
@@ -288,7 +300,7 @@ mod tests {
                 .query_row(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?",
                     [table],
-                    |row| row.get(0),
+                    |row| Ok(row.get(0)?),
                 )
                 .unwrap();
             assert_eq!(count, 1, "missing table {table}");
@@ -316,10 +328,10 @@ mod tests {
         drop(MlDb::open(&path).unwrap());
         Connection::open(&path)
             .unwrap()
-            .pragma_update(None, "user_version", 16)
+            .pragma_update("user_version", 16)
             .unwrap();
         match MlDb::open(&path) {
-            Err(Error::Database(crate::db::Error::Downgrade { current, target })) => {
+            Err(Error::Downgrade { current, target }) => {
                 assert_eq!(current, 16);
                 assert_eq!(target, 15);
             }
@@ -336,7 +348,7 @@ mod tests {
             connection
                 .execute_batch(crate::ml_db::schema::CREATE_FACES_TABLE)
                 .unwrap();
-            connection.pragma_update(None, "user_version", 1).unwrap();
+            connection.pragma_update("user_version", 1).unwrap();
         }
         let db = MlDb::open(&path).unwrap();
         assert_eq!(user_version(&path), 15);
