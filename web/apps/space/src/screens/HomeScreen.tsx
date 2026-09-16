@@ -1122,9 +1122,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         <Box
                             aria-hidden
                             sx={{
-                                border: "2px solid rgba(255, 255, 255, 0.35)",
+                                border: "1px solid rgba(255, 255, 255, 0.16)",
                                 borderRadius: "50%",
-                                inset: -2,
+                                boxShadow: "0 1px 4px rgba(0, 0, 0, 0.24)",
+                                inset: 0,
                                 pointerEvents: "none",
                                 position: "absolute",
                                 zIndex: 2,
