@@ -69,6 +69,13 @@ func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceR
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("space key version is stale")
 		}
+		if errors.Is(stacktrace.RootCause(err), repo.ErrSpaceSentFriendRequestLimitReached) {
+			return nil, &ente.ApiError{
+				Code:           ente.ErrorCode("SPACE_SENT_FRIEND_REQUEST_LIMIT_REACHED"),
+				Message:        "space sent friend request limit reached",
+				HttpStatusCode: http.StatusConflict,
+			}
+		}
 		if errors.Is(stacktrace.RootCause(err), repo.ErrSpaceFriendRequestLimitReached) {
 			return nil, &ente.ApiError{
 				Code:           ente.ErrorCode("SPACE_FRIEND_REQUEST_LIMIT_REACHED"),

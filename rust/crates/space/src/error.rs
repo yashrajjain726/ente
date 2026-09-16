@@ -39,12 +39,6 @@ pub enum Error {
     #[error("space post limit reached")]
     PostLimitReached,
 
-    #[error("space friend limit reached")]
-    FriendLimitReached,
-
-    #[error("other space friend limit reached")]
-    OtherFriendLimitReached,
-
     #[error("space profile not found")]
     ProfileNotFound,
 
@@ -53,6 +47,9 @@ pub enum Error {
 
     #[error("space friend request limit reached")]
     FriendRequestLimitReached,
+
+    #[error("space sent friend request limit reached")]
+    SentFriendRequestLimitReached,
 
     #[error("friend request is no longer available")]
     FriendRequestUnavailable,
