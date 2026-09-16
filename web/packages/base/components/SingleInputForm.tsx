@@ -15,7 +15,7 @@ import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import log from "ente-base/log";
 import { useFormik } from "formik";
 import { t } from "i18next";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useId, useState } from "react";
 import { ShowHidePasswordInputAdornment } from "./mui/PasswordInputAdornment";
 
 export type SingleInputFormProps = Pick<
@@ -48,6 +48,8 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
     onSubmit,
     ...rest
 }) => {
+    const inputID = useId();
+    const helperID = useId();
     const [showPassword, setShowPassword] = useState(false);
 
     const handleToggleShowHidePassword = useCallback(
@@ -86,9 +88,17 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
             >
                 <Stack sx={{ gap: "8px" }}>
                     {rest.label && (
-                        <Typography sx={v2LabelSx}>{rest.label}</Typography>
+                        <Typography
+                            component="label"
+                            htmlFor={inputID}
+                            sx={v2LabelSx}
+                        >
+                            {rest.label}
+                        </Typography>
                     )}
                     <InputBase
+                        id={inputID}
+                        aria-describedby={error ? helperID : undefined}
                         name="value"
                         value={formik.values.value}
                         onChange={formik.handleChange}
@@ -100,7 +110,11 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
                         error={!!error}
                         sx={v2InputSx}
                     />
-                    <Typography sx={v2HelperSx(!!error)}>
+                    <Typography
+                        id={helperID}
+                        aria-live="polite"
+                        sx={v2HelperSx(!!error)}
+                    >
                         {error ?? ""}
                     </Typography>
                 </Stack>
@@ -241,6 +255,11 @@ const v2BaseActionSx = {
     lineHeight: "20px",
     fontWeight: 500,
     fontFamily: "inherit",
+    "&.Mui-focusVisible": {
+        outline: "1px solid",
+        outlineColor: "stroke.base",
+        outlineOffset: "2px",
+    },
     "&.Mui-disabled": { opacity: 0.7 },
 };
 const v2CancelButtonSx = (theme: Theme) => ({
