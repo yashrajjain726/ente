@@ -60,7 +60,7 @@ Open Apple Photos, choose the photo, open the share sheet, and select Ente Locke
 
 ### How do I scan a physical document? {#locker-scan-document}
 
-In the Locker mobile app on Android or iOS, tap the camera button on the home screen. You can also tap **+** and select **Document**. Point the camera at a page and use automatic or manual capture. Add more pages if needed, then tap **Done**.
+In the Locker mobile app on Android or iOS, tap the camera button on the home screen. Point the camera at a page and use automatic or manual capture to add one or more pages.
 
 Review the pages, adjust the crop or rotation if needed, and tap **Save to Ente**. Locker combines the pages into a PDF and lets you choose the collections to upload it to.
 
