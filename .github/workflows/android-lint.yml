@@ -19,11 +19,26 @@ jobs:
               with:
                   workspaces: rust
                   shared-key: photos-desktop-ensu-android
+                  cache-targets: false
                   save-if: false
+
+            - name: Restore Rust target
+              uses: ./.github/actions/restore-rust-target
+              with:
+                  shared-key: photos-desktop-ensu-android
 
             - name: Install Vulkan build dependencies
               run: |
                   sudo apt-get update
                   sudo apt-get install -y libvulkan-dev glslc
+
+            - name: Restore Gradle cache
+              uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  key: gradle-${{ github.sha }}
+                  restore-keys: gradle-
+                  path: |
+                      ~/.gradle/caches
+                      ~/.gradle/wrapper
 
             - run: ./android/scripts/lint.sh

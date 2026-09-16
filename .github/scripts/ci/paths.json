@@ -1,5 +1,6 @@
 {
     "android-lint": [
+        ".github/actions/restore-rust-target/**",
         ".github/workflows/android-lint.yml",
         "android/**",
         "rust/.cargo/config.toml",

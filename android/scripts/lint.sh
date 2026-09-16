@@ -6,4 +6,4 @@ python3 checks/gradle-order/check.py .
 python3 checks/gradle-order/test.py
 
 (cd ../rust && cargo codegen native)
-./gradlew :lint
+./gradlew --build-cache :lint
