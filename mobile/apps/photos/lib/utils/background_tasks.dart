@@ -7,6 +7,7 @@ import "package:ente_background_manager/ente_background_manager.dart";
 import "package:ente_photos_platform/ente_photos_platform.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
+import "package:flutter/widgets.dart" show AppLifecycleState, WidgetsBinding;
 import "package:logging/logging.dart";
 import "package:permission_handler/permission_handler.dart";
 import "package:photos/db/upload_locks_db.dart";
@@ -57,7 +58,8 @@ class BackgroundTasks {
     if (Platform.isIOS) await retireLegacySchedules();
     await _configureNative(enabled: true);
     _configuredNative = true;
-    if (!isProcessBg) {
+    if (!isProcessBg &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
       await BackgroundManager.stopActiveRun();
       final acquired = await ProcessLockClient.instance.tryAcquire(
         name: "background_process",
