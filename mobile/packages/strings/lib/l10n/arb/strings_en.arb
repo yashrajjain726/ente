@@ -2154,6 +2154,7 @@
       "count": {}
     }
   },
+  "itemWillBeRemovedFromThisFolder": "Item will be removed from this folder",
   "items": "{count} items",
   "@items": {
     "description": "Number of items in a collection",

@@ -32,6 +32,7 @@ extension CollectionFileActions on CollectionActions {
     SelectedFiles selectedFiles,
     bool removingOthersFile, {
     bool isHidden = false,
+    String? body,
   }) async {
     final actionResult = await showActionSheet(
       context: context,
@@ -68,9 +69,11 @@ extension CollectionFileActions on CollectionActions {
         ),
       ],
       title: context.strings.removeFromAlbumTitle,
-      body: removingOthersFile
-          ? context.strings.removeShareItemsWarning
-          : context.strings.itemsWillBeRemovedFromAlbum,
+      body:
+          body ??
+          (removingOthersFile
+              ? context.strings.removeShareItemsWarning
+              : context.strings.itemsWillBeRemovedFromAlbum),
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     if (actionResult?.action != null &&
