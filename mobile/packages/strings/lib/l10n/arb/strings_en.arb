@@ -1531,6 +1531,79 @@
       }
     }
   },
+  "memoryLaneCaptionYearsAgo": "{name} {count, plural, one{{number} year ago} other{{number} years ago}}",
+  "@memoryLaneCaptionYearsAgo": {
+    "description": "Memory Lane caption in elapsed years. Always keep the number, including for one.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "number": {
+        "type": "String",
+        "description": "Placeholder rendered as a separate, larger number; retain in every plural form."
+      }
+    }
+  },
+  "memoryLaneCaptionMonthsAgo": "{name} {count, plural, one{{number} month ago} other{{number} months ago}}",
+  "@memoryLaneCaptionMonthsAgo": {
+    "description": "Memory Lane caption in elapsed months. Always keep the number, including for one.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "number": {
+        "type": "String",
+        "description": "Placeholder rendered as a separate, larger number; retain in every plural form."
+      }
+    }
+  },
+  "memoryLaneCaptionWeeksAgo": "{name} {count, plural, one{{number} week ago} other{{number} weeks ago}}",
+  "@memoryLaneCaptionWeeksAgo": {
+    "description": "Memory Lane caption in elapsed weeks. Always keep the number, including for one.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "number": {
+        "type": "String",
+        "description": "Placeholder rendered as a separate, larger number; retain in every plural form."
+      }
+    }
+  },
+  "memoryLaneCaptionDaysAgo": "{name} {count, plural, one{{number} day ago} other{{number} days ago}}",
+  "@memoryLaneCaptionDaysAgo": {
+    "description": "Memory Lane caption in elapsed days. Always keep the number, including for one.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "number": {
+        "type": "String",
+        "description": "Placeholder rendered as a separate, larger number; retain in every plural form."
+      }
+    }
+  },
+  "memoryLaneCaptionToday": "{name} today",
+  "@memoryLaneCaptionToday": {
+    "description": "Memory Lane caption for a photo taken today, without a number.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "facesTimelinePlaybackPause": "Pause",
   "@facesTimelinePlaybackPause": {
     "description": "Tooltip or semantics label for the pause button"

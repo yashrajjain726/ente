@@ -352,68 +352,66 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
         final file = _files.isEmpty ? null : _files[i];
         final entry = _entries.isEmpty ? null : _chunkinator!.get(_entries[i]);
         final creationTime = file?.creationTime;
-        final birthDate = DateTime.tryParse(
-          widget.person?.data.birthDate ?? "",
-        );
         final creationDate = creationTime == null
             ? null
             : DateTime.fromMicrosecondsSinceEpoch(creationTime);
-        int? age;
-        if (birthDate != null &&
-            creationDate != null &&
-            !creationDate.isBefore(birthDate)) {
-          age = creationDate.year - birthDate.year;
-          final lastDay = DateTime(
-            creationDate.year,
-            birthDate.month + 1,
-            0,
-          ).day;
-          final anniversary = DateTime(
-            creationDate.year,
-            birthDate.month,
-            birthDate.day.clamp(1, lastDay),
-          );
-          if (creationDate.isBefore(anniversary)) age--;
-        }
         const captionPlaceholder = "\uFFFC";
         int? captionValue;
         String? caption;
-        if (age != null && name != null && name.isNotEmpty) {
-          captionValue = age;
-          caption = context.strings.memoryLaneAgeCaption(
-            name: name,
-            count: age,
-            age: captionPlaceholder,
-          );
-        } else if (creationDate != null) {
+        if (creationDate != null) {
           final now = DateTime.now();
-          final anniversary = DateTime(
-            now.year,
+          final today = DateTime.utc(now.year, now.month, now.day);
+          final photoDate = DateTime.utc(
+            creationDate.year,
             creationDate.month,
+            creationDate.day,
+          );
+          var months =
+              (now.year - creationDate.year) * 12 +
+              now.month -
+              creationDate.month;
+          final anniversary = DateTime.utc(
+            now.year,
+            now.month,
             creationDate.day.clamp(
               1,
-              DateTime(now.year, creationDate.month + 1, 0).day,
+              DateTime.utc(now.year, now.month + 1, 0).day,
             ),
           );
-          captionValue =
-              (now.year -
-                      creationDate.year -
-                      (now.isBefore(anniversary) ? 1 : 0))
-                  .clamp(0, 1000);
-          caption = context.strings.facesTimelineCaptionYearsAgo(
-            count: captionValue,
-          );
-          if (caption.contains("#")) {
-            caption = caption.replaceAll("#", captionPlaceholder);
-          } else {
-            caption = caption.replaceFirst(
-              NumberFormat.decimalPattern(
-                context.strings.localeName,
-              ).format(captionValue),
-              captionPlaceholder,
+          if (today.isBefore(anniversary)) months--;
+          final days = today.difference(photoDate).inDays;
+          if (months >= 12) {
+            captionValue = months ~/ 12;
+            caption = context.strings.memoryLaneCaptionYearsAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
             );
+          } else if (months >= 1) {
+            captionValue = months;
+            caption = context.strings.memoryLaneCaptionMonthsAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
+            );
+          } else if (days >= 7) {
+            captionValue = days ~/ 7;
+            caption = context.strings.memoryLaneCaptionWeeksAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
+            );
+          } else if (days >= 1) {
+            captionValue = days;
+            caption = context.strings.memoryLaneCaptionDaysAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
+            );
+          } else {
+            caption = context.strings.memoryLaneCaptionToday(name: name ?? "");
           }
-          if (name != null && name.isNotEmpty) caption = "$name $caption";
+          caption = caption.trim();
         }
         final captionParts =
             caption?.split(captionPlaceholder) ?? const <String>[];
@@ -717,7 +715,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          if (captionValue != null) ...[
+                          if (caption != null) ...[
                             ConstrainedBox(
                               constraints: const BoxConstraints(minHeight: 48),
                               child: Align(
@@ -734,7 +732,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                       index < captionParts.length;
                                       index++
                                     ) ...[
-                                      if (index > 0)
+                                      if (index > 0 && captionValue != null)
                                         _MemoryLaneAnimatedDigit(
                                           value: captionValue,
                                         ),
