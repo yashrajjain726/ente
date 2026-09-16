@@ -494,6 +494,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isDeleteExit ||
         isDraftPostExit ||
         isCaptionEditing ||
+        isReplyMode ||
         isDraftPost ||
         isDraftPostPreviewPending;
     const viewerViewportSize = React.useCallback(() => {
@@ -1034,10 +1035,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 arrowNext: false,
                 arrowPrev: false,
                 bgClickAction: false,
-                bgOpacity: 1,
+                bgOpacity: 0,
                 clickToCloseNonZoomable: false,
                 close: false,
-                closeOnVerticalDrag: false,
+                closeOnVerticalDrag: true,
                 counter: false,
                 doubleTapAction: "zoom",
                 errorMsg: "Unable to preview this photo",
@@ -1082,6 +1083,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             });
             pswp.on("close", () => {
                 if (!closedByReact) onCloseRef.current();
+            });
+            pswp.on("verticalDrag", (event) => {
+                if (isSwipeBlockedRef.current) event.preventDefault();
+            });
+            pswp.on("zoomPanUpdate", () => {
+                root.style.setProperty(
+                    "--space-viewer-bg-opacity",
+                    String(pswp!.bgOpacity),
+                );
             });
             pswp.on("change", () => {
                 const nextIndex = pswp?.currIndex;
@@ -1175,6 +1185,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             swipeGestureRef.current = null;
             pswpRef.current = undefined;
             pswp?.destroy();
+            root.style.removeProperty("--space-viewer-bg-opacity");
         };
     }, [isDraftPostPreviewPending, usePhotoSwipeViewer, viewerViewportSize]);
 
@@ -1229,7 +1240,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 finishDraftPostExit();
             }}
             sx={{
-                bgcolor: viewerBackground,
+                bgcolor: "rgb(0 0 0 / var(--space-viewer-bg-opacity, 1))",
                 boxSizing: "border-box",
                 color: textBase,
                 display: "flex",
@@ -1246,6 +1257,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 transition: `opacity ${draftPostExitDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
                 width: "100%",
                 zIndex: 1300,
+                "& [data-space-viewer-chrome='true'], & [data-space-viewer-bottom='true']":
+                    { opacity: "var(--space-viewer-bg-opacity, 1)" },
                 "@media (prefers-reduced-motion: reduce)": {
                     transition: "none",
                 },

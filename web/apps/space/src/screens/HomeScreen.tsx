@@ -11,7 +11,6 @@ import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceFeedPostButton } from "components/FeedPostButton";
 import {
     SpaceFileViewer,
-    SpaceViewerPostBackdrop,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/FileViewer";
@@ -1786,7 +1785,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 position: "relative",
             }}
         >
-            {selectedViewer && <SpaceViewerPostBackdrop />}
             <Box
                 sx={{
                     bgcolor: homeBackground,
