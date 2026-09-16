@@ -558,39 +558,23 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                         onPointerCancel: _onPhotoPointerEnd,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTapUp:
-                              widget.onNextMemory == null &&
-                                  widget.onPreviousMemory == null
-                              ? null
-                              : (details) {
-                                  if (!widget.isActive || _entries.isEmpty) {
-                                    return;
-                                  }
-                                  final previous =
-                                      details.localPosition.dx <
-                                      screenSize.width / 2;
-                                  final index = i + (previous ? -1 : 1);
-                                  if (index < 0 || index >= _entries.length) {
-                                    final onMemory = previous
-                                        ? widget.onPreviousMemory
-                                        : widget.onNextMemory;
-                                    if (onMemory != null) {
-                                      _pause();
-                                      onMemory();
-                                    }
-                                  } else if (_playbackToken != null) {
-                                    unawaited(
-                                      _play(index, fastTransition: true),
-                                    );
-                                  } else {
-                                    setState(
-                                      () => _selectEntry(
-                                        index,
-                                        fastTransition: true,
-                                      ),
-                                    );
-                                  }
-                                },
+                          onTapUp: (details) {
+                            if (!widget.isActive || _entries.isEmpty) return;
+                            final previous =
+                                details.localPosition.dx < screenSize.width / 2;
+                            final index = i + (previous ? -1 : 1);
+                            if (index < 0 || index >= _entries.length) {
+                              final onMemory = previous
+                                  ? widget.onPreviousMemory
+                                  : widget.onNextMemory;
+                              if (onMemory != null) {
+                                _pause();
+                                onMemory();
+                              }
+                            } else {
+                              unawaited(_play(index, fastTransition: true));
+                            }
+                          },
                           onLongPress: () {},
                           child: Padding(
                             padding: EdgeInsets.symmetric(
