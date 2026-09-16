@@ -153,7 +153,8 @@ class _AlbumsItemWidgetState extends State<AlbumsItemWidget> {
 
   bool _canRemoveFrom(Collection collection) {
     if (collection.type == CollectionType.uncategorized ||
-        collection.isQuickLinkCollection()) {
+        collection.isQuickLinkCollection() ||
+        collection.isDefaultHidden()) {
       return false;
     }
     if (collection.type == CollectionType.favorites) {
