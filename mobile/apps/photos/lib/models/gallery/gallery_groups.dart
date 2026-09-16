@@ -36,6 +36,7 @@ class GalleryGroups {
   final bool sortOrderAsc;
   final double widthAvailable;
   final double groupHeaderExtent;
+  static const double spacing = galleryGridSpacing;
   GalleryGroups({
     required this.allFiles,
     required this.groupType,
@@ -59,8 +60,6 @@ class GalleryGroups {
       );
     }
   }
-
-  static const double spacing = 2.0;
 
   late final int crossAxisCount;
   late final GalleryLayoutType layoutType;
