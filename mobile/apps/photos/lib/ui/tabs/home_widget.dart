@@ -1251,7 +1251,7 @@ class _HomeWidgetState extends State<HomeWidget> {
       }
       if (sheetAction == ChangeLogPageAction.openReferrals) {
         if (!context.mounted) return;
-        await ReferralScreen.open(context, showLoadingDialog: true);
+        await openReferralScreen(context, showLoadingDialog: true);
       }
     } finally {
       _isShowingChangeLog = false;

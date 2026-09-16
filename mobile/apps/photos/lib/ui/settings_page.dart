@@ -361,7 +361,7 @@ class _SettingsBody extends StatelessWidget {
           icon: HugeIcons.strokeRoundedTicketStar,
           showOnlyLoadingState: true,
           onTap: () async {
-            await ReferralScreen.open(context);
+            await openReferralScreen(context);
           },
         ),
       ],
@@ -420,7 +420,7 @@ class _SettingsBody extends StatelessWidget {
             icon: HugeIcons.strokeRoundedTvSmart,
             showOnlyLoadingState: true,
             onTap: () async {
-              await CastSettingsPage.open(context);
+              await openCastSettingsPage(context);
             },
           ),
         _buildMapsMenuItem(context),

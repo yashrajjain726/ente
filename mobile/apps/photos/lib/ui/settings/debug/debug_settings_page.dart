@@ -205,7 +205,7 @@ class _DebugSettingsPageState extends State<DebugSettingsPage> {
                                   action != ChangeLogPageAction.openReferrals) {
                                 return;
                               }
-                              await ReferralScreen.open(
+                              await openReferralScreen(
                                 context,
                                 showLoadingDialog: true,
                               );

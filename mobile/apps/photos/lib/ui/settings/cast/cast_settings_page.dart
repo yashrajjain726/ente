@@ -15,27 +15,27 @@ import "package:photos/theme/ente_theme.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/relative_time_formatter.dart";
 
-class CastSettingsPage extends StatelessWidget {
-  const CastSettingsPage({required this.initialSessions, super.key});
-
-  final List<CastInfo> initialSessions;
-
-  static Future<void> open(BuildContext context) async {
-    late final List<CastInfo> sessions;
-    try {
-      sessions = await CastGateway(
-        NetworkClient.instance.enteDio,
-      ).getAllCastSessions();
-    } catch (error) {
-      if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
-        return;
-      }
-      await showGenericErrorDialog(context: context, error: error);
+Future<void> openCastSettingsPage(BuildContext context) async {
+  late final List<CastInfo> sessions;
+  try {
+    sessions = await CastGateway(
+      NetworkClient.instance.enteDio,
+    ).getAllCastSessions();
+  } catch (error) {
+    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
-    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
-    await routeToPage(context, CastSettingsPage(initialSessions: sessions));
+    await showGenericErrorDialog(context: context, error: error);
+    return;
   }
+  if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+  await routeToPage(context, _CastSettingsPage(initialSessions: sessions));
+}
+
+class _CastSettingsPage extends StatelessWidget {
+  const _CastSettingsPage({required this.initialSessions});
+
+  final List<CastInfo> initialSessions;
 
   @override
   Widget build(BuildContext context) {

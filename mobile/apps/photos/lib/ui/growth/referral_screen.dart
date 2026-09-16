@@ -15,55 +15,54 @@ import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 import "package:tuple/tuple.dart";
 
-class ReferralScreen extends StatefulWidget {
-  const ReferralScreen({this.initialData, super.key});
+Future<void> openReferralScreen(
+  BuildContext context, {
+  bool showLoadingDialog = false,
+}) async {
+  final dialog = showLoadingDialog
+      ? createProgressDialog(
+          context,
+          context.strings.pleaseWait,
+          isDismissible: true,
+        )
+      : null;
+  if (dialog != null) await dialog.show();
 
-  final Tuple2<ReferralView, UserDetails>? initialData;
-
-  static Future<void> open(
-    BuildContext context, {
-    bool showLoadingDialog = false,
-  }) async {
-    final dialog = showLoadingDialog
-        ? createProgressDialog(
-            context,
-            context.strings.pleaseWait,
-            isDismissible: true,
-          )
-        : null;
-    if (dialog != null) await dialog.show();
-
-    late final Tuple2<ReferralView, UserDetails> data;
-    try {
-      data = await _fetchData();
-    } catch (error) {
-      if (dialog != null && !await dialog.hide()) return;
-      if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
-        return;
-      }
-      await showGenericErrorDialog(context: context, error: error);
+  late final Tuple2<ReferralView, UserDetails> data;
+  try {
+    data = await _fetchReferralData();
+  } catch (error) {
+    if (dialog != null && !await dialog.hide()) return;
+    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
-    if (dialog != null && !await dialog.hide()) return;
-    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
-    await routeToPage(context, ReferralScreen(initialData: data));
+    await showGenericErrorDialog(context: context, error: error);
+    return;
   }
-
-  static Future<Tuple2<ReferralView, UserDetails>> _fetchData() async {
-    UserDetails? cachedUserDetails = UserService.instance
-        .getCachedUserDetails();
-    cachedUserDetails ??= await UserService.instance.getUserDetailsV2(
-      memoryCount: false,
-    );
-    final referralView = await storageBonusService.getReferralView();
-    return Tuple2(referralView, cachedUserDetails);
-  }
-
-  @override
-  State<ReferralScreen> createState() => _ReferralScreenState();
+  if (dialog != null && !await dialog.hide()) return;
+  if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+  await routeToPage(context, _ReferralScreen(initialData: data));
 }
 
-class _ReferralScreenState extends State<ReferralScreen> {
+Future<Tuple2<ReferralView, UserDetails>> _fetchReferralData() async {
+  UserDetails? cachedUserDetails = UserService.instance.getCachedUserDetails();
+  cachedUserDetails ??= await UserService.instance.getUserDetailsV2(
+    memoryCount: false,
+  );
+  final referralView = await storageBonusService.getReferralView();
+  return Tuple2(referralView, cachedUserDetails);
+}
+
+class _ReferralScreen extends StatefulWidget {
+  const _ReferralScreen({required this.initialData});
+
+  final Tuple2<ReferralView, UserDetails> initialData;
+
+  @override
+  State<_ReferralScreen> createState() => _ReferralScreenState();
+}
+
+class _ReferralScreenState extends State<_ReferralScreen> {
   late Future<Tuple2<ReferralView, UserDetails>> _dataFuture;
   Tuple2<ReferralView, UserDetails>? _initialData;
 
@@ -71,16 +70,14 @@ class _ReferralScreenState extends State<ReferralScreen> {
   void initState() {
     super.initState();
     _initialData = widget.initialData;
-    _dataFuture = widget.initialData == null
-        ? ReferralScreen._fetchData()
-        : Future.value(widget.initialData!);
+    _dataFuture = Future.value(widget.initialData);
   }
 
   void _safeUIUpdate() {
     if (mounted) {
       setState(() {
         _initialData = null;
-        _dataFuture = ReferralScreen._fetchData();
+        _dataFuture = _fetchReferralData();
       });
     }
   }
