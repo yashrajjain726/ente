@@ -25,7 +25,11 @@ class ReferralScreen extends StatefulWidget {
     bool showLoadingDialog = false,
   }) async {
     final dialog = showLoadingDialog
-        ? createProgressDialog(context, context.strings.pleaseWait)
+        ? createProgressDialog(
+            context,
+            context.strings.pleaseWait,
+            isDismissible: true,
+          )
         : null;
     if (dialog != null) await dialog.show();
 
@@ -33,13 +37,15 @@ class ReferralScreen extends StatefulWidget {
     try {
       data = await _fetchData();
     } catch (error) {
-      if (dialog != null) await dialog.hide();
-      if (!context.mounted) return;
+      if (dialog != null && !await dialog.hide()) return;
+      if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
       await showGenericErrorDialog(context: context, error: error);
       return;
     }
-    if (dialog != null) await dialog.hide();
-    if (!context.mounted) return;
+    if (dialog != null && !await dialog.hide()) return;
+    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
     await routeToPage(context, ReferralScreen(initialData: data));
   }
 

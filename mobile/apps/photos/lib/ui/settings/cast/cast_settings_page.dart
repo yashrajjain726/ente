@@ -27,11 +27,13 @@ class CastSettingsPage extends StatelessWidget {
         NetworkClient.instance.enteDio,
       ).getAllCastSessions();
     } catch (error) {
-      if (!context.mounted) return;
+      if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
       await showGenericErrorDialog(context: context, error: error);
       return;
     }
-    if (!context.mounted) return;
+    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
     await routeToPage(context, CastSettingsPage(initialSessions: sessions));
   }
 
