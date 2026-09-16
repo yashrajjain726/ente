@@ -40,6 +40,7 @@ allprojects {
                             "ChromeOsAbiSupport",
                             "GradleDependency",
                             "IconLauncherShape",
+                            "OldTargetApi",
                             "UseKtx",
                             "VectorPath",
                         )
