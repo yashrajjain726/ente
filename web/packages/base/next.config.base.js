@@ -99,6 +99,7 @@ if (process.env.NEXT_PUBLIC_ENTE_SHARE_ENDPOINT) {
 const nextConfig = {
     agentRules: false,
     output: "export",
+    outputFileTracingExcludes: { "*": ["**/*"] },
     devIndicators: false,
     compiler: { emotion: true },
     transpilePackages: [
