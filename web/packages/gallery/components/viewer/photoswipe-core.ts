@@ -144,6 +144,23 @@ export class FileViewerPhotoSwipe<
             pinchToClose: !disableGestureClose,
             closeOnVerticalDrag: !disableGestureClose,
             wheelToZoom: true,
+            // Allow low-resolution videos to scale up to fit the viewport.
+            initialZoomLevel: (zoomLevel) => {
+                const { elementSize, itemData, panAreaSize } = zoomLevel;
+                if (
+                    (itemData as ItemData).fileType != FileType.video ||
+                    !elementSize?.x ||
+                    !elementSize.y ||
+                    !panAreaSize
+                ) {
+                    return zoomLevel.fit;
+                }
+
+                return Math.min(
+                    panAreaSize.x / elementSize.x,
+                    panAreaSize.y / elementSize.y,
+                );
+            },
             // PhotoSwipe's focus trap conflicts with MUI drawers and fast swipes.
             trapFocus: false,
             index: initialIndex,
@@ -163,6 +180,13 @@ export class FileViewerPhotoSwipe<
 
         const asItemData = (slideData: SlideData | undefined) =>
             slideData! as ItemData;
+
+        pswp.on("zoomLevelsUpdate", ({ zoomLevels, slideData }) => {
+            if (asItemData(slideData).fileType == FileType.video) {
+                // Keep vertical drag-to-close enabled for upscaled videos.
+                zoomLevels.fit = Math.max(zoomLevels.fit, zoomLevels.initial);
+            }
+        });
 
         const currSlideData = () => asItemData(pswp.currSlide?.data);
 
