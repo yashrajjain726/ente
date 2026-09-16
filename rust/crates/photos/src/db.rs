@@ -17,7 +17,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Connection(rusqlite::Connection);
 
 impl Connection {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self(rusqlite::Connection::open(path)?))
     }
 
