@@ -866,7 +866,7 @@ mod tests {
 
     #[test]
     fn other_errors_keep_the_bridge_variant_and_message() {
-        let error = MlDbError::from(ml_db::Error::InvalidArgument("invalid value".into()));
+        let error = MlDbError::from(ml_db::Error::Invalid("invalid value".into()));
         assert!(matches!(
             error,
             MlDbError::Other { message } if message == "invalid value"

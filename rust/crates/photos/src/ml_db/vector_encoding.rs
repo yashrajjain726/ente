@@ -145,7 +145,7 @@ fn advance(bytes: &[u8], offset: &mut usize, count: usize) -> Result<usize> {
 }
 
 fn malformed() -> Error {
-    Error::Codec("malformed EVector bytes".to_string())
+    Error::Invalid("malformed EVector bytes".to_string())
 }
 
 #[cfg(test)]

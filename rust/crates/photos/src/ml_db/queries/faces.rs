@@ -233,7 +233,7 @@ impl MlDb {
             }
         }
         if person_id.is_none() && cluster_id.is_none() {
-            return Err(Error::InvalidArgument(
+            return Err(Error::Invalid(
                 "personID and clusterID cannot be null".to_string(),
             ));
         }
@@ -560,7 +560,7 @@ pub(super) fn is_bad_face_for_clustering(
 
 pub(super) fn file_id_from_face_id(face_id: &str) -> Result<i64> {
     try_file_id_from_face_id(face_id)
-        .ok_or_else(|| Error::Codec(format!("Error parsing faceId: {face_id}")))
+        .ok_or_else(|| Error::Invalid(format!("Error parsing faceId: {face_id}")))
 }
 
 fn try_file_id_from_face_id(face_id: &str) -> Option<i64> {
@@ -899,7 +899,7 @@ pub(in crate::ml_db) mod tests {
         assert_eq!(cover(9, Some("p9"), None, None), None);
         assert!(matches!(
             db.get_cover_face_for_person(1, None, None, None),
-            Err(Error::InvalidArgument(_))
+            Err(Error::Invalid(_))
         ));
     }
 

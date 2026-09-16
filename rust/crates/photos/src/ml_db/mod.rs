@@ -27,14 +27,10 @@ pub enum Error {
     #[error("currentVersion({current}) cannot be greater than toVersion({target})")]
     Downgrade { current: i64, target: i64 },
     #[error("{0}")]
-    Codec(String),
-    #[error("{0}")]
-    InvalidArgument(String),
+    Invalid(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub const TARGET_VERSION: i64 = schema::MIGRATION_SCRIPTS.len() as i64;
 
 pub struct MlDb {
     db: Database,
@@ -89,7 +85,7 @@ mod tests {
 
     use super::queries::clip::tests::full_clip;
     use super::queries::{caches, clip, clusters, faces, filedata, persons, pets};
-    use super::{Error, MlDb, TARGET_VERSION};
+    use super::{Error, MlDb, schema};
     use crate::db::Connection;
     use tempfile::TempDir;
 
@@ -281,7 +277,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("ente.ml.db");
         let _db = MlDb::open(&path).unwrap();
-        assert_eq!(TARGET_VERSION, 15);
+        assert_eq!(schema::MIGRATION_SCRIPTS.len(), 15);
         assert_eq!(user_version(&path), 15);
         let connection = Connection::open(&path).unwrap();
         for table in [
