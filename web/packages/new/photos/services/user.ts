@@ -3,7 +3,7 @@ import { boxSealOpenBytes, decryptBox } from "ente-base/crypto";
 import type { KeyPair } from "ente-base/crypto/types";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { ensureMasterKeyFromSession } from "ente-base/session";
+import { ensureMasterKeyFromSession } from "ente-new/photos/services/account-keys";
 import { nullToUndefined } from "ente-utils/transform";
 import { z } from "zod";
 

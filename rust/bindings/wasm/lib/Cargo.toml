@@ -11,7 +11,8 @@ contacts = [
     "dep:wasm-bindgen-futures",
 ]
 crypto = ["dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
-crypto-file = ["crypto", "dep:md-5"]
+crypto-blob = ["crypto"]
+crypto-file = ["crypto-blob", "dep:md-5"]
 crypto-seal = ["crypto"]
 locker = ["session", "dep:ente-locker"]
 prelogin = ["accounts", "crypto"]

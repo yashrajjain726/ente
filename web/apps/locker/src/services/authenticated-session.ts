@@ -1,4 +1,3 @@
-import { createAuthenticatedRecoveryKeyOps } from "ente-accounts/services/authenticated-recovery-key";
 import {
     ensureLocalUser,
     ensureSavedKeyAttributes,
@@ -7,12 +6,7 @@ import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
 import { savedAuthToken } from "ente-base/token";
 import { openSession as openLegacySession } from "ente-legacy-wasm/authenticated";
-import {
-    encryptBoxWithRecoveryKey,
-    generateKey,
-    openSession,
-    type Session,
-} from "ente-locker-wasm";
+import { openSession, type Session } from "ente-locker-wasm";
 import { masterKeyFromSession } from "./account-keys";
 
 const lockerSessions = sessionCache(openSession);
@@ -54,16 +48,6 @@ export const clearAuthenticatedSession = () => {
     lockerSessions.clear();
     legacySessions.clear();
 };
-
-export const {
-    encryptWithRecoveryKey,
-    generatePasskeyRecovery,
-    recoveryKeyMnemonic,
-} = createAuthenticatedRecoveryKeyOps({
-    ensureSession: ensureAuthenticatedSession,
-    encryptBox: encryptBoxWithRecoveryKey,
-    generateKey,
-});
 
 function sessionCache<T extends Pick<Session, "free" | "updateAuthToken">>(
     open: (config: Parameters<typeof openSession>[0]) => Promise<T>,

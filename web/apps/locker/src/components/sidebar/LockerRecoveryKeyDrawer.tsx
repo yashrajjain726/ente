@@ -1,4 +1,4 @@
-import { recoveryKeyMnemonic } from "@/services/authenticated-session";
+import { recoveryKeyMnemonic } from "@/services/recovery-key";
 import {
     Box,
     Button,

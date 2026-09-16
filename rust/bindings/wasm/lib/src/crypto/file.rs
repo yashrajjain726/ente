@@ -95,63 +95,6 @@ pub fn crypto_md5_base64(data: Vec<u8>) -> String {
 
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-pub struct EncryptedBlob {
-    pub encrypted_data: String,
-    pub decryption_header: String,
-}
-
-#[wasm_bindgen(js_name = cryptoEncryptBlob)]
-pub fn crypto_encrypt_blob(
-    data: &[u8],
-    key_b64: &str,
-) -> Result<<EncryptedBlob as Tsify>::JsType, Error> {
-    let key = b64::decode(key_b64)?;
-
-    let out = crypto::blob::encrypt(data, &crypto::Key::try_from_slice(&key)?)?;
-    EncryptedBlob {
-        encrypted_data: b64::encode(&out.encrypted_data),
-        decryption_header: b64::encode(out.decryption_header.as_bytes()),
-    }
-    .into_js()
-    .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = cryptoDecryptBlob)]
-pub fn crypto_decrypt_blob(
-    encrypted_data_b64: &str,
-    decryption_header_b64: &str,
-    key_b64: &str,
-) -> Result<Vec<u8>, Error> {
-    let ciphertext = b64::decode(encrypted_data_b64)?;
-    let header = b64::decode(decryption_header_b64)?;
-    let key = b64::decode(key_b64)?;
-
-    Ok(crypto::blob::decrypt(
-        &ciphertext,
-        &crypto::Header::try_from_slice(&header)?,
-        &crypto::Key::try_from_slice(&key)?,
-    )?)
-}
-
-#[wasm_bindgen(js_name = cryptoDecryptBlobLegacy)]
-pub fn crypto_decrypt_blob_legacy(
-    encrypted_data_b64: &str,
-    decryption_header_b64: &str,
-    key_b64: &str,
-) -> Result<Vec<u8>, Error> {
-    let ciphertext = b64::decode(encrypted_data_b64)?;
-    let header = b64::decode(decryption_header_b64)?;
-    let key = b64::decode(key_b64)?;
-
-    Ok(crypto::blob::decrypt_legacy(
-        &ciphertext,
-        &crypto::Header::try_from_slice(&header)?,
-        &crypto::Key::try_from_slice(&key)?,
-    )?)
-}
-
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
 pub struct EncryptedStreamResult {
     #[serde(serialize_with = "crate::types::serialize_bytes")]
     #[tsify(type = "Uint8Array<ArrayBuffer>")]

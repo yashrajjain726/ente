@@ -2396,6 +2396,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-auth-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-wasm-lib",
+]
+
+[[package]]
 name = "ente-cast"
 version = "0.0.0"
 dependencies = [

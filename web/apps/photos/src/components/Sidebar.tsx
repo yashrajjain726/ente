@@ -8,11 +8,11 @@ import { ReferralSettings } from "@/components/sidebar/ReferralSettings";
 import { SessionsSettings } from "@/components/sidebar/SessionsSettings";
 import { TwoFactorSettings } from "@/components/sidebar/TwoFactorSettings";
 import { downloadAppDialogAttributes } from "@/components/utils/download";
+import exportService from "@/services/export";
 import {
     generatePasskeyRecovery,
     recoveryKeyMnemonic,
-} from "@/services/authenticated-session";
-import exportService from "@/services/export";
+} from "@/services/recovery-key";
 import { performSidebarAction as performSidebarRegistryAction } from "@/services/search/sidebar-search-registry";
 import {
     Delete02Icon,
