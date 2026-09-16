@@ -83,8 +83,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
   final _logger = Logger("MemoryLanePageV2");
   Timer? _playbackTimer;
   Object? _playbackToken;
-  bool _wasPlayingBeforeSeek = false;
-  bool _wasPlayingBeforeTouch = false;
   int? _photoPointer;
   bool _useFastTransition = false;
   late final Future<void> _memoryLaneLoaded;
@@ -237,28 +235,10 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
     });
   }
 
-  void _onPlayPauseTap() {
-    if (_playbackToken != null) {
-      _pause();
-    } else if (i == _entries.length - 1) {
-      _play(0);
-    } else {
-      unawaited(_play(i));
-    }
-  }
-
   void _onPhotoPointerEnd(PointerEvent event) {
     if (event.pointer != _photoPointer) return;
     _photoPointer = null;
-    final wasPlaying = _wasPlayingBeforeTouch;
-    _wasPlayingBeforeTouch = false;
-    if (wasPlaying) unawaited(_play(i, fastTransition: true));
-  }
-
-  void _onSeekEnd() {
-    final wasPlaying = _wasPlayingBeforeSeek;
-    _wasPlayingBeforeSeek = false;
-    if (wasPlaying) unawaited(_play(i));
+    unawaited(_play(i, fastTransition: true));
   }
 
   Future<Uint8List?> _loadEntry(MemoryLaneEntry entry, EnteFile file) async {
@@ -372,68 +352,66 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
         final file = _files.isEmpty ? null : _files[i];
         final entry = _entries.isEmpty ? null : _chunkinator!.get(_entries[i]);
         final creationTime = file?.creationTime;
-        final birthDate = DateTime.tryParse(
-          widget.person?.data.birthDate ?? "",
-        );
         final creationDate = creationTime == null
             ? null
             : DateTime.fromMicrosecondsSinceEpoch(creationTime);
-        int? age;
-        if (birthDate != null &&
-            creationDate != null &&
-            !creationDate.isBefore(birthDate)) {
-          age = creationDate.year - birthDate.year;
-          final lastDay = DateTime(
-            creationDate.year,
-            birthDate.month + 1,
-            0,
-          ).day;
-          final anniversary = DateTime(
-            creationDate.year,
-            birthDate.month,
-            birthDate.day.clamp(1, lastDay),
-          );
-          if (creationDate.isBefore(anniversary)) age--;
-        }
         const captionPlaceholder = "\uFFFC";
         int? captionValue;
         String? caption;
-        if (age != null && name != null && name.isNotEmpty) {
-          captionValue = age;
-          caption = context.strings.memoryLaneAgeCaption(
-            name: name,
-            count: age,
-            age: captionPlaceholder,
-          );
-        } else if (creationDate != null) {
+        if (creationDate != null) {
           final now = DateTime.now();
-          final anniversary = DateTime(
-            now.year,
+          final today = DateTime.utc(now.year, now.month, now.day);
+          final photoDate = DateTime.utc(
+            creationDate.year,
             creationDate.month,
+            creationDate.day,
+          );
+          var months =
+              (now.year - creationDate.year) * 12 +
+              now.month -
+              creationDate.month;
+          final anniversary = DateTime.utc(
+            now.year,
+            now.month,
             creationDate.day.clamp(
               1,
-              DateTime(now.year, creationDate.month + 1, 0).day,
+              DateTime.utc(now.year, now.month + 1, 0).day,
             ),
           );
-          captionValue =
-              (now.year -
-                      creationDate.year -
-                      (now.isBefore(anniversary) ? 1 : 0))
-                  .clamp(0, 1000);
-          caption = context.strings.facesTimelineCaptionYearsAgo(
-            count: captionValue,
-          );
-          if (caption.contains("#")) {
-            caption = caption.replaceAll("#", captionPlaceholder);
-          } else {
-            caption = caption.replaceFirst(
-              NumberFormat.decimalPattern(
-                context.strings.localeName,
-              ).format(captionValue),
-              captionPlaceholder,
+          if (today.isBefore(anniversary)) months--;
+          final days = today.difference(photoDate).inDays;
+          if (months >= 12) {
+            captionValue = months ~/ 12;
+            caption = context.strings.memoryLaneCaptionYearsAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
             );
+          } else if (months >= 1) {
+            captionValue = months;
+            caption = context.strings.memoryLaneCaptionMonthsAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
+            );
+          } else if (days >= 7) {
+            captionValue = days ~/ 7;
+            caption = context.strings.memoryLaneCaptionWeeksAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
+            );
+          } else if (days >= 1) {
+            captionValue = days;
+            caption = context.strings.memoryLaneCaptionDaysAgo(
+              name: name ?? "",
+              count: captionValue,
+              number: captionPlaceholder,
+            );
+          } else {
+            caption = context.strings.memoryLaneCaptionToday(name: name ?? "");
           }
-          if (name != null && name.isNotEmpty) caption = "$name $caption";
+          caption = caption.trim();
         }
         final captionParts =
             caption?.split(captionPlaceholder) ?? const <String>[];
@@ -477,92 +455,104 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
             ),
             Scaffold(
               backgroundColor: Colors.transparent,
-              appBar: AppBar(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                iconTheme: const IconThemeData(color: Colors.white),
-                actionsIconTheme: const IconThemeData(color: Colors.white),
-                systemOverlayStyle: SystemUiOverlayStyle.light,
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Hero(
-                      tag: 'memory-lane-title-${widget.personId}',
-                      child: Text(
-                        title,
-                        style: darkTheme.textTheme.large.copyWith(
-                          inherit: false,
+              appBar: PreferredSize(
+                preferredSize: const Size.fromHeight(kToolbarHeight + 16),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: AppBar(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    iconTheme: const IconThemeData(color: Colors.white),
+                    actionsIconTheme: const IconThemeData(color: Colors.white),
+                    systemOverlayStyle: SystemUiOverlayStyle.light,
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Hero(
+                          tag: 'memory-lane-title-${widget.personId}',
+                          child: Text(
+                            title,
+                            style: darkTheme.textTheme.large.copyWith(
+                              inherit: false,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        if (file != null && creationTime != null)
+                          GestureDetector(
+                            onTap: () => _onDateTap(file),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  DateFormat.yMMMMd(
+                                    Localizations.localeOf(
+                                      context,
+                                    ).toLanguageTag(),
+                                  ).format(
+                                    DateTime.fromMicrosecondsSinceEpoch(
+                                      creationTime,
+                                    ),
+                                  ),
+                                  style: darkTheme.textTheme.small,
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    leadingWidth: 48 + screenSize.width * 0.04,
+                    actionsPadding: EdgeInsets.only(
+                      right: screenSize.width * 0.04,
+                    ),
+                    // TODO: Replace with an Ente component when it supports this pressed overlay.
+                    leading: Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: IconButton(
+                          tooltip: context.strings.close,
+                          style: IconButton.styleFrom(
+                            overlayColor: Colors.white.withValues(alpha: 0.08),
+                          ),
+                          icon: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedCancel01,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
                       ),
                     ),
-                    if (file != null && creationTime != null)
-                      GestureDetector(
-                        onTap: () => _onDateTap(file),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              DateFormat.yMMMMd(
-                                Localizations.localeOf(context).toLanguageTag(),
-                              ).format(
-                                DateTime.fromMicrosecondsSinceEpoch(
-                                  creationTime,
-                                ),
+                    actions: [
+                      if (widget.person != null &&
+                          flagService.enableMemoryShareLink &&
+                          !isLocalGalleryMode)
+                        // TODO: Replace with an Ente component when it supports this pressed overlay.
+                        SizedBox.square(
+                          dimension: 48,
+                          child: IconButton(
+                            tooltip: context.strings.shareLink,
+                            style: IconButton.styleFrom(
+                              overlayColor: Colors.white.withValues(
+                                alpha: 0.08,
                               ),
-                              style: darkTheme.textTheme.small,
                             ),
-                            const Icon(
-                              Icons.chevron_right,
-                              size: 16,
+                            icon: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedShare08,
                               color: Colors.white,
                             ),
-                          ],
+                            onPressed: _onShareTap,
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-                leadingWidth: 48 + screenSize.width * 0.04,
-                actionsPadding: EdgeInsets.only(right: screenSize.width * 0.04),
-                // TODO: Replace with an Ente component when it supports this pressed overlay.
-                leading: Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox.square(
-                    dimension: 48,
-                    child: IconButton(
-                      tooltip: context.strings.close,
-                      style: IconButton.styleFrom(
-                        overlayColor: Colors.white.withValues(alpha: 0.08),
-                      ),
-                      icon: const HugeIcon(
-                        icon: HugeIcons.strokeRoundedCancel01,
-                        color: Colors.white,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
+                    ],
                   ),
                 ),
-                actions: [
-                  if (widget.person != null &&
-                      flagService.enableMemoryShareLink &&
-                      !isLocalGalleryMode)
-                    // TODO: Replace with an Ente component when it supports this pressed overlay.
-                    SizedBox.square(
-                      dimension: 48,
-                      child: IconButton(
-                        tooltip: context.strings.shareLink,
-                        style: IconButton.styleFrom(
-                          overlayColor: Colors.white.withValues(alpha: 0.08),
-                        ),
-                        icon: const HugeIcon(
-                          icon: HugeIcons.strokeRoundedShare08,
-                          color: Colors.white,
-                        ),
-                        onPressed: _onShareTap,
-                      ),
-                    ),
-                ],
               ),
               body: SafeArea(
                 child: Column(
@@ -572,55 +562,38 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                         onPointerDown: (event) {
                           if (_photoPointer != null || !widget.isActive) return;
                           _photoPointer = event.pointer;
-                          _wasPlayingBeforeTouch = _playbackToken != null;
                           _pause();
                         },
                         onPointerUp: _onPhotoPointerEnd,
                         onPointerCancel: _onPhotoPointerEnd,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTapUp:
-                              widget.onNextMemory == null &&
-                                  widget.onPreviousMemory == null
-                              ? null
-                              : (details) {
-                                  if (!widget.isActive || _entries.isEmpty) {
-                                    return;
-                                  }
-                                  final previous =
-                                      details.localPosition.dx <
-                                      screenSize.width / 2;
-                                  final index = i + (previous ? -1 : 1);
-                                  if (index < 0 || index >= _entries.length) {
-                                    final onMemory = previous
-                                        ? widget.onPreviousMemory
-                                        : widget.onNextMemory;
-                                    if (onMemory != null) {
-                                      _pause();
-                                      onMemory();
-                                    }
-                                  } else if (_playbackToken != null) {
-                                    unawaited(
-                                      _play(index, fastTransition: true),
-                                    );
-                                  } else {
-                                    setState(
-                                      () => _selectEntry(
-                                        index,
-                                        fastTransition: true,
-                                      ),
-                                    );
-                                  }
-                                },
+                          onTapUp: (details) {
+                            if (!widget.isActive || _entries.isEmpty) return;
+                            final previous =
+                                details.localPosition.dx < screenSize.width / 2;
+                            final index = i + (previous ? -1 : 1);
+                            if (index < 0 || index >= _entries.length) {
+                              final onMemory = previous
+                                  ? widget.onPreviousMemory
+                                  : widget.onNextMemory;
+                              if (onMemory != null) {
+                                _pause();
+                                onMemory();
+                              }
+                            } else {
+                              unawaited(_play(index, fastTransition: true));
+                            }
+                          },
                           onLongPress: () {},
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                               horizontal: screenSize.width * 0.08,
-                              vertical: screenSize.height * 0.04,
+                              vertical: screenSize.height * 0.02,
                             ),
                             child: Align(
                               child: AspectRatio(
-                                aspectRatio: 3 / 4,
+                                aspectRatio: 3 / 5,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(24),
                                   child: AnimatedSwitcher(
@@ -736,13 +709,13 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                     ),
                     ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: screenSize.height * 0.2,
+                        minHeight: screenSize.height * 0.1,
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          if (captionValue != null) ...[
+                          if (caption != null) ...[
                             ConstrainedBox(
                               constraints: const BoxConstraints(minHeight: 48),
                               child: Align(
@@ -759,7 +732,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                       index < captionParts.length;
                                       index++
                                     ) ...[
-                                      if (index > 0)
+                                      if (index > 0 && captionValue != null)
                                         _MemoryLaneAnimatedDigit(
                                           value: captionValue,
                                         ),
@@ -778,11 +751,11 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                 ),
                               ),
                             ),
-                            SizedBox(height: screenSize.height * 0.02),
+                            SizedBox(height: screenSize.height * 0.01),
                           ],
                           if (_entries.isNotEmpty)
                             ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 48),
+                              constraints: const BoxConstraints(minHeight: 32),
                               child: Padding(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: screenSize.width * 0.16,
@@ -790,61 +763,6 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                 child: Row(
                                   mainAxisAlignment: .center,
                                   children: [
-                                    // TODO: Replace with an Ente component.
-                                    IconButton(
-                                      style: ButtonStyle(
-                                        fixedSize: const WidgetStatePropertyAll(
-                                          Size.square(48),
-                                        ),
-                                        shape: const WidgetStatePropertyAll(
-                                          CircleBorder(),
-                                        ),
-                                        foregroundColor:
-                                            const WidgetStatePropertyAll(
-                                              Colors.white,
-                                            ),
-                                        overlayColor:
-                                            const WidgetStatePropertyAll(
-                                              Colors.transparent,
-                                            ),
-                                        backgroundColor:
-                                            WidgetStateProperty.resolveWith(
-                                              (states) =>
-                                                  Colors.white.withValues(
-                                                    alpha:
-                                                        states.contains(
-                                                          WidgetState.disabled,
-                                                        )
-                                                        ? 0.16
-                                                        : states.contains(
-                                                            WidgetState.pressed,
-                                                          )
-                                                        ? 0.36
-                                                        : states.contains(
-                                                            WidgetState.hovered,
-                                                          )
-                                                        ? 0.30
-                                                        : 0.24,
-                                                  ),
-                                            ),
-                                      ),
-                                      tooltip: _playbackToken != null
-                                          ? context
-                                                .strings
-                                                .facesTimelinePlaybackPause
-                                          : context
-                                                .strings
-                                                .facesTimelinePlaybackPlay,
-                                      onPressed: _onPlayPauseTap,
-                                      icon: HugeIcon(
-                                        icon: _playbackToken != null
-                                            ? HugeIcons.strokeRoundedPause
-                                            : HugeIcons.strokeRoundedPlay,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(width: screenSize.width * 0.03),
                                     Expanded(
                                       child: LayoutBuilder(
                                         builder: (context, constraints) {
@@ -873,25 +791,14 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                                         0,
                                                         _entries.length - 1,
                                                       );
-                                              if (_playbackToken != null) {
-                                                unawaited(
-                                                  _play(
-                                                    index,
-                                                    fastTransition: true,
-                                                  ),
-                                                );
-                                              } else {
-                                                setState(
-                                                  () => _selectEntry(
-                                                    index,
-                                                    fastTransition: true,
-                                                  ),
-                                                );
-                                              }
+                                              unawaited(
+                                                _play(
+                                                  index,
+                                                  fastTransition: true,
+                                                ),
+                                              );
                                             },
                                             onHorizontalDragStart: (details) {
-                                              _wasPlayingBeforeSeek =
-                                                  _playbackToken != null;
                                               _seekFromPosition(
                                                 details.localPosition.dx,
                                                 constraints.maxWidth,
@@ -903,8 +810,9 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                                                   constraints.maxWidth,
                                                 ),
                                             onHorizontalDragEnd: (_) =>
-                                                _onSeekEnd(),
-                                            onHorizontalDragCancel: _onSeekEnd,
+                                                unawaited(_play(i)),
+                                            onHorizontalDragCancel: () =>
+                                                unawaited(_play(i)),
                                             child: Row(
                                               spacing: dotSpacing,
                                               children: List.generate(dotCount, (
