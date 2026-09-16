@@ -24,6 +24,9 @@ const guardrailFiles = new Set([
     "rustfmt.toml",
     ".rustfmt.toml",
     "eslint.config.mjs",
+    "eslint-suppressions.json",
+    "rust/checks/lint-exceptions/suppressions.json",
+    "web/checks/lint-exceptions/suppressions.json",
     ".prettierrc.json",
     "analysis_options.yaml",
 ]);
