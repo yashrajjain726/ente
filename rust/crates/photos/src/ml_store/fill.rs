@@ -219,7 +219,7 @@ mod tests {
     use crate::ml_db::{ClipEmbedding, ClusterSummary, MlDb};
     use crate::ml_store::tests::{
         centroid, clips, empty, hot_position, index_path, live_count, lose_index_files, meta,
-        nearest, one_hot, open, open_in, open_with_unusable_index_dir,
+        nearest, one_hot, open, open_in, open_with_unusable_clip_index,
     };
     use crate::ml_store::{Error, FillState, Index, MlStore, Result};
 
@@ -418,7 +418,7 @@ mod tests {
 
     #[test]
     fn failed_fill_keeps_the_filling_state_and_cursor() {
-        let (_directory, store) = open_with_unusable_index_dir();
+        let (_directory, store) = open_with_unusable_clip_index();
         store.db().insert_clip_rows(&clips(1..=5)).unwrap();
         store.db().set_meta("clip.fill", "filling").unwrap();
         store.db().set_meta("clip.cursor", "3").unwrap();

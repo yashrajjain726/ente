@@ -40,14 +40,14 @@ pub struct MlStore {
 }
 
 impl MlStore {
-    pub fn open(db_path: impl AsRef<Path>, index_dir: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(db_path: impl AsRef<Path>) -> Result<Self> {
         let db_path = db_path.as_ref();
         let db_stem = index::db_stem(db_path)?;
         let db = MlDb::open(db_path)?;
         Ok(Self {
             db,
             locks: lock::for_database(db_path),
-            indexes: Index::ALL.map(|index| index::Slot::new(index, index_dir.as_ref(), &db_stem)),
+            indexes: Index::ALL.map(|index| index::Slot::new(index, db_path, &db_stem)),
         })
     }
 
@@ -162,14 +162,12 @@ mod tests {
     }
 
     pub(super) fn open_in(directory: &TempDir) -> MlStore {
-        MlStore::open(directory.path().join(DB_FILE), directory.path()).unwrap()
+        MlStore::open(directory.path().join(DB_FILE)).unwrap()
     }
 
-    pub(super) fn open_with_unusable_index_dir() -> (TempDir, MlStore) {
-        let directory = tempfile::tempdir().unwrap();
-        let blocker = directory.path().join("indexes");
-        fs::write(&blocker, b"not a directory").unwrap();
-        let store = MlStore::open(directory.path().join(DB_FILE), &blocker).unwrap();
+    pub(super) fn open_with_unusable_clip_index() -> (TempDir, MlStore) {
+        let (directory, store) = open();
+        fs::create_dir(index_path(&directory, Index::Clip)).unwrap();
         (directory, store)
     }
 

@@ -222,7 +222,7 @@ mod tests {
     use crate::ml_db::{CLIP_EMBEDDING_DIMENSIONS, ClusterSummary};
     use crate::ml_store::tests::{
         DB_FILE, centroid, clips, empty, hot_position, index_path, live_count, meta, nearest,
-        one_hot, open, open_with_unusable_index_dir, pet,
+        one_hot, open, open_with_unusable_clip_index, pet,
     };
     use crate::ml_store::{Error, FillOutcome, FillState, Index, Species};
 
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn index_write_failure_marks_the_index_stale() {
-        let (_directory, store) = open_with_unusable_index_dir();
+        let (_directory, store) = open_with_unusable_clip_index();
         store.db().set_meta("clip.fill", "filled").unwrap();
         assert!(matches!(store.put_clip(&clips([1])), Err(Error::Index(_))));
         assert_eq!(store.db().count_clip_rows().unwrap(), 1);

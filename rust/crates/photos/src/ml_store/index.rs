@@ -119,10 +119,10 @@ pub(super) struct Slot {
 }
 
 impl Slot {
-    pub(super) fn new(index: Index, index_dir: &Path, db_stem: &str) -> Self {
+    pub(super) fn new(index: Index, db_path: &Path, db_stem: &str) -> Self {
         Self {
             index,
-            path: index_dir.join(format!("{db_stem}.vecdb.{}", index.name())),
+            path: db_path.with_file_name(format!("{db_stem}.vecdb.{}", index.name())),
             handle: RwLock::new(None),
         }
     }
@@ -234,18 +234,14 @@ mod tests {
     #[test]
     fn index_files_are_named_after_the_database_stem() {
         let directory = tempfile::tempdir().unwrap();
-        let store = MlStore::open(
-            directory.path().join("ente.ml.offline.db"),
-            directory.path(),
-        )
-        .unwrap();
+        let store = MlStore::open(directory.path().join("ente.ml.offline.db")).unwrap();
         store.fill_clip_index(false).unwrap();
         assert_eq!(
             VecDb::open_cost(&directory.path().join("ente.ml.offline.vecdb.clip")),
             OpenCost::Ready
         );
         assert!(matches!(
-            MlStore::open(directory.path().join(".."), directory.path()),
+            MlStore::open(directory.path().join("..")),
             Err(Error::InvalidArgument(_))
         ));
     }
