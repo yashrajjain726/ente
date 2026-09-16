@@ -146,7 +146,7 @@ pub(in crate::ml_db) mod tests {
         assert_eq!(db.get_repeated_text_embedding_cache("dog").unwrap(), None);
         let remaining: i64 = connection
             .query_row("SELECT COUNT(*) FROM text_embeddings_cache", (), |row| {
-                row.get(0)
+                Ok(row.get(0)?)
             })
             .unwrap();
         assert_eq!(remaining, 0);

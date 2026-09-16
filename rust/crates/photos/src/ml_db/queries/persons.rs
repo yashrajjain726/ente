@@ -73,7 +73,7 @@ impl MlDb {
             "SELECT cluster_id FROM cluster_person WHERE person_id IN ({})",
             person_ids,
             const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
-            |row| row.get(0),
+            |row| Ok(row.get(0)?),
         )
         .map_err(Into::into)
     }

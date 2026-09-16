@@ -3,13 +3,140 @@ use std::path::Path;
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use rusqlite::OpenFlags;
-pub use rusqlite::{
-    Connection, Error, OptionalExtension, Params, Result, Row, ToSql, Transaction,
-    TransactionBehavior, params_from_iter, types::FromSql,
-};
+use rusqlite::{OpenFlags, OptionalExtension};
+pub use rusqlite::{Params, Row, ToSql, TransactionBehavior, params_from_iter, types::FromSql};
 
 const BUSY_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub struct Error(#[from] rusqlite::Error);
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub struct Connection(rusqlite::Connection);
+
+impl Connection {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self(rusqlite::Connection::open(path)?))
+    }
+
+    pub fn execute(&self, sql: &str, parameters: impl Params) -> Result<usize> {
+        Ok(self.0.execute(sql, parameters)?)
+    }
+
+    pub fn execute_batch(&self, sql: &str) -> Result<()> {
+        Ok(self.0.execute_batch(sql)?)
+    }
+
+    pub fn prepare_cached(&self, sql: &str) -> Result<Statement<'_>> {
+        Ok(Statement(self.0.prepare_cached(sql)?))
+    }
+
+    pub fn query_row<T>(
+        &self,
+        sql: &str,
+        parameters: impl Params,
+        map: impl FnOnce(&Row<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.0.query_row(sql, parameters, |row| Ok(map(row)))?
+    }
+
+    pub fn pragma_query_value<T>(
+        &self,
+        name: &str,
+        map: impl FnOnce(&Row<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.0.pragma_query_value(None, name, |row| Ok(map(row)))?
+    }
+
+    pub fn pragma_update(&self, name: &str, value: impl ToSql) -> Result<()> {
+        Ok(self.0.pragma_update(None, name, value)?)
+    }
+
+    pub fn transaction_with_behavior(
+        &mut self,
+        behavior: TransactionBehavior,
+    ) -> Result<Transaction<'_>> {
+        Ok(Transaction(self.0.transaction_with_behavior(behavior)?))
+    }
+}
+
+pub struct Statement<'connection>(rusqlite::CachedStatement<'connection>);
+
+impl Statement<'_> {
+    pub fn execute(&mut self, parameters: impl Params) -> Result<usize> {
+        Ok(self.0.execute(parameters)?)
+    }
+
+    pub fn query_map<T>(
+        &mut self,
+        parameters: impl Params,
+        map: impl FnMut(&Row<'_>) -> Result<T>,
+    ) -> Result<impl Iterator<Item = Result<T>>> {
+        Ok(self.0.query_and_then(parameters, map)?)
+    }
+
+    pub fn query_row<T>(
+        &mut self,
+        parameters: impl Params,
+        map: impl FnOnce(&Row<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.0.query_row(parameters, |row| Ok(map(row)))?
+    }
+
+    pub fn query_optional<T>(
+        &mut self,
+        parameters: impl Params,
+        map: impl FnOnce(&Row<'_>) -> Result<T>,
+    ) -> Result<Option<T>> {
+        self.0
+            .query_row(parameters, |row| Ok(map(row)))
+            .optional()?
+            .transpose()
+    }
+}
+
+pub struct Transaction<'connection>(rusqlite::Transaction<'connection>);
+
+impl Transaction<'_> {
+    pub fn execute(&self, sql: &str, parameters: impl Params) -> Result<usize> {
+        Ok(self.0.execute(sql, parameters)?)
+    }
+
+    pub fn execute_batch(&self, sql: &str) -> Result<()> {
+        Ok(self.0.execute_batch(sql)?)
+    }
+
+    pub fn prepare_cached(&self, sql: &str) -> Result<Statement<'_>> {
+        Ok(Statement(self.0.prepare_cached(sql)?))
+    }
+
+    pub fn query_row<T>(
+        &self,
+        sql: &str,
+        parameters: impl Params,
+        map: impl FnOnce(&Row<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.0.query_row(sql, parameters, |row| Ok(map(row)))?
+    }
+
+    pub fn pragma_query_value<T>(
+        &self,
+        name: &str,
+        map: impl FnOnce(&Row<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.0.pragma_query_value(None, name, |row| Ok(map(row)))?
+    }
+
+    pub fn pragma_update(&self, name: &str, value: impl ToSql) -> Result<()> {
+        Ok(self.0.pragma_update(None, name, value)?)
+    }
+
+    pub fn commit(self) -> Result<()> {
+        Ok(self.0.commit()?)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct OpenOptions {
@@ -29,15 +156,15 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn open<E: From<rusqlite::Error>>(
+    pub fn open<E: From<Error>>(
         path: impl AsRef<Path>,
         options: OpenOptions,
         initialize: impl FnOnce(&mut Connection) -> std::result::Result<(), E>,
     ) -> std::result::Result<Self, E> {
         let path = path.as_ref();
         let mut writer = Connection::open(path)?;
-        writer.busy_timeout(BUSY_TIMEOUT)?;
-        writer.pragma_update(None, "journal_mode", "WAL")?;
+        writer.0.busy_timeout(BUSY_TIMEOUT).map_err(Error::from)?;
+        writer.pragma_update("journal_mode", "WAL")?;
         initialize(&mut writer)?;
         let readers = (0..options.reader_count.get())
             .map(|_| open_reader(path))
@@ -73,9 +200,9 @@ fn open_reader(path: &Path) -> Result<Connection> {
     let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
         | OpenFlags::SQLITE_OPEN_URI
         | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-    let connection = Connection::open_with_flags(path, flags)?;
+    let connection = rusqlite::Connection::open_with_flags(path, flags)?;
     connection.busy_timeout(BUSY_TIMEOUT)?;
-    Ok(connection)
+    Ok(Connection(connection))
 }
 
 struct Pool {
@@ -154,9 +281,9 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use rusqlite::{Connection, Result};
-
-    use super::{Database, OpenOptions, lock, open_reader};
+    use super::{
+        Connection, Database, Error, OpenOptions, Result, TransactionBehavior, lock, open_reader,
+    };
 
     fn open() -> (tempfile::TempDir, Database) {
         let directory = tempfile::tempdir().unwrap();
@@ -170,7 +297,7 @@ mod tests {
     }
 
     fn value(db: &Database, sql: &str) -> i64 {
-        db.read(|connection| connection.query_row(sql, (), |row| row.get(0)))
+        db.read(|connection| connection.query_row(sql, (), |row| Ok(row.get(0)?)))
             .unwrap()
     }
 
@@ -181,13 +308,75 @@ mod tests {
     }
 
     #[test]
+    fn optional_queries_distinguish_missing_rows_from_errors() {
+        let (_directory, db) = open();
+        db.read(|connection| {
+            let mut statement = connection.prepare_cached("SELECT ?1 WHERE ?2")?;
+            let missing: Option<i64> = statement.query_optional((7, false), |_| {
+                panic!("a missing row must not invoke the mapper")
+            })?;
+            assert_eq!(missing, None);
+            assert_eq!(
+                statement.query_optional((7, true), |row| Ok(row.get::<_, i64>(0)?))?,
+                Some(7)
+            );
+            assert!(
+                statement
+                    .query_row((7, false), |row| Ok(row.get::<_, i64>(0)?))
+                    .is_err()
+            );
+            assert!(
+                statement
+                    .query_optional(("not an integer", true), |row| Ok(row.get::<_, i64>(0)?))
+                    .is_err()
+            );
+            assert!(statement.query_optional((), |_| Ok(())).is_err());
+            let mut failing = connection.prepare_cached("SELECT abs(?1)")?;
+            assert!(failing.query_optional([i64::MIN], |_| Ok(())).is_err());
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn mapped_queries_propagate_errors_and_allow_statement_reuse() {
+        let (_directory, db) = open();
+        db.read(|connection| {
+            let mut statement =
+                connection.prepare_cached("SELECT column1 FROM (VALUES (1), ('invalid'), (3))")?;
+            {
+                let mut rows = statement.query_map((), |row| Ok(row.get::<_, i64>(0)?))?;
+                assert_eq!(rows.next().unwrap().unwrap(), 1);
+                assert!(rows.next().unwrap().is_err());
+                assert_eq!(rows.next().unwrap().unwrap(), 3);
+                assert!(rows.next().is_none());
+            }
+            {
+                let mut rows = statement.query_map((), |row| Ok(row.get::<_, i64>(0)?))?;
+                assert_eq!(rows.next().unwrap().unwrap(), 1);
+            }
+            assert_eq!(statement.query_row((), |row| Ok(row.get::<_, i64>(0)?))?, 1);
+            assert!(statement.query_map([1], |_| Ok(())).is_err());
+            let mut failing = connection.prepare_cached("SELECT abs(?1)")?;
+            {
+                let mut rows = failing.query_map([i64::MIN], |_| Ok(()))?;
+                assert!(rows.next().unwrap().is_err());
+                assert!(rows.next().is_none());
+            }
+            assert_eq!(failing.query_row([-7], |row| Ok(row.get::<_, i64>(0)?))?, 7);
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
     fn open_initializes_before_readers_and_configures_connections() {
         let (_directory, db) = open();
         db.write(|connection| {
             let journal: String =
-                connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+                connection.pragma_query_value("journal_mode", |row| Ok(row.get(0)?))?;
             let timeout: i64 =
-                connection.pragma_query_value(None, "busy_timeout", |row| row.get(0))?;
+                connection.pragma_query_value("busy_timeout", |row| Ok(row.get(0)?))?;
             assert_eq!(journal, "wal");
             assert_eq!(timeout, 30000);
             connection.execute("INSERT INTO items VALUES (7)", ())
@@ -210,10 +399,7 @@ mod tests {
             let connection = Connection::open(&path).unwrap();
             connection.execute_batch("CREATE TABLE items (id INTEGER); INSERT INTO items VALUES (7); PRAGMA user_version = 42;").unwrap();
         }
-        let db = Database::open(&path, OpenOptions::default(), |_| {
-            Ok::<_, rusqlite::Error>(())
-        })
-        .unwrap();
+        let db = Database::open(&path, OpenOptions::default(), |_| Ok::<_, Error>(())).unwrap();
         assert_eq!(value(&db, "PRAGMA user_version"), 42);
         assert_eq!(value(&db, "SELECT id FROM items"), 7);
     }
@@ -223,8 +409,8 @@ mod tests {
         #[derive(Debug, PartialEq, Eq)]
         struct InitializationError(String);
 
-        impl From<rusqlite::Error> for InitializationError {
-            fn from(error: rusqlite::Error) -> Self {
+        impl From<Error> for InitializationError {
+            fn from(error: Error) -> Self {
                 Self(error.to_string())
             }
         }
@@ -273,7 +459,9 @@ mod tests {
             .write_transaction(|transaction| {
                 transaction.execute("INSERT INTO items VALUES (?)", [1])?;
                 transaction.execute("INSERT INTO items VALUES (?)", [2])?;
-                transaction.query_row("SELECT SUM(id) FROM items", (), |row| row.get::<_, i64>(0))
+                transaction.query_row("SELECT SUM(id) FROM items", (), |row| {
+                    Ok(row.get::<_, i64>(0)?)
+                })
             })
             .unwrap();
         assert_eq!(total, 3);
@@ -287,12 +475,15 @@ mod tests {
             .unwrap();
         let counts = db
             .read(|connection| {
-                let transaction = connection.transaction()?;
+                let transaction =
+                    connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
                 let before: i64 =
-                    transaction.query_row("SELECT COUNT(*) FROM items", (), |row| row.get(0))?;
+                    transaction
+                        .query_row("SELECT COUNT(*) FROM items", (), |row| Ok(row.get(0)?))?;
                 db.write(|writer| writer.execute("INSERT INTO items VALUES (?)", [2]))?;
                 let after: i64 =
-                    transaction.query_row("SELECT COUNT(*) FROM items", (), |row| row.get(0))?;
+                    transaction
+                        .query_row("SELECT COUNT(*) FROM items", (), |row| Ok(row.get(0)?))?;
                 assert!(
                     transaction
                         .execute("INSERT INTO items VALUES (?)", [3])
@@ -315,7 +506,7 @@ mod tests {
                 OpenOptions {
                     reader_count: NonZeroUsize::new(reader_count).unwrap(),
                 },
-                |_| Ok::<_, rusqlite::Error>(()),
+                |_| Ok::<_, Error>(()),
             )
             .unwrap();
 

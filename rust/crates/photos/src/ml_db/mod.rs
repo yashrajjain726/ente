@@ -121,7 +121,7 @@ mod tests {
     fn user_version(path: &Path) -> i64 {
         Connection::open(path)
             .unwrap()
-            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .pragma_query_value("user_version", |row| Ok(row.get(0)?))
             .unwrap()
     }
 
@@ -131,7 +131,7 @@ mod tests {
             .query_row(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_fcClusterID'",
                 (),
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap()
     }
@@ -235,7 +235,7 @@ mod tests {
         let row_count = |table: &str| -> i64 {
             connection
                 .query_row(&format!("SELECT COUNT(*) FROM {table}"), (), |row| {
-                    row.get(0)
+                    Ok(row.get(0)?)
                 })
                 .unwrap()
         };
@@ -270,8 +270,8 @@ mod tests {
             .db
             .write(|connection| {
                 Ok((
-                    connection.pragma_query_value(None, "synchronous", |row| row.get(0))?,
-                    connection.pragma_query_value(None, "journal_size_limit", |row| row.get(0))?,
+                    connection.pragma_query_value("synchronous", |row| Ok(row.get(0)?))?,
+                    connection.pragma_query_value("journal_size_limit", |row| Ok(row.get(0)?))?,
                 ))
             })
             .unwrap();
@@ -313,7 +313,7 @@ mod tests {
                 .query_row(
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?",
                     [table],
-                    |row| row.get(0),
+                    |row| Ok(row.get(0)?),
                 )
                 .unwrap();
             assert_eq!(count, 1, "missing table {table}");
@@ -341,7 +341,7 @@ mod tests {
         drop(MlDb::open(&path).unwrap());
         Connection::open(&path)
             .unwrap()
-            .pragma_update(None, "user_version", 16)
+            .pragma_update("user_version", 16)
             .unwrap();
         match MlDb::open(&path) {
             Err(Error::Downgrade { current, target }) => {
@@ -361,7 +361,7 @@ mod tests {
             connection
                 .execute_batch(crate::ml_db::schema::CREATE_FACES_TABLE)
                 .unwrap();
-            connection.pragma_update(None, "user_version", 1).unwrap();
+            connection.pragma_update("user_version", 1).unwrap();
         }
         let db = MlDb::open(&path).unwrap();
         assert_eq!(user_version(&path), 15);

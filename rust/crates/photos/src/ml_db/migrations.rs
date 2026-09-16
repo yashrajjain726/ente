@@ -4,14 +4,14 @@ use super::{Error, Result};
 
 pub(super) fn migrate(connection: &mut Connection, scripts: &[&str]) -> Result<()> {
     let target = scripts.len() as i64;
-    let probed: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    let probed: i64 = connection.pragma_query_value("user_version", |row| Ok(row.get(0)?))?;
     check_not_downgrade(probed, target)?;
     if probed == target {
         return Ok(());
     }
 
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    let current: i64 = transaction.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    let current: i64 = transaction.pragma_query_value("user_version", |row| Ok(row.get(0)?))?;
     check_not_downgrade(current, target)?;
     if current == target {
         return Ok(());
@@ -19,7 +19,7 @@ pub(super) fn migrate(connection: &mut Connection, scripts: &[&str]) -> Result<(
     for script in &scripts[current as usize..] {
         transaction.execute_batch(script)?;
     }
-    transaction.pragma_update(None, "user_version", target)?;
+    transaction.pragma_update("user_version", target)?;
     transaction.commit()?;
     Ok(())
 }
@@ -64,9 +64,10 @@ mod tests {
         let (version, label): (i64, String) = db
             .read(|connection| {
                 Ok((
-                    connection.pragma_query_value(None, "user_version", |row| row.get(0))?,
-                    connection
-                        .query_row("SELECT label FROM items WHERE id = 7", (), |row| row.get(0))?,
+                    connection.pragma_query_value("user_version", |row| Ok(row.get(0)?))?,
+                    connection.query_row("SELECT label FROM items WHERE id = 7", (), |row| {
+                        Ok(row.get(0)?)
+                    })?,
                 ))
             })
             .unwrap();
@@ -104,12 +105,12 @@ mod tests {
         {
             let connection = Connection::open(&path).unwrap();
             let version: i64 = connection
-                .pragma_query_value(None, "user_version", |row| row.get(0))
+                .pragma_query_value("user_version", |row| Ok(row.get(0)?))
                 .unwrap();
             let columns = connection
-                .prepare("SELECT name FROM pragma_table_info('items')")
+                .prepare_cached("SELECT name FROM pragma_table_info('items')")
                 .unwrap()
-                .query_map((), |row| row.get::<_, String>(0))
+                .query_map((), |row| Ok(row.get::<_, String>(0)?))
                 .unwrap()
                 .collect::<SqliteResult<Vec<_>>>()
                 .unwrap();
@@ -119,7 +120,7 @@ mod tests {
         let db = open(&path, &[CREATE_ITEMS, ADD_LABEL]).unwrap();
         assert_eq!(
             db.read(|connection| connection
-                .query_row("SELECT id FROM items", (), |row| row.get::<_, i64>(0)))
+                .query_row("SELECT id FROM items", (), |row| Ok(row.get::<_, i64>(0)?)))
                 .unwrap(),
             7
         );
@@ -140,9 +141,8 @@ mod tests {
                     let db = open(path, &[CREATE_ITEMS, ADD_LABEL]).unwrap();
                     let version = db
                         .read(|connection| {
-                            connection.pragma_query_value(None, "user_version", |row| {
-                                row.get::<_, i64>(0)
-                            })
+                            connection
+                                .pragma_query_value("user_version", |row| Ok(row.get::<_, i64>(0)?))
                         })
                         .unwrap();
                     assert_eq!(version, 2);

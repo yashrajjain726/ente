@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
 
-use crate::db::{
-    FromSql, OptionalExtension, Params, Result, Row, ToSql, TransactionBehavior, params_from_iter,
-};
+use crate::db::{FromSql, Params, Result, Row, ToSql, TransactionBehavior, params_from_iter};
 
 use crate::ml_db::MlDb;
 
@@ -29,7 +27,7 @@ impl MlDb {
         sql: &str,
         parameters: P,
     ) -> Result<C> {
-        self.read_all(sql, parameters, |row| row.get(0))
+        self.read_all(sql, parameters, |row| Ok(row.get(0)?))
     }
 
     pub(in crate::ml_db) fn read_grouped<
@@ -54,7 +52,7 @@ impl MlDb {
         self.db.read(|connection| {
             connection
                 .prepare_cached(sql)?
-                .query_row(parameters, |row| row.get(0))
+                .query_row(parameters, |row| Ok(row.get(0)?))
         })
     }
 
@@ -66,8 +64,7 @@ impl MlDb {
         self.db.read(|connection| {
             connection
                 .prepare_cached(sql)?
-                .query_row(parameters, |row| row.get(0))
-                .optional()
+                .query_optional(parameters, |row| Ok(row.get(0)?))
         })
     }
 
@@ -434,7 +431,7 @@ mod tests {
                 "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
                 &ids,
                 NonZeroUsize::MIN,
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap();
         assert_eq!(one_at_a_time, ids);
@@ -443,7 +440,7 @@ mod tests {
                 "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
                 &ids,
                 const { NonZeroUsize::new(3).unwrap() },
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap();
         assert_eq!(by_chunk, [3, 2, 1, 6, 5, 4, 7]);
@@ -452,7 +449,7 @@ mod tests {
                 "SELECT id FROM items WHERE id IN ({}) ORDER BY id DESC",
                 &ids,
                 const { NonZeroUsize::new(10).unwrap() },
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap();
         assert_eq!(single_chunk, [7, 6, 5, 4, 3, 2, 1]);
@@ -461,7 +458,7 @@ mod tests {
                 "SELECT id FROM missing_table WHERE id IN ({})",
                 &Vec::<i64>::new(),
                 const { NonZeroUsize::new(3).unwrap() },
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap();
         assert!(none.is_empty());
@@ -471,7 +468,7 @@ mod tests {
                 "SELECT id FROM items WHERE id IN ({})",
                 &many,
                 const { NonZeroUsize::new(MAX_SQL_BIND_PARAMS_PER_QUERY).unwrap() },
-                |row| row.get(0),
+                |row| Ok(row.get(0)?),
             )
             .unwrap();
         assert_eq!(found, HashSet::from([1, 2, 3, 4, 5, 6, 7]));
