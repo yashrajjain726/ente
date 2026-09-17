@@ -460,6 +460,7 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: AppBar(
+                    centerTitle: false,
                     backgroundColor: Colors.transparent,
                     foregroundColor: Colors.white,
                     iconTheme: const IconThemeData(color: Colors.white),
