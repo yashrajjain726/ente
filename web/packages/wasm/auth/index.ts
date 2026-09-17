@@ -5,9 +5,9 @@ import type {
     Session,
 } from "./pkg/ente_auth_wasm";
 
-const wasm = () => import("./pkg/ente_auth_wasm");
-
 export type { Session } from "./pkg/ente_auth_wasm";
+
+const wasm = () => import("./pkg/ente_auth_wasm");
 
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);

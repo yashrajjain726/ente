@@ -3,14 +3,14 @@ import type {
     OpenSpaceLinkCtxJsInput,
 } from "./pkg/ente_space_wasm";
 
-const wasm = () => import("./pkg/ente_space_wasm");
-
 export type { DecryptedSpaceProfile } from "./pkg/ente_space_wasm";
 
 export type SpaceAccountCtxHandle =
     import("./pkg/ente_space_wasm").SpaceAccountCtxHandle;
 export type SpaceLinkCtxHandle =
     import("./pkg/ente_space_wasm").SpaceLinkCtxHandle;
+
+const wasm = () => import("./pkg/ente_space_wasm");
 
 export const encryptSpaceRootEntityKey = async (
     spaceRootKeyB64: string,

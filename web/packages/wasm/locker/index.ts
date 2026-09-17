@@ -9,9 +9,9 @@ import type {
     WrappedRootContactKey,
 } from "./pkg/ente_locker_wasm";
 
-const wasm = () => import("./pkg/ente_locker_wasm");
-
 export type { OpenSessionInput, Session } from "./pkg/ente_locker_wasm";
+
+const wasm = () => import("./pkg/ente_locker_wasm");
 
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
