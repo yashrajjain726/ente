@@ -17,6 +17,7 @@ import { removeAuthToken } from "ente-base/token";
 import {
     decryptSpaceRootEntityKey,
     encryptSpaceRootEntityKey,
+    type SpaceKeyResponse,
 } from "ente-space-wasm";
 import { spaceBootstrapAuthHeaders } from "services/bootstrap-auth";
 import {
@@ -39,7 +40,6 @@ const OwnedSpace = z.object({
     keyVersion: z.number(),
 });
 const OwnedSpaces = OwnedSpace.array();
-export type OwnedSpace = z.infer<typeof OwnedSpace>;
 
 const SpaceProfileAvatar = z.object({
     keyVersion: z.number(),
@@ -133,7 +133,7 @@ export const savedSpaceProfileAvatar = () =>
 
 export const saveSpaceOwnedSpaces = (
     sessionToken: string,
-    ownedSpaces: OwnedSpace[],
+    ownedSpaces: SpaceKeyResponse[],
 ) => {
     const persisted = savedPersistedSession();
     if (persisted?.sessionToken != sessionToken) return;
