@@ -40,7 +40,9 @@ struct FlowLayout: Layout {
         return CGSize(width: finalWidth, height: totalHeight)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(
+        in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+    ) {
         let sizes = subviews.map { childSize(for: $0, maxWidth: bounds.width) }
 
         struct RowItem {

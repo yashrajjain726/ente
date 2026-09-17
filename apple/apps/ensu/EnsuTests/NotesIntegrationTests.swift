@@ -14,14 +14,19 @@ final class NotesIntegrationTests: XCTestCase {
     func testNativeSourceFailureAndCancellationCrossTheBridge() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let collection = try NotesCollection(indexRoot: root.path, collectionId: UUID().uuidString.lowercased())
+        let collection = try NotesCollection(
+            indexRoot: root.path, collectionId: UUID().uuidString.lowercased())
         let source = UnavailableNotesSource()
-        XCTAssertThrowsError(try collection.inspectFreshness(source: source, cancellation: NotesCancellation())) {
+        XCTAssertThrowsError(
+            try collection.inspectFreshness(source: source, cancellation: NotesCancellation())
+        ) {
             XCTAssertEqual($0 as? NotesError, .Unavailable)
         }
         let cancellation = NotesCancellation()
         cancellation.cancel()
-        XCTAssertThrowsError(try collection.inspectFreshness(source: source, cancellation: cancellation)) {
+        XCTAssertThrowsError(
+            try collection.inspectFreshness(source: source, cancellation: cancellation)
+        ) {
             XCTAssertEqual($0 as? NotesError, .Cancelled)
         }
     }

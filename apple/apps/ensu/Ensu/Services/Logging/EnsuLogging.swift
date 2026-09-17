@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 #if canImport(ZIPFoundation)
-import ZIPFoundation
+    import ZIPFoundation
 #endif
 
 enum EnsuLogLevel: String {
@@ -45,15 +45,20 @@ final class EnsuLogging: Sendable {
 
     private init(maxLogFiles: Int = 5) {
         self.maxLogFiles = maxLogFiles
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let support = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first
         let base = support ?? FileManager.default.temporaryDirectory
         let directory = base.appendingPathComponent("logs", isDirectory: true)
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: directory, withIntermediateDirectories: true)
             logsDirectory = directory
         } catch {
-            logsDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("logs", isDirectory: true)
-            try? FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
+            logsDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "logs", isDirectory: true)
+            try? FileManager.default.createDirectory(
+                at: logsDirectory, withIntermediateDirectories: true)
         }
     }
 
@@ -70,7 +75,10 @@ final class EnsuLogging: Sendable {
         EnsuLogger(tag: tag)
     }
 
-    func log(level: EnsuLogLevel, tag: String, message: String, details: String? = nil, error: Error? = nil) {
+    func log(
+        level: EnsuLogLevel, tag: String, message: String, details: String? = nil,
+        error: Error? = nil
+    ) {
         let safeMessage = EnsuLogSanitizer.sanitize(message) ?? ""
         let safeDetails = EnsuLogSanitizer.sanitize(combineDetails(details: details, error: error))
 
@@ -94,8 +102,11 @@ final class EnsuLogging: Sendable {
     }
 
     func listLogFiles() -> [URL] {
-        let urls = (try? FileManager.default.contentsOfDirectory(at: logsDirectory, includingPropertiesForKeys: nil)) ?? []
-        return urls
+        let urls =
+            (try? FileManager.default.contentsOfDirectory(
+                at: logsDirectory, includingPropertiesForKeys: nil)) ?? []
+        return
+            urls
             .filter { $0.pathExtension.lowercased() == "txt" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
@@ -108,17 +119,18 @@ final class EnsuLogging: Sendable {
     }
 
     func createLogsArchive() throws -> URL {
-        let name = "ensu-logs-\(dayFormatter.string(from: Date()))-\(Int(Date().timeIntervalSince1970)).zip"
+        let name =
+            "ensu-logs-\(dayFormatter.string(from: Date()))-\(Int(Date().timeIntervalSince1970)).zip"
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         if FileManager.default.fileExists(atPath: dest.path) {
             try? FileManager.default.removeItem(at: dest)
         }
 
         #if canImport(ZIPFoundation)
-        if #available(iOS 16.0, macOS 13.0, *) {
-            try FileManager.default.zipItem(at: logsDirectory, to: dest, shouldKeepParent: true)
-            return dest
-        }
+            if #available(iOS 16.0, macOS 13.0, *) {
+                try FileManager.default.zipItem(at: logsDirectory, to: dest, shouldKeepParent: true)
+                return dest
+            }
         #endif
 
         // Fallback: concatenate logs into a single text file.
@@ -214,7 +226,8 @@ struct EnsuLogger {
     }
 
     func error(_ message: String, _ error: Error? = nil, details: String? = nil) {
-        EnsuLogging.shared.log(level: .error, tag: tag, message: message, details: details, error: error)
+        EnsuLogging.shared.log(
+            level: .error, tag: tag, message: message, details: details, error: error)
     }
 }
 
@@ -235,8 +248,10 @@ private final class EnsuRustLogSink: RustLogSink {
 private enum EnsuLogSanitizer {
     private static let emailPattern = "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
     private static let bearerPattern = "(?i)bearer\\s+[A-Za-z0-9._-]+"
-    private static let keyValuePattern = "(?i)(token|authToken|accessToken|refreshToken|authorization|password|otp|secret|secretKey|masterKey|encryptedToken|srpA|srpB|srpM1|srpM2|kek)\\s*[:=]\\s*([^\\s,;]+)"
-    private static let queryPattern = "(?i)(token|key|sig|signature|auth|session|passkey|otp)=([^&\\s]+)"
+    private static let keyValuePattern =
+        "(?i)(token|authToken|accessToken|refreshToken|authorization|password|otp|secret|secretKey|masterKey|encryptedToken|srpA|srpB|srpM1|srpM2|kek)\\s*[:=]\\s*([^\\s,;]+)"
+    private static let queryPattern =
+        "(?i)(token|key|sig|signature|auth|session|passkey|otp)=([^&\\s]+)"
     private static let longBlobPattern = "[A-Za-z0-9+/=]{40,}"
 
     static func sanitize(_ input: String?) -> String? {
@@ -253,8 +268,11 @@ private enum EnsuLogSanitizer {
 
 private extension String {
     func replacingRegex(_ pattern: String, with replacement: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return self }
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return self
+        }
         let range = NSRange(startIndex..<endIndex, in: self)
-        return regex.stringByReplacingMatches(in: self, options: [], range: range, withTemplate: replacement)
+        return regex.stringByReplacingMatches(
+            in: self, options: [], range: range, withTemplate: replacement)
     }
 }

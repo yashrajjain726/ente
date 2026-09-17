@@ -8,7 +8,8 @@ final class AssetStore: Sendable {
 
     @MainActor
     init() async {
-        let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let baseDir =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         var assetsDir = baseDir.appendingPathComponent("assets", isDirectory: true)
         try? FileManager.default.createDirectory(at: assetsDir, withIntermediateDirectories: true)
@@ -18,12 +19,14 @@ final class AssetStore: Sendable {
         core = AssetStoreCore(assetsDir: assetsDir.path)
         let settings = UserDefaults.standard
         let pendingSelection = settings.object(forKey: "ensu.model.id") == nil
-        let legacyModelUrl = pendingSelection && settings.bool(forKey: "ensu.model.use_custom")
+        let legacyModelUrl =
+            pendingSelection && settings.bool(forKey: "ensu.model.use_custom")
             ? settings.string(forKey: "ensu.model.url")
             : nil
         let legacy = LegacyAssets(
             llmDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
-            transcriptionDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
+            transcriptionDir: baseDir.appendingPathComponent("transcription", isDirectory: true)
+                .path,
             modelUrl: legacyModelUrl,
             mmprojUrl: settings.string(forKey: "ensu.model.mmproj")
         )

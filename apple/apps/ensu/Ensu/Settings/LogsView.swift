@@ -133,14 +133,17 @@ struct LogsView: View {
         for line in text.components(separatedBy: .newlines) {
             guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
 
-            if let match = logLineRegex.firstMatch(in: line, options: [], range: NSRange(line.startIndex..., in: line)),
-               let tagRange = Range(match.range(at: 1), in: line),
-               let levelRange = Range(match.range(at: 2), in: line),
-               let timestampRange = Range(match.range(at: 3), in: line),
-               let messageRange = Range(match.range(at: 4), in: line) {
+            if let match = logLineRegex.firstMatch(
+                in: line, options: [], range: NSRange(line.startIndex..., in: line)),
+                let tagRange = Range(match.range(at: 1), in: line),
+                let levelRange = Range(match.range(at: 2), in: line),
+                let timestampRange = Range(match.range(at: 3), in: line),
+                let messageRange = Range(match.range(at: 4), in: line)
+            {
                 entries.append(
                     EnsuLogEntry(
-                        timestamp: logLineFormatter.date(from: String(line[timestampRange])) ?? Date(),
+                        timestamp: logLineFormatter.date(from: String(line[timestampRange]))
+                            ?? Date(),
                         level: EnsuLogLevel(rawValue: String(line[levelRange])) ?? .info,
                         tag: String(line[tagRange]),
                         message: String(line[messageRange]),
@@ -157,7 +160,8 @@ struct LogsView: View {
                 )
             } else {
                 entries.append(
-                    EnsuLogEntry(timestamp: Date(), level: .info, tag: "Log", message: line, details: nil)
+                    EnsuLogEntry(
+                        timestamp: Date(), level: .info, tag: "Log", message: line, details: nil)
                 )
             }
         }
@@ -322,6 +326,7 @@ private let logLineFormatter: DateFormatter = {
 
 private let logLineRegex: NSRegularExpression = {
     let pattern = "^\\[(.+?)\\]\\[(.+?)\\] \\[(.+?)\\] (.*)$"
+    // swift-format-ignore: NeverUseForceTry
     return try! NSRegularExpression(pattern: pattern, options: [])
 }()
 
@@ -346,6 +351,7 @@ struct ExportDocumentPicker: UIViewControllerRepresentable {
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    func updateUIViewController(
+        _ uiViewController: UIDocumentPickerViewController, context: Context
+    ) {}
 }
-

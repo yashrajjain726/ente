@@ -24,7 +24,9 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: EnsuSpacing.lg) {
                     if let aboutItem = filteredAboutItem {
                         Button(action: aboutItem.action) {
-                            settingsCard(title: aboutItem.title, iconName: aboutItem.iconName, showsChevron: true)
+                            settingsCard(
+                                title: aboutItem.title, iconName: aboutItem.iconName,
+                                showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -33,21 +35,24 @@ struct SettingsView: View {
                         NavigationLink {
                             item.destination
                         } label: {
-                            settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                            settingsCard(
+                                title: item.title, iconName: item.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
 
                     if shouldShowSignInRow {
                         Button(action: onSignIn) {
-                            settingsCard(title: signInTitle, iconName: "Upload01Icon", showsChevron: true)
+                            settingsCard(
+                                title: signInTitle, iconName: "Upload01Icon", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
 
                     ForEach(filteredLegalLinkItems) { item in
                         Button(action: item.action) {
-                            settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                            settingsCard(
+                                title: item.title, iconName: item.iconName, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -62,7 +67,8 @@ struct SettingsView: View {
                             NavigationLink {
                                 item.destination
                             } label: {
-                                settingsCard(title: item.title, iconName: item.iconName, showsChevron: true)
+                                settingsCard(
+                                    title: item.title, iconName: item.iconName, showsChevron: true)
                             }
                             .buttonStyle(.plain)
                         }
@@ -139,7 +145,7 @@ struct SettingsView: View {
                 title: "Terms of Service",
                 iconName: "DescriptionIcon",
                 action: { openExternalLink("https://ente.com/terms") }
-            )
+            ),
         ]
     }
 
@@ -166,17 +172,20 @@ struct SettingsView: View {
     private var signInTitle: String { "Sign In to Backup" }
 
     private var allItems: [SettingsItem] {
-        var items = [SettingsItem(
-            title: "Your Notes",
-            iconName: "Folder01Icon",
-            destination: AnyView(NotesSettingsView(store: notesStore))
-        )]
+        var items = [
+            SettingsItem(
+                title: "Your Notes",
+                iconName: "Folder01Icon",
+                destination: AnyView(NotesSettingsView(store: notesStore))
+            )
+        ]
         if isEnsuPacksEnabled {
-            items.append(SettingsItem(
-                title: "Ensu Packs",
-                iconName: "PackageIcon",
-                destination: AnyView(KnowledgeSettingsView(store: knowledgeStore))
-            ))
+            items.append(
+                SettingsItem(
+                    title: "Ensu Packs",
+                    iconName: "PackageIcon",
+                    destination: AnyView(KnowledgeSettingsView(store: knowledgeStore))
+                ))
         }
         items.append(
             SettingsItem(
@@ -199,7 +208,7 @@ struct SettingsView: View {
                 title: "System prompt",
                 iconName: "Edit01Icon",
                 destination: AnyView(SystemPromptSettingsView(embeddedInNavigation: true))
-            )
+            ),
         ]
     }
 
@@ -341,7 +350,8 @@ private struct SystemPromptSettingsView: View {
                     .padding(.horizontal, EnsuSpacing.inputHorizontal)
                     .padding(.vertical, EnsuSpacing.inputVertical)
                     .background(EnsuColor.fillFaint)
-                    .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.input, style: .continuous))
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: EnsuCornerRadius.input, style: .continuous))
 
                 Text("Leave this blank to use the default prompt.")
                     .font(EnsuTypography.small)
@@ -377,7 +387,8 @@ private struct SystemPromptSettingsView: View {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 200_000_000)
             let trimmedPrompt = promptBody.trimmingCharacters(in: .whitespacesAndNewlines)
-            let defaultPrompt = ModelSettingsStore.defaultSystemPromptBody.trimmingCharacters(in: .whitespacesAndNewlines)
+            let defaultPrompt = ModelSettingsStore.defaultSystemPromptBody.trimmingCharacters(
+                in: .whitespacesAndNewlines)
             settings.systemPromptBody = trimmedPrompt == defaultPrompt ? "" : trimmedPrompt
             promptBody = ModelSettingsStore.resolveSystemPromptBody(settings.systemPromptBody)
             isSaving = false

@@ -108,7 +108,8 @@ final class VoiceTranscriptionService {
         let session = AVAudioSession.sharedInstance()
         switch session.recordPermission {
         case .granted:
-            prepareModelAndStartRecording(onState: onState, shouldStartRecording: shouldStartRecording)
+            prepareModelAndStartRecording(
+                onState: onState, shouldStartRecording: shouldStartRecording)
         case .denied:
             onState(.error("Microphone permission is required for voice input."))
         case .undetermined:
@@ -271,13 +272,17 @@ final class VoiceTranscriptionService {
             return
         }
         await MainActor.run { [weak self] in
-            guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else { return }
+            guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else {
+                return
+            }
             onState(.downloading(percent: nil))
         }
         try await assetStore.download(assets: assets) { [weak self] progress in
             let percent = min(max(Int(progress.percentage), 0), 100)
             Task { @MainActor [weak self] in
-                guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else { return }
+                guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else {
+                    return
+                }
                 onState(.downloading(percent: percent))
             }
         }
@@ -372,7 +377,8 @@ private final class PcmAudioRecorder {
         lock.unlock()
 
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .measurement, options: [.allowBluetoothHFP, .defaultToSpeaker])
+        try session.setCategory(
+            .playAndRecord, mode: .measurement, options: [.allowBluetoothHFP, .defaultToSpeaker])
         try session.setActive(true)
 
         let input = engine.inputNode

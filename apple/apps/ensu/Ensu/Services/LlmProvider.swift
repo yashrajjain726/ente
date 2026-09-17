@@ -148,7 +148,10 @@ actor LlmProvider {
         return try await modelLoadGate.withLock(operation)
     }
 
-    init(assetStore: AssetStore, transcriber: Transcriber, knowledgeEmbedding: KnowledgeEmbeddingConfig) {
+    init(
+        assetStore: AssetStore, transcriber: Transcriber,
+        knowledgeEmbedding: KnowledgeEmbeddingConfig
+    ) {
         self.assetStore = assetStore
         self.transcriber = transcriber
         self.knowledgeEmbedding = knowledgeEmbedding
@@ -164,8 +167,7 @@ actor LlmProvider {
     }
 
     nonisolated func isModelDownloaded(_ selection: LlmModelSelection) -> Bool {
-        isChatModelReady(selection) &&
-            (!isEnsuPacksEnabled || isEmbeddingModelReady())
+        isChatModelReady(selection) && (!isEnsuPacksEnabled || isEmbeddingModelReady())
     }
 
     func missingModelDownloadSize(_ selection: LlmModelSelection) async -> Int64? {
@@ -248,7 +250,8 @@ actor LlmProvider {
         if !capability.isChatSupported {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
-        let modelKey = LoadedModelKey(id: selection.id, requestedContextLength: selection.contextLength)
+        let modelKey = LoadedModelKey(
+            id: selection.id, requestedContextLength: selection.contextLength)
         if currentModelKey == modelKey, loadedModel != nil, loadedContext != nil {
             return
         }
@@ -268,14 +271,15 @@ actor LlmProvider {
 
         onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
         do {
-            try loadModel(
-                selection,
-                modelPath: assetStore.llmModelPath(asset)!
-            )
+            guard let modelPath = assetStore.llmModelPath(asset) else {
+                throw RequiredModelValidationError(modelId: selection.id)
+            }
+            try loadModel(selection, modelPath: modelPath)
         } catch {
             if allowRecovery, wasAlreadyDownloaded, assetStore.removeDownloaded(asset) {
                 onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
-                try await ensureModelReadyLocked(selection, onProgress: onProgress, allowRecovery: false)
+                try await ensureModelReadyLocked(
+                    selection, onProgress: onProgress, allowRecovery: false)
                 return
             }
             throw error
@@ -330,7 +334,9 @@ actor LlmProvider {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
         guard let context = loadedContext else {
-            throw NSError(domain: "LlmProvider", code: -1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+            throw NSError(
+                domain: "LlmProvider", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
         currentJobId.withLock { $0 = nil }
 
@@ -339,7 +345,8 @@ actor LlmProvider {
         }
 
         let asset = chatAsset(selection)
-        let mmprojPath = imageFiles.isEmpty
+        let mmprojPath =
+            imageFiles.isEmpty
             ? nil
             : assetStore.llmMmprojPath(asset)?.path
         let clampedTemperature = min(max(temperature, 0.35), 0.7)
@@ -465,11 +472,13 @@ actor LlmProvider {
                 let asset = self.chatAsset(selection)
                 guard self.assetStore.isDownloaded(asset) else { return }
                 guard let mmprojPath = self.assetStore.llmMmprojPath(asset),
-                      FileManager.default.fileExists(atPath: mmprojPath.path) else {
+                    FileManager.default.fileExists(atPath: mmprojPath.path)
+                else {
                     return
                 }
 
-                try await self.ensureModelReadyLocked(selection, onProgress: { _ in }, allowRecovery: true)
+                try await self.ensureModelReadyLocked(
+                    selection, onProgress: { _ in }, allowRecovery: true)
                 guard let context = self.loadedContext else {
                     return
                 }
@@ -478,7 +487,7 @@ actor LlmProvider {
                 try context.prewarmMultimodal(
                     mmprojPath: mmprojPath.path,
                     mediaMarker: nil
-                    )
+                )
             }
         } catch {
             return
@@ -488,14 +497,16 @@ actor LlmProvider {
     func resetContext() async {
         try? await withModelLock {
             guard let model = loadedModel else { return }
-            let contextParams = LlmContextParams(contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
+            let contextParams = LlmContextParams(
+                contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
             loadedContext = nil
             loadedContext = try? model.newContext(params: contextParams)
         }
     }
 
     func loadedContextLength(_ selection: LlmModelSelection) -> Int? {
-        let modelKey = LoadedModelKey(id: selection.id, requestedContextLength: selection.contextLength)
+        let modelKey = LoadedModelKey(
+            id: selection.id, requestedContextLength: selection.contextLength)
         guard currentModelKey == modelKey, loadedModel != nil, loadedContext != nil else {
             return nil
         }
@@ -518,7 +529,8 @@ actor LlmProvider {
     }
 
     private func loadModel(_ selection: LlmModelSelection, modelPath: URL) throws {
-        let params = LlmModelLoadParams(modelPath: modelPath.path, nGpuLayers: 0, useMmap: true, useMlock: false)
+        let params = LlmModelLoadParams(
+            modelPath: modelPath.path, nGpuLayers: 0, useMmap: true, useMlock: false)
         let model = try LlmModel.load(params: params)
         loadedModel = model
 
@@ -530,16 +542,21 @@ actor LlmProvider {
 
         for contextSize in candidates {
             do {
-                let contextParams = LlmContextParams(contextSize: Int32(contextSize), nThreads: Int32(threadCount), nBatch: Int32(512))
+                let contextParams = LlmContextParams(
+                    contextSize: Int32(contextSize), nThreads: Int32(threadCount),
+                    nBatch: Int32(512))
                 loadedContext = try model.newContext(params: contextParams)
-                currentModelKey = LoadedModelKey(id: selection.id, requestedContextLength: selection.contextLength)
+                currentModelKey = LoadedModelKey(
+                    id: selection.id, requestedContextLength: selection.contextLength)
                 currentContextLength = contextSize
                 return
             } catch {
                 continue
             }
         }
-        throw NSError(domain: "LlmProvider", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create context"])
+        throw NSError(
+            domain: "LlmProvider", code: -5,
+            userInfo: [NSLocalizedDescriptionKey: "Failed to create context"])
     }
 }
 

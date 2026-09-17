@@ -24,7 +24,8 @@ final class KnowledgeStore: ObservableObject {
     var enabledReadyDatasets: [KnowledgeDatasetConfig] {
         packs.compactMap { pack in
             guard pack.enabled,
-                  pack.status == .ready || pack.status == .updateAvailable else {
+                pack.status == .ready || pack.status == .updateAvailable
+            else {
                 return nil
             }
             return pack.config
@@ -82,8 +83,9 @@ final class KnowledgeStore: ObservableObject {
 
     func downloadOrUpdate(stableId: String) {
         guard downloadsAllowed,
-              mutationTasks[stableId] == nil,
-              let index = packs.firstIndex(where: { $0.id == stableId }) else {
+            mutationTasks[stableId] == nil,
+            let index = packs.firstIndex(where: { $0.id == stableId })
+        else {
             return
         }
         let dataset = packs[index].config
@@ -110,7 +112,8 @@ final class KnowledgeStore: ObservableObject {
                 if shouldEnable {
                     preferences.setDatasetEnabled(id: stableId, enabled: true)
                 }
-                let preservedEnablement = packs
+                let preservedEnablement =
+                    packs
                     .first(where: { $0.id == stableId })?.enabled == true
                 applyReconciliation(
                     result,
@@ -119,7 +122,8 @@ final class KnowledgeStore: ObservableObject {
                 )
             } catch {
                 if let result = try? await provider.reconcile(dataset: dataset) {
-                    let enabled = packs
+                    let enabled =
+                        packs
                         .first(where: { $0.id == stableId })?.enabled == true
                     applyReconciliation(
                         result,
@@ -153,7 +157,8 @@ final class KnowledgeStore: ObservableObject {
                 return
             }
             if let result {
-                let enabled = packs
+                let enabled =
+                    packs
                     .first(where: { $0.id == stableId })?.enabled == true
                 applyReconciliation(result, stableId: stableId, enabled: enabled)
             }
@@ -167,8 +172,9 @@ final class KnowledgeStore: ObservableObject {
 
     func setEnabled(stableId: String, enabled: Bool) {
         guard let index = packs.firstIndex(where: { $0.id == stableId }),
-              packs[index].activeIdentity != nil,
-              !packs[index].isMutating else {
+            packs[index].activeIdentity != nil,
+            !packs[index].isMutating
+        else {
             return
         }
         updatePack(stableId) { pack in
@@ -213,7 +219,7 @@ final class KnowledgeStore: ObservableObject {
         case AssetDownloadError.Http:
             return "The knowledge pack is currently unavailable. Please try again later."
         case AssetDownloadError.Validation,
-             AssetDownloadError.InvalidDownload:
+            AssetDownloadError.InvalidDownload:
             return "The knowledge pack couldn't be verified. Please try again."
         case AssetDownloadError.Io:
             return "Couldn't save the knowledge pack. Please try again."

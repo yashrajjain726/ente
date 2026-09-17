@@ -13,7 +13,9 @@ actor CredentialStore {
     }
 
     func getOrCreateChatDbKey(hasChatData: Bool) throws -> Data {
-        if let existing = try KeychainStore.get(service: keychainService, account: KeychainAccount.chatDbKey) {
+        if let existing = try KeychainStore.get(
+            service: keychainService, account: KeychainAccount.chatDbKey)
+        {
             guard existing.count == 32 else { throw KeychainStoreError.invalidItemFormat }
             return existing
         }

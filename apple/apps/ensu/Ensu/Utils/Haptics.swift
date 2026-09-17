@@ -31,4 +31,3 @@ func hapticWarning() {
 func hapticError() {
     UINotificationFeedbackGenerator().notificationOccurred(.error)
 }
-

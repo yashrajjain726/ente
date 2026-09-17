@@ -54,7 +54,7 @@ final class LlmIntegrationTests: XCTestCase {
         let request = LlmChatRequest(
             messages: [
                 LlmChatMessage(role: "system", content: "You are a helpful assistant."),
-                LlmChatMessage(role: "user", content: "Say hello in one short sentence.")
+                LlmChatMessage(role: "user", content: "Say hello in one short sentence."),
             ],
             templateOverride: nil,
             addAssistant: true,
@@ -104,7 +104,7 @@ final class LlmIntegrationTests: XCTestCase {
         let request = LlmChatRequest(
             messages: [
                 LlmChatMessage(role: "system", content: "You are a helpful assistant."),
-                LlmChatMessage(role: "user", content: "What color is the car? Answer in one word.")
+                LlmChatMessage(role: "user", content: "What color is the car? Answer in one word."),
             ],
             templateOverride: nil,
             addAssistant: true,

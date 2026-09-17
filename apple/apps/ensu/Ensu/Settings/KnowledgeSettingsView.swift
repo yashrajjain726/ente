@@ -125,13 +125,17 @@ private struct PackAttributionSheet: View {
                     .foregroundStyle(EnsuColor.textPrimary)
 
                 HStack(spacing: EnsuSpacing.md) {
-                    Link(destination: URL(string: attribution.publicPackUrl)!) {
-                        Label("Source", systemImage: "arrow.up.right.square")
-                            .frame(minHeight: 44)
+                    if let sourceUrl = URL(string: attribution.publicPackUrl) {
+                        Link(destination: sourceUrl) {
+                            Label("Source", systemImage: "arrow.up.right.square")
+                                .frame(minHeight: 44)
+                        }
                     }
-                    Link(destination: URL(string: attribution.licenseUrl)!) {
-                        Label("License", systemImage: "doc.text")
-                            .frame(minHeight: 44)
+                    if let licenseUrl = URL(string: attribution.licenseUrl) {
+                        Link(destination: licenseUrl) {
+                            Label("License", systemImage: "doc.text")
+                                .frame(minHeight: 44)
+                        }
                     }
                 }
                 .font(EnsuTypography.mini)
@@ -140,9 +144,11 @@ private struct PackAttributionSheet: View {
 
                 Divider()
 
-                Text("Wikimedia and Ensu are not affiliated. Wikimedia project names identify the source material only.")
-                    .font(EnsuTypography.small)
-                    .foregroundStyle(EnsuColor.textMuted)
+                Text(
+                    "Wikimedia and Ensu are not affiliated. Wikimedia project names identify the source material only."
+                )
+                .font(EnsuTypography.small)
+                .foregroundStyle(EnsuColor.textMuted)
             }
         }
     }
