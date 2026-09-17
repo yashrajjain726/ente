@@ -18,7 +18,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
     NewPasswordForm,
     type NewPasswordFormProps,
-    type NewPasswordPresentationProps,
 } from "../components/NewPasswordForm";
 import { savedLocalUser } from "../services/accounts-db";
 
@@ -54,6 +53,7 @@ interface PageContentsProps {
 }
 
 const PageContents: React.FC<PageContentsProps> = ({ user, isReset }) => {
+    const { Shell } = useAuthPageConfig();
     const router = useRouter();
 
     const handleSubmit: NewPasswordFormProps["onSubmit"] = useCallback(
@@ -73,12 +73,14 @@ const PageContents: React.FC<PageContentsProps> = ({ user, isReset }) => {
 
     if (isReset) {
         return (
-            <NewPasswordForm
-                userEmail={user.email}
-                submitButtonTitle={t("change_password")}
-                onSubmit={handleSubmit}
-                presentation={ConfiguredResetPasswordPresentation}
-            />
+            <Shell>
+                <NewPasswordForm
+                    userEmail={user.email}
+                    submitButtonTitle={t("change_password")}
+                    onSubmit={handleSubmit}
+                    presentation={SetPasswordForm}
+                />
+            </Shell>
         );
     }
 
@@ -97,14 +99,3 @@ const PageContents: React.FC<PageContentsProps> = ({ user, isReset }) => {
         </AccountsPageContents>
     );
 };
-
-function ConfiguredResetPasswordPresentation(
-    props: NewPasswordPresentationProps,
-): React.JSX.Element {
-    const { Shell } = useAuthPageConfig();
-    return (
-        <Shell>
-            <SetPasswordForm {...props} />
-        </Shell>
-    );
-}
