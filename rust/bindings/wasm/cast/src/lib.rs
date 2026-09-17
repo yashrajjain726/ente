@@ -72,31 +72,3 @@ pub struct CastPayload {
     cast_token: String,
     collection_key: String,
 }
-
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
-pub struct PreparedCastPayload {
-    cast_token: String,
-    encrypted_payload: String,
-}
-
-#[wasm_bindgen(js_name = preparePayload)]
-pub fn prepare_payload(
-    public_key: &str,
-    pq_public_key: Option<String>,
-    collection_id: i64,
-    collection_key: &str,
-) -> Result<<PreparedCastPayload as Tsify>::JsType, Error> {
-    let payload = ente_cast::prepare_payload(
-        public_key,
-        pq_public_key.as_deref(),
-        collection_id,
-        collection_key,
-    )?;
-    PreparedCastPayload {
-        cast_token: payload.cast_token,
-        encrypted_payload: payload.encrypted_payload,
-    }
-    .into_js()
-    .map_err(Into::into)
-}

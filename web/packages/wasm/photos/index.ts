@@ -61,3 +61,16 @@ export const openCollectionKey = async (
         encryptedKey,
         keyDecryptionNonce,
     );
+
+export const prepareCastPayload = async (
+    publicKey: string,
+    pqPublicKey: string | undefined,
+    collectionID: number,
+    collectionKey: string,
+) =>
+    (await wasm()).preparePayload(
+        publicKey,
+        pqPublicKey,
+        BigInt(collectionID),
+        collectionKey,
+    );

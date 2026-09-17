@@ -11,16 +11,3 @@ export const openCastPayload = (
     receiver: CastReceiver,
     encryptedPayload: string,
 ) => receiver.openPayload(encryptedPayload);
-
-export const prepareCastPayload = async (
-    publicKey: string,
-    pqPublicKey: string | undefined,
-    collectionID: number,
-    collectionKey: string,
-) =>
-    (await wasm()).preparePayload(
-        publicKey,
-        pqPublicKey,
-        BigInt(collectionID),
-        collectionKey,
-    );

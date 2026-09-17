@@ -14,35 +14,40 @@ import { lockerPrepareFileLinkPayload } from "../locker/pkg/ente_locker_wasm";
 
 afterEach(() => vi.unstubAllGlobals());
 
-test("Cast rejects collection IDs outside JavaScript's safe integer range", async () => {
-    const receiver = await cast.createCastReceiver();
-    const collectionKey = await generateKey();
-    try {
-        for (const collectionID of [
-            Number.MAX_SAFE_INTEGER,
-            Number.MAX_SAFE_INTEGER + 1,
-        ]) {
-            const { castToken, encryptedPayload } =
-                await cast.prepareCastPayload(
-                    receiver.publicKey,
-                    undefined,
-                    collectionID,
-                    collectionKey,
-                );
-            if (Number.isSafeInteger(collectionID)) {
-                expect(
-                    cast.openCastPayload(receiver, encryptedPayload),
-                ).toStrictEqual({ castToken, collectionID, collectionKey });
-            } else {
-                expect(() =>
-                    cast.openCastPayload(receiver, encryptedPayload),
-                ).toThrow(Error);
+test.each(["classical", "post-quantum"])(
+    "Photos %s Cast payloads round-trip and enforce safe collection IDs",
+    async (encryption) => {
+        const receiver = await cast.createCastReceiver();
+        const collectionKey = await generateKey();
+        try {
+            for (const collectionID of [
+                Number.MAX_SAFE_INTEGER,
+                Number.MAX_SAFE_INTEGER + 1,
+            ]) {
+                const { castToken, encryptedPayload } =
+                    await photos.prepareCastPayload(
+                        receiver.publicKey,
+                        encryption === "post-quantum"
+                            ? receiver.pqPublicKey
+                            : undefined,
+                        collectionID,
+                        collectionKey,
+                    );
+                if (Number.isSafeInteger(collectionID)) {
+                    expect(
+                        cast.openCastPayload(receiver, encryptedPayload),
+                    ).toStrictEqual({ castToken, collectionID, collectionKey });
+                } else {
+                    expect(() =>
+                        cast.openCastPayload(receiver, encryptedPayload),
+                    ).toThrow(Error);
+                }
             }
+        } finally {
+            receiver.free();
         }
-    } finally {
-        receiver.free();
-    }
-});
+    },
+);
 
 for (const [name, api] of [
     ["Photos", photos],
