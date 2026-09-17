@@ -24,7 +24,6 @@ jobs:
             - name: Crowdin push
               uses: crowdin/github-action@0d5670f539973aea2f01abce61a8989934df0025 # v3.0.2
               with:
-                  base_path: mobile/packages/strings/
                   config: mobile/packages/strings/crowdin.yml
                   upload_sources: true
                   upload_translations: true
