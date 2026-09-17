@@ -11,7 +11,6 @@ export interface AuthLoginFrameProps extends PropsWithChildren {
     onHostChanged: () => void;
 }
 
-// App defaults for shared account pages, not reusable forms or dialogs.
 export interface AuthPageConfig {
     LoginFrame?: ComponentType<AuthLoginFrameProps>;
     keepLoginLoadingOnRedirect?: boolean;
