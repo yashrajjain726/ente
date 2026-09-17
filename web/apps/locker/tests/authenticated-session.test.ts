@@ -175,9 +175,7 @@ test("failed opens can be retried and account changes replace the cached session
 
 const mockSession = () =>
     ({
-        encryptWithRecoveryKey: vi.fn(),
         free: vi.fn(),
-        recoveryKeyMnemonic: vi.fn(),
         updateAuthToken: vi.fn(),
         [Symbol.dispose]: vi.fn(),
     }) satisfies Session;
