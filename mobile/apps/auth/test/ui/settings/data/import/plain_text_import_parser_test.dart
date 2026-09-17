@@ -35,6 +35,29 @@ not-an-otp-uri
       expect(codes.single.account, 'valid@example.com');
     });
 
+    test('preserves commas inside newline-delimited OTP entries', () {
+      const content = '''
+otpauth://totp/alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example,%20Inc
+otpauth://totp/bob@example.com?secret=GEZDGNBVGY3TQOJQ&issuer=Example
+''';
+
+      final codes = parsePlainTextImport(content);
+
+      expect(codes, hasLength(2));
+      expect(codes.first.issuer, 'Example, Inc');
+      expect(codes.last.account, 'bob@example.com');
+    });
+
+    test('parses comma-delimited OTP entries', () {
+      const content =
+          'otpauth://totp/alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example,'
+          'otpauth://totp/bob@example.com?secret=GEZDGNBVGY3TQOJQ&issuer=Example';
+
+      final codes = parsePlainTextImport(content);
+
+      expect(codes, hasLength(2));
+    });
+
     test('preserves display properties from the rich fixture', () async {
       final content = await File(
         'test/ui/settings/data/import/fixtures/rich_display_import.txt',
