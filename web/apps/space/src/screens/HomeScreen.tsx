@@ -1973,6 +1973,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     lineHeight: "30px",
                                     m: 0,
                                     maxWidth: 260,
+                                    textWrap: "balance",
                                 }}
                             >
                                 Invite your friends and family
@@ -1989,10 +1990,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     m: 0,
                                     mt: "10px",
                                     maxWidth: 250,
+                                    textWrap: "balance",
                                 }}
                             >
-                                You’ll see posts from your friends and family
-                                here.
+                                Keep up with each other through
+                                <br />
+                                everyday photos.
                             </Box>
                             <Box
                                 component="button"
