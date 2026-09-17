@@ -654,7 +654,7 @@
   },
   "cleanUncategorized": "Clean Uncategorized",
   "cleanUncategorizedDescription": "Remove all files from Uncategorized that are present in other albums",
-  "cleanedUncategorizedItems": "{count, plural, one{Cleaned {count} item.} other{Cleaned {count} items.}}",
+  "cleanedUncategorizedItems": "{count, plural, one{Removed {count} item} other{Removed {count} items}}",
   "@cleanedUncategorizedItems": {
     "placeholders": {
       "count": {
@@ -2906,7 +2906,7 @@
     }
   },
   "nothingToSeeHere": "Nothing to see here",
-  "nothingToCleanUpInUncategorized": "Nothing to clean up. These files are not in your other albums.",
+  "nothingToCleanUpInUncategorized": "Nothing to clean up because no items are in your other albums",
   "nothingToTidyUpHere": "Nothing to tidy up here",
   "notifications": "Notifications",
   "notifyMe": "Notify me",
