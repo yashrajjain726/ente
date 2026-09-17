@@ -967,11 +967,14 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
                         }}
                     >
                         <Typography
+                            title={t("new_person")}
                             sx={{
                                 position: "absolute",
-                                top: 10,
-                                left: 10,
-                                right: 10,
+                                top: 8,
+                                insetInline: 8,
+                                overflow: "hidden",
+                                whiteSpace: "nowrap",
+                                textOverflow: "ellipsis",
                                 fontSize: 14,
                                 lineHeight: "20px",
                                 fontWeight: 500,
@@ -985,6 +988,7 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
                                 top: "50%",
                                 left: "50%",
                                 transform: "translate(-50%, -50%)",
+                                fontSize: 20,
                             }}
                         />
                     </CollectionTileButton>
@@ -1000,7 +1004,7 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
 
             <SingleInputDialog
                 open={openNameInput}
-                variant="v2"
+                variant="people"
                 sx={{ "& .MuiDialog-paper": { borderRadius: "32px" } }}
                 onClose={() => {
                     setOpenNameInput(false);

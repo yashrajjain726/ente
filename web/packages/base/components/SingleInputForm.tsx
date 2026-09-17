@@ -22,7 +22,7 @@ export type SingleInputFormProps = Pick<
     TextFieldProps,
     "label" | "placeholder" | "autoComplete" | "autoFocus" | "slotProps"
 > & {
-    variant?: "default" | "v2";
+    variant?: "default" | "v2" | "people";
     inputType?: TextFieldProps["type"];
     initialValue?: string;
     submitButtonColor?: ButtonProps["color"];
@@ -59,7 +59,7 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
 
     const formik = useFormik({
         initialValues: { value: initialValue ?? "" },
-        enableReinitialize: variant === "v2",
+        enableReinitialize: variant !== "default",
         onSubmit: async (values, { setFieldError }) => {
             const value = values.value;
             const setValueFieldError = (message: string) =>
@@ -78,7 +78,7 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
         },
     });
 
-    if (variant === "v2") {
+    if (variant !== "default") {
         const error = formik.errors.value;
         return (
             <Stack
@@ -89,16 +89,18 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
                 <Stack sx={{ gap: "8px" }}>
                     {rest.label && (
                         <Typography
-                            component="label"
-                            htmlFor={inputID}
+                            component={variant === "people" ? "label" : "p"}
+                            htmlFor={variant === "people" ? inputID : undefined}
                             sx={v2LabelSx}
                         >
                             {rest.label}
                         </Typography>
                     )}
                     <InputBase
-                        id={inputID}
-                        aria-describedby={error ? helperID : undefined}
+                        id={variant === "people" ? inputID : undefined}
+                        aria-describedby={
+                            variant === "people" && error ? helperID : undefined
+                        }
                         name="value"
                         value={formik.values.value}
                         onChange={formik.handleChange}
@@ -111,8 +113,8 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
                         sx={v2InputSx}
                     />
                     <Typography
-                        id={helperID}
-                        aria-live="polite"
+                        id={variant === "people" ? helperID : undefined}
+                        aria-live={variant === "people" ? "polite" : undefined}
                         sx={v2HelperSx(!!error)}
                     >
                         {error ?? ""}
@@ -123,7 +125,10 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
                         <ButtonBase
                             onClick={onCancel}
                             disabled={formik.isSubmitting}
-                            sx={v2CancelButtonSx}
+                            sx={[
+                                v2CancelButtonSx,
+                                variant === "people" && peopleActionFocusSx,
+                            ]}
                         >
                             {t("cancel")}
                         </ButtonBase>
@@ -131,7 +136,10 @@ export const SingleInputForm: React.FC<SingleInputFormProps> = ({
                     <ButtonBase
                         type="submit"
                         disabled={formik.isSubmitting}
-                        sx={v2SubmitButtonSx}
+                        sx={[
+                            v2SubmitButtonSx,
+                            variant === "people" && peopleActionFocusSx,
+                        ]}
                     >
                         {formik.isSubmitting ? (
                             <CircularProgress
@@ -255,11 +263,6 @@ const v2BaseActionSx = {
     lineHeight: "20px",
     fontWeight: 500,
     fontFamily: "inherit",
-    "&.Mui-focusVisible": {
-        outline: "1px solid",
-        outlineColor: "stroke.base",
-        outlineOffset: "2px",
-    },
     "&.Mui-disabled": { opacity: 0.7 },
 };
 const v2CancelButtonSx = (theme: Theme) => ({
@@ -281,5 +284,13 @@ const v2SubmitButtonSx = {
         color: "#fff",
         backgroundColor: greenAccent,
         opacity: 0.7,
+    },
+};
+
+const peopleActionFocusSx = {
+    "&.Mui-focusVisible": {
+        outline: "1px solid",
+        outlineColor: "stroke.base",
+        outlineOffset: "2px",
     },
 };
