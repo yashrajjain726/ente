@@ -10,16 +10,17 @@ import {
     decryptMetadataJSON,
     encryptBoxBytes,
     openCollectionKey,
+    type Session,
 } from "ente-locker-wasm";
 import type { z } from "zod";
 import { ensureAuthenticatedSession } from "../authenticated-session";
 import { fromInfoTypeWireValue } from "../info-type-wire";
 import {
+    getLockerCacheSnapshot,
     type EncryptedCollectionRecord,
     type EncryptedFileRecord,
     type LockerCollectionPayload,
     type LockerEncryptedCache,
-    getLockerCacheSnapshot,
 } from "../locker-cache";
 import type { StoredTrashFileRecord } from "../locker-db";
 import { toLockerCollectionParticipant } from "../remote-types";
@@ -223,6 +224,7 @@ const encryptCollectionPayload = async (
 };
 
 export const toEncryptedCollectionRecord = (
+    session: Session,
     collection: RemoteCollection,
 ): Promise<EncryptedCollectionRecord> => {
     const record: EncryptedCollectionRecord = {
@@ -238,7 +240,7 @@ export const toEncryptedCollectionRecord = (
     };
 
     const buildEncryptedRecord = async () => {
-        const collectionKey = await decryptCollectionKey(record);
+        const collectionKey = await openCollectionKeyForRecord(session, record);
         const payload: LockerCollectionPayload = {
             owner: {
                 ...toLockerCollectionParticipant(collection.owner),
@@ -293,6 +295,7 @@ const decryptCollectionDetails = async (
 };
 
 export const decryptStoredTrash = async (
+    session: Session,
     cache: LockerEncryptedCache,
     trashFiles: StoredTrashFileRecord[],
     lastUpdatedAt: number,
@@ -308,7 +311,10 @@ export const decryptStoredTrash = async (
         }
 
         try {
-            const collectionKey = await decryptCollectionKey(collectionRecord);
+            const collectionKey = await openCollectionKeyForRecord(
+                session,
+                collectionRecord,
+            );
             const item = await decryptFileToLockerItem(
                 record,
                 collectionKey,
@@ -341,8 +347,14 @@ export const buildStoredTrashFileRecord = (
 export const decryptCollectionKey = async (
     record: EncryptedCollectionRecord,
 ): Promise<string> =>
+    openCollectionKeyForRecord(await ensureAuthenticatedSession(), record);
+
+const openCollectionKeyForRecord = (
+    session: Session,
+    record: EncryptedCollectionRecord,
+) =>
     openCollectionKey(
-        await ensureAuthenticatedSession(),
+        session,
         record.ownerID,
         record.encryptedKey,
         record.keyDecryptionNonce,
@@ -466,6 +478,7 @@ const decryptFileToLockerItem = async (
 };
 
 export const decryptAllData = async (
+    session: Session,
     cache: LockerEncryptedCache,
 ): Promise<DecryptAllDataResult> => {
     const activeCollectionRecords = [...cache.collections.values()].filter(
@@ -489,7 +502,10 @@ export const decryptAllData = async (
 
     for (const collectionRecord of activeCollectionRecords) {
         try {
-            const collectionKey = await decryptCollectionKey(collectionRecord);
+            const collectionKey = await openCollectionKeyForRecord(
+                session,
+                collectionRecord,
+            );
             const collectionDetails = await decryptCollectionDetails(
                 collectionRecord,
                 collectionKey,

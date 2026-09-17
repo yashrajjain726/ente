@@ -1,5 +1,8 @@
 import { masterKeyFromSession } from "@/services/account-keys";
-import { openAuthenticatedSession } from "@/services/authenticated-session";
+import {
+    ensureAuthenticatedSession,
+    openAuthenticatedSession,
+} from "@/services/authenticated-session";
 import type { LockerUploadLimitState } from "@/services/locker-limits";
 import {
     loadPersistedLockerState,
@@ -82,21 +85,9 @@ export const useLockerData = ({
     }, [userDetails]);
 
     const warmContacts = useCallback(async () => {
-        const [authToken, masterKey] = await Promise.all([
-            savedAuthToken(),
-            masterKeyFromSession(),
-        ]);
-        if (!authToken || !masterKey) return;
-
-        const userID = ensureLocalUser().id;
-        const session = await openAuthenticatedSession(
-            userID,
-            authToken,
-            masterKey,
-        );
         await initContacts(
-            userID,
-            session,
+            ensureLocalUser().id,
+            ensureAuthenticatedSession,
             contactsGetDiff,
             contactsGetProfilePicture,
         );

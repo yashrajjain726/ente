@@ -57,7 +57,8 @@ interface ProfilePictureOutput {
     wrappedRootContactKey?: WrappedRootContactKey;
 }
 
-type GetDiff = (
+type GetDiff<Session> = (
+    session: Session,
     wrappedRootContactKey: WrappedRootContactKey | undefined,
     sinceTime: number,
     limit: number,
@@ -73,7 +74,7 @@ interface ContactsState {
     listeners: Set<() => void>;
     currentSessionKey: string | undefined;
     sessionGeneration: number;
-    getDiff: GetDiff | undefined;
+    sync: (() => Promise<void>) | undefined;
     getProfilePicture: LoadProfilePicture | undefined;
     wrappedRootContactKey: WrappedRootContactKey | undefined;
     pullPromise: Promise<void> | undefined;
@@ -98,7 +99,7 @@ const state: ContactsState = {
     listeners: new Set(),
     currentSessionKey: undefined,
     sessionGeneration: 0,
-    getDiff: undefined,
+    sync: undefined,
     getProfilePicture: undefined,
     wrappedRootContactKey: undefined,
     pullPromise: undefined,
@@ -145,7 +146,7 @@ const clearInMemoryState = () => {
     for (const avatarURL of state.avatarURLByContactID.values()) {
         URL.revokeObjectURL(avatarURL);
     }
-    state.getDiff = undefined;
+    state.sync = undefined;
     state.getProfilePicture = undefined;
     state.wrappedRootContactKey = undefined;
     state.pullPromise = undefined;
@@ -309,14 +310,16 @@ const ensureSessionLoaded = async (sessionKey: string) =>
         ? state.sessionGeneration
         : loadLocalSessionState(sessionKey);
 
-const syncContacts = async (
+const syncContacts = async <Session>(
     sessionKey: string,
     generation: number,
-    getDiff: GetDiff,
+    getSession: () => Promise<Session>,
+    getDiff: GetDiff<Session>,
 ) => {
     if (!isCurrentSession(sessionKey, generation)) {
         return;
     }
+    const session = await getSession();
     const cachedWrappedRootContactKey =
         state.wrappedRootContactKey ??
         (await savedWrappedRootContactKey(sessionKey));
@@ -330,6 +333,7 @@ const syncContacts = async (
 
     while (true) {
         const output = await getDiff(
+            session,
             state.wrappedRootContactKey,
             sinceTime,
             CONTACT_DIFF_LIMIT,
@@ -377,13 +381,8 @@ const syncContacts = async (
 
 export const initContacts = async <Session>(
     userID: number,
-    session: Session,
-    getDiff: (
-        session: Session,
-        wrappedRootContactKey: WrappedRootContactKey | undefined,
-        sinceTime: number,
-        limit: number,
-    ) => Promise<ContactsDiffOutput>,
+    getSession: () => Promise<Session>,
+    getDiff: GetDiff<Session>,
     getProfilePicture: (
         session: Session,
         wrappedRootContactKey: WrappedRootContactKey | undefined,
@@ -398,23 +397,20 @@ export const initContacts = async <Session>(
         return;
     }
 
-    state.getDiff = (key, sinceTime, limit) =>
-        getDiff(session, key, sinceTime, limit);
-    state.getProfilePicture = (key, contactID) =>
-        getProfilePicture(session, key, contactID);
+    state.sync = () =>
+        syncContacts(sessionKey, generation, getSession, getDiff);
+    state.getProfilePicture = async (key, contactID) =>
+        getProfilePicture(await getSession(), key, contactID);
 };
 
 export const pullContacts = async () => {
-    const sessionKey = state.currentSessionKey;
-    const generation = state.sessionGeneration;
-    const getDiff = state.getDiff;
-    if (!sessionKey || !getDiff) return;
+    const sync = state.sync;
+    if (!sync) return;
     if (state.pullPromise) return state.pullPromise;
 
-    const pullPromise = retryAsyncOperation(
-        () => syncContacts(sessionKey, generation, getDiff),
-        { retryProfile: "background" },
-    ).finally(() => {
+    const pullPromise = retryAsyncOperation(sync, {
+        retryProfile: "background",
+    }).finally(() => {
         if (state.pullPromise === pullPromise) {
             state.pullPromise = undefined;
         }
