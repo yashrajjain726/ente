@@ -262,6 +262,8 @@ struct MarkdownParser {
             let code = codeBlock.code.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { return [] }
             return [.code(text: code)]
+        case let html as HTMLBlock:
+            return [.paragraph(text: InlineContent().appending(html.rawHTML))]
         case _ as ThematicBreak:
             return [.divider]
         case let orderedList as OrderedList:
@@ -284,6 +286,10 @@ struct MarkdownParser {
     private func renderBlockQuote(_ quote: BlockQuote) -> InlineContent {
         var parts: [InlineContent] = []
         for child in quote.children {
+            if let html = child as? HTMLBlock {
+                parts.append(InlineContent().appending(html.rawHTML))
+                continue
+            }
             if let paragraph = child as? Paragraph {
                 let text = renderInlineChildren(paragraph)
                 if !text.isEmpty {
@@ -321,6 +327,10 @@ struct MarkdownParser {
     private func renderListItem(_ item: ListItem) -> InlineContent {
         var parts: [InlineContent] = []
         for child in item.children {
+            if let html = child as? HTMLBlock {
+                parts.append(InlineContent().appending(html.rawHTML))
+                continue
+            }
             if let paragraph = child as? Paragraph {
                 let text = renderInlineChildren(paragraph)
                 if !text.isEmpty {

@@ -53,6 +53,35 @@ final class MessageMarkdownTests: XCTestCase {
         XCTAssertTrue(mathSpans(inline).isEmpty)
     }
 
+    func testHTMLBlocksRemainLiteral() {
+        let html = "<div>\nhello $x$\n</div>\n"
+        let sources = [
+            html,
+            "> <div>\n> hello $x$\n> </div>",
+            "- <div>\n  hello $x$\n  </div>",
+        ]
+        for source in sources {
+            let blocks = MarkdownParser.parse(source)
+            XCTAssertEqual(blocks.count, 1)
+            guard let block = blocks.first else { continue }
+            let content: InlineContent
+            switch block.kind {
+            case .paragraph(let text), .blockquote(let text):
+                content = text
+            case .list(let items):
+                XCTAssertEqual(items.count, 1)
+                content = InlineContent.joined(items, separator: "")
+            default:
+                XCTFail("Unexpected block kind")
+                continue
+            }
+            XCTAssertEqual(String(content.attributedText.characters), html)
+            XCTAssertFalse(content.hasMath)
+        }
+        let details = "<details>summary</details>"
+        XCTAssertEqual(String(paragraph(details).attributedText.characters), details + "\n")
+    }
+
     func testMathInBlocksAndLinkLabels() {
         let blocks = MarkdownParser.parse(
             "# Heading \\(x\\)\n\n- Item $y$\n\n> Quote \\(z\\)\ncontinued $q$\n\n$$\\frac{1}{2}$$")
