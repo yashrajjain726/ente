@@ -9,12 +9,12 @@ A short summary list of changes to the Ensu mobile and desktop apps. For a more 
 
 ## v0.1.20 - Sep 2026
 
-- Added a progress indicator while attaching images.
-- Added the ability to rename chats on desktop (@fosszil).
+- Chat with your local markdown notes on desktop
 - Ensu packs support on desktop
 - Gemma as default for high RAM mobile devices
+- Added a progress indicator while attaching images.
+- Added the ability to rename chats on desktop (@fosszil).
 - Fixed typing lag in the message composer and chat search.
-- Chat with your local markdown notes on desktop
 
 ## v0.1.19 - Aug 2026
 
