@@ -1,3 +1,4 @@
+import { authPageConfig } from "@/auth-page-config";
 import { AppLockReauthenticationDialog } from "@/components/app-lock/AppLockReauthenticationDialog";
 import { AppLockSetupError } from "@/components/app-lock/LockScreenContents";
 import {
@@ -17,6 +18,7 @@ import "@fontsource-variable/outfit";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { CssBaseline, Typography } from "@mui/material";
 import { styled, ThemeProvider, useColorScheme } from "@mui/material/styles";
+import { AuthPageProvider } from "ente-accounts/components/auth/AuthPageProvider";
 import {
     isLocalStorageAndIndexedDBMismatch,
     savedLocalUser,
@@ -178,21 +180,23 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
             )}
             <BaseContext value={baseContext}>
                 <PhotosAppContext value={appContext}>
-                    {!isI18nReady ? (
-                        <LoadingIndicator />
-                    ) : isDesktop ? (
-                        <DesktopMainContent
-                            Component={Component}
-                            pageProps={pageProps}
-                            isChangingRoute={isChangingRoute}
-                        />
-                    ) : (
-                        <WebMainContent
-                            Component={Component}
-                            pageProps={pageProps}
-                            isChangingRoute={isChangingRoute}
-                        />
-                    )}
+                    <AuthPageProvider value={authPageConfig}>
+                        {!isI18nReady ? (
+                            <LoadingIndicator />
+                        ) : isDesktop ? (
+                            <DesktopMainContent
+                                Component={Component}
+                                pageProps={pageProps}
+                                isChangingRoute={isChangingRoute}
+                            />
+                        ) : (
+                            <WebMainContent
+                                Component={Component}
+                                pageProps={pageProps}
+                                isChangingRoute={isChangingRoute}
+                            />
+                        )}
+                    </AuthPageProvider>
                 </PhotosAppContext>
             </BaseContext>
         </ThemeProvider>

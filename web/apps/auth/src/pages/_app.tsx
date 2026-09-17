@@ -1,8 +1,10 @@
+import { authPageConfig } from "@/auth-page-config";
 import { authLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
+import { AuthPageProvider } from "ente-accounts/components/auth/AuthPageProvider";
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
 import { staticAppTitle } from "ente-base/app";
 import { CustomHead } from "ente-base/components/Head";
@@ -51,14 +53,16 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             <AttributedMiniDialog {...miniDialogProps} />
 
             <BaseContext value={baseContext}>
-                {!isI18nReady ? (
-                    <LoadingIndicator />
-                ) : (
-                    <>
-                        {isChangingRoute && <TranslucentLoadingOverlay />}
-                        <Component {...pageProps} />
-                    </>
-                )}
+                <AuthPageProvider value={authPageConfig}>
+                    {!isI18nReady ? (
+                        <LoadingIndicator />
+                    ) : (
+                        <>
+                            {isChangingRoute && <TranslucentLoadingOverlay />}
+                            <Component {...pageProps} />
+                        </>
+                    )}
+                </AuthPageProvider>
             </BaseContext>
         </ThemeProvider>
     );

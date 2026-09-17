@@ -1,40 +1,47 @@
-import { AccountsPageContents } from "ente-accounts/components/layouts/centered-paper";
-import {
-    LoginContents,
-    type LoginPresentationProps,
-} from "ente-accounts/components/LoginContents";
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { LoginContents } from "ente-accounts/components/LoginContents";
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import { customAPIHost } from "ente-base/origins";
 import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
 
-export interface LoginPageProps {
-    presentation?: React.ComponentType<LoginPresentationProps>;
-}
-
-const Page: React.FC<LoginPageProps> = ({ presentation: Presentation }) => {
+const Page: React.FC = () => {
+    const { Shell, LoginFrame, keepLoginLoadingOnRedirect } =
+        useAuthPageConfig();
     const [loading, setLoading] = useState(true);
     const [host, setHost] = useState<string | undefined>(undefined);
 
     const router = useRouter();
 
+    const refreshHost = useCallback(
+        () => void customAPIHost().then(setHost),
+        [],
+    );
+
     useEffect(() => {
-        void customAPIHost().then(setHost);
-        if (savedPartialLocalUser()?.email) void router.replace("/verify");
+        refreshHost();
+        if (savedPartialLocalUser()?.email) {
+            void router.replace("/verify");
+            if (keepLoginLoadingOnRedirect) return;
+        }
         setLoading(false);
-    }, [router]);
+    }, [router, refreshHost, keepLoginLoadingOnRedirect]);
 
     const onSignUp = useCallback(() => void router.push("/signup"), [router]);
 
-    return loading ? (
-        <LoadingIndicator />
-    ) : Presentation ? (
-        <LoginContents {...{ host, onSignUp }} presentation={Presentation} />
-    ) : (
-        <AccountsPageContents>
+    if (loading) return <LoadingIndicator />;
+
+    const contents = (
+        <Shell>
             <LoginContents {...{ host, onSignUp }} />
-        </AccountsPageContents>
+        </Shell>
+    );
+
+    return LoginFrame ? (
+        <LoginFrame onHostChanged={refreshHost}>{contents}</LoginFrame>
+    ) : (
+        contents
     );
 };
 

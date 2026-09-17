@@ -76,6 +76,7 @@ export function RecoverTwoFactorForm(
 }
 
 interface RecoveryFormProps extends RecoverAccountPresentationProps {
+    onNoRecoveryKey: () => void;
     title: React.ReactNode;
     subtitle: React.ReactNode;
 }
