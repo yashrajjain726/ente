@@ -58,3 +58,21 @@ test("low-level WASM declarations are excluded", async () => {
         ),
     );
 });
+
+test("generated APIs cannot expose any", async () => {
+    const [result] = await eslint.lintText(
+        `/* eslint-disable */
+        export interface ResultData { items: any[]; }
+        export class Handle { read(): Promise<any>; }
+        export function open(input: any): Handle;`,
+        { filePath },
+    );
+    assert.equal(result.messages.length, 3);
+    assert.ok(
+        result.messages.every(
+            ({ ruleId, severity }) =>
+                ruleId === "@typescript-eslint/no-explicit-any" &&
+                severity === 2,
+        ),
+    );
+});
