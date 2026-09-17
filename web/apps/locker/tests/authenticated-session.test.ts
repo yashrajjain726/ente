@@ -10,7 +10,6 @@ const {
     encryptBoxWithRecoveryKey,
     generateKey,
     openLocker,
-    openLegacy,
 } = vi.hoisted(() => ({
     apiOrigin: vi.fn<() => Promise<string>>(),
     savedAuthToken: vi.fn<() => Promise<string>>(),
@@ -27,8 +26,6 @@ const {
         vi.fn<typeof import("ente-locker-wasm").encryptBoxWithRecoveryKey>(),
     generateKey: vi.fn<typeof import("ente-locker-wasm").generateKey>(),
     openLocker: vi.fn<typeof import("ente-locker-wasm").openSession>(),
-    openLegacy:
-        vi.fn<typeof import("ente-legacy-wasm/authenticated").openSession>(),
 }));
 
 vi.mock("ente-base/app", () => ({
@@ -48,7 +45,6 @@ vi.mock("ente-locker-wasm", () => ({
     generateKey,
     openSession: openLocker,
 }));
-vi.mock("ente-legacy-wasm/authenticated", () => ({ openSession: openLegacy }));
 
 let sessions: typeof import("../src/services/authenticated-session");
 
@@ -62,39 +58,25 @@ beforeEach(async () => {
     sessions = await import("../src/services/authenticated-session");
 });
 
-test("opens each artifact only when needed, reuses sessions, and clears both at logout", async () => {
+test("Legacy reuses the Locker session and refreshes its token", async () => {
     const locker = mockSession();
-    const legacy = mockSession();
     openLocker.mockResolvedValue(locker);
-    openLegacy.mockResolvedValue(legacy);
 
-    expect(openLocker).not.toHaveBeenCalled();
-    expect(openLegacy).not.toHaveBeenCalled();
     expect(await sessions.openAuthenticatedSession(1, "token", "key")).toBe(
         locker,
     );
     expect(await sessions.ensureAuthenticatedSession()).toBe(locker);
     expect(masterKeyFromSession).not.toHaveBeenCalled();
-    expect(openLocker).toHaveBeenCalledTimes(1);
-    expect(openLegacy).not.toHaveBeenCalled();
-
-    const first = sessions.authenticatedLegacySession();
-    const second = sessions.authenticatedLegacySession();
-    expect(await first).toBe(legacy);
-    expect(await second).toBe(legacy);
+    expect(await sessions.authenticatedSession()).toBe(locker);
     savedAuthToken.mockResolvedValue("rotated-token");
-    expect(await sessions.authenticatedLegacySession()).toBe(legacy);
-    expect(legacy.updateAuthToken).toHaveBeenLastCalledWith("rotated-token");
-    expect(openLegacy).toHaveBeenCalledTimes(1);
+    expect(await sessions.authenticatedSession()).toBe(locker);
+    expect(locker.updateAuthToken).toHaveBeenLastCalledWith("rotated-token");
+    expect(openLocker).toHaveBeenCalledOnce();
 
     sessions.clearAuthenticatedSession();
     expect(locker.free).not.toHaveBeenCalled();
-    expect(legacy.free).not.toHaveBeenCalled();
-    await sessions.openAuthenticatedSession(1, "rotated-token", "key");
+    await sessions.authenticatedSession();
     expect(openLocker).toHaveBeenCalledTimes(2);
-    expect(openLegacy).toHaveBeenCalledTimes(1);
-    await sessions.authenticatedLegacySession();
-    expect(openLegacy).toHaveBeenCalledTimes(2);
 });
 
 test("retries a failed Locker session", async () => {
@@ -110,15 +92,15 @@ test("retries a failed Locker session", async () => {
     expect(openLocker).toHaveBeenCalledTimes(2);
 });
 
-test("logout during credential lookup cannot reopen a Legacy session", async () => {
+test("logout during credential lookup cannot reopen a session", async () => {
     const key = Promise.withResolvers<string>();
     masterKeyFromSession.mockReturnValue(key.promise);
-    const opening = sessions.authenticatedLegacySession();
+    const opening = sessions.authenticatedSession();
     sessions.clearAuthenticatedSession();
     key.resolve("key");
 
     await expect(opening).rejects.toThrow("Authenticated session was cleared");
-    expect(openLegacy).not.toHaveBeenCalled();
+    expect(openLocker).not.toHaveBeenCalled();
 });
 
 test("logout during WASM initialization frees the unused handle and permits a new session", async () => {
@@ -126,42 +108,42 @@ test("logout during WASM initialization frees the unused handle and permits a ne
     const started = Promise.withResolvers<undefined>();
     const previous = mockSession();
     const next = mockSession();
-    openLegacy
+    openLocker
         .mockImplementationOnce(() => {
             started.resolve(undefined);
             return ready.promise;
         })
         .mockResolvedValueOnce(next);
-    const opening = sessions.authenticatedLegacySession();
+    const opening = sessions.authenticatedSession();
     await started.promise;
     sessions.clearAuthenticatedSession();
-    expect(await sessions.authenticatedLegacySession()).toBe(next);
+    expect(await sessions.authenticatedSession()).toBe(next);
     ready.resolve(previous);
 
     await expect(opening).rejects.toThrow("Authenticated session was cleared");
     expect(previous.free).toHaveBeenCalledOnce();
-    expect(await sessions.authenticatedLegacySession()).toBe(next);
+    expect(await sessions.authenticatedSession()).toBe(next);
     expect(next.free).not.toHaveBeenCalled();
-    expect(openLegacy).toHaveBeenCalledTimes(2);
+    expect(openLocker).toHaveBeenCalledTimes(2);
 });
 
-test("failed opens can be retried and account changes replace the cached Legacy session", async () => {
+test("failed opens can be retried and account changes replace the cached session", async () => {
     const previous = mockSession();
     const next = mockSession();
-    openLegacy
+    openLocker
         .mockRejectedValueOnce(new Error("Download failed"))
         .mockResolvedValueOnce(previous)
         .mockResolvedValueOnce(next);
-    await expect(sessions.authenticatedLegacySession()).rejects.toThrow(
+    await expect(sessions.authenticatedSession()).rejects.toThrow(
         "Download failed",
     );
-    expect(await sessions.authenticatedLegacySession()).toBe(previous);
+    expect(await sessions.authenticatedSession()).toBe(previous);
 
     user.id = 2;
     savedAuthToken.mockResolvedValue("other-token");
     masterKeyFromSession.mockResolvedValue("other-key");
-    expect(await sessions.authenticatedLegacySession()).toBe(next);
-    expect(openLegacy).toHaveBeenLastCalledWith({
+    expect(await sessions.authenticatedSession()).toBe(next);
+    expect(openLocker).toHaveBeenLastCalledWith({
         baseUrl: "http://localhost:8080",
         authToken: "other-token",
         userID: 2,

@@ -6,6 +6,8 @@ pub mod collections;
 pub mod contacts;
 #[cfg(feature = "crypto")]
 pub mod crypto;
+#[cfg(feature = "legacy")]
+pub mod legacy;
 #[cfg(feature = "locker")]
 pub mod locker;
 mod logging;

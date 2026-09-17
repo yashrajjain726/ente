@@ -1,6 +1,6 @@
 import * as cast from "ente-cast-wasm";
-import * as legacy from "ente-legacy-wasm/authenticated";
 import * as locker from "ente-locker-wasm";
+import { createLegacyService } from "ente-locker-wasm/legacy";
 import * as photos from "ente-photos-wasm";
 import {
     boxSealOpenBytes,
@@ -193,7 +193,7 @@ test("Locker file-link payload survives cloning and unlocks its file key", async
     ).toBe(fileKey);
 });
 
-describe("Legacy", () => {
+describe("Locker Legacy", () => {
     test("returns plain information and sends typed updates through a reused session", async () => {
         const user = { id: 42, email: "owner@example.com" };
         const emergencyContact = { id: 43, email: "friend@example.com" };
@@ -236,33 +236,34 @@ describe("Legacy", () => {
             }
         });
         const masterKey = await generateKey();
-        const session = await legacy.openSession({
+        const session = await locker.openSession({
             baseUrl: "http://localhost",
             authToken: "token",
             masterKeyB64: masterKey,
             ...(await sessionKeyAttributes(masterKey)),
         });
         try {
-            expect(await legacy.getInfo(session)).toStrictEqual(info);
+            const legacy = createLegacyService(async () => session);
+            expect(await legacy.getInfo()).toStrictEqual(info);
             session.updateAuthToken("rotated-token");
-            await legacy.updateContact(session, 42, 43, "CONTACT_LEFT");
+            await legacy.updateContact(42, 43, "CONTACT_LEFT");
             expect(updateBody).toStrictEqual({
                 userID: 42,
                 emergencyContactID: 43,
                 state: "CONTACT_LEFT",
             });
             await expect(
-                legacy.updateRecoveryNotice(session, 43, 30),
+                legacy.updateRecoveryNotice(43, 30),
             ).rejects.toMatchObject({ name: "active_recovery_session" });
             recoveryErrorBody = {
                 code: "BAD_REQUEST",
                 message: "Cannot update during an active recovery session",
             };
             await expect(
-                legacy.updateRecoveryNotice(session, 43, 30),
+                legacy.updateRecoveryNotice(43, 30),
             ).rejects.not.toMatchObject({ name: "active_recovery_session" });
             recovery.createdAt = Number.MAX_SAFE_INTEGER + 1;
-            await expect(legacy.getInfo(session)).rejects.toBeInstanceOf(Error);
+            await expect(legacy.getInfo()).rejects.toBeInstanceOf(Error);
         } finally {
             session.free();
         }
@@ -295,14 +296,15 @@ describe("Legacy", () => {
                     throw new Error(`Unexpected request: ${request.url}`);
             }
         });
-        const session = await legacy.openSession({
+        const session = await locker.openSession({
             baseUrl: "http://localhost",
             authToken: "token",
             masterKeyB64: masterKey,
             ...(await sessionKeyAttributes(masterKey, recoveryKey)),
         });
         try {
-            await legacy.addContact(session, "friend@example.com", 30);
+            const legacy = createLegacyService(async () => session);
+            await legacy.addContact("friend@example.com", 30);
             expect(sharedRecoveryKey).toStrictEqual(
                 new Uint8Array(Buffer.from(recoveryKey, "base64")),
             );

@@ -12,7 +12,6 @@
         "ente-accounts": "*",
         "ente-base": "*",
         "ente-contacts": "*",
-        "ente-legacy-wasm": "*",
         "ente-locker-wasm": "*"
     },
     "devDependencies": {

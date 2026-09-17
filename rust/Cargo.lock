@@ -2644,7 +2644,6 @@ dependencies = [
 name = "ente-legacy-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-core",
  "ente-legacy",
  "ente-wasm-lib",
  "serde",
@@ -2936,6 +2935,7 @@ dependencies = [
  "ente-collections",
  "ente-contacts",
  "ente-core",
+ "ente-legacy",
  "ente-locker",
  "js-sys",
  "log",

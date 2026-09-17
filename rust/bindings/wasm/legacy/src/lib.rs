@@ -1,13 +1,9 @@
 mod types;
 
-use ente_core::b64;
 use ente_legacy::LegacyKitRecoveryClient;
-use ente_wasm_lib::session::Session;
 use serde_wasm_bindgen as swb;
 use tsify::Tsify;
-use types::{
-    LegacyContactState, LegacyInfo, LegacyKitRecoverySession, LegacyKitShare, OpenKitRecoveryInput,
-};
+use types::{LegacyKitRecoverySession, LegacyKitShare, OpenKitRecoveryInput};
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -16,8 +12,6 @@ pub enum Error {
     Legacy(#[from] ente_legacy::Error),
     #[error(transparent)]
     Serde(#[from] swb::Error),
-    #[error(transparent)]
-    Decode(#[from] b64::DecodeError),
 }
 
 impl Error {
@@ -28,10 +22,6 @@ impl Error {
                 Some("duplicate_legacy_kit_share")
             }
             Self::Legacy(ente_legacy::Error::LegacyKitInactive) => Some("legacy_kit_inactive"),
-            Self::Legacy(ente_legacy::Error::ContactNotOnEnte) => Some("contact_not_on_ente"),
-            Self::Legacy(ente_legacy::Error::ActiveRecoverySession) => {
-                Some("active_recovery_session")
-            }
             _ => None,
         }
     }
@@ -41,110 +31,6 @@ impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
         ente_wasm_lib::js_error(&error, error.name())
     }
-}
-
-#[wasm_bindgen(js_name = legacyGetInfo)]
-pub async fn legacy_get_info(session: &Session) -> Result<<LegacyInfo as Tsify>::JsType, Error> {
-    LegacyInfo::from(ente_legacy::info(session.inner()).await?)
-        .into_js()
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyPublicKey)]
-pub async fn legacy_public_key(session: &Session, email: String) -> Result<Option<String>, Error> {
-    ente_legacy::public_key(session.inner(), &email)
-        .await
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyVerificationID)]
-pub fn legacy_verification_id(public_key_b64: String) -> Result<String, Error> {
-    ente_legacy::verification_id(&public_key_b64).map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyAddContact)]
-pub async fn legacy_add_contact(
-    session: &Session,
-    email: String,
-    recovery_notice_in_days: Option<i32>,
-) -> Result<(), Error> {
-    ente_legacy::add_contact(session.inner(), &email, recovery_notice_in_days)
-        .await
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyUpdateContact)]
-pub async fn legacy_update_contact(
-    session: &Session,
-    user_id: i64,
-    emergency_contact_id: i64,
-    state: <LegacyContactState as Tsify>::JsType,
-) -> Result<(), Error> {
-    let state = LegacyContactState::from_js(state)?;
-    ente_legacy::update_contact(session.inner(), user_id, emergency_contact_id, state.into())
-        .await
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyUpdateRecoveryNotice)]
-pub async fn legacy_update_recovery_notice(
-    session: &Session,
-    emergency_contact_id: i64,
-    recovery_notice_in_days: i32,
-) -> Result<(), Error> {
-    ente_legacy::update_recovery_notice(
-        session.inner(),
-        emergency_contact_id,
-        recovery_notice_in_days,
-    )
-    .await
-    .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyStartRecovery)]
-pub async fn legacy_start_recovery(
-    session: &Session,
-    user_id: i64,
-    emergency_contact_id: i64,
-) -> Result<(), Error> {
-    ente_legacy::start_recovery(session.inner(), user_id, emergency_contact_id)
-        .await
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyStopRecovery)]
-pub async fn legacy_stop_recovery(
-    session: &Session,
-    recovery_id: String,
-    user_id: i64,
-    emergency_contact_id: i64,
-) -> Result<(), Error> {
-    ente_legacy::stop_recovery(session.inner(), &recovery_id, user_id, emergency_contact_id)
-        .await
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyRejectRecovery)]
-pub async fn legacy_reject_recovery(
-    session: &Session,
-    recovery_id: String,
-    user_id: i64,
-    emergency_contact_id: i64,
-) -> Result<(), Error> {
-    ente_legacy::reject_recovery(session.inner(), &recovery_id, user_id, emergency_contact_id)
-        .await
-        .map_err(Into::into)
-}
-
-#[wasm_bindgen(js_name = legacyChangePassword)]
-pub async fn legacy_change_password(
-    session: &Session,
-    recovery_id: String,
-    new_password: String,
-) -> Result<(), Error> {
-    ente_legacy::change_password(session.inner(), &recovery_id, &new_password)
-        .await
-        .map_err(Into::into)
 }
 
 #[wasm_bindgen(js_name = parseLegacyKitShare)]

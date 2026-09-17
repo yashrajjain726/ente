@@ -45,7 +45,6 @@ vi.mock("ente-accounts/services/logout", () => ({
     logoutClearStateAgain: vi.fn(),
 }));
 vi.mock("ente-locker-wasm", () => ({ openSession }));
-vi.mock("ente-legacy-wasm/authenticated", () => ({ openSession }));
 vi.mock("../src/services/locker-db", () => ({ clearLockerDB: vi.fn() }));
 
 afterEach(() => vi.unstubAllGlobals());
