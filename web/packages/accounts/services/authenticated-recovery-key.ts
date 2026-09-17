@@ -3,22 +3,18 @@ interface EncryptedBox {
     nonce: string;
 }
 
-export const createAuthenticatedRecoveryKeyOps = <
-    Session extends { recoveryKeyMnemonic: () => string },
->({
+export const createAuthenticatedRecoveryKeyOps = <Session>({
     ensureSession,
     generateKey,
     encryptBox,
+    getMnemonic,
 }: {
     ensureSession: () => Promise<Session>;
     generateKey: () => Promise<string>;
-    encryptBox: (
-        session: Session,
-        data: string,
-    ) => EncryptedBox | Promise<EncryptedBox>;
+    getMnemonic: (session: Session) => Promise<string>;
+    encryptBox: (session: Session, data: string) => Promise<EncryptedBox>;
 }) => {
-    const recoveryKeyMnemonic = async () =>
-        (await ensureSession()).recoveryKeyMnemonic();
+    const recoveryKeyMnemonic = async () => getMnemonic(await ensureSession());
 
     const encryptWithRecoveryKey = async (data: string) => {
         const session = await ensureSession();

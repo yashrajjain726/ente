@@ -6,9 +6,8 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-ente-core.workspace = true
 ente-legacy.workspace = true
-ente-wasm-lib = { workspace = true, features = ["session"] }
+ente-wasm-lib.workspace = true
 serde.workspace = true
 serde-wasm-bindgen.workspace = true
 thiserror.workspace = true

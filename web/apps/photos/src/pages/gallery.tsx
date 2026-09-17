@@ -501,9 +501,8 @@ const Page: React.FC = () => {
                 return;
             }
 
-            let session;
             try {
-                session = await ensureAuthenticatedSession();
+                await ensureAuthenticatedSession();
             } catch (e) {
                 if (isNamedError(e, "missing_recovery_key")) {
                     showMiniDialog(sessionExpiredDialogAttributes(logout));
@@ -524,7 +523,7 @@ const Page: React.FC = () => {
             const user = ensureLocalUser();
             void initContacts(
                 user.id,
-                session,
+                ensureAuthenticatedSession,
                 contactsGetDiff,
                 contactsGetProfilePicture,
             )

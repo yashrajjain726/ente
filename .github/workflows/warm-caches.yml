@@ -218,6 +218,13 @@ jobs:
                   lookup-only: true
                   shared-key: rust-wasm
 
+            # rust-src timestamps must match the cached build-std artifacts.
+            - name: Cache Cast toolchain
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  key: cast-toolchain-${{ hashFiles('rust/bindings/wasm/cast/rust-toolchain.toml') }}
+                  path: ~/.rustup/toolchains/nightly-*
+
             - name: Cache web
               uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:

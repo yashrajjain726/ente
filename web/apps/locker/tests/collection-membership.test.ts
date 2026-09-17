@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
+    addFileToCollections,
     deleteCollectionKeepingFiles,
     updateItemCollections,
 } from "../src/services/collection-membership";
@@ -10,6 +11,9 @@ import {
 } from "../src/services/locker-cache";
 import type { LockerCollection, LockerItem } from "../src/types";
 
+const { ensureAuthenticatedSession } = vi.hoisted(() => ({
+    ensureAuthenticatedSession: vi.fn(() => Promise.resolve({})),
+}));
 vi.mock("ente-accounts/services/user", () => ({
     ensureLocalUser: () => ({ id: 1 }),
 }));
@@ -26,7 +30,9 @@ vi.mock("ente-base/origins", () => ({
             : path,
 }));
 vi.mock("ente-base/log", () => ({ default: {} }));
-vi.mock("../src/services/authenticated-session", () => ({}));
+vi.mock("../src/services/authenticated-session", () => ({
+    ensureAuthenticatedSession,
+}));
 vi.mock("ente-locker-wasm", () => ({
     decryptBox: () => "file-key",
     encryptBox: (_fileKey: string, collectionKey: string) => ({
@@ -35,8 +41,10 @@ vi.mock("ente-locker-wasm", () => ({
     }),
 }));
 vi.mock("../src/services/sync/decrypt", () => ({
-    decryptCollectionKey: (record: EncryptedCollectionRecord) =>
-        `collection-${record.id}`,
+    openCollectionKeyForRecord: (
+        _session: unknown,
+        record: EncryptedCollectionRecord,
+    ) => `collection-${record.id}`,
 }));
 vi.mock("../src/services/sync/sync", () => ({}));
 
@@ -124,6 +132,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 test("membership updates deduplicate targets and add before moving the removed owned membership", async () => {
     await updateItemCollections(10, [2, 3, 3], "master-key");
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
     expect(requests()).toEqual([
         {
             url: "/collections/add-files",
@@ -155,6 +164,23 @@ test("membership updates deduplicate targets and add before moving the removed o
             },
         },
     ]);
+});
+
+test("adding to multiple collections acquires one session", async () => {
+    await addFileToCollections(10, "file-key", [2, 3]);
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
+    expect(requests().map((request) => request.body)).toEqual(
+        [2, 3].map((collectionID) => ({
+            collectionID,
+            files: [
+                {
+                    id: 10,
+                    encryptedKey: `encrypted-for-collection-${collectionID}`,
+                    keyDecryptionNonce: "nonce",
+                },
+            ],
+        })),
+    );
 });
 
 test("removing a shared membership detaches it without moving the file", async () => {
@@ -224,6 +250,7 @@ test("keeping files batches owned moves, detaches other owners' files, then dele
         source([...ids.map((id) => item(id)), item(200, 2)]),
         "master-key",
     );
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
     const calls = requests();
     expect(calls.map((call) => call.url)).toEqual([
         "/collections/move-files",

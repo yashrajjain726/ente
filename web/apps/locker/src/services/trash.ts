@@ -3,8 +3,9 @@ import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
 import { decryptBox, encryptBox } from "ente-locker-wasm";
+import { ensureAuthenticatedSession } from "./authenticated-session";
 import { getCollectionRecord, getEncryptedFileRecord } from "./locker-cache";
-import { decryptCollectionKey } from "./sync/decrypt";
+import { openCollectionKeyForRecord } from "./sync/decrypt";
 import { fetchLockerTrash } from "./sync/sync";
 
 export const trashFiles = async (
@@ -58,7 +59,11 @@ export const restoreFromTrash = async (
     if (!collectionRecord)
         throw new Error(`Collection ${targetCollectionID} not in cache`);
 
-    const collectionKey = await decryptCollectionKey(collectionRecord);
+    const session = await ensureAuthenticatedSession();
+    const collectionKey = await openCollectionKeyForRecord(
+        session,
+        collectionRecord,
+    );
 
     const buildRestorePayload = async (
         candidateItems: Pick<LockerItem, "id" | "collectionID">[],
@@ -88,8 +93,10 @@ export const restoreFromTrash = async (
                 continue;
             }
 
-            const origCollectionKey =
-                await decryptCollectionKey(origCollectionRecord);
+            const origCollectionKey = await openCollectionKeyForRecord(
+                session,
+                origCollectionRecord,
+            );
             const fileKey = await decryptBox(
                 {
                     encryptedData: fileRecord.encryptedKey,

@@ -121,6 +121,61 @@ test("production references cross lazy loaders, aliases, destructuring and worke
     }
 });
 
+test("module arguments and props reference only the receiving contract", () => {
+    const directory = mkdtempSync(join(tmpdir(), "wasm-module-exports-"));
+    const bindings = join(directory, "bindings.ts");
+    const entry = join(directory, "entry.tsx");
+    try {
+        writeFileSync(
+            bindings,
+            `
+            export const getInfo = (_session: number) => {};
+            export const publicKey = () => "key";
+            export const unused = () => {};
+        `,
+        );
+        const consumers = `
+            import * as legacy from "./bindings";
+            function Panel<Session>({ session, legacy }: {
+                session: Session;
+                legacy: { getInfo(session: Session): void };
+            }) {
+                legacy.getInfo(session);
+                return null;
+            }
+            function verify(api: { publicKey(): string }) {
+                return api.publicKey();
+            }
+            verify(legacy);
+        `;
+        const check = () =>
+            unusedExports(
+                [bindings],
+                [
+                    {
+                        entryFiles: [entry],
+                        options: {
+                            jsx: ts.JsxEmit.Preserve,
+                            module: ts.ModuleKind.ESNext,
+                            moduleResolution: ts.ModuleResolutionKind.Bundler,
+                        },
+                    },
+                ],
+            ).map(({ name }) => name);
+
+        writeFileSync(
+            entry,
+            consumers + "<Panel session={42} legacy={legacy} />;",
+        );
+        assert.deepEqual(check(), ["unused"]);
+
+        writeFileSync(entry, consumers);
+        assert.deepEqual(check(), ["getInfo", "unused"]);
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
 test("copies of a Rust export need one caller across artifacts", () => {
     const directory = mkdtempSync(join(tmpdir(), "wasm-export-origins-"));
     const file = (name, contents) => {

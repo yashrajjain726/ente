@@ -54,20 +54,6 @@ export type LockerUploadProgress =
     | { phase: "uploading"; loaded: number; total: number }
     | { phase: "finalizing" };
 
-interface UploadDeps<TCollectionRecord> {
-    getCollectionRecord: (
-        collectionID: number,
-    ) => TCollectionRecord | undefined;
-    decryptCollectionKey: (
-        collectionRecord: TCollectionRecord,
-    ) => Promise<string>;
-    addFileToCollections: (
-        fileID: number,
-        fileKey: string,
-        targetCollectionIDs: number[],
-    ) => Promise<void>;
-}
-
 const fetchUploadURL = async (
     contentLength: number,
     contentMd5: string,
@@ -280,13 +266,17 @@ const createAggregateUploadProgressReporter = (
     };
 };
 
-export const uploadLockerFileWithDeps = async <TCollectionRecord>(
+export const uploadLockerFile = async (
     file: File,
     collectionIDs: number[],
-    deps: UploadDeps<TCollectionRecord>,
+    masterKey: string,
     onProgress?: (progress: LockerUploadProgress) => void,
 ): Promise<number> => {
-    const [collectionID, ...additionalCollectionIDs] = collectionIDs;
+    const [collectionID, ...additionalCollectionIDs] =
+        await resolveCollectionIDsWithUncategorizedFallback(
+            collectionIDs,
+            masterKey,
+        );
     if (collectionID === undefined) {
         throw new Error("No collection selected");
     }
@@ -437,11 +427,11 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
         encryptedThumb.md5Hash,
     );
 
-    const collectionRecord = deps.getCollectionRecord(collectionID);
+    const collectionRecord = getCollectionRecord(collectionID);
     if (!collectionRecord) {
         throw new Error(`Collection ${collectionID} not in cache`);
     }
-    const collectionKey = await deps.decryptCollectionKey(collectionRecord);
+    const collectionKey = await decryptCollectionKey(collectionRecord);
     const encryptedKey = await encryptBox(fileKey, collectionKey);
 
     const now = Date.now();
@@ -500,30 +490,11 @@ export const uploadLockerFileWithDeps = async <TCollectionRecord>(
     ensureOk(res);
     const created = RemoteIDResponseSchema.parse(await res.json());
     if (additionalCollectionIDs.length > 0) {
-        await deps.addFileToCollections(
+        await addFileToCollections(
             created.id,
             fileKey,
             additionalCollectionIDs,
         );
     }
     return created.id;
-};
-
-export const uploadLockerFile = async (
-    file: File,
-    collectionIDs: number[],
-    masterKey: string,
-    onProgress?: (progress: LockerUploadProgress) => void,
-): Promise<number> => {
-    const targetCollectionIDs =
-        await resolveCollectionIDsWithUncategorizedFallback(
-            collectionIDs,
-            masterKey,
-        );
-    return uploadLockerFileWithDeps(
-        file,
-        targetCollectionIDs,
-        { getCollectionRecord, decryptCollectionKey, addFileToCollections },
-        onProgress,
-    );
 };

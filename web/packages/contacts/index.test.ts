@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const session = {};
+const getSession = vi.fn(() => Promise.resolve({}));
 
 beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    getSession.mockReset();
     vi.useRealTimers();
 });
 
@@ -92,10 +93,17 @@ describe("contacts synchronization", () => {
         const { contacts, getDiff, getProfilePicture, setKV } =
             await setupContactsModule();
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
+        expect(getSession).not.toHaveBeenCalled();
         expect(getDiff).not.toHaveBeenCalled();
         expect(contacts.contactsDisplaySnapshot().isHydrated).toBe(true);
         await contacts.pullContacts();
+        expect(getSession).toHaveBeenCalledOnce();
 
         const persisted = setKV.mock.calls
             .map(([key, value]) => `${key}:${JSON.stringify(value)}`)
@@ -113,7 +121,12 @@ describe("contacts synchronization", () => {
         const { contacts, getDiff, getProfilePicture, setKV } =
             await setupContactsModule({ rootKeyResolved: false, diff: [] });
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         await contacts.pullContacts();
 
         const persisted = setKV.mock.calls
@@ -127,7 +140,12 @@ describe("contacts synchronization", () => {
         const { contacts, getDiff, getProfilePicture, setKV } =
             await setupContactsModule({ rootKeyResolved: false });
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         await contacts.pullContacts();
 
         const persisted = setKV.mock.calls
@@ -138,6 +156,50 @@ describe("contacts synchronization", () => {
     });
 });
 
+test("each pull and avatar load acquires the current session", async () => {
+    const first = { token: "first" };
+    const second = { token: "second" };
+    const third = { token: "third" };
+    getSession
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(second)
+        .mockResolvedValueOnce(third);
+    const { contacts, getDiff, getProfilePicture } =
+        await setupContactsModule();
+
+    await contacts.initContacts(101, getSession, getDiff, getProfilePicture);
+    await contacts.pullContacts();
+    expect(getDiff.mock.calls[0]?.[0]).toBe(first);
+    expect(getDiff.mock.calls[1]?.[0]).toBe(first);
+
+    getDiff.mockResolvedValue({ records: [] });
+    await contacts.pullContacts();
+    expect(getDiff.mock.lastCall?.[0]).toBe(second);
+
+    await contacts.__testing.preloadResolvedContactAvatar({ userID: 101 });
+    expect(getProfilePicture).toHaveBeenCalledWith(
+        third,
+        expect.anything(),
+        "ct_1",
+    );
+    expect(getSession).toHaveBeenCalledTimes(3);
+});
+
+test("logout while acquiring a session prevents the pull", async () => {
+    const pending = Promise.withResolvers<object>();
+    getSession.mockReturnValueOnce(pending.promise);
+    const { contacts, getDiff, getProfilePicture } =
+        await setupContactsModule();
+    await contacts.initContacts(101, getSession, getDiff, getProfilePicture);
+
+    const pulling = contacts.pullContacts();
+    expect(getSession).toHaveBeenCalledOnce();
+    contacts.logoutContacts();
+    pending.resolve({});
+    await pulling;
+    expect(getDiff).not.toHaveBeenCalled();
+});
+
 describe("profile picture loading", () => {
     test("negative-caches failed profile picture fetches and logs at info", async () => {
         const { contacts, getDiff, getProfilePicture, info } =
@@ -145,7 +207,12 @@ describe("profile picture loading", () => {
                 getProfilePictureError: new Error("network failure"),
             });
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         await contacts.pullContacts();
 
         await contacts.__testing.preloadResolvedContactAvatar({
@@ -175,7 +242,12 @@ describe("profile picture loading", () => {
         const { contacts, getDiff, getProfilePicture } =
             await setupContactsModule({ getProfilePictureBytes: pngBytes });
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         await contacts.pullContacts();
         await contacts.__testing.preloadResolvedContactAvatar({ userID: 101 });
 
@@ -193,7 +265,7 @@ describe("profile picture loading", () => {
                 await setupContactsModule();
             await contacts.initContacts(
                 101,
-                session,
+                getSession,
                 getDiff,
                 getProfilePicture,
             );
@@ -224,7 +296,7 @@ describe("profile picture loading", () => {
             }
             await contacts.initContacts(
                 change === "account change" ? 202 : 101,
-                session,
+                getSession,
                 getDiff,
                 getProfilePicture,
             );
@@ -268,7 +340,12 @@ describe("retry after warm-up failure", () => {
             })
             .mockResolvedValueOnce({ records: [] });
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         const ready = contacts.pullContacts();
         await vi.advanceTimersByTimeAsync(10_001);
         await expect(ready).resolves.toBeUndefined();
@@ -283,7 +360,12 @@ describe("retry after warm-up failure", () => {
         getDiff.mockReset();
         getDiff.mockRejectedValue(new Error("down"));
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         const ready = expect(contacts.pullContacts()).rejects.toThrow("down");
 
         await vi.advanceTimersByTimeAsync(10_001);
@@ -305,7 +387,12 @@ describe("retry after warm-up failure", () => {
             .mockRejectedValueOnce(new Error("transient"))
             .mockResolvedValue({ records: [] });
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         const stalePull = contacts.pullContacts();
         await vi.advanceTimersByTimeAsync(0);
         expect(getDiff).toHaveBeenCalledTimes(1);
@@ -314,7 +401,12 @@ describe("retry after warm-up failure", () => {
         await contacts.pullContacts();
         expect(getDiff).toHaveBeenCalledTimes(1);
 
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         await contacts.pullContacts();
         expect(getDiff).toHaveBeenCalledTimes(2);
 
@@ -334,7 +426,12 @@ describe("logout", () => {
             await setupContactsModule({
                 getProfilePictureBytes: new Uint8Array([1, 2, 3]),
             });
-        await contacts.initContacts(101, session, getDiff, getProfilePicture);
+        await contacts.initContacts(
+            101,
+            getSession,
+            getDiff,
+            getProfilePicture,
+        );
         await contacts.pullContacts();
         await contacts.__testing.preloadResolvedContactAvatar({ userID: 101 });
         const changed = vi.fn();

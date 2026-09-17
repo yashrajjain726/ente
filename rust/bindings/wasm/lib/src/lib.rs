@@ -1,11 +1,15 @@
 #[cfg(feature = "accounts")]
 pub mod accounts;
+#[cfg(feature = "cast")]
+pub mod cast;
 #[cfg(feature = "collections")]
 pub mod collections;
 #[cfg(feature = "contacts")]
 pub mod contacts;
 #[cfg(feature = "crypto")]
 pub mod crypto;
+#[cfg(feature = "legacy")]
+pub mod legacy;
 #[cfg(feature = "locker")]
 pub mod locker;
 mod logging;

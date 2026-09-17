@@ -1,10 +1,11 @@
-import { authenticatedLegacySession } from "@/services/authenticated-session";
+import { ensureAuthenticatedSession } from "@/services/authenticated-session";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { CircularProgress } from "@mui/material";
 import {
     LegacyDrawerContent,
     type LegacySuggestedUser,
 } from "ente-contacts/legacy";
+import * as legacy from "ente-locker-wasm/legacy";
 import { t } from "i18next";
 import React from "react";
 import { LockerSidebarCardButton } from "./LockerSidebarCardButton";
@@ -26,7 +27,8 @@ export const LockerLegacyDrawer: React.FC<
             intro={t("legacy_intro")}
             open={open}
             suggestedUsers={suggestedUsers}
-            getSession={authenticatedLegacySession}
+            getSession={ensureAuthenticatedSession}
+            legacy={legacy}
             renderAddContactButton={({ onClick, disabled, loading }) => (
                 <LockerSidebarCardButton
                     icon={UserAdd01Icon}
