@@ -296,8 +296,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
             },
           ),
         ),
+      ...cards.skip(hasMemoryLane ? 1 : 0).take(1),
       if (memoryLaneCard != null && !hasSeenMemoryLane) memoryLaneCard,
-      ...cards.skip(hasMemoryLane ? 1 : 0),
+      ...cards.skip(hasMemoryLane ? 2 : 1),
       if (memoryLaneCard != null && hasSeenMemoryLane) memoryLaneCard,
     ];
   }

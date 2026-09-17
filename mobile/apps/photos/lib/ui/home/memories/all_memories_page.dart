@@ -117,7 +117,10 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
     for (final smartMemory in widget.allMemories) {
       if (smartMemory.memories.isEmpty) continue;
       final index =
-          pages.length + (memoryLane != null && !hasSeenMemoryLane ? 1 : 0);
+          pages.length +
+          (memoryLane != null && !hasSeenMemoryLane && pages.isNotEmpty
+              ? 1
+              : 0);
       pages.add(
         MemoryPageWrapper(
           id: smartMemory.id,
@@ -153,7 +156,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
     }
     if (memoryLane != null) {
       pages.insert(
-        hasSeenMemoryLane ? pages.length : 0,
+        hasSeenMemoryLane ? pages.length : 1,
         MemoryPageWrapper(
           id: "memoryLane_${memoryLane.personId}",
           widget: ({onNextMemory, onPreviousMemory}) => MemoryLanePageV2(
