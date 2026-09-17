@@ -2,64 +2,21 @@ import type { LockerCollection } from "@/types";
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { decryptBox, encryptBox } from "ente-locker-wasm";
+import { decryptBox, encryptBox, type Session } from "ente-locker-wasm";
+import { ensureAuthenticatedSession } from "./authenticated-session";
 import { deleteCollection, ensureUncategorizedCollection } from "./collections";
 import {
     getCollectionIDsForFile,
     getCollectionRecord,
     getEncryptedFileRecord,
+    type EncryptedCollectionRecord,
 } from "./locker-cache";
-import { decryptCollectionKey } from "./sync/decrypt";
+import { openCollectionKeyForRecord } from "./sync/decrypt";
 
-interface CollectionRecordLike {
-    id: number;
-    ownerID: number;
-    type: string;
-}
-
-export interface EncryptedCollectionFileItem {
+interface EncryptedCollectionFileItem {
     id: number;
     encryptedKey: string;
     keyDecryptionNonce: string;
-}
-
-interface CollectionMutationDeps {
-    getCollectionIDsForFile: (fileID: number) => number[];
-    getCollectionRecord: (
-        collectionID: number,
-    ) => CollectionRecordLike | undefined;
-    ensureUncategorizedCollection: (
-        masterKey: string,
-    ) => Promise<CollectionRecordLike>;
-    decryptFileKeyForCollection: (
-        fileID: number,
-        collectionID: number,
-    ) => Promise<string>;
-    buildEncryptedFileMoveItem: (
-        fileID: number,
-        fromCollectionID: number,
-        toCollectionID: number,
-    ) => Promise<EncryptedCollectionFileItem>;
-    removeFilesFromCollection: (
-        collectionID: number,
-        fileIDs: number[],
-    ) => Promise<void>;
-    moveFilesBetweenCollections: (
-        fromCollectionID: number,
-        toCollectionID: number,
-        files: EncryptedCollectionFileItem[],
-    ) => Promise<void>;
-    addFileToCollections: (
-        fileID: number,
-        fileKey: string,
-        targetCollectionIDs: number[],
-    ) => Promise<void>;
-}
-
-interface CollectionMutationContext {
-    currentUserID: number;
-    masterKey: string;
-    deps: CollectionMutationDeps;
 }
 
 const AUTO_MOVE_EXCLUDED_COLLECTION_TYPES = new Set([
@@ -76,12 +33,11 @@ const appendMapValue = <K, V>(map: Map<K, V[]>, key: K, value: V) => {
     map.set(key, [value]);
 };
 
-const createCachedUncategorizedResolver = (
-    loadUncategorizedCollection: () => Promise<CollectionRecordLike>,
-) => {
-    let uncategorizedCollection: CollectionRecordLike | undefined;
+const createCachedUncategorizedResolver = (masterKey: string) => {
+    let uncategorizedCollection: EncryptedCollectionRecord | undefined;
     return async () => {
-        uncategorizedCollection ??= await loadUncategorizedCollection();
+        uncategorizedCollection ??=
+            await ensureUncategorizedCollection(masterKey);
         return uncategorizedCollection;
     };
 };
@@ -89,9 +45,6 @@ const createCachedUncategorizedResolver = (
 const isAutoMoveCandidateCollection = (
     collectionID: number,
     currentUserID: number,
-    getCollectionRecord: (
-        collectionID: number,
-    ) => CollectionRecordLike | undefined,
     sourceCollectionID?: number,
 ) => {
     if (collectionID === sourceCollectionID) {
@@ -110,23 +63,18 @@ const resolveAutoMoveTargetCollectionID = async ({
     currentUserID,
     sourceCollectionID,
     preferredCollectionIDs,
-    getCollectionRecord,
     getUncategorizedCollection,
 }: {
     currentUserID: number;
     sourceCollectionID: number;
     preferredCollectionIDs: number[];
-    getCollectionRecord: (
-        collectionID: number,
-    ) => CollectionRecordLike | undefined;
-    getUncategorizedCollection: () => Promise<CollectionRecordLike>;
+    getUncategorizedCollection: () => Promise<EncryptedCollectionRecord>;
 }) => {
     const existingTargetCollectionID = preferredCollectionIDs.find(
         (candidateCollectionID) =>
             isAutoMoveCandidateCollection(
                 candidateCollectionID,
                 currentUserID,
-                getCollectionRecord,
                 sourceCollectionID,
             ),
     );
@@ -137,26 +85,16 @@ const resolveAutoMoveTargetCollectionID = async ({
     return (await getUncategorizedCollection()).id;
 };
 
-export const updateItemCollectionsWithDeps = async (
+export const updateItemCollections = async (
     fileID: number,
     collectionIDs: number[],
-    context: CollectionMutationContext,
+    masterKey: string,
 ): Promise<void> => {
-    const { currentUserID, masterKey, deps } = context;
-    const {
-        getCollectionIDsForFile,
-        getCollectionRecord,
-        ensureUncategorizedCollection,
-        decryptFileKeyForCollection,
-        buildEncryptedFileMoveItem,
-        removeFilesFromCollection,
-        moveFilesBetweenCollections,
-        addFileToCollections,
-    } = deps;
+    const currentUserID = ensureLocalUser().id;
+    const session = await ensureAuthenticatedSession();
     const currentCollectionIDs = getCollectionIDsForFile(fileID);
-    const getUncategorizedCollection = createCachedUncategorizedResolver(() =>
-        ensureUncategorizedCollection(masterKey),
-    );
+    const getUncategorizedCollection =
+        createCachedUncategorizedResolver(masterKey);
     const nextCollectionIDs = Array.from(
         new Set(
             collectionIDs.length > 0
@@ -179,7 +117,11 @@ export const updateItemCollectionsWithDeps = async (
               ) ?? currentCollectionIDs[0])
             : undefined;
     const sourceFileKeyForAdd = sourceCollectionIDForAdd
-        ? await decryptFileKeyForCollection(fileID, sourceCollectionIDForAdd)
+        ? await decryptFileKeyForCollection(
+              session,
+              fileID,
+              sourceCollectionIDForAdd,
+          )
         : null;
 
     // Add the new memberships before removing existing ones so the file
@@ -188,7 +130,8 @@ export const updateItemCollectionsWithDeps = async (
         if (!sourceFileKeyForAdd) {
             throw new Error(`File ${fileID} has no source collection`);
         }
-        await addFileToCollections(
+        await addFileToCollectionsWithSession(
+            session,
             fileID,
             sourceFileKeyForAdd,
             collectionIDsToAdd,
@@ -210,7 +153,6 @@ export const updateItemCollectionsWithDeps = async (
             currentUserID,
             sourceCollectionID: collectionID,
             preferredCollectionIDs: nextCollectionIDs,
-            getCollectionRecord,
             getUncategorizedCollection,
         });
         if (targetCollectionID === collectionID) {
@@ -218,6 +160,7 @@ export const updateItemCollectionsWithDeps = async (
         }
         await moveFilesBetweenCollections(collectionID, targetCollectionID, [
             await buildEncryptedFileMoveItem(
+                session,
                 fileID,
                 collectionID,
                 targetCollectionID,
@@ -226,25 +169,15 @@ export const updateItemCollectionsWithDeps = async (
     }
 };
 
-// This helper only rehomes or detaches the collection's files; the caller is
-// responsible for issuing the final collection delete request.
-export const deleteCollectionKeepingFilesWithDeps = async (
+export const deleteCollectionKeepingFiles = async (
     collection: LockerCollection,
-    context: CollectionMutationContext,
+    masterKey: string,
 ): Promise<void> => {
-    const { currentUserID, masterKey, deps } = context;
-    const {
-        getCollectionIDsForFile,
-        getCollectionRecord,
-        ensureUncategorizedCollection,
-        buildEncryptedFileMoveItem,
-        removeFilesFromCollection,
-        moveFilesBetweenCollections,
-    } = deps;
+    const currentUserID = ensureLocalUser().id;
+    const session = await ensureAuthenticatedSession();
     const collectionID = collection.id;
-    const getUncategorizedCollection = createCachedUncategorizedResolver(() =>
-        ensureUncategorizedCollection(masterKey),
-    );
+    const getUncategorizedCollection =
+        createCachedUncategorizedResolver(masterKey);
 
     const fileIDsToRemove: number[] = [];
     const filesToMoveByTargetCollectionID = new Map<
@@ -264,13 +197,13 @@ export const deleteCollectionKeepingFilesWithDeps = async (
             currentUserID,
             sourceCollectionID: collectionID,
             preferredCollectionIDs: getCollectionIDsForFile(item.id),
-            getCollectionRecord,
             getUncategorizedCollection,
         });
         appendMapValue(
             filesToMoveByTargetCollectionID,
             targetCollectionID,
             await buildEncryptedFileMoveItem(
+                session,
                 item.id,
                 collectionID,
                 targetCollectionID,
@@ -287,21 +220,23 @@ export const deleteCollectionKeepingFilesWithDeps = async (
     }
 
     await removeFilesFromCollection(collectionID, fileIDsToRemove);
-};
-
-export const updateItemCollections = async (
-    fileID: number,
-    collectionIDs: number[],
-    masterKey: string,
-): Promise<void> => {
-    await updateItemCollectionsWithDeps(fileID, collectionIDs, {
-        currentUserID: ensureLocalUser().id,
-        masterKey,
-        deps: createCollectionMutationDeps(),
-    });
+    await deleteCollection(collectionID, { keepFiles: true });
 };
 
 export const addFileToCollections = async (
+    fileID: number,
+    fileKey: string,
+    targetCollectionIDs: number[],
+): Promise<void> =>
+    addFileToCollectionsWithSession(
+        await ensureAuthenticatedSession(),
+        fileID,
+        fileKey,
+        targetCollectionIDs,
+    );
+
+const addFileToCollectionsWithSession = async (
+    session: Session,
     fileID: number,
     fileKey: string,
     targetCollectionIDs: number[],
@@ -312,7 +247,10 @@ export const addFileToCollections = async (
             throw new Error(`Collection ${targetCollectionID} not in cache`);
         }
 
-        const collectionKey = await decryptCollectionKey(collectionRecord);
+        const collectionKey = await openCollectionKeyForRecord(
+            session,
+            collectionRecord,
+        );
         const encryptedFileKey = await encryptBox(fileKey, collectionKey);
 
         const res = await fetch(await apiURL("/collections/add-files"), {
@@ -350,6 +288,7 @@ const batchValues = <T>(
 };
 
 const decryptFileKeyForCollection = async (
+    session: Session,
     fileID: number,
     collectionID: number,
 ): Promise<string> => {
@@ -365,7 +304,10 @@ const decryptFileKeyForCollection = async (
         throw new Error(`Collection ${collectionID} not in cache`);
     }
 
-    const collectionKey = await decryptCollectionKey(collectionRecord);
+    const collectionKey = await openCollectionKeyForRecord(
+        session,
+        collectionRecord,
+    );
     return await decryptBox(
         {
             encryptedData: fileRecord.encryptedKey,
@@ -376,16 +318,22 @@ const decryptFileKeyForCollection = async (
 };
 
 const buildEncryptedFileMoveItem = async (
+    session: Session,
     fileID: number,
     fromCollectionID: number,
     toCollectionID: number,
 ): Promise<EncryptedCollectionFileItem> => {
-    const fileKey = await decryptFileKeyForCollection(fileID, fromCollectionID);
+    const fileKey = await decryptFileKeyForCollection(
+        session,
+        fileID,
+        fromCollectionID,
+    );
     const targetCollectionRecord = getCollectionRecord(toCollectionID);
     if (!targetCollectionRecord) {
         throw new Error(`Collection ${toCollectionID} not in cache`);
     }
-    const targetCollectionKey = await decryptCollectionKey(
+    const targetCollectionKey = await openCollectionKeyForRecord(
+        session,
         targetCollectionRecord,
     );
     const encryptedFileKey = await encryptBox(fileKey, targetCollectionKey);
@@ -442,27 +390,4 @@ const moveFilesBetweenCollections = async (
         });
         ensureOk(res);
     }
-};
-
-export const createCollectionMutationDeps = () => ({
-    getCollectionIDsForFile,
-    getCollectionRecord,
-    ensureUncategorizedCollection,
-    decryptFileKeyForCollection,
-    buildEncryptedFileMoveItem,
-    removeFilesFromCollection,
-    moveFilesBetweenCollections,
-    addFileToCollections,
-});
-
-export const deleteCollectionKeepingFiles = async (
-    collection: LockerCollection,
-    masterKey: string,
-): Promise<void> => {
-    await deleteCollectionKeepingFilesWithDeps(collection, {
-        currentUserID: ensureLocalUser().id,
-        masterKey,
-        deps: createCollectionMutationDeps(),
-    });
-    await deleteCollection(collection.id, { keepFiles: true });
 };

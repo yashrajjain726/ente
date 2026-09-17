@@ -11,8 +11,7 @@ import {
 } from "ente-locker-wasm";
 import {
     addFileToCollections,
-    createCollectionMutationDeps,
-    updateItemCollectionsWithDeps,
+    updateItemCollections,
 } from "./collection-membership";
 import {
     ensureFavoritesCollection,
@@ -261,10 +260,6 @@ export const setItemImportant = async (
         return false;
     }
 
-    await updateItemCollectionsWithDeps(fileID, nextCollectionIDs, {
-        currentUserID,
-        masterKey,
-        deps: createCollectionMutationDeps(),
-    });
+    await updateItemCollections(fileID, nextCollectionIDs, masterKey);
     return true;
 };

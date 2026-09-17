@@ -349,7 +349,7 @@ export const decryptCollectionKey = async (
 ): Promise<string> =>
     openCollectionKeyForRecord(await ensureAuthenticatedSession(), record);
 
-const openCollectionKeyForRecord = (
+export const openCollectionKeyForRecord = (
     session: Session,
     record: EncryptedCollectionRecord,
 ) =>
