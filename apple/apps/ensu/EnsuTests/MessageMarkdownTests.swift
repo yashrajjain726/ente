@@ -23,6 +23,8 @@ final class MessageMarkdownTests: XCTestCase {
             ("a $x$\n   b $y$", ["x"], "a  b $y$"),
             ("a $x$\\\nb $y$", ["x"], "a \nb $y$"),
             ("![0]() and $x$", ["x"], "0 and "),
+            ("<b>$x$</b> t", ["x"], "<b></b> t"),
+            ("Use <v> here.", [], "Use <v> here."),
         ]
         for (source, math, text) in cases {
             let inline = paragraph(source)

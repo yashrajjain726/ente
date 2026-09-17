@@ -371,6 +371,10 @@ struct MarkdownParser {
             return InlineContent(segments: [
                 .text(AttributedString(text.string, attributes: attributes))
             ])
+        case let html as InlineHTML:
+            return InlineContent(segments: [
+                .text(AttributedString(html.rawHTML, attributes: attributes))
+            ])
         case is SoftBreak:
             return InlineContent(segments: [.text(AttributedString(" ", attributes: attributes))])
         case is LineBreak:
