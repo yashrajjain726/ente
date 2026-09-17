@@ -155,14 +155,6 @@ pub struct CreatedSpace {
 
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-pub struct CreatedSpaceLink {
-    space_id: String,
-    space_slug: String,
-    access_key: String,
-}
-
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
 pub struct DecryptedSpaceProfile {
     space_id: String,
     space_slug: String,
@@ -984,36 +976,6 @@ pub struct SpaceAccountCtxHandle {
 
 #[wasm_bindgen]
 impl SpaceAccountCtxHandle {
-    #[wasm_bindgen(js_name = getOrCreateSpaceLink)]
-    pub async fn get_or_create_space_link(
-        &self,
-        space_id: String,
-    ) -> Result<<CreatedSpaceLink as Tsify>::JsType, Error> {
-        let value = self.inner.get_or_create_space_link(&space_id).await?;
-        CreatedSpaceLink {
-            space_id: value.space_id,
-            space_slug: value.space_slug,
-            access_key: value.access_key,
-        }
-        .into_js()
-        .map_err(Into::into)
-    }
-
-    #[wasm_bindgen(js_name = rotateSpaceLink)]
-    pub async fn rotate_space_link(
-        &self,
-        space_id: String,
-    ) -> Result<<CreatedSpaceLink as Tsify>::JsType, Error> {
-        let value = self.inner.rotate_space_link(&space_id).await?;
-        CreatedSpaceLink {
-            space_id: value.space_id,
-            space_slug: value.space_slug,
-            access_key: value.access_key,
-        }
-        .into_js()
-        .map_err(Into::into)
-    }
-
     #[wasm_bindgen(js_name = createSpace)]
     pub async fn create_space(
         &self,

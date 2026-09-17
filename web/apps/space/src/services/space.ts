@@ -613,14 +613,6 @@ const withCurrentSpaceContext = async <T>(
     }
 };
 
-export const getOrCreateCurrentSpaceLink = () =>
-    withCurrentSpaceContext((ctx, spaceId) =>
-        ctx.getOrCreateSpaceLink(spaceId),
-    );
-
-export const rotateCurrentSpaceLink = () =>
-    withCurrentSpaceContext((ctx, spaceId) => ctx.rotateSpaceLink(spaceId));
-
 const messageQuoteFromPostResponse = async (
     ctx: SpaceAccountCtxHandle,
     post: PostResponse,
