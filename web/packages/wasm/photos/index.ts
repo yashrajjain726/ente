@@ -68,7 +68,7 @@ export const prepareCastPayload = async (
     collectionID: number,
     collectionKey: string,
 ) =>
-    (await wasm()).preparePayload(
+    (await wasm()).castPreparePayload(
         publicKey,
         pqPublicKey,
         BigInt(collectionID),

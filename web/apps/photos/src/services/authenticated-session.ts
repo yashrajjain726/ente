@@ -10,7 +10,7 @@ const sessions = createAuthenticatedSessionCache((input): Promise<Session> => {
     const opening = openSession(input);
     bindCollectionKeyOpener(async (input) =>
         openCollectionKey(
-            await (sessions.current() ?? sessions.ensure()),
+            await sessions.ensure(),
             input.ownerID,
             input.encryptedKey,
             input.keyDecryptionNonce,

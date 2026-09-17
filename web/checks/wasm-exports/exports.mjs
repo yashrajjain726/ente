@@ -205,6 +205,15 @@ export function unusedExports(files, projects, rustOrigins = new Map()) {
                         ts.isPropertyAccessExpression(node.parent))
                 ) {
                     reference(checker.getSymbolAtLocation(node));
+                    const expected = checker.getContextualType(node);
+                    for (const property of expected?.getProperties() ?? []) {
+                        reference(
+                            checker.getPropertyOfType(
+                                checker.getTypeAtLocation(node),
+                                property.name,
+                            ),
+                        );
+                    }
                 } else if (
                     ts.isElementAccessExpression(node) &&
                     ts.isStringLiteral(node.argumentExpression)

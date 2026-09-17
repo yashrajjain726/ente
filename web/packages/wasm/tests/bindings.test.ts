@@ -1,6 +1,6 @@
 import * as cast from "ente-cast-wasm";
 import * as locker from "ente-locker-wasm";
-import { createLegacyService } from "ente-locker-wasm/legacy";
+import * as legacy from "ente-locker-wasm/legacy";
 import * as photos from "ente-photos-wasm";
 import {
     boxSealOpenBytes,
@@ -243,27 +243,26 @@ describe("Locker Legacy", () => {
             ...(await sessionKeyAttributes(masterKey)),
         });
         try {
-            const legacy = createLegacyService(async () => session);
-            expect(await legacy.getInfo()).toStrictEqual(info);
+            expect(await legacy.getInfo(session)).toStrictEqual(info);
             session.updateAuthToken("rotated-token");
-            await legacy.updateContact(42, 43, "CONTACT_LEFT");
+            await legacy.updateContact(session, 42, 43, "CONTACT_LEFT");
             expect(updateBody).toStrictEqual({
                 userID: 42,
                 emergencyContactID: 43,
                 state: "CONTACT_LEFT",
             });
             await expect(
-                legacy.updateRecoveryNotice(43, 30),
+                legacy.updateRecoveryNotice(session, 43, 30),
             ).rejects.toMatchObject({ name: "active_recovery_session" });
             recoveryErrorBody = {
                 code: "BAD_REQUEST",
                 message: "Cannot update during an active recovery session",
             };
             await expect(
-                legacy.updateRecoveryNotice(43, 30),
+                legacy.updateRecoveryNotice(session, 43, 30),
             ).rejects.not.toMatchObject({ name: "active_recovery_session" });
             recovery.createdAt = Number.MAX_SAFE_INTEGER + 1;
-            await expect(legacy.getInfo()).rejects.toBeInstanceOf(Error);
+            await expect(legacy.getInfo(session)).rejects.toBeInstanceOf(Error);
         } finally {
             session.free();
         }
@@ -303,8 +302,7 @@ describe("Locker Legacy", () => {
             ...(await sessionKeyAttributes(masterKey, recoveryKey)),
         });
         try {
-            const legacy = createLegacyService(async () => session);
-            await legacy.addContact("friend@example.com", 30);
+            await legacy.addContact(session, "friend@example.com", 30);
             expect(sharedRecoveryKey).toStrictEqual(
                 new Uint8Array(Buffer.from(recoveryKey, "base64")),
             );

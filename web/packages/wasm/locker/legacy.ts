@@ -2,82 +2,84 @@ import type { LegacyContactState, Session } from "./pkg/ente_locker_wasm";
 
 const wasm = () => import("./pkg/ente_locker_wasm");
 
-export const createLegacyService = (getSession: () => Promise<Session>) => ({
-    getInfo: async () => (await wasm()).legacyGetInfo(await getSession()),
+export const getInfo = async (session: Session) =>
+    (await wasm()).legacyGetInfo(session);
 
-    publicKey: async (email: string) =>
-        (await wasm()).legacyPublicKey(await getSession(), email),
+export const publicKey = async (session: Session, email: string) =>
+    (await wasm()).legacyPublicKey(session, email);
 
-    verificationID: async (email: string) => {
-        const api = await wasm();
-        const key = await api.legacyPublicKey(await getSession(), email);
-        return key ? api.legacyVerificationID(key) : undefined;
-    },
+export const verificationID = async (publicKeyB64: string) =>
+    (await wasm()).legacyVerificationID(publicKeyB64);
 
-    addContact: async (email: string, recoveryNoticeInDays?: number) =>
-        (await wasm()).legacyAddContact(
-            await getSession(),
-            email,
-            recoveryNoticeInDays,
-        ),
+export const addContact = async (
+    session: Session,
+    email: string,
+    recoveryNoticeInDays?: number,
+) => (await wasm()).legacyAddContact(session, email, recoveryNoticeInDays);
 
-    updateContact: async (
-        userID: number,
-        emergencyContactID: number,
-        state: LegacyContactState,
-    ) =>
-        (await wasm()).legacyUpdateContact(
-            await getSession(),
-            BigInt(userID),
-            BigInt(emergencyContactID),
-            state,
-        ),
+export const updateContact = async (
+    session: Session,
+    userID: number,
+    emergencyContactID: number,
+    state: LegacyContactState,
+) =>
+    (await wasm()).legacyUpdateContact(
+        session,
+        BigInt(userID),
+        BigInt(emergencyContactID),
+        state,
+    );
 
-    updateRecoveryNotice: async (
-        emergencyContactID: number,
-        recoveryNoticeInDays: number,
-    ) =>
-        (await wasm()).legacyUpdateRecoveryNotice(
-            await getSession(),
-            BigInt(emergencyContactID),
-            recoveryNoticeInDays,
-        ),
+export const updateRecoveryNotice = async (
+    session: Session,
+    emergencyContactID: number,
+    recoveryNoticeInDays: number,
+) =>
+    (await wasm()).legacyUpdateRecoveryNotice(
+        session,
+        BigInt(emergencyContactID),
+        recoveryNoticeInDays,
+    );
 
-    startRecovery: async (userID: number, emergencyContactID: number) =>
-        (await wasm()).legacyStartRecovery(
-            await getSession(),
-            BigInt(userID),
-            BigInt(emergencyContactID),
-        ),
+export const startRecovery = async (
+    session: Session,
+    userID: number,
+    emergencyContactID: number,
+) =>
+    (await wasm()).legacyStartRecovery(
+        session,
+        BigInt(userID),
+        BigInt(emergencyContactID),
+    );
 
-    stopRecovery: async (
-        recoveryID: string,
-        userID: number,
-        emergencyContactID: number,
-    ) =>
-        (await wasm()).legacyStopRecovery(
-            await getSession(),
-            recoveryID,
-            BigInt(userID),
-            BigInt(emergencyContactID),
-        ),
+export const stopRecovery = async (
+    session: Session,
+    recoveryID: string,
+    userID: number,
+    emergencyContactID: number,
+) =>
+    (await wasm()).legacyStopRecovery(
+        session,
+        recoveryID,
+        BigInt(userID),
+        BigInt(emergencyContactID),
+    );
 
-    rejectRecovery: async (
-        recoveryID: string,
-        userID: number,
-        emergencyContactID: number,
-    ) =>
-        (await wasm()).legacyRejectRecovery(
-            await getSession(),
-            recoveryID,
-            BigInt(userID),
-            BigInt(emergencyContactID),
-        ),
+export const rejectRecovery = async (
+    session: Session,
+    recoveryID: string,
+    userID: number,
+    emergencyContactID: number,
+) =>
+    (await wasm()).legacyRejectRecovery(
+        session,
+        recoveryID,
+        BigInt(userID),
+        BigInt(emergencyContactID),
+    );
 
-    changePassword: async (recoveryID: string, newPassword: string) =>
-        (await wasm()).legacyChangePassword(
-            await getSession(),
-            recoveryID,
-            newPassword,
-        ),
-});
+export const changePassword = async (
+    session: Session,
+    recoveryID: string,
+    newPassword: string,
+) => (await wasm()).legacyChangePassword(session, recoveryID, newPassword);

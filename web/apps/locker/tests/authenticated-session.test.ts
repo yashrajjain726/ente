@@ -58,7 +58,7 @@ beforeEach(async () => {
     sessions = await import("../src/services/authenticated-session");
 });
 
-test("Legacy reuses the Locker session and refreshes its token", async () => {
+test("reuses the session without decrypting the master key and refreshes its token", async () => {
     const locker = mockSession();
     openLocker.mockResolvedValue(locker);
 
@@ -67,15 +67,14 @@ test("Legacy reuses the Locker session and refreshes its token", async () => {
     );
     expect(await sessions.ensureAuthenticatedSession()).toBe(locker);
     expect(masterKeyFromSession).not.toHaveBeenCalled();
-    expect(await sessions.authenticatedSession()).toBe(locker);
     savedAuthToken.mockResolvedValue("rotated-token");
-    expect(await sessions.authenticatedSession()).toBe(locker);
+    expect(await sessions.ensureAuthenticatedSession()).toBe(locker);
     expect(locker.updateAuthToken).toHaveBeenLastCalledWith("rotated-token");
     expect(openLocker).toHaveBeenCalledOnce();
 
     sessions.clearAuthenticatedSession();
     expect(locker.free).not.toHaveBeenCalled();
-    await sessions.authenticatedSession();
+    await sessions.ensureAuthenticatedSession();
     expect(openLocker).toHaveBeenCalledTimes(2);
 });
 
@@ -94,13 +93,32 @@ test("retries a failed Locker session", async () => {
 
 test("logout during credential lookup cannot reopen a session", async () => {
     const key = Promise.withResolvers<string>();
-    masterKeyFromSession.mockReturnValue(key.promise);
-    const opening = sessions.authenticatedSession();
+    const started = Promise.withResolvers<undefined>();
+    masterKeyFromSession.mockImplementation(() => {
+        started.resolve(undefined);
+        return key.promise;
+    });
+    const opening = sessions.ensureAuthenticatedSession();
+    await started.promise;
     sessions.clearAuthenticatedSession();
     key.resolve("key");
 
     await expect(opening).rejects.toThrow("Authenticated session was cleared");
     expect(openLocker).not.toHaveBeenCalled();
+});
+
+test("concurrent access decrypts the master key once", async () => {
+    const locker = mockSession();
+    openLocker.mockResolvedValue(locker);
+    expect(
+        await Promise.all([
+            sessions.ensureAuthenticatedSession(),
+            sessions.ensureAuthenticatedSession(),
+        ]),
+    ).toEqual([locker, locker]);
+    expect(await sessions.ensureAuthenticatedSession()).toBe(locker);
+    expect(masterKeyFromSession).toHaveBeenCalledOnce();
+    expect(openLocker).toHaveBeenCalledOnce();
 });
 
 test("logout during WASM initialization frees the unused handle and permits a new session", async () => {
@@ -114,15 +132,15 @@ test("logout during WASM initialization frees the unused handle and permits a ne
             return ready.promise;
         })
         .mockResolvedValueOnce(next);
-    const opening = sessions.authenticatedSession();
+    const opening = sessions.ensureAuthenticatedSession();
     await started.promise;
     sessions.clearAuthenticatedSession();
-    expect(await sessions.authenticatedSession()).toBe(next);
+    expect(await sessions.ensureAuthenticatedSession()).toBe(next);
     ready.resolve(previous);
 
     await expect(opening).rejects.toThrow("Authenticated session was cleared");
     expect(previous.free).toHaveBeenCalledOnce();
-    expect(await sessions.authenticatedSession()).toBe(next);
+    expect(await sessions.ensureAuthenticatedSession()).toBe(next);
     expect(next.free).not.toHaveBeenCalled();
     expect(openLocker).toHaveBeenCalledTimes(2);
 });
@@ -134,15 +152,15 @@ test("failed opens can be retried and account changes replace the cached session
         .mockRejectedValueOnce(new Error("Download failed"))
         .mockResolvedValueOnce(previous)
         .mockResolvedValueOnce(next);
-    await expect(sessions.authenticatedSession()).rejects.toThrow(
+    await expect(sessions.ensureAuthenticatedSession()).rejects.toThrow(
         "Download failed",
     );
-    expect(await sessions.authenticatedSession()).toBe(previous);
+    expect(await sessions.ensureAuthenticatedSession()).toBe(previous);
 
     user.id = 2;
     savedAuthToken.mockResolvedValue("other-token");
     masterKeyFromSession.mockResolvedValue("other-key");
-    expect(await sessions.authenticatedSession()).toBe(next);
+    expect(await sessions.ensureAuthenticatedSession()).toBe(next);
     expect(openLocker).toHaveBeenLastCalledWith({
         baseUrl: "http://localhost:8080",
         authToken: "other-token",

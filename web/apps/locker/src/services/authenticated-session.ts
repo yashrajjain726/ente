@@ -8,7 +8,5 @@ const sessions = createAuthenticatedSessionCache(
 );
 
 export const openAuthenticatedSession = sessions.open;
-export const ensureAuthenticatedSession = () =>
-    sessions.current() ?? sessions.ensure();
-export const authenticatedSession = sessions.ensure;
+export const ensureAuthenticatedSession = sessions.ensure;
 export const clearAuthenticatedSession = sessions.clear;

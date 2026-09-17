@@ -3,7 +3,7 @@ export { mergeLegacySuggestedUsers } from "./suggestions";
 export type {
     LegacyContactRecord,
     LegacyInfo,
+    LegacyOperations,
     LegacyRecoverySession,
-    LegacyService,
     LegacySuggestedUser,
 } from "./types";

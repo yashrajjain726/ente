@@ -28,7 +28,7 @@ export const createAuthenticatedSessionCache = <T extends Session>(
     const open = async (
         userID: number,
         authToken: string,
-        masterKeyB64: string,
+        masterKeyB64?: string,
     ) => {
         const startedGeneration = generation;
         const baseUrl = await apiOrigin();
@@ -37,15 +37,24 @@ export const createAuthenticatedSessionCache = <T extends Session>(
         }
         const key = `${baseUrl}:${userID}`;
         if (current?.key !== key) {
-            const opening = openSession({
-                baseUrl,
-                authToken,
-                userID,
-                masterKeyB64,
-                keyAttributes: ensureSavedKeyAttributes(),
-                clientPackage: clientPackageName,
-                clientVersion: isDesktop ? desktopAppVersion : undefined,
-            })
+            const opening = (async () => {
+                const keyAttributes = ensureSavedKeyAttributes();
+                const masterKey =
+                    masterKeyB64 ?? (await masterKeyFromSession());
+                if (startedGeneration !== generation) {
+                    throw new Error("Authenticated session was cleared");
+                }
+                if (!masterKey) throw new Error("Missing current master key");
+                return openSession({
+                    baseUrl,
+                    authToken,
+                    userID,
+                    masterKeyB64: masterKey,
+                    keyAttributes,
+                    clientPackage: clientPackageName,
+                    clientVersion: isDesktop ? desktopAppVersion : undefined,
+                });
+            })()
                 .then((session) => {
                     if (current?.opening !== opening) {
                         session.free();
@@ -72,20 +81,15 @@ export const createAuthenticatedSessionCache = <T extends Session>(
     const ensure = async () => {
         const startedGeneration = generation;
         const userID = ensureLocalUser().id;
-        const [authToken, masterKeyB64] = await Promise.all([
-            savedAuthToken(),
-            masterKeyFromSession(),
-        ]);
+        const authToken = await savedAuthToken();
         if (startedGeneration !== generation) {
             throw new Error("Authenticated session was cleared");
         }
-        if (!masterKeyB64) throw new Error("Missing current master key");
         if (!authToken) throw new Error("Missing auth token");
-        return open(userID, authToken, masterKeyB64);
+        return open(userID, authToken);
     };
 
     return {
-        current: () => current?.opening,
         open,
         ensure,
         clear: () => {

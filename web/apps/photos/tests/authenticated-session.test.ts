@@ -100,6 +100,9 @@ test("concurrent opens share a session and retain the latest token", async () =>
     );
     expect(openSession).toHaveBeenCalledTimes(1);
 
+    expect(await sessions.ensureAuthenticatedSession()).toBe(session);
+    expect(masterKeyFromSession).not.toHaveBeenCalled();
+
     sessions.clearAuthenticatedSession();
     sessions.clearAuthenticatedSession();
     expect(session.free).not.toHaveBeenCalled();

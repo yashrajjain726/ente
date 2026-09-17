@@ -2813,13 +2813,7 @@ dependencies = [
 name = "ente-photos-wasm"
 version = "0.0.0"
 dependencies = [
- "ente-cast",
  "ente-wasm-lib",
- "serde",
- "serde-wasm-bindgen",
- "thiserror 2.0.18",
- "tsify",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2932,6 +2926,7 @@ name = "ente-wasm-lib"
 version = "0.0.0"
 dependencies = [
  "ente-accounts",
+ "ente-cast",
  "ente-collections",
  "ente-contacts",
  "ente-core",
