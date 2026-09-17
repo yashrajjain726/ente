@@ -2,7 +2,8 @@ import Foundation
 
 enum ChatMessageTagRegex {
     static let think = try? NSRegularExpression(pattern: "<think>([\\s\\S]*?)</think>", options: [])
-    static let todoList = try? NSRegularExpression(pattern: "<todo_list>([\\s\\S]*?)</todo_list>", options: [])
+    static let todoList = try? NSRegularExpression(
+        pattern: "<todo_list>([\\s\\S]*?)</todo_list>", options: [])
 }
 
 struct ChatAttachment: Identifiable, Equatable {
@@ -18,7 +19,10 @@ struct ChatAttachment: Identifiable, Equatable {
     let url: URL?
     var isUploading: Bool
 
-    init(id: UUID = UUID(), name: String, size: Int64, kind: Kind, url: URL? = nil, isUploading: Bool = false) {
+    init(
+        id: UUID = UUID(), name: String, size: Int64, kind: Kind, url: URL? = nil,
+        isUploading: Bool = false
+    ) {
         self.id = id
         self.name = name
         self.size = size

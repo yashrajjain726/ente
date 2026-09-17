@@ -161,7 +161,8 @@ struct MessageListView: View {
 
     @ViewBuilder
     private func messageListContent(containerHeight: CGFloat) -> some View {
-        let emptyStateMinHeight = max(0, containerHeight - contentBottomPadding - (EnsuSpacing.lg * 2))
+        let emptyStateMinHeight = max(
+            0, containerHeight - contentBottomPadding - (EnsuSpacing.lg * 2))
 
         VStack(alignment: .leading, spacing: 0) {
             LazyVStack(alignment: .leading, spacing: EnsuSpacing.lg) {
@@ -236,7 +237,9 @@ struct MessageListView: View {
                 .background(
                     GeometryReader { geo in
                         Color.clear
-                            .preference(key: BottomOffsetKey.self, value: geo.frame(in: .named("scroll")).maxY)
+                            .preference(
+                                key: BottomOffsetKey.self,
+                                value: geo.frame(in: .named("scroll")).maxY)
                     }
                 )
         }
@@ -304,7 +307,9 @@ struct MessageListView: View {
         }
     }
 
-    private func scrollToBottom(_ proxy: ScrollViewProxy, force: Bool = false, animated: Bool = true) {
+    private func scrollToBottom(
+        _ proxy: ScrollViewProxy, force: Bool = false, animated: Bool = true
+    ) {
         guard force || (autoScrollEnabled && isAtBottom) else { return }
         if animated {
             withAnimation(.easeOut(duration: 0.2)) {
@@ -317,8 +322,9 @@ struct MessageListView: View {
 
     private func performStreamingStartHapticIfNeeded() {
         guard isGenerating,
-              !didPerformStreamingStartHaptic,
-              hasVisibleStreamingContent(streamingResponse) else {
+            !didPerformStreamingStartHaptic,
+            hasVisibleStreamingContent(streamingResponse)
+        else {
             return
         }
         hapticTap()
@@ -361,8 +367,8 @@ struct MessageListView: View {
         let textWithoutUnclosedThink = removingUnclosedStreamingTag("think", from: text)
         let visibleText = removingUnclosedStreamingTag("todo_list", from: textWithoutUnclosedThink)
         let parsed = ParsedMessage(text: visibleText)
-        return !parsed.todoBlocks.isEmpty ||
-            !parsed.markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return !parsed.todoBlocks.isEmpty
+            || !parsed.markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func removingUnclosedStreamingTag(_ tag: String, from text: String) -> String {
@@ -373,7 +379,10 @@ struct MessageListView: View {
 
         while let openRange = text.range(of: openingTag, range: cursor..<text.endIndex) {
             result.append(contentsOf: text[cursor..<openRange.lowerBound])
-            guard let closeRange = text.range(of: closingTag, range: openRange.upperBound..<text.endIndex) else {
+            guard
+                let closeRange = text.range(
+                    of: closingTag, range: openRange.upperBound..<text.endIndex)
+            else {
                 return result
             }
             result.append(contentsOf: text[openRange.lowerBound..<closeRange.upperBound])

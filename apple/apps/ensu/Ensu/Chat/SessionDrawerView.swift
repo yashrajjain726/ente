@@ -160,7 +160,9 @@ struct SessionDrawerView: View {
         .contentShape(Rectangle())
     }
 
-    private func drawerPrimaryTile(icon: String, title: String, action: @escaping () -> Void, expands: Bool = true) -> some View {
+    private func drawerPrimaryTile(
+        icon: String, title: String, action: @escaping () -> Void, expands: Bool = true
+    ) -> some View {
         Button(action: {
             hapticTap()
             action()
@@ -204,7 +206,8 @@ struct SessionDrawerView: View {
         let order = ["TODAY", "YESTERDAY", "THIS WEEK", "LAST WEEK", "THIS MONTH", "OLDER"]
         return order.compactMap { title in
             guard let items = grouped[title], !items.isEmpty else { return nil }
-            return SessionSection(title: title, sessions: items.sorted { $0.updatedAt > $1.updatedAt })
+            return SessionSection(
+                title: title, sessions: items.sorted { $0.updatedAt > $1.updatedAt })
         }
     }
 
@@ -215,7 +218,9 @@ struct SessionDrawerView: View {
         if calendar.isDate(date, equalTo: Date(), toGranularity: .weekOfYear) { return "THIS WEEK" }
 
         let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: Date()) ?? Date()
-        if calendar.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear) { return "LAST WEEK" }
+        if calendar.isDate(date, equalTo: lastWeek, toGranularity: .weekOfYear) {
+            return "LAST WEEK"
+        }
         if calendar.isDate(date, equalTo: Date(), toGranularity: .month) { return "THIS MONTH" }
         return "OLDER"
     }

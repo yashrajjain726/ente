@@ -28,10 +28,11 @@ actor KnowledgeProvider {
             let asset = try knowledgePackAsset(stableId: dataset.stableId)
             task = Task.detached(priority: .utility) {
                 try await assetStore.download(assets: [asset]) {
-                    onProgress(KnowledgeDownloadProgress(
-                        label: $0.label,
-                        percentage: $0.percentage
-                    ))
+                    onProgress(
+                        KnowledgeDownloadProgress(
+                            label: $0.label,
+                            percentage: $0.percentage
+                        ))
                 }
             }
         }
@@ -132,7 +133,8 @@ actor KnowledgeProvider {
     ) async -> [KnowledgeSearchHit] {
         do {
             return try await withIndexGate {
-                let selected = datasets.compactMap { dataset -> (KnowledgeDatasetConfig, RetrievalIndex)? in
+                let selected = datasets.compactMap {
+                    dataset -> (KnowledgeDatasetConfig, RetrievalIndex)? in
                     guard let index = indexes[dataset.stableId]?.index else { return nil }
                     return (dataset, index)
                 }
@@ -151,11 +153,13 @@ actor KnowledgeProvider {
                             continue
                         }
                         if Task.isCancelled { return [] }
-                        merged.append(contentsOf: hits.map {
-                            KnowledgeSearchHit(dataset: dataset, hit: $0)
-                        })
+                        merged.append(
+                            contentsOf: hits.map {
+                                KnowledgeSearchHit(dataset: dataset, hit: $0)
+                            })
                     }
-                    return merged
+                    return
+                        merged
                         .sorted { $0.hit.score > $1.hit.score }
                         .prefix(Int(maxHits))
                         .map { $0 }

@@ -252,8 +252,11 @@ struct ImageAttachmentThumbnail: View {
             thumbnailContent(loadedImage)
                 .frame(width: size.width, height: size.height)
                 .background(EnsuColor.fillFaint)
-                .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous))
+                .clipShape(
+                    RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous)
+                )
+                .contentShape(
+                    RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous))
 
             if isUploading {
                 RoundedRectangle(cornerRadius: EnsuCornerRadius.card, style: .continuous)
@@ -307,12 +310,14 @@ struct ImageAttachmentThumbnail: View {
             return CGSize(width: width, height: height)
         }
         if loadedImage.pixelHeight > loadedImage.pixelWidth,
-           let portraitWidth,
-           let portraitHeight {
+            let portraitWidth,
+            let portraitHeight
+        {
             return CGSize(width: portraitWidth, height: portraitHeight)
         }
         if loadedImage.pixelHeight == loadedImage.pixelWidth,
-           let squareSize {
+            let squareSize
+        {
             return CGSize(width: squareSize, height: squareSize)
         }
         return CGSize(width: width, height: height)
