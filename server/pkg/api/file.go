@@ -22,6 +22,7 @@ import (
 	"github.com/ente/museum/pkg/controller"
 	"github.com/ente/museum/pkg/utils/auth"
 	"github.com/ente/museum/pkg/utils/handler"
+	"github.com/ente/museum/pkg/utils/network"
 	"github.com/ente/museum/pkg/utils/time"
 	"github.com/gin-gonic/gin"
 )
@@ -135,7 +136,7 @@ func (h *FileHandler) GetUploadURLs(c *gin.Context) {
 
 	userID := auth.GetUserID(c.Request.Header)
 	count, _ := strconv.Atoi(c.Query("count"))
-	urls, err := h.Controller.GetUploadURLs(c, userID, count, enteApp, false)
+	urls, err := h.Controller.GetUploadURLs(c, userID, count, enteApp, false, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -163,7 +164,7 @@ func (h *FileHandler) GetUploadURLV2(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
-	url, err := h.Controller.GetUploadURLWithMetadata(c, userID, req, enteApp)
+	url, err := h.Controller.GetUploadURLWithMetadata(c, userID, req, enteApp, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -176,7 +177,7 @@ func (h *FileHandler) GetMultipartUploadURLs(c *gin.Context) {
 
 	userID := auth.GetUserID(c.Request.Header)
 	count, _ := strconv.Atoi(c.Query("count"))
-	urls, err := h.Controller.GetMultipartUploadURLs(c, userID, count, enteApp)
+	urls, err := h.Controller.GetMultipartUploadURLs(c, userID, count, enteApp, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -194,7 +195,7 @@ func (h *FileHandler) GetMultipartUploadURLV2(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
-	upload, err := h.Controller.GetMultipartUploadURLWithMetadata(c, userID, req, enteApp)
+	upload, err := h.Controller.GetMultipartUploadURLWithMetadata(c, userID, req, enteApp, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return

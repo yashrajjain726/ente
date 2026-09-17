@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/ente/museum/pkg/utils/network"
 	"github.com/ente/museum/space/models"
 	spacerepo "github.com/ente/museum/space/repo"
 	"github.com/gin-gonic/gin"
@@ -11,7 +12,7 @@ func (h *Handlers) PresignUpload(c *gin.Context, space *spacerepo.SpaceRecord) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	resp, err := h.Module.Assets.PresignUpload(c, space, req)
+	resp, err := h.Module.Assets.PresignUpload(c, space, req, network.GetClientInfo(c))
 	respondJSON(c, resp, err)
 }
 

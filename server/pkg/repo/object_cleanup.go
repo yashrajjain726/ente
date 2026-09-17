@@ -22,14 +22,13 @@ type ObjectCleanupRepository struct {
 }
 
 func (repo *ObjectCleanupRepository) AddTempObject(tempObject ente.TempObject, expirationTime int64) error {
-	var err error
-	if tempObject.IsMultipart {
-		_, err = repo.DB.Exec(`INSERT INTO temp_objects(object_key, expiration_time,upload_id,is_multipart, bucket_id)
-		VALUES($1, $2, $3, $4, $5)`, tempObject.ObjectKey, expirationTime, tempObject.UploadID, tempObject.IsMultipart, tempObject.BucketId)
-	} else {
-		_, err = repo.DB.Exec(`INSERT INTO temp_objects(object_key, expiration_time, bucket_id)
-		VALUES($1, $2, $3)`, tempObject.ObjectKey, expirationTime, tempObject.BucketId)
-	}
+	_, err := repo.DB.Exec(`
+		INSERT INTO temp_objects (
+		    object_key, expiration_time, upload_id, is_multipart, bucket_id,
+		    user_id, app, purpose, content_length, content_md5, client
+		) VALUES ($1, $2, NULLIF($3, ''), $4, $5, NULLIF($6::BIGINT, 0), NULLIF($7, ''), NULLIF($8, ''), $9, $10, NULLIF($11, ''))`,
+		tempObject.ObjectKey, expirationTime, tempObject.UploadID, tempObject.IsMultipart, tempObject.BucketId,
+		tempObject.UserID, tempObject.App, tempObject.Purpose, tempObject.ContentLength, tempObject.ContentMD5, tempObject.Client)
 	return stacktrace.Propagate(err, "")
 }
 
