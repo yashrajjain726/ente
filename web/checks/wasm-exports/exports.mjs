@@ -206,8 +206,8 @@ export function unusedExports(files, projects, rustOrigins = new Map()) {
                 ) {
                     reference(checker.getSymbolAtLocation(node));
                     const context = checker.getContextualType(node);
-                    if (context) {
-                        const type = checker.getTypeAtLocation(node);
+                    const type = checker.getTypeAtLocation(node);
+                    if (context && type.symbol?.flags & ts.SymbolFlags.Module) {
                         for (const property of context.getProperties()) {
                             reference(type.getProperty(property.name));
                         }
