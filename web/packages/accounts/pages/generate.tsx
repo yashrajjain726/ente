@@ -1,10 +1,7 @@
 import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
 import { RecoveryKeyForm } from "ente-accounts/components/auth/RecoveryKeyForm";
 import { SetPasswordForm } from "ente-accounts/components/auth/SetPasswordForm";
-import {
-    RecoveryKeyContents,
-    type RecoveryKeyPresentationProps,
-} from "ente-accounts/components/RecoveryKey";
+import { RecoveryKeyContents } from "ente-accounts/components/RecoveryKey";
 import {
     savedJustSignedUp,
     savedOriginalKeyAttributes,
@@ -35,11 +32,10 @@ import { useCallback, useEffect, useState } from "react";
 import {
     NewPasswordForm,
     type NewPasswordFormProps,
-    type NewPasswordPresentationProps,
 } from "../components/NewPasswordForm";
 
 const Page: React.FC = () => {
-    const { recoveryKeyCloseDestination } = useAuthPageConfig();
+    const { Shell, recoveryKeyCloseDestination } = useAuthPageConfig();
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState("");
@@ -98,49 +94,31 @@ const Page: React.FC = () => {
 
     if (openRecoveryKey) {
         return (
-            <RecoveryKeyContents
-                open
-                onClose={handleRecoveryKeyClose}
-                getRecoveryKeyMnemonic={getPreloginRecoveryKeyMnemonic}
-                showMiniDialog={showMiniDialog}
-                presentation={ConfiguredRecoveryKeyPresentation}
-            />
+            <Shell key="recovery-key">
+                <RecoveryKeyContents
+                    open
+                    onClose={handleRecoveryKeyClose}
+                    getRecoveryKeyMnemonic={getPreloginRecoveryKeyMnemonic}
+                    showMiniDialog={showMiniDialog}
+                    presentation={RecoveryKeyForm}
+                />
+            </Shell>
         );
     }
 
     return userEmail ? (
-        <NewPasswordForm
-            userEmail={userEmail}
-            submitButtonTitle={t("set_password")}
-            onSubmit={handleSubmit}
-            onBack={logout}
-            presentation={ConfiguredPasswordPresentation}
-        />
+        <Shell>
+            <NewPasswordForm
+                userEmail={userEmail}
+                submitButtonTitle={t("set_password")}
+                onSubmit={handleSubmit}
+                onBack={logout}
+                presentation={SetPasswordForm}
+            />
+        </Shell>
     ) : (
         <LoadingIndicator />
     );
 };
 
 export default Page;
-
-function ConfiguredPasswordPresentation(
-    props: NewPasswordPresentationProps,
-): React.JSX.Element {
-    const { Shell } = useAuthPageConfig();
-    return (
-        <Shell>
-            <SetPasswordForm {...props} />
-        </Shell>
-    );
-}
-
-function ConfiguredRecoveryKeyPresentation(
-    props: RecoveryKeyPresentationProps,
-): React.JSX.Element {
-    const { Shell } = useAuthPageConfig();
-    return (
-        <Shell>
-            <RecoveryKeyForm {...props} />
-        </Shell>
-    );
-}
