@@ -182,9 +182,7 @@ class _AlbumsItemWidgetState extends State<AlbumsItemWidget> {
       selectedFiles,
       removingOthersFile,
       isHidden: collection.isHidden(),
-      body: removingOthersFile
-          ? null
-          : context.strings.itemWillBeRemovedFromThisFolder,
+      body: context.strings.itemWillBeRemovedFromThisFolder,
     );
     if (mounted) setState(() {});
   }
