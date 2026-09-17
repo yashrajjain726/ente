@@ -1,1 +1,1 @@
-- Import all Google Authenticator QR batches in one session.
+- Import multi-QR Google Authenticator exports in a single session.
