@@ -7,6 +7,7 @@ struct PendingWhatsNew: Identifiable {
     var id: Int { version }
 }
 
+@MainActor
 final class WhatsNewService {
     static let shared = WhatsNewService()
 

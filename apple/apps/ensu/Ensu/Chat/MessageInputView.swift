@@ -303,9 +303,7 @@ struct MessageInputView: View {
     .padding(.top, EnsuSpacing.sm)
 }
 
-    private var attachmentIconSize: CGFloat {
-        return 16
-    }
+    private let attachmentIconSize: CGFloat = 16
 
     private var keyboardDismissIconName: String {
         UIImage(systemName: "keyboard.chevron.compact.down") != nil
@@ -403,7 +401,7 @@ struct MessageInputView: View {
 }
 
 struct InputBarHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
@@ -455,6 +453,7 @@ private struct CursorEndSynchronizer: UIViewRepresentable {
     }
 }
 
+@MainActor
 private protocol CursorEndTextInput: AnyObject {
     var cursorText: String { get }
     var isFirstResponder: Bool { get }

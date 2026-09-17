@@ -265,7 +265,7 @@ final class VoiceTranscriptionService {
         downloadId: UUID,
         onState: @escaping StateHandler
     ) async throws {
-        let assets = await modelAssets
+        let assets = modelAssets
         let assetStore = self.assetStore
         if assets.allSatisfy({ assetStore.isDownloaded($0) }) {
             return
@@ -372,7 +372,7 @@ private final class PcmAudioRecorder {
         lock.unlock()
 
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .measurement, options: [.allowBluetooth, .defaultToSpeaker])
+        try session.setCategory(.playAndRecord, mode: .measurement, options: [.allowBluetoothHFP, .defaultToSpeaker])
         try session.setActive(true)
 
         let input = engine.inputNode

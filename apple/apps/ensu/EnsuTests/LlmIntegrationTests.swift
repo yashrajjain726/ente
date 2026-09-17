@@ -1,25 +1,30 @@
 import XCTest
+import os
 @testable import Ensu
 
 private final class GenerateEventCollector: LlmGenerationEventCallback {
-    private(set) var events: [LlmGenerationEvent] = []
+    private let events = OSAllocatedUnfairLock<[LlmGenerationEvent]>(initialState: [])
 
     func onEvent(event: LlmGenerationEvent) {
-        events.append(event)
+        events.withLock { $0.append(event) }
     }
 
     var hasDone: Bool {
-        events.contains { event in
-            if case .done = event { return true }
-            return false
+        events.withLock { events in
+            events.contains { event in
+                if case .done = event { return true }
+                return false
+            }
         }
     }
 
     var textOutput: String {
-        events.compactMap { event in
-            if case let .text(_, text, _) = event { return text }
-            return nil
-        }.joined()
+        events.withLock { events in
+            events.compactMap { event in
+                if case let .text(_, text, _) = event { return text }
+                return nil
+            }.joined()
+        }
     }
 }
 

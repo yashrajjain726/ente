@@ -1,13 +1,13 @@
 import Foundation
 
 @MainActor
-protocol ModelMaintenance: AnyObject {
+protocol ModelMaintenance: AnyObject, Sendable {
     func suspendMaintenance() -> ModelUseScope
     func awaitMaintenance() async
 }
 
 extension ModelMaintenance {
-    func withMaintenanceSuspended<T>(_ body: () async throws -> T) async throws -> T {
+    func withMaintenanceSuspended<T>(_ body: @MainActor () async throws -> T) async throws -> T {
         let token = suspendMaintenance()
         defer { token.close() }
         await awaitMaintenance()

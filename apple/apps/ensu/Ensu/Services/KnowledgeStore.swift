@@ -98,7 +98,7 @@ final class KnowledgeStore: ObservableObject {
         mutationTasks[stableId] = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await provider.download(dataset: dataset) { progress in
+                let result = try await provider.download(dataset: dataset) { [weak self] progress in
                     Task { @MainActor [weak self] in
                         self?.updatePack(stableId) { pack in
                             pack.progressPercent = min(100, max(0, Int(progress.percentage)))

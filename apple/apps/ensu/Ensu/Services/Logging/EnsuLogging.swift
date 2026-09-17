@@ -19,7 +19,7 @@ struct EnsuLogEntry: Identifiable, Hashable {
     let details: String?
 }
 
-final class EnsuLogging {
+final class EnsuLogging: Sendable {
     static let shared = EnsuLogging()
 
     private let queue = DispatchQueue(label: "io.ente.ensu.logging")
@@ -38,37 +38,31 @@ final class EnsuLogging {
         return formatter
     }()
 
-    private var isStarted = false
-    private(set) var logsDirectory: URL!
+    @MainActor private var isStarted = false
+    private let logsDirectory: URL
 
     private let maxLogFiles: Int
 
     private init(maxLogFiles: Int = 5) {
         self.maxLogFiles = maxLogFiles
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let base = support ?? FileManager.default.temporaryDirectory
+        let directory = base.appendingPathComponent("logs", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            logsDirectory = directory
+        } catch {
+            logsDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("logs", isDirectory: true)
+            try? FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
+        }
     }
 
+    @MainActor
     func start() {
         guard !isStarted else { return }
         isStarted = true
-
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        let base = support ?? FileManager.default.temporaryDirectory
-        logsDirectory = base.appendingPathComponent("logs", isDirectory: true)
-
-        queue.async {
-            do {
-                try FileManager.default.createDirectory(at: self.logsDirectory, withIntermediateDirectories: true)
-                self.pruneOldLogFiles()
-            } catch {
-                // Best-effort: fallback to temp.
-                self.logsDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("logs", isDirectory: true)
-                try? FileManager.default.createDirectory(at: self.logsDirectory, withIntermediateDirectories: true)
-            }
-
-            let launchMessage = self.buildAppLaunchMessage()
-            self.log(level: .info, tag: "App", message: launchMessage)
-        }
-
+        queue.async { self.pruneOldLogFiles() }
+        log(level: .info, tag: "App", message: buildAppLaunchMessage())
         initRustLogging(sink: EnsuRustLogSink())
     }
 
@@ -77,8 +71,6 @@ final class EnsuLogging {
     }
 
     func log(level: EnsuLogLevel, tag: String, message: String, details: String? = nil, error: Error? = nil) {
-        start()
-
         let safeMessage = EnsuLogSanitizer.sanitize(message) ?? ""
         let safeDetails = EnsuLogSanitizer.sanitize(combineDetails(details: details, error: error))
 
@@ -97,13 +89,11 @@ final class EnsuLogging {
     }
 
     func todayLogFileURL() -> URL {
-        start()
         let name = "\(dayFormatter.string(from: Date())).txt"
         return logsDirectory.appendingPathComponent(name)
     }
 
     func listLogFiles() -> [URL] {
-        start()
         let urls = (try? FileManager.default.contentsOfDirectory(at: logsDirectory, includingPropertiesForKeys: nil)) ?? []
         return urls
             .filter { $0.pathExtension.lowercased() == "txt" }
@@ -111,7 +101,6 @@ final class EnsuLogging {
     }
 
     func readLogText(fileURL: URL? = nil) -> String {
-        start()
         let url = fileURL ?? todayLogFileURL()
         return queue.sync {
             (try? String(contentsOf: url, encoding: .utf8)) ?? ""
@@ -119,7 +108,6 @@ final class EnsuLogging {
     }
 
     func createLogsArchive() throws -> URL {
-        start()
         let name = "ensu-logs-\(dayFormatter.string(from: Date()))-\(Int(Date().timeIntervalSince1970)).zip"
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         if FileManager.default.fileExists(atPath: dest.path) {
@@ -195,6 +183,7 @@ final class EnsuLogging {
         return parts.isEmpty ? nil : parts.joined(separator: "\n")
     }
 
+    @MainActor
     private func buildAppLaunchMessage() -> String {
         var parts: [String] = ["App launched"]
 
@@ -229,7 +218,7 @@ struct EnsuLogger {
     }
 }
 
-private final class EnsuRustLogSink: RustLogSink, @unchecked Sendable {
+private final class EnsuRustLogSink: RustLogSink {
     func log(level: RustLogLevel, target: String, message: String) {
         let line = "[\(target)] \(message)"
         switch level {

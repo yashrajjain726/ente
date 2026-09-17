@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-final class CredentialStore {
+actor CredentialStore {
     static let shared = CredentialStore()
 
     private init() {}

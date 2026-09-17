@@ -4,7 +4,7 @@ import QuickLook
 import UIKit
 
 struct BottomOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
@@ -12,7 +12,7 @@ struct BottomOffsetKey: PreferenceKey {
 }
 
 struct ContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()

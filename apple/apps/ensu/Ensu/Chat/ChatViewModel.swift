@@ -1,4 +1,5 @@
 import Foundation
+import os
 import SwiftUI
 
 @MainActor
@@ -6,6 +7,13 @@ final class ChatViewModel: ObservableObject {
     private struct ModelReadyKey: Equatable {
         let id: String
         let requestedContextLength: Int?
+    }
+
+    private struct StreamingBuffer {
+        var text = ""
+        var tokenCount = 0
+        var lastUiUpdate = Date.distantPast
+        var updateTask: Task<Void, Never>?
     }
 
     private static let defaultTemperature: Float = 0.5
@@ -108,7 +116,7 @@ final class ChatViewModel: ObservableObject {
     private var pendingOverflow: PendingOverflow?
     private var overflowBypassMessageId: UUID?
 
-    init(assetStore: AssetStore) {
+    init(assetStore: AssetStore) async {
         logger.info("Initializing")
         let summaries = Self.loadSessionSummaries().reduce(into: [String: String]()) { result, item in
             result[item.key.lowercased()] = item.value
@@ -142,7 +150,7 @@ final class ChatViewModel: ObservableObject {
             (try? FileManager.default.contentsOfDirectory(atPath: attachmentsDir.path).isEmpty) != true
         let chatDbKey: Data
         do {
-            chatDbKey = try CredentialStore.shared.getOrCreateChatDbKey(hasChatData: hasChatData)
+            chatDbKey = try await CredentialStore.shared.getOrCreateChatDbKey(hasChatData: hasChatData)
         } catch {
             fatalError("Failed to load chat DB key: \(error)")
         }
@@ -478,7 +486,7 @@ final class ChatViewModel: ObservableObject {
         let selection = modelSettings.currentSelection()
         guard provider.isChatModelReady(selection) else { return }
 
-        Task { [weak self] in
+        Task(priority: .utility) { [weak self] in
             guard let self else { return }
             await self.provider.prewarmImageInference(selection)
         }
@@ -1017,7 +1025,7 @@ final class ChatViewModel: ObservableObject {
         rebuildMessages(for: userNode.sessionId)
 
         let notesScope = notesStore.suspendMaintenance()
-        generationTask = Task {
+        generationTask = Task { [self] in
             defer {
                 notesScope.close()
                 settleGenerationIfActive(generationId: generationId, sessionId: userNode.sessionId)
@@ -1093,7 +1101,7 @@ final class ChatViewModel: ObservableObject {
                 return
             }
 
-            let generationLimits = resolveGenerationLimits(selection)
+            let generationLimits = await resolveGenerationLimits(selection)
             let normalSystemPrompt = systemPrompt()
             let normalHistorySelection = buildHistorySelection(
                 sessionId: userNode.sessionId,
@@ -1169,38 +1177,8 @@ final class ChatViewModel: ObservableObject {
                 LlmMessage(text: effectiveSystemPrompt, role: .system, hasAttachments: false)
             ] + historySelection.messages + [userMessage]
 
-            let bufferLock = NSLock()
-            var buffer = ""
-            var tokenCount = 0
+            let buffer = OSAllocatedUnfairLock(initialState: StreamingBuffer())
             let uiUpdateInterval: TimeInterval = 0.05
-            var lastUiUpdate = Date.distantPast
-            var pendingSnapshot: String?
-            var updateWorkItem: DispatchWorkItem?
-
-            let scheduleStreamingUpdate = {
-                bufferLock.lock()
-                if updateWorkItem != nil {
-                    bufferLock.unlock()
-                    return
-                }
-                let workItem = DispatchWorkItem { [weak self] in
-                    guard let self else { return }
-                    bufferLock.lock()
-                    let snapshot = pendingSnapshot
-                    pendingSnapshot = nil
-                    updateWorkItem = nil
-                    lastUiUpdate = Date()
-                    bufferLock.unlock()
-                    guard let snapshot else { return }
-                    Task { @MainActor in
-                        guard self.activeGenerationId == generationId else { return }
-                        self.streamingResponse = snapshot
-                    }
-                }
-                updateWorkItem = workItem
-                bufferLock.unlock()
-                DispatchQueue.main.asyncAfter(deadline: .now() + uiUpdateInterval, execute: workItem)
-            }
 
             do {
                 let runGeneration: () async throws -> GenerationSummary = {
@@ -1211,32 +1189,41 @@ final class ChatViewModel: ObservableObject {
                         temperature: self.resolveTemperature(),
                         maxTokens: generationLimits.maxOutput,
                         onToken: { token in
-                            let tokenEstimate = max(1, token.count / 4)
-                            var snapshot = ""
-                            var shouldUpdateNow = false
-
-                            bufferLock.lock()
-                            buffer.append(token)
-                            tokenCount += tokenEstimate
-                            snapshot = buffer
-                            pendingSnapshot = snapshot
-                            let now = Date()
-                            shouldUpdateNow = now.timeIntervalSince(lastUiUpdate) >= uiUpdateInterval
-                            if shouldUpdateNow {
-                                lastUiUpdate = now
-                                pendingSnapshot = nil
-                                updateWorkItem?.cancel()
-                                updateWorkItem = nil
+                            let snapshot = buffer.withLock { state -> String? in
+                                state.text.append(token)
+                                state.tokenCount += max(1, token.count / 4)
+                                let now = Date()
+                                if now.timeIntervalSince(state.lastUiUpdate) >= uiUpdateInterval {
+                                    state.lastUiUpdate = now
+                                    state.updateTask?.cancel()
+                                    state.updateTask = nil
+                                    return state.text
+                                }
+                                if state.updateTask == nil {
+                                    state.updateTask = Task { @MainActor [weak self] in
+                                        do {
+                                            try await Task.sleep(for: .seconds(uiUpdateInterval))
+                                        } catch {
+                                            return
+                                        }
+                                        let snapshot = buffer.withLock { state -> String? in
+                                            guard !Task.isCancelled else { return nil }
+                                            state.updateTask = nil
+                                            state.lastUiUpdate = Date()
+                                            return state.text
+                                        }
+                                        guard let self, let snapshot,
+                                              self.activeGenerationId == generationId else { return }
+                                        self.streamingResponse = snapshot
+                                    }
+                                }
+                                return nil
                             }
-                            bufferLock.unlock()
-
-                            if shouldUpdateNow {
+                            if let snapshot {
                                 Task { @MainActor in
                                     guard self.activeGenerationId == generationId else { return }
                                     self.streamingResponse = snapshot
                                 }
-                            } else {
-                                scheduleStreamingUpdate()
                             }
                         }
                     )
@@ -1246,7 +1233,7 @@ final class ChatViewModel: ObservableObject {
                     summary = try await runGeneration()
                 } catch {
                     if case LlmError.PromptTooLong = error,
-                       buffer.isEmpty,
+                       buffer.withLock({ $0.text.isEmpty }),
                        !activeCitations.isEmpty {
                         activeCitations = []
                         messages = [
@@ -1262,15 +1249,17 @@ final class ChatViewModel: ObservableObject {
                     }
                 }
 
-                finishGeneration(parent: userNode, response: buffer, tokenCount: tokenCount, totalTimeMs: summary.totalTimeMs, interrupted: false, generationId: generationId, citations: activeCitations)
+                let snapshot = buffer.withLock { $0 }
+                finishGeneration(parent: userNode, response: snapshot.text, tokenCount: snapshot.tokenCount, totalTimeMs: summary.totalTimeMs, interrupted: false, generationId: generationId, citations: activeCitations)
             } catch {
+                let snapshot = buffer.withLock { $0 }
                 let wasCancelled = stopRequested || isCancellation(error)
                 if activeGenerationId == generationId && !wasCancelled {
-                    let details = "session=\(userNode.sessionId.uuidString) promptLen=\(prompt.text.count) responseLen=\(buffer.count) tokens=\(tokenCount)"
+                    let details = "session=\(userNode.sessionId.uuidString) promptLen=\(prompt.text.count) responseLen=\(snapshot.text.count) tokens=\(snapshot.tokenCount)"
                     logger.error("Generation failed", error, details: details)
                     generationErrorMessage = "Response failed. Try again."
                 }
-                finishGeneration(parent: userNode, response: buffer, tokenCount: tokenCount, totalTimeMs: nil, interrupted: true, generationId: generationId, citations: activeCitations)
+                finishGeneration(parent: userNode, response: snapshot.text, tokenCount: snapshot.tokenCount, totalTimeMs: nil, interrupted: true, generationId: generationId, citations: activeCitations)
             }
             if embeddingAssetInvalid {
                 refreshModelDownloadInfo()
@@ -1863,8 +1852,7 @@ final class ChatViewModel: ObservableObject {
             LlmMessage(text: cleanedInput, role: .user, hasAttachments: false)
         ]
 
-        let bufferLock = NSLock()
-        var buffer = ""
+        let buffer = OSAllocatedUnfairLock(initialState: "")
 
         do {
             try await provider.ensureModelReady(selection) { _ in }
@@ -1875,16 +1863,14 @@ final class ChatViewModel: ObservableObject {
                 temperature: 0.2,
                 maxTokens: 64
             ) { token in
-                bufferLock.lock()
-                buffer.append(token)
-                bufferLock.unlock()
+                buffer.withLock { $0.append(token) }
             }
         } catch {
             let fallbackSummary = summarizeQuestion(fallback)
             return fallbackSummary.isEmpty ? nil : sessionTitle(from: fallbackSummary, fallback: fallback)
         }
 
-        let raw = sanitizeTitleText(buffer)
+        let raw = sanitizeTitleText(buffer.withLock { $0 })
         guard !raw.isEmpty else { return sessionTitle(from: fallback, fallback: fallback) }
         let words = raw.split(separator: " ").map { String($0) }.filter { !$0.isEmpty }
         guard !words.isEmpty else { return nil }
@@ -2075,8 +2061,8 @@ final class ChatViewModel: ObservableObject {
         return HistorySelection(messages: selected, inputTokens: inputTokens, inputBudget: inputBudget, wasTrimmed: inputTokens > inputBudget)
     }
 
-    private func resolveGenerationLimits(_ selection: LlmModelSelection) -> GenerationLimits {
-        let contextLength = provider.loadedContextLength(selection) ?? selection.contextLength ?? 12000
+    private func resolveGenerationLimits(_ selection: LlmModelSelection) async -> GenerationLimits {
+        let contextLength = await provider.loadedContextLength(selection) ?? selection.contextLength ?? 12000
         let maxOutput = resolveMaxOutputTokens(configuredMaxTokens: selection.maxTokens, contextLength: contextLength)
         return GenerationLimits(contextLength: contextLength, maxOutput: maxOutput)
     }

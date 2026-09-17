@@ -291,7 +291,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         let cancellation = operation.cancellation
         let record = NotesCollectionInfo(id: collection.id, label: collection.label)
         let hadIndex = collection.indexAvailable
-        let task = Task { @MainActor in
+        let task = Task { @MainActor [self] in
             defer {
                 if active?.operation === operation {
                     active = nil
