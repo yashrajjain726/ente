@@ -1103,12 +1103,12 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         showShortToast(
           buildContext,
           cleanupResult.removedFilesCount > 0
-              ? buildContext.strings.cleanedUncategorizedItems(
+              ? buildContext.strings.removedItems(
                   count: cleanupResult.removedFilesCount,
                 )
               : cleanupResult.uncategorizedFilesCount == 0
               ? buildContext.strings.uncategorizedIsClean
-              : buildContext.strings.nothingToCleanUpInUncategorized,
+              : buildContext.strings.nothingToCleanUp,
         );
       } else if (actionResult.action == ButtonAction.error) {
         if (!buildContext.mounted) return;
