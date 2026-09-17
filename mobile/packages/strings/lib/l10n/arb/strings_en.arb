@@ -3199,8 +3199,11 @@
       "folderName": {}
     }
   },
+  "publicLink": "Public link",
   "publicLinkAccessDescription": "Anyone with the link can open the album without an Ente account.",
+  "publicLinkCollectDescription": "Anyone with this link can add photos to your album.",
   "publicLinkEnabled": "Public link enabled",
+  "publicLinkViewDescription": "Anyone with this link can access your album.",
   "qr": "QR",
   "qrCode": "QR code",
   "questionmark": "?",

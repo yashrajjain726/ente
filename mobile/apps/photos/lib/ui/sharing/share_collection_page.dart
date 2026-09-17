@@ -98,13 +98,24 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
       children.addAll([
         const SizedBox(height: Spacing.xxl),
         ShareSectionTitle(
-          hasUrl
-              ? context.strings.publicLinkEnabled
-              : context.strings.shareALink,
+          hasUrl ? context.strings.publicLink : context.strings.shareALink,
         ),
       ]);
       if (hasUrl) {
-        children.add(
+        final url = _collection.publicURLs.first;
+        children.addAll([
+          if (!url.isExpired)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.sm),
+              child: Text(
+                url.enableCollect
+                    ? context.strings.publicLinkCollectDescription
+                    : context.strings.publicLinkViewDescription,
+                style: TextStyles.mini.copyWith(
+                  color: context.componentColors.textLight,
+                ),
+              ),
+            ),
           PublicLinkEnabledActionsWidget(
             collection: _collection,
             sendLinkButtonKey: sendLinkButtonKey,
@@ -126,7 +137,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
               ),
             ],
           ),
-        );
+        ]);
       } else {
         children.addAll([
           ShareMenuItem(
