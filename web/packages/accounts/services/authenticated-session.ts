@@ -21,6 +21,7 @@ interface SessionInput {
 export const createAuthenticatedSessionCache = <T extends Session>(
     openSession: (input: SessionInput) => Promise<T>,
     masterKeyFromSession: () => Promise<string | undefined>,
+    onOpen?: (session: T) => void,
 ) => {
     let current: { key: string; opening: Promise<T> } | undefined;
     let generation = 0;
@@ -60,6 +61,7 @@ export const createAuthenticatedSessionCache = <T extends Session>(
                         session.free();
                         throw new Error("Authenticated session was cleared");
                     }
+                    onOpen?.(session);
                     return session;
                 })
                 .catch((error: unknown) => {
