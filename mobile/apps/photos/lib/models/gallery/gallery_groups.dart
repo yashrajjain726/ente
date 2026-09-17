@@ -40,6 +40,7 @@ class GalleryGroups {
   final bool sortOrderAsc;
   final double widthAvailable;
   final double groupHeaderExtent;
+  static const double spacing = galleryGridSpacing;
   GalleryGroups({
     required this.allFiles,
     required this.groupType,
@@ -64,7 +65,6 @@ class GalleryGroups {
     }
   }
 
-  static const double spacing = 2.0;
   // Product decision: limit how tall the preferred justified row can grow as
   // the gallery widens.
   static const double _maximumJustifiedTargetRowHeight = 320.0;
