@@ -51,6 +51,23 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
     return ShareScaffold(
       title: context.strings.linkSettings,
       children: [
+        PublicLinkEnabledActionsWidget(
+          collection: collection,
+          sendLinkButtonKey: sendLinkButtonKey,
+          showEmbedHtml: true,
+          showShareActions: isQuickLink,
+        ),
+        if (!url.isExpired)
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.sm),
+            child: Text(
+              context.strings.publicLinkAccessDescription,
+              style: TextStyles.mini.copyWith(
+                color: context.componentColors.textLight,
+              ),
+            ),
+          ),
+        const SizedBox(height: Spacing.sm),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
@@ -224,23 +241,6 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
             ),
           ],
         ),
-        const SizedBox(height: Spacing.sm),
-        PublicLinkEnabledActionsWidget(
-          collection: collection,
-          sendLinkButtonKey: sendLinkButtonKey,
-          showEmbedHtml: true,
-          showShareActions: isQuickLink,
-        ),
-        if (!url.isExpired)
-          Padding(
-            padding: const EdgeInsets.only(top: Spacing.sm),
-            child: Text(
-              context.strings.publicLinkAccessDescription,
-              style: TextStyles.mini.copyWith(
-                color: context.componentColors.textLight,
-              ),
-            ),
-          ),
         const SizedBox(height: Spacing.sm),
         ShareMenuGroup(
           items: [
