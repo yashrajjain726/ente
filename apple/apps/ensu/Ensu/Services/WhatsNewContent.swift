@@ -14,11 +14,12 @@ enum WhatsNewContent {
         ),
         WhatsNewEntry(
             title: "Chat with Your Notes",
-            description: "Add your markdown notes folder, and chat with your notes. Ask questions or discuss the thoughts you put down."
+            description:
+                "Add your markdown notes folder, and chat with your notes. Ask questions or discuss the thoughts you put down."
         ),
         WhatsNewEntry(
             title: "Gemma for high RAM phones",
             description: "For phones with >8GB RAM, Gemma 4 is the new default model."
-        )
+        ),
     ]
 }

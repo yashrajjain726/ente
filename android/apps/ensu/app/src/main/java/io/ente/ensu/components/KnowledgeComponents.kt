@@ -26,15 +26,15 @@ import io.ente.ensu.designsystem.EnsuTypography
 internal fun KnowledgeCard(
     padding: Dp = EnsuSpacing.lg.dp,
     spacing: Dp = 0.dp,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.card.dp))
-            .padding(padding),
+        modifier =
+            Modifier.fillMaxWidth()
+                .background(EnsuColor.fillFaint(), RoundedCornerShape(EnsuCornerRadius.card.dp))
+                .padding(padding),
         verticalArrangement = Arrangement.spacedBy(spacing),
-        content = content
+        content = content,
     )
 }
 
@@ -42,7 +42,7 @@ internal fun KnowledgeCard(
 internal fun AttributionDialog(
     title: String,
     onDismiss: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -51,11 +51,11 @@ internal fun AttributionDialog(
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(EnsuSpacing.md.dp),
-                content = content
+                content = content,
             )
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-        containerColor = EnsuColor.backgroundBase()
+        containerColor = EnsuColor.backgroundBase(),
     )
 }
 
@@ -63,7 +63,7 @@ internal fun AttributionDialog(
 internal fun AttributionLink(label: String, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
-        contentPadding = PaddingValues(vertical = EnsuSpacing.xs.dp)
+        contentPadding = PaddingValues(vertical = EnsuSpacing.xs.dp),
     ) {
         Text(label, style = EnsuTypography.mini, color = EnsuColor.accent())
     }

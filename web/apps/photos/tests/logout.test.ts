@@ -27,7 +27,9 @@ vi.mock("ente-base/app", () => ({
     isDesktop: false,
 }));
 vi.mock("ente-base/origins", () => ({ apiOrigin }));
-vi.mock("ente-base/session", () => ({ masterKeyFromSession: vi.fn() }));
+vi.mock("ente-new/photos/services/account-keys", () => ({
+    masterKeyFromSession: vi.fn(),
+}));
 vi.mock("ente-base/token", () => ({ savedAuthToken: vi.fn() }));
 vi.mock("ente-base/log", () => ({
     default: { info: vi.fn(), error: vi.fn() },

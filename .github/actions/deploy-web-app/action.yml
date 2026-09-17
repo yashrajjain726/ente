@@ -1,22 +1,22 @@
-name: "Deploy web app"
-description: "Build a web app and publish it to Cloudflare Pages"
+name: Deploy web app
+description: Build a web app and publish it to Cloudflare Pages
 
 inputs:
     app:
-        description: "Web app slug"
+        description: Web app slug
         required: true
     output:
-        description: "Build output directory within web/apps/<app>"
-        default: "out"
+        description: Build output directory within web/apps/<app>
+        default: out
     account-id:
-        description: "Cloudflare account ID"
+        description: Cloudflare account ID
         required: true
     api-token:
-        description: "Cloudflare API token"
+        description: Cloudflare API token
         required: true
 
 runs:
-    using: "composite"
+    using: composite
     steps:
         - name: Build ${{ inputs.app }}
           shell: bash

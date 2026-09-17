@@ -7,11 +7,43 @@ import (
 	"testing"
 
 	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/utils/config"
+	"github.com/ente/museum/pkg/utils/s3config"
 	"github.com/ente/museum/space/models"
 	spacerepo "github.com/ente/museum/space/repo"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPresignUploadStoresMetadata(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	require.NoError(t, config.ConfigureViper("local"))
+	viper.Set("s3.b2-eu-cen.key", "test-key")
+	viper.Set("s3.b2-eu-cen.secret", "test-secret")
+	viper.Set("s3.b2-eu-cen.endpoint", "http://localhost:9000")
+	viper.Set("s3.b2-eu-cen.region", "us-east-1")
+	viper.Set("s3.b2-eu-cen.bucket", "test-bucket")
+	viper.Set(spaceAssetsPrimaryBucketConfigKey, "b2-eu-cen")
+	repos.Assets.S3Config = s3config.NewS3Config()
+	ownerID := insertSpaceControllerUser(t, repos, "upload-metadata@example.com", "public")
+	space, err := testCreateSpace(ctx, repos, ownerID, "upload_metadata", "key", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	const client = "io.ente.space.web/1.0"
+	resp, err := module.Assets.PresignUpload(ctx, space, models.PresignUploadRequest{
+		Size: 5, ContentMD5: "5d41402abc4b2a76b9719d911017c592",
+	}, client)
+	require.NoError(t, err)
+	rec, err := repos.Assets.GetTempObject(ctx, resp.ObjectKey, spacerepo.TempObjectPurposePost, &space.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(5), rec.ExpectedSize)
+	require.True(t, rec.ContentMD5.Valid)
+	require.Equal(t, resp.Headers["Content-MD5"], rec.ContentMD5.String)
+	require.True(t, rec.Client.Valid)
+	require.Equal(t, client, rec.Client.String)
+	require.Positive(t, rec.CreatedAt)
+}
 
 type testSpaceAssetBuckets map[string]bool
 
@@ -41,6 +73,7 @@ func TestPresignUploadRejectsOversizedAssets(t *testing.T) {
 				context.Background(),
 				&spacerepo.SpaceRecord{SpaceID: "space-1"},
 				request,
+				"",
 			)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), strconv.FormatInt(test.limit, 10))
@@ -106,7 +139,7 @@ func TestPresignUploadReturnsUnavailableWhenSpaceAssetBucketMissing(t *testing.T
 	resp, err := module.Assets.PresignUpload(ctx, space, models.PresignUploadRequest{
 		Size:       1,
 		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
-	})
+	}, "")
 
 	require.Nil(t, resp)
 	requireSpaceAssetsUnavailable(t, err)

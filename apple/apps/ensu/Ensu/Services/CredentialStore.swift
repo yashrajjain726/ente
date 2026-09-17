@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-final class CredentialStore {
+actor CredentialStore {
     static let shared = CredentialStore()
 
     private init() {}
@@ -13,7 +13,9 @@ final class CredentialStore {
     }
 
     func getOrCreateChatDbKey(hasChatData: Bool) throws -> Data {
-        if let existing = try KeychainStore.get(service: keychainService, account: KeychainAccount.chatDbKey) {
+        if let existing = try KeychainStore.get(
+            service: keychainService, account: KeychainAccount.chatDbKey)
+        {
             guard existing.count == 32 else { throw KeychainStoreError.invalidItemFormat }
             return existing
         }

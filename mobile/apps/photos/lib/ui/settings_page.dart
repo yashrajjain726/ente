@@ -359,8 +359,9 @@ class _SettingsBody extends StatelessWidget {
         _buildMenuItem(
           title: context.strings.referrals,
           icon: HugeIcons.strokeRoundedTicketStar,
+          showOnlyLoadingState: true,
           onTap: () async {
-            await routeToPage(context, const ReferralScreen());
+            await openReferralScreen(context);
           },
         ),
       ],
@@ -417,8 +418,9 @@ class _SettingsBody extends StatelessWidget {
           _buildMenuItem(
             title: context.strings.castSessions,
             icon: HugeIcons.strokeRoundedTvSmart,
+            showOnlyLoadingState: true,
             onTap: () async {
-              await routeToPage(context, const CastSettingsPage());
+              await openCastSettingsPage(context);
             },
           ),
         _buildMapsMenuItem(context),

@@ -12,9 +12,9 @@ use ente_core::http;
 fn map_friend_mutation_error(error: http::Error) -> Error {
     match &error {
         http::Error::Api { code, .. } => match code.as_str() {
-            "SPACE_FRIEND_LIMIT_REACHED" => Error::FriendLimitReached,
             "SPACE_SELF_FRIENDSHIP" => Error::SelfFriendship,
             "SPACE_FRIEND_REQUEST_LIMIT_REACHED" => Error::FriendRequestLimitReached,
+            "SPACE_SENT_FRIEND_REQUEST_LIMIT_REACHED" => Error::SentFriendRequestLimitReached,
             "SPACE_FRIEND_REQUEST_UNAVAILABLE" => Error::FriendRequestUnavailable,
             _ => error.into(),
         },
@@ -262,21 +262,5 @@ impl AccountSpaceCtx {
             .error_for_status()?;
         self.clear_friend_share_cache()?;
         Ok(updated)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn maps_friend_limit_error() {
-        let error = map_friend_mutation_error(http::Error::Api {
-            status: 409,
-            path: "/spaces/space/friends/add".into(),
-            code: "SPACE_FRIEND_LIMIT_REACHED".into(),
-        });
-
-        assert!(matches!(error, Error::FriendLimitReached));
     }
 }

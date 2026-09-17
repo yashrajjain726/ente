@@ -232,6 +232,37 @@ func (c *UserController) GetPublicKey(requesterUserID int64, email string) (stri
 	return key, nil
 }
 
+func (c *UserController) GetPublicKeys(requesterUserID int64, emails []string) ([]string, error) {
+	if len(emails) == 0 {
+		return nil, stacktrace.Propagate(ente.ErrBadRequest, "emails are required")
+	}
+	if len(emails) > ente.MaxPublicKeyBatchSize {
+		return nil, stacktrace.Propagate(ente.ErrBatchSizeTooLarge, "")
+	}
+
+	seen := make(map[string]struct{}, len(emails))
+	for _, value := range emails {
+		normalizedEmail := email.NormalizeEmail(value)
+		if normalizedEmail == "" {
+			return nil, stacktrace.Propagate(ente.ErrBadRequest, "email is required")
+		}
+		if _, ok := seen[normalizedEmail]; ok {
+			return nil, stacktrace.Propagate(ente.ErrBadRequest, "duplicate email")
+		}
+		seen[normalizedEmail] = struct{}{}
+	}
+
+	publicKeys := make([]string, 0, len(emails))
+	for _, value := range emails {
+		publicKey, err := c.GetPublicKey(requesterUserID, value)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		publicKeys = append(publicKeys, publicKey)
+	}
+	return publicKeys, nil
+}
+
 func (c *UserController) GetTwoFactorStatus(userID int64) (bool, error) {
 	isTwoFactorEnabled, err := c.UserRepo.IsTwoFactorEnabled(userID)
 	if err != nil {

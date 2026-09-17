@@ -52,7 +52,9 @@ private struct MathLabelView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: MathLabelContainerView, context: Context) {
-        view.update(latex: latex, rawLatex: rawLatex, textColor: textColor, fontSize: fontSize, isInline: isInline)
+        view.update(
+            latex: latex, rawLatex: rawLatex, textColor: textColor, fontSize: fontSize,
+            isInline: isInline)
     }
 }
 
@@ -80,10 +82,12 @@ private final class MathLabelContainerView: UIView {
                 height: childSize.height + currentInsets.top + currentInsets.bottom
             )
         }
-        let maxLabelWidth = fallbackLabel.preferredMaxLayoutWidth > 0
+        let maxLabelWidth =
+            fallbackLabel.preferredMaxLayoutWidth > 0
             ? fallbackLabel.preferredMaxLayoutWidth
             : CGFloat.greatestFiniteMagnitude
-        let labelSize = fallbackLabel.sizeThatFits(CGSize(width: maxLabelWidth, height: .greatestFiniteMagnitude))
+        let labelSize = fallbackLabel.sizeThatFits(
+            CGSize(width: maxLabelWidth, height: .greatestFiniteMagnitude))
         return CGSize(
             width: labelSize.width + currentInsets.left + currentInsets.right,
             height: labelSize.height + currentInsets.top + currentInsets.bottom
@@ -102,8 +106,11 @@ private final class MathLabelContainerView: UIView {
         }
     }
 
-    func update(latex: String, rawLatex: String, textColor: PlatformColor, fontSize: CGFloat, isInline: Bool) {
-        currentInsets = isInline
+    func update(
+        latex: String, rawLatex: String, textColor: PlatformColor, fontSize: CGFloat, isInline: Bool
+    ) {
+        currentInsets =
+            isInline
             ? UIEdgeInsets(top: 1, left: 1, bottom: 1, right: 1)
             : UIEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
 
@@ -125,4 +132,3 @@ private final class MathLabelContainerView: UIView {
         invalidateIntrinsicContentSize()
     }
 }
-

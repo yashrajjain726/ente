@@ -162,28 +162,13 @@ func (c *ObjectCleanupController) removeUnreportedObject(tx *sql.Tx, t ente.Temp
 	return nil
 }
 
-func (c *ObjectCleanupController) AddTempObjectKey(objectKey string, dc string) error {
-	expiry := time.Microseconds() + (2 * PreSignedRequestValidityDuration.Microseconds())
-	return c.addCleanupEntryForObjectKey(objectKey, dc, expiry)
-}
-
-func (c *ObjectCleanupController) addCleanupEntryForObjectKey(objectKey string, dc string, expirationTime int64) error {
-	err := c.Repo.AddTempObject(ente.TempObject{
-		ObjectKey:   objectKey,
-		IsMultipart: false,
-		BucketId:    dc,
-	}, expirationTime)
-	return stacktrace.Propagate(err, "")
-}
-
-func (c *ObjectCleanupController) AddMultipartTempObjectKey(objectKey string, uploadID string, dc string) error {
-	expiry := time.Microseconds() + (2 * PreSignedPartUploadRequestDuration.Microseconds())
-	err := c.Repo.AddTempObject(ente.TempObject{
-		ObjectKey:   objectKey,
-		IsMultipart: true,
-		UploadID:    uploadID,
-		BucketId:    dc,
-	}, expiry)
+func (c *ObjectCleanupController) AddTempObject(object ente.TempObject) error {
+	validity := PreSignedRequestValidityDuration
+	if object.IsMultipart {
+		validity = PreSignedPartUploadRequestDuration
+	}
+	expiry := time.Microseconds() + 2*validity.Microseconds()
+	err := c.Repo.AddTempObject(object, expiry)
 	return stacktrace.Propagate(err, "")
 }
 

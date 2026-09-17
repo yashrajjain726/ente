@@ -26,8 +26,11 @@ actor NotesProvider {
     private let diskGate = AsyncSerialGate()
     private var registrations: [Registration] = []
 
-    init(root: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("notes", isDirectory: true)) {
+    init(
+        root: URL = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("notes", isDirectory: true)
+    ) {
         self.root = root
     }
 
@@ -58,8 +61,9 @@ actor NotesProvider {
                     guard let path = Self.identityPath(registered) else { continue }
                     let existingPrefix = path.hasSuffix("/") ? path : path + "/"
                     guard canonical != path,
-                          !canonical.hasPrefix(existingPrefix),
-                          !path.hasPrefix(selectedPrefix) else {
+                        !canonical.hasPrefix(existingPrefix),
+                        !path.hasPrefix(selectedPrefix)
+                    else {
                         throw NotesError.InvalidInput(
                             detail: "This folder overlaps a folder already added to Your Notes."
                         )
@@ -71,7 +75,8 @@ actor NotesProvider {
                     includingResourceValuesForKeys: [.pathKey],
                     relativeTo: nil
                 )
-                let source = try IOSNotesSource(bookmark: bookmark, cancellation: NotesCancellation())
+                let source = try IOSNotesSource(
+                    bookmark: bookmark, cancellation: NotesCancellation())
                 let record = Registration(
                     id: UUID().uuidString.lowercased(),
                     label: source.root.lastPathComponent,
@@ -109,7 +114,9 @@ actor NotesProvider {
         }
     }
 
-    func inspectFreshness(_ id: String, operation: NotesReadOperation) async throws -> NotesFreshness {
+    func inspectFreshness(_ id: String, operation: NotesReadOperation) async throws
+        -> NotesFreshness
+    {
         try await diskGate.withLock {
             let root = self.root
             let record = try self.registration(id)
@@ -174,9 +181,11 @@ actor NotesProvider {
                 let bytes = try Self.readVerified(record, reference, operation: operation)
                 let folder = FileManager.default.temporaryDirectory
                     .appendingPathComponent("note-preview-" + UUID().uuidString)
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(
+                    at: folder, withIntermediateDirectories: true)
                 do {
-                    let url = folder.appendingPathComponent((reference.documentId as NSString).lastPathComponent)
+                    let url = folder.appendingPathComponent(
+                        (reference.documentId as NSString).lastPathComponent)
                     try bytes.write(to: url, options: [.atomic, .completeFileProtection])
                     return url
                 } catch {
@@ -194,7 +203,9 @@ actor NotesProvider {
         return record
     }
 
-    private static func source(_ record: Registration, operation: NotesReadOperation) throws -> IOSNotesSource {
+    private static func source(_ record: Registration, operation: NotesReadOperation) throws
+        -> IOSNotesSource
+    {
         try IOSNotesSource(
             bookmark: record.bookmark,
             cancellation: operation.cancellation,
@@ -224,8 +235,9 @@ actor NotesProvider {
         ) {
             return url.standardizedFileURL.resolvingSymlinksInPath().path
         }
-        return record.canonicalPath ??
-            (NSURL.resourceValues(forKeys: [.pathKey], fromBookmarkData: record.bookmark)?[.pathKey] as? String)
+        return record.canonicalPath
+            ?? (NSURL.resourceValues(forKeys: [.pathKey], fromBookmarkData: record.bookmark)?[
+                .pathKey] as? String)
     }
 
     private static func handle(_ root: URL, _ id: String) throws -> NotesCollection {
@@ -244,11 +256,17 @@ actor NotesProvider {
         let registry = try JSONDecoder().decode(Registry.self, from: data)
         let registeredIds = Set(registry.collections.map(\.id))
         guard registry.schemaVersion == 1,
-              registeredIds.count == registry.collections.count,
-              registry.collections.allSatisfy({ UUID(uuidString: $0.id)?.uuidString.lowercased() == $0.id }) else {
+            registeredIds.count == registry.collections.count,
+            registry.collections.allSatisfy({
+                UUID(uuidString: $0.id)?.uuidString.lowercased() == $0.id
+            })
+        else {
             throw NotesError.InvalidInput(detail: "Invalid Notes registry.")
         }
-        for child in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? [] {
+        for child
+            in (try? FileManager.default.contentsOfDirectory(
+                at: root, includingPropertiesForKeys: nil)) ?? []
+        {
             let id = child.lastPathComponent
             if !registeredIds.contains(id), UUID(uuidString: id)?.uuidString.lowercased() == id {
                 try? handle(root, id).remove()
@@ -258,7 +276,9 @@ actor NotesProvider {
         for index in records.indices where records[index].canonicalPath == nil {
             records[index].canonicalPath = identityPath(records[index])
         }
-        if zip(registry.collections, records).contains(where: { $0.canonicalPath != $1.canonicalPath }) {
+        if zip(registry.collections, records).contains(where: {
+            $0.canonicalPath != $1.canonicalPath
+        }) {
             try? save(records, root: root)
         }
         return records
@@ -278,7 +298,9 @@ actor NotesProvider {
         guard data.count <= 1024 * 1024 else {
             throw NotesError.InvalidInput(detail: "Notes registry is too large.")
         }
-        try data.write(to: root.appendingPathComponent("collections.json"), options: [.atomic, .completeFileProtection])
+        try data.write(
+            to: root.appendingPathComponent("collections.json"),
+            options: [.atomic, .completeFileProtection])
     }
 }
 

@@ -24,7 +24,8 @@ struct DownloadOnboardingView: View {
                     if let totalBytes, let percent = downloadPercent {
                         let clamped = min(max(percent, 0), 100)
                         let downloaded = Int64(Double(totalBytes) * Double(clamped) / 100.0)
-                        return "Downloading... \(downloaded.formattedFileSize) / \(totalBytes.formattedFileSize)"
+                        return
+                            "Downloading... \(downloaded.formattedFileSize) / \(totalBytes.formattedFileSize)"
                     }
                     if let statusText, !statusText.isEmpty {
                         return statusText
@@ -143,7 +144,9 @@ struct SignInComingSoonDialog: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, EnsuSpacing.md)
                         .background(EnsuColor.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.button, style: .continuous))
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: EnsuCornerRadius.button, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }

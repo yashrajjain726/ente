@@ -22,11 +22,9 @@ fun App(appViewModel: AppViewModel) {
     val isReady by appViewModel.isReady.collectAsState()
     if (!isReady) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(EnsuColor.backgroundBase()),
+            modifier = Modifier.fillMaxSize().background(EnsuColor.backgroundBase()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             CircularProgressIndicator(color = EnsuColor.action())
             Spacer(Modifier.height(16.dp))
@@ -40,6 +38,6 @@ fun App(appViewModel: AppViewModel) {
         logRepository = appViewModel.logRepository,
         advancedSettingsDataStore = appViewModel.advancedSettingsDataStore,
         appVersion = appViewModel.appVersion,
-        configDefaults = appViewModel.configDefaults
+        configDefaults = appViewModel.configDefaults,
     )
 }

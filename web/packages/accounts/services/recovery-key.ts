@@ -1,7 +1,6 @@
 import { savedKeyAttributes } from "ente-accounts/services/accounts-db";
 import {
     decryptBox,
-    encryptBox,
     recoveryKeyFromMnemonicOrHex,
 } from "ente-accounts/services/crypto";
 import { ensureMasterKeyFromSession } from "ente-accounts/services/prelogin-session";
@@ -33,6 +32,3 @@ const preloginRecoveryKey = async () => {
 
 export const getPreloginRecoveryKeyMnemonic = async () =>
     recoveryKeyToMnemonic(await preloginRecoveryKey());
-
-export const encryptWithPreloginRecoveryKey = async (data: string) =>
-    encryptBox(data, await preloginRecoveryKey());

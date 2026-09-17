@@ -606,8 +606,8 @@ func main() {
 	}
 	pasteHandler := &api.PasteHandler{Controller: pasteCtrl}
 	storageAPI.GET("/files/upload-eligibility", fileHandler.ValidateUploadEligibility)
-	storageAPI.GET("/files/upload-urls", fileHandler.GetUploadURLs)
-	storageAPI.GET("/files/multipart-upload-urls", fileHandler.GetMultipartUploadURLs)
+	storageAPI.GET("/files/upload-urls", fileHandler.RestrictLegacyUploads, fileHandler.GetUploadURLs)
+	storageAPI.GET("/files/multipart-upload-urls", fileHandler.RestrictLegacyUploads, fileHandler.GetMultipartUploadURLs)
 	storageAPI.POST("/files/upload-url", fileHandler.GetUploadURLV2)
 	storageAPI.POST("/files/multipart-upload-url", fileHandler.GetMultipartUploadURLV2)
 	storageAPI.GET("/files/download/:fileID", fileHandler.Get)
@@ -710,6 +710,7 @@ func main() {
 	publicAPI.POST("/users/srp/create-session", userHandler.CreateSRPSession)
 	privateAPI.PUT("/users/recovery-key", userHandler.SetRecoveryKey)
 	privateAPI.GET("/users/public-key", userHandler.GetPublicKey)
+	privateAPI.POST("/users/public-keys", userHandler.GetPublicKeys)
 	privateAPI.GET("/users/session-validity/v2", userHandler.GetSessionValidityV2)
 	privateAPI.POST("/users/event", userHandler.ReportEvent)
 	privateAPI.POST("/users/logout", userHandler.Logout)
@@ -753,6 +754,7 @@ func main() {
 	storageAPI.GET("/collections/v2", collectionHandler.GetV2)
 	storageAPI.GET("/collections/v3", collectionHandler.GetWithLimit)
 	storageAPI.POST("/collections/share", collectionHandler.Share)
+	storageAPI.POST("/collections/share/batch", collectionHandler.BatchShare)
 	storageAPI.POST("/collections/share/bulk", collectionHandler.BulkShare)
 	storageAPI.POST("/collections/join-link", collectionHandler.JoinLink)
 	storageAPI.POST("/collections/share-url", collectionHandler.ShareURL)

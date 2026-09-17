@@ -12,6 +12,7 @@ class TouchCrossDetector extends SingleChildRenderObjectWidget {
     this.onExit,
     this.onHover,
     this.onPointerDown,
+    this.shouldTrackPointerMoves,
     required Widget super.child,
   });
 
@@ -19,6 +20,10 @@ class TouchCrossDetector extends SingleChildRenderObjectWidget {
   final void Function(PointerExitEvent)? onExit;
   final void Function(PointerHoverEvent)? onHover;
   final void Function(PointerDownEvent)? onPointerDown;
+  // Read at dispatch time so a gesture can enable crossing without waiting for
+  // a rebuild. The tile where a pointer started keeps tracking it so long
+  // presses still know whether the pointer is inside.
+  final bool Function()? shouldTrackPointerMoves;
 
   static bool isPointerActive(int pointer) {
     return _TouchCrossRenderTracker.instance.isPointerActive(pointer);
@@ -31,6 +36,7 @@ class TouchCrossDetector extends SingleChildRenderObjectWidget {
       onExit: onExit,
       onHover: onHover,
       onPointerDown: onPointerDown,
+      shouldTrackPointerMoves: shouldTrackPointerMoves,
     );
   }
 
@@ -43,7 +49,8 @@ class TouchCrossDetector extends SingleChildRenderObjectWidget {
       ..onEnter = onEnter
       ..onExit = onExit
       ..onHover = onHover
-      ..onPointerDown = onPointerDown;
+      ..onPointerDown = onPointerDown
+      ..shouldTrackPointerMoves = shouldTrackPointerMoves;
   }
 }
 
@@ -53,6 +60,7 @@ class RenderTouchCrossDetector extends RenderProxyBox {
     void Function(PointerExitEvent)? onExit,
     void Function(PointerHoverEvent)? onHover,
     void Function(PointerDownEvent)? onPointerDown,
+    this.shouldTrackPointerMoves,
     RenderBox? child,
   }) : _onEnter = onEnter,
        _onExit = onExit,
@@ -89,6 +97,8 @@ class RenderTouchCrossDetector extends RenderProxyBox {
   }
 
   final Set<int> _activePointers = <int>{};
+  final Set<int> _pointersStartedInside = <int>{};
+  bool Function()? shouldTrackPointerMoves;
 
   @override
   void attach(PipelineOwner owner) {
@@ -106,6 +116,7 @@ class RenderTouchCrossDetector extends RenderProxyBox {
     if (!attached) return;
     final bool isInside = size.contains(globalToLocal(event.position));
     if (isInside) {
+      _pointersStartedInside.add(event.pointer);
       _activePointers.add(event.pointer);
       _onPointerDown?.call(event);
       _onEnter?.call(
@@ -119,7 +130,11 @@ class RenderTouchCrossDetector extends RenderProxyBox {
   }
 
   void handlePointerUpdate(PointerEvent event) {
-    if (!attached) return;
+    if (!attached ||
+        (!_pointersStartedInside.contains(event.pointer) &&
+            shouldTrackPointerMoves?.call() == false)) {
+      return;
+    }
     final bool isInside = size.contains(globalToLocal(event.position));
     final bool wasInside = _activePointers.contains(event.pointer);
     if (isInside && !wasInside) {
@@ -152,6 +167,7 @@ class RenderTouchCrossDetector extends RenderProxyBox {
   }
 
   void handlePointerUp(PointerUpEvent event) {
+    _pointersStartedInside.remove(event.pointer);
     if (_activePointers.contains(event.pointer)) {
       _activePointers.remove(event.pointer);
       _onExit?.call(
@@ -165,6 +181,7 @@ class RenderTouchCrossDetector extends RenderProxyBox {
   }
 
   void handlePointerCancel(PointerCancelEvent event) {
+    _pointersStartedInside.remove(event.pointer);
     if (_activePointers.contains(event.pointer)) {
       _activePointers.remove(event.pointer);
       _onExit?.call(

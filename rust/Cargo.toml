@@ -12,6 +12,7 @@ members = [
     "bindings/uniffi/cast",
     "bindings/uniffi/ensu",
     "bindings/uniffi/log",
+    "bindings/wasm/auth",
     "bindings/wasm/cast",
     "bindings/wasm/ensu",
     "bindings/wasm/legacy",
@@ -108,8 +109,8 @@ tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = "1.41.0"
 tsify = { version = "0.5.8", default-features = false, features = ["js"] }
-uniffi = { version = "=0.31.0" }
-uniffi_bindgen = { version = "=0.31.0", default-features = false, features = ["cargo-metadata"] }
+uniffi = { version = "=0.31.2" }
+uniffi_bindgen = { version = "=0.31.2", default-features = false, features = ["cargo-metadata"] }
 url = "2.5.8"
 urlencoding = "2.1.3"
 uuid = "1.23.1"

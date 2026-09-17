@@ -33,6 +33,7 @@ jobs:
                   client-id: ${{ secrets.ENTE_APPROVER_GH_CLIENT_ID }}
                   private-key: ${{ secrets.ENTE_APPROVER_GH_APP_PRIVATE_KEY }}
                   repositories: ente
+                  permission-contents: read
                   permission-pull-requests: write
 
             - name: Approve PR
@@ -77,12 +78,13 @@ jobs:
                       }
 
                       const pull = { ...context.repo, pull_number: pr.number };
-                      const { data: files } = await github.rest.pulls.listFiles({
-                          ...pull,
-                          per_page: 100,
+                      const { data } = await github.rest.repos.compareCommitsWithBasehead({
+                          ...context.repo,
+                          basehead: `${pr.base.sha}...${pr.head.sha}`,
                       });
+                      const files = data.files;
 
-                      if (files.length !== pr.changed_files) {
+                      if (files?.length !== pr.changed_files) {
                           core.info(
                               "The complete file list is unavailable; human approval is required.",
                           );

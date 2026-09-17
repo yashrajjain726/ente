@@ -1,1 +1,0 @@
-- (i) Added tuning controls and improved the experimental justified gallery layouts.

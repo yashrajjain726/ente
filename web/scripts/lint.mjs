@@ -13,7 +13,7 @@ const commands = [
         name: "eslint",
         command: `npm exec --workspaces -- eslint ${fix ? "--fix " : ""}--max-warnings 0`,
     },
-    { name: "tsc", command: "npm exec --workspaces -- tsc" },
+    { name: "tsc", command: "npm exec --workspaces -- tsc --incremental" },
     ...globSync("checks/*/check.mjs", { cwd })
         .sort()
         .map((path) => ({

@@ -3,11 +3,29 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
 const root = resolve(process.argv[2]);
+const listPath = "rust/checks/lint-exceptions/suppressions.json";
+const allowed = JSON.parse(readFileSync(resolve(root, listPath), "utf8"));
+const unused = new Map(
+    Object.entries(allowed).map(([path, rules]) => [path, new Set(rules)]),
+);
 
 for (const path of files()) {
     const source = readFileSync(resolve(root, path), "utf8");
     for (const attribute of attributes(source)) {
-        if (!/\bexpect\s*\(/.test(attribute.text)) continue;
+        for (const lint of suppressedLints(attribute.tokens)) {
+            unused.get(path)?.delete(lint);
+            if (!allowed[path]?.includes(lint)) {
+                const line = source
+                    .slice(0, attribute.start)
+                    .split("\n").length;
+                console.error(
+                    `${path}:${line}: ${lint} is not listed in ${listPath}`,
+                );
+                process.exitCode = 1;
+            }
+        }
+        if (!attribute.tokens.some((token) => /^(?:r#)?expect$/.test(token)))
+            continue;
         const lints = expectedLints(attribute.text);
         if (attribute.inner) {
             if (
@@ -24,6 +42,15 @@ for (const path of files()) {
         if (module === "frb_generated") continue;
         if (lints?.length === 1 && lints[0] === "dead_code") continue;
         reject(path, source, attribute.start);
+    }
+}
+
+for (const [path, rules] of unused) {
+    for (const rule of rules) {
+        console.error(
+            `${path}: ${rule} has no suppression; remove it from ${listPath}`,
+        );
+        process.exitCode = 1;
     }
 }
 
@@ -66,17 +93,48 @@ function files() {
 }
 
 function* attributes(source) {
-    const pattern = /^[ \t]*#(!?)\[/gm;
-    for (const match of source.matchAll(pattern)) {
-        const start = match.index + match[0].indexOf("#");
-        const end = attributeEnd(source, start);
-        if (end === undefined) continue;
+    const tokens = tokenize(source);
+    for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i].text !== "#") continue;
+        const inner = tokens[i + 1]?.text === "!";
+        const open = i + (inner ? 2 : 1);
+        if (tokens[open]?.text !== "[") continue;
+        let end = open + 1;
+        for (let depth = 1; end < tokens.length; end++) {
+            if (tokens[end].text === "[") depth++;
+            if (tokens[end].text === "]" && --depth === 0) break;
+        }
+        const start = tokens[i].start;
+        const offset = tokens[end].start + 1;
         yield {
-            end,
-            inner: match[1] === "!",
+            inner,
             start,
-            text: source.slice(start, end),
+            end: offset,
+            text: source.slice(start, offset),
+            tokens: tokens.slice(i, end + 1).map(({ text }) => text),
         };
+        i = end;
+    }
+}
+
+function* suppressedLints(tokens) {
+    for (let i = 0; i < tokens.length; i++) {
+        if (
+            !/^(?:r#)?(?:allow|expect)$/.test(tokens[i]) ||
+            tokens[i + 1] !== "("
+        )
+            continue;
+        let lint = "";
+        for (let j = i + 2; j < tokens.length; j++) {
+            const token = tokens[j];
+            if ([",", ")", "reason"].includes(token)) {
+                if (lint) yield lint;
+                lint = "";
+                if (token !== ",") break;
+            } else {
+                lint += token.replace(/^r#/, "");
+            }
+        }
     }
 }
 
@@ -131,4 +189,28 @@ function reject(path, source, start) {
     const line = source.slice(0, start).split("\n").length;
     console.error(`${path}:${line}: unapproved crate or module lint exception`);
     process.exitCode = 1;
+}
+
+function tokenize(source) {
+    const lexer =
+        /\/\/[^\n]*|\/\*|[bc]?r(#+)?"[\s\S]*?"\1|[bc]?"(?:\\[\s\S]|[^"\\])*"|b?'(?:\\(?:u\{[\da-fA-F_]+\}|x[\da-fA-F]{2}|[\s\S])|[^'\\\r\n])'|(?:r#)?[a-zA-Z_]\w*|[^\s]/gu;
+    const tokens = [];
+    let match;
+    while ((match = lexer.exec(source))) {
+        const text = match[0];
+        if (text.startsWith("//")) continue;
+        if (text === "/*") {
+            const comments = /\/\*|\*\//g;
+            comments.lastIndex = lexer.lastIndex;
+            for (let depth = 1; depth; ) {
+                const comment = comments.exec(source);
+                if (!comment) throw new Error("Unclosed Rust comment");
+                depth += comment[0] === "/*" ? 1 : -1;
+            }
+            lexer.lastIndex = comments.lastIndex;
+        } else {
+            tokens.push({ text, start: match.index });
+        }
+    }
+    return tokens;
 }

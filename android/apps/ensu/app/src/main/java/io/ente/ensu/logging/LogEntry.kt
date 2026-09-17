@@ -8,13 +8,13 @@ data class LogEntry(
     val level: LogLevel,
     val tag: String? = null,
     val message: String,
-    val details: String? = null
+    val details: String? = null,
 )
 
 enum class LogLevel {
     Info,
     Warning,
-    Error
+    Error,
 }
 
 internal fun buildLogEntry(
@@ -24,7 +24,7 @@ internal fun buildLogEntry(
     tag: String?,
     throwable: Throwable?,
     idProvider: () -> String = { UUID.randomUUID().toString() },
-    nowProvider: () -> Long = { System.currentTimeMillis() }
+    nowProvider: () -> Long = { System.currentTimeMillis() },
 ): LogEntry {
     val combinedDetails = buildString {
         if (!details.isNullOrBlank()) {
@@ -34,7 +34,8 @@ internal fun buildLogEntry(
             if (isNotEmpty()) append("\n")
             append(throwable.stackTraceToString())
         }
-    }.ifBlank { null }
+    }
+        .ifBlank { null }
 
     val safeMessage = sanitizeLog(message).orEmpty()
     val safeDetails = sanitizeLog(combinedDetails)
@@ -45,6 +46,6 @@ internal fun buildLogEntry(
         level = level,
         tag = tag,
         message = safeMessage,
-        details = safeDetails
+        details = safeDetails,
     )
 }

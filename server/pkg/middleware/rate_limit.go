@@ -226,7 +226,7 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	if reqPath == "/spaces/:spaceID/conversations" && reqMethod == http.MethodGet {
 		return r.limit60ReqPerMin
 	}
-	if reqPath == "/spaces/:spaceID/home-posts" && reqMethod == http.MethodGet {
+	if reqPath == "/spaces/:spaceID/feed" && reqMethod == http.MethodGet {
 		return r.limit60ReqPerMin
 	}
 	if reqMethod == http.MethodGet && isSpaceViewerReadURLPath(reqPath) {
@@ -248,10 +248,12 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	if isPublicCollectionUploadURLPath(reqPath) {
 		return r.limit250ReqPerMin
 	}
-	if reqPath == "/collections/share/bulk" || reqPath == "/collections/unshare/bulk" {
+	if reqPath == "/collections/share/bulk" ||
+		reqPath == "/collections/share/batch" ||
+		reqPath == "/collections/unshare/bulk" {
 		return r.limit60ReqPerMin
 	}
-	if reqPath == "/users/public-key" {
+	if reqPath == "/users/public-key" || reqPath == "/users/public-keys" {
 		return r.limit60ReqPerMin
 	}
 	if reqPath == "/paste/guard" || reqPath == "/paste/consume" {

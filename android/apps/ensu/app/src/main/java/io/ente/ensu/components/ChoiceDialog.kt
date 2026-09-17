@@ -21,7 +21,7 @@ fun ChoiceDialog(
     isDismissible: Boolean = true,
     onFirst: () -> Unit,
     onSecond: (() -> Unit)? = null,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = { if (isDismissible) onDismiss() },
@@ -31,7 +31,7 @@ fun ChoiceDialog(
             if (isCritical) {
                 Button(
                     onClick = onFirst,
-                    colors = ButtonDefaults.buttonColors(containerColor = EnsuColor.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = EnsuColor.error),
                 ) {
                     Text(text = firstButtonLabel)
                 }
@@ -45,7 +45,7 @@ fun ChoiceDialog(
             if (secondButtonLabel != null && onSecond != null) {
                 TextButton(
                     onClick = onSecond,
-                    colors = ButtonDefaults.textButtonColors(contentColor = EnsuColor.textMuted())
+                    colors = ButtonDefaults.textButtonColors(contentColor = EnsuColor.textMuted()),
                 ) {
                     Text(text = secondButtonLabel)
                 }
@@ -53,6 +53,6 @@ fun ChoiceDialog(
         },
         containerColor = EnsuColor.backgroundBase(),
         tonalElevation = 0.dp,
-        shape = AlertDialogDefaults.shape
+        shape = AlertDialogDefaults.shape,
     )
 }

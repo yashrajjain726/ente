@@ -16,7 +16,7 @@ fun NativeChoiceDialog(
     isDismissible: Boolean = true,
     onFirst: () -> Unit,
     onSecond: (() -> Unit)? = null,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val currentOnFirst by rememberUpdatedState(onFirst)
@@ -24,17 +24,15 @@ fun NativeChoiceDialog(
     val currentOnDismiss by rememberUpdatedState(onDismiss)
 
     DisposableEffect(title, body, firstButtonLabel, secondButtonLabel, isDismissible) {
-        val builder = AlertDialog.Builder(context)
-            .setTitle(title)
-            .setMessage(body)
-            .setPositiveButton(firstButtonLabel) { _, _ ->
+        val builder =
+            AlertDialog.Builder(context).setTitle(title).setMessage(body).setPositiveButton(
+                firstButtonLabel
+            ) { _, _ ->
                 currentOnFirst()
             }
 
         if (secondButtonLabel != null && currentOnSecond != null) {
-            builder.setNegativeButton(secondButtonLabel) { _, _ ->
-                currentOnSecond?.invoke()
-            }
+            builder.setNegativeButton(secondButtonLabel) { _, _ -> currentOnSecond?.invoke() }
         }
 
         val dialog = builder.create()

@@ -77,8 +77,10 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                         collections.append(NoteCollectionState(id: record.id, label: record.label))
                         enqueue(record.id, rebuild: true, due: .distantPast)
                     } catch {
-                        collections.append(NoteCollectionState(id: record.id, label: record.label, status: .error,
-                            error: Self.message(error)))
+                        collections.append(
+                            NoteCollectionState(
+                                id: record.id, label: record.label, status: .error,
+                                error: Self.message(error)))
                     }
                 }
                 loaded = true
@@ -162,7 +164,8 @@ final class NotesStore: ObservableObject, ModelMaintenance {
 
     func retry(_ id: String) {
         guard let collection = collections.first(where: { $0.id == id }),
-              collection.status == .error || collection.status == .unavailable else {
+            collection.status == .error || collection.status == .unavailable
+        else {
             return
         }
         failed.remove(id)
@@ -209,16 +212,18 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                 continue
             }
             guard accepted < Int(limits.maxGroundingHits),
-                  collections.contains(where: { $0.id == reference.collectionId }) else {
+                collections.contains(where: { $0.id == reference.collectionId })
+            else {
                 continue
             }
             do {
                 let reference = try await provider.verify(reference)
-                result.append(GroundedExcerpt(
-                    score: excerpt.score,
-                    source: .localNote(reference: reference),
-                    text: excerpt.text
-                ))
+                result.append(
+                    GroundedExcerpt(
+                        score: excerpt.score,
+                        source: .localNote(reference: reference),
+                        text: excerpt.text
+                    ))
                 accepted += 1
             } catch is CancellationError {
                 throw CancellationError()
@@ -250,7 +255,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         }
     }
 
-    private func enqueue(_ id: String, forced: Set<String> = [], rebuild: Bool = false, due: Date? = nil) {
+    private func enqueue(
+        _ id: String, forced: Set<String> = [], rebuild: Bool = false, due: Date? = nil
+    ) {
         guard collections.contains(where: { $0.id == id }) else { return }
         let old = pending[id]
         generation &+= 1
@@ -266,11 +273,19 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         guard loaded, !disabled, foreground, scopes == 0, active == nil else { return }
         wake?.cancel()
         let embeddingReady = modelProvider.isEmbeddingModelReady()
-        let request = embeddingReady ?
-            pending.filter { !failed.contains($0.key) && $0.value.due <= Date() }.min { $0.key < $1.key } : nil
-        guard let id = request?.key ?? scans.filter({ pending[$0] == nil && !failed.contains($0) }).min(),
-              let collection = collections.first(where: { $0.id == id }) else {
-            let due = embeddingReady ? pending.filter { !failed.contains($0.key) }.values.map(\.due).min() : nil
+        let request =
+            embeddingReady
+            ? pending.filter { !failed.contains($0.key) && $0.value.due <= Date() }.min {
+                $0.key < $1.key
+            } : nil
+        guard
+            let id = request?.key
+                ?? scans.filter({ pending[$0] == nil && !failed.contains($0) }).min(),
+            let collection = collections.first(where: { $0.id == id })
+        else {
+            let due =
+                embeddingReady
+                ? pending.filter { !failed.contains($0.key) }.values.map(\.due).min() : nil
             let seconds = min(300, max(0.1, due?.timeIntervalSinceNow ?? 300))
             wake = Task { [weak self] in
                 do {
@@ -279,8 +294,10 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                     return
                 }
                 guard let self else { return }
-                self.scans.formUnion(self.collections.filter { $0.status != .unavailable &&
-                    ($0.status != .error || $0.completedEmpty) }.map(\.id))
+                self.scans.formUnion(
+                    self.collections.filter {
+                        $0.status != .unavailable && ($0.status != .error || $0.completedEmpty)
+                    }.map(\.id))
                 self.pump()
             }
             return
@@ -291,7 +308,7 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         let cancellation = operation.cancellation
         let record = NotesCollectionInfo(id: collection.id, label: collection.label)
         let hadIndex = collection.indexAvailable
-        let task = Task { @MainActor in
+        let task = Task { @MainActor [self] in
             defer {
                 if active?.operation === operation {
                     active = nil
@@ -305,7 +322,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                         $0.status = hadIndex ? .updating : .indexing
                         $0.error = nil
                     }
-                    let result = try await modelProvider.withEmbeddingContext(checkCancellation: cancellation.check) { context in
+                    let result = try await modelProvider.withEmbeddingContext(
+                        checkCancellation: cancellation.check
+                    ) { context in
                         try await self.provider.index(
                             id,
                             context: context,
@@ -342,7 +361,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                             $0.status = .pending
                             $0.documentCount = result.summary.documentCount
                             $0.lastUpdatedAtMs = result.summary.lastUpdatedAtMs
-                            $0.indexAvailable = hadIndex && result.summary.initialComplete && result.summary.documentCount > 0
+                            $0.indexAvailable =
+                                hadIndex && result.summary.initialComplete
+                                && result.summary.documentCount > 0
                         }
                     }
                 } else {
@@ -351,7 +372,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                         $0 = Self.state(record, result.summary, progress: $0.progress)
                     }
                     if result.changed {
-                        enqueue(id, forced: Set(result.forcedDocumentIds), due: result.summary.initialComplete ? nil : .distantPast)
+                        enqueue(
+                            id, forced: Set(result.forcedDocumentIds),
+                            due: result.summary.initialComplete ? nil : .distantPast)
                         update(id) {
                             $0.status = .pending
                             $0.error = nil
@@ -364,7 +387,9 @@ final class NotesStore: ObservableObject, ModelMaintenance {
                 update(id) {
                     $0.status = .pending
                     if let saved { $0.lastUpdatedAtMs = saved.lastUpdatedAtMs }
-                    $0.indexAvailable = hadIndex && saved?.initialComplete == true && (saved?.documentCount ?? 0) > 0
+                    $0.indexAvailable =
+                        hadIndex && saved?.initialComplete == true
+                        && (saved?.documentCount ?? 0) > 0
                 }
             } catch NotesError.RebuildRequired {
                 if snapshot == nil {
@@ -395,13 +420,18 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         }
     }
     private static func message(_ error: Error) -> String {
-        guard let error = error as? NotesError else { return "Could not update Your Notes. Please try again." }
+        guard let error = error as? NotesError else {
+            return "Could not update Your Notes. Please try again."
+        }
         switch error {
-        case .Unavailable: return "This Notes folder is unavailable. Check access and try again. If access has expired, remove the folder and add it again."
+        case .Unavailable:
+            return
+                "This Notes folder is unavailable. Check access and try again. If access has expired, remove the folder and add it again."
         case .SourceChanged: return "The folder changed. Retry to update Your Notes."
         case .SourceRead(let detail), .InvalidInput(let detail): return detail
         case .Storage: return "Could not save the Notes index. Check storage and try again."
-        case .RebuildRequired: return "The Notes index needs rebuilding. Retry to update Your Notes."
+        case .RebuildRequired:
+            return "The Notes index needs rebuilding. Retry to update Your Notes."
         default: return "Could not update Your Notes. Please try again."
         }
     }
@@ -410,12 +440,16 @@ final class NotesStore: ObservableObject, ModelMaintenance {
         guard let index = collections.firstIndex(where: { $0.id == id }) else { return }
         body(&collections[index])
     }
-    private static func state(_ record: NotesCollectionInfo, _ summary: NotesSummary, progress: UInt8? = nil) -> NoteCollectionState {
+    private static func state(
+        _ record: NotesCollectionInfo, _ summary: NotesSummary, progress: UInt8? = nil
+    ) -> NoteCollectionState {
         let ready = summary.initialComplete && summary.documentCount > 0
         let empty = summary.initialComplete && !ready
-        return NoteCollectionState(id: record.id, label: record.label,
+        return NoteCollectionState(
+            id: record.id, label: record.label,
             status: ready ? .ready : summary.initialComplete ? .error : .pending,
-            documentCount: summary.documentCount, lastUpdatedAtMs: summary.lastUpdatedAtMs, indexAvailable: ready,
+            documentCount: summary.documentCount, lastUpdatedAtMs: summary.lastUpdatedAtMs,
+            indexAvailable: ready,
             progress: summary.initialComplete ? nil : progress,
             error: empty ? emptyNotes : nil,
             completedEmpty: empty)

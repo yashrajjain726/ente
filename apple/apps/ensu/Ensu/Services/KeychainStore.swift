@@ -15,7 +15,7 @@ final class KeychainStore {
         ]
 
         let attributes: [String: Any] = [
-            kSecValueData as String: data,
+            kSecValueData as String: data
         ]
 
         let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)

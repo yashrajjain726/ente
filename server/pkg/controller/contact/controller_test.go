@@ -765,12 +765,14 @@ func TestUserAttachmentsRejectDuplicateBucketMembership(t *testing.T) {
 func TestAttachmentLifecycle(t *testing.T) {
 	ctrl, db, ctx, s3Cfg := setupContactControllerTest(t)
 	mustInsertTestUser(t, db, 1)
+	ctx.Request.Header.Set("X-Client-Package", "io.ente.photos")
+	ctx.Request.Header.Set("X-Client-Version", "1.0")
 
 	created := createContactForTest(t, db, ctrl, ctx, 41, "wrapped-key-1", "payload-1")
 
 	upload1, err := ctrl.GetAttachmentUploadURL(ctx, string(contactmodel.ProfilePicture), contactmodel.AttachmentUploadURLRequest{
 		ContentLength: 128,
-		ContentMD5:    "ZmFrZS1tZDU=",
+		ContentMD5:    "XUFAKrxLKna5cZ2REBfFkg==",
 	})
 	if err != nil {
 		t.Fatalf("GetAttachmentUploadURL() error = %v", err)
@@ -786,6 +788,12 @@ func TestAttachmentLifecycle(t *testing.T) {
 	}
 	if bucketID != s3Cfg.GetAttachmentBucketID(string(contactmodel.ProfilePicture)) {
 		t.Fatalf("bucket_id = %q, want %q", bucketID, s3Cfg.GetAttachmentBucketID(string(contactmodel.ProfilePicture)))
+	}
+	var metadataMatches bool
+	if err := db.QueryRow(`SELECT user_id = 1 AND app = 'photos' AND purpose = 'attachment'
+	    AND content_length = 128 AND content_md5 = 'XUFAKrxLKna5cZ2REBfFkg==' AND client = 'io.ente.photos/1.0'
+	    FROM temp_objects WHERE object_key = $1`, objectKey1).Scan(&metadataMatches); err != nil || !metadataMatches {
+		t.Fatalf("unexpected upload metadata: matches=%v err=%v", metadataMatches, err)
 	}
 
 	withPicture, err := ctrl.AttachContactAttachment(ctx, created.ID, string(contactmodel.ProfilePicture), contactmodel.CommitAttachmentRequest{
@@ -816,6 +824,10 @@ func TestAttachmentLifecycle(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("second GetAttachmentUploadURL() error = %v", err)
+	}
+	if err := db.QueryRow(`SELECT content_md5 IS NULL FROM temp_objects WHERE object_key = $1`,
+		contactmodel.AttachmentObjectKey(1, contactmodel.ProfilePicture, upload2.AttachmentID)).Scan(&metadataMatches); err != nil || !metadataMatches {
+		t.Fatalf("invalid MD5 should not be recorded: matches=%v err=%v", metadataMatches, err)
 	}
 	replaced, err := ctrl.AttachContactAttachment(ctx, created.ID, string(contactmodel.ProfilePicture), contactmodel.CommitAttachmentRequest{
 		AttachmentID: upload2.AttachmentID,

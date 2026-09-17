@@ -14,6 +14,7 @@ import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
 const dangerColor = "#F63A3A";
+const headerBackground = "#2C2C2E";
 const headerActionSize = spaceTouchTargetSize;
 const headerAvatarImageSize = 28;
 const headerChatCircleSize = 36;
@@ -64,8 +65,8 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
             width: "100%",
             zIndex: 4,
             "&::after": {
-                bgcolor: spaceSurface,
-                borderRadius: "12px",
+                bgcolor: headerBackground,
+                borderRadius: "22px",
                 content: '""',
                 height: spaceHomeHeaderBarHeight,
                 left: "16px",
@@ -223,7 +224,7 @@ export const SpaceHomeHeader: React.FC<SpaceHomeHeaderProps> = ({
                     <Box
                         sx={{
                             bgcolor: dangerColor,
-                            border: `2px solid ${spaceSurface}`,
+                            border: `2px solid ${headerBackground}`,
                             borderRadius: "50%",
                             boxSizing: "border-box",
                             height: 12.5,

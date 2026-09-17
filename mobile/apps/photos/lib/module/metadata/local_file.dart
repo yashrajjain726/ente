@@ -2,6 +2,7 @@ import "dart:convert";
 import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:path/path.dart";
 import "package:photo_manager/photo_manager.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
@@ -9,6 +10,7 @@ import "package:photos/models/location/location.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/module/metadata/asset_date_times.dart";
 import "package:photos/module/metadata/exif.dart";
+import "package:photos/module/metadata/filename.dart";
 
 EnteFile fileFromAsset(String deviceFolder, AssetEntity asset) {
   final resolvedDateTimes = resolveAssetDateTimes(asset);
@@ -56,7 +58,9 @@ void applyCreationTimeMetadata(EnteFile file, ParsedExifDateTime? exifTime) {
   // Try to get the timestamp from fileName. In case of iOS, file names are
   // generic IMG_XXXX, so only parse it on Android devices
   if (!hasExifTime && Platform.isAndroid && file.title != null) {
-    final timeFromFileName = parseDateTimeFromFileNameV2(file.title!);
+    final timeFromFileName = parseDateTimeFromFileName(
+      basenameWithoutExtension(file.title!),
+    );
     if (timeFromFileName != null) {
       // Filename dates often omit the time; keep photo_manager's timestamp
       // when both values fall on the same day.

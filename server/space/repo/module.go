@@ -128,6 +128,8 @@ type SpaceTempObjectRecord struct {
 	ExpiresAt    int64
 	CleanupAfter int64
 	CreatedAt    int64
+	ContentMD5   sql.NullString
+	Client       sql.NullString
 }
 
 type SpaceMessageRecord struct {

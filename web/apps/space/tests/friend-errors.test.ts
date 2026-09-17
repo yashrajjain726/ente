@@ -8,7 +8,6 @@ import {
     friendRequestErrorMessage,
     isFriendRequestCanceledError,
 } from "../src/utils/friend-errors";
-import { spaceFriendLimitMessage } from "../src/utils/friend-limits";
 
 let ctx: SpaceAccountCtxHandle;
 const publicKey = Buffer.from([9, ...new Array<number>(31).fill(0)]).toString(
@@ -97,7 +96,11 @@ test.each([
         409,
         "@friend can't receive more friend requests right now.",
     ],
-    ["SPACE_FRIEND_LIMIT_REACHED", 409, spaceFriendLimitMessage],
+    [
+        "SPACE_SENT_FRIEND_REQUEST_LIMIT_REACHED",
+        409,
+        "You have too many pending friend requests. Cancel a sent request or wait for someone to respond.",
+    ],
     ["CONFLICT", 409, "Couldn't send the friend request. Please try again."],
 ] as const)(
     "%s reaches the add-friend message",

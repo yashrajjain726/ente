@@ -2,10 +2,6 @@ package io.ente.ensu.chat
 
 import io.ente.ensu.device.ChatDeviceCapability
 import io.ente.ensu.llm.DownloadPhase
-import io.ente.ensu.chat.Attachment
-import io.ente.ensu.chat.ChatMessage
-import io.ente.ensu.chat.ChatSession
-
 
 data class ChatState(
     val sessions: List<ChatSession> = emptyList(),
@@ -31,12 +27,12 @@ data class ChatState(
     val hasRequestedModelDownload: Boolean = false,
     val deviceCapability: ChatDeviceCapability = ChatDeviceCapability.Unknown,
     val showUnsupportedDeviceDialog: Boolean = false,
-    val overflowDialog: OverflowDialogState? = null
+    val overflowDialog: OverflowDialogState? = null,
 )
 
 data class OverflowDialogState(
     val inputTokens: Int,
     val inputBudget: Int,
     val contextLength: Int,
-    val maxOutput: Int
+    val maxOutput: Int,
 )

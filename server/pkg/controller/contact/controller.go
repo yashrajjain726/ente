@@ -2,6 +2,8 @@ package contact
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/base64"
 	"errors"
 	"io"
 	"os"
@@ -16,6 +18,7 @@ import (
 	contactrepo "github.com/ente/museum/pkg/repo/contact"
 	"github.com/ente/museum/pkg/utils/auth"
 	fileutil "github.com/ente/museum/pkg/utils/file"
+	"github.com/ente/museum/pkg/utils/network"
 	"github.com/ente/museum/pkg/utils/s3config"
 	enteTime "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
@@ -188,7 +191,20 @@ func (c *Controller) GetAttachmentUploadURL(ctx *gin.Context, attachmentTypeRaw 
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to presign profile picture upload url")
 	}
-	if err := c.ObjectCleanupController.AddTempObjectKey(objectKey, dc); err != nil {
+	var contentMD5 *string
+	if digest, err := base64.StdEncoding.DecodeString(req.ContentMD5); err == nil && len(digest) == md5.Size {
+		contentMD5 = aws.String(base64.StdEncoding.EncodeToString(digest))
+	}
+	if err := c.ObjectCleanupController.AddTempObject(ente.TempObject{
+		ObjectKey:     objectKey,
+		BucketId:      dc,
+		UserID:        userID,
+		App:           auth.GetApp(ctx),
+		Purpose:       "attachment",
+		ContentLength: &req.ContentLength,
+		ContentMD5:    contentMD5,
+		Client:        network.GetClientInfo(ctx),
+	}); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to stage temp object for attachment upload")
 	}
 

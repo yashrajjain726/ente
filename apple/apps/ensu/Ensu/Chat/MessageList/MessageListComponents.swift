@@ -4,7 +4,7 @@ import QuickLook
 import UIKit
 
 struct BottomOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
@@ -12,7 +12,7 @@ struct BottomOffsetKey: PreferenceKey {
 }
 
 struct ContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
@@ -91,11 +91,14 @@ struct ImageAttachmentPreview: View {
         }
     }
 
-    private func fittedPreviewSize(imageSize: CGSize, containerSize: CGSize, padding: CGFloat) -> CGSize {
+    private func fittedPreviewSize(imageSize: CGSize, containerSize: CGSize, padding: CGFloat)
+        -> CGSize
+    {
         let availableWidth = max(0, containerSize.width - (padding * 2))
         let availableHeight = max(0, containerSize.height - (padding * 2))
 
-        guard imageSize.width > 0, imageSize.height > 0, availableWidth > 0, availableHeight > 0 else {
+        guard imageSize.width > 0, imageSize.height > 0, availableWidth > 0, availableHeight > 0
+        else {
             return .zero
         }
 
@@ -137,7 +140,9 @@ struct QuickLookPreview: UIViewControllerRepresentable {
             1
         }
 
-        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int)
+            -> QLPreviewItem
+        {
             url as NSURL
         }
     }
@@ -202,7 +207,7 @@ struct UserMessageBubbleView: View {
                     Text(message.text)
                         .font(EnsuTypography.message)
                         .foregroundStyle(EnsuColor.userMessageText)
-                        .lineSpacing(EnsuLineHeight.spacing(fontSize: 15, lineHeight: 1.7))
+                        .lineSpacing(EnsuLineHeight.spacing(fontSize: 15, lineHeight: 22.0 / 15))
                         .multilineTextAlignment(.leading)
                         .textSelection(.enabled)
                 }
@@ -253,12 +258,15 @@ struct AssistantMessageBubbleView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
-                    AssistantMessageRenderer(text: parsed.text, isStreaming: false, storageId: message.id.uuidString)
+                    AssistantMessageRenderer(
+                        text: parsed.text, isStreaming: false, storageId: message.id.uuidString)
 
                     if !parsed.sourceLabels.isEmpty {
                         ViewThatFits(in: .horizontal) {
                             HStack(spacing: EnsuSpacing.sm) { sourceChips(parsed.sourceLabels) }
-                            VStack(alignment: .leading, spacing: EnsuSpacing.sm) { sourceChips(parsed.sourceLabels) }
+                            VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
+                                sourceChips(parsed.sourceLabels)
+                            }
                         }
                     }
 
@@ -313,7 +321,9 @@ struct AssistantMessageBubbleView: View {
 
     private func sourceChips(_ labels: [String]) -> some View {
         ForEach(Array(labels.enumerated()), id: \.offset) { _, label in
-            Button { showSources = true } label: {
+            Button {
+                showSources = true
+            } label: {
                 Text(label)
                     .font(EnsuTypography.small)
                     .foregroundStyle(EnsuColor.textPrimary)
@@ -363,7 +373,9 @@ private struct KnowledgeSourcesSheet: View {
                         Text(reference.documentId)
                             .font(EnsuTypography.small)
                             .foregroundStyle(EnsuColor.textMuted)
-                        Button { notes.open(reference) } label: {
+                        Button {
+                            notes.open(reference)
+                        } label: {
                             Label("Open note", systemImage: "arrow.up.right.square")
                                 .frame(minHeight: 44)
                         }
@@ -375,7 +387,9 @@ private struct KnowledgeSourcesSheet: View {
 
                         ViewThatFits(in: .horizontal) {
                             HStack(spacing: EnsuSpacing.lg) { sourceLinks(citation) }
-                            VStack(alignment: .leading, spacing: EnsuSpacing.sm) { sourceLinks(citation) }
+                            VStack(alignment: .leading, spacing: EnsuSpacing.sm) {
+                                sourceLinks(citation)
+                            }
                         }
                         .font(EnsuTypography.small)
                     }
@@ -395,7 +409,8 @@ private struct KnowledgeSourcesSheet: View {
     private func sourceHeader(_ source: GroundedSource, number: Int) -> String {
         switch source {
         case .localNote(let reference):
-            return "SOURCE \(number) · YOUR NOTES" + (reference.collectionLabel.map { " · \($0.uppercased())" } ?? "")
+            return "SOURCE \(number) · YOUR NOTES"
+                + (reference.collectionLabel.map { " · \($0.uppercased())" } ?? "")
         case .ensuPack(let citation):
             return "SOURCE \(number) · ENSU PACK · \(citation.datasetLabel.uppercased())"
         }
@@ -410,13 +425,17 @@ private struct KnowledgeSourcesSheet: View {
 
     @ViewBuilder
     private func sourceLinks(_ citation: SourceCitation) -> some View {
-        Link(destination: URL(string: citation.sourceUrl)!) {
-            Label("Open source", systemImage: "arrow.up.right.square")
-                .frame(minHeight: 44)
+        if let sourceUrl = URL(string: citation.sourceUrl) {
+            Link(destination: sourceUrl) {
+                Label("Open source", systemImage: "arrow.up.right.square")
+                    .frame(minHeight: 44)
+            }
         }
-        Link(destination: URL(string: citation.licenseUrl)!) {
-            Label(citation.licenseLabel, systemImage: "arrow.up.right.square")
-                .frame(minHeight: 44)
+        if let licenseUrl = URL(string: citation.licenseUrl) {
+            Link(destination: licenseUrl) {
+                Label(citation.licenseLabel, systemImage: "arrow.up.right.square")
+                    .frame(minHeight: 44)
+            }
         }
     }
 
@@ -434,7 +453,8 @@ struct StreamingBubbleView: View {
     @State private var renderedText = ""
 
     var body: some View {
-        let hasText = isGenerating && !renderedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasText =
+            isGenerating && !renderedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let bubbleVerticalPadding = hasText ? EnsuSpacing.md : 0
         let contentSpacing = hasText ? EnsuSpacing.sm : 0
 
@@ -588,16 +608,20 @@ struct ParsedMessage {
         var remaining = text
         var todos: [TodoBlock] = []
 
-        let thinkMatches = ParsedMessage.extractTags(using: ChatMessageTagRegex.think, from: remaining)
+        let thinkMatches = ParsedMessage.extractTags(
+            using: ChatMessageTagRegex.think, from: remaining)
         remaining = thinkMatches.cleaned
 
-        let todoMatches = ParsedMessage.extractTags(using: ChatMessageTagRegex.todoList, from: remaining)
+        let todoMatches = ParsedMessage.extractTags(
+            using: ChatMessageTagRegex.todoList, from: remaining)
         remaining = todoMatches.cleaned
 
         for content in todoMatches.contents {
             if let data = content.data(using: .utf8),
-               let payload = try? JSONDecoder().decode(TodoPayload.self, from: data) {
-                todos.append(TodoBlock(title: payload.title, status: payload.status, items: payload.items))
+                let payload = try? JSONDecoder().decode(TodoPayload.self, from: data)
+            {
+                todos.append(
+                    TodoBlock(title: payload.title, status: payload.status, items: payload.items))
             }
         }
 
@@ -606,7 +630,9 @@ struct ParsedMessage {
         self.markdownBlocks = MarkdownParser.parse(remaining)
     }
 
-    private static func extractTags(using regex: NSRegularExpression?, from text: String) -> (contents: [String], cleaned: String) {
+    private static func extractTags(using regex: NSRegularExpression?, from text: String) -> (
+        contents: [String], cleaned: String
+    ) {
         guard let regex else {
             return ([], text)
         }
@@ -616,7 +642,8 @@ struct ParsedMessage {
             guard let range = Range(match.range(at: 1), in: text) else { return nil }
             return String(text[range])
         }
-        let cleaned = regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        let cleaned = regex.stringByReplacingMatches(
+            in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
         return (contents, cleaned)
     }
 
@@ -651,7 +678,7 @@ struct TodoListCardView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(items, id: \.self) { item in
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .top, spacing: EnsuSpacing.sm) {
                         Circle()
                             .fill(EnsuColor.accent)
@@ -679,16 +706,19 @@ struct MarkdownView: View {
     let blocks: [MarkdownBlock]
     var showCursor: Bool = false
 
+    private let messageLineSpacing = EnsuLineHeight.spacing(fontSize: 15, lineHeight: 22.0 / 15)
+
     var body: some View {
         let lastKind = blocks.last?.kind
-        let inlineCursorSupported = lastKind.map { kind in
-            switch kind {
-            case .heading, .paragraph, .blockquote, .list:
-                return true
-            case .code, .math, .divider:
-                return false
-            }
-        } ?? false
+        let inlineCursorSupported =
+            lastKind.map { kind in
+                switch kind {
+                case .heading, .paragraph, .blockquote, .list:
+                    return true
+                case .code, .math, .divider:
+                    return false
+                }
+            } ?? false
         let showTrailingCursor = showCursor && (!inlineCursorSupported || blocks.isEmpty)
 
         VStack(alignment: .leading, spacing: EnsuSpacing.md) {
@@ -702,7 +732,8 @@ struct MarkdownView: View {
                             text: displayText,
                             fonts: InlineFontSet(
                                 normal: headingFont(for: level),
-                                code: EnsuFont.code(size: headingFontSize(for: level), weight: .semibold),
+                                code: EnsuFont.code(
+                                    size: headingFontSize(for: level), weight: .semibold),
                                 mathSize: headingFontSize(for: level)
                             ),
                             textColor: EnsuColor.textPrimary
@@ -724,7 +755,7 @@ struct MarkdownView: View {
                         markdownText(displayText)
                             .font(EnsuTypography.message)
                             .foregroundStyle(EnsuColor.textPrimary)
-                            .lineSpacing(EnsuLineHeight.spacing(fontSize: 15, lineHeight: 1.7))
+                            .lineSpacing(messageLineSpacing)
                     }
                 case .blockquote(let text):
                     let displayText = showCursor && isLast ? text + StreamingCursor.glyph : text
@@ -734,14 +765,15 @@ struct MarkdownView: View {
                 case .math(let text):
                     MathBlockView(text: text)
                 case .list(let items):
-                    let resolvedItems = (showCursor && isLast)
+                    let resolvedItems =
+                        (showCursor && isLast)
                         ? items.enumerated().map { offset, item in
                             offset == items.count - 1 ? item + StreamingCursor.glyph : item
                         }
                         : items
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(resolvedItems, id: \.self) { item in
+                    VStack(alignment: .leading, spacing: EnsuSpacing.md) {
+                        ForEach(Array(resolvedItems.enumerated()), id: \.offset) { _, item in
                             HStack(alignment: .top, spacing: EnsuSpacing.sm) {
                                 Text("•")
                                     .font(EnsuTypography.message)
@@ -756,6 +788,7 @@ struct MarkdownView: View {
                                     markdownText(item)
                                         .font(EnsuTypography.message)
                                         .foregroundStyle(EnsuColor.textPrimary)
+                                        .lineSpacing(messageLineSpacing)
                                 }
                             }
                         }
@@ -827,11 +860,6 @@ private let messageInlineFonts = InlineFontSet(
     mathSize: 15
 )
 
-private let inlineMathPattern = try! NSRegularExpression(
-    pattern: #"(?<!\\)\$(?!\$)(?:[^$\n\\]|\\.)+?(?<!\\)\$(?!\$)|\\\((?:[^\n\\]|\\.)+?\\\)"#,
-    options: []
-)
-
 private func parseInlineSegments(_ text: String) -> [InlineSegment] {
     let characters = Array(text)
     var segments: [InlineSegment] = []
@@ -847,7 +875,9 @@ private func parseInlineSegments(_ text: String) -> [InlineSegment] {
     }
 
     while index < characters.count {
-        if let mathMatch = findInlineMathMatch(characters, startIndex: index) {
+        if currentStyle != .code,
+            let mathMatch = findInlineMathMatch(characters, startIndex: index)
+        {
             flushBuffer()
             segments.append(.math(mathMatch.latex))
             index = mathMatch.endIndex
@@ -884,18 +914,18 @@ private func parseInlineSegments(_ text: String) -> [InlineSegment] {
             }
         case .normal:
             switch true {
-            case hasPrefix(characters, at: index, token: ["*", "*"]) && hasClosingDelimiter(characters, startIndex: index + 2, delimiter: ["*", "*"]):
+            case hasPrefix(characters, at: index, token: ["*", "*"])
+                && hasClosingDelimiter(characters, startIndex: index + 2, delimiter: ["*", "*"]):
                 flushBuffer()
                 currentStyle = .bold
                 index += 2
-            case characters[index] == "*" &&
-                !hasPrefix(characters, at: index, token: ["*", "*"]) &&
-                hasClosingSingleAsterisk(characters, startIndex: index + 1):
+            case characters[index] == "*" && !hasPrefix(characters, at: index, token: ["*", "*"])
+                && hasClosingSingleAsterisk(characters, startIndex: index + 1):
                 flushBuffer()
                 currentStyle = .italic
                 index += 1
-            case characters[index] == "`" &&
-                hasClosingDelimiter(characters, startIndex: index + 1, delimiter: ["`"]):
+            case characters[index] == "`"
+                && hasClosingDelimiter(characters, startIndex: index + 1, delimiter: ["`"]):
                 flushBuffer()
                 currentStyle = .code
                 index += 1
@@ -926,6 +956,7 @@ private func findInlineMathMatch(_ characters: [Character], startIndex: Int) -> 
                     return nil
                 }
                 if characters[index + 1] == ")" {
+                    guard index > startIndex + 2 else { return nil }
                     return InlineMathMatch(
                         latex: String(characters[(startIndex + 2)..<index]),
                         endIndex: index + 2
@@ -939,7 +970,10 @@ private func findInlineMathMatch(_ characters: [Character], startIndex: Int) -> 
         return nil
     }
 
-    if characters[startIndex] != "$" || (startIndex > 0 && characters[startIndex - 1] == "\\") {
+    if characters[startIndex] != "$"
+        || (startIndex > 0
+            && (characters[startIndex - 1] == "\\" || characters[startIndex - 1] == "$"))
+    {
         return nil
     }
     if startIndex + 1 < characters.count && characters[startIndex + 1] == "$" {
@@ -951,10 +985,10 @@ private func findInlineMathMatch(_ characters: [Character], startIndex: Int) -> 
         if characters[index] == "\n" {
             return nil
         }
-        if characters[index] == "$" &&
-            characters[index - 1] != "\\" &&
-            (index + 1 >= characters.count || characters[index + 1] != "$") {
-            if index == startIndex + 1 {
+        if characters[index] == "$" && characters[index - 1] != "\\" {
+            if index == startIndex + 1
+                || (index + 1 < characters.count && characters[index + 1] == "$")
+            {
                 return nil
             }
             return InlineMathMatch(
@@ -976,7 +1010,9 @@ private func hasPrefix(_ characters: [Character], at startIndex: Int, token: [Ch
     return Array(characters[startIndex..<endIndex]) == token
 }
 
-private func hasClosingDelimiter(_ characters: [Character], startIndex: Int, delimiter: [Character]) -> Bool {
+private func hasClosingDelimiter(_ characters: [Character], startIndex: Int, delimiter: [Character])
+    -> Bool
+{
     var index = startIndex
     while index < characters.count {
         if characters[index] == "\n" {
@@ -1005,8 +1041,10 @@ private func hasClosingSingleAsterisk(_ characters: [Character], startIndex: Int
 }
 
 private func containsInlineMath(_ text: String) -> Bool {
-    let nsText = text as NSString
-    return inlineMathPattern.firstMatch(in: text, range: NSRange(location: 0, length: nsText.length)) != nil
+    parseInlineSegments(text).contains {
+        if case .math = $0 { return true }
+        return false
+    }
 }
 
 private func styledInlineText(
@@ -1072,17 +1110,23 @@ private struct InlineMathTextView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, rawLine in
+            ForEach(
+                Array(text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()),
+                id: \.offset
+            ) { _, rawLine in
                 let line = String(rawLine)
                 FlowLayout(spacing: 0) {
-                    ForEach(Array(parseInlineSegments(line).enumerated()), id: \.offset) { _, segment in
+                    ForEach(Array(parseInlineSegments(line).enumerated()), id: \.offset) {
+                        _, segment in
                         switch segment {
                         case .math(let latex):
                             InlineLaTeXView(latex: latex, fontSize: fonts.mathSize)
                                 .fixedSize()
                         case .text(let content, let style):
-                            ForEach(Array(splitTextChunks(content).enumerated()), id: \.offset) { _, chunk in
-                                styledInlineText(chunk, style: style, fonts: fonts, textColor: textColor)
+                            ForEach(Array(splitTextChunks(content).enumerated()), id: \.offset) {
+                                _, chunk in
+                                styledInlineText(
+                                    chunk, style: style, fonts: fonts, textColor: textColor)
                             }
                         }
                     }
@@ -1175,7 +1219,9 @@ enum MarkdownParser {
             flushMarkdown()
             mathEndDelimiter = endDelimiter
             mathLines.removeAll()
-            if let initial = initialContent?.trimmingCharacters(in: .whitespacesAndNewlines), !initial.isEmpty {
+            if let initial = initialContent?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !initial.isEmpty
+            {
                 mathLines.append(initial)
             }
         }
@@ -1199,7 +1245,8 @@ enum MarkdownParser {
                     continue
                 }
                 if endDelimiter != "]" && trimmed.hasSuffix(endDelimiter) {
-                    let content = String(trimmed.dropLast(endDelimiter.count)).trimmingCharacters(in: .whitespaces)
+                    let content = String(trimmed.dropLast(endDelimiter.count)).trimmingCharacters(
+                        in: .whitespaces)
                     if !content.isEmpty {
                         mathLines.append(content)
                     }
@@ -1241,7 +1288,8 @@ enum MarkdownParser {
             }
 
             if isBracketMathLine(trimmed) {
-                let inner = String(trimmed.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+                let inner = String(trimmed.dropFirst().dropLast()).trimmingCharacters(
+                    in: .whitespaces)
                 flushMarkdown()
                 segments.append(.math(inner))
                 continue
@@ -1291,10 +1339,12 @@ enum MarkdownParser {
         case _ as ThematicBreak:
             return [.divider]
         case let orderedList as OrderedList:
-            let items = orderedList.children.compactMap { $0 as? ListItem }.map(renderListItem).filter { !$0.isEmpty }
+            let items = orderedList.children.compactMap { $0 as? ListItem }.map(renderListItem)
+                .filter { !$0.isEmpty }
             return items.isEmpty ? [] : [.list(items: items)]
         case let unorderedList as UnorderedList:
-            let items = unorderedList.children.compactMap { $0 as? ListItem }.map(renderListItem).filter { !$0.isEmpty }
+            let items = unorderedList.children.compactMap { $0 as? ListItem }.map(renderListItem)
+                .filter { !$0.isEmpty }
             return items.isEmpty ? [] : [.list(items: items)]
         default:
             var nestedBlocks: [MarkdownBlock.Kind] = []
@@ -1323,14 +1373,16 @@ enum MarkdownParser {
                 continue
             }
             if let list = child as? OrderedList {
-                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter { !$0.isEmpty }
+                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter
+                { !$0.isEmpty }
                 if !items.isEmpty {
                     parts.append(items.joined(separator: "\n"))
                 }
                 continue
             }
             if let list = child as? UnorderedList {
-                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter { !$0.isEmpty }
+                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter
+                { !$0.isEmpty }
                 if !items.isEmpty {
                     parts.append(items.joined(separator: "\n"))
                 }
@@ -1351,14 +1403,16 @@ enum MarkdownParser {
                 continue
             }
             if let list = child as? OrderedList {
-                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter { !$0.isEmpty }
+                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter
+                { !$0.isEmpty }
                 if !items.isEmpty {
                     parts.append(items.joined(separator: "\n"))
                 }
                 continue
             }
             if let list = child as? UnorderedList {
-                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter { !$0.isEmpty }
+                let items = list.children.compactMap { $0 as? ListItem }.map(renderListItem).filter
+                { !$0.isEmpty }
                 if !items.isEmpty {
                     parts.append(items.joined(separator: "\n"))
                 }
@@ -1450,7 +1504,8 @@ struct MathBlockView: View {
                 RoundedRectangle(cornerRadius: EnsuCornerRadius.codeBlock)
                     .stroke(EnsuColor.border, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: EnsuCornerRadius.codeBlock, style: .continuous))
+            .clipShape(
+                RoundedRectangle(cornerRadius: EnsuCornerRadius.codeBlock, style: .continuous))
     }
 }
 

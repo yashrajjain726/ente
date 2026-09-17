@@ -5,7 +5,7 @@ export const profilePhotoRows = <Tile extends { aspectRatio: number }>(
     tiles: Tile[],
     width: number,
 ) => {
-    const rows: { aspectRatio: number; tiles: Tile[] }[] = [];
+    const rows: { aspectRatio: number; height: number; tiles: Tile[] }[] = [];
     let nextTileIndex = 0;
 
     while (nextTileIndex < tiles.length) {
@@ -33,7 +33,11 @@ export const profilePhotoRows = <Tile extends { aspectRatio: number }>(
             rowSize--;
         }
 
-        rows.push({ aspectRatio, tiles: rowTiles });
+        rows.push({
+            aspectRatio,
+            height: (width - (rowSize - 1) * profilePhotoGap) / aspectRatio,
+            tiles: rowTiles,
+        });
         nextTileIndex += rowSize;
     }
 

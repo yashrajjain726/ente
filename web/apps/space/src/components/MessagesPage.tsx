@@ -1,4 +1,3 @@
-import { SpaceFriendLimitToast } from "components/FriendLimitToast";
 import { SpaceFriendRequestCanceledToast } from "components/FriendRequestCanceledToast";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
@@ -27,10 +26,7 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
-import {
-    isFriendRequestCanceledError,
-    isSpaceFriendLimitError,
-} from "utils/friend-errors";
+import { isFriendRequestCanceledError } from "utils/friend-errors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -137,8 +133,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         React.useState(true);
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [showFriendRequestCanceledToast, setShowFriendRequestCanceledToast] =
-        React.useState(false);
-    const [showFriendLimitToast, setShowFriendLimitToast] =
         React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
     const [selectedFriendProfile, setSelectedFriendProfile] =
@@ -407,10 +401,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     friendRequestIdFromConversation(conversation),
                 );
             } catch (error: unknown) {
-                if (isSpaceFriendLimitError(error)) {
-                    setShowFriendLimitToast(true);
-                    return;
-                }
                 if (!isFriendRequestCanceledError(error)) throw error;
                 setConversations((currentConversations) =>
                     currentConversations.filter(
@@ -845,11 +835,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             {showFriendRequestCanceledToast && (
                 <SpaceFriendRequestCanceledToast
                     onClose={() => setShowFriendRequestCanceledToast(false)}
-                />
-            )}
-            {showFriendLimitToast && (
-                <SpaceFriendLimitToast
-                    onClose={() => setShowFriendLimitToast(false)}
                 />
             )}
         </>

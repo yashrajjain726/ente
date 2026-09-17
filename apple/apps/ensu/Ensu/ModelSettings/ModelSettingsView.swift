@@ -24,9 +24,10 @@ struct ModelSettingsView: View {
         let defaultModel = policy.defaultModel
         return [
             ModelChoice(id: Self.defaultOptionId, name: defaultModel.title, isDefault: true)
-        ] + policy.visibleModels.filter { $0.id != defaultModel.id }.map { preset in
-            ModelChoice(id: preset.id, name: preset.title)
-        }
+        ]
+            + policy.visibleModels.filter { $0.id != defaultModel.id }.map { preset in
+                ModelChoice(id: preset.id, name: preset.title)
+            }
     }()
 
     init(embeddedInNavigation: Bool = false) {
@@ -67,7 +68,9 @@ struct ModelSettingsView: View {
             contextLength = settings.contextLength
             maxTokens = settings.maxTokens
             temperature = settings.temperature
-            showAdvancedLimits = !settings.contextLength.isEmpty || !settings.maxTokens.isEmpty || !settings.temperature.isEmpty
+            showAdvancedLimits =
+                !settings.contextLength.isEmpty || !settings.maxTokens.isEmpty
+                || !settings.temperature.isEmpty
         }
         .overlay(alignment: .bottom) {
             if let toastMessage {
@@ -145,7 +148,9 @@ struct ModelSettingsView: View {
                 Divider().background(EnsuColor.border)
 
                 VStack(spacing: EnsuSpacing.md) {
-                    PrimaryButton(text: "Save Model Settings", isLoading: isSaving, isEnabled: !isSaving) {
+                    PrimaryButton(
+                        text: "Save Model Settings", isLoading: isSaving, isEnabled: !isSaving
+                    ) {
                         saveTapped()
                     }
 
@@ -280,7 +285,9 @@ struct ModelSettingsView: View {
             isValid = false
         }
 
-        if let contextValue = Int(contextLength), let maxValue = Int(maxTokens), maxValue > contextValue {
+        if let contextValue = Int(contextLength), let maxValue = Int(maxTokens),
+            maxValue > contextValue
+        {
             maxTokensError = "Must be <= context length"
             isValid = false
         }

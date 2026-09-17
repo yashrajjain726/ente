@@ -284,9 +284,9 @@ class FileActions {
   }) async {
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.strings.areYouSure,
-      body: context.strings.deleteMultipleFilesDialogBody(count: 1),
-      deleteButtonLabel: context.strings.yesDeleteFiles(count: 1),
+      title: context.strings.moveToTrashQuestion,
+      body: context.strings.itemsWillBeDeletedFromAllCollections(count: 1),
+      deleteButtonLabel: context.strings.deleteItemCount(count: 1),
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
@@ -338,9 +338,11 @@ class FileActions {
 
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.strings.areYouSure,
-      body: context.strings.deleteMultipleFilesDialogBody(count: files.length),
-      deleteButtonLabel: context.strings.yesDeleteFiles(count: files.length),
+      title: context.strings.moveToTrashQuestion,
+      body: context.strings.itemsWillBeDeletedFromAllCollections(
+        count: files.length,
+      ),
+      deleteButtonLabel: context.strings.deleteItemCount(count: files.length),
       illustration: LockerBottomSheetIllustration.fileDelete,
     );
 

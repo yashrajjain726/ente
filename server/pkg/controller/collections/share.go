@@ -9,6 +9,7 @@ import (
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/pkg/controller/access"
 	"github.com/ente/museum/pkg/controller/public"
+	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
 	emailUtil "github.com/ente/museum/pkg/utils/email"
 	"github.com/ente/museum/pkg/utils/time"
@@ -59,6 +60,90 @@ func (c *CollectionController) Share(ctx *gin.Context, req ente.AlterShareReques
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return sharees, nil
+}
+
+func (c *CollectionController) BatchShare(ctx *gin.Context, shares []ente.AlterShareRequest) ([]ente.CollectionUser, error) {
+	if err := validateBatchShares(shares); err != nil {
+		return nil, err
+	}
+	fromUserID := auth.GetUserID(ctx.Request.Header)
+	collection, err := c.collectionForShareMutation(shares[0].CollectionID, fromUserID)
+	if err != nil {
+		return nil, err
+	}
+	if collection.IsDeleted {
+		return nil, stacktrace.Propagate(ente.ErrCollectionDeleted, "")
+	}
+
+	resolvedShares := make([]repo.CollectionShareItem, 0, len(shares))
+	for _, share := range shares {
+		if err := validateSealedCollectionKey(share.EncryptedKey); err != nil {
+			return nil, ente.NewBadRequestWithMessage(err.Error())
+		}
+		role := ente.VIEWER
+		if share.Role != nil {
+			role = *share.Role
+		}
+		if role != ente.VIEWER && role != ente.COLLABORATOR && role != ente.ADMIN {
+			return nil, ente.NewBadRequestWithMessage("invalid role " + string(role))
+		}
+		if !collection.AllowParticipantSharing(role) {
+			return nil, stacktrace.Propagate(ente.ErrBadRequest, "sharing %s is not allowed", collection.Type)
+		}
+		toUserID, err := c.UserLookup.LookupUserID(fromUserID, share.Email)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if err := validateShareRecipient(fromUserID, collection.Owner.ID, toUserID); err != nil {
+			return nil, err
+		}
+		resolvedShares = append(resolvedShares, repo.CollectionShareItem{
+			ToUserID:     toUserID,
+			EncryptedKey: share.EncryptedKey,
+			Role:         role,
+		})
+	}
+
+	err = c.CollectionRepo.BatchShare(
+		ctx.Request.Context(),
+		collection.ID,
+		collection.Owner.ID,
+		resolvedShares,
+		time.Microseconds(),
+	)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	sharees, err := c.GetSharees(ctx, collection.ID, fromUserID)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return sharees, nil
+}
+
+func validateBatchShares(shares []ente.AlterShareRequest) error {
+	if len(shares) == 0 {
+		return stacktrace.Propagate(ente.ErrBadRequest, "shares are required")
+	}
+	if len(shares) > ente.MaxBatchShareSize {
+		return stacktrace.Propagate(ente.ErrBatchSizeTooLarge, "")
+	}
+	collectionID := shares[0].CollectionID
+	seen := make(map[string]struct{}, len(shares))
+	for _, share := range shares {
+		if share.CollectionID != collectionID {
+			return stacktrace.Propagate(ente.ErrBadRequest, "all shares must have the same collection ID")
+		}
+		email := emailUtil.NormalizeEmail(share.Email)
+		if email == "" {
+			return stacktrace.Propagate(ente.ErrBadRequest, "email is required")
+		}
+		if _, ok := seen[email]; ok {
+			return stacktrace.Propagate(ente.ErrBadRequest, "duplicate email")
+		}
+		seen[email] = struct{}{}
+	}
+	return nil
 }
 
 func (c *CollectionController) BulkShare(
@@ -591,5 +676,6 @@ func (c *CollectionController) GetPublicDiff(ctx *gin.Context, sinceTime int64) 
 			diff[idx].IsDeleted = true
 		}
 	}
+	scrubDeletedFiles(diff)
 	return diff, hasMore, nil
 }

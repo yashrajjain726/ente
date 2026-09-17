@@ -40,6 +40,7 @@ class GalleryGroups {
   final bool sortOrderAsc;
   final double widthAvailable;
   final double groupHeaderExtent;
+  static const double spacing = galleryGridSpacing;
   GalleryGroups({
     required this.allFiles,
     required this.groupType,
@@ -64,7 +65,6 @@ class GalleryGroups {
     }
   }
 
-  static const double spacing = 2.0;
   // Product decision: limit how tall the preferred justified row can grow as
   // the gallery widens.
   static const double _maximumJustifiedTargetRowHeight = 320.0;
@@ -451,9 +451,6 @@ class GalleryGroups {
     final flexTuning = strategy == JustifiedLayoutStrategy.flex
         ? localSettings.getFlexLayoutTuning()
         : FlexLayoutTuning.defaults;
-    final flexFullRowsTuning = strategy == JustifiedLayoutStrategy.flexFullRows
-        ? localSettings.getFlexFullRowsLayoutTuning()
-        : FlexFullRowsLayoutTuning.defaults;
     final comfortLargeTuning = strategy == JustifiedLayoutStrategy.comfortLarge
         ? localSettings.getComfortLargeLayoutTuning()
         : ComfortLargeLayoutTuning.defaults;
@@ -466,8 +463,6 @@ class GalleryGroups {
       JustifiedLayoutStrategy.comfortLarge =>
         comfortLargeTuning.targetHeightScale,
       JustifiedLayoutStrategy.flex => flexTuning.targetHeightScale,
-      JustifiedLayoutStrategy.flexFullRows =>
-        flexFullRowsTuning.targetHeightScale,
     };
     final targetRowHeight = baseTargetRowHeight * targetHeightScale;
     final groupLayouts = <SectionLayout>[];
@@ -501,17 +496,9 @@ class GalleryGroups {
           targetRowHeight: targetRowHeight,
           spacing: spacing,
           maximumRowHeightFactor: flexTuning.maximumHeightFactor,
+          minimumNonFinalSingletonAspectRatio:
+              flexTuning.minimumNonFinalSingletonAspectRatio,
         ),
-        JustifiedLayoutStrategy.flexFullRows =>
-          FlexLayoutCalculator.computeRows(
-            aspectRatios: aspectRatios,
-            availableWidth: widthAvailable,
-            targetRowHeight: targetRowHeight,
-            spacing: spacing,
-            maximumRowHeightFactor: flexFullRowsTuning.maximumHeightFactor,
-            minimumNonFinalSingletonAspectRatio:
-                flexFullRowsTuning.minimumNonFinalSingletonAspectRatio,
-          ),
       };
       final firstIndex = currentIndex == 0 ? currentIndex : currentIndex + 1;
       final lastIndex = firstIndex + rows.length;

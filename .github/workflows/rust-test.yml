@@ -19,7 +19,7 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: Free runner disk space
               run: sudo rm -rf /usr/share/dotnet
@@ -30,19 +30,35 @@ jobs:
                   sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libvulkan-dev glslc libdbus-1-dev dbus gnome-keyring libglib2.0-bin
 
             - name: Setup go
-              uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+              uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
               with:
                   go-version-file: server/go.mod
                   cache: false
 
             # Restore-only; primed on main by warm-caches.yml.
             - name: Restore Rust cache
-              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
               with:
                   workspaces: rust
                   shared-key: rust-workspace
+                  cache-targets: false
                   save-if: false
                   cache-directories: rust/.cache
+
+            - name: Restore Rust target
+              uses: ./.github/actions/restore-rust-target
+              with:
+                  shared-key: rust-workspace
+
+            - name: Restore Museum cache
+              uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  key: museum-${{ github.sha }}
+                  restore-keys: museum-
+                  path: |
+                      ~/go/pkg/mod
+                      ~/.cache/go-build
+                      ~/.cache/.theseus/postgresql
 
             - run: cargo test --locked --features museum,ente-ml/ml-assets
               # postgresql_embedded downloads its binaries from GitHub.
