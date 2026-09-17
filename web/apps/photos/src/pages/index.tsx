@@ -1,6 +1,5 @@
 import { DevSettingsDialog } from "@/components/auth/DevSettingsDialog";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { LoginForm } from "ente-accounts/components/auth/LoginForm";
 import { SignUpForm } from "ente-accounts/components/auth/SignUpForm";
 import { LoginContents } from "ente-accounts/components/LoginContents";
 import { SignUpContents } from "ente-accounts/components/SignUpContents";
@@ -120,7 +119,6 @@ const Page: React.FC = () => {
                         <LoginContents
                             {...{ host }}
                             onSignUp={handleShowSignUp}
-                            presentation={LoginForm}
                         />
                     ) : (
                         <SignUpContents

@@ -1,9 +1,5 @@
 import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
-import { LoginForm } from "ente-accounts/components/auth/LoginForm";
-import {
-    LoginContents,
-    type LoginPresentationProps,
-} from "ente-accounts/components/LoginContents";
+import { LoginContents } from "ente-accounts/components/LoginContents";
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import { customAPIHost } from "ente-base/origins";
@@ -11,7 +7,8 @@ import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
 
 const Page: React.FC = () => {
-    const { LoginFrame, keepLoginLoadingOnRedirect } = useAuthPageConfig();
+    const { Shell, LoginFrame, keepLoginLoadingOnRedirect } =
+        useAuthPageConfig();
     const [loading, setLoading] = useState(true);
     const [host, setHost] = useState<string | undefined>(undefined);
 
@@ -36,10 +33,9 @@ const Page: React.FC = () => {
     if (loading) return <LoadingIndicator />;
 
     const contents = (
-        <LoginContents
-            {...{ host, onSignUp }}
-            presentation={ConfiguredLoginPresentation}
-        />
+        <Shell>
+            <LoginContents {...{ host, onSignUp }} />
+        </Shell>
     );
 
     return LoginFrame ? (
@@ -50,14 +46,3 @@ const Page: React.FC = () => {
 };
 
 export default Page;
-
-function ConfiguredLoginPresentation(
-    props: LoginPresentationProps,
-): React.JSX.Element {
-    const { Shell } = useAuthPageConfig();
-    return (
-        <Shell>
-            <LoginForm {...props} />
-        </Shell>
-    );
-}

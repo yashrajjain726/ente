@@ -1,3 +1,4 @@
+import { LoginForm } from "ente-accounts/components/auth/LoginForm";
 import {
     replaceSavedLocalUser,
     saveSRPAttributes,
@@ -17,7 +18,6 @@ import { z } from "zod";
 interface LoginContentsProps {
     host: string | undefined;
     onSignUp: () => void;
-    presentation: React.ComponentType<LoginPresentationProps>;
 }
 
 export interface LoginPresentationProps {
@@ -38,7 +38,6 @@ export interface LoginPresentationProps {
 export const LoginContents: React.FC<LoginContentsProps> = ({
     onSignUp,
     host,
-    presentation: Presentation,
 }) => {
     const router = useRouter();
     const [isJoinAlbumContext, setIsJoinAlbumContext] = useState(false);
@@ -122,7 +121,7 @@ export const LoginContents: React.FC<LoginContentsProps> = ({
     }
 
     return (
-        <Presentation
+        <LoginForm
             email={formik.values.email}
             emailError={formik.errors.email}
             host={host}
