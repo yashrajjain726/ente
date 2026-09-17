@@ -2154,7 +2154,7 @@
       "count": {}
     }
   },
-  "itemWillBeRemovedFromThisFolder": "This item will be removed from this album",
+  "itemWillBeRemovedFromThisAlbum": "This item will be removed from this album",
   "items": "{count} items",
   "@items": {
     "description": "Number of items in a collection",
