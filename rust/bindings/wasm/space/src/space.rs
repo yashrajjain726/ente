@@ -5,7 +5,7 @@ use ente_space::{
     AccountSpaceCtx, CreatedSpace, DecryptedMessage, DecryptedPost, DecryptedSpaceProfile,
     MessageConversationActivity, MessagePayload, MessageResponse, OpenAccountSpaceCtxInput,
     OpenSpaceLinkCtxInput, PostPhotoAssetOptions, PostResponse, ProfileAvatarResponse,
-    ProfileCoverResponse, SpaceActorResponse, SpaceKeyResponse, SpaceLinkCtx,
+    ProfileCoverResponse, SpaceActorResponse, SpaceLinkCtx,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
@@ -67,26 +67,61 @@ impl From<Error> for JsValue {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct OpenAccountSpaceCtxJsInput {
+pub struct OpenAccountSpaceCtxJsInput {
     base_url: String,
+    #[tsify(optional)]
     space_session_token: Option<String>,
     space_root_key_b64: String,
     #[serde(default)]
+    #[tsify(optional)]
     owned_spaces: Option<Vec<SpaceKeyResponse>>,
+    #[tsify(optional)]
     client_package: Option<String>,
+    #[tsify(optional)]
     client_version: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct OpenSpaceLinkCtxJsInput {
+pub struct OpenSpaceLinkCtxJsInput {
     base_url: String,
     space_username: String,
     access_key: String,
+    #[tsify(optional)]
     client_package: Option<String>,
+    #[tsify(optional)]
     client_version: Option<String>,
+}
+
+#[derive(Deserialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub struct SpaceKeyResponse {
+    space_id: String,
+    space_slug: String,
+    root_wrapped_space_key: String,
+    #[serde(default)]
+    public_key: String,
+    #[serde(default)]
+    encrypted_secret_key: String,
+    #[serde(default)]
+    encrypted_profile: String,
+    key_version: i32,
+}
+
+impl From<SpaceKeyResponse> for ente_space::SpaceKeyResponse {
+    fn from(value: SpaceKeyResponse) -> Self {
+        Self {
+            space_id: value.space_id,
+            space_slug: value.space_slug,
+            root_wrapped_space_key: value.root_wrapped_space_key,
+            public_key: value.public_key,
+            encrypted_secret_key: value.encrypted_secret_key,
+            encrypted_profile: value.encrypted_profile,
+            key_version: value.key_version,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -658,14 +693,18 @@ async fn resilient_message_conversation_activity_to_js(
 }
 
 #[wasm_bindgen(js_name = spaceOpenAccountCtx)]
-pub fn space_open_account_ctx(input: JsValue) -> Result<SpaceAccountCtxHandle, Error> {
-    let input: OpenAccountSpaceCtxJsInput = swb::from_value(input)?;
+pub fn space_open_account_ctx(
+    input: <OpenAccountSpaceCtxJsInput as Tsify>::JsType,
+) -> Result<SpaceAccountCtxHandle, Error> {
+    let input = OpenAccountSpaceCtxJsInput::from_js(input)?;
     let space_root_key = decode_b64_field(&input.space_root_key_b64)?;
     let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
         base_url: input.base_url,
         space_session_token: input.space_session_token,
         space_root_key,
-        initial_owned_spaces: input.owned_spaces,
+        initial_owned_spaces: input
+            .owned_spaces
+            .map(|spaces| spaces.into_iter().map(Into::into).collect()),
         user_agent: None,
         client_package: input.client_package,
         client_version: input.client_version,
@@ -674,8 +713,10 @@ pub fn space_open_account_ctx(input: JsValue) -> Result<SpaceAccountCtxHandle, E
 }
 
 #[wasm_bindgen(js_name = spaceOpenLinkCtx)]
-pub async fn space_open_link_ctx(input: JsValue) -> Result<SpaceLinkCtxHandle, Error> {
-    let input: OpenSpaceLinkCtxJsInput = swb::from_value(input)?;
+pub async fn space_open_link_ctx(
+    input: <OpenSpaceLinkCtxJsInput as Tsify>::JsType,
+) -> Result<SpaceLinkCtxHandle, Error> {
+    let input = OpenSpaceLinkCtxJsInput::from_js(input)?;
     let inner = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
         base_url: input.base_url,
         space_slug: input.space_username,
