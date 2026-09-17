@@ -37,7 +37,7 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ github.ref_name }}
 
@@ -103,13 +103,13 @@ jobs:
 
         steps:
             - name: Checkout code and submodules
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.build-metadata.outputs.commit_sha }}
                   submodules: recursive
 
             - name: Setup JDK 17
-              uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
+              uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
               with:
                   distribution: "temurin"
                   java-version: "17"
@@ -229,7 +229,7 @@ jobs:
 
         steps:
             - name: Checkout code and submodules
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.build-metadata.outputs.commit_sha }}
                   submodules: recursive
@@ -340,7 +340,7 @@ jobs:
 
         steps:
             - name: Checkout code and submodules
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.build-metadata.outputs.commit_sha }}
                   submodules: recursive
@@ -504,7 +504,7 @@ jobs:
 
         steps:
             - name: Checkout code and submodules
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.build-metadata.outputs.commit_sha }}
                   submodules: recursive
@@ -622,7 +622,7 @@ jobs:
     build-ios:
         needs: build-metadata
         if: needs.build-metadata.outputs.should_build == 'true'
-        runs-on: macos-26
+        runs-on: macos-latest
         environment:
             name: production
         env:
@@ -635,7 +635,7 @@ jobs:
 
         steps:
             - name: Checkout code and submodules
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.build-metadata.outputs.commit_sha }}
                   submodules: recursive
@@ -701,7 +701,7 @@ jobs:
 
         steps:
             - name: Checkout built commit
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   ref: ${{ needs.build-metadata.outputs.commit_sha }}
 
