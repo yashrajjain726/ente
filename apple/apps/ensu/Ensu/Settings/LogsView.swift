@@ -45,7 +45,7 @@ struct LogsView: View {
             }
         }
         .task {
-            refreshEntries()
+            entries = await Self.loadEntries()
         }
         .sheet(item: $shareArchive) { archive in
             ActivityView(activityItems: [archive.url])
@@ -124,25 +124,27 @@ struct LogsView: View {
         }
     }
 
-    private func refreshEntries() {
-        entries = parseLogText(EnsuLogging.shared.readLogText())
-    }
-
-    private func parseLogText(_ text: String) -> [EnsuLogEntry] {
+    @concurrent
+    private static func loadEntries() async -> [EnsuLogEntry] {
+        let text = EnsuLogging.shared.readLogText()
         var entries: [EnsuLogEntry] = []
         for line in text.components(separatedBy: .newlines) {
             guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
 
-            if let match = line.wholeMatch(
-                of: #/\[(.+?)\]\[(.+?)\] \[(.+?)\] (.*)/#.matchingSemantics(.unicodeScalar))
+            if let match = logLineRegex?.firstMatch(
+                in: line, range: NSRange(line.startIndex..., in: line)),
+                let tagRange = Range(match.range(at: 1), in: line),
+                let levelRange = Range(match.range(at: 2), in: line),
+                let timestampRange = Range(match.range(at: 3), in: line),
+                let messageRange = Range(match.range(at: 4), in: line)
             {
-                let (_, tag, level, timestamp, message) = match.output
                 entries.append(
                     EnsuLogEntry(
-                        timestamp: logLineFormatter.date(from: String(timestamp)) ?? Date(),
-                        level: EnsuLogLevel(rawValue: String(level)) ?? .info,
-                        tag: String(tag),
-                        message: String(message),
+                        timestamp: logLineFormatter.date(from: String(line[timestampRange]))
+                            ?? Date(),
+                        level: EnsuLogLevel(rawValue: String(line[levelRange])) ?? .info,
+                        tag: String(line[tagRange]),
+                        message: String(line[messageRange]),
                         details: nil
                     )
                 )
@@ -305,6 +307,9 @@ private struct LogDetailView: View {
         return out
     }
 }
+
+private let logLineRegex = try? NSRegularExpression(
+    pattern: #"^\[(.+?)\]\[(.+?)\] \[(.+?)\] (.*)$"#)
 
 private let logTimestampFormatter: DateFormatter = {
     let formatter = DateFormatter()
