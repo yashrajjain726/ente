@@ -1,100 +1,101 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(
-    process.argv[2] ?? resolve(import.meta.dirname, "../../.."),
-);
 const listPath = "apple/checks/lint-exceptions/suppressions.json";
-const allowed = JSON.parse(readFileSync(resolve(root, listPath), "utf8"));
-const unused = new Map(
-    Object.entries(allowed).map(([path, rules]) => [path, new Set(rules)]),
-);
-const files = execFileSync(
-    "git",
-    [
-        "ls-files",
-        "--cached",
-        "--others",
-        "--exclude-standard",
-        "-z",
-        "--",
-        "apple",
-    ],
-    { cwd: root, encoding: "utf8" },
-).split("\0");
 
-for (const path of new Set(files)) {
-    if (!path.endsWith(".swift") || !existsSync(resolve(root, path))) continue;
-    const source = readFileSync(resolve(root, path), "utf8");
-    for (const { text, start } of comments(source)) {
+export function parse(sources) {
+    const swift = execFileSync("xcrun", ["--find", "swift"], {
+        encoding: "utf8",
+    }).trim();
+    const libraries = resolve(dirname(swift), "../lib/swift/host");
+    return JSON.parse(
+        execFileSync(
+            swift,
+            [
+                "-module-cache-path",
+                resolve(import.meta.dirname, "../../.build/lint-exceptions"),
+                "-I",
+                libraries,
+                "-L",
+                libraries,
+                resolve(import.meta.dirname, "parse.swift"),
+            ],
+            { input: JSON.stringify(sources), encoding: "utf8" },
+        ),
+    );
+}
+
+export function check(comments, allowed) {
+    const unused = new Map(
+        Object.entries(allowed).map(([path, rules]) => [path, new Set(rules)]),
+    );
+    const errors = [];
+    for (const { path, text, line: startLine } of comments) {
         const directives =
             /\bswiftlint\s*:\s*disable(?::(?:next|previous|this))?\b([^\r\n]*)|\bswift-format-ignore(-file)?\b([^\r\n]*)/g;
         for (const match of text.matchAll(directives)) {
-            const line = source
-                .slice(0, start + match.index)
-                .split("\n").length;
+            const line =
+                startLine + text.slice(0, match.index).split("\n").length - 1;
             const value = (match[1] ?? match[3]).split(/\/\/|\*\//)[0].trim();
             const rules = value
                 .replace(/^:\s*/, "")
                 .split(/[\s,]+/)
                 .filter(Boolean);
             if (match[2] || !rules.length || rules.includes("all")) {
-                reject(path, line, "Name the rules being suppressed");
+                errors.push(`${path}:${line}: Name the rules being suppressed`);
                 continue;
             }
             for (const rule of rules) {
                 unused.get(path)?.delete(rule);
                 if (!allowed[path]?.includes(rule)) {
-                    reject(path, line, `${rule} is not listed in ${listPath}`);
+                    errors.push(
+                        `${path}:${line}: ${rule} is not listed in ${listPath}`,
+                    );
                 }
             }
         }
     }
+    for (const [path, rules] of unused) {
+        for (const rule of rules)
+            errors.push(
+                `${path}: ${rule} has no suppression; remove it from ${listPath}`,
+            );
+    }
+    return errors;
 }
 
-for (const [path, rules] of unused) {
-    for (const rule of rules) {
-        reject(
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    const root = resolve(
+        process.argv[2] ?? resolve(import.meta.dirname, "../../.."),
+    );
+    const files = execFileSync(
+        "git",
+        [
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            "apple",
+        ],
+        { cwd: root, encoding: "utf8" },
+    ).split("\0");
+    const sources = [...new Set(files)]
+        .filter(
+            (path) =>
+                path.endsWith(".swift") && existsSync(resolve(root, path)),
+        )
+        .map((path) => ({
             path,
-            1,
-            `${rule} has no suppression; remove it from ${listPath}`,
-        );
-    }
-}
-
-function* comments(source) {
-    const lexer = /\/\/[^\r\n]*|\/\*|(#*)("""|")/g;
-    let match;
-    while ((match = lexer.exec(source))) {
-        const start = match.index;
-        if (match[0].startsWith("//")) {
-            yield { text: match[0], start };
-        } else if (match[0] === "/*") {
-            const markers = /\/\*|\*\//g;
-            markers.lastIndex = lexer.lastIndex;
-            for (let depth = 1; depth; ) {
-                const marker = markers.exec(source);
-                if (!marker) throw new Error("Unclosed Swift comment");
-                depth += marker[0] === "/*" ? 1 : -1;
-            }
-            lexer.lastIndex = markers.lastIndex;
-            yield { text: source.slice(start, lexer.lastIndex), start };
-        } else {
-            const end = match[2] + match[1];
-            const escape = "\\" + match[1];
-            let offset = lexer.lastIndex;
-            while (offset < source.length && !source.startsWith(end, offset)) {
-                offset += source.startsWith(escape, offset)
-                    ? escape.length + 1
-                    : 1;
-            }
-            lexer.lastIndex = offset + end.length;
-        }
-    }
-}
-
-function reject(path, line, message) {
-    console.error(`${path}:${line}: ${message}`);
-    process.exitCode = 1;
+            source: readFileSync(resolve(root, path), "utf8"),
+        }));
+    const errors = check(
+        parse(sources),
+        JSON.parse(readFileSync(resolve(root, listPath), "utf8")),
+    );
+    for (const error of errors) console.error(error);
+    process.exitCode = errors.length ? 1 : 0;
 }

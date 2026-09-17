@@ -1,101 +1,94 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { check, parse } from "./check.mjs";
 
-const check = join(import.meta.dirname, "check.mjs");
-const root = mkdtempSync(join(tmpdir(), "ente-android-lint-exceptions-"));
-try {
-    assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
-    mkdirSync(join(root, "android/checks/lint-exceptions"), {
-        recursive: true,
-    });
-    for (const [extension, source] of [
-        ["kt", '@Suppress("NewApi") fun example() {}'],
-        ["kts", '@file:Suppress("NewApi")'],
-        ["kt", '@file:[Suppress("NewApi")]'],
-        ["kt", '@Suppress(\n/* reason */ "NewApi",\n) fun example() {}'],
-        ["kt", '@Suppress(names = ["NewApi"]) fun example() {}'],
-        ["kt", '@Suppress(names = arrayOf("NewApi")) fun example() {}'],
-        [
-            "kt",
-            'import kotlin.Suppress as Quiet\n@Quiet("NewApi") fun example() {}',
-        ],
-        ["java", '@android.annotation.SuppressLint("NewApi") class Example {}'],
-        ["java", '@SuppressWarnings(value = {"NewApi"}) class Example {}'],
-        ["java", "//noinspection NewApi\nclass Example {}"],
-        ["xml", '<view tools:ignore="NewApi" />'],
-        [
-            "xml",
-            '<view xmlns:lint="http://schemas.android.com/tools" lint:ignore="NewApi" />',
-        ],
-    ]) {
-        assert.equal(run(extension, source).status, 1);
-        const file = `android/Example.${extension}`;
-        const result = run(extension, source, { [file]: ["NewApi"] });
-        assert.equal(result.status, 0, result.stderr);
-        assert.equal(
-            run(extension, source, { "android/Other.kt": ["NewApi"] }).status,
-            1,
+const suppressions = [
+    ["kt", '@Suppress("NewApi") fun example() {}'],
+    ["kts", '@file:Suppress("NewApi")'],
+    ["kt", '@file:[Suppress("NewApi")]'],
+    [
+        "kt",
+        '@[Other(values = ["value"]) SuppressLint("NewApi")] fun example() {}',
+    ],
+    ["kt", '@Suppress(\n/* reason */ "NewApi",\n) fun example() {}'],
+    ["kt", '@Suppress(names = ["NewApi"]) fun example() {}'],
+    ["kt", '@Suppress(names = arrayOf("NewApi")) fun example() {}'],
+    ["kt", '@Suppress(names = arrayOf<String>("NewApi")) fun example() {}'],
+    ["kt", '@Suppress(*arrayOf("NewApi")) fun example() {}'],
+    [
+        "kt",
+        'import kotlin.Suppress as Quiet\n@Quiet("NewApi") fun example() {}',
+    ],
+    ["kt", 'val text = """${run {\n@Suppress("NewApi")\noldMethod()\n}}"""'],
+    ["java", '@android.annotation.SuppressLint("NewApi") class Example {}'],
+    ["java", '@SuppressWarnings(value = {"NewApi"}) class Example {}'],
+    ["java", "//noinspection NewApi\nclass Example {}"],
+    [
+        "xml",
+        '<root xmlns:tools="http://schemas.android.com/tools">\n  <view\n    tools:ignore="NewApi" />\n</root>',
+        3,
+    ],
+    [
+        "xml",
+        '<view xmlns:lint="http://schemas.android.com/tools" lint:ignore="NewApi" />',
+    ],
+];
+const invalid = [
+    '@Suppress("NewApi", "MissingPermission") fun example() {}',
+    '@Suppress("all") fun example() {}',
+    "@Suppress(RULE) fun example() {}",
+    '@Suppress("New" + "Api") fun example() {}',
+    "//noinspection",
+    'typealias Quiet = Suppress\n@Quiet("NewApi") fun example() {}',
+];
+const ordinary = [
+    [
+        "kt",
+        'fun Suppress(text: String) {}\nfun example() { Suppress("NewApi") }',
+    ],
+    ["kt", '// @Suppress("NewApi")'],
+    ["kt", '/* outer /* nested */ @Suppress("NewApi") */'],
+    ["kt", 'val text = "@Suppress(\\"NewApi\\")"'],
+    ["kt", 'val text = """\n@Suppress("NewApi")\n//noinspection NewApi\n"""'],
+    ["xml", '<root><!-- <view tools:ignore="NewApi" /> --></root>'],
+    ["xml", '<value><![CDATA[tools:ignore="NewApi"]]></value>'],
+    ["xml", '<string name="example">tools:ignore="NewApi"</string>'],
+    ["xml", `<view text='tools:ignore="NewApi"' />`],
+];
+const sources = [
+    ...suppressions,
+    ...invalid.map((source) => ["kt", source]),
+    ...ordinary,
+].map(([extension, source], i) => ({
+    path: `android/Example${i}.${extension}`,
+    source,
+}));
+const parsed = parse(sources);
+for (const [i, { path, source }] of sources.entries()) {
+    const records = parsed.filter((record) => record.path === path);
+    const allowed = { [path]: ["NewApi"] };
+    if (i < suppressions.length) {
+        const line = suppressions[i][2];
+        if (line)
+            assert.deepEqual(
+                records.map((record) => record.line),
+                [line],
+            );
+        assert.ok(check(records, {}).length, source);
+        assert.deepEqual(check(records, allowed), [], source);
+        assert.ok(
+            check(records, { "android/Other.kt": ["NewApi"] }).length,
+            source,
         );
+        assert.deepEqual(check([...records, ...records], allowed), []);
+    } else if (i < suppressions.length + invalid.length) {
+        assert.ok(check(records, {}).length, source);
+        assert.ok(check(records, allowed).length, source);
+    } else {
+        assert.deepEqual(check(records, {}), [], source);
     }
-    for (const source of [
-        '@Suppress("NewApi", "MissingPermission")',
-        '@Suppress("all")',
-        "@Suppress(RULE)",
-        '@Suppress("New" + "Api")',
-        "//noinspection",
-    ]) {
-        assert.equal(
-            run("kt", source, { "android/Example.kt": ["NewApi"] }).status,
-            1,
-        );
-    }
-    for (const [extension, source] of [
-        [
-            "kt",
-            'fun Suppress(text: String) {}\nfun example() { Suppress("NewApi") }',
-        ],
-        ["kt", '// @Suppress("NewApi")'],
-        ["kt", '/* outer /* nested */ @Suppress("NewApi") */'],
-        ["kt", 'val text = "@Suppress(\\"NewApi\\")"'],
-        [
-            "kt",
-            'val text = """\n@Suppress("NewApi")\n//noinspection NewApi\n"""',
-        ],
-        ["xml", '<!-- <view tools:ignore="NewApi" /> -->'],
-        ["xml", '<value><![CDATA[tools:ignore="NewApi"]]></value>'],
-        ["xml", '<string name="example">tools:ignore="NewApi"</string>'],
-        ["xml", `<view text='tools:ignore="NewApi"' />`],
-    ]) {
-        const result = run(extension, source);
-        assert.equal(result.status, 0, result.stderr);
-    }
-    const suppression = '@SuppressLint("NewApi") fun example() {}\n';
-    for (const source of [suppression + suppression, suppression]) {
-        const result = run("kt", source, { "android/Example.kt": ["NewApi"] });
-        assert.equal(result.status, 0, result.stderr);
-    }
-    for (const source of ["fun example() {}", null]) {
-        const result = run("kt", source, { "android/Example.kt": ["NewApi"] });
-        assert.equal(result.status, 1, result.stderr);
-        assert.match(result.stderr, /NewApi has no suppression/);
-        assert.equal(run("kt", source).status, 0);
-    }
-} finally {
-    rmSync(root, { recursive: true });
 }
-
-function run(extension, source, allowed = {}) {
-    for (const extension of ["kt", "kts", "java", "xml"]) {
-        rmSync(join(root, `android/Example.${extension}`), { force: true });
-    }
-    if (source !== null)
-        writeFileSync(join(root, `android/Example.${extension}`), source);
-    writeFileSync(
-        join(root, "android/checks/lint-exceptions/suppressions.json"),
-        JSON.stringify(allowed),
-    );
-    return spawnSync(process.execPath, [check, root], { encoding: "utf8" });
-}
+assert.match(
+    check([], { "android/Deleted.kt": ["NewApi"] }).join("\n"),
+    /NewApi has no suppression/,
+);
+assert.deepEqual(check([], {}), []);

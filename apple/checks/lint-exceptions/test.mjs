@@ -1,80 +1,75 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { check, parse } from "./check.mjs";
 
-const check = join(import.meta.dirname, "check.mjs");
-const root = mkdtempSync(join(tmpdir(), "ente-apple-lint-exceptions-"));
-const file = "apple/Example.swift";
-try {
-    assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
-    mkdirSync(join(root, "apple/checks/lint-exceptions"), { recursive: true });
-    for (const [source, rule] of [
-        [
-            "// swift-format-ignore: NeverForceUnwrap\nlet value = optional!",
-            "NeverForceUnwrap",
-        ],
-        [
-            "// swiftlint:disable:next empty_count\nlet empty = values.count == 0",
-            "empty_count",
-        ],
-        [
-            "let empty = values.count == 0 // swiftlint:disable:this empty_count",
-            "empty_count",
-        ],
-        ["/* swiftlint:disable empty_count */", "empty_count"],
-        [
-            "/* outer /* nested */ swiftlint:disable empty_count */",
-            "empty_count",
-        ],
-    ]) {
-        assert.equal(run(source).status, 1);
-        const result = run(source, { [file]: [rule] });
-        assert.equal(result.status, 0, result.stderr);
-        assert.equal(run(source, { "apple/Other.swift": [rule] }).status, 1);
+const suppressions = [
+    [
+        "// swift-format-ignore: NeverForceUnwrap\nlet value = optional!",
+        "NeverForceUnwrap",
+    ],
+    [
+        "// swiftlint:disable:next empty_count\nlet empty = values.count == 0",
+        "empty_count",
+    ],
+    [
+        "let empty = values.count == 0 // swiftlint:disable:this empty_count",
+        "empty_count",
+    ],
+    ["/* swiftlint:disable empty_count */", "empty_count"],
+    ["/* outer /* nested */ swiftlint:disable empty_count */", "empty_count"],
+    [
+        String.raw`let text = """
+\({
+    // swift-format-ignore: NeverForceUnwrap
+    return value!
+}())
+"""`,
+        "NeverForceUnwrap",
+    ],
+];
+const invalid = [
+    "// swift-format-ignore",
+    "// swift-format-ignore-file",
+    "// swiftlint:disable all",
+    "// swiftlint:disable",
+    "// swiftlint:disable empty_count force_cast",
+];
+const ordinary = [
+    "// swiftlint:enable empty_count",
+    'let text = "// swiftlint:disable empty_count"',
+    'let text = #"a "quote" // swiftlint:disable empty_count"#',
+    'let text = """\n// swift-format-ignore-file\n"""',
+    'let text = #"""\n""" // swift-format-ignore-file\n"""#',
+    "let expression = #/[//] swiftlint:disable all/#",
+];
+const sources = [
+    ...suppressions.map(([source]) => source),
+    ...invalid,
+    ...ordinary,
+].map((source, i) => ({ path: `apple/Example${i}.swift`, source }));
+const parsed = parse(sources);
+for (const [i, { path, source }] of sources.entries()) {
+    const comments = parsed.filter((record) => record.path === path);
+    if (i < suppressions.length) {
+        const rule = suppressions[i][1];
+        assert.ok(check(comments, {}).length, source);
+        assert.deepEqual(check(comments, { [path]: [rule] }), [], source);
+        assert.ok(
+            check(comments, { "apple/Other.swift": [rule] }).length,
+            source,
+        );
+        assert.deepEqual(
+            check([...comments, ...comments], { [path]: [rule] }),
+            [],
+        );
+    } else if (i < suppressions.length + invalid.length) {
+        assert.ok(check(comments, {}).length, source);
+        assert.ok(check(comments, { [path]: ["empty_count"] }).length, source);
+    } else {
+        assert.deepEqual(check(comments, {}), [], source);
     }
-    for (const source of [
-        "// swift-format-ignore",
-        "// swift-format-ignore-file",
-        "// swiftlint:disable all",
-        "// swiftlint:disable",
-        "// swiftlint:disable empty_count force_cast",
-    ]) {
-        assert.equal(run(source, { [file]: ["empty_count"] }).status, 1);
-    }
-    for (const source of [
-        "// swiftlint:enable empty_count",
-        'let text = "// swiftlint:disable empty_count"',
-        'let text = #"a "quote" // swiftlint:disable empty_count"#',
-        'let text = """\n// swift-format-ignore-file\n"""',
-        'let text = #"""\n""" // swift-format-ignore-file\n"""#',
-    ]) {
-        const result = run(source);
-        assert.equal(result.status, 0, result.stderr);
-    }
-    const suppression =
-        "// swiftlint:disable:next empty_count\nlet empty = values.count == 0\n";
-    for (const source of [suppression + suppression, suppression]) {
-        const result = run(source, { [file]: ["empty_count"] });
-        assert.equal(result.status, 0, result.stderr);
-    }
-    for (const source of ["let value = 1", null]) {
-        const result = run(source, { [file]: ["empty_count"] });
-        assert.equal(result.status, 1, result.stderr);
-        assert.match(result.stderr, /empty_count has no suppression/);
-        assert.equal(run(source).status, 0);
-    }
-} finally {
-    rmSync(root, { recursive: true });
 }
-
-function run(source, allowed = {}) {
-    if (source === null) rmSync(join(root, file), { force: true });
-    else writeFileSync(join(root, file), source);
-    writeFileSync(
-        join(root, "apple/checks/lint-exceptions/suppressions.json"),
-        JSON.stringify(allowed),
-    );
-    return spawnSync(process.execPath, [check, root], { encoding: "utf8" });
-}
+assert.match(
+    check([], { "apple/Deleted.swift": ["empty_count"] }).join("\n"),
+    /empty_count has no suppression/,
+);
+assert.deepEqual(check([], {}), []);
