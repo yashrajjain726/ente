@@ -145,7 +145,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     return {
       "/": (context) =>
           Configuration.instance.hasConfiguredAccount() ||
-              Configuration.instance.hasOptedForOfflineMode()
+              (Configuration.instance.hasOptedForOfflineMode() &&
+                  Configuration.instance.getOfflineSecretKey() != null)
           ? const HomePage()
           : const OnboardingPage(),
     };

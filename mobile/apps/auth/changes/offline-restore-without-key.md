@@ -1,0 +1,1 @@
+- Fixed startup after restoring offline app data without its device encryption key.
