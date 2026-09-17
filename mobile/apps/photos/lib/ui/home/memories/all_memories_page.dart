@@ -156,7 +156,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
     }
     if (memoryLane != null) {
       pages.insert(
-        hasSeenMemoryLane ? pages.length : 1,
+        hasSeenMemoryLane || pages.isEmpty ? pages.length : 1,
         MemoryPageWrapper(
           id: "memoryLane_${memoryLane.personId}",
           widget: ({onNextMemory, onPreviousMemory}) => MemoryLanePageV2(
