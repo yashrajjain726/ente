@@ -84,6 +84,10 @@ Future<int?> _processAegisExportFile(
   } else {
     aegisDB = decodedJson['db'];
   }
+  return saveImportedCodes(parseAegisCodes(aegisDB));
+}
+
+List<Code> parseAegisCodes(Map? aegisDB) {
   final Map<String, String> groupIDToName = {};
   try {
     if (aegisDB?['groups'] != null) {
@@ -129,12 +133,16 @@ Future<int?> _processAegisExportFile(
       ),
     );
     code = code.copyWith(
-      display: CodeDisplay(pinned: isFavorite, tags: tags),
+      display: CodeDisplay(
+        pinned: isFavorite,
+        tags: tags,
+        note: item['note'] ?? '',
+      ),
     );
     parsedCodes.add(code);
   }
 
-  return saveImportedCodes(parsedCodes);
+  return parsedCodes;
 }
 
 String decryptAegisVault(dynamic data, {required String password}) {
