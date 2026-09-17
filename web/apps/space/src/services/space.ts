@@ -5,6 +5,7 @@ import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
 import {
     openSpaceLinkContext,
+    type DecryptedSpaceProfile,
     type SpaceAccountCtxHandle,
     type SpaceLinkCtxHandle,
 } from "ente-space-wasm";
@@ -46,18 +47,6 @@ interface SpaceAvatar {
 }
 
 type SpaceCover = SpaceAvatar;
-
-interface SpaceProfileResponse {
-    avatar?: SpaceAvatar;
-    cover?: SpaceCover;
-    friends?: number;
-    posts?: number;
-    profile: string;
-    updatedAt?: string;
-    version?: number;
-    spaceId: string;
-    spaceSlug: string;
-}
 
 interface SpaceActor {
     avatar?: SpaceAvatar;
@@ -444,7 +433,7 @@ const actorProfile = (actor: SpaceActor): FriendProfile => {
 };
 
 const profileFromSpaceProfile = (
-    spaceProfile: SpaceProfileResponse,
+    spaceProfile: DecryptedSpaceProfile,
 ): FriendProfile => {
     const payload = parseSpaceProfilePayload(spaceProfile.profile);
     const fullName =
@@ -720,7 +709,7 @@ export const openPublicSpaceLink = async (
         spaceUsername,
     });
     try {
-        const response = ctx.getProfile() as SpaceProfileResponse;
+        const response = ctx.getProfile();
         const profile = profileFromSpaceProfile(response);
         return {
             close: () => ctx.free(),
@@ -1062,10 +1051,7 @@ export const loadCurrentSpaceFriends = async (spaceId: string) => {
 export const loadCurrentSpaceFriendsCount = async (spaceId: string) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const spaceProfile = (await ctx.getSpaceProfile(
-            spaceId,
-            spaceId,
-        )) as SpaceProfileResponse;
+        const spaceProfile = await ctx.getSpaceProfile(spaceId, spaceId);
         return spaceProfile.friends ?? 0;
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1105,10 +1091,10 @@ export const loadCurrentSpaceProfile = async (
 ): Promise<FriendProfile> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const spaceProfile = (await ctx.getSpaceProfile(
+        const spaceProfile = await ctx.getSpaceProfile(
             spaceId,
             viewerSpaceId ?? null,
-        )) as SpaceProfileResponse;
+        );
         const profile = profileFromSpaceProfile(spaceProfile);
         const [avatarUrl, coverUrl] = await Promise.all([
             accountAvatarURL(

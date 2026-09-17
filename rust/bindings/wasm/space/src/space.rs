@@ -2,10 +2,9 @@ use std::collections::BTreeMap;
 
 use ente_core::b64;
 use ente_space::{
-    AccountSpaceCtx, CreatedSpace, DecryptedMessage, DecryptedPost, DecryptedSpaceProfile,
-    MessageConversationActivity, MessagePayload, MessageResponse, OpenAccountSpaceCtxInput,
-    OpenSpaceLinkCtxInput, PostPhotoAssetOptions, PostResponse, ProfileAvatarResponse,
-    ProfileCoverResponse, SpaceActorResponse, SpaceLinkCtx,
+    AccountSpaceCtx, CreatedSpace, DecryptedMessage, DecryptedPost, MessageConversationActivity,
+    MessagePayload, MessageResponse, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput,
+    PostPhotoAssetOptions, PostResponse, SpaceActorResponse, SpaceLinkCtx,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
@@ -148,9 +147,9 @@ pub struct CreatedSpaceLinkJs {
     access_key: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
-struct SpaceProfileJs {
+pub struct DecryptedSpaceProfile {
     space_id: String,
     space_slug: String,
     version: i32,
@@ -159,8 +158,29 @@ struct SpaceProfileJs {
     posts: Option<i64>,
     profile: String,
     avatar: Option<ProfileAvatarResponse>,
-    cover: Option<ProfileCoverResponse>,
+    cover: Option<ProfileAvatarResponse>,
     updated_at: Option<String>,
+}
+
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+struct ProfileAvatarResponse {
+    #[serde(rename = "objectID")]
+    object_id: String,
+    key_version: i32,
+    size: i64,
+    updated_at: String,
+}
+
+impl From<ente_space::ProfileAvatarResponse> for ProfileAvatarResponse {
+    fn from(value: ente_space::ProfileAvatarResponse) -> Self {
+        Self {
+            object_id: value.object_id,
+            key_version: value.key_version,
+            size: value.size,
+            updated_at: value.updated_at,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -340,7 +360,7 @@ fn created_space_to_js(value: CreatedSpace) -> CreatedSpaceJs {
     }
 }
 
-fn profile_to_js(value: DecryptedSpaceProfile) -> Result<SpaceProfileJs, Error> {
+fn profile_to_js(value: ente_space::DecryptedSpaceProfile) -> Result<DecryptedSpaceProfile, Error> {
     let profile = String::from_utf8(value.profile).unwrap_or_else(|error| {
         log::warn!(
             "Space profile {} has invalid UTF-8: {error}",
@@ -348,15 +368,15 @@ fn profile_to_js(value: DecryptedSpaceProfile) -> Result<SpaceProfileJs, Error> 
         );
         String::new()
     });
-    Ok(SpaceProfileJs {
+    Ok(DecryptedSpaceProfile {
         space_id: value.space_id,
         space_slug: value.space_slug,
         version: value.version,
         friends: value.friends,
         posts: None,
         profile,
-        avatar: value.avatar,
-        cover: value.cover,
+        avatar: value.avatar.map(Into::into),
+        cover: value.cover.map(Into::into),
         updated_at: value.updated_at,
     })
 }
@@ -368,7 +388,7 @@ fn actor_to_js(actor: SpaceActorResponse, profile: Option<Vec<u8>>) -> Result<Ac
         public_key: actor.public_key,
         key_version: actor.key_version,
         profile: optional_utf8_field(profile, "actor profile")?,
-        avatar: actor.avatar,
+        avatar: actor.avatar.map(Into::into),
     })
 }
 
@@ -737,10 +757,10 @@ pub struct SpaceLinkCtxHandle {
 #[wasm_bindgen]
 impl SpaceLinkCtxHandle {
     #[wasm_bindgen(js_name = getProfile)]
-    pub fn get_profile(&self) -> Result<JsValue, Error> {
+    pub fn get_profile(&self) -> Result<<DecryptedSpaceProfile as Tsify>::JsType, Error> {
         let mut profile = profile_to_js(self.inner.profile().clone())?;
         profile.posts = Some(self.inner.posts());
-        swb::to_value(&profile).map_err(Into::into)
+        profile.into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = listPosts)]
@@ -899,12 +919,13 @@ impl SpaceAccountCtxHandle {
         &self,
         space_id: String,
         viewer_space_id: Option<String>,
-    ) -> Result<JsValue, Error> {
-        swb::to_value(&profile_to_js(
+    ) -> Result<<DecryptedSpaceProfile as Tsify>::JsType, Error> {
+        profile_to_js(
             self.inner
                 .get_space_profile_for_display(&space_id, viewer_space_id.as_deref(), None)
                 .await?,
-        )?)
+        )?
+        .into_js()
         .map_err(Into::into)
     }
 
@@ -1797,7 +1818,7 @@ mod tests {
 
     #[test]
     fn invalid_profile_utf8_uses_empty_payload() {
-        let profile = profile_to_js(DecryptedSpaceProfile {
+        let profile = profile_to_js(ente_space::DecryptedSpaceProfile {
             space_id: "space-1".into(),
             space_slug: "alice".into(),
             version: 1,

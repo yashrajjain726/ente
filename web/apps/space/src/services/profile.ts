@@ -4,6 +4,7 @@ import { isNamedError } from "ente-base/error";
 import { apiOrigin, apiURL } from "ente-base/origins";
 import {
     openSpaceAccountContext,
+    type DecryptedSpaceProfile,
     type SpaceAccountCtxHandle,
 } from "ente-space-wasm";
 import type {
@@ -47,15 +48,6 @@ type SpaceCover = SpaceAvatar;
 interface SpaceLookup {
     spaceId: string;
     spaceSlug: string;
-}
-
-interface DecryptedSpaceProfile {
-    spaceId: string;
-    spaceSlug: string;
-    profile: string;
-    avatar?: SpaceAvatar;
-    cover?: SpaceCover;
-    updatedAt?: string;
 }
 
 interface UpdateSpaceProfileResponse {
@@ -370,10 +362,10 @@ export const loadExistingSpaceProfile = async (options?: {
         // Give the home screen, which shares this lookup, the first request slot.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const ctx = await ensureCurrentSpaceContext();
-        const spaceProfile = (await ctx.getSpaceProfile(
+        const spaceProfile = await ctx.getSpaceProfile(
             space.spaceId,
             space.spaceId,
-        )) as DecryptedSpaceProfile;
+        );
         await persistCurrentOwnedSpaces(ctx);
         const profile = profileFromDecryptedSpaceProfile(spaceProfile);
         persistSpaceProfileAvatar(profile);

@@ -5,6 +5,8 @@ import type {
 
 const wasm = () => import("./pkg/ente_space_wasm");
 
+export type { DecryptedSpaceProfile } from "./pkg/ente_space_wasm";
+
 export type SpaceAccountCtxHandle =
     import("./pkg/ente_space_wasm").SpaceAccountCtxHandle;
 export type SpaceLinkCtxHandle =
