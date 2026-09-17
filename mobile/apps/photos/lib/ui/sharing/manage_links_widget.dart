@@ -67,7 +67,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
               ),
             ),
           ),
-        const SizedBox(height: Spacing.sm),
+        const SizedBox(height: Spacing.lg),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
@@ -85,7 +85,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
             ),
           ],
         ),
-        const SizedBox(height: Spacing.sm),
+        const SizedBox(height: Spacing.lg),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
@@ -100,67 +100,6 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   });
                 },
               ),
-            ),
-            ShareMenuItem(
-              key: ValueKey("Enable comment ${url.enableComment}"),
-              title: context.strings.commentAndReact,
-              icon: HugeIcons.strokeRoundedMessage01,
-              trailing: ToggleSwitchComponent(
-                selected: url.enableComment,
-                onChanged: (selected) async {
-                  await _updateUrlSettings(context, {
-                    'enableComment': selected,
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Spacing.sm),
-        ShareMenuGroup(
-          items: [
-            ShareMenuItem(
-              title: context.strings.linkExpiry,
-              subtitle: (url.hasExpiry
-                  ? (url.isExpired
-                        ? context.strings.linkExpired
-                        : context.strings.linkEnabled)
-                  : context.strings.linkNeverExpires),
-              titleMaxLines: 1,
-              icon: HugeIcons.strokeRoundedCalendar03,
-              showChevron: true,
-              onTap: () async {
-                await _showLinkExpirySheet(context, url);
-              },
-            ),
-          ],
-        ),
-        if (url.hasExpiry) ...[
-          ShareSectionDescription(
-            url.isExpired
-                ? context.strings.expiredLinkInfo
-                : context.strings.linkExpiresOn(
-                    expiryTime: getFormattedTime(
-                      DateTime.fromMicrosecondsSinceEpoch(url.validTill),
-                      context: context,
-                    ),
-                  ),
-          ),
-          const SizedBox(height: Spacing.sm),
-        ],
-        const SizedBox(height: Spacing.sm),
-        ShareMenuGroup(
-          items: [
-            ShareMenuItem(
-              title: context.strings.linkDeviceLimit,
-              subtitle: url.deviceLimit == 0
-                  ? context.strings.noLimit
-                  : "${url.deviceLimit}",
-              icon: HugeIcons.strokeRoundedLaptop,
-              showChevron: true,
-              onTap: () async {
-                await _showDeviceLimitSheet(context, url);
-              },
             ),
             ShareMenuItem(
               key: ValueKey("Allow downloads ${url.enableDownload}"),
@@ -186,6 +125,24 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
               ),
             ),
             ShareMenuItem(
+              key: ValueKey("Enable comment ${url.enableComment}"),
+              title: context.strings.commentAndReact,
+              icon: HugeIcons.strokeRoundedMessage01,
+              trailing: ToggleSwitchComponent(
+                selected: url.enableComment,
+                onChanged: (selected) async {
+                  await _updateUrlSettings(context, {
+                    'enableComment': selected,
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.lg),
+        ShareMenuGroup(
+          items: [
+            ShareMenuItem(
               key: ValueKey("Allow join ${url.enableJoin}"),
               title: context.strings.allowJoining,
               subtitle: url.enableDownload
@@ -199,6 +156,25 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                           _updateUrlSettings(context, {'enableJoin': selected})
                     : null,
               ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Spacing.lg),
+        ShareMenuGroup(
+          items: [
+            ShareMenuItem(
+              title: context.strings.linkExpiry,
+              subtitle: (url.hasExpiry
+                  ? (url.isExpired
+                        ? context.strings.linkExpired
+                        : context.strings.linkEnabled)
+                  : context.strings.linkNeverExpires),
+              titleMaxLines: 1,
+              icon: HugeIcons.strokeRoundedCalendar03,
+              showChevron: true,
+              onTap: () async {
+                await _showLinkExpirySheet(context, url);
+              },
             ),
             ShareMenuItem(
               key: ValueKey("Password lock ${url.passwordEnabled}"),
@@ -239,9 +215,31 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                 },
               ),
             ),
+            ShareMenuItem(
+              title: context.strings.linkDeviceLimit,
+              subtitle: url.deviceLimit == 0
+                  ? context.strings.noLimit
+                  : "${url.deviceLimit}",
+              icon: HugeIcons.strokeRoundedLaptop,
+              showChevron: true,
+              onTap: () async {
+                await _showDeviceLimitSheet(context, url);
+              },
+            ),
           ],
         ),
-        const SizedBox(height: Spacing.sm),
+        if (url.hasExpiry)
+          ShareSectionDescription(
+            url.isExpired
+                ? context.strings.expiredLinkInfo
+                : context.strings.linkExpiresOn(
+                    expiryTime: getFormattedTime(
+                      DateTime.fromMicrosecondsSinceEpoch(url.validTill),
+                      context: context,
+                    ),
+                  ),
+          ),
+        const SizedBox(height: Spacing.lg),
         ShareMenuGroup(
           items: [
             ShareMenuItem(
