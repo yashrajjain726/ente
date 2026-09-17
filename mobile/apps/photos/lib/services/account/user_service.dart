@@ -254,13 +254,11 @@ class UserService {
   }
 
   Future<List<String?>> _getPublicKeyBatch(List<String> emails) async {
-    if (flagService.internalUser) {
-      try {
-        return await _gateway.getPublicKeys(emails);
-      } on DioException catch (error) {
-        if (error.response?.statusCode != 404) {
-          rethrow;
-        }
+    try {
+      return await _gateway.getPublicKeys(emails);
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 404) {
+        rethrow;
       }
     }
 

@@ -247,36 +247,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             count: _selectedEmails.length,
           ),
           isDisabled: _selectedEmails.isEmpty,
-          onTap: () async {
-            final results = <bool>[];
-            final collections = widget.collections;
-
-            for (String email in _selectedEmails) {
-              bool result = false;
-              for (Collection collection in collections) {
-                result = await collectionActions.addEmailToCollection(
-                  context,
-                  collection,
-                  email,
-                  CollectionParticipantRole.collaborator,
-                );
-              }
-              results.add(result);
-            }
-
-            final noOfSuccessfullAdds = results.where((e) => e).length;
-            if (!mounted) return;
-            showToast(
-              context,
-              context.strings.collaboratorsSuccessfullyAdded(
-                count: noOfSuccessfullAdds,
-              ),
-            );
-
-            if (!results.any((e) => e == false) && mounted) {
-              Navigator.of(context).pop(true);
-            }
-          },
+          onTap: () => _shareSelected(CollectionParticipantRole.collaborator),
         ),
       );
     }
@@ -287,36 +258,7 @@ class _AddParticipantPage extends State<AddParticipantPage> {
           size: ButtonComponentSize.large,
           label: context.strings.addViewers(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
-          onTap: () async {
-            final results = <bool>[];
-            final collections = widget.collections;
-
-            for (final email in _selectedEmails) {
-              bool result = false;
-              for (final collection in collections) {
-                result = await collectionActions.addEmailToCollection(
-                  context,
-                  collection,
-                  email,
-                  CollectionParticipantRole.viewer,
-                );
-              }
-              results.add(result);
-            }
-
-            final noOfSuccessfullAdds = results.where((e) => e).length;
-            if (!mounted) return;
-            showToast(
-              context,
-              context.strings.viewersSuccessfullyAdded(
-                count: noOfSuccessfullAdds,
-              ),
-            );
-
-            if (!results.any((e) => e == false) && mounted) {
-              Navigator.of(context).pop(true);
-            }
-          },
+          onTap: () => _shareSelected(CollectionParticipantRole.viewer),
         ),
       );
     }
@@ -329,38 +271,39 @@ class _AddParticipantPage extends State<AddParticipantPage> {
           size: ButtonComponentSize.large,
           label: context.strings.addAdmins(count: _selectedEmails.length),
           isDisabled: _selectedEmails.isEmpty,
-          onTap: () async {
-            final results = <bool>[];
-            final collections = widget.collections;
-
-            for (final email in _selectedEmails) {
-              bool result = false;
-              for (final collection in collections) {
-                result = await collectionActions.addEmailToCollection(
-                  context,
-                  collection,
-                  email,
-                  CollectionParticipantRole.admin,
-                );
-              }
-              results.add(result);
-            }
-
-            final successful = results.where((e) => e).length;
-            if (!mounted) return;
-            showToast(
-              context,
-              context.strings.adminsSuccessfullyAdded(count: successful),
-            );
-
-            if (!results.any((e) => e == false) && mounted) {
-              Navigator.of(context).pop(true);
-            }
-          },
+          onTap: () => _shareSelected(CollectionParticipantRole.admin),
         ),
       );
     }
     return widgets;
+  }
+
+  Future<void> _shareSelected(CollectionParticipantRole role) async {
+    final emails = _selectedEmails
+        .map((email) => email.trim().toLowerCase())
+        .toSet();
+    final collections = List<Collection>.of(widget.collections);
+    final sharedEmails = await collectionActions.addEmailsToCollections(
+      context,
+      collections,
+      emails,
+      role,
+    );
+    if (!mounted) return;
+    final count = sharedEmails.length;
+    final message = switch (role) {
+      CollectionParticipantRole.viewer =>
+        context.strings.viewersSuccessfullyAdded(count: count),
+      CollectionParticipantRole.collaborator =>
+        context.strings.collaboratorsSuccessfullyAdded(count: count),
+      CollectionParticipantRole.admin =>
+        context.strings.adminsSuccessfullyAdded(count: count),
+      _ => throw ArgumentError.value(role, "role"),
+    };
+    showToast(context, message);
+    if (count == emails.length) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   void clearFocus() {
@@ -410,14 +353,12 @@ class _AddParticipantPage extends State<AddParticipantPage> {
     if (!_emailIsValid) {
       return;
     }
-    final result = await collectionActions.doesEmailHaveAccount(
-      context,
-      _newEmail,
-    );
-    if (result && mounted) {
+    final email = _newEmail;
+    final result = await collectionActions.doesEmailHaveAccount(context, email);
+    if (result && mounted && _newEmail == email) {
       setState(() {
         for (var suggestedUser in _suggestedUsers) {
-          if (suggestedUser.email == _newEmail) {
+          if (suggestedUser.email == email) {
             _selectedEmails.add(suggestedUser.email);
             _clearEmailField();
             textFieldFocusNode.unfocus();
@@ -425,8 +366,8 @@ class _AddParticipantPage extends State<AddParticipantPage> {
             return;
           }
         }
-        _suggestedUsers.insert(0, UserSuggestion(_newEmail));
-        _selectedEmails.add(_newEmail);
+        _suggestedUsers.insert(0, UserSuggestion(email));
+        _selectedEmails.add(email);
         _clearEmailField();
         textFieldFocusNode.unfocus();
       });

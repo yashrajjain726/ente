@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/errors.dart";
+import "package:photos/core/network/api_response.dart";
 import 'package:photos/db/files_db.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
 import "package:photos/models/api/collection/user.dart";
@@ -246,6 +247,95 @@ class CollectionActions {
     }
   }
 
+  Future<Set<String>> addEmailsToCollections(
+    BuildContext context,
+    List<Collection> collections,
+    Set<String> emails,
+    CollectionParticipantRole role,
+  ) async {
+    final validEmails = <String>{};
+    final ownEmail = Configuration.instance.getEmail()?.trim().toLowerCase();
+    for (final email in emails) {
+      if (!context.mounted) return {};
+      if (!isValidEmail(email)) {
+        await showErrorDialog(
+          context,
+          context.strings.invalidEmailAddress,
+          context.strings.enterValidEmail,
+        );
+      } else if (email == ownEmail) {
+        await showErrorDialog(
+          context,
+          context.strings.oops,
+          context.strings.youCannotShareWithYourself,
+        );
+      } else {
+        validEmails.add(email);
+      }
+    }
+
+    final publicKeys = <String, String>{};
+    try {
+      final keys = await UserService.instance.getPublicKeys(validEmails);
+      for (final entry in keys.entries) {
+        if (!context.mounted) return {};
+        final publicKey = entry.value;
+        if (publicKey == null || publicKey.isEmpty) {
+          await showInviteDialog(context, entry.key);
+        } else {
+          publicKeys[entry.key] = publicKey;
+        }
+      }
+    } catch (e) {
+      logger.severe("Failed to get public keys", e);
+      if (context.mounted) {
+        await showGenericErrorDialog(context: context, error: e);
+      }
+      return {};
+    }
+    if (publicKeys.isEmpty) return {};
+
+    try {
+      for (final collection in collections) {
+        if (!context.mounted) return {};
+        final sharees = await collectionsService.shareBatch(
+          collection.id,
+          publicKeys,
+          role,
+        );
+        collection.updateSharees(sharees);
+      }
+      return publicKeys.keys.toSet();
+    } catch (e) {
+      if (!context.mounted) return {};
+      if (e is UnexpectedApiResponseException &&
+          e.response?.statusCode == 404) {
+        final sharedEmails = <String>{};
+        for (final email in publicKeys.keys) {
+          var result = false;
+          for (final collection in collections) {
+            if (!context.mounted) return sharedEmails;
+            result = await addEmailToCollection(
+              context,
+              collection,
+              email,
+              role,
+            );
+          }
+          if (result) sharedEmails.add(email);
+        }
+        return sharedEmails;
+      }
+      if (e is SharingNotPermittedForFreeAccountsError) {
+        await _showUnSupportedAlert(context);
+      } else {
+        logger.severe("Failed to share collection", e);
+        await showGenericErrorDialog(context: context, error: e);
+      }
+      return {};
+    }
+  }
+
   Future<bool> addEmailToCollection(
     BuildContext context,
     Collection collection,
@@ -316,7 +406,7 @@ class CollectionActions {
       return false;
     } else {
       try {
-        final newSharees = await CollectionsService.instance.share(
+        final newSharees = await collectionsService.share(
           collection.id,
           email,
           publicKey,

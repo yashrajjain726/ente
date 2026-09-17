@@ -15,7 +15,6 @@ import 'package:photos/core/configuration.dart';
 import 'package:photos/core/constants.dart';
 import 'package:photos/core/errors.dart';
 import 'package:photos/core/event_bus.dart';
-import 'package:photos/core/network/api_response.dart';
 import 'package:photos/db/collections_db.dart';
 import 'package:photos/db/device_files_db.dart';
 import 'package:photos/db/files_db.dart';
@@ -885,7 +884,6 @@ class CollectionsService {
     );
     final collectionKey = getCollectionKey(collectionID);
     final shareRole = role.toStringVal();
-    var useLegacyAPI = !flagService.internalUser;
     try {
       for (final batch in publicKeys.entries.toList().chunks(_shareBatchSize)) {
         final encryptedKeys = <String, String>{};
@@ -897,28 +895,13 @@ class CollectionsService {
           encryptedKeys[entry.key] = CryptoUtil.bin2base64(encryptedKey);
         }
 
-        if (!useLegacyAPI) {
-          try {
-            sharees = await collectionShareGateway.shareBatch(
-              collectionID: collectionID,
-              encryptedKeys: encryptedKeys,
-              role: shareRole,
-            );
-            _cacheSharees(_collectionIDToCollections[collectionID]!, sharees);
-            RemoteSyncService.instance.sync(silently: true).ignore();
-            continue;
-          } on UnexpectedApiResponseException catch (error) {
-            if (error.response?.statusCode != 404) rethrow;
-            useLegacyAPI = true;
-          }
-        }
-
-        sharees = await _shareBatchLegacy(
-          collectionID,
-          encryptedKeys,
-          shareRole,
-          sharees,
+        sharees = await collectionShareGateway.shareBatch(
+          collectionID: collectionID,
+          encryptedKeys: encryptedKeys,
+          role: shareRole,
         );
+        _cacheSharees(_collectionIDToCollections[collectionID]!, sharees);
+        RemoteSyncService.instance.sync(silently: true).ignore();
       }
       return sharees;
     } on DioException catch (error) {
@@ -927,26 +910,6 @@ class CollectionsService {
       }
       rethrow;
     }
-  }
-
-  Future<List<User>> _shareBatchLegacy(
-    int collectionID,
-    Map<String, String> encryptedKeys,
-    String role,
-    List<User> initialSharees,
-  ) async {
-    var sharees = initialSharees;
-    for (final entry in encryptedKeys.entries) {
-      sharees = await collectionShareGateway.share(
-        collectionID: collectionID,
-        email: entry.key,
-        encryptedKey: entry.value,
-        role: role,
-      );
-      _cacheSharees(_collectionIDToCollections[collectionID]!, sharees);
-      RemoteSyncService.instance.sync(silently: true).ignore();
-    }
-    return sharees;
   }
 
   Future<List<User>> unshare(int collectionID, String email) async {
