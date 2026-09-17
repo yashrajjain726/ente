@@ -2926,6 +2926,7 @@
   "offlineHomeSignupBannerAction": "Back up now",
   "offlineHomeSignupBannerDescription": "Encrypted backups across 3 locations to keep your memories safe.",
   "offlineHomeSignupBannerTitle": "Protect your memories forever",
+  "offlineKeyUnavailableMessage": "The encryption key for your offline codes is unavailable. Log in or restore from a backup to continue.",
   "offlineModeWarning": "You have chosen to proceed without backups. Please take manual backups to make sure your codes are safe.",
   "offlineNameFaceBannerSubtitle": "Sign up to tag them and easily find their photos later.",
   "offlineNameFaceBannerTitle": "Give this face a name",
@@ -4605,6 +4606,7 @@
       }
     }
   },
+  "unableToAccessYourCodes": "Unable to access your codes",
   "unableToCheckForUpdatesRightNow": "Unable to check for updates right now",
   "unableToExtractFileInformation": "Unable to extract information from this file",
   "unarchive": "Unarchive",

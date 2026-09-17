@@ -34,7 +34,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:local_auth/local_auth.dart';
 
 class OnboardingPage extends StatefulWidget {
-  const OnboardingPage({super.key});
+  final bool showOfflineKeyUnavailableDialog;
+
+  const OnboardingPage({
+    super.key,
+    this.showOfflineKeyUnavailableDialog = false,
+  });
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -68,6 +73,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
       await autoLogoutAlert(context);
     });
     _startAutoScroll();
+    if (widget.showOfflineKeyUnavailableDialog) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final l10n = context.strings;
+        unawaited(
+          showErrorDialog(
+            context,
+            l10n.unableToAccessYourCodes,
+            l10n.offlineKeyUnavailableMessage,
+            isDismissable: false,
+            showContactSupport: false,
+            dismissButtonLabel: l10n.ok,
+          ),
+        );
+      });
+    }
     super.initState();
   }
 
