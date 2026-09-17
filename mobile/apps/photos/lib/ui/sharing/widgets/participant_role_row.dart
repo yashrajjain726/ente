@@ -90,10 +90,6 @@ class _ParticipantRoleRowState extends State<ParticipantRoleRow> {
               size: IconSizes.small,
             ),
             isActive: role == activeRole,
-            activeTrailingWidget: const HugeIcon(
-              icon: HugeIcons.strokeRoundedTick02,
-              size: IconSizes.small,
-            ),
           ),
       EntePopupMenuOption(
         value: _ParticipantRoleAction.remove,
