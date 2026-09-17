@@ -110,7 +110,7 @@ class _ShareCollectionPageState extends State<ShareCollectionPage> {
             sendLinkButtonKey: sendLinkButtonKey,
             additionalItems: [
               ShareMenuItem(
-                title: context.strings.manageLink,
+                title: context.strings.linkSettings,
                 icon: HugeIcons.strokeRoundedSetting07,
                 showChevron: true,
                 onTap: () async {
