@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.FontWeight
 public object EnteFontFamily {
     public val inter: FontFamily =
         FontFamily(
+            Font(R.font.inter_light, FontWeight.Light),
             Font(R.font.inter_regular, FontWeight.Normal),
             Font(R.font.inter_medium, FontWeight.Medium),
             Font(R.font.inter_semibold, FontWeight.SemiBold),
@@ -14,4 +15,6 @@ public object EnteFontFamily {
         )
 
     public val montserrat: FontFamily = FontFamily(Font(R.font.montserrat_bold, FontWeight.Bold))
+
+    public val outfit: FontFamily = FontFamily(Font(R.font.outfit_semibold, FontWeight.SemiBold))
 }

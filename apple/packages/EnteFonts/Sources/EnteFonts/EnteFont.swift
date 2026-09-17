@@ -1,5 +1,6 @@
 import CoreText
 import SwiftUI
+import UIKit
 
 public enum EnteFont {
     public enum InterWeight {
@@ -47,7 +48,15 @@ public enum EnteFont {
         return .custom("Montserrat-Bold", fixedSize: fixedSize)
     }
 
-    private static let registration: Void = {
+    public static func outfit(
+        size: CGFloat,
+        relativeTo textStyle: Font.TextStyle = .body
+    ) -> Font {
+        _ = registration
+        return .custom("Outfit-SemiBold", size: size, relativeTo: textStyle)
+    }
+
+    fileprivate static let registration: Void = {
         for url in Bundle.module.urls(forResourcesWithExtension: "ttf", subdirectory: nil) ?? [] {
             var error: Unmanaged<CFError>?
             let registered = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
@@ -58,4 +67,17 @@ public enum EnteFont {
             )
         }
     }()
+}
+
+public extension UIFont {
+    static func inter(
+        size: CGFloat,
+        weight: EnteFont.InterWeight = .regular,
+        relativeTo textStyle: UIFont.TextStyle = .body
+    ) -> UIFont {
+        _ = EnteFont.registration
+        let descriptor = UIFontDescriptor(name: weight.name, size: size)
+        let font = UIFont(descriptor: descriptor, size: size)
+        return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: font)
+    }
 }

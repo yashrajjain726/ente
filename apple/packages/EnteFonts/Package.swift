@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "EnteFonts",
-    platforms: [.iOS("15.1"), .macOS(.v13), .tvOS(.v16)],
+    platforms: [.iOS("15.1"), .tvOS(.v16)],
     products: [.library(name: "EnteFonts", targets: ["EnteFonts"])],
     targets: [
         .target(

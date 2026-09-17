@@ -31,6 +31,10 @@ dependencyResolutionManagement {
 
 rootProject.name = "android"
 
+include(":components")
+
+project(":components").projectDir = file("packages/components")
+
 include(":ensu")
 
 project(":ensu").projectDir = file("apps/ensu")
