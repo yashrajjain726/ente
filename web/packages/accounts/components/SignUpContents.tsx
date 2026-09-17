@@ -20,7 +20,7 @@ import {
     stashReferralSource,
     stashSRPSetupAttributes,
 } from "ente-accounts/services/accounts-db";
-import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/session-storage";
+import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/prelogin-session";
 import { generateSRPSetupAttributes } from "ente-accounts/services/srp";
 import {
     generateAndSaveInteractiveKeyAttributes,

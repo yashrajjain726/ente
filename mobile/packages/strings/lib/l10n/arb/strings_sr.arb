@@ -323,7 +323,6 @@
   },
   "deviceNotFound": "Уређај није пронађен",
   "digits": "Цифре",
-  "disableAutoLock": "Онемогући закључавање екрана",
   "disableDownloadWarningBody": "Људи и даље могу да направе снимак екрана или да скину ваше фотографије користећи друге апликације",
   "disableDownloadWarningTitle": "Молим, обратите пажњу",
   "disableLinkMessage": "Ово ће уклонити јавни линк за приступ \"{albumName}\".",
@@ -1354,7 +1353,6 @@
     "description": "Action of 'Unarchiving' an element"
   },
   "unarchiving": "Премештам из архиве...",
-  "unavailableReferralCode": "Жао нам је, овај кôд није доступан.",
   "uncategorized": "Некатегоризовано",
   "unlock": "Откључај",
   "@unlock": {

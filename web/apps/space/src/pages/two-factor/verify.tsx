@@ -4,13 +4,11 @@ import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
-import {
-    VerifyTwoFactorScreen,
-    verifyTwoFactorBackground,
-} from "screens/VerifyTwoFactorScreen";
+import { VerifyTwoFactorScreen } from "screens/VerifyTwoFactorScreen";
 import { spaceAuthErrorMessage } from "services/auth-error";
 import { completeSpaceLoginSecondFactor } from "services/login";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { routeAfterCompletedLogin } from "utils/login-navigation";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -70,12 +68,12 @@ const Page: React.FC = () => {
     };
 
     if (!twoFactorSessionID) {
-        return <SpaceRouteFallback background={verifyTwoFactorBackground} />;
+        return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
     }
 
     return (
         <>
-            <SpacePageMeta themeColor={verifyTwoFactorBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <VerifyTwoFactorScreen
                 codeResetKey={codeResetKey}
                 errorMessage={errorMessage}

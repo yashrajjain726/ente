@@ -596,11 +596,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Вимкніть блокування екрана пристрою, коли на передньому плані знаходиться Ente і виконується резервне копіювання. Зазвичай це не потрібно, але може допомогти швидше завершити великі вивантаження і початковий імпорт великих бібліотек.",
   "deviceNotFound": "Пристрій не знайдено",
   "didYouKnow": "Чи знали ви?",
   "digits": "Цифри",
-  "disableAutoLock": "Вимкнути автоблокування",
   "disableDownloadWarningBody": "Переглядачі все ще можуть робити знімки екрана або зберігати копію ваших фотографій за допомогою зовнішніх інструментів",
   "disableDownloadWarningTitle": "Зверніть увагу",
   "disableLinkMessage": "Це вилучить публічне посилання для доступу до «{albumName}».",
@@ -1812,8 +1810,6 @@
   "referrals": "Реферали",
   "referralsAreCurrentlyPaused": "Реферали зараз призупинені",
   "referralStats": "Реферальна статистика",
-  "referralStep1": "1. Налаштуйте код і поділіться ним.",
-  "referralStep2": "2. Користувач зареєструється в Ente, використовуючи ваш код.",
   "rejectRecovery": "Відхилити відновлення",
   "related": "Пов'язані",
   "remindToEmptyDeviceTrash": "Також очистьте «Нещодавно видалено» в «Налаштування» -> «Сховище», щоб отримати вільне місце",
@@ -1939,8 +1935,6 @@
   "saveChangesBeforeLeavingQuestion": "Зберегти зміни перед виходом?",
   "saveCollage": "Зберегти колаж",
   "saveCopy": "Зберегти копію",
-  "saveDocumentDescription": "Завантажте важливі документи.",
-  "saveDocumentTitle": "Документ",
   "saveKey": "Зберегти ключ",
   "@saveKey": {
     "description": "Save key button label"
@@ -2376,7 +2370,6 @@
   },
   "unarchiveAlbum": "Розархівувати альбом",
   "unarchiving": "Розархівуємо...",
-  "unavailableReferralCode": "На жаль, цей код недоступний.",
   "uncategorized": "Без категорії",
   "unhide": "Показати",
   "unhideToAlbum": "Показати в альбомі",

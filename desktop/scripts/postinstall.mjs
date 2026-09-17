@@ -24,6 +24,7 @@ const run = (cmd) => {
     execSync(cmd, { stdio: "inherit" });
 };
 
+run("node scripts/patch-electron-builder.mjs");
 run("npm rebuild --ignore-scripts=false ffmpeg-static electron-winstaller");
 run("npm exec -- electron-builder install-app-deps");
 run("node scripts/vips.js");

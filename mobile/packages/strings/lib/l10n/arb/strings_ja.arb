@@ -554,11 +554,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "進行中のバックアップがある場合、デバイスがスリープしないようにします。\n\n※容量の大きいアップロードがある際にご活用ください。",
   "deviceNotFound": "デバイスが見つかりません",
   "didYouKnow": "ご存知ですか?",
   "digits": "桁",
-  "disableAutoLock": "自動ロックを無効にする",
   "disableDownloadWarningBody": "ビューアーはスクリーンショットを撮ったり、外部ツールを使用して写真のコピーを保存したりすることができます",
   "disableDownloadWarningTitle": "ご注意ください",
   "disableLinkMessage": "\"{albumName}\" にアクセスするための公開リンクが削除されます。",
@@ -662,7 +660,6 @@
     }
   },
   "earned": "獲得済み",
-  "earnFreeStorage": "無料のストレージを獲得",
   "earnMoreSpace": "より多くのスペースを獲得！",
   "edit": "編集",
   "editCodeAuthMessage": "コードを編集するためには認証が必要です",
@@ -1846,8 +1843,6 @@
   "saveCollage": "コラージュを保存",
   "saveContact": "連絡先を保存",
   "saveCopy": "コピーを保存",
-  "saveDocumentDescription": "重要なドキュメントをアップロードします。",
-  "saveDocumentTitle": "ドキュメント",
   "saveKey": "キーを保存",
   "@saveKey": {
     "description": "Save key button label"
@@ -2337,7 +2332,6 @@
   },
   "unarchiveAlbum": "アルバムのアーカイブ解除",
   "unarchiving": "アーカイブを解除中...",
-  "unavailableReferralCode": "このコードは利用できません",
   "uncategorized": "カテゴリなし",
   "undo": "元に戻す",
   "unhide": "再表示",

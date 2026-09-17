@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"image/png"
 
 	"github.com/ente/museum/pkg/utils/network"
 
 	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
 	"github.com/ente/museum/pkg/utils/crypto"
 	"github.com/ente/museum/pkg/utils/time"
@@ -142,11 +144,7 @@ func (c *UserController) VerifyTwoFactor(context *gin.Context, sessionID string,
 		go c.DiscordController.NotifyPotentialAbuse(msg)
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(ente.ErrIncorrectTOTP, "OTP code has already been used")
 	}
-	if err = c.TwoFactorRepo.ConsumeTwoFactorSession(sessionID); err != nil {
-		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
-	}
-
-	response, err := c.GetKeyAttributeAndToken(context, userID)
+	response, err := c.GetKeyAttributeAndToken(context, userID, sessionID, repo.TOTPPendingLogin, false, false)
 	if err != nil {
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
@@ -188,21 +186,16 @@ func (c *UserController) RemoveTOTPTwoFactor(context *gin.Context, sessionID str
 	if !exists {
 		return nil, stacktrace.Propagate(ente.ErrPermissionDenied, "")
 	}
-	if err = c.TwoFactorRepo.ConsumeTwoFactorSession(sessionID); err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	err = c.TwoFactorRepo.UpdateTwoFactorStatus(userID, false)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	response, err := c.GetKeyAttributeAndToken(context, userID)
+	response, err := c.GetKeyAttributeAndToken(context, userID, sessionID, repo.TOTPPendingLogin, true, false)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &response, nil
 }
 
-func (c *UserController) GetKeyAttributeAndToken(context *gin.Context, userID int64) (ente.TwoFactorAuthorizationResponse, error) {
+func (c *UserController) GetKeyAttributeAndToken(context *gin.Context, userID int64, sessionID string,
+	session repo.PendingLoginSession, disableTwoFactor, publishForPolling bool,
+) (ente.TwoFactorAuthorizationResponse, error) {
 	keyAttributes, err := c.UserRepo.GetKeyAttributes(userID)
 	if err != nil {
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
@@ -212,14 +205,30 @@ func (c *UserController) GetKeyAttributeAndToken(context *gin.Context, userID in
 	if err != nil {
 		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
 	}
-	err = c.AddTokenAndNotify(context, userID, auth.GetApp(context),
-		token, network.GetClientIP(context), context.Request.UserAgent())
-	if err != nil {
-		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
-	}
-	return ente.TwoFactorAuthorizationResponse{
+	app := auth.GetApp(context)
+	ip := network.GetClientIP(context)
+	userAgent := context.Request.UserAgent()
+	response := ente.TwoFactorAuthorizationResponse{
 		ID:             userID,
 		KeyAttributes:  &keyAttributes,
 		EncryptedToken: encryptedToken,
-	}, nil
+	}
+	if session == repo.NoPendingLogin {
+		err = c.AddTokenAndNotify(context, userID, app, token, ip, userAgent)
+	} else if err = c.ensureStorageWarningDeletionLoginAllowed(userID, app); err == nil {
+		var tokenData []byte
+		if publishForPolling {
+			tokenData, err = json.Marshal(response)
+		}
+		if err == nil {
+			err = c.UserAuthRepo.AddTokenForPendingLogin(context, userID, sessionID, session, disableTwoFactor, app, token, ip, userAgent, tokenData)
+		}
+		if err == nil {
+			err = c.notifyLogin(context, userID, app, ip, userAgent)
+		}
+	}
+	if err != nil {
+		return ente.TwoFactorAuthorizationResponse{}, stacktrace.Propagate(err, "")
+	}
+	return response, nil
 }

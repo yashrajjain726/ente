@@ -50,6 +50,9 @@ pub enum Error {
     #[error("Invalid public key")]
     InvalidPublicKey,
 
+    #[error("Secret key does not match public key")]
+    KeyPairMismatch,
+
     #[error("JSON error: {0}")]
     Json(String),
 

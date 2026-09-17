@@ -26,6 +26,8 @@ import { UpdateSubscription } from "./UpdateSubscription";
 
 export interface UserDetailsData {
     email: string;
+    userID: number;
+    showFileCountInitializer: boolean;
     user: UserTableRow[];
     storage: UserTableRow[];
     subscription: UserTableRow[];
@@ -49,9 +51,15 @@ type UserSectionKey = "user" | "storage" | "subscription" | "security";
 
 interface UserDetailsProps {
     userData: UserDetailsData;
+    fileCountInitPending: boolean;
+    onInitializeFileCounts: () => Promise<void>;
 }
 
-export const UserDetails: React.FC<UserDetailsProps> = ({ userData }) => {
+export const UserDetails: React.FC<UserDetailsProps> = ({
+    userData,
+    fileCountInitPending,
+    onInitializeFileCounts,
+}) => {
     const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
     const [emailMFAEnabled, setEmailMFAEnabled] = useState(
         userData.securityState.emailMFAEnabled,
@@ -87,7 +95,6 @@ export const UserDetails: React.FC<UserDetailsProps> = ({ userData }) => {
             setDisable2FAOpen(true);
         }
     };
-
     const sections: {
         key: UserSectionKey;
         title: string;
@@ -130,6 +137,18 @@ export const UserDetails: React.FC<UserDetailsProps> = ({ userData }) => {
                     />
                 </Grid>
             ))}
+            {userData.showFileCountInitializer && (
+                <Button
+                    variant="contained"
+                    disabled={fileCountInitPending}
+                    onClick={onInitializeFileCounts}
+                    sx={{ textTransform: "none" }}
+                >
+                    {fileCountInitPending
+                        ? "Initializing..."
+                        : "Initialize file counts"}
+                </Button>
+            )}
 
             <DeleteAccount
                 open={deleteAccountOpen}

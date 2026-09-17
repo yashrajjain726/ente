@@ -8,6 +8,10 @@ pub struct SystemInfo {
 }
 
 #[cfg(unix)]
+#[expect(
+    unsafe_code,
+    reason = "Read physical memory through the system's sysconf API"
+)]
 fn total_memory_bytes() -> Option<u64> {
     let pages = unsafe { libc::sysconf(libc::_SC_PHYS_PAGES) };
     let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
@@ -21,6 +25,7 @@ fn total_memory_bytes() -> Option<u64> {
 }
 
 #[cfg(target_os = "windows")]
+#[expect(unsafe_code, reason = "Read physical memory through the Windows API")]
 fn total_memory_bytes() -> Option<u64> {
     use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 

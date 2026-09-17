@@ -16,11 +16,19 @@ import { SpaceNotificationPermissionInstructions } from "components/Notification
 import { useSpacePWAInstallPrompt } from "hooks/use-pwa-install-prompt";
 import { useSpaceWebPushPrompt } from "hooks/use-web-push-prompt";
 import React from "react";
+import { spaceToastActionButtonSx } from "styles/buttons";
+import {
+    spaceDialogBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
 const green = "#08C225";
-const textBase = "#000";
-const textSoft = "#777777";
+const textBase = spaceText;
+const textSoft = spaceTextMuted;
 const authenticatedSessionSeenKey = "space.prompts.authenticatedSessionSeen";
 const automaticPromptClaimedKey = "space.prompts.automaticClaimed";
 
@@ -205,12 +213,12 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             position: "fixed",
             top:
                 placement == "top"
-                    ? "calc(env(safe-area-inset-top) + 10px)"
+                    ? "calc(env(safe-area-inset-top) + 12px)"
                     : undefined,
             transform: hidden
                 ? placement == "bottom"
                     ? "translate(-50%, calc(100% + env(safe-area-inset-bottom) + 16px))"
-                    : "translate(-50%, calc(-100% - env(safe-area-inset-top) - 10px))"
+                    : "translate(-50%, calc(-100% - env(safe-area-inset-top) - 12px))"
                 : "translate(-50%, 0)",
             transition: "transform 180ms ease",
             width: "100%",
@@ -224,8 +232,8 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: "#FFFFFF",
-                borderRadius: "18px",
+                bgcolor: spaceDialogBackground,
+                borderRadius: "22px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 color: textBase,
                 display: "flex",
@@ -234,11 +242,11 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                 fontWeight: 650,
                 gap: "10px",
                 lineHeight: "20px",
-                minHeight: 50,
+                minHeight: spaceTouchTargetSize,
                 pointerEvents: hidden ? "none" : "auto",
                 pl: "10px",
                 pr: "6px",
-                py: "3px",
+                py: 0,
                 width: "100%",
             }}
         >
@@ -254,7 +262,7 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                     width: 24,
                 }}
             >
-                <HugeiconsIcon icon={icon} size={24} strokeWidth={1.9} />
+                <HugeiconsIcon icon={icon} size={20} strokeWidth={1.9} />
             </Box>
             <Box
                 sx={{
@@ -271,28 +279,11 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
             <Box sx={{ alignItems: "center", display: "flex", flexShrink: 0 }}>
                 {onAction && (
                     <Box
-                        className="green-bg"
                         component="button"
                         type="button"
                         disabled={actionDisabled}
                         onClick={onAction}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: green,
-                            border: 0,
-                            borderRadius: "14px",
-                            color: "#FFFFFF",
-                            cursor: actionDisabled ? "default" : "pointer",
-                            display: "flex",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 700,
-                            height: 34,
-                            justifyContent: "center",
-                            minWidth: 48,
-                            opacity: actionDisabled ? 0.7 : 1,
-                            px: "17px",
-                        }}
+                        sx={spaceToastActionButtonSx}
                     >
                         {actionLabel}
                     </Box>
@@ -314,6 +305,10 @@ export const SpacePWAPromptBanner: React.FC<SpacePWAPromptBannerProps> = ({
                             justifyContent: "center",
                             p: 0,
                             width: 36,
+                            "&:focus-visible": {
+                                outline: `2px solid ${spaceText}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
                         <HugeiconsIcon
@@ -476,7 +471,6 @@ export const SpacePWAInstallInstructions: React.FC<
             aria-describedby={
                 purpose == "notifications" ? descriptionID : undefined
             }
-            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.56)" }}
             slots={
                 isBottomSheet
                     ? { transition: SpaceBottomSheetTransition }
@@ -485,7 +479,6 @@ export const SpacePWAInstallInstructions: React.FC<
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: "#FFFFFF",
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "0 -18px 44px rgba(0, 0, 0, 0.18)",
@@ -574,7 +567,7 @@ export const SpacePWAInstallInstructions: React.FC<
                         bgcolor: green,
                         border: 0,
                         borderRadius: "20px",
-                        color: "#FFFFFF",
+                        color: spaceOnAccent,
                         cursor: "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -589,7 +582,7 @@ export const SpacePWAInstallInstructions: React.FC<
                         width: "100%",
                         "&:active": { filter: "brightness(0.96)" },
                         "&:focus-visible": {
-                            outline: "2px solid rgba(0 0 0 / 0.72)",
+                            outline: `2px solid ${spaceText}`,
                             outlineOffset: 2,
                         },
                         "&:hover": { filter: "brightness(0.98)" },
@@ -606,7 +599,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: "#FAFAFA",
+            bgcolor: spaceSurface,
             borderRadius: "18px",
             color: textSoft,
             display: "flex",
@@ -619,7 +612,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
         <Box
             sx={{
                 alignItems: "center",
-                bgcolor: "#E7F6E9",
+                bgcolor: "rgba(8, 194, 37, 0.14)",
                 borderRadius: "14px",
                 color: green,
                 display: "flex",

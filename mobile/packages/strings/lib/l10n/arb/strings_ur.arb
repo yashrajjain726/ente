@@ -810,11 +810,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "جب Ente فور گراؤنڈ میں ہو اور بیک اپ جاری ہو تو ڈیوائس اسکرین لاک کو غیر فعال کریں. اس کی عام طور پر ضرورت نہیں ہوتی، لیکن بڑی اپ لوڈز اور بڑی لائبریریوں کی ابتدائی درآمدات کو تیزی سے مکمل کرنے میں مدد مل سکتی ہے.",
   "deviceNotFound": "ڈیوائس نہیں ملی",
   "didYouKnow": "کیا آپ جانتے ہیں؟",
   "digits": "ہندسے",
-  "disableAutoLock": "آٹو لاک غیر فعال کریں",
   "disableDownloadWarningBody": "ناظرین اب بھی اسکرین شاٹس لے سکتے ہیں یا بیرونی ٹولز کا استعمال کرتے ہوئے آپ کی تصاویر کی کاپی محفوظ کر سکتے ہیں",
   "disableDownloadWarningTitle": "براہ کرم نوٹ کریں",
   "disableLinkMessage": "یہ \"{albumName}\" تک رسائی کے لیے عوامی لنک کو ہٹا دے گا.",
@@ -945,7 +943,6 @@
     }
   },
   "earned": "کمایا",
-  "earnFreeStorage": "مفت اسٹوریج کمائیں",
   "earnMoreSpace": "مزید جگہ کمائیں!",
   "edit": "ترمیم کریں",
   "editAutoAddPeople": "لوگوں کے خودکار اضافے میں ترمیم کریں",
@@ -2269,14 +2266,6 @@
   "referrals": "ریفرلز",
   "referralsAreCurrentlyPaused": "ریفرلز فی الحال روکے گئے ہیں",
   "referralStats": "ریفرل کے اعدادوشمار",
-  "referralStep1": "۱. اپنے کوڈ کو حسب ضرورت بنائیں اور شیئر کریں.",
-  "referralStep2": "۲. وہ آپ کے کوڈ کا استعمال کرتے ہوئے Ente پر سائن اپ کرتے ہیں.",
-  "referralStep3": "۳. ان کے لیے {storageInGB} جی بی مفت + آپ کے لیے {storageInGB} جی بی مفت جب وہ اپ گریڈ کریں.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "ان کے لیے {storageAmountInGB} جی بی + آپ کے لیے {storageAmountInGB} جی بی جب وہ اپ گریڈ کریں.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2741,7 +2730,6 @@
   "share": "شیئر کریں",
   "shareALink": "لنک شیئر کریں",
   "shareAnAlbum": "البم شیئر کریں",
-  "shareCodeEarnStorage": "اپنا کوڈ شیئر کریں، اسٹوریج کمائیں.",
   "shareCodes": "کوڈز شیئر کریں",
   "shareCodesDuration": "وہ دورانیہ منتخب کریں جس کے لیے آپ کوڈز شیئر کرنا چاہتے ہیں۔",
   "sharedAlbumSectionDescription": "دوسرے Ente صارفین کے ساتھ مشترکہ اور باہمی البمز بنائیں، بشمول مفت پلان والے صارفین.",
@@ -3147,7 +3135,6 @@
   },
   "unarchiveAlbum": "البم ان آرکائیو کریں",
   "unarchiving": "ان آرکائیو کیا جا رہا ہے...",
-  "unavailableReferralCode": "معذرت، یہ کوڈ دستیاب نہیں ہے.",
   "uncategorized": "غیر زمرہ بند",
   "undo": "کالعدم کریں",
   "unhide": "ظاہر کریں",

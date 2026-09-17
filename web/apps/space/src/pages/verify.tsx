@@ -3,10 +3,7 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
-import {
-    VerifyEmailScreen,
-    verifyEmailBackground,
-} from "screens/VerifyEmailScreen";
+import { VerifyEmailScreen } from "screens/VerifyEmailScreen";
 import { spaceAuthErrorMessage } from "services/auth-error";
 import {
     completeSpaceLoginEmailVerification,
@@ -18,6 +15,7 @@ import {
 import { savePendingSpacePasskeyVerification } from "services/passkey-verification";
 import { completeSpaceSignup, resendSpaceSignupCode } from "services/signup";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { routeAfterCompletedLogin } from "utils/login-navigation";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes, verifyFlowFromQuery } from "utils/routes";
@@ -205,12 +203,12 @@ const Page: React.FC = () => {
     };
 
     if (!router.isReady || !email) {
-        return <SpaceRouteFallback background={verifyEmailBackground} />;
+        return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
     }
 
     return (
         <>
-            <SpacePageMeta themeColor={verifyEmailBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <VerifyEmailScreen
                 codeResetKey={codeResetKey}
                 email={email}

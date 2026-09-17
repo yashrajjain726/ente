@@ -5,9 +5,11 @@ import "dart:math" show min;
 import "dart:typed_data" show Uint8List;
 
 import "package:flutter/foundation.dart" show kDebugMode;
+import "package:flutter/widgets.dart" show AppLifecycleState, WidgetsBinding;
 import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
+import "package:photos/db/ml/base.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/ml/db_pet_model_mappers.dart";
 import "package:photos/db/offline_files_db.dart";
@@ -81,10 +83,10 @@ class MLService {
         : _kForceClusteringFaceCount;
   }
 
-  MLDataDB get _mlDataDB =>
+  IMLDataDB<int> get _mlDataDB =>
       isLocalGalleryMode ? MLDataDB.localGalleryInstance : MLDataDB.instance;
 
-  MLDataDB _dbForMode(MLMode mode) {
+  IMLDataDB<int> _dbForMode(MLMode mode) {
     return mode == MLMode.localGallery
         ? MLDataDB.localGalleryInstance
         : MLDataDB.instance;
@@ -340,7 +342,9 @@ class MLService {
 
   Future<MlRunDisposition> runAllML({
     bool force = false,
+    bool allowImageIndexing = true,
     MlRunControl? control,
+    Duration? lockWait,
   }) async {
     final runControl = control ?? MlRunControl();
     // A latched stop always wins, force included.
@@ -358,6 +362,15 @@ class MLService {
     }
     if (!hasGrantedMLConsent) {
       _logger.info("runAllML called without ML consent, skipping");
+      return MlRunDisposition.denied;
+    }
+    // On iOS the main engine may be woken without being resumed; the resume
+    // hook re-triggers ML, so no retry is scheduled here.
+    if (!force &&
+        !isProcessBg &&
+        Platform.isIOS &&
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      _logger.info("runAllML skipped, app is not resumed");
       return MlRunDisposition.denied;
     }
     final MLMode mode = isLocalGalleryMode
@@ -381,9 +394,11 @@ class MLService {
           disposition = await _runAllMLProtected(
             mode: mode,
             force: force,
+            allowImageIndexing: allowImageIndexing,
             control: runControl,
           );
         },
+        lockWait: lockWait,
       );
       if (attempt != MlLockAttempt.ran) {
         _logger.info("runAllML denied the ml process lock (${attempt.name})");
@@ -420,6 +435,7 @@ class MLService {
   Future<MlRunDisposition> _runAllMLProtected({
     required MLMode mode,
     required bool force,
+    required bool allowImageIndexing,
     required MlRunControl control,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
@@ -452,7 +468,11 @@ class MLService {
         return MlRunDisposition.stopped;
       }
       if (canFetch()) {
-        await _fetchAndIndexAllImages(mode: mode, control: control);
+        await _fetchAndIndexAllImages(
+          mode: mode,
+          control: control,
+          allowImageIndexing: allowImageIndexing,
+        );
       }
       if (control.stopRequested) {
         _logRunStopped(control, "before final clustering");
@@ -498,18 +518,25 @@ class MLService {
   Future<MlLockAttempt> _runExclusiveWithControl(
     MlOperation operation,
     MlRunControl control,
-    Future<void> Function() body,
-  ) async {
+    Future<void> Function() body, {
+    Duration? lockWait,
+  }) async {
     _runControls.add(control);
     try {
-      return await MlProcessLock.instance.tryRunExclusive(operation, () async {
-        _installRunControl(control);
-        try {
-          await body();
-        } finally {
-          _clearRunControl(control);
-        }
-      }, background: isProcessBg);
+      return await MlProcessLock.instance.tryRunExclusive(
+        operation,
+        () async {
+          _installRunControl(control);
+          try {
+            await body();
+          } finally {
+            _clearRunControl(control);
+          }
+        },
+        background: isProcessBg,
+        waitForAvailability: lockWait != null,
+        waitDeadline: lockWait,
+      );
     } finally {
       _runControls.remove(control);
     }
@@ -533,7 +560,7 @@ class MLService {
   }
 
   void triggerML() {
-    if (_mlControllerStatus && !MlProcessLock.instance.isBusy) {
+    if (_mlControllerStatus) {
       unawaited(runAllML());
     }
   }
@@ -562,6 +589,7 @@ class MLService {
   Future<void> _fetchAndIndexAllImages({
     required MLMode mode,
     required MlRunControl control,
+    bool allowImageIndexing = true,
   }) async {
     assert(MlProcessLock.instance.isBusy, "ml funnel must be held");
     if (control.stopRequested) {
@@ -573,7 +601,7 @@ class MLService {
     bool rustRuntimePrepared = false;
     try {
       _logger.info('starting image indexing');
-      if (localSettings.isMLLocalIndexingEnabled) {
+      if (allowImageIndexing && localSettings.isMLLocalIndexingEnabled) {
         await MLModelDownloadService.instance.ensureModelsDownloaded(
           onlyIndexingModels: true,
         );
@@ -590,7 +618,7 @@ class MLService {
           _logRunStopped(control, "between indexing chunks");
           break;
         }
-        if (!localSettings.isMLLocalIndexingEnabled) {
+        if (!allowImageIndexing || !localSettings.isMLLocalIndexingEnabled) {
           if (rustRuntimePrepared) {
             await MLIndexingIsolate.instance.releaseRustRuntime();
             rustRuntimePrepared = false;

@@ -8,7 +8,7 @@ pub use srp::SrpSession;
 
 pub use api::{DecryptedSecrets, GeneratedKek, GeneratedSrpSetup, SrpCredentials};
 pub use api::{
-    decrypt_keys_only, decrypt_secrets, derive_kek, derive_srp_credentials,
+    decrypt_keys_only, decrypt_secrets, derive_kek, derive_srp_credentials, derive_srp_login_key,
     generate_interactive_kek, generate_sensitive_kek, generate_srp_setup,
     generate_srp_setup_with_login_key,
 };

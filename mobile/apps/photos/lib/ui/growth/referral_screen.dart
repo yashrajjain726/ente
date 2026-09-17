@@ -11,38 +11,83 @@ import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/growth/apply_code_sheet.dart";
 import "package:photos/ui/growth/referral_code_widget.dart";
 import "package:photos/ui/growth/storage_details_screen.dart";
+import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/share_util.dart";
 import "package:tuple/tuple.dart";
 
-class ReferralScreen extends StatefulWidget {
-  const ReferralScreen({super.key});
+Future<void> openReferralScreen(
+  BuildContext context, {
+  bool showLoadingDialog = false,
+}) async {
+  final dialog = showLoadingDialog
+      ? createProgressDialog(
+          context,
+          context.strings.pleaseWait,
+          isDismissible: true,
+        )
+      : null;
+  if (dialog != null) await dialog.show();
 
-  @override
-  State<ReferralScreen> createState() => _ReferralScreenState();
+  late final Tuple2<ReferralView, UserDetails> data;
+  try {
+    data = await _fetchReferralData();
+  } catch (error) {
+    if (dialog != null && !await dialog.hide()) return;
+    if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    await showGenericErrorDialog(context: context, error: error);
+    return;
+  }
+  if (dialog != null && !await dialog.hide()) return;
+  if (!context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+  await routeToPage(context, _ReferralScreen(initialData: data));
 }
 
-class _ReferralScreenState extends State<ReferralScreen> {
-  void _safeUIUpdate() {
-    if (mounted) {
-      setState(() {});
-    }
+Future<Tuple2<ReferralView, UserDetails>> _fetchReferralData() async {
+  UserDetails? cachedUserDetails = UserService.instance.getCachedUserDetails();
+  cachedUserDetails ??= await UserService.instance.getUserDetailsV2(
+    memoryCount: false,
+  );
+  final referralView = await storageBonusService.getReferralView();
+  return Tuple2(referralView, cachedUserDetails);
+}
+
+class _ReferralScreen extends StatefulWidget {
+  const _ReferralScreen({required this.initialData});
+
+  final Tuple2<ReferralView, UserDetails> initialData;
+
+  @override
+  State<_ReferralScreen> createState() => _ReferralScreenState();
+}
+
+class _ReferralScreenState extends State<_ReferralScreen> {
+  late Future<Tuple2<ReferralView, UserDetails>> _dataFuture;
+  Tuple2<ReferralView, UserDetails>? _initialData;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialData = widget.initialData;
+    _dataFuture = Future.value(widget.initialData);
   }
 
-  Future<Tuple2<ReferralView, UserDetails>> _fetchData() async {
-    UserDetails? cachedUserDetails = UserService.instance
-        .getCachedUserDetails();
-    cachedUserDetails ??= await UserService.instance.getUserDetailsV2(
-      memoryCount: false,
-    );
-    final referralView = await storageBonusService.getReferralView();
-    return Tuple2(referralView, cachedUserDetails);
+  void _safeUIUpdate() {
+    if (mounted) {
+      setState(() {
+        _initialData = null;
+        _dataFuture = _fetchReferralData();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.strings;
     return FutureBuilder<Tuple2<ReferralView, UserDetails>>(
-      future: _fetchData(),
+      future: _dataFuture,
+      initialData: _initialData,
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           return SettingsPageScaffold(

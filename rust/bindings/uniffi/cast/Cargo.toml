@@ -1,6 +1,6 @@
 [package]
 name = "ente-cast-uniffi"
-edition = "2024"
+edition.workspace = true
 
 [lib]
 name = "cast"
@@ -12,3 +12,6 @@ ente-core.workspace = true
 ente-uniffi-log.workspace = true
 thiserror.workspace = true
 uniffi.workspace = true
+
+[lints]
+workspace = true

@@ -105,6 +105,8 @@ else
         private-network.private-network-id="$SCW_PRIVATE_NETWORK_ID"
     scw rdb instance wait "$BACKUP_INSTANCE_ID" timeout=12h
 
+    sleep 10
+
     PRIVATE_ENDPOINT_IP="$(
         scw rdb endpoint list "$BACKUP_INSTANCE_ID" -o json \
             | jq -er '

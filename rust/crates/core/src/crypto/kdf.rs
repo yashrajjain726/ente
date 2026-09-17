@@ -48,14 +48,13 @@ pub fn derive_subkey(
     Ok(SecretVec::new(hash.as_bytes()[..subkey_len].to_vec()))
 }
 
-pub fn derive_login_key(master_key: &Key) -> SecretVec {
-    let subkey = derive_subkey(
-        master_key,
-        LOGIN_SUBKEY_LEN,
-        LOGIN_SUBKEY_ID,
-        LOGIN_SUBKEY_CONTEXT,
-    )
-    .expect("login subkey parameters are statically valid");
+pub fn derive_login_key(kek: &Key) -> SecretVec {
+    #[expect(
+        clippy::expect_used,
+        reason = "The login subkey length, ID and context are fixed valid constants"
+    )]
+    let subkey = derive_subkey(kek, LOGIN_SUBKEY_LEN, LOGIN_SUBKEY_ID, LOGIN_SUBKEY_CONTEXT)
+        .expect("login subkey parameters are statically valid");
     SecretVec::new(subkey[..16].to_vec())
 }
 

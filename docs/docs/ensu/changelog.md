@@ -7,6 +7,15 @@ description: Release notes of recent updates to Ensu
 
 A short summary list of changes to the Ensu mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v0.1.20 - Sep 2026
+
+- Chat with your local markdown notes on desktop and mobile
+- Ensu packs support on desktop
+- Gemma as default for high RAM mobile devices
+- Added a progress indicator on desktop while attaching images.
+- Added the ability to rename chats on desktop (@fosszil).
+- Fixed typing lag in the message composer and chat search on desktop.
+
 ## v0.1.19 - Aug 2026
 
 - Fixed an issue that prevented Gemma models from downloading.

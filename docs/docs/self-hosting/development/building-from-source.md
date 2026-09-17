@@ -61,13 +61,13 @@ Flutter can be [installed](https://flutter.dev/docs/get-started/install) in many
 
 > [!NOTE]
 >
-> Unlike the other toolchains where any recent version would do, we pin fiddly Flutter to the [version CI uses](https://github.com/ente/ente/blob/main/.github/actions/setup-flutter/action.yml). At the time of writing, it was 3.38.10.
+> Unlike the other toolchains where any recent version would do, we pin fiddly Flutter to the [version CI uses](https://github.com/ente/ente/blob/main/.github/actions/setup-flutter/action.yml). At the time of writing, it was 3.47.2.
 
 ```sh
 mkdir -p ~/.local/share
 cd ~/.local/share
-curl -LO https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.38.10-stable.zip
-unzip -q flutter_macos_arm64_3.38.10-stable.zip
+curl -LO https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.47.2-stable.zip
+unzip -q flutter_macos_arm64_3.47.2-stable.zip
 
 # Also added this to my ~/.zprofile
 export PATH="$HOME/.local/share/flutter/bin:$PATH"
@@ -82,7 +82,7 @@ Then run `flutter doctor`. It'll tell us that Android is missing; we'll come to 
 > ```sh
 > cd ~/.local/share/flutter
 > git fetch origin --tags
-> git switch --detach 3.38.10
+> git switch --detach 3.47.2
 > flutter --version
 > flutter doctor
 > ```
@@ -307,12 +307,12 @@ cargo codegen native
 Then, for example, to run the Ensu Android app:
 
 ```sh
-cd android/apps/ensu
-./gradlew :app:installDebug
+cd android
+./gradlew :ensu:app:installDebug
 adb shell am start -n io.ente.ensu.debug/io.ente.ensu.MainActivity
 ```
 
-Or, if you have Android Studio, you can just open `android/apps/ensu` and run. Same goes for opening `apple/apps/ensu` in Xcode and running.
+Or, if you have Android Studio, you can just open `android/` and run Ensu's `app` module. Same goes for opening `apple/apps/ensu` in Xcode and running.
 
 ## That's all folks.
 

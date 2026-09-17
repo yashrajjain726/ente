@@ -1,9 +1,13 @@
 import { savedLocalUser } from "ente-accounts/services/accounts-db";
-import { accountLogout } from "ente-accounts/services/logout";
+import {
+    accountLogout,
+    logoutClearStateAgain,
+} from "ente-accounts/services/logout";
 import log from "ente-base/log";
+import { logoutContacts } from "ente-contacts";
 import { clearAuthenticatedSession } from "./authenticated-session";
+import { clearLockerCache } from "./locker-cache";
 import { clearLockerDB } from "./locker-db";
-import { clearLockerCache } from "./remote-cache";
 
 export const lockerLogout = async () => {
     const ignoreError = (label: string, error: unknown) =>
@@ -13,17 +17,19 @@ export const lockerLogout = async () => {
 
     const userID = savedLocalUser()?.id;
 
+    // Session
+
     try {
         clearAuthenticatedSession();
     } catch (error) {
         ignoreError("Authenticated session", error);
     }
 
-    try {
-        clearLockerCache();
-    } catch (error) {
-        ignoreError("Locker in-memory cache", error);
-    }
+    // Remote logout and clear state
+
+    await accountLogout();
+
+    // Locker services
 
     try {
         if (userID !== undefined) {
@@ -33,5 +39,20 @@ export const lockerLogout = async () => {
         ignoreError("Locker DB", error);
     }
 
-    await accountLogout();
+    try {
+        clearLockerCache();
+    } catch (error) {
+        ignoreError("Locker in-memory cache", error);
+    }
+
+    try {
+        logoutContacts();
+    } catch (error) {
+        ignoreError("Contacts", error);
+    }
+
+    // Final sweep and reload
+
+    await logoutClearStateAgain();
+    window.location.replace("/login");
 };

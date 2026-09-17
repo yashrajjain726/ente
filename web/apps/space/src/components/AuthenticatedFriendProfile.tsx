@@ -4,16 +4,11 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import { useBrowserBackClose } from "hooks/use-browser-back-close";
 import React from "react";
-import { friendsBackground } from "screens/FriendsScreen";
 import {
     FriendProfileImageViewerScreen,
     friendProfileImageViewerBackground,
 } from "screens/ProfileImageViewerScreen";
 import { ProfileScreen } from "screens/ProfileScreen";
-import {
-    patchCachedSpaceFeedPost,
-    removeCachedSpaceFeedPostsBySpace,
-} from "services/feed-cache";
 import {
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfile,
@@ -24,6 +19,7 @@ import {
     type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { profilePostItemsFromPosts } from "utils/post-display";
 import { spaceDefaultCoverImagePath } from "utils/post-image";
 import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
@@ -38,6 +34,8 @@ export const AuthenticatedFriendProfile: React.FC<
     AuthenticatedFriendProfileProps
 > = ({ friendSpaceId, username }) => {
     const router = useSpaceRouter();
+    const initialSection =
+        router.query.section == "latest" ? "latest" : undefined;
     const { friends, profile, profileLoadError, profileLoadStatus } =
         useSpaceAppState();
     const [friendProfile, setFriendProfile] =
@@ -139,35 +137,34 @@ export const AuthenticatedFriendProfile: React.FC<
         if (!actorSpaceId) return;
 
         await removeCurrentSpaceFriend(actorSpaceId, friendSpaceId);
-        await removeCachedSpaceFeedPostsBySpace(actorSpaceId, friendSpaceId);
     }, [friendSpaceId, profile?.spaceId]);
 
     if (profileLoadStatus != "ready" || !profile?.spaceId) {
         return (
             <SpaceRouteFallback
-                background={friendsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
     }
     if (
-        !hadCachedFriendProfileOnMount.current &&
+        (!hadCachedFriendProfileOnMount.current ||
+            initialSection == "latest") &&
         (isProfileLoading || isPostsLoading)
     ) {
-        return <SpaceRouteFallback background={friendsBackground} />;
+        return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
     }
     const actorSpaceId = profile.spaceId;
 
     return (
         <>
-            <SpacePageMeta themeColor={friendsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <ProfileScreen
-                friendsCount={displayedProfile.friendsCount}
                 headerVariant="friend"
+                initialSection={initialSection}
                 isCoverLoading={isProfileLoading}
                 isNameLoading={isProfileLoading && !immediateFriendProfile}
                 isPostsLoading={isPostsLoading}
-                isStatsLoading={isProfileLoading || isPostsLoading}
                 onBack={goBack}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onMessageFriend={() =>
@@ -179,10 +176,24 @@ export const AuthenticatedFriendProfile: React.FC<
                     replyToCurrentPost(actorSpaceId, postSpaceId, postId, text)
                 }
                 onSetPostLiked={async (postId, liked) => {
-                    await setCurrentPostLiked(actorSpaceId, postId, liked);
-                    void patchCachedSpaceFeedPost(actorSpaceId, postId, {
-                        viewerLiked: liked,
-                    });
+                    const previousLiked =
+                        posts.find((post) => post.postId == postId)
+                            ?.viewerLiked ?? false;
+                    const updateLiked = (viewerLiked: boolean) =>
+                        setPosts((current) =>
+                            current.map((post) =>
+                                post.postId == postId
+                                    ? { ...post, viewerLiked }
+                                    : post,
+                            ),
+                        );
+                    updateLiked(liked);
+                    try {
+                        await setCurrentPostLiked(actorSpaceId, postId, liked);
+                    } catch (error) {
+                        updateLiked(previousLiked);
+                        throw error;
+                    }
                 }}
                 onUnfriend={unfriend}
                 onUnfriendComplete={() =>

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ente_accounts::auth::{self, KeyAttributes, SrpSession};
 use ente_core::b64;
 use ente_core::crypto::{self, SecretString, SecretVec, sealed, secretbox};
-use ente_core::http::{Api, ApiConfig, Http, Response};
+use ente_core::http::{self, Api, ApiConfig, Http};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -65,15 +65,16 @@ impl LegacyKitRecoveryClient {
         let first_share = shares.first().ok_or_else(|| {
             Error::InvalidInput("at least two legacy kit shares are required".into())
         })?;
-        let response = self
+        let challenge = self
             .api
             .post("/legacy-kits/recovery/challenge")
             .json(&LegacyKitChallengeRequest {
                 kit_id: first_share.kit_id.clone(),
             })
             .send()
-            .await?;
-        let challenge = active_kit_response(response)?
+            .await?
+            .error_for_status()
+            .map_err(map_kit_error)?
             .json::<LegacyKitChallengeResponse>()
             .await?;
         self.open_from_encrypted_challenge(shares, &challenge.encrypted_challenge, email)
@@ -120,8 +121,9 @@ impl LegacyKitRecoveryClient {
                 email,
             })
             .send()
-            .await?;
-        let response = active_kit_response(response)?
+            .await?
+            .error_for_status()
+            .map_err(map_kit_error)?
             .json::<LegacyKitOpenRecoveryResponse>()
             .await?;
         Ok(LegacyKitRecoveryHandle {
@@ -230,11 +232,10 @@ impl LegacyKitRecoveryHandle {
     }
 }
 
-fn active_kit_response(response: Response) -> Result<Response> {
-    if response.status() == 404 {
-        Err(Error::LegacyKitInactive)
-    } else {
-        Ok(response.error_for_status()?)
+fn map_kit_error(error: http::Error) -> Error {
+    match error.status_code() {
+        Some(404) => Error::LegacyKitInactive,
+        _ => error.into(),
     }
 }
 

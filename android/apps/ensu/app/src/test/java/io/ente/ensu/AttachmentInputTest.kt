@@ -21,24 +21,21 @@ class AttachmentInputTest {
     fun rejectsInputPastTheLimit() {
         val input = ByteArrayInputStream(byteArrayOf(1, 2, 3, 4, 5))
 
-        assertThrows(IOException::class.java) {
-            input.readAttachmentImageBytes(maxBytes = 4)
-        }
+        assertThrows(IOException::class.java) { input.readAttachmentImageBytes(maxBytes = 4) }
     }
 
     @Test
     fun stopsReadingAStreamThatDoesNotEnd() {
-        val input = object : InputStream() {
-            override fun read(): Int = 0
+        val input =
+            object : InputStream() {
+                override fun read(): Int = 0
 
-            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-                buffer.fill(0, offset, offset + length)
-                return length
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    buffer.fill(0, offset, offset + length)
+                    return length
+                }
             }
-        }
 
-        assertThrows(IOException::class.java) {
-            input.readAttachmentImageBytes(maxBytes = 16)
-        }
+        assertThrows(IOException::class.java) { input.readAttachmentImageBytes(maxBytes = 16) }
     }
 }

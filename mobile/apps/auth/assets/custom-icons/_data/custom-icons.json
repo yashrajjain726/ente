@@ -716,6 +716,13 @@
       ]
     },
     {
+      "title": "Dockhand",
+      "slug": "dockhand",
+      "altNames": [
+        "dockhand.pro"
+      ]
+    },
+    {
       "title": "DocuSeal"
     },
     {
@@ -1236,6 +1243,13 @@
       "title": "Jottacloud"
     },
     {
+      "title": "Jotty Page",
+      "slug": "jotty",
+      "altNames": [
+        "Jotty"
+      ]
+    },
+    {
       "title": "JOYclub",
       "slug": "joyclub",
       "hex": "000000",
@@ -1353,6 +1367,15 @@
         "Life Miles",
         "lifemiles.com",
         "Avianca LifeMiles"
+      ]
+    },
+    {
+      "title": "Lightyear",
+      "hex": "000000",
+      "altNames": [
+        "Lightyear Investing",
+        "Lightyear: Invest in stocks",
+        "Lightyear: Stocks and ETFs"
       ]
     },
     {
@@ -1789,6 +1812,13 @@
       "slug": "palform"
     },
     {
+      "title": "PandaDoc",
+      "slug": "pandadoc",
+      "altNames": [
+        "PandaDoc"
+      ]
+    },
+    {
       "title": "Pangolin",
       "slug": "pangolin"
     },
@@ -2138,6 +2168,13 @@
     {
       "title": "Seafile",
       "slug": "seafile"
+    },
+    {
+      "title": "Securo Finance",
+      "slug": "securo",
+      "altNames": [
+        "Securo"
+      ]
     },
     {
       "title": "SEI",

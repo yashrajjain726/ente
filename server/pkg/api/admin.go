@@ -44,6 +44,7 @@ type AdminHandler struct {
 	AuthenticatorRepo      *authenticator.Repository
 	UserAuthRepo           *repo.UserAuthRepository
 	FileRepo               *repo.FileRepository
+	UsageRepo              *repo.UsageRepository
 	BillingRepo            *repo.BillingRepository
 	StorageBonusRepo       *storagebonus.Repository
 	BillingController      *controller.BillingController
@@ -510,6 +511,29 @@ func (h *AdminHandler) ReQueueItem(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
+func (h *AdminHandler) InitializeFileCounts(c *gin.Context) {
+	var r ente.AdminOpsForUserRequest
+	if err := handler.BindJSON(c, &r); err != nil {
+		handler.Error(c, stacktrace.Propagate(err, "Bad request"))
+		return
+	}
+	initialized, err := h.UsageRepo.InitializeFileCounts(c.Request.Context(), r.UserID)
+	logrus.WithFields(logrus.Fields{
+		"admin_id":    auth.GetUserID(c.Request.Header),
+		"user_id":     r.UserID,
+		"initialized": initialized,
+	}).WithError(err).Info("file count initialization")
+	if err != nil && !errors.Is(err, repo.ErrFileCountIneligible) {
+		handler.Error(c, stacktrace.Propagate(err, "failed to initialize file counts"))
+		return
+	}
+	response := gin.H{"initialized": initialized}
+	if err != nil {
+		response["reason"] = err.Error()
+	}
+	c.JSON(http.StatusOK, response)
+}
+
 func (h *AdminHandler) UpdateBonus(c *gin.Context) {
 	var r ente.SupportUpdateBonus
 	if err := handler.BindJSON(c, &r); err != nil {
@@ -671,6 +695,16 @@ func (h *AdminHandler) alertIfAdminMissing2FA(ctx adminAlertContext) {
 }
 
 func (h *AdminHandler) attachSubscription(ctx *gin.Context, userID int64, response gin.H) {
+	storageConsumed, photos, locker, err := h.UsageRepo.GetStoredFileCounts(ctx.Request.Context(), userID)
+	if err != nil {
+		logrus.WithError(err).WithField("user_id", userID).Error("failed to get user storage usage")
+		response["storageConsumedStatus"] = "unavailable"
+	} else {
+		response["storageConsumed"] = storageConsumed
+		response["storageConsumedStatus"] = "available"
+		response["photosFileCount"] = photos
+		response["lockerFileCount"] = locker
+	}
 	subscription, err := h.BillingRepo.GetUserSubscription(userID)
 	if err == nil {
 		response["subscription"] = subscription

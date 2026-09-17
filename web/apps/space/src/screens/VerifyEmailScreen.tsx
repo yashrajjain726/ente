@@ -3,15 +3,20 @@ import { SpaceBackIcon } from "components/BackIcon";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import { SpaceOtpInput } from "components/OtpInput";
 import React, { useEffect, useRef, useState } from "react";
+import {
+    spaceAppBackground,
+    spaceOnAccent,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { sanitizeSpaceOTP, spaceOTPCodeLength } from "utils/otp";
 
-export const verifyEmailBackground = "#FAFAFA";
-
 const green = "#08C225";
-const textBase = "#000";
-const textMuted = "#666";
-const textLight = "#969696";
+const textBase = spaceText;
+const textMuted = spaceTextMuted;
+const textLight = spaceTextMuted;
 const warning = "#F63A3A";
 const verifyEmailFormID = "space-verify-email-form";
 
@@ -85,7 +90,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: verifyEmailBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -95,7 +100,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: verifyEmailBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -326,7 +331,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
 
                 <Box
                     sx={{
-                        bgcolor: verifyEmailBackground,
+                        bgcolor: "transparent",
                         bottom: 0,
                         boxSizing: "border-box",
                         left: "50%",
@@ -349,10 +354,14 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                         aria-busy={isSubmitting ? true : undefined}
                         sx={{
                             alignItems: "center",
-                            bgcolor: isVerifyButtonActive ? green : "#F5F5F5",
+                            bgcolor: isVerifyButtonActive
+                                ? green
+                                : spaceSurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: isVerifyButtonActive ? "white" : textLight,
+                            color: isVerifyButtonActive
+                                ? spaceOnAccent
+                                : textLight,
                             cursor: canVerify ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

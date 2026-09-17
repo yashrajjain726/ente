@@ -3,7 +3,6 @@ import "dart:io";
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:native_video_player/native_video_player.dart";
@@ -19,6 +18,7 @@ import "package:photos/events/video_mute_changed_event.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/preview/playlist_data.dart";
+import 'package:photos/module/download/download_error.dart';
 import "package:photos/module/download/file.dart";
 import "package:photos/module/download/task.dart";
 import "package:photos/module/metadata/video.dart";
@@ -27,7 +27,6 @@ import "package:photos/services/files_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/states/detail_page_state.dart";
 import "package:photos/theme/colors.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/native_video_player_controls/play_pause_button.dart";
@@ -35,8 +34,8 @@ import "package:photos/ui/viewer/file/native_video_player_controls/seek_bar.dart
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/video_control/gallery_video_controls.dart";
 import "package:photos/ui/viewer/file/video_double_tap_seek.dart";
+import "package:photos/ui/viewer/file/video_download_progress_indicator.dart";
 import "package:photos/ui/viewer/file/video_seek_controller.dart";
-import "package:photos/ui/viewer/file/video_stream_change.dart";
 import "package:photos/ui/viewer/file/zoomable_video_viewer.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:video_player/video_player.dart" as vp;
@@ -50,7 +49,6 @@ class VideoWidgetNative extends StatefulWidget {
   final bool isFromMemories;
   final bool isActive;
   final bool? isAudioMutedOverride;
-  final void Function()? onStreamChange;
   final PlaylistData? playlistData;
   final bool selectedPreview;
   final ValueNotifier<double> playbackSpeed;
@@ -64,7 +62,6 @@ class VideoWidgetNative extends StatefulWidget {
     this.isFromMemories = false,
     required this.isActive,
     this.isAudioMutedOverride,
-    required this.onStreamChange,
     super.key,
     this.playlistData,
     this.onFinalFileLoad,
@@ -101,6 +98,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   StreamSubscription<DownloadTask>? downloadTaskSubscription;
   final _transformationController = TransformationController();
   bool _isZooming = false;
+  OverlayEntry? _longPressSpeedIndicatorEntry;
 
   @override
   void initState() {
@@ -137,6 +135,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     }
 
     pauseVideoSubscription = Bus.instance.on<PauseVideoEvent>().listen((event) {
+      if (event.fileTag != null && event.fileTag != widget.file.tag) return;
       _controller?.pause();
     });
     resumeVideoSubscription = Bus.instance.on<ResumeVideoEvent>().listen((
@@ -163,7 +162,10 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     });
     _streamSwitchedSubscription = Bus.instance.on<StreamSwitchedEvent>().listen(
       (event) {
-        if (event.type != PlayerType.nativeVideoPlayer) return;
+        if (event.fileTag != widget.file.tag ||
+            event.type != PlayerType.nativeVideoPlayer) {
+          return;
+        }
         _filePath = null;
         if (event.selectedPreview) {
           loadPreview(update: true);
@@ -278,6 +280,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   @override
   void dispose() {
+    _longPressSpeedIndicatorEntry?.remove();
     widget.playbackSpeed.removeListener(_onPlaybackSpeedChanged);
     _subscription?.cancel();
     _controller?.stop().ignore();
@@ -324,6 +327,20 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
 
   void _onPlaybackSpeedChanged() {
     _controller?.setPlaybackSpeed(widget.playbackSpeed.value);
+  }
+
+  void _startLongPressSpeed() {
+    final controller = _controller;
+    if (_longPressSpeedIndicatorEntry != null || controller == null) return;
+    _longPressSpeedIndicatorEntry = showVideoLongPressSpeedIndicator(context);
+    controller.setPlaybackSpeed(kVideoLongPressPlaybackSpeed).ignore();
+  }
+
+  void _restorePlaybackSpeed() {
+    if (_longPressSpeedIndicatorEntry == null) return;
+    _longPressSpeedIndicatorEntry?.remove();
+    _longPressSpeedIndicatorEntry = null;
+    _controller?.setPlaybackSpeed(widget.playbackSpeed.value).ignore();
   }
 
   void _onInteractionLockChanged(bool shouldLock) {
@@ -424,25 +441,31 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                       );
                                     }
                                   },
-                            onLongPress: widget.isFromMemories
-                                ? () {
-                                    widget.playbackCallback?.call(
-                                      false,
-                                      FullScreenRequestReason.userInteraction,
-                                    );
-                                    _controller?.pause();
-                                  }
-                                : null,
-                            onLongPressUp: widget.isFromMemories
-                                ? () {
-                                    if (!widget.isActive) return;
-                                    widget.playbackCallback?.call(
-                                      true,
-                                      FullScreenRequestReason.userInteraction,
-                                    );
-                                    _controller?.play();
-                                  }
-                                : null,
+                            onLongPress: () {
+                              if (widget.isFromMemories) {
+                                widget.playbackCallback?.call(
+                                  false,
+                                  FullScreenRequestReason.userInteraction,
+                                );
+                                _controller?.pause();
+                              } else {
+                                _startLongPressSpeed();
+                              }
+                            },
+                            onLongPressUp: () {
+                              if (widget.isFromMemories && widget.isActive) {
+                                widget.playbackCallback?.call(
+                                  true,
+                                  FullScreenRequestReason.userInteraction,
+                                );
+                                _controller?.play();
+                              } else if (!widget.isFromMemories) {
+                                _restorePlaybackSpeed();
+                              }
+                            },
+                            onLongPressCancel: widget.isFromMemories
+                                ? null
+                                : _restorePlaybackSpeed,
                           ),
                           if (!widget.isFromMemories && isPlaybackReady)
                             Positioned.fill(
@@ -469,10 +492,8 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                             Positioned.fill(child: _getLoadingWidget()),
                           widget.isFromMemories
                               ? const SizedBox.shrink()
-                              : Positioned(
+                              : GalleryBottomControlsPositioned(
                                   bottom: kVideoProgressRowBottomInset,
-                                  right: 0,
-                                  left: 0,
                                   child: SafeArea(
                                     top: false,
                                     left: false,
@@ -485,32 +506,6 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
                                             seekController: _seekController,
                                           )
                                         : const SizedBox.shrink(),
-                                  ),
-                                ),
-                          widget.isFromMemories
-                              ? const SizedBox.shrink()
-                              : Positioned(
-                                  bottom: videoStreamControlBottomInset(
-                                    widget.file.caption?.isNotEmpty ?? false,
-                                  ),
-                                  right: 0,
-                                  left: 0,
-                                  child: SafeArea(
-                                    top: false,
-                                    left: false,
-                                    right: false,
-                                    child: ValueListenableBuilder(
-                                      valueListenable: _showControls,
-                                      builder: (context, value, _) {
-                                        return VideoStreamChangeWidget(
-                                          showControls: value,
-                                          file: widget.file,
-                                          isPreviewPlayer:
-                                              widget.selectedPreview,
-                                          onStreamChange: widget.onStreamChange,
-                                        );
-                                      },
-                                    ),
                                   ),
                                 ),
                         ],
@@ -697,6 +692,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   void _loadNetworkVideo(bool update) {
     getFileFromServer(
           widget.file,
+          throwOnDecryptionFailure: true,
           progressCallback: (count, total) {
             if (!mounted) {
               return;
@@ -716,11 +712,15 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
         })
         .onError((error, stackTrace) {
           if (!mounted) return;
-          showErrorDialog(
-            context,
-            context.strings.error,
-            context.strings.failedToDownloadVideo,
-          );
+          if (error is DownloadDecryptionError) {
+            showDownloadDecryptionFailedDialog(context: context);
+          } else {
+            showErrorDialog(
+              context,
+              context.strings.error,
+              context.strings.failedToDownloadVideo,
+            );
+          }
         });
   }
 
@@ -778,33 +778,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
             child: ValueListenableBuilder(
               valueListenable: _progressNotifier,
               builder: (BuildContext context, double? progress, _) {
-                return progress == null || progress == 1
-                    ? const EnteLoadingWidget(
-                        size: 32,
-                        color: fillBaseDark,
-                        padding: 0,
-                      )
-                    : Stack(
-                        children: [
-                          CircularProgressIndicator(
-                            backgroundColor: Colors.transparent,
-                            value: progress,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color.fromRGBO(45, 194, 98, 1.0),
-                            ),
-                            strokeWidth: 2,
-                            strokeCap: StrokeCap.round,
-                          ),
-                          Center(
-                            child: Text(
-                              "${(progress * 100).toStringAsFixed(0)}%",
-                              style: getEnteTextTheme(
-                                context,
-                              ).tiny.copyWith(color: textBaseDark),
-                            ),
-                          ),
-                        ],
-                      );
+                return VideoDownloadProgressIndicator(progress: progress);
               },
             ),
           ),

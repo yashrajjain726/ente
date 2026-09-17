@@ -37,13 +37,13 @@ Multiple albums can be selected (long press to select), and choosing Share will 
 - View all photos in the album
 - Download photos
 - Add photos to their own albums (creates a copy)
+- Comment and react
 
 **Collaborators can:**
 
 - Everything viewers can do, plus:
 - Add new photos and videos to the shared album
 - Remove photos they uploaded
-- Comment and react (coming soon)
 
 **Admins can:**
 

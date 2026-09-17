@@ -7,6 +7,20 @@ use crate::transport::{
     SpaceFriendRequestResponse, SpaceFriendResponse, SpaceSentFriendRequestResponse,
 };
 use ente_core::b64;
+use ente_core::http;
+
+fn map_friend_mutation_error(error: http::Error) -> Error {
+    match &error {
+        http::Error::Api { code, .. } => match code.as_str() {
+            "SPACE_SELF_FRIENDSHIP" => Error::SelfFriendship,
+            "SPACE_FRIEND_REQUEST_LIMIT_REACHED" => Error::FriendRequestLimitReached,
+            "SPACE_SENT_FRIEND_REQUEST_LIMIT_REACHED" => Error::SentFriendRequestLimitReached,
+            "SPACE_FRIEND_REQUEST_UNAVAILABLE" => Error::FriendRequestUnavailable,
+            _ => error.into(),
+        },
+        _ => error.into(),
+    }
+}
 
 impl AccountSpaceCtx {
     async fn request_friend_with_target(
@@ -37,7 +51,9 @@ impl AccountSpaceCtx {
             .json(&payload)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_code()
+            .await
+            .map_err(map_friend_mutation_error)?
             .json()
             .await?;
         if response.status == "friend" {
@@ -100,7 +116,7 @@ impl AccountSpaceCtx {
             .await?
             .into_iter()
             .find(|value| value.request_id == request_id)
-            .ok_or_else(|| Error::InvalidInput("friend request is not available".into()))?;
+            .ok_or(Error::FriendRequestUnavailable)?;
         if request.requester.public_key.trim().is_empty() {
             return Err(Error::InvalidInput(
                 "requester public key is required".into(),
@@ -123,7 +139,9 @@ impl AccountSpaceCtx {
             .json(&payload)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_code()
+            .await
+            .map_err(map_friend_mutation_error)?
             .json()
             .await?;
         self.clear_friend_share_cache()?;
@@ -135,7 +153,13 @@ impl AccountSpaceCtx {
             return Err(Error::InvalidInput("friend request id is required".into()));
         }
         let path = format!("/spaces/{space_id}/friends/requests/{request_id}");
-        self.api().delete(&path).send().await?.error_for_status()?;
+        self.api()
+            .delete(&path)
+            .send()
+            .await?
+            .error_for_code()
+            .await
+            .map_err(map_friend_mutation_error)?;
         Ok(())
     }
 

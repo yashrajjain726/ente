@@ -1,17 +1,10 @@
 name: "Lint (Rust)"
 
 on:
-    pull_request:
-        paths:
-            - ".github/workflows/rust-lint.yml"
-            - "rust/**"
+    workflow_call:
 
 permissions:
     contents: read
-
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
 
 env:
     RUSTFLAGS: -D warnings
@@ -24,7 +17,7 @@ jobs:
                 working-directory: rust
         steps:
             - name: Checkout
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: Free runner disk space
               run: sudo rm -rf /usr/share/dotnet
@@ -32,21 +25,23 @@ jobs:
             - name: Install Linux dependencies
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libvulkan-dev glslc
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libvulkan-dev glslc libdbus-1-dev
 
             # Restore-only; primed on main by warm-caches.yml.
             - name: Restore Rust cache
-              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
               with:
                   workspaces: rust
                   shared-key: rust-workspace
+                  cache-targets: false
                   save-if: false
                   cache-directories: rust/.cache
 
-            - run: cargo fmt --check
-
-            - run: cargo clippy --locked --all-targets --features museum,ente-ml/ml-assets
+            - name: Restore Rust target
+              uses: ./.github/actions/restore-rust-target
+              with:
+                  shared-key: rust-workspace
 
             - run: cargo install cargo-audit --version 0.22.2 --locked
 
-            - run: cargo audit
+            - run: ./scripts/lint.sh

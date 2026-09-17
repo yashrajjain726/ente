@@ -1,12 +1,20 @@
 [package]
 name = "ente-photos"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
 ente-assets.workspace = true
+ente-collections.workspace = true
+ente-core.workspace = true
+ente-exif.workspace = true
 ente-location.workspace = true
-quick-xml = "0.41"
+quick-xml.workspace = true
+rusqlite = { workspace = true, default-features = true }
+serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-tempfile = "3.12"
+tempfile.workspace = true
+
+[lints]
+workspace = true

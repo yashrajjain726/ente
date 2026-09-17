@@ -1,5 +1,9 @@
 #![cfg(feature = "museum")]
 
+#[expect(
+    dead_code,
+    reason = "Sync tests use only part of the shared CLI helpers"
+)]
 mod support;
 
 use ente_test_support::HARDCODED_OTT;

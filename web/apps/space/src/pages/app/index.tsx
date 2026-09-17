@@ -1,38 +1,35 @@
+import { SpaceAddFriendDialog } from "components/AddFriendDialog";
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
-import { HomeScreen, homeBackground } from "screens/HomeScreen";
+import { HomeScreen } from "screens/HomeScreen";
 import {
     cacheCurrentSpaceFeedPage,
     loadCachedSpaceFeed,
-    patchCachedSpaceFeedPost,
-    prependCachedSpaceFeedPost,
-    removeCachedSpaceFeedPost,
 } from "services/feed-cache";
 import { consumeSentSpaceInviteFriend, spaceInviteURL } from "services/invite";
+import { savedSpaceOwnedSpaces } from "services/persistent-session";
 import { loadExistingSpaceId } from "services/profile";
 import {
-    createCurrentPhotoPost,
+    clearSpaceFriendsCache,
     deleteCurrentPost,
-    isSpacePostLimitReachedError,
+    hasCurrentSpacePosts,
     loadCurrentFeedPage,
+    loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
     loadCurrentSpacePostAvatarURL,
     loadCurrentUnreadStatus,
     replyToCurrentPost,
+    requestFriendByUsername,
     setCurrentPostLiked,
     updateCurrentPostCaption,
+    type SpaceFriendRequest,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
-import {
-    confirmLocalFeedPost,
-    createLocalFeedPostID,
-    failLocalFeedPost,
-} from "utils/local-feed-post";
-import { prepareSpacePostImageFromEdit } from "utils/post-image";
+import { spaceAppBackgroundColor as homeBackground } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -43,38 +40,29 @@ const Page: React.FC = () => {
     const {
         friends,
         localFeedPosts,
-        pendingPostPhotoFile,
         profile,
         profileLoadError,
         profileLoadStatus,
         setFriends,
         setLocalFeedPosts,
         setPendingPostPhotoFile,
-        setSkipNextHomeFeedSkeleton,
-        skipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
+    const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
+    const [friendRequests, setFriendRequests] = useState<SpaceFriendRequest[]>(
+        [],
+    );
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
     const [hasFeedLoadMoreError, setHasFeedLoadMoreError] = useState(false);
     const [feedNextCursor, setFeedNextCursor] = useState<string>();
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
+    const [hasOwnPosts, setHasOwnPosts] = useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
     const [isFriendsLoading, setIsFriendsLoading] = useState(true);
     const [spaceId, setSpaceId] = useState<string>();
     const [showInviteFriendsToast, setShowInviteFriendsToast] = useState(false);
-    const inviteFriendsToastTimerRef = React.useRef<number | undefined>(
-        undefined,
-    );
-    const isInitialFeedLoading =
-        Boolean(spaceId || profile?.spaceId) &&
-        isFeedLoading &&
-        feedItems.length == 0 &&
-        localFeedPosts.length == 0;
-    const isSkippingInitialFeedSkeleton =
-        isInitialFeedLoading && skipNextHomeFeedSkeleton;
-    const isHomeFeedLoading = isFeedLoading && !isSkippingInitialFeedSkeleton;
     const closeFriendRequestSentToast = React.useCallback(
         () => setFriendRequestSentToastName(undefined),
         [],
@@ -84,13 +72,20 @@ const Page: React.FC = () => {
         [],
     );
 
-    useEffect(
-        () => () => {
-            if (inviteFriendsToastTimerRef.current !== undefined)
-                window.clearTimeout(inviteFriendsToastTimerRef.current);
-        },
-        [],
-    );
+    const firstPostID =
+        localFeedPosts.length == 1 &&
+        localFeedPosts[0]?.status == "ready" &&
+        !feedItems.some((post) => post.spaceId == profile?.spaceId)
+            ? localFeedPosts[0].id
+            : undefined;
+    useEffect(() => {
+        if (!firstPostID) return;
+        const timer = window.setTimeout(
+            () => setShowInviteFriendsToast(true),
+            inviteFriendsToastDelayMs,
+        );
+        return () => window.clearTimeout(timer);
+    }, [firstPostID]);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -108,8 +103,43 @@ const Page: React.FC = () => {
     }, [router.isReady]);
 
     useEffect(() => {
+        if (!isAddFriendOpen || !profile?.spaceId) return;
+
         let cancelled = false;
+        void loadCurrentFriendRequests(profile.spaceId)
+            .then((requests) => {
+                if (!cancelled) setFriendRequests(requests);
+            })
+            .catch((error: unknown) =>
+                log.error("Failed to load Space friend requests", error),
+            );
+        return () => {
+            cancelled = true;
+        };
+    }, [isAddFriendOpen, profile?.spaceId]);
+
+    useEffect(() => {
+        setHasOwnPosts(undefined);
+        if (!spaceId) return;
+
+        let cancelled = false;
+        void hasCurrentSpacePosts(spaceId)
+            .then((hasPosts) => {
+                if (!cancelled) setHasOwnPosts(hasPosts);
+            })
+            .catch((error: unknown) =>
+                log.error("Failed to check for own Space posts", error),
+            );
+        return () => {
+            cancelled = true;
+        };
+    }, [spaceId]);
+
+    useEffect(() => {
+        const request = { cancelled: false };
+        const isCancelled = () => request.cancelled;
         let loadedSpaceId: string | undefined;
+        let cachedFeedSyncedAtMs: number | undefined;
         setSpaceId(undefined);
         setFeedItems([]);
         setHasFeedLoadMoreError(false);
@@ -118,36 +148,50 @@ const Page: React.FC = () => {
         setIsFeedLoading(true);
         setIsFeedLoadingMore(false);
         setIsFriendsLoading(true);
-        void loadExistingSpaceId()
-            .then(async (nextSpaceId) => {
-                if (cancelled) return undefined;
-
-                loadedSpaceId = nextSpaceId;
-                setSpaceId(nextSpaceId);
-                if (!nextSpaceId) return undefined;
-
-                let freshFeedApplied = false;
-                const cachedFeedLoad = loadCachedSpaceFeed(nextSpaceId);
-                const freshFeedLoad = loadCurrentFeedPage(nextSpaceId);
-                void cachedFeedLoad.then((cachedFeed) => {
-                    if (cancelled || freshFeedApplied || !cachedFeed) return;
-
-                    setFeedItems(cachedFeed.items);
-                    setFeedNextCursor(
-                        cachedFeed.dirty ? undefined : cachedFeed.nextCursor,
-                    );
-                });
-
-                const feed = await freshFeedLoad;
-                freshFeedApplied = true;
-                return feed;
-            })
+        void (async () => {
+            const savedSpaceId = savedSpaceOwnedSpaces()?.[0]?.spaceId;
+            const loadCache = async (spaceId: string) => {
+                const cachedFeed = await loadCachedSpaceFeed(spaceId);
+                if (isCancelled()) return;
+                cachedFeedSyncedAtMs = cachedFeed?.syncedAtMs;
+                setFeedItems(cachedFeed?.items ?? []);
+                setFeedNextCursor(
+                    cachedFeed?.dirty ? undefined : cachedFeed?.nextCursor,
+                );
+            };
+            if (savedSpaceId) {
+                loadedSpaceId = savedSpaceId;
+                setSpaceId(savedSpaceId);
+                await loadCache(savedSpaceId);
+            }
+            const nextSpaceId = await loadExistingSpaceId();
+            if (isCancelled()) return undefined;
+            loadedSpaceId = nextSpaceId;
+            setSpaceId(nextSpaceId);
+            if (!nextSpaceId) {
+                setFeedItems([]);
+                return undefined;
+            }
+            if (savedSpaceId != nextSpaceId) await loadCache(nextSpaceId);
+            while (!isCancelled()) {
+                const feed = await loadCurrentFeedPage(nextSpaceId);
+                if (isCancelled()) return undefined;
+                const applied = await cacheCurrentSpaceFeedPage(
+                    nextSpaceId,
+                    feed,
+                    { syncedAtMs: cachedFeedSyncedAtMs },
+                );
+                if (applied) return feed;
+                cachedFeedSyncedAtMs = (await loadCachedSpaceFeed(nextSpaceId))
+                    ?.syncedAtMs;
+            }
+            return undefined;
+        })()
             .then((feed) => {
-                if (cancelled || !loadedSpaceId || !feed) return;
+                if (isCancelled() || !loadedSpaceId || !feed) return;
 
                 setFeedItems(feed.items);
                 setFeedNextCursor(feed.nextCursor);
-                void cacheCurrentSpaceFeedPage(loadedSpaceId, feed);
                 const refreshedPostIDs = new Set(
                     feed.items.map((item) => item.postId),
                 );
@@ -163,10 +207,9 @@ const Page: React.FC = () => {
                 log.error("Failed to load space feed", error),
             )
             .finally(() => {
-                if (cancelled) return;
+                if (isCancelled()) return;
 
                 setIsFeedLoading(false);
-                setSkipNextHomeFeedSkeleton(false);
                 if (!loadedSpaceId) {
                     setHasUnreadMessages(false);
                     setIsFriendsLoading(false);
@@ -175,7 +218,7 @@ const Page: React.FC = () => {
 
                 void loadCurrentUnreadStatus(loadedSpaceId)
                     .then((unreadStatus) => {
-                        if (!cancelled) {
+                        if (!isCancelled()) {
                             setHasUnreadMessages(unreadStatus.messagesUnread);
                         }
                     })
@@ -184,23 +227,24 @@ const Page: React.FC = () => {
                     );
                 void loadCurrentSpaceFriends(loadedSpaceId)
                     .then((nextFriends) => {
-                        if (!cancelled) setFriends(nextFriends);
+                        if (!isCancelled()) setFriends(nextFriends);
                     })
                     .catch((error: unknown) =>
                         log.error("Failed to load space friends", error),
                     )
                     .finally(() => {
-                        if (!cancelled) setIsFriendsLoading(false);
+                        if (!isCancelled()) setIsFriendsLoading(false);
                     });
             });
 
         return () => {
-            cancelled = true;
+            request.cancelled = true;
         };
-    }, [setFriends, setLocalFeedPosts, setSkipNextHomeFeedSkeleton]);
+    }, [setFriends, setLocalFeedPosts]);
 
     const loadMoreFeedItems = React.useCallback(async () => {
-        if (!spaceId || !feedNextCursor || isFeedLoadingMore) return;
+        if (!spaceId || !feedNextCursor || isFeedLoading || isFeedLoadingMore)
+            return;
 
         setHasFeedLoadMoreError(false);
         setIsFeedLoadingMore(true);
@@ -224,16 +268,13 @@ const Page: React.FC = () => {
         } finally {
             setIsFeedLoadingMore(false);
         }
-    }, [feedNextCursor, isFeedLoadingMore, spaceId]);
+    }, [feedNextCursor, isFeedLoading, isFeedLoadingMore, spaceId]);
 
     const setFeedPostLiked = React.useCallback(
         async (postId: number, liked: boolean) => {
             if (!spaceId) throw new Error("Missing space.");
 
             await setCurrentPostLiked(spaceId, postId, liked);
-            void patchCachedSpaceFeedPost(spaceId, postId, {
-                viewerLiked: liked,
-            });
             setFeedItems((currentItems) =>
                 currentItems.map((item) =>
                     item.postId == postId
@@ -246,7 +287,9 @@ const Page: React.FC = () => {
     );
 
     if (
-        profileLoadStatus == "error" ||
+        (profileLoadStatus == "error" &&
+            feedItems.length == 0 &&
+            localFeedPosts.length == 0) ||
         (profileLoadStatus == "ready" && !profile)
     ) {
         return (
@@ -265,17 +308,21 @@ const Page: React.FC = () => {
                 friendRequestSentToastName={friendRequestSentToastName}
                 hasFeedLoadMoreError={hasFeedLoadMoreError}
                 hasUnreadMessages={hasUnreadMessages}
-                initialPostPhotoFile={pendingPostPhotoFile}
-                hasMoreFeedItems={Boolean(feedNextCursor)}
-                isFeedLoading={isHomeFeedLoading}
+                hasMoreFeedItems={!isFeedLoading && Boolean(feedNextCursor)}
+                isFeedLoading={isFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
                 localFeedPosts={localFeedPosts}
+                showFirstPostPrompt={
+                    hasOwnPosts === false &&
+                    localFeedPosts.length == 0 &&
+                    !feedItems.some((post) => post.spaceId == spaceId)
+                }
                 profile={profile}
                 viewerSpaceId={spaceId ?? profile?.spaceId}
                 showInstallPrompt={
                     profileLoadStatus == "ready" &&
                     Boolean(profile) &&
-                    !isHomeFeedLoading
+                    !isFeedLoading
                 }
                 showInviteFriendsToast={
                     showInviteFriendsToast &&
@@ -284,92 +331,12 @@ const Page: React.FC = () => {
                 }
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
                 onInviteFriendsToastClose={closeInviteFriendsToast}
-                onInitialPostPhotoConsumed={() => setPendingPostPhotoFile(null)}
-                onCreatePost={
-                    profile
-                        ? async (image, caption) => {
-                              const spaceId = profile.spaceId;
-                              if (!spaceId) throw new Error("Missing space.");
-
-                              const isFirstPost =
-                                  !feedItems.some(
-                                      (item) => item.spaceId == spaceId,
-                                  ) &&
-                                  !localFeedPosts.some(
-                                      (item) => item.status != "failed",
-                                  );
-                              const localPostId = createLocalFeedPostID();
-                              const displayName =
-                                  profile.fullName.trim() ||
-                                  profile.username.trim();
-                              setLocalFeedPosts((currentPosts) => [
-                                  {
-                                      avatarUrl: profile.avatarUrl,
-                                      caption: caption.trim() || undefined,
-                                      friendID: spaceId,
-                                      height: image.height,
-                                      id: localPostId,
-                                      imageUrl:
-                                          image.previewUrl ||
-                                          URL.createObjectURL(image.file),
-                                      name: displayName || "You",
-                                      spaceId,
-                                      status: "pending",
-                                      timestampMs: Date.now(),
-                                      width: image.width,
-                                  },
-                                  ...currentPosts,
-                              ]);
-                              try {
-                                  const preparedImage =
-                                      await prepareSpacePostImageFromEdit(
-                                          image.file,
-                                          image.cropArea,
-                                          image.rotationDegrees,
-                                      );
-                                  const post = await createCurrentPhotoPost({
-                                      caption,
-                                      file: preparedImage.file,
-                                      height: preparedImage.height,
-                                      spaceId,
-                                      thumbHash: preparedImage.thumbHash,
-                                      width: preparedImage.width,
-                                  });
-                                  confirmLocalFeedPost(
-                                      setLocalFeedPosts,
-                                      localPostId,
-                                      post,
-                                  );
-                                  void prependCachedSpaceFeedPost(
-                                      spaceId,
-                                      post,
-                                  );
-                                  if (isFirstPost) {
-                                      inviteFriendsToastTimerRef.current =
-                                          window.setTimeout(() => {
-                                              setShowInviteFriendsToast(true);
-                                              inviteFriendsToastTimerRef.current =
-                                                  undefined;
-                                          }, inviteFriendsToastDelayMs);
-                                  }
-                              } catch (error) {
-                                  failLocalFeedPost(
-                                      setLocalFeedPosts,
-                                      localPostId,
-                                      isSpacePostLimitReachedError(error)
-                                          ? "post-limit"
-                                          : undefined,
-                                  );
-                                  throw error;
-                              }
-                          }
-                        : undefined
-                }
+                onAddFriend={() => setIsAddFriendOpen(true)}
+                onPostPhotoSelect={setPendingPostPhotoFile}
                 onDeletePost={async (postId) => {
                     const spaceId = profile?.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
-                    void removeCachedSpaceFeedPost(spaceId, postId);
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.filter(
                             (item) =>
@@ -388,9 +355,6 @@ const Page: React.FC = () => {
 
                     await updateCurrentPostCaption(spaceId, postId, caption);
                     const normalizedCaption = caption.trim() || undefined;
-                    void patchCachedSpaceFeedPost(spaceId, postId, {
-                        caption: normalizedCaption,
-                    });
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.map((item) =>
                             (item.status == "posted" ||
@@ -462,6 +426,56 @@ const Page: React.FC = () => {
                         : undefined
                 }
             />
+            {profile && (
+                <SpaceAddFriendDialog
+                    friendRequests={friendRequests}
+                    friends={friends}
+                    open={isAddFriendOpen}
+                    onClose={() => setIsAddFriendOpen(false)}
+                    profileLink={spaceInviteURL({
+                        spaceUsername: profile.username,
+                    })}
+                    username={profile.username}
+                    onAddFriend={async (username) => {
+                        const actorSpaceId = profile.spaceId;
+                        if (!actorSpaceId) throw new Error("Missing space.");
+                        const status = await requestFriendByUsername({
+                            spaceUsername: username,
+                        });
+                        try {
+                            if (status == "friend") {
+                                clearSpaceFriendsCache();
+                                const [requests, friends, feed] =
+                                    await Promise.all([
+                                        loadCurrentFriendRequests(actorSpaceId),
+                                        loadCurrentSpaceFriends(actorSpaceId),
+                                        loadCurrentFeedPage(actorSpaceId),
+                                    ]);
+                                setFriendRequests(requests);
+                                setFriends(friends);
+                                setFeedItems(feed.items);
+                                setFeedNextCursor(feed.nextCursor);
+                                await cacheCurrentSpaceFeedPage(
+                                    actorSpaceId,
+                                    feed,
+                                );
+                            } else {
+                                setFriendRequests(
+                                    await loadCurrentFriendRequests(
+                                        actorSpaceId,
+                                    ),
+                                );
+                            }
+                        } catch (error) {
+                            log.error(
+                                "Failed to refresh friends after sending request",
+                                error,
+                            );
+                        }
+                        return status;
+                    }}
+                />
+            )}
         </>
     );
 };

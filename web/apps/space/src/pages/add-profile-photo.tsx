@@ -3,10 +3,10 @@ import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import { SetupProfilePhotoScreen } from "screens/SetupProfilePhotoScreen";
-import { setupProfileBackground } from "screens/SetupProfileScreen";
 import { savedPendingSpaceInvite } from "services/invite";
 import { saveSpaceProfile, spaceProfileErrorMessage } from "services/profile";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { sendPendingSpaceFriendRequest } from "utils/pending-friend-request";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -20,7 +20,6 @@ const Page: React.FC = () => {
         profileLoadStatus,
         setPendingCreateProfile,
         setProfile,
-        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const createProfileSource = pendingCreateProfile?.source ?? "verify";
     const [setupError, setSetupError] = useState<string>();
@@ -50,7 +49,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || profile || !pendingCreateProfile) {
         return (
             <SpaceRouteFallback
-                background={setupProfileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -58,7 +57,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={setupProfileBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <SetupProfilePhotoScreen
                 errorMessage={setupError}
                 isSubmitting={isSubmitting}
@@ -82,11 +81,7 @@ const Page: React.FC = () => {
                         );
                         setProfile(savedProfile);
                         setPendingCreateProfile(null);
-                        const handledPendingFriendRequest =
-                            await sendPendingSpaceFriendRequest();
-                        if (!handledPendingFriendRequest) {
-                            setSkipNextHomeFeedSkeleton(true);
-                        }
+                        await sendPendingSpaceFriendRequest();
                         await router.push(spaceRoutes.home);
                     } catch (error) {
                         log.error("Space profile setup failed", error);

@@ -1,5 +1,6 @@
+use std::num::NonZeroUsize;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -19,6 +20,7 @@ pub struct State {
     context: Mutex<Option<llm::ContextRef>>,
     lifecycle: async_runtime::Mutex<()>,
     retrieval_epoch: Arc<AtomicU64>,
+    model_state_epoch: AtomicU64,
 }
 
 impl State {
@@ -33,11 +35,24 @@ impl State {
     fn cancel_retrieval(&self) {
         self.retrieval_epoch.fetch_add(1, Ordering::Relaxed);
     }
+
+    fn model_state_epoch(&self) -> u64 {
+        self.model_state_epoch.load(Ordering::SeqCst)
+    }
+
+    fn mark_model_state_changed(&self) {
+        self.model_state_epoch.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 #[tauri::command]
 pub fn llm_retrieval_epoch(state: TauriState<'_, State>) -> u64 {
     state.retrieval_epoch.load(Ordering::Relaxed)
+}
+
+#[tauri::command]
+pub fn llm_model_state_epoch(state: TauriState<'_, State>) -> u64 {
+    state.model_state_epoch()
 }
 
 pub struct ModelDownloadState {
@@ -143,16 +158,38 @@ pub(crate) fn replace_state(
 
     *model_guard = model;
     *context_guard = context;
+    state.mark_model_state_changed();
+    drop(context_guard);
+    drop(model_guard);
     Ok(())
 }
 
 fn default_threads() -> i32 {
     let available = std::thread::available_parallelism()
-        .map(|count| count.get())
+        .map(NonZeroUsize::get)
         .unwrap_or(2);
     let half = available / 2;
     let threads = if half == 0 { 1 } else { half };
     i32::try_from(threads).unwrap_or(1)
+}
+
+pub(crate) fn load_knowledge_embedding_context(
+    model_path: &Path,
+    check_cancelled: impl Fn() -> Result<(), ApiError>,
+) -> Result<llm::ContextRef, ApiError> {
+    let model = llm::Model::load(llm::ModelLoadParams {
+        model_path: model_path.display().to_string(),
+        n_gpu_layers: Some(0),
+        use_mmap: Some(true),
+        use_mlock: Some(false),
+    })
+    .map_err(llm_api_error)?;
+    check_cancelled()?;
+    let threads = std::thread::available_parallelism()
+        .map(|count| count.get().saturating_sub(1).max(1))
+        .unwrap_or(1);
+    llm::Context::new_knowledge_embedding(&model, Some(i32::try_from(threads).unwrap_or(1)))
+        .map_err(llm_api_error)
 }
 
 #[derive(Serialize, Clone)]
@@ -500,6 +537,8 @@ pub async fn llm_create_context(
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = Some(context);
+    state.mark_model_state_changed();
+    drop(context_guard);
 
     logging::log("LLM", "create context succeeded");
     Ok(())
@@ -513,6 +552,8 @@ pub async fn llm_free_context(state: TauriState<'_, State>) -> Result<(), ApiErr
         .lock()
         .map_err(|_| ApiError::new("lock", "Failed to lock LLM context store"))?;
     *context_guard = None;
+    state.mark_model_state_changed();
+    drop(context_guard);
     Ok(())
 }
 

@@ -1,9 +1,10 @@
 import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import React, { useEffect } from "react";
-import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
+import { SettingsScreen } from "screens/SettingsScreen";
 import { spaceLogout } from "services/logout";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -21,7 +22,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={settingsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -29,7 +30,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={settingsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <SettingsScreen
                 onBack={() => void router.push(spaceRoutes.profile)}
                 onChangeCoverImage={() =>

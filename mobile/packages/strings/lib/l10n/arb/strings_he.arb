@@ -1,21 +1,193 @@
 {
   "about": "אודות",
+  "acceptTrustInvite": "קבל הזמנה",
   "account": "חשבון",
+  "accountCredentials": "סוד",
+  "accountCredentialsDescription": "לשמור אישורים של המשתמש.",
+  "accountIsAlreadyConfigured": "משתמש כבר הוגדר.",
+  "accountOwnerPersonAppbarTitle": "{title} (אני)",
+  "@accountOwnerPersonAppbarTitle": {
+    "description": "Title of appbar for account owner person",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "accountRecovery": "שחזור חשבון",
+  "accountSetupIncompleteCreateAccount": "הגדרת משתמש חסרה. יש ליצור משתמש כדי לסיים התקנה.",
+  "@accountSetupIncompleteCreateAccount": {
+    "description": "Error shown when account exists but signup is incomplete"
+  },
+  "actionNotSupportedForSharedFiles": "{count, plural, one{פעולה לא נתמכת עבור {count} קובץ מצורף} other{פעולה לא נתמכת עבור {count} קבצים משותפים}}",
+  "@actionNotSupportedForSharedFiles": {
+    "description": "Message when action is not supported for shared files",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "actionNotSupportedOnFavouritesAlbum": "פעולה לא נתמכת באלבום מועדפים",
+  "activeLinksWillShowUpHere": "קישורים פעילים יופיעו כאן",
   "activeSessions": "חיבורים פעילים",
   "@activeSessions": {
     "description": "Title for active sessions page"
   },
+  "add": "להוסיף",
+  "addAdmin": "הוספת מנהל",
+  "addAdmins": "{count, plural, =0{הוספת אדמין} one{הוספת אדמין} other{הוספת אדמינים}}",
+  "@addAdmins": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    },
+    "description": "Button text to add admins"
+  },
+  "addAlbumWidgetPrompt": "להוסיף ווידג'ט אלבום למסך הבית כדי לעצב אותו כאן.",
+  "addANameAndPhoto": "להוסיף שם ותמונה",
   "addANewEmail": "הוסף דוא\"ל חדש",
   "addCode": "הוסף קוד",
   "addCollaborator": "הוסף משתף פעולה",
+  "addCollaborators": "{count, plural, =0{הוספת משתף פעולה} one{הוספת משתף פעולה} other{הוספת משתפי פעולה}}",
+  "@addCollaborators": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "addedAMemoryTo": "נוסף זיכרון ל-{albumName}",
+  "@addedAMemoryTo": {
+    "description": "Social notification action text shown after a person's name, for example 'John added a memory to Recents'. Make sure the translation reads naturally with a name before it, and do not capitalize the first letter.",
+    "placeholders": {
+      "albumName": {
+        "type": "String"
+      }
+    }
+  },
   "addedAs": "הוסף בתור",
+  "addedBy": "נוסף על ידי {emailOrName}",
+  "@addedBy": {
+    "placeholders": {
+      "emailOrName": {}
+    }
+  },
+  "addedFilesToPerson": "{count, plural, one{נוסף {count} קובץ ל-{personName}} other{נוספו {count} קבצים ל-{personName}}}",
+  "@addedFilesToPerson": {
+    "description": "Toast shown after manually tagging one or more files to a person.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      },
+      "personName": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "addedNMemoriesTo": "נוספו {count} זיכרונות ל-{albumName}",
+  "@addedNMemoriesTo": {
+    "description": "Social notification action text shown after a person's name, for example 'John added 4 memories to Recents'. Make sure the translation reads naturally with a name before it, and do not capitalize the first letter.",
+    "placeholders": {
+      "albumName": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addedSuccessfullyTo": "נוסף בהצלחה ל-{albumName}",
+  "@addedSuccessfullyTo": {
+    "placeholders": {
+      "albumName": {}
+    }
+  },
+  "addedToAlbums": "{count, plural, one{נוסף בהצלחה ל-{count} אלבום} other{נוספו בהצלחה ל-{count} אלבומים}}",
+  "@addedToAlbums": {
+    "description": "Message shown when items are added to albums",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addedToQueue": "נוסף לתור",
+  "addEmail": "להוסיף אימייל",
+  "addFamilyMember": "להוסיף קרוב משפחה",
+  "addFiles": "להוסיף קבצים",
+  "addFromDevice": "להוסיף מהמכשיר",
+  "addingPhotos": "הוספת תמונות",
   "addingToFavorites": "מוסיף למועדפים...",
+  "addItem": "{count, plural, one{להוסיף פריט} other{להוסיף פריטים}}",
+  "@addItem": {
+    "description": "Page title while adding one or more items to album",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "addLocation": "להוסיף מיקום",
   "addLocationButton": "הוסף",
+  "addMember": "להוסיף חבר",
+  "addMemoriesWidgetPrompt": "יש להוסיף ווידג'ט זיכרונות למסך הבית כדי לעצב אותו כאן.",
   "addMore": "הוסף עוד",
+  "addMoreAdmins": "להוסיף עוד אדמינים",
+  "addName": "הוסף שם",
+  "addNew": "הוסף חדש",
+  "@addNew": {
+    "description": "Text to add a new item (location tag, album, caption etc)"
+  },
+  "addNewEmail": "הוסף דוא\"ל חדש",
+  "addOnPageSubtitle": "פרטים של תוספות",
+  "addOns": "תוספות",
+  "addOnValidTill": "תוסף ה-{storageAmount} שלך תקף עד {endDate}",
+  "@addOnValidTill": {
+    "placeholders": {
+      "endDate": {},
+      "storageAmount": {}
+    }
+  },
+  "addPage": "הוסף עמוד",
+  "@addPage": {
+    "description": "Button to capture another page in the document scanner"
+  },
+  "addParticipants": "הוסף משתתפים",
+  "addPeopleWidgetPrompt": "יש להוסיף ווידג'ט אנשים לדף הבית שלך כדי לעצב אותו כאן.",
+  "addPerson": "הוסף אדם",
+  "@addPerson": {
+    "description": "Title for the manual tagging flow where user selects a person to tag files with."
+  },
   "addPhotos": "הוסף תמונות",
+  "addSelected": "הוסף נבחרים",
   "addTag": "הוספת תגית",
+  "addTo": "הוסף ל",
   "addToAlbum": "הוסף לאלבום",
+  "addToCollection": "להוסיף לאוסף",
+  "addToEnte": "הוסף ל-ente",
+  "addToHiddenAlbum": "להוסיף לאלבום מוסתר",
+  "addToPerson": "להוסיף לאדם",
+  "@addToPerson": {
+    "description": "Action label to add selected files to an existing person."
+  },
+  "addTrustedContact": "להוסיף איש קשר אמין",
+  "addTrustedPerson": "להוסיף אדם אמין",
+  "addUpTo5MembersFree": "להוסיף עד 5 משתמשים בחינם",
   "addViewer": "הוסף צופה",
+  "addViewers": "{count, plural, =0{להוסיף צופה} one{להוסיף צופה} other{להוסיף צופים}}",
+  "@addViewers": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "addYourPhotosNow": "להוסיף את התמונות שלך עכשיו",
+  "adjust": "לסדר",
+  "adjustCrop": "לסדר חיתוך",
+  "admin": "מנהל",
+  "admins": "מנהלים",
+  "adminsAndCollaboratorsCanAddPhotosDescription": "אדמינים ומשתפי פעולה יכולים להוסיף תמונות. אדמינים יכולים גם לנהל תמונות ומשתתפים.",
   "advanced": "מתקדם",
   "after1Day": "אחרי יום 1",
   "after1Hour": "אחרי שעה 1",
@@ -288,7 +460,6 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "disableAutoLock": "השבת נעילה אוטומטית",
   "disableDownloadWarningBody": "צופים יכולים עדיין לקחת צילומי מסך או לשמור עותק של התמונות שלך בעזרת כלים חיצוניים",
   "disableDownloadWarningTitle": "שים לב",
   "disableLinkMessage": "זה יסיר את הלינק הפומבי שדרכו ניתן לגשת ל\"{albumName}\".",

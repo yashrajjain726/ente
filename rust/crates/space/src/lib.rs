@@ -15,8 +15,8 @@ pub use crypto::{decrypt_space_root_entity_key, encrypt_space_root_entity_key};
 pub use error::{Error, Result};
 pub use models::{
     CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
-    DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload,
-    OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata,
+    DecryptedSpaceProfile, HydratedKeys, MessagePayload, OpenAccountSpaceCtxInput,
+    OpenSpaceLinkCtxInput, PostObjectMetadata,
 };
 pub use transport::{
     ConversationChatSummaryResponse, ConversationsResponse, EntityKeyPayload,

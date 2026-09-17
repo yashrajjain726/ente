@@ -1,6 +1,8 @@
 // Keep these definitions in sync with web/packages/base/types/ipc.ts.
 export type UtilityProcessType = "ml";
 
+export type ThemeMode = "light" | "dark" | "system";
+
 export interface AppUpdate {
     autoUpdatable: boolean;
     version: string;

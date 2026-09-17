@@ -24,6 +24,13 @@ pub(crate) use tensor::{
 
 use providers::{ExecutionProvider, ProviderPlan};
 
+#[derive(Clone, Debug)]
+pub(crate) struct GpuOptions {
+    pub(crate) subgraphs: bool,
+    #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
+    pub(crate) prefer_nhwc: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AccelerationValidation {
     GoldenRequired,
@@ -58,8 +65,9 @@ pub(crate) struct OnnxSession {
     model_namespace: String,
     mode: ExecutionMode,
     validation: AccelerationValidation,
+    gpu_options: Option<GpuOptions>,
     provider_plan: Option<ProviderPlan>,
-    session: Option<Session>,
+    session: Option<(Session, ExecutionProvider)>,
     first_run_canary: Option<webgpu::ArmedCanary>,
 }
 
@@ -70,16 +78,22 @@ impl OnnxSession {
             model_namespace: model_namespace.to_string(),
             mode,
             validation: AccelerationValidation::GoldenRequired,
+            gpu_options: None,
             provider_plan: None,
             session: None,
             first_run_canary: None,
         }
     }
 
-    /// Only for models whose output is not indexed and so cannot
-    /// silently poison stored data.
+    // Only for models whose output is not indexed and so cannot
+    // silently poison stored data.
     pub(crate) fn with_unvalidated_acceleration(mut self) -> Self {
         self.validation = AccelerationValidation::Unvalidated;
+        self
+    }
+
+    pub(crate) fn with_gpu_options(mut self, options: GpuOptions) -> Self {
+        self.gpu_options = Some(options);
         self
     }
 
@@ -117,17 +131,7 @@ impl OnnxSession {
         mut operation: impl FnMut(&mut Session) -> SessionRunResult<T>,
     ) -> MlResult<(T, ProviderUsage)> {
         loop {
-            self.ensure_loaded()?;
-
-            let execution_provider = self
-                .provider_plan
-                .as_ref()
-                .and_then(ProviderPlan::selected_provider)
-                .expect("loaded session must have a selected execution provider");
-            let session = self
-                .session
-                .as_mut()
-                .expect("session must be loaded before model execution");
+            let (session, execution_provider) = self.ensure_loaded()?;
             match operation(session) {
                 Ok(value) => {
                     self.disarm_first_run_canary();
@@ -148,10 +152,11 @@ impl OnnxSession {
         }
     }
 
-    fn ensure_loaded(&mut self) -> MlResult<()> {
-        if self.session.is_some() {
-            return Ok(());
-        }
+    fn ensure_loaded(&mut self) -> MlResult<(&mut Session, ExecutionProvider)> {
+        let slot = match &mut self.session {
+            Some((session, provider)) => return Ok((session, *provider)),
+            slot => slot,
+        };
 
         let model_path = self.model_path.as_str();
         let model_namespace = self.model_namespace.as_str();
@@ -161,18 +166,20 @@ impl OnnxSession {
         let model_name = model_file_label(model_path);
         log::info!("loading {model_name} with {:?} execution", self.mode);
         let started_at = std::time::Instant::now();
-        let loaded =
-            build_next_session(model_path, provider_plan, model_namespace, self.validation)?;
-        let execution_provider = provider_plan
-            .selected_provider()
-            .expect("successful session build must select an execution provider");
+        let (loaded, execution_provider) = build_next_session(
+            model_path,
+            provider_plan,
+            model_namespace,
+            self.validation,
+            self.gpu_options.as_ref(),
+        )?;
         log::info!(
             "loaded {model_name} with {execution_provider:?} in {:?}",
             started_at.elapsed()
         );
-        self.session = Some(loaded.session);
         self.first_run_canary = loaded.first_run_canary;
-        Ok(())
+        let (session, provider) = slot.insert((loaded.session, execution_provider));
+        Ok((session, *provider))
     }
 
     fn disarm_first_run_canary(&mut self) {
@@ -230,7 +237,7 @@ impl SessionRunError {
         Self::Retryable(error)
     }
 
-    fn from_inference_error(error: ort::Error) -> Self {
+    pub(crate) fn from_inference_error(error: ort::Error) -> Self {
         match error.code() {
             ort::ErrorCode::GenericFailure
             | ort::ErrorCode::RuntimeException
@@ -288,9 +295,15 @@ fn build_next_session(
     plan: &mut ProviderPlan,
     model_namespace: &str,
     validation: AccelerationValidation,
-) -> MlResult<LoadedSession> {
+    gpu_options: Option<&GpuOptions>,
+) -> MlResult<(LoadedSession, ExecutionProvider)> {
     let result = providers::run_provider_plan(plan, |execution_provider| {
-        let attempt = providers::provider_attempt(execution_provider, model_path, model_namespace);
+        let attempt = providers::provider_attempt(
+            execution_provider,
+            model_path,
+            model_namespace,
+            gpu_options,
+        );
         if attempt.execution_provider() == ExecutionProvider::WebGpu {
             #[cfg(any(target_os = "android", target_os = "linux", target_os = "windows"))]
             {
@@ -360,8 +373,9 @@ fn build_cpu_session(model_path: &str) -> MlResult<Session> {
         &mut plan,
         "golden-tooling",
         AccelerationValidation::GoldenRequired,
+        None,
     )
-    .map(|loaded| loaded.session)
+    .map(|(loaded, _)| loaded.session)
 }
 
 // A CoreML self-test failure is treated as construction failure so the caller
@@ -381,8 +395,7 @@ fn build_and_validate_session(
     ))]
     let execution_provider = attempt.execution_provider();
 
-    #[cfg_attr(not(any(target_os = "ios", target_os = "macos")), allow(unused_mut))]
-    let mut session = match providers::build_session(model_path, attempt) {
+    let session = match providers::build_session(model_path, attempt) {
         Ok(session) => session,
         Err(error) => {
             #[cfg(any(
@@ -401,6 +414,9 @@ fn build_and_validate_session(
             return Err(error);
         }
     };
+
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    let mut session = session;
 
     #[cfg(any(target_os = "ios", target_os = "macos"))]
     if execution_provider == ExecutionProvider::CoreMl
@@ -620,6 +636,24 @@ fn model_file_label(model_path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::{ExecutionMode, ExecutionProvider, OnnxSession, provider_attempt_failure_message};
+
+    #[test]
+    fn unvalidated_acceleration_does_not_enable_ocr_gpu_options() {
+        let indexing = OnnxSession::new("model.onnx", "indexing", ExecutionMode::PlatformDefault);
+        assert!(indexing.gpu_options.is_none());
+        assert_eq!(
+            indexing.validation,
+            super::AccelerationValidation::GoldenRequired
+        );
+
+        let scanner = indexing.with_unvalidated_acceleration();
+        assert!(scanner.gpu_options.is_none());
+        assert_eq!(
+            scanner.validation,
+            super::AccelerationValidation::Unvalidated
+        );
+        assert_eq!(scanner.mode, ExecutionMode::PlatformDefault);
+    }
 
     fn first_run_canary(temp: &tempfile::TempDir) -> super::webgpu::ArmedCanary {
         let model = temp.path().join("model.onnx");

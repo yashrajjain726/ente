@@ -730,11 +730,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Deshabilita el bloqueo de pantalla del dispositivo cuando Ente está en primer plano y haya una copia de seguridad en curso. Normalmente esto no es necesario, pero puede ayudar a que las grandes cargas y las importaciones iniciales de grandes bibliotecas se completen más rápido.",
   "deviceNotFound": "Dispositivo no encontrado",
   "didYouKnow": "¿Sabías que?",
   "digits": "Dígitos",
-  "disableAutoLock": "Desactivar bloqueo automático",
   "disableDownloadWarningBody": "Los espectadores todavía pueden tomar capturas de pantalla o guardar una copia de tus fotos usando herramientas externas",
   "disableDownloadWarningTitle": "Por favor, ten en cuenta",
   "disableLinkMessage": "Esto eliminará el enlace público para acceder a \"{albumName}\".",
@@ -870,7 +868,6 @@
     }
   },
   "earned": "ganado",
-  "earnFreeStorage": "Gana almacenamiento gratuito",
   "earnMoreSpace": "¡Consigue más espacio!",
   "edit": "Editar",
   "editAutoAddPeople": "Editar agregar personas automáticamente",
@@ -2113,14 +2110,6 @@
   "referrals": "Referidos",
   "referralsAreCurrentlyPaused": "Las referencias están actualmente en pausa",
   "referralStats": "Estadísticas de referencia",
-  "referralStep1": "1. Personaliza y comparte tu código.",
-  "referralStep2": "2. Se inscriben a Ente usando tu código.",
-  "referralStep3": "3. {storageInGB}GB gratis para ellos + {storageInGB}GB gratis para ti cuando actualicen.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "{storageAmountInGB} GB para ellos + {storageAmountInGB} GB para ti cuando actualicen.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -2367,8 +2356,6 @@
   "saveCode": "Guardar código",
   "saveCollage": "Guardar collage",
   "saveCopy": "Guardar copia",
-  "saveDocumentDescription": "Sube documentos importantes.",
-  "saveDocumentTitle": "Documento",
   "saveKey": "Guardar clave",
   "@saveKey": {
     "description": "Save key button label"
@@ -2611,7 +2598,6 @@
   "setupFirstAccount": "Configura tu primera cuenta",
   "share": "Compartir",
   "shareALink": "Compartir un enlace",
-  "shareCodeEarnStorage": "Comparte tu código, gana almacenamiento.",
   "shareCodes": "Compartir código",
   "shareCodesDuration": "Selecciona la duración durante la cual deseas compartir el código.",
   "sharedAlbumSectionDescription": "Crea álbumes compartidos y colaborativos con otros usuarios de Ente, incluyendo usuarios de planes gratuitos.",
@@ -2948,7 +2934,6 @@
   },
   "unarchiveAlbum": "Desarchivar álbum",
   "unarchiving": "Desarchivando...",
-  "unavailableReferralCode": "Lo sentimos, este código no está disponible.",
   "uncategorized": "Sin categorizar",
   "undo": "Deshacer",
   "unhide": "Dejar de ocultar",

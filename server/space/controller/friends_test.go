@@ -3,8 +3,10 @@ package controller
 import (
 	"context"
 	"encoding/base64"
+	"net/http"
 	"testing"
 
+	"github.com/ente/museum/ente"
 	"github.com/ente/museum/space/models"
 	spacerepo "github.com/ente/museum/space/repo"
 	"github.com/stretchr/testify/require"
@@ -99,8 +101,54 @@ func TestAddFriendRejectsOwnSpace(t *testing.T) {
 	})
 
 	require.Nil(t, resp)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot add yourself as a friend")
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.ErrorCode("SPACE_SELF_FRIENDSHIP"), apiErr.Code)
+	require.Equal(t, http.StatusBadRequest, apiErr.HttpStatusCode)
+}
+
+func TestFriendRequestUnavailableDoesNotIncludeStaleKeys(t *testing.T) {
+	friends, repos, ctx := setupFriendsControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice-request-state@example.com", "alice-public")
+	bobID := insertSpaceControllerUser(t, repos, "bob-request-state@example.com", "bob-public")
+	alice, err := testCreateSpace(ctx, repos, aliceID, "alice_request_state", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	bob, err := testCreateSpace(ctx, repos, bobID, "bob_request_state", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	request, _, _, err := repos.Friends.CreateFriendRequest(ctx, aliceID, alice.SpaceID, bob.SpaceID, []byte("requester-key"), alice.CurrentVersion)
+	require.NoError(t, err)
+	confirm := models.ConfirmFriendRequestPayload{
+		TargetFriendSealedSpaceKey: base64.StdEncoding.EncodeToString([]byte("target-key")),
+		TargetKeyVersion:           bob.CurrentVersion,
+	}
+
+	staleTarget := confirm
+	staleTarget.TargetKeyVersion++
+	_, err = friends.ConfirmRequest(ctx, bob, request.RequestID, staleTarget)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.ErrorCode("BAD_REQUEST"), apiErr.Code)
+	require.Equal(t, "space key version is stale", apiErr.Message)
+
+	_, err = testRotateKey(ctx, repos, aliceID, alice.SpaceID, alice.CurrentVersion, "new-root", "wrapped-previous-key", "new-profile")
+	require.NoError(t, err)
+	_, err = friends.ConfirmRequest(ctx, bob, request.RequestID, confirm)
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.ErrorCode("BAD_REQUEST"), apiErr.Code)
+	require.Equal(t, "space key version is stale", apiErr.Message)
+	requests, err := friends.ListRequests(ctx, bob)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+
+	require.NoError(t, friends.DeleteRequest(ctx, alice, request.RequestID))
+	_, err = friends.ConfirmRequest(ctx, bob, request.RequestID, confirm)
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.ErrorCode("SPACE_FRIEND_REQUEST_UNAVAILABLE"), apiErr.Code)
+	require.Equal(t, http.StatusBadRequest, apiErr.HttpStatusCode)
+	err = friends.DeleteRequest(ctx, bob, request.RequestID)
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.ErrorCode("SPACE_FRIEND_REQUEST_UNAVAILABLE"), apiErr.Code)
+	require.Equal(t, http.StatusNotFound, apiErr.HttpStatusCode)
 }
 
 func TestUnfriendBySpaceIDRemovesReciprocalShares(t *testing.T) {

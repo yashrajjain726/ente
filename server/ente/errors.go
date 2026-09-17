@@ -218,6 +218,12 @@ var ErrLinkDeviceLimitExceeded = ApiError{
 	HttpStatusCode: http.StatusForbidden,
 }
 
+var ErrActiveRecoverySession = ApiError{
+	Code:           ActiveRecoverySession,
+	Message:        "cannot update recovery notice while there is an active recovery session",
+	HttpStatusCode: http.StatusBadRequest,
+}
+
 var ErrFileInTrash = ApiError{
 	Code:           FileInTrash,
 	Message:        "One or more files are in trash or have been deleted, please restore them first",
@@ -282,6 +288,11 @@ const (
 	LinkEditNotAllowed ErrorCode = "LINK_EDIT_NOT_ALLOWED"
 
 	LinkDeviceLimitExceeded ErrorCode = "LINK_DEVICE_LIMIT_EXCEEDED"
+	LinkExpired             ErrorCode = "LINK_EXPIRED"
+	LinkDisabled            ErrorCode = "LINK_DISABLED"
+	LinkUnavailable         ErrorCode = "LINK_UNAVAILABLE"
+
+	ActiveRecoverySession ErrorCode = "ACTIVE_RECOVERY_SESSION"
 )
 
 type ApiError struct {

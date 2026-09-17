@@ -1,6 +1,6 @@
 [package]
 name = "ente-contacts"
-edition = "2024"
+edition.workspace = true
 
 [features]
 museum = []
@@ -12,14 +12,11 @@ serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-ente-accounts.workspace = true
 ente-legacy.workspace = true
 ente-test-support.workspace = true
-hmac = "0.13"
 mockito.workspace = true
-reqwest = { workspace = true, features = ["json"] }
 serde_json.workspace = true
-sha1 = "0.11"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-uuid = { version = "1", features = ["v4", "js"] }
-zeroize.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

@@ -261,7 +261,8 @@ class FileUploader {
       _queue.complete(item, uploadedFile);
       return uploadedFile;
     } catch (e) {
-      if (e is LockAlreadyAcquiredError) {
+      if (e is LockAlreadyAcquiredError &&
+          _processType == ProcessType.foreground) {
         return _queue.moveToBackground(item);
       }
       if (isDeviceStorageFullError(e)) {

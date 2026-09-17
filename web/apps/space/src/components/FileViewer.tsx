@@ -2,10 +2,8 @@ import {
     Cancel01Icon,
     Delete02Icon,
     Edit01Icon,
-    FavouriteIcon,
     Loading03Icon,
     MoreHorizontalIcon,
-    Navigation03Icon,
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -16,17 +14,15 @@ import {
     type SpaceActionPhase,
 } from "components/ActionFeedback";
 import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpaceCaptionText } from "components/CaptionText";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
-import {
-    spacePostLikeButtonPop,
-    spacePostLikeHeartPop,
-    spacePostLikePopDurationMs,
-    spacePostLikePopTiming,
-} from "components/post-like-animation";
+import { spacePostLikePopDurationMs } from "components/post-like-animation";
+import { SpacePostReplyControls } from "components/PostReplyControls";
 import log from "ente-base/log";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import type { SpaceInviteIntent } from "services/invite";
+import { spaceDialogBackground, spaceTextMuted } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom, formatSpaceDate } from "utils/display";
 import { clampSpaceMessageText } from "utils/message-limits";
@@ -37,8 +33,6 @@ const textBase = "#F4F4F4";
 const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
-const controlBackground = "rgba(36, 36, 36, 0.72)";
-const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
 const inputBackground = "rgba(58, 58, 58, 0.86)";
 const inputBackgroundActive = "rgba(72, 72, 72, 0.9)";
 const controlIcon = "#D8D8D8";
@@ -58,7 +52,6 @@ const defaultPhotoHeight = 680;
 const viewerSwipeMinDeltaPx = 72;
 const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
-const viewerHeaderButtonVisualSize = 28;
 const draftPostExitDurationMs = 320;
 const keyboardInsetThresholdPx = 80;
 const keyboardDismissMaxDurationMs = 500;
@@ -182,6 +175,7 @@ interface SpaceFileViewerProps {
     photos?: SpaceViewerPhoto[];
     focusReplyOnOpen?: boolean;
     postActionMode?: SpaceViewerPostActionMode;
+    showSequenceProgress?: boolean;
 }
 
 interface ViewerSwipeGesture {
@@ -226,25 +220,7 @@ const viewerSwipeStartsOnInteractiveTarget = (target: EventTarget | null) =>
         ),
     );
 
-const viewerActionButtonSx = {
-    alignItems: "center",
-    bgcolor: controlBackground,
-    border: 0,
-    borderRadius: "50%",
-    boxShadow: "0 10px 28px rgba(0, 0, 0, 0.36)",
-    color: controlIcon,
-    cursor: "pointer",
-    display: "flex",
-    height: 48,
-    justifyContent: "center",
-    p: 0,
-    width: 48,
-    "&:active": { bgcolor: "#3A3A3A" },
-    "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
-    "&:hover": { bgcolor: controlBackgroundHover },
-};
-
-export const SpaceViewerFeedBackdrop: React.FC<{ exiting?: boolean }> = ({
+export const SpaceViewerPostBackdrop: React.FC<{ exiting?: boolean }> = ({
     exiting = false,
 }) => (
     <Box
@@ -270,28 +246,17 @@ const viewerHeaderButtonSx = {
     bgcolor: "transparent",
     border: 0,
     borderRadius: "50%",
-    color: controlIcon,
+    color: "#E4E4E4",
     cursor: "pointer",
     display: "flex",
     height: spaceTouchTargetSize,
     justifyContent: "center",
+    left: "8px",
     mx: "-8px",
     p: 0,
+    position: "relative",
     width: spaceTouchTargetSize,
     "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
-    "&:hover .space-viewer-header-button-visual": {
-        bgcolor: controlBackgroundHover,
-    },
-};
-
-const viewerHeaderButtonVisualSx = {
-    alignItems: "center",
-    bgcolor: controlBackground,
-    borderRadius: "50%",
-    display: "flex",
-    height: viewerHeaderButtonVisualSize,
-    justifyContent: "center",
-    width: viewerHeaderButtonVisualSize,
 };
 
 const resizeCaptionInput = (
@@ -308,22 +273,14 @@ const resizeCaptionInput = (
 };
 
 const viewerCaptionTextSx = {
-    color: "#FFFFFF",
+    color: "#E6E6E6",
     fontFamily: '"Inter Variable", Inter, sans-serif',
     fontSize: 14,
-    fontWeight: 650,
-    lineHeight: "21px",
+    fontWeight: 600,
+    lineHeight: "23px",
     textAlign: "center",
     textWrap: "balance",
     whiteSpace: "pre-wrap",
-} as const;
-const viewerCaptionBubbleSx = {
-    bgcolor: "rgba(48, 48, 48, 0.86)",
-    borderRadius: "10px",
-    boxDecorationBreak: "clone",
-    px: "8px",
-    py: "2px",
-    WebkitBoxDecorationBreak: "clone",
 } as const;
 
 const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
@@ -337,19 +294,16 @@ const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
                 bottom: "14%",
                 left: "50%",
                 m: 0,
-                maxWidth: "70vw",
+                maxWidth: "78vw",
                 minWidth: 0,
                 overflowWrap: "break-word",
                 position: "fixed",
-                textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                 transform: "translateX(-50%)",
-                width: "70vw",
+                width: "78vw",
                 zIndex: 2,
             }}
         >
-            <Box component="span" sx={viewerCaptionBubbleSx}>
-                {caption}
-            </Box>
+            <SpaceCaptionText caption={caption} />
         </Box>
     );
 };
@@ -377,6 +331,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     photoIndex = 0,
     photos,
     postActionMode = "like-only",
+    showSequenceProgress = false,
 }) => {
     const activePostActionMode = postActionMode;
     const isDraftPost = activePostActionMode == "draft-post";
@@ -404,6 +359,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         viewerPhotos.length - 1,
     );
     const activePhoto = viewerPhotos[activePhotoIndex] ?? photo;
+    const shouldShowSequenceProgress =
+        showSequenceProgress && !isDraftPost && viewerPhotos.length > 1;
     const canUpdatePostCaption =
         !isDraftPost &&
         Boolean(activePhoto.postId) &&
@@ -511,8 +468,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isReplyMode =
         canReplyToPost &&
         (isReplyFocused || replyText.trim().length > 0 || isReplyActionRunning);
-    const isPhotoLikePopping =
-        !isReplyMode && isPhotoLiked && photoLikePopID > 0;
     const usePhotoSwipeViewer = !isDraftPost || isDesktopViewer;
     const canSendReply =
         canReplyToPost &&
@@ -529,6 +484,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isDeleteExit ||
         isDraftPostExit ||
         isCaptionEditing ||
+        isReplyMode ||
         isDraftPost ||
         isDraftPostPreviewPending;
     const viewerViewportSize = React.useCallback(() => {
@@ -862,10 +818,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [isCaptionEditing]);
 
     React.useLayoutEffect(() => {
-        resizeCaptionInput(replyInputRef.current, replyInputMinHeight);
-    }, [replyText]);
-
-    React.useLayoutEffect(() => {
         if (!focusReplyOnOpen || !canReplyToPost) return;
 
         setIsReplyFocused(true);
@@ -929,6 +881,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     React.useEffect(() => {
         setIsPhotoLiked(activePhoto.viewerLiked ?? false);
+    }, [activePhoto.imageUrl, activePhoto.postId, activePhoto.viewerLiked]);
+
+    React.useEffect(() => {
         setCaptionUpdateActionPhase(null);
         setHasCaptionUpdateError(false);
         setIsCaptionEditing(false);
@@ -939,7 +894,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         activePhoto.imageUrl,
         activePhoto.postId,
         activePhoto.timestampMs,
-        activePhoto.viewerLiked,
         canReplyToPost,
         focusReplyOnOpen,
     ]);
@@ -962,6 +916,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         const pswp = pswpRef.current;
         if (!pswp) return;
 
+        pswp.options.allowPanToNext = viewerPhotosRef.current.length > 1;
         const refreshIndex = (index: number) => {
             if (index >= 0 && index < viewerPhotosRef.current.length) {
                 pswp.refreshSlideContent(index);
@@ -1070,10 +1025,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 arrowNext: false,
                 arrowPrev: false,
                 bgClickAction: false,
-                bgOpacity: 1,
+                bgOpacity: 0,
                 clickToCloseNonZoomable: false,
                 close: false,
-                closeOnVerticalDrag: false,
+                closeOnVerticalDrag: true,
                 counter: false,
                 doubleTapAction: "zoom",
                 errorMsg: "Unable to preview this photo",
@@ -1118,6 +1073,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             });
             pswp.on("close", () => {
                 if (!closedByReact) onCloseRef.current();
+            });
+            pswp.on("verticalDrag", (event) => {
+                if (isSwipeBlockedRef.current) event.preventDefault();
+            });
+            pswp.on("zoomPanUpdate", () => {
+                root.style.setProperty(
+                    "--space-viewer-bg-opacity",
+                    String(pswp!.bgOpacity),
+                );
             });
             pswp.on("change", () => {
                 const nextIndex = pswp?.currIndex;
@@ -1211,6 +1175,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             swipeGestureRef.current = null;
             pswpRef.current = undefined;
             pswp?.destroy();
+            root.style.removeProperty("--space-viewer-bg-opacity");
         };
     }, [isDraftPostPreviewPending, usePhotoSwipeViewer, viewerViewportSize]);
 
@@ -1265,7 +1230,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 finishDraftPostExit();
             }}
             sx={{
-                bgcolor: viewerBackground,
+                bgcolor: "rgb(0 0 0 / var(--space-viewer-bg-opacity, 1))",
                 boxSizing: "border-box",
                 color: textBase,
                 display: "flex",
@@ -1282,6 +1247,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 transition: `opacity ${draftPostExitDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
                 width: "100%",
                 zIndex: 1300,
+                "& [data-space-viewer-chrome='true'], & [data-space-viewer-bottom='true']":
+                    { opacity: "var(--space-viewer-bg-opacity, 1)" },
                 "@media (prefers-reduced-motion: reduce)": {
                     transition: "none",
                 },
@@ -1437,6 +1404,33 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         justifySelf: "flex-end",
                     }}
                 >
+                    {shouldShowSequenceProgress && (
+                        <Box
+                            component="span"
+                            aria-label={`Post ${activePhotoIndex + 1} of ${viewerPhotos.length}`}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "#F63A3A",
+                                borderRadius: "999px",
+                                boxSizing: "border-box",
+                                color: "#FFFFFF",
+                                display: "inline-flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontVariantNumeric: "tabular-nums",
+                                fontWeight: 700,
+                                height: 24,
+                                justifyContent: "center",
+                                lineHeight: "16px",
+                                minWidth: 48,
+                                px: "10px",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {activePhotoIndex + 1} / {viewerPhotos.length}
+                        </Box>
+                    )}
                     {canManagePost && !isCaptionEditing && (
                         <Box
                             component="button"
@@ -1488,17 +1482,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         onClick={closeViewer}
                         sx={viewerHeaderButtonSx}
                     >
-                        <Box
-                            className="space-viewer-header-button-visual"
-                            component="span"
-                            sx={viewerHeaderButtonVisualSx}
-                        >
-                            <HugeiconsIcon
-                                icon={Cancel01Icon}
-                                size={18}
-                                strokeWidth={1.8}
-                            />
-                        </Box>
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={18}
+                            strokeWidth={1.8}
+                        />
                     </Box>
                 </Box>
                 {canManagePost && (
@@ -1817,7 +1805,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color: "#111111",
+                                color: "#1C1C1E",
                                 cursor: isDraftPostPublishDisabled
                                     ? "default"
                                     : "pointer",
@@ -1839,9 +1827,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     outlineOffset: 2,
                                 },
                                 "&:hover": {
-                                    bgcolor: isDraftPostPublishDisabled
-                                        ? "#FFFFFF"
-                                        : "#F0F0F0",
+                                    filter: isDraftPostPublishDisabled
+                                        ? undefined
+                                        : "brightness(0.96)",
                                 },
                             }}
                         >
@@ -1956,7 +1944,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color: "#111111",
+                                color: "#1C1C1E",
                                 cursor: isCaptionUpdateDisabled
                                     ? "default"
                                     : "pointer",
@@ -1972,19 +1960,23 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 minWidth: 70,
                                 px: "20px",
                                 py: "10px",
-                                "&:disabled": {
-                                    opacity: captionUpdateActionPhase
-                                        ? 1
-                                        : 0.62,
-                                },
+                                transition:
+                                    "background-color 160ms ease, color 160ms ease, filter 120ms ease",
+                                "&:disabled": isCaptionUpdateActionRunning
+                                    ? undefined
+                                    : {
+                                          bgcolor: spaceDialogBackground,
+                                          color: spaceTextMuted,
+                                      },
                                 "&:focus-visible": {
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "&:hover": {
-                                    bgcolor: isCaptionUpdateDisabled
-                                        ? "#FFFFFF"
-                                        : "#F0F0F0",
+                                "&:hover:not(:disabled)": {
+                                    filter: "brightness(0.96)",
+                                },
+                                "&:active:not(:disabled)": {
+                                    filter: "brightness(0.92)",
                                 },
                             }}
                         >
@@ -2040,7 +2032,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 >
                                     <HugeiconsIcon
                                         icon={Tick02Icon}
-                                        primaryColor={green}
                                         size={22}
                                         strokeWidth={1.8}
                                     />
@@ -2074,210 +2065,41 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         zIndex: 2,
                     }}
                 >
-                    <Box
-                        sx={{
-                            alignItems: "flex-end",
-                            display: "flex",
-                            gap: "8px",
-                            justifyContent: "flex-end",
-                            width: "100%",
-                        }}
-                    >
-                        {canReplyToPost && (
-                            <Box
-                                ref={replyInputRef}
-                                component="textarea"
-                                aria-label="Reply to post"
-                                disabled={isReplyActionRunning}
-                                onBlur={() => setIsReplyFocused(false)}
-                                onChange={(event) => {
-                                    const nextText = clampSpaceMessageText(
-                                        event.target.value,
-                                    );
-                                    event.currentTarget.value = nextText;
-                                    setReplyText(nextText);
-                                    resizeCaptionInput(
-                                        event.currentTarget,
-                                        replyInputMinHeight,
-                                    );
-                                }}
-                                onFocus={() => setIsReplyFocused(true)}
-                                onKeyDown={handleReplyKeyDown}
-                                onPointerDown={handleReplyInputPointerDown}
-                                placeholder="Reply..."
-                                readOnly={canAddFriendForPostAction}
-                                rows={1}
-                                value={replyText}
-                                sx={{
-                                    bgcolor: inputBackground,
-                                    border: 0,
-                                    borderRadius: "24px",
-                                    boxSizing: "border-box",
-                                    color: textBase,
-                                    flex: "1 1 auto",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 14,
-                                    fontWeight: 500,
-                                    lineHeight: "20px",
-                                    maxHeight: captionInputMaxHeight,
-                                    minHeight: replyInputMinHeight,
-                                    minWidth: 0,
-                                    outline: 0,
-                                    overflow: "hidden",
-                                    pb: `${replyInputPadding}px`,
-                                    pl: `${replyInputPaddingLeft}px`,
-                                    pr: `${replyInputPadding}px`,
-                                    pt: `${replyInputPadding}px`,
-                                    resize: "none",
-                                    "&::placeholder": { color: textSecondary },
-                                    "&:disabled": { opacity: 0.74 },
-                                    "&:focus": {
-                                        bgcolor: inputBackgroundActive,
-                                    },
-                                }}
-                            />
-                        )}
-                        <Box
-                            sx={{ height: 48, position: "relative", width: 48 }}
-                        >
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    isReplyMode
-                                        ? replyActionPhase == "busy"
-                                            ? "Sending reply"
-                                            : replyActionPhase == "done"
-                                              ? "Reply sent"
-                                              : "Send reply"
-                                        : isPhotoLiked
-                                          ? "Unlike photo"
-                                          : "Like photo"
-                                }
-                                aria-pressed={
-                                    isReplyMode ? undefined : isPhotoLiked
-                                }
-                                aria-disabled={
-                                    isReplyMode && !canSendReply
-                                        ? true
-                                        : undefined
-                                }
-                                onClick={
-                                    isReplyMode
-                                        ? sendReply
-                                        : handlePhotoLikeClick
-                                }
-                                onPointerDown={
-                                    isReplyMode
-                                        ? handleInputActionPointerDown
-                                        : undefined
-                                }
-                                sx={{
-                                    ...viewerActionButtonSx,
-                                    animation: isPhotoLikePopping
-                                        ? `${spacePostLikeButtonPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
-                                        : undefined,
-                                    bgcolor:
-                                        isReplyMode && canSendReply
-                                            ? "#FFFFFF"
-                                            : controlBackground,
-                                    color:
-                                        isReplyMode && canSendReply
-                                            ? "#111111"
-                                            : controlIcon,
-                                    cursor:
-                                        isReplyMode && !canSendReply
-                                            ? "default"
-                                            : "pointer",
-                                    touchAction: "manipulation",
-                                    userSelect: "none",
-                                    WebkitTouchCallout: "none",
-                                    WebkitUserSelect: "none",
-                                    "&:hover": {
-                                        bgcolor: isReplyMode
-                                            ? canSendReply
-                                                ? "#F0F0F0"
-                                                : controlBackground
-                                            : controlBackgroundHover,
-                                    },
-                                    "@media (prefers-reduced-motion: reduce)": {
-                                        animation: "none",
-                                    },
-                                }}
-                            >
-                                {isReplyMode ? (
-                                    replyActionPhase == "busy" ? (
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                animation: `${postButtonSpin} 2.4s linear infinite`,
-                                                display: "flex",
-                                                lineHeight: 0,
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Loading03Icon}
-                                                size={22}
-                                                strokeWidth={1.8}
-                                            />
-                                        </Box>
-                                    ) : replyActionPhase == "done" ? (
-                                        <HugeiconsIcon
-                                            icon={Tick02Icon}
-                                            primaryColor={green}
-                                            size={22}
-                                            strokeWidth={1.8}
-                                        />
-                                    ) : (
-                                        <HugeiconsIcon
-                                            icon={Navigation03Icon}
-                                            size={24}
-                                            strokeWidth={1.8}
-                                            style={{
-                                                transform:
-                                                    "translate(-1px, 1px)",
-                                            }}
-                                        />
-                                    )
-                                ) : (
-                                    <Box
-                                        key={
-                                            isPhotoLikePopping
-                                                ? `heart-${photoLikePopID}`
-                                                : "heart"
-                                        }
-                                        component="span"
-                                        sx={{
-                                            animation: isPhotoLikePopping
-                                                ? `${spacePostLikeHeartPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
-                                                : undefined,
-                                            display: "flex",
-                                            lineHeight: 0,
-                                            transformOrigin: "50% 58%",
-                                            "@media (prefers-reduced-motion: reduce)":
-                                                { animation: "none" },
-                                        }}
-                                    >
-                                        <HugeiconsIcon
-                                            fill={isPhotoLiked ? green : "none"}
-                                            icon={FavouriteIcon}
-                                            primaryColor={
-                                                isPhotoLiked ? green : undefined
-                                            }
-                                            size={26}
-                                            strokeWidth={1.8}
-                                        />
-                                    </Box>
-                                )}
-                            </Box>
-                        </Box>
-                    </Box>
+                    <SpacePostReplyControls
+                        canSendReply={canSendReply}
+                        isReplyMode={isReplyMode}
+                        liked={isPhotoLiked}
+                        likePopID={photoLikePopID}
+                        onLike={handlePhotoLikeClick}
+                        onSendReply={sendReply}
+                        replyActionPhase={replyActionPhase}
+                        replyInputRef={replyInputRef}
+                        replyInputProps={
+                            canReplyToPost
+                                ? {
+                                      onBlur: () => setIsReplyFocused(false),
+                                      onChange: (event) => {
+                                          const nextText =
+                                              clampSpaceMessageText(
+                                                  event.target.value,
+                                              );
+                                          event.currentTarget.value = nextText;
+                                          setReplyText(nextText);
+                                      },
+                                      onFocus: () => setIsReplyFocused(true),
+                                      onKeyDown: handleReplyKeyDown,
+                                      onPointerDown:
+                                          handleReplyInputPointerDown,
+                                      readOnly: canAddFriendForPostAction,
+                                      value: replyText,
+                                  }
+                                : undefined
+                        }
+                    />
                 </Box>
             )}
             {canDeletePost && (
                 <ConfirmationActionSheet
-                    appearance="dark"
                     open={deleteSheetOpen}
                     title="Are you sure you want to delete this?"
                     confirmLabel="Yes, delete"
@@ -2291,7 +2113,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             )}
             {canAddFriendForPostAction && (
                 <ConfirmationActionSheet
-                    appearance="dark"
                     open={addFriendSheetOpen}
                     title={
                         addFriendIntent == "like"

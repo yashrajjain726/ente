@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ente/museum/pkg/repo/remotestore"
 	"github.com/gin-contrib/requestid"
@@ -27,10 +28,9 @@ import (
 	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
 	"github.com/ente/museum/pkg/utils/network"
-	"github.com/ente/museum/pkg/utils/time"
+	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,7 +41,7 @@ type CollectionLinkMiddleware struct {
 	PublicCollectionCtrl *public2.CollectionLinkController
 	CollectionRepo       *repo.CollectionRepository
 	AnonUsersRepo        *socialrepo.AnonUsersRepository
-	Cache                *cache.Cache
+	Cache                *public.LinkCache
 	BillingCtrl          *controller.BillingController
 	DiscordController    *discord.DiscordController
 	RemoteStoreRepo      *remotestore.Repository
@@ -63,11 +63,12 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 		shouldCheckDeviceLimit := shouldCheckCollectionLinkDeviceLimit(reqPath)
 		passwordValidated := false
 
+		lookupStarted := time.Now()
 		cacheKey := computeHashKeyForList([]string{accessToken, clientIP, userAgent, c.GetHeader("Origin")}, ":")
 		var cachedValue interface{}
 		cacheHit := false
 		if !shouldCheckDeviceLimit {
-			cachedValue, cacheHit = m.Cache.Get(cacheKey)
+			cachedValue, cacheHit = m.Cache.Get(accessToken, cacheKey)
 		}
 		if !cacheHit {
 			publicCollectionSummary, err = m.CollectionLinkRepo.GetCollectionSummaryByToken(c, accessToken)
@@ -76,13 +77,13 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 				return
 			}
 			if publicCollectionSummary.IsDisabled {
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "disabled token"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkDisabled, "error": "disabled token"})
 				return
 			}
 			isFreeUser, err := m.validateOwnersSubscription(c, publicCollectionSummary.CollectionID)
 			if err != nil {
 				logrus.WithError(err).Warn("failed to verify active paid subscription")
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "no active subscription"})
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkUnavailable, "error": "no active subscription"})
 				return
 			}
 			if isFreeUser {
@@ -90,8 +91,8 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 			}
 
 			if publicCollectionSummary.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
-				publicCollectionSummary.ValidTill < time.Microseconds() {
-				c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+				publicCollectionSummary.ValidTill < timeutil.Microseconds() {
+				c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 				return
 			}
 			if publicCollectionSummary.PassHash != nil && *publicCollectionSummary.PassHash != "" {
@@ -126,8 +127,8 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 		}
 
 		if publicCollectionSummary.ValidTill > 0 && // expiry time is defined, 0 indicates no expiry
-			publicCollectionSummary.ValidTill < time.Microseconds() {
-			c.AbortWithStatusJSON(http.StatusGone, gin.H{"error": "expired token"})
+			publicCollectionSummary.ValidTill < timeutil.Microseconds() {
+			c.AbortWithStatusJSON(http.StatusGone, gin.H{"code": ente.LinkExpired, "error": "expired token"})
 			return
 		}
 
@@ -140,7 +141,7 @@ func (m *CollectionLinkMiddleware) Authenticate(urlSanitizer func(_ *gin.Context
 		}
 
 		if !cacheHit && !shouldCheckDeviceLimit {
-			m.Cache.Set(cacheKey, publicCollectionSummary, cache.DefaultExpiration)
+			m.Cache.Set(cacheKey, publicCollectionSummary, lookupStarted)
 		}
 
 		publicCtx := ente.PublicAccessContext{
@@ -184,7 +185,7 @@ func (m *CollectionLinkMiddleware) checkDeviceLimit(c *gin.Context, accessToken 
 	if linkDeviceToken != "" {
 		claim, err := public2.ValidateLinkDeviceToken(m.PublicCollectionCtrl.JwtSecret, linkDeviceToken, public2.LinkDeviceScopeCollection, linkID, accessToken)
 		if err == nil {
-			if claim.ExpiryTime-time.Microseconds() < public2.LinkDeviceTokenRefreshBefore {
+			if claim.ExpiryTime-timeutil.Microseconds() < public2.LinkDeviceTokenRefreshBefore {
 				token, _, tokenErr := public2.NewLinkDeviceToken(m.PublicCollectionCtrl.JwtSecret, public2.LinkDeviceScopeCollection, linkID, accessToken, collectionSummary.ValidTill)
 				return token, false, stacktrace.Propagate(tokenErr, "")
 			}

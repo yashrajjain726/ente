@@ -16,6 +16,7 @@ class DoubleTapSeekOverlay extends StatefulWidget {
   final VoidCallback? onSeekInteraction;
   final GestureLongPressCallback? onLongPress;
   final GestureLongPressUpCallback? onLongPressUp;
+  final VoidCallback? onLongPressCancel;
 
   const DoubleTapSeekOverlay({
     required this.enabled,
@@ -26,6 +27,7 @@ class DoubleTapSeekOverlay extends StatefulWidget {
     this.onSingleTap,
     this.onLongPress,
     this.onLongPressUp,
+    this.onLongPressCancel,
     super.key,
   });
 
@@ -145,6 +147,7 @@ class _DoubleTapSeekOverlayState extends State<DoubleTapSeekOverlay>
           },
           onLongPress: widget.onLongPress,
           onLongPressUp: widget.onLongPressUp,
+          onLongPressCancel: widget.onLongPressCancel,
           child: Container(constraints: const BoxConstraints.expand()),
         ),
         SafeArea(

@@ -58,14 +58,14 @@ func TestMessageReplyValidation(t *testing.T) {
 	require.Equal(t, bobMessage.MessageID, *reply.ReplyMessageID)
 
 	_, err = controller.Create(ctx, aliceSpace, bobSpace.SpaceID, models.CreateMessageRequest{
-		MessageCipher:                spaceTestB64("wave-reply-cipher"),
-		SenderEncryptedMessageKey:    spaceTestB64("wave-reply-sender-key"),
-		RecipientEncryptedMessageKey: spaceTestB64("wave-reply-recipient-key"),
+		MessageCipher:                spaceTestB64("poke-reply-cipher"),
+		SenderEncryptedMessageKey:    spaceTestB64("poke-reply-sender-key"),
+		RecipientEncryptedMessageKey: spaceTestB64("poke-reply-recipient-key"),
 		ReplyMessageID:               bobMessage.MessageID,
-		NotificationKind:             spaceMessageNotificationKindWave,
+		NotificationKind:             spaceMessageNotificationKindPoke,
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "wave notification is not supported for replies")
+	require.Contains(t, err.Error(), "poke notification is not supported for replies")
 
 	require.NoError(t, repos.Messages.DeleteMessage(ctx, bobMessage.MessageID, bobSpace.SpaceID))
 	_, err = controller.Create(ctx, aliceSpace, bobSpace.SpaceID, models.CreateMessageRequest{

@@ -2,6 +2,13 @@ import type { Electron, ElectronMLWorker, ZipItem } from "ente-base/types/ipc";
 import { z } from "zod";
 import type { FileSystemUploadItem } from "../services/upload";
 
+declare global {
+    interface RequestInit {
+        // Chromium requires this for streamed request bodies.
+        duplex?: "half";
+    }
+}
+
 // Electron arguments prove these are desktop calls.
 // The native protocol handlers do not otherwise use them.
 export const readStream = async (
@@ -52,8 +59,6 @@ export const writeStream = async (
 
     const req = new Request(url, {
         method: "POST",
-        // Chromium requires duplex for streamed request bodies.
-        // @ts-expect-error duplex is missing from lib.dom.d.ts.
         duplex: "half",
         body: stream,
     });
@@ -96,7 +101,6 @@ export const initiateGenerateHLS = async (
         op: "generate-hls",
         fileID: fileID.toString(),
         fetchURL,
-        authToken,
     });
 
     let body: ReadableStream | null;
@@ -118,13 +122,11 @@ export const initiateGenerateHLS = async (
     const url = `stream://video?${params.toString()}`;
     const res = await fetch(url, {
         method: "POST",
-        // Chromium requires duplex for streamed request bodies.
-        // @ts-expect-error duplex is missing from lib.dom.d.ts.
+        headers: { "X-Auth-Token": authToken },
         duplex: "half",
         body,
     });
-    if (!res.ok)
-        throw new Error(`Failed to write stream to ${url}: HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to generate HLS: HTTP ${res.status}`);
 
     // 204 means the original video can be streamed as-is.
     if (res.status == 204) return undefined;

@@ -19,6 +19,7 @@ import {
 import { searchDataSync } from "ente-new/photos/services/search";
 import { pullSettings } from "ente-new/photos/services/settings";
 import { pullTrash, type TrashItem } from "ente-new/photos/services/trash";
+import { ensureAuthenticatedSession } from "./authenticated-session";
 
 export const prePullFiles = async () => {
     await Promise.all([pullSettings(), isMLSupported && pullMLStatus()]);
@@ -33,6 +34,7 @@ interface PullFilesOpts {
 
 // Do not run pullFiles concurrently.
 export const pullFiles = async (opts?: PullFilesOpts) => {
+    await ensureAuthenticatedSession();
     const collections = await pullCollections();
     opts?.onSetCollections(collections);
     const didUpdateFiles = await pullCollectionFiles(

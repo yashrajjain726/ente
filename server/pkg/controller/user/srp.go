@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"github.com/ente/go-srp"
 	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/controller/authsession"
+	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
 	emailUtil "github.com/ente/museum/pkg/utils/email"
 	"github.com/ente/stacktrace"
@@ -75,55 +77,64 @@ func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 	req ente.UpdateSRPAndKeysRequest,
 	shouldClearTokens bool,
 ) (*ente.UpdateSRPSetupResponse, error) {
-	return c.updateSrpAndKeyAttributes(context, userID, req, shouldClearTokens, revokeOtherSessions)
+	return c.updateSrpAndKeyAttributes(context, userID, req, shouldClearTokens, revokeOtherSessions, nil)
 }
 
 func (c *UserController) RecoverSrpAndKeyAttributes(context *gin.Context,
 	userID int64,
 	req ente.UpdateSRPAndKeysRequest,
 	logOutAllSessions bool,
+	authorize repo.PasswordUpdateAuthorization,
 ) (*ente.UpdateSRPSetupResponse, error) {
-	return c.updateSrpAndKeyAttributes(context, userID, req, logOutAllSessions, revokeAllSessions)
+	return c.updateSrpAndKeyAttributes(context, userID, req, logOutAllSessions, revokeAllSessions, authorize)
 }
 
-func (c *UserController) updateSrpAndKeyAttributes(context *gin.Context,
+func (c *UserController) updateSrpAndKeyAttributes(ctx *gin.Context,
 	userID int64,
 	req ente.UpdateSRPAndKeysRequest,
 	shouldClearTokens bool,
 	revocationScope sessionRevocationScope,
+	authorize repo.PasswordUpdateAuthorization,
 ) (*ente.UpdateSRPSetupResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, stacktrace.Propagate(err, "invalid request")
 	}
-	setup, err := c.UserAuthRepo.GetTempSRPSetupEntity(context, req.SetupID)
+	setup, err := c.UserAuthRepo.GetTempSRPSetupEntity(ctx, req.SetupID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	srpM2, err := c.verifySRPSession(context, setup.Verifier, setup.SessionID, req.SRPM1)
+	srpM2, err := c.verifySRPSession(ctx, setup.Verifier, setup.SessionID, req.SRPM1)
 	if err != nil {
 		return nil, err
 	}
-	if shouldClearTokens && c.SpaceAccessResetter != nil {
-		if err = c.SpaceAccessResetter.RevokeBrowserSessions(context, userID); err != nil {
+	if shouldClearTokens && authorize == nil && c.SpaceAccessResetter != nil {
+		if err = c.SpaceAccessResetter.RevokeBrowserSessions(ctx, userID); err != nil {
 			return nil, err
 		}
 	}
-	err = c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, *req.UpdateAttributes, setup)
+	if authorize != nil && shouldClearTokens && c.SpaceAccessResetter != nil {
+		recoveryAuthorization := authorize
+		authorize = func(txCtx context.Context, tx *sql.Tx) error {
+			if err := recoveryAuthorization(txCtx, tx); err != nil {
+				return err
+			}
+			return c.SpaceAccessResetter.RevokeBrowserSessionsTx(txCtx, tx, userID)
+		}
+	}
+	var currentTokenHash []byte
+	if revocationScope == revokeOtherSessions {
+		tokenHash := auth.HashToken(auth.GetToken(ctx))
+		currentTokenHash = tokenHash[:]
+	}
+	revokedTokens, err := c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(ctx, userID, *req.UpdateAttributes, setup, shouldClearTokens, currentTokenHash, revocationScope == revokeAllSessions, authorize)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to add entry in srp auth")
 	}
 
 	if shouldClearTokens {
-		if revocationScope == revokeAllSessions {
-			err = c.RemoveAllTokens(userID)
-		} else {
-			err = c.RemoveAllOtherTokens(userID, auth.GetToken(context))
-		}
-		if err != nil {
-			return nil, err
-		}
+		authsession.MarkRevoked(c.Cache, revokedTokens)
 		if c.SpaceAccessResetter != nil {
-			if sweepErr := c.SpaceAccessResetter.RevokeBrowserSessions(context, userID); sweepErr != nil {
+			if sweepErr := c.SpaceAccessResetter.RevokeBrowserSessions(ctx, userID); sweepErr != nil {
 				logrus.WithError(sweepErr).WithField("user_id", userID).Warn("failed to sweep space browser sessions after password update")
 			}
 		}
@@ -206,7 +217,7 @@ func (c *UserController) VerifySRPSession(context *gin.Context, req ente.VerifyS
 	if err != nil {
 		return nil, err
 	}
-	verResponse, err := c.onVerificationSuccess(context, user.Email, nil)
+	verResponse, err := c.onVerificationSuccess(context, user.Email, nil, srpAuthEntity)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

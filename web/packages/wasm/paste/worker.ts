@@ -11,25 +11,11 @@ export class PasteWorker {
     }
 
     async create(pasteOrigin: string, text: string, password?: string) {
-        const paste = await (
-            await this.client
-        ).create(pasteOrigin, text, password);
-        try {
-            return { url: paste.url, passwordRequired: paste.passwordRequired };
-        } finally {
-            paste.free();
-        }
+        return (await this.client).create(pasteOrigin, text, password);
     }
 
     async open(url: string) {
-        const paste = await (await this.client).open(url);
-        try {
-            return paste.passwordRequired
-                ? { passwordRequired: true as const }
-                : { passwordRequired: false as const, text: paste.text! };
-        } finally {
-            paste.free();
-        }
+        return (await this.client).open(url);
     }
 
     submitPassword = async (password: string) =>

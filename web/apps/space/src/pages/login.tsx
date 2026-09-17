@@ -1,14 +1,11 @@
 import { SpacePageMeta } from "components/PageMeta";
 import React, { useState } from "react";
-import {
-    LoginScreen,
-    loginBackground,
-    type SpaceLoginCredentials,
-} from "screens/LoginScreen";
+import { LoginScreen, type SpaceLoginCredentials } from "screens/LoginScreen";
 import { spaceAuthErrorMessage } from "services/auth-error";
 import { beginSpaceLogin, type SpaceLoginResult } from "services/login";
 import { savePendingSpacePasskeyVerification } from "services/passkey-verification";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { routeAfterCompletedLogin } from "utils/login-navigation";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -62,7 +59,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={loginBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <LoginScreen
                 errorMessage={loginError}
                 isSubmitting={isSubmitting}

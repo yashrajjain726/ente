@@ -1,4 +1,4 @@
-import { haveMasterKeyInSession } from "ente-accounts/services/session-storage";
+import { haveMasterKeyInSession } from "ente-base/session-storage";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { stashRedirect } from "../../services/redirect";

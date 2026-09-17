@@ -6,6 +6,6 @@ export const SpaceButtonSpinner: React.FC = () => (
         ariaLabel="Loading"
         color="currentColor"
         size={20}
-        trackColor="rgba(255, 255, 255, 0.38)"
+        trackColor="color-mix(in srgb, currentColor 30%, transparent)"
     />
 );

@@ -2,6 +2,7 @@ package io.ente.photos.media_extension
 
 import android.app.Activity
 import android.content.ClipData
+import android.content.ComponentName
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -33,14 +34,9 @@ internal fun isMediaStorePendingItemError(message: String?): Boolean {
     return message?.contains(MediaStorePendingItemErrorPrefix, ignoreCase = true) == true
 }
 
-/// The Class which implements Activity Aware FlutterPlugin
 class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     PluginRegistry.ActivityResultListener, PluginRegistry.NewIntentListener {
 
-    /// The MethodChannel that will the communication between Flutter and native Android
-    ///
-    /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-    /// when the Flutter Engine is detached from the Activity
     private lateinit var methodChannel: MethodChannel
     private lateinit var context: Context
     private var activity: Activity? = null
@@ -49,7 +45,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     private val ioExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val logTag = "EnteMediaExtension"
 
-    ///ENUM of all the possible IntentAction for a gallery app.
     enum class IntentAction {
         MAIN,
         PICK,
@@ -57,20 +52,14 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         VIEW
     }
 
-    /// The Method invoked when FlutterEngine is attached to the app
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        ///Application context is assigned to variable context
         context = flutterPluginBinding.applicationContext
 
-        ///Method Channel instance is created for channel [media_extension]
         methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "media_extension")
 
-        /// Method Channel handler which handles all the methods
-        /// invoked from flutter thread
         methodChannel.setMethodCallHandler(this)
     }
 
-    /// The Method invoked when a methodCall is executed from flutter thread
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "getPlatformVersion" -> {
@@ -106,11 +95,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         }
     }
 
-    /// The Method is triggered by the Flutter thread with arguments containing
-    /// and [uri] of the received media of type content://xyz.
-    /// MediaStore/file image URIs are passed through directly so callers can
-    /// render them without base64 overhead. Other image content providers keep
-    /// the base64 fallback for compatibility with transient grants.
     private fun getResolvedContent(
         contentUri: Uri,
         contentType: String,
@@ -151,6 +135,7 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         if (contentType.startsWith("video")) {
             resolvedContent["data"] = contentUri.toString()
         } else if (contentType.startsWith("image")) {
+            // Preserve transient-provider images after their URI grant expires.
             resolvedContent["data"] = if (contentUri.canBeRenderedFromUri()) {
                 contentUri.toString()
             } else {
@@ -224,8 +209,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
     }
 
-    /// The Method is triggered when the app is opened and it sends the [intent-action]
-    /// and [uri] information in a HashMap Structure to the Flutter thread.
     private fun emitIntentAction(intent: Intent) {
         Handler(Looper.getMainLooper()).post {
             methodChannel.invokeMethod("getIntentAction", getIntentAction(intent))
@@ -276,9 +259,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         return result
     }
 
-    /// The Method is triggered by the Flutter thread with arguments containing
-    /// and [uri] of the selected image and sends the image to the requested app
-    /// via RESULT_ACTION Intent using Content Provider
     private fun setResult(call: MethodCall, result: Result) {
         val uri = call.argument<String>("uri")?.let { Uri.parse(it) }
         if (uri == null) {
@@ -429,9 +409,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         }
     }
 
-    /// The Method is triggered by the Flutter thread with arguments containing
-    /// and [uri] of the selected image and sends the image to the chosen app
-    /// which can handle the `ACTION_ATTACH_DATA` Intent
     private fun setAs(call: MethodCall, result: Result) {
         val title = "Set as"
         val uri = call.argument<String>("uri")?.let { Uri.parse(it) }
@@ -444,13 +421,12 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             .putExtra("mimeType", mimeType)
             .setDataAndType(getShareableUri(activity!!.applicationContext, uri), mimeType)
-        val started = safeStartActivityChooser(title, intent)
+        val wallpaperIntent = Intent(intent)
+            .setComponent(ComponentName(context, "io.ente.photos.WallpaperActivity"))
+        val started = safeStartActivityChooser(title, intent, arrayOf(wallpaperIntent))
         result.success(started)
     }
 
-    /// The Method is triggered by the Flutter thread with arguments containing
-    /// and [uri] of the selected image and sends the image to the chosen app
-    /// which can handle the `ACTION_VIEW` Intent
     private fun openWith(call: MethodCall, result: Result) {
         val title = call.argument<String>("title")
         val uri = call.argument<String>("uri")?.let { Uri.parse(it) }
@@ -468,9 +444,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         result.success(started)
     }
 
-    /// The Method is triggered by the Flutter thread with arguments containing
-    /// and [uri] of the selected image and sends the image to the chosen app
-    /// which can handle the `ACTION_EDIT` Intent
     private fun edit(call: MethodCall, result: Result) {
         val title = call.argument<String>("title")
         val uri = call.argument<String>("uri")?.let { Uri.parse(it) }
@@ -488,8 +461,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         result.success(started)
     }
 
-    /// The Method is creates content of the file which needs to be shared to
-    /// other app using content resolver.
     private fun getShareableUri(context: Context, uri: Uri): Uri? {
         /* https://developer.android.com/training/secure-file-sharing/setup-sharing.html
         https://developer.android.com/training/secure-file-sharing/setup-sharing.html
@@ -508,15 +479,22 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         }
     }
 
-    /// The Method is used to list out all the available apps
-    ///  which can handle the Supplied Intent Action.
-    private fun safeStartActivityChooser(title: String?, intent: Intent): Boolean {
-        if (activity?.let { intent.resolveActivity(it.packageManager) } == null) {
+    private fun safeStartActivityChooser(
+        title: String?,
+        intent: Intent,
+        initialIntents: Array<Intent> = emptyArray(),
+    ): Boolean {
+        val currentActivity = activity ?: return false
+        if (intent.resolveActivity(currentActivity.packageManager) == null) {
             Log.i(logTag, " intent=$intent resolved activity return null")
             //return false
         }
         try {
-            activity?.startActivity(Intent.createChooser(intent, title))
+            val chooser = Intent.createChooser(intent, title)
+            if (initialIntents.isNotEmpty()) {
+                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, initialIntents)
+            }
+            currentActivity.startActivity(chooser)
             return true
         } catch (e: SecurityException) {
             if (intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0) {
@@ -525,7 +503,7 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
                 // so we retry without it
                 Log.i(logTag, "retry intent=$intent without FLAG_GRANT_WRITE_URI_PERMISSION")
                 intent.flags = intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION.inv()
-                return safeStartActivityChooser(title, intent)
+                return safeStartActivityChooser(title, intent, initialIntents)
             } else {
                 Log.w(logTag, "failed to start activity chooser for intent=$intent", e)
             }
@@ -539,8 +517,6 @@ class MediaExtensionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         ioExecutor.shutdown()
     }
 
-    /// The Method Invoked after the Plugin is attached to Flutter engine
-    /// Provides the activity context of the application
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activityBinding = binding
         activity = binding.activity

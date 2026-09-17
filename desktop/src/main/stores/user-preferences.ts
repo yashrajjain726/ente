@@ -1,4 +1,5 @@
 import Store, { Schema } from "electron-store";
+import type { ThemeMode } from "../../types/ipc";
 
 interface UserPreferences {
     hideDockIcon?: boolean;
@@ -7,6 +8,7 @@ interface UserPreferences {
     lastShownChangelogVersion?: number;
     windowBounds?: { x: number; y: number; width: number; height: number };
     isWindowMaximized?: boolean;
+    themeMode?: ThemeMode;
 }
 
 const userPreferencesSchema: Schema<UserPreferences> = {
@@ -23,6 +25,7 @@ const userPreferencesSchema: Schema<UserPreferences> = {
         },
     },
     isWindowMaximized: { type: "boolean" },
+    themeMode: { type: "string", enum: ["light", "dark", "system"] },
 };
 
 export const userPreferences = new Store({

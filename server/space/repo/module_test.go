@@ -180,6 +180,18 @@ func testConfirmFriendRequest(ctx context.Context, module *Module, _ int64, targ
 	return module.Friends.ConfirmFriendRequest(ctx, targetSpaceID, requestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 }
 
+func addTestSpaceFriends(t *testing.T, ctx context.Context, module *Module, space *SpaceRecord, prefix string, count int) {
+	t.Helper()
+	for i := 0; i < count; i++ {
+		suffix := strconv.Itoa(i)
+		friendID := insertSpaceUser(t, module, prefix+"-"+suffix+"@example.com", prefix+"-public-"+suffix)
+		friendSpace, err := testCreateSpace(ctx, module, friendID, prefix+"_"+suffix, "root", "public", "secret", "nonce", "profile")
+		require.NoError(t, err)
+		require.NoError(t, testUpsertShare(ctx, module, space.SpaceID, friendSpace.SpaceID, "friend-share", space.CurrentVersion))
+		require.NoError(t, testUpsertShare(ctx, module, friendSpace.SpaceID, space.SpaceID, "space-share", friendSpace.CurrentVersion))
+	}
+}
+
 func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
 	return upsertFriendShare(ctx, module.Friends.DB, friendShareMutation{
 		SpaceID:              spaceID,
@@ -363,6 +375,115 @@ func TestCreateFriendRequestEnforcesTargetLimit(t *testing.T) {
 	_, created, err := testCreateFriendRequest(ctx, module, extraID, extraSpace.SpaceID, targetSpace.SpaceID, "share-key", extraSpace.CurrentVersion)
 	require.NoError(t, err)
 	require.True(t, created)
+}
+
+func TestCreateFriendRequestEnforcesSenderLimit(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "sender-limit@example.com", "sender-limit-public")
+	requester, err := testCreateSpace(ctx, module, requesterID, "sender_limit", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+
+	var firstTarget *SpaceRecord
+	var firstRequestID int64
+	for i := 0; i < MaxPendingFriendRequestsPerSpace; i++ {
+		suffix := strconv.Itoa(i)
+		targetID := insertSpaceUser(t, module, "sender-target-"+suffix+"@example.com", "sender-target-public-"+suffix)
+		target, err := testCreateSpace(ctx, module, targetID, "sender_target_"+suffix, "root", "public", "secret", "nonce", "profile")
+		require.NoError(t, err)
+		request, created, err := testCreateFriendRequest(ctx, module, requesterID, requester.SpaceID, target.SpaceID, "share-key", requester.CurrentVersion)
+		require.NoError(t, err)
+		require.True(t, created)
+		if i == 0 {
+			firstTarget = target
+			firstRequestID = request.RequestID
+		}
+	}
+
+	extraID := insertSpaceUser(t, module, "sender-extra@example.com", "sender-extra-public")
+	extra, err := testCreateSpace(ctx, module, extraID, "sender_extra", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	_, created, err := testCreateFriendRequest(ctx, module, requesterID, requester.SpaceID, extra.SpaceID, "share-key", requester.CurrentVersion)
+	require.ErrorIs(t, err, ErrSpaceSentFriendRequestLimitReached)
+	require.False(t, created)
+	require.Equal(t, int64(MaxPendingFriendRequestsPerSpace), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1`, requester.SpaceID))
+
+	request, created, err := testCreateFriendRequest(ctx, module, requesterID, requester.SpaceID, firstTarget.SpaceID, "updated-share-key", requester.CurrentVersion)
+	require.NoError(t, err)
+	require.False(t, created)
+	require.Equal(t, firstRequestID, request.RequestID)
+	require.Equal(t, []byte("updated-share-key"), request.RequesterFriendSealedSpaceKey)
+
+	_, created, err = testCreateFriendRequest(ctx, module, extraID, extra.SpaceID, requester.SpaceID, "extra-share-key", extra.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	_, created, becameFriends, err := module.Friends.CreateFriendRequest(ctx, requesterID, requester.SpaceID, extra.SpaceID, []byte("share-key"), requester.CurrentVersion)
+	require.NoError(t, err)
+	require.False(t, created)
+	require.True(t, becameFriends)
+	require.Equal(t, int64(MaxPendingFriendRequestsPerSpace), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1`, requester.SpaceID))
+
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, requester.SpaceID, firstRequestID))
+	request, created, err = testCreateFriendRequest(ctx, module, requesterID, requester.SpaceID, firstTarget.SpaceID, "share-key", requester.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	require.NotEqual(t, firstRequestID, request.RequestID)
+
+	_, becameFriends, err = module.Friends.ConfirmFriendRequest(ctx, firstTarget.SpaceID, request.RequestID, []byte("target-share-key"), firstTarget.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, becameFriends)
+	require.Equal(t, int64(MaxPendingFriendRequestsPerSpace-1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1`, requester.SpaceID))
+}
+
+func TestCreateFriendRequestsBeyondNine(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	requesterID := insertSpaceUser(t, module, "requester@example.com", "requester-public")
+	requester, err := testCreateSpace(ctx, module, requesterID, "requester", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+	addTestSpaceFriends(t, ctx, module, requester, "existing_friend", 12)
+
+	for i := 0; i < 12; i++ {
+		suffix := strconv.Itoa(i)
+		targetID := insertSpaceUser(t, module, "target-"+suffix+"@example.com", "target-public-"+suffix)
+		target, err := testCreateSpace(ctx, module, targetID, "target_"+suffix, "root", "public", "secret", "nonce", "profile")
+		require.NoError(t, err)
+		_, created, err := testCreateFriendRequest(ctx, module, requesterID, requester.SpaceID, target.SpaceID, "share-key", requester.CurrentVersion)
+		require.NoError(t, err)
+		require.True(t, created)
+	}
+	require.Equal(t, int64(12), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1`, requester.SpaceID))
+}
+
+func TestAcceptFriendRequestBeyondNine(t *testing.T) {
+	for _, operation := range []string{"confirm", "reciprocal"} {
+		t.Run(operation, func(t *testing.T) {
+			module := newSpaceTestModule(t)
+			ctx := context.Background()
+			requesterID := insertSpaceUser(t, module, "requester@example.com", "requester-public")
+			targetID := insertSpaceUser(t, module, "target@example.com", "target-public")
+			requester, err := testCreateSpace(ctx, module, requesterID, "requester", "root", "public", "secret", "nonce", "profile")
+			require.NoError(t, err)
+			target, err := testCreateSpace(ctx, module, targetID, "target", "root", "public", "secret", "nonce", "profile")
+			require.NoError(t, err)
+			request, _, err := testCreateFriendRequest(ctx, module, requesterID, requester.SpaceID, target.SpaceID, "requester-share", requester.CurrentVersion)
+			require.NoError(t, err)
+			addTestSpaceFriends(t, ctx, module, requester, "requester_friend", 12)
+			addTestSpaceFriends(t, ctx, module, target, "target_friend", 12)
+
+			var becameFriends bool
+			if operation == "confirm" {
+				_, becameFriends, err = module.Friends.ConfirmFriendRequest(ctx, target.SpaceID, request.RequestID, []byte("target-share"), target.CurrentVersion)
+			} else {
+				_, _, becameFriends, err = module.Friends.CreateFriendRequest(ctx, targetID, target.SpaceID, requester.SpaceID, []byte("target-share"), target.CurrentVersion)
+			}
+			require.NoError(t, err)
+			require.True(t, becameFriends)
+			require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE request_id = $1`, request.RequestID))
+			require.Equal(t, int64(13), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1`, requester.SpaceID))
+			require.Equal(t, int64(13), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1`, target.SpaceID))
+		})
+	}
 }
 
 func testUpdateCaption(ctx context.Context, module *Module, postID int64, _ int64, spaceID string, captionCipher *string) error {
@@ -1931,7 +2052,7 @@ func TestAddFriendRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
-	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.ErrorIs(t, err, ErrSpaceFriendRequestStale)
 
 	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.ErrorIs(t, err, sql.ErrNoRows)

@@ -3,6 +3,7 @@ import "dart:io";
 
 import "package:ente_strings/ente_strings.dart";
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 import "package:media_kit/media_kit.dart";
 import "package:media_kit_video/media_kit_video.dart";
@@ -17,6 +18,7 @@ import "package:photos/services/file_magic_service.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/states/detail_page_state.dart";
 import 'package:photos/ui/notification/toast.dart';
+import "package:photos/ui/viewer/file/file_viewer_image_page_readiness.dart";
 import "package:photos/ui/viewer/file/live_image_long_press_router.dart";
 import "package:photos/ui/viewer/file/qr_code_detection_helper.dart";
 import 'package:photos/ui/viewer/file/zoomable_image.dart';
@@ -29,6 +31,8 @@ class ZoomableLiveImageNew extends StatefulWidget {
   final bool isFromMemories;
   final Function({required int memoryDuration})? onFinalFileLoad;
   final ValueChanged<File>? onFinalImageLoaded;
+  final FileViewerImagePageReadinessRegistration?
+  onImagePageReadinessRegistration;
   final ValueNotifier<QrCodeDetectionResult?>? qrDetectionsNotifier;
   final GestureLongPressStartCallback? onTextSelectionStart;
 
@@ -41,6 +45,7 @@ class ZoomableLiveImageNew extends StatefulWidget {
     this.isFromMemories = false,
     this.onFinalFileLoad,
     this.onFinalImageLoaded,
+    this.onImagePageReadinessRegistration,
     this.qrDetectionsNotifier,
     this.onTextSelectionStart,
   });
@@ -199,6 +204,7 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
       isFromMemories: widget.isFromMemories,
       onFinalFileLoad: widget.onFinalFileLoad,
       onFinalImageLoaded: widget.onFinalImageLoaded,
+      onImagePageReadinessRegistration: widget.onImagePageReadinessRegistration,
     );
 
     final shouldShowVideo =
@@ -221,14 +227,18 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
       ],
     );
 
-    if (!widget.isFromMemories) {
-      return GestureDetector(
-        onLongPressStart: _onLongPressStart,
-        onLongPressEnd: (_) => _setPlaybackPressed(false),
-        child: content,
-      );
-    }
-    return content;
+    final Widget child = widget.isFromMemories
+        ? content
+        : GestureDetector(
+            onLongPressStart: _onLongPressStart,
+            onLongPressEnd: (_) => _setPlaybackPressed(false),
+            child: content,
+          );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: child,
+    );
   }
 
   @override

@@ -8,13 +8,11 @@ const val CHAT_MIN_RAM_BYTES: Long = 3_200_000_000L
 sealed interface ChatDeviceCapability {
     val totalMemoryBytes: Long?
 
-    data class Supported(
-        override val totalMemoryBytes: Long?
-    ) : ChatDeviceCapability
+    data class Supported(override val totalMemoryBytes: Long?) : ChatDeviceCapability
 
     data class UnsupportedLowMemory(
         override val totalMemoryBytes: Long,
-        val requiredMemoryBytes: Long = CHAT_MIN_RAM_BYTES
+        val requiredMemoryBytes: Long = CHAT_MIN_RAM_BYTES,
     ) : ChatDeviceCapability
 
     object Unknown : ChatDeviceCapability {
@@ -22,10 +20,8 @@ sealed interface ChatDeviceCapability {
     }
 }
 
-
-class UnsupportedDeviceMemoryException(
-    val capability: ChatDeviceCapability.UnsupportedLowMemory
-) : IllegalStateException("Device does not have enough RAM for local chat")
+class UnsupportedDeviceMemoryException(val capability: ChatDeviceCapability.UnsupportedLowMemory) :
+    IllegalStateException("Device does not have enough RAM for local chat")
 
 fun ChatDeviceCapability.isChatSupported(): Boolean =
     this !is ChatDeviceCapability.UnsupportedLowMemory

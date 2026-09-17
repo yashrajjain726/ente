@@ -3,6 +3,7 @@ package legacy_kit
 import (
 	"database/sql"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/ente/museum/ente"
@@ -223,6 +224,8 @@ func TestUpdateRecoveryNoticeRejectsActiveSession(t *testing.T) {
 
 	var apiErr *ente.ApiError
 	require.True(t, errors.As(err, &apiErr))
+	require.Equal(t, ente.ActiveRecoverySession, apiErr.Code)
+	require.Equal(t, http.StatusBadRequest, apiErr.HttpStatusCode)
 	require.Equal(t, "cannot update recovery notice while there is an active recovery session", apiErr.Message)
 
 	var noticePeriod int32

@@ -1,7 +1,7 @@
-//! Reproduces libyuv's limited-range BT.601 fixed-point arithmetic — not the
-//! textbook full-range matrix — because that is what Android camera stacks
-//! apply when converting frames to RGBA, so YUV and RGBA frames yield the
-//! same quad.
+// Reproduces libyuv's limited-range BT.601 fixed-point arithmetic instead of
+// the textbook full-range matrix because that is what Android camera stacks
+// apply when converting frames to RGBA, so YUV and RGBA frames yield the
+// same quad.
 
 use crate::cv;
 use crate::cv::image::ImageU8;

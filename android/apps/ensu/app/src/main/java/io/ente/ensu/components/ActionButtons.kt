@@ -33,7 +33,7 @@ fun ActionButton(
     icon: ImageVector,
     onTap: () -> Unit,
     contentDescription: String,
-    color: Color = EnsuColor.textMuted()
+    color: Color = EnsuColor.textMuted(),
 ) {
     val haptic = rememberHaptics()
     IconButton(
@@ -42,12 +42,12 @@ fun ActionButton(
             onTap()
         },
         modifier = Modifier.size(36.dp),
-        colors = IconButtonDefaults.iconButtonColors(contentColor = color)
+        colors = IconButtonDefaults.iconButtonColors(contentColor = color),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(16.dp),
         )
     }
 }
@@ -57,7 +57,7 @@ fun ActionButton(
     iconRes: Int,
     onTap: () -> Unit,
     contentDescription: String,
-    color: Color = EnsuColor.textMuted()
+    color: Color = EnsuColor.textMuted(),
 ) {
     val haptic = rememberHaptics()
     IconButton(
@@ -66,12 +66,12 @@ fun ActionButton(
             onTap()
         },
         modifier = Modifier.size(36.dp),
-        colors = IconButtonDefaults.iconButtonColors(contentColor = color)
+        colors = IconButtonDefaults.iconButtonColors(contentColor = color),
     ) {
         Icon(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(16.dp),
         )
     }
 }
@@ -79,14 +79,31 @@ fun ActionButton(
 @Composable
 fun TextActionButton(
     text: String,
-    onTap: () -> Unit
+    onTap: () -> Unit,
 ) {
     val haptic = rememberHaptics()
-    TextButton(onClick = {
-        haptic.perform(HapticFeedbackType.TextHandleMove)
-        onTap()
-    }) {
+    TextButton(
+        onClick = {
+            haptic.perform(HapticFeedbackType.TextHandleMove)
+            onTap()
+        }
+    ) {
         Text(text = text, style = EnsuTypography.small, color = EnsuColor.textMuted())
+    }
+}
+
+@Composable
+fun CompactButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(containerColor = EnsuColor.accent()),
+        contentPadding =
+            PaddingValues(
+                horizontal = EnsuSpacing.md.dp,
+                vertical = EnsuSpacing.xs.dp,
+            ),
+    ) {
+        Text(label, style = EnsuTypography.mini)
     }
 }
 
@@ -95,7 +112,7 @@ fun PrimaryButton(
     text: String,
     isLoading: Boolean,
     isEnabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Button(
         onClick = onClick,
@@ -103,19 +120,20 @@ fun PrimaryButton(
         enabled = isEnabled,
         colors = ButtonDefaults.buttonColors(containerColor = EnsuColor.accent()),
         contentPadding = PaddingValues(vertical = EnsuSpacing.buttonVertical.dp),
-        shape = RoundedCornerShape(EnsuCornerRadius.button.dp)
+        shape = RoundedCornerShape(EnsuCornerRadius.button.dp),
     ) {
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
                 color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 2.dp
+                strokeWidth = 2.dp,
             )
         } else {
             Text(
                 text = text,
-                style = EnsuTypography.body.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onPrimary
+                style =
+                    EnsuTypography.body.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onPrimary,
             )
         }
     }

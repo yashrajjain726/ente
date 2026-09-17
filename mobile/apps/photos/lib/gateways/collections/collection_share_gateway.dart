@@ -135,19 +135,18 @@ class CollectionShareGateway {
     } on DioException catch (e) {
       switch (e.response?.statusCode) {
         case 401:
-          throw PublicCollectionInfoUnauthorizedException();
+          throw PublicCollectionInfoUnavailableException();
         case 410:
-          throw PublicCollectionInfoExpiredException();
+          if (_hasErrorCode(e.response?.data, "LINK_EXPIRED")) {
+            throw PublicCollectionInfoExpiredException();
+          }
+          throw PublicCollectionInfoUnavailableException();
         case 403:
           if (_hasErrorCode(e.response?.data, _linkDeviceLimitExceededCode)) {
             throw PublicCollectionDeviceLimitExceededException();
           }
           rethrow;
         case 429:
-          final errorMessage = _extractErrorMessage(e.response?.data);
-          if (errorMessage?.toLowerCase().contains("device limit") ?? false) {
-            throw PublicCollectionDeviceLimitExceededException();
-          }
           throw PublicCollectionRateLimitedException();
         default:
           rethrow;
@@ -189,16 +188,6 @@ List<CollectionShareResult> _parseBulkResults(dynamic data) =>
         )
         .toList();
 
-String? _extractErrorMessage(dynamic data) {
-  if (data is Map<String, dynamic>) {
-    return data["error"]?.toString();
-  }
-  if (data is Map) {
-    return data["error"]?.toString();
-  }
-  return null;
-}
-
 bool _hasErrorCode(dynamic data, String code) {
   if (data is Map<String, dynamic>) {
     return data["code"] == code;
@@ -209,7 +198,7 @@ bool _hasErrorCode(dynamic data, String code) {
   return false;
 }
 
-class PublicCollectionInfoUnauthorizedException implements Exception {}
+class PublicCollectionInfoUnavailableException implements Exception {}
 
 class PublicCollectionInfoExpiredException implements Exception {}
 

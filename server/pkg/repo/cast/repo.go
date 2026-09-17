@@ -55,13 +55,16 @@ func (r *Repository) InsertCastData(ctx context.Context, castUserID int64, code 
 	var deviceID uuid.UUID
 	err := r.DB.QueryRowContext(
 		ctx,
-		"UPDATE casting SET collection_id = $1, cast_user = $2, token = $3, encrypted_payload = $4 WHERE code = $5 and is_deleted=false RETURNING id",
+		"UPDATE casting SET collection_id = $1, cast_user = $2, token = $3, encrypted_payload = $4 WHERE code = $5 and is_deleted=false and cast_user IS NULL RETURNING id",
 		collectionID,
 		castUserID,
 		castToken,
 		encryptedPayload,
 		code,
 	).Scan(&deviceID)
+	if err == sql.ErrNoRows {
+		return uuid.Nil, ente.NewConflictError("cast code unavailable or already paired")
+	}
 	return deviceID, err
 }
 

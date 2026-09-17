@@ -3,7 +3,6 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React from "react";
-import { patchCachedSpaceFeedPost } from "services/feed-cache";
 import {
     loadCurrentSpacePost,
     replyToCurrentPost,
@@ -11,7 +10,8 @@ import {
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
-import { useSpaceRouter } from "utils/route-transitions";
+import { spaceAppBackgroundColor } from "styles/colors";
+import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
 const postBackground = "#000000";
@@ -89,12 +89,13 @@ const Page: React.FC = () => {
             return;
         }
 
+        const viewerSpaceId = profile.spaceId;
         let cancelled = false;
         setPost(null);
         setPostLoadError(undefined);
         setIsPostLoading(true);
 
-        void loadCurrentSpacePost(spaceId, postId, profile.spaceId)
+        void loadCurrentSpacePost(spaceId, postId, viewerSpaceId)
             .then((nextPost) => {
                 if (cancelled) return;
                 if (!nextPost) {
@@ -131,12 +132,12 @@ const Page: React.FC = () => {
     }, [post?.spaceId, post?.username, profile?.spaceId, router, spaceId]);
 
     const closePost = React.useCallback(() => {
-        if (typeof window != "undefined" && window.history.length > 1) {
+        if (hasPreviousSpaceRoute()) {
             router.back();
             return;
         }
-        openOwnerProfile();
-    }, [openOwnerProfile, router]);
+        void router.replace(spaceRoutes.home);
+    }, [router]);
 
     if (
         !router.isReady ||
@@ -149,7 +150,7 @@ const Page: React.FC = () => {
     ) {
         return (
             <SpaceRouteFallback
-                background="#FFFFFF"
+                background={spaceAppBackgroundColor}
                 message={postLoadError || profileLoadError}
             />
         );
@@ -158,7 +159,7 @@ const Page: React.FC = () => {
     if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
-                background="#FFFFFF"
+                background={spaceAppBackgroundColor}
                 message={postLoadError || profileLoadError}
             />
         );
@@ -185,9 +186,6 @@ const Page: React.FC = () => {
                 }
                 onSetPostLiked={async (nextPostId, liked) => {
                     await setCurrentPostLiked(actorSpaceId, nextPostId, liked);
-                    void patchCachedSpaceFeedPost(actorSpaceId, nextPostId, {
-                        viewerLiked: liked,
-                    });
                 }}
             />
         </>

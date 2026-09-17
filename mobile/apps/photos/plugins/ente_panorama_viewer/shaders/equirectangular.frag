@@ -71,9 +71,6 @@ void main() {
   }
 
   vec2 clamped_uv = clamp(texture_uv, vec2(0.00001), vec2(0.99999));
-#ifdef IMPELLER_TARGET_OPENGLES
-  clamped_uv.y = 1.0 - clamped_uv.y;
-#endif
   vec4 sharp_color = texture(u_texture, clamped_uv);
   vec2 crop_size = u_crop.zw - u_crop.xy;
   bool full_sphere = crop_size.x > 0.99999 && crop_size.y > 0.99999;

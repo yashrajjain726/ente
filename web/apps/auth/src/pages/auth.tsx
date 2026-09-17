@@ -1,3 +1,4 @@
+import { masterKeyFromSession } from "@/services/account-keys";
 import { generateOTPs, type Code } from "@/services/code";
 import { getAuthCodesAndTimeOffset } from "@/services/remote";
 import { prettyFormatCode } from "@/utils/format";
@@ -16,7 +17,6 @@ import {
 import { useColorScheme } from "@mui/material/styles";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import { stashRedirect } from "ente-accounts/services/redirect";
-import { masterKeyFromSession } from "ente-accounts/services/session-storage";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";

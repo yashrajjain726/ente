@@ -12,7 +12,7 @@ pub use contact::{
 
 use ente_core::Session;
 use ente_core::b64;
-use ente_core::crypto::{self, SecretVec, secretbox};
+use ente_core::crypto::{self, Key, SecretVec, secretbox};
 use ente_core::http::Api;
 use serde::{Deserialize, Serialize};
 
@@ -33,26 +33,24 @@ pub struct ContactOutput<T> {
 }
 
 struct RootContactKey {
-    key: SecretVec,
+    key: Key,
     wrapped: WrappedRootContactKey,
 }
 
 impl RootContactKey {
-    fn from_wrapped(wrapped: WrappedRootContactKey, master_key: &[u8]) -> Result<Self> {
+    fn from_wrapped(wrapped: WrappedRootContactKey, master_key: &Key) -> Result<Self> {
         let key = decrypt_root_contact_key(&wrapped, master_key)?;
         Ok(Self { key, wrapped })
     }
 
     fn encrypt_contact_key(&self, contact_key: &[u8]) -> Result<String> {
-        let encrypted =
-            secretbox::encrypt_combined(contact_key, &crypto::Key::try_from_slice(&self.key)?);
+        let encrypted = secretbox::encrypt_combined(contact_key, &self.key);
         Ok(b64::encode(&encrypted))
     }
 
     fn decrypt_contact_key(&self, encrypted_key: &str) -> Result<SecretVec> {
         let encrypted_key = b64::decode(encrypted_key)?;
-        let contact_key =
-            secretbox::decrypt_combined(&encrypted_key, &crypto::Key::try_from_slice(&self.key)?)?;
+        let contact_key = secretbox::decrypt_combined(&encrypted_key, &self.key)?;
         Ok(SecretVec::new(contact_key))
     }
 }
@@ -77,7 +75,7 @@ async fn root_contact_key(
     let wrapped = if let Some(remote) = fetch_root_key(&session.api).await? {
         remote.into()
     } else {
-        let key = SecretVec::new(crypto::random_bytes(32));
+        let key = Key::generate();
         let wrapped = encrypt_root_contact_key(&key, &session.master_key)?;
         create_root_key(&session.api, &wrapped)
             .await?
@@ -89,10 +87,10 @@ async fn root_contact_key(
 }
 
 fn encrypt_root_contact_key(
-    root_contact_key: &[u8],
-    master_key: &[u8],
+    root_contact_key: &Key,
+    master_key: &Key,
 ) -> Result<WrappedRootContactKey> {
-    let encrypted = secretbox::encrypt(root_contact_key, &crypto::Key::try_from_slice(master_key)?);
+    let encrypted = secretbox::encrypt(root_contact_key.as_bytes(), master_key);
     Ok(WrappedRootContactKey {
         encrypted_key: b64::encode(&encrypted.encrypted_data),
         header: b64::encode(encrypted.nonce.as_bytes()),
@@ -101,16 +99,16 @@ fn encrypt_root_contact_key(
 
 fn decrypt_root_contact_key(
     wrapped_root_contact_key: &WrappedRootContactKey,
-    master_key: &[u8],
-) -> Result<SecretVec> {
+    master_key: &Key,
+) -> Result<Key> {
     let encrypted_key = b64::decode(&wrapped_root_contact_key.encrypted_key)?;
     let header = b64::decode(&wrapped_root_contact_key.header)?;
     let root_contact_key = secretbox::decrypt(
         &encrypted_key,
         &crypto::Nonce::try_from_slice(&header)?,
-        &crypto::Key::try_from_slice(master_key)?,
+        master_key,
     )?;
-    Ok(SecretVec::new(root_contact_key))
+    Ok(Key::try_from_slice(&root_contact_key)?)
 }
 
 async fn fetch_root_key(api: &Api) -> Result<Option<RootKeyResponse>> {

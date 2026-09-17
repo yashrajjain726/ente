@@ -32,18 +32,18 @@ import {
     passkeyVerificationRedirectURL,
 } from "ente-accounts/services/passkey";
 import {
-    appHomeRoute,
-    stashRedirect,
-    unstashRedirect,
-} from "ente-accounts/services/redirect";
-import { checkSessionValidity } from "ente-accounts/services/session";
-import {
     masterKeyFromSession,
     saveMasterKeyInSessionAndSafeStore,
     stashKeyEncryptionKeyInSessionStore,
     unstashKeyEncryptionKeyFromSession,
     updateSessionFromElectronSafeStorageIfNeeded,
-} from "ente-accounts/services/session-storage";
+} from "ente-accounts/services/prelogin-session";
+import {
+    appHomeRoute,
+    stashRedirect,
+    unstashRedirect,
+} from "ente-accounts/services/redirect";
+import { checkSessionValidity } from "ente-accounts/services/session";
 import type { SRPAttributes } from "ente-accounts/services/srp";
 import {
     generateSRPSetupAttributes,

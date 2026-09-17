@@ -2,4 +2,6 @@
 pub mod contacts;
 #[cfg(feature = "legacy")]
 pub mod legacy;
+#[cfg(feature = "locker")]
+pub mod locker;
 pub mod session;

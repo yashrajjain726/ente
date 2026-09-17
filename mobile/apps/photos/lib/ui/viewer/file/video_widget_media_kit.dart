@@ -2,7 +2,6 @@ import "dart:async";
 import "dart:io";
 
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/loading_widget.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:media_kit/media_kit.dart";
@@ -16,16 +15,16 @@ import "package:photos/events/stream_switched_event.dart";
 import "package:photos/events/video_mute_changed_event.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
+import 'package:photos/module/download/download_error.dart';
 import "package:photos/module/download/file.dart";
 import "package:photos/module/download/task.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/files_service.dart";
 import "package:photos/services/wake_lock_service.dart";
 import "package:photos/states/detail_page_state.dart";
-import "package:photos/theme/colors.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/actions/file/file_actions.dart";
 import "package:photos/ui/notification/toast.dart";
+import "package:photos/ui/viewer/file/video_download_progress_indicator.dart";
 import "package:photos/ui/viewer/file/video_widget_media_kit_common.dart"
     as common;
 import "package:photos/utils/dialog_util.dart";
@@ -38,7 +37,6 @@ class VideoWidgetMediaKit extends StatefulWidget {
   final bool isFromMemories;
   final bool isActive;
   final bool? isAudioMutedOverride;
-  final void Function() onStreamChange;
   final File? preview;
   final bool selectedPreview;
   final ValueNotifier<double> playbackSpeed;
@@ -52,7 +50,6 @@ class VideoWidgetMediaKit extends StatefulWidget {
     this.isFromMemories = false,
     required this.isActive,
     this.isAudioMutedOverride,
-    required this.onStreamChange,
     this.preview,
     required this.selectedPreview,
     required this.playbackSpeed,
@@ -97,6 +94,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     }
 
     pauseVideoSubscription = Bus.instance.on<PauseVideoEvent>().listen((event) {
+      if (event.fileTag != null && event.fileTag != widget.file.tag) return;
       player.pause();
     });
     resumeVideoSubscription = Bus.instance.on<ResumeVideoEvent>().listen((
@@ -132,7 +130,11 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
 
     _streamSwitchedSubscription = Bus.instance.on<StreamSwitchedEvent>().listen(
       (event) {
-        if (event.type != PlayerType.mediaKit || !mounted) return;
+        if (event.fileTag != widget.file.tag ||
+            event.type != PlayerType.mediaKit ||
+            !mounted) {
+          return;
+        }
         if (event.selectedPreview) {
           loadPreview();
         } else {
@@ -159,7 +161,9 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   }
 
   void loadPreview() {
-    _setVideoController(widget.preview!.path);
+    final preview = widget.preview;
+    if (preview == null) return;
+    _setVideoController(preview.path);
   }
 
   void loadOriginal() {
@@ -257,7 +261,6 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
                 transformationController: _transformationController,
                 onInteractionLockChanged: _onInteractionLockChanged,
                 isFromMemories: widget.isFromMemories,
-                onStreamChange: widget.onStreamChange,
                 isPreviewPlayer: widget.selectedPreview,
                 playbackSpeed: widget.playbackSpeed,
               )
@@ -265,33 +268,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
                 child: ValueListenableBuilder(
                   valueListenable: _progressNotifier,
                   builder: (BuildContext context, double? progress, _) {
-                    return progress == null || progress == 1
-                        ? const EnteLoadingWidget(
-                            size: 32,
-                            color: fillBaseDark,
-                            padding: 0,
-                          )
-                        : Stack(
-                            children: [
-                              CircularProgressIndicator(
-                                backgroundColor: Colors.transparent,
-                                value: progress,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color.fromRGBO(45, 194, 98, 1.0),
-                                ),
-                                strokeWidth: 2,
-                                strokeCap: StrokeCap.round,
-                              ),
-                              Center(
-                                child: Text(
-                                  "${(progress * 100).toStringAsFixed(0)}%",
-                                  style: getEnteTextTheme(
-                                    context,
-                                  ).tiny.copyWith(color: textBaseDark),
-                                ),
-                              ),
-                            ],
-                          );
+                    return VideoDownloadProgressIndicator(progress: progress);
                   },
                 ),
               ),
@@ -302,6 +279,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
   void _loadNetworkVideo() {
     getFileFromServer(
           widget.file,
+          throwOnDecryptionFailure: true,
           progressCallback: (count, total) {
             if (!mounted) {
               return;
@@ -321,11 +299,15 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
         })
         .onError((error, stackTrace) {
           if (!mounted) return;
-          showErrorDialog(
-            context,
-            context.strings.error,
-            context.strings.failedToDownloadVideo,
-          );
+          if (error is DownloadDecryptionError) {
+            showDownloadDecryptionFailedDialog(context: context);
+          } else {
+            showErrorDialog(
+              context,
+              context.strings.error,
+              context.strings.failedToDownloadVideo,
+            );
+          }
         });
   }
 

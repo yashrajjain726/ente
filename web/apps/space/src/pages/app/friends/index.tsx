@@ -3,17 +3,12 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect } from "react";
-import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
-import {
-    invalidateCachedSpaceFeed,
-    removeCachedSpaceFeedPostsBySpace,
-} from "services/feed-cache";
+import { FriendsScreen } from "screens/FriendsScreen";
 import { spaceInviteURL } from "services/invite";
 import {
     clearSpaceFriendsCache,
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
-    isFriendRequestCanceledError,
     loadCurrentFriendAvatarURL,
     loadCurrentFriendRequests,
     loadCurrentSpaceFriends,
@@ -22,6 +17,8 @@ import {
     type SpaceFriendRequest,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
+import { isFriendRequestCanceledError } from "utils/friend-errors";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -79,7 +76,7 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                background={friendsBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -87,7 +84,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={friendsBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <FriendsScreen
                 friendRequests={friendRequests}
                 friends={friends}
@@ -103,7 +100,6 @@ const Page: React.FC = () => {
                     try {
                         if (status == "friend") {
                             clearSpaceFriendsCache();
-                            void invalidateCachedSpaceFeed(actorSpaceId);
                             const [requests, friends] = await Promise.all([
                                 loadCurrentFriendRequests(actorSpaceId),
                                 loadCurrentSpaceFriends(actorSpaceId),
@@ -150,7 +146,6 @@ const Page: React.FC = () => {
                 onAcceptFriendRequest={async (requestID) => {
                     const actorSpaceId = profile.spaceId;
                     if (!actorSpaceId) return;
-
                     try {
                         await confirmCurrentFriendRequest(
                             actorSpaceId,
@@ -166,14 +161,14 @@ const Page: React.FC = () => {
                         setShowFriendRequestCanceledToast(true);
                         return;
                     }
-                    void invalidateCachedSpaceFeed(actorSpaceId);
-                    const friends = await loadCurrentSpaceFriends(actorSpaceId);
+                    const loadedFriends =
+                        await loadCurrentSpaceFriends(actorSpaceId);
                     setFriendRequests((currentRequests) =>
                         currentRequests.filter(
                             (request) => request.requestId != requestID,
                         ),
                     );
-                    setFriends(friends);
+                    setFriends(loadedFriends);
                 }}
                 onDeleteFriendRequest={async (requestID) => {
                     const actorSpaceId = profile.spaceId;
@@ -221,10 +216,6 @@ const Page: React.FC = () => {
                     if (!friend?.spaceId) return;
 
                     await removeCurrentSpaceFriend(
-                        actorSpaceId,
-                        friend.spaceId,
-                    );
-                    await removeCachedSpaceFeedPostsBySpace(
                         actorSpaceId,
                         friend.spaceId,
                     );

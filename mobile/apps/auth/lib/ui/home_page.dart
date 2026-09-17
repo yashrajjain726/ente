@@ -840,7 +840,7 @@ class _HomePageState extends State<HomePage> {
       identifier: 'auth_selection_action_bar',
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.4,
+          maxHeight: MediaQuery.of(context).size.height * 0.4 + bottomPadding,
         ),
         child: Card(
           margin: EdgeInsets.zero,

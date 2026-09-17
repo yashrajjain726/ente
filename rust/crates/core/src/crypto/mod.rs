@@ -1,4 +1,5 @@
 mod error;
+mod keypair;
 mod secret;
 mod types;
 

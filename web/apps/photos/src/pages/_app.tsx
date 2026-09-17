@@ -16,7 +16,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/outfit";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { CssBaseline, Typography } from "@mui/material";
-import { styled, ThemeProvider } from "@mui/material/styles";
+import { styled, ThemeProvider, useColorScheme } from "@mui/material/styles";
 import {
     isLocalStorageAndIndexedDBMismatch,
     savedLocalUser,
@@ -76,6 +76,7 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
     const { loadingBarRef, showLoadingBar, hideLoadingBar } = useLoadingBar();
 
     const [watchFolderView, setWatchFolderView] = useState(false);
+    const [isFileViewerOpen, setIsFileViewerOpen] = useState(false);
 
     const logout = useCallback(() => void photosLogout(), []);
 
@@ -146,6 +147,7 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
             hideLoadingBar,
             watchFolderView,
             setWatchFolderView,
+            setIsFileViewerOpen,
             showNotification,
         }),
         [
@@ -153,6 +155,7 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
             hideLoadingBar,
             watchFolderView,
             setWatchFolderView,
+            setIsFileViewerOpen,
             showNotification,
         ],
     );
@@ -168,7 +171,11 @@ const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
             <AttributedMiniDialog {...miniDialogProps} />
             <Notification {...notificationProps} />
 
-            {isDesktop && <WindowTitlebar>{title}</WindowTitlebar>}
+            {isDesktop && (
+                <WindowTitlebar {...{ isFileViewerOpen }}>
+                    {title}
+                </WindowTitlebar>
+            )}
             <BaseContext value={baseContext}>
                 <PhotosAppContext value={appContext}>
                     {!isI18nReady ? (
@@ -240,18 +247,31 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
     );
 };
 
-const WindowTitlebar: React.FC<React.PropsWithChildren> = ({ children }) => (
-    <WindowTitlebarArea>
-        <Typography variant="small" sx={{ mt: "2px", fontWeight: "bold" }}>
-            {children}
-        </Typography>
-    </WindowTitlebarArea>
-);
+const WindowTitlebar: React.FC<
+    React.PropsWithChildren<{ isFileViewerOpen: boolean }>
+> = ({ children, isFileViewerOpen }) => {
+    const { mode, systemMode } = useColorScheme();
+
+    useEffect(() => {
+        if (mode && (mode != "system" || systemMode)) {
+            globalThis.electron?.setTitleBarOverlay(mode, isFileViewerOpen);
+        }
+    }, [isFileViewerOpen, mode, systemMode]);
+
+    return (
+        <WindowTitlebarArea>
+            <Typography variant="small" sx={{ mt: "2px", fontWeight: "bold" }}>
+                {children}
+            </Typography>
+        </WindowTitlebarArea>
+    );
+};
 
 // Electron uses this as a window drag region.
 const WindowTitlebarArea = styled(CenteredRow)`
     width: 100%;
-    height: env(titlebar-area-height, 30px);
+    height: env(titlebar-area-height, 0px);
     flex-shrink: 0;
+    overflow: hidden;
     app-region: drag;
 `;

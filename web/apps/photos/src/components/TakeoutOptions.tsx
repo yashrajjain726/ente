@@ -29,6 +29,7 @@ const optionsTitleSx = {
 };
 
 interface TakeoutOptionsProps {
+    provider: "google" | "apple";
     isFolderSelectionPending?: boolean;
     onBack: () => void;
     onClose: () => void;
@@ -37,6 +38,7 @@ interface TakeoutOptionsProps {
 }
 
 export function TakeoutOptions({
+    provider,
     isFolderSelectionPending,
     onBack,
     onClose,
@@ -75,11 +77,15 @@ export function TakeoutOptions({
                         <ArrowBackIcon sx={{ fontSize: "24px" }} />
                     </IconButton>
                     <Typography sx={optionsTitleSx}>
-                        {t(
-                            isSheet
-                                ? "google_takeout"
-                                : "import_from_google_photos",
-                        )}
+                        {provider == "apple"
+                            ? isSheet
+                                ? "Apple Photos"
+                                : "Import from Apple Photos"
+                            : t(
+                                  isSheet
+                                      ? "google_takeout"
+                                      : "import_from_google_photos",
+                              )}
                     </Typography>
                 </Stack>
                 <IconButton
@@ -103,21 +109,36 @@ export function TakeoutOptions({
                 <Stack sx={{ gap: 1 }}>
                     <TakeoutOptionButton
                         icon={<HugeiconsIcon icon={Folder01Icon} size={18} />}
-                        label={t("unzipped_folder")}
-                        description={t("unzipped_folder_hint")}
+                        label={
+                            provider == "apple"
+                                ? "Exported folder"
+                                : t("unzipped_folder")
+                        }
+                        description={
+                            provider == "apple"
+                                ? "Select the folder exported from Photos"
+                                : t("unzipped_folder_hint")
+                        }
                         pending={isFolderSelectionPending}
                         onClick={onSelectFolder}
                     />
-                    <TakeoutOptionButton
-                        icon={<HugeiconsIcon icon={FileZipIcon} size={18} />}
-                        label={t("zip_files")}
-                        description={
-                            isDesktop ? t("zip_files_hint") : t("desktop_only")
-                        }
-                        disabled={!isDesktop}
-                        onClick={onSelectZips}
-                    />
+                    {provider == "google" && (
+                        <TakeoutOptionButton
+                            icon={
+                                <HugeiconsIcon icon={FileZipIcon} size={18} />
+                            }
+                            label={t("zip_files")}
+                            description={
+                                isDesktop
+                                    ? t("zip_files_hint")
+                                    : t("desktop_only")
+                            }
+                            disabled={!isDesktop}
+                            onClick={onSelectZips}
+                        />
+                    )}
                 </Stack>
+                {provider == "apple" && <AppleExportSteps />}
                 <Typography
                     sx={{
                         alignSelf: "center",
@@ -131,7 +152,11 @@ export function TakeoutOptions({
                         {t("takeout_help_prompt")}{" "}
                     </span>
                     <Link
-                        href="https://ente.com/help/photos/migration/from-google-photos/"
+                        href={
+                            provider == "apple"
+                                ? "https://ente.com/help/photos/faq/migration/#can-i-import-apple-photos-via-desktop"
+                                : "https://ente.com/help/photos/migration/from-google-photos/"
+                        }
                         target="_blank"
                         rel="noopener"
                         sx={{
@@ -144,6 +169,69 @@ export function TakeoutOptions({
                     </Link>
                 </Typography>
             </Stack>
+        </Stack>
+    );
+}
+
+function AppleExportSteps(): React.JSX.Element {
+    const steps = [
+        "In Photos, select your photos and choose File > Export > Export Unmodified Originals",
+        "Select Export IPTC as XMP so dates, locations, and captions come along",
+    ];
+
+    return (
+        <Stack component="ol" sx={{ m: 0, py: 0, pr: 0, pl: "16px" }}>
+            {steps.map((step, index) => (
+                <Stack
+                    component="li"
+                    direction="row"
+                    key={step}
+                    sx={{ gap: "12px", listStyle: "none" }}
+                >
+                    <Stack sx={{ alignItems: "center" }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                width: "24px",
+                                height: "24px",
+                                flexShrink: 0,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                border: "1px solid",
+                                borderColor: "stroke.muted",
+                                borderRadius: "50%",
+                                color: "text.muted",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                lineHeight: 1,
+                            }}
+                        >
+                            {index + 1}
+                        </Box>
+                        {index < steps.length - 1 && (
+                            <Box
+                                sx={{
+                                    width: "1px",
+                                    minHeight: "16px",
+                                    flex: 1,
+                                    backgroundColor: "stroke.muted",
+                                }}
+                            />
+                        )}
+                    </Stack>
+                    <Typography
+                        sx={{
+                            pb: index < steps.length - 1 ? "16px" : 0,
+                            color: "text.muted",
+                            fontSize: "13px",
+                            fontWeight: 400,
+                            lineHeight: "20px",
+                        }}
+                    >
+                        {step}
+                    </Typography>
+                </Stack>
+            ))}
         </Stack>
     );
 }

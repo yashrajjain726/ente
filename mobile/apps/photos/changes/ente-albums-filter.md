@@ -1,1 +1,0 @@
-- All Ente albums accessible to a user, regardless of share status, are now displayed in the "Ente" album chip.

@@ -2,6 +2,7 @@ package emergency
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/pkg/repo/emergency"
@@ -55,31 +56,15 @@ func (c *Controller) ChangePassword(ctx *gin.Context, userID int64, request ente
 	if err != nil {
 		return nil, err
 	}
-	if err := request.UpdateSrp.Validate(); err != nil {
-		return nil, stacktrace.Propagate(err, "invalid request")
-	}
-	if disableErr := c.UserCtrl.DisableTwoFactor(contact.UserID); disableErr != nil {
-		return nil, stacktrace.Propagate(disableErr, "failed to disable 2fa")
-	}
-	if disableErr := c.PasskeyController.RemovePasskey2FA(contact.UserID); disableErr != nil {
-		return nil, stacktrace.Propagate(disableErr, "failed to disable passkey")
-	}
 	logOutAllSessions := request.UpdateSrp.LogOutOtherDevices == nil || *request.UpdateSrp.LogOutOtherDevices
-	resp, err := c.UserCtrl.RecoverSrpAndKeyAttributes(ctx, contact.UserID, request.UpdateSrp, logOutAllSessions)
+	resp, err := c.UserCtrl.RecoverSrpAndKeyAttributes(ctx, contact.UserID, request.UpdateSrp, logOutAllSessions,
+		func(txCtx context.Context, tx *sql.Tx) error {
+			return c.Repo.CompleteRecovery(txCtx, tx, sessionID, contact.UserID, contact.EmergencyContactID)
+		})
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-
-	hasUpdate, err := c.Repo.UpdateRecoveryStatusForSession(ctx, sessionID, contact.UserID, contact.EmergencyContactID, ente.RecoveryStatusRecovered)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "failed to update recovery status")
-	}
-	if !hasUpdate {
-		log.WithField("userID", userID).WithField("req", request).
-			Warn("no row updated while marking recovery complete")
-	} else {
-		go c.sendRecoveryNotification(ctx, contact.UserID, contact.EmergencyContactID, ente.RecoveryStatusRecovered, nil)
-	}
+	go c.sendRecoveryNotification(ctx, contact.UserID, contact.EmergencyContactID, ente.RecoveryStatusRecovered, nil)
 
 	return resp, nil
 }

@@ -53,6 +53,9 @@ class _SwipeSelectableFileWidgetState extends State<SwipeSelectableFileWidget> {
         }
 
         return TouchCrossDetector(
+          shouldTrackPointerMoves: () =>
+              swipeActiveNotifier?.value == true ||
+              swipeHelper?.isActive == true,
           onPointerDown: (event) {
             _isPointerInside = true;
             widget.onPointerStateChanged?.call(event.pointer, true);

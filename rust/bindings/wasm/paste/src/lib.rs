@@ -1,11 +1,15 @@
 use ente_paste::{Client, OpenPaste, PasteSession};
-use ente_wasm_log as _;
+use serde::Serialize;
+use serde_wasm_bindgen as swb;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Paste(#[from] ente_paste::Error),
+    #[error(transparent)]
+    Serde(#[from] swb::Error),
 }
 
 impl Error {
@@ -32,58 +36,33 @@ impl Error {
             _ => None,
         }
     }
-
-    fn message(&self) -> String {
-        ente_core::error::chain(self)
-    }
 }
 
 impl From<Error> for JsValue {
     fn from(error: Error) -> Self {
-        let js_error = js_sys::Error::new(&error.message());
-        if let Some(name) = error.name() {
-            js_error.set_name(name);
-        }
-        js_error.into()
+        ente_wasm_lib::js_error(&error, error.name())
     }
 }
 
-#[wasm_bindgen]
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
 pub struct CreatedPaste {
     url: String,
     password_required: bool,
 }
 
-#[wasm_bindgen]
-impl CreatedPaste {
-    #[wasm_bindgen(getter)]
-    pub fn url(&self) -> String {
-        self.url.clone()
-    }
-
-    #[wasm_bindgen(getter, js_name = passwordRequired)]
-    pub fn password_required(&self) -> bool {
-        self.password_required
-    }
-}
-
-#[wasm_bindgen]
-pub struct OpenedPaste {
-    password_required: bool,
-    text: Option<String>,
-}
-
-#[wasm_bindgen]
-impl OpenedPaste {
-    #[wasm_bindgen(getter, js_name = passwordRequired)]
-    pub fn password_required(&self) -> bool {
-        self.password_required
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn text(&self) -> Option<String> {
-        self.text.clone()
-    }
+#[derive(Serialize, Tsify)]
+#[serde(untagged, rename_all_fields = "camelCase")]
+pub enum OpenedPaste {
+    PasswordRequired {
+        #[tsify(type = "true")]
+        password_required: bool,
+    },
+    Text {
+        #[tsify(type = "false")]
+        password_required: bool,
+        text: String,
+    },
 }
 
 #[wasm_bindgen]
@@ -107,28 +86,29 @@ impl PasteClient {
         paste_origin: &str,
         text: &str,
         password: Option<String>,
-    ) -> Result<CreatedPaste, Error> {
+    ) -> Result<<CreatedPaste as Tsify>::JsType, Error> {
         let link = self.client.create(text, password.as_deref()).await?;
-        Ok(CreatedPaste {
+        CreatedPaste {
             url: link.url(paste_origin),
             password_required: link.password_required(),
-        })
+        }
+        .into_js()
+        .map_err(Into::into)
     }
 
-    pub async fn open(&mut self, url: &str) -> Result<OpenedPaste, Error> {
+    pub async fn open(&mut self, url: &str) -> Result<<OpenedPaste as Tsify>::JsType, Error> {
         let mut session = PasteSession::parse(url)?;
         let opened = match session.open(&self.client).await? {
-            OpenPaste::PasswordRequired => OpenedPaste {
+            OpenPaste::PasswordRequired => OpenedPaste::PasswordRequired {
                 password_required: true,
-                text: None,
             },
-            OpenPaste::Text(text) => OpenedPaste {
+            OpenPaste::Text(text) => OpenedPaste::Text {
                 password_required: false,
-                text: Some(text),
+                text,
             },
         };
         self.session = Some(session);
-        Ok(opened)
+        opened.into_js().map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = submitPassword)]

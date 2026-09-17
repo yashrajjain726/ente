@@ -7,10 +7,12 @@ import "package:flutter/material.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/gallery_layout_changed_event.dart";
 import "package:photos/models/gallery/gallery_layout_config.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
 import "package:photos/ui/settings/gallery_settings_screen.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
+import "package:photos/ui/viewer/gallery/justified_layout_strategy_label.dart";
 
 class GalleryLayoutSettings extends StatefulWidget {
   const GalleryLayoutSettings({super.key});
@@ -23,6 +25,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
   late bool isDayLayout;
   late bool isMonthLayout;
   late bool isJustifiedLayout;
+  late JustifiedLayoutStrategy justifiedStrategy;
 
   @override
   void initState() {
@@ -43,6 +46,7 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
         localSettings.getGalleryGroupType() == GroupType.month &&
         localSettings.getPhotoGridSize() == 5;
     isJustifiedLayout = layoutType == GalleryLayoutType.justified;
+    justifiedStrategy = localSettings.getJustifiedLayoutStrategy();
   }
 
   void _reloadWithLatestSetting() {
@@ -78,15 +82,17 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
             onTap: () => _applyLayout(GroupType.month, 5),
           ),
           if (isJustifiedLayoutAvailable)
-            MenuComponent(
-              title: context.strings.layoutJustified,
-              leading: const Icon(Icons.view_quilt_outlined),
-              trailing: isJustifiedLayout
-                  ? Icon(Icons.check, color: colors.primary)
-                  : null,
-              showOnlyLoadingState: true,
-              onTap: _applyJustifiedLayout,
-            ),
+            for (final strategy in JustifiedLayoutStrategy.values)
+              MenuComponent(
+                key: ValueKey(strategy),
+                title: strategy.label(context),
+                leading: const Icon(Icons.view_quilt_outlined),
+                trailing: isJustifiedLayout && justifiedStrategy == strategy
+                    ? Icon(Icons.check, color: colors.primary)
+                    : null,
+                showOnlyLoadingState: true,
+                onTap: () => _applyJustifiedLayout(strategy),
+              ),
           MenuComponent(
             title: context.strings.custom,
             trailing: Row(
@@ -132,10 +138,14 @@ class _GalleryLayoutSettingsState extends State<GalleryLayoutSettings> {
     Navigator.pop(context);
   }
 
-  Future<void> _applyJustifiedLayout() async {
+  Future<void> _applyJustifiedLayout(JustifiedLayoutStrategy strategy) async {
     if (!isJustifiedLayoutAvailable) return;
-    if (localSettings.getGalleryLayoutType() != GalleryLayoutType.justified) {
-      await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
+    if (localSettings.getGalleryLayoutType() != GalleryLayoutType.justified ||
+        localSettings.getJustifiedLayoutStrategy() != strategy) {
+      await Future.wait([
+        localSettings.setGalleryLayoutType(GalleryLayoutType.justified),
+        localSettings.setJustifiedLayoutStrategy(strategy),
+      ]);
       Bus.instance.fire(GalleryLayoutChangedEvent());
     }
 

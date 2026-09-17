@@ -1,6 +1,6 @@
 import { savedKeyAttributes } from "ente-accounts/services/accounts-db";
 import { boxSeal, fromB64 } from "ente-base/crypto";
-import { authenticatedRequestHeaders } from "ente-base/http";
+import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import {
     clearJoinAlbumContext,
     getJoinAlbumContext,
@@ -33,23 +33,7 @@ const joinPublicAlbum = async (
         body: JSON.stringify({ collectionID, encryptedKey }),
     });
 
-    if (!response.ok) {
-        log.error("Album join API failed", {
-            collectionID,
-            status: response.status,
-        });
-        let errorMessage = `Failed to join album (status: ${response.status})`;
-        try {
-            const errorData = (await response.json()) as {
-                message?: string;
-                code?: string;
-            };
-            errorMessage = errorData.message ?? errorMessage;
-        } catch {
-            // Ignore parse error, use default message
-        }
-        throw new Error(errorMessage);
-    }
+    ensureOk(response);
 };
 
 export const processPendingAlbumJoin = async (): Promise<number | null> => {

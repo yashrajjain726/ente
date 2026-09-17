@@ -1,5 +1,9 @@
 #![cfg(feature = "ml-assets")]
 
+#[expect(
+    dead_code,
+    reason = "Indexing tests do not use the golden-generation and OCR helpers"
+)]
 mod support;
 
 use anyhow::Result;

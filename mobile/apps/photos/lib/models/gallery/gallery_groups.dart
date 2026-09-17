@@ -1,4 +1,5 @@
 import "dart:core";
+import "dart:math" as math;
 
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
@@ -8,9 +9,12 @@ import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/gallery/fixed_extent_grid_row.dart";
 import "package:photos/models/gallery/fixed_extent_section_layout.dart";
+import "package:photos/models/gallery/flex_layout.dart";
 import "package:photos/models/gallery/gallery_layout_config.dart";
 import "package:photos/models/gallery/justified_grid_row.dart";
 import "package:photos/models/gallery/justified_layout.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
+import "package:photos/models/gallery/justified_layout_tuning.dart";
 import "package:photos/models/gallery/section_layout.dart";
 import "package:photos/models/selected_files.dart";
 import "package:photos/service_locator.dart";
@@ -60,6 +64,10 @@ class GalleryGroups {
       );
     }
   }
+
+  // Product decision: limit how tall the preferred justified row can grow as
+  // the gallery widens.
+  static const double _maximumJustifiedTargetRowHeight = 320.0;
 
   late final int crossAxisCount;
   late final GalleryLayoutType layoutType;
@@ -439,25 +447,59 @@ class GalleryGroups {
 
   List<SectionLayout> _computeJustifiedGroupLayouts() {
     final stopwatch = Stopwatch()..start();
-    final targetRowHeight =
+    final strategy = localSettings.getJustifiedLayoutStrategy();
+    final flexTuning = strategy == JustifiedLayoutStrategy.flex
+        ? localSettings.getFlexLayoutTuning()
+        : FlexLayoutTuning.defaults;
+    final comfortLargeTuning = strategy == JustifiedLayoutStrategy.comfortLarge
+        ? localSettings.getComfortLargeLayoutTuning()
+        : ComfortLargeLayoutTuning.defaults;
+    final gridTargetRowHeight =
         (widthAvailable - (crossAxisCount - 1) * spacing) / crossAxisCount;
+    final baseTargetRowHeight = gridTargetRowHeight.isFinite
+        ? math.min(gridTargetRowHeight, _maximumJustifiedTargetRowHeight)
+        : gridTargetRowHeight;
+    final targetHeightScale = switch (strategy) {
+      JustifiedLayoutStrategy.comfortLarge =>
+        comfortLargeTuning.targetHeightScale,
+      JustifiedLayoutStrategy.flex => flexTuning.targetHeightScale,
+    };
+    final targetRowHeight = baseTargetRowHeight * targetHeightScale;
     final groupLayouts = <SectionLayout>[];
     var currentIndex = 0;
     var currentOffset = 0.0;
 
     for (final groupID in _groupIdToFilesMap.keys) {
       final filesInGroup = _groupIdToFilesMap[groupID]!;
-      final rows = JustifiedLayoutCalculator.computeRows(
-        aspectRatios: filesInGroup.map(
-          (file) => JustifiedLayoutCalculator.aspectRatioForDimensions(
-            file.width,
-            file.height,
-          ),
+      final aspectRatios = filesInGroup.map(
+        (file) => JustifiedLayoutCalculator.aspectRatioForDimensions(
+          file.width,
+          file.height,
         ),
-        availableWidth: widthAvailable,
-        targetRowHeight: targetRowHeight,
-        spacing: spacing,
       );
+      final rows = switch (strategy) {
+        JustifiedLayoutStrategy.comfortLarge =>
+          JustifiedLayoutCalculator.computeRows(
+            aspectRatios: aspectRatios,
+            availableWidth: widthAvailable,
+            targetRowHeight: targetRowHeight,
+            spacing: spacing,
+            maximumRowHeightFactor: comfortLargeTuning.maximumHeightFactor,
+            wideFinalMaximumRowHeightFactor:
+                comfortLargeTuning.wideFinalMaximumHeightFactor,
+            minimumLandscapeRowHeightFactor:
+                comfortLargeTuning.minimumLandscapeHeightFactor,
+          ),
+        JustifiedLayoutStrategy.flex => FlexLayoutCalculator.computeRows(
+          aspectRatios: aspectRatios,
+          availableWidth: widthAvailable,
+          targetRowHeight: targetRowHeight,
+          spacing: spacing,
+          maximumRowHeightFactor: flexTuning.maximumHeightFactor,
+          minimumNonFinalSingletonAspectRatio:
+              flexTuning.minimumNonFinalSingletonAspectRatio,
+        ),
+      };
       final firstIndex = currentIndex == 0 ? currentIndex : currentIndex + 1;
       final lastIndex = firstIndex + rows.length;
       final minOffset = currentOffset;

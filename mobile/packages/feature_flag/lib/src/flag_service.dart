@@ -27,15 +27,18 @@ class FlagService {
   }
 
   RemoteFlags? _flags;
+  String? _flagsJson;
 
   RemoteFlags get flags {
     try {
       if (!_prefs.containsKey("remote_flags")) {
         _fetch().ignore();
       }
-      _flags ??= RemoteFlags.fromMap(
-        jsonDecode(_prefs.getString("remote_flags") ?? "{}"),
-      );
+      final flagsJson = _prefs.getString("remote_flags");
+      if (_flags == null || flagsJson != _flagsJson) {
+        _flags = RemoteFlags.fromMap(jsonDecode(flagsJson ?? "{}"));
+        _flagsJson = flagsJson;
+      }
       return _flags!;
     } catch (e) {
       debugPrint("Failed to get feature flags $e");
@@ -49,6 +52,8 @@ class FlagService {
     final isDisabled = _prefs.getBool("ls.internal_user_disabled") ?? false;
     return (flags.internalUser || kDebugMode) && !isDisabled;
   }
+
+  bool get offlineLinkSharing => internalUser;
 
   bool get librarySharing =>
       internalUser || _isServerFlagEnabled(_librarySharingFlag);
@@ -79,6 +84,11 @@ class FlagService {
   bool get usearchForSearch => true;
 
   bool get usearchForSuggestions => true;
+
+  // Kept false until the heavy ML DB queries no longer round-trip data between
+  // Rust and Dart. Then internal users; then everyone, once no heavy queries
+  // run in Dart at all and internal users have soaked it for a while.
+  bool get rustMlDb => false;
 
   String get castUrl => flags.castUrl;
 
@@ -113,6 +123,8 @@ class FlagService {
   bool get qrFeatureEnabled => true;
 
   bool get ocrOverlayEnabled => true;
+
+  bool get rustOcr => internalUser;
 
   bool get enableBgLocalUploadPriority => internalUser;
 
@@ -151,29 +163,59 @@ class FlagService {
   }
 
   Completer<void>? _fetchCompleter;
+  String? _fetchToken;
+  int? _fetchUserID;
+
   Future<void> _fetch() async {
-    if (!_prefs.containsKey("token")) {
+    final requestToken = _prefs.getString("token");
+    final requestUserID = _prefs.getInt(_userIdKey);
+    if (requestToken == null) {
       log("token not found, skip", name: "FlagService");
       return;
     }
-    if (_fetchCompleter != null) {
-      await _fetchCompleter!.future;
+
+    final pendingFetch = _fetchCompleter;
+    if (pendingFetch != null) {
+      final isSameAccount =
+          _fetchToken == requestToken && _fetchUserID == requestUserID;
+      await pendingFetch.future;
+      if (!isSameAccount && _isCurrentAccount(requestToken, requestUserID)) {
+        await _fetch();
+      }
       return;
     }
-    _fetchCompleter = Completer<void>();
+
+    final fetchCompleter = Completer<void>();
+    _fetchCompleter = fetchCompleter;
+    _fetchToken = requestToken;
+    _fetchUserID = requestUserID;
     try {
       log("fetching feature flags", name: "FlagService");
       final response = await _enteDio.get("/remote-store/feature-flags");
+      if (!_isCurrentAccount(requestToken, requestUserID)) {
+        log(
+          "discarding feature flags fetched for a stale account",
+          name: "FlagService",
+        );
+        return;
+      }
       final remoteFlags = RemoteFlags.fromMap(response.data);
-      await _prefs.setString("remote_flags", remoteFlags.toJson());
+      final flagsJson = remoteFlags.toJson();
+      await _prefs.setString("remote_flags", flagsJson);
       _flags = remoteFlags;
+      _flagsJson = flagsJson;
     } catch (e) {
       debugPrint("Failed to sync feature flags $e");
     } finally {
-      _fetchCompleter?.complete();
       _fetchCompleter = null;
+      _fetchToken = null;
+      _fetchUserID = null;
+      fetchCompleter.complete();
     }
   }
+
+  bool _isCurrentAccount(String token, int? userID) =>
+      _prefs.getString("token") == token && _prefs.getInt(_userIdKey) == userID;
 
   Future<void> _updateKeyValue(String key, String value) async {
     try {
@@ -191,8 +233,10 @@ class FlagService {
   }
 
   void _updateFlags(RemoteFlags flags) {
+    final flagsJson = flags.toJson();
     _flags = flags;
-    _prefs.setString("remote_flags", flags.toJson());
+    _flagsJson = flagsJson;
+    _prefs.setString("remote_flags", flagsJson);
     _fetch().ignore();
   }
 

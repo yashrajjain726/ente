@@ -1,14 +1,14 @@
 [package]
 name = "ente-space"
 version = "0.0.1"
-edition = "2024"
+edition.workspace = true
 
 [features]
 museum = []
 
 [dependencies]
 ente-core.workspace = true
-futures-util = "0.3.32"
+futures-util.workspace = true
 log.workspace = true
 md-5.workspace = true
 serde.workspace = true
@@ -21,6 +21,8 @@ zeroize.workspace = true
 ente-accounts.workspace = true
 ente-test-support.workspace = true
 mockito.workspace = true
-reqwest = { workspace = true, features = ["json"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-uuid = { version = "1.11", features = ["v4"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+uuid = { workspace = true, features = ["v4"] }
+
+[lints]
+workspace = true

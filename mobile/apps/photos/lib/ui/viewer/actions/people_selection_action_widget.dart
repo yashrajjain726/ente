@@ -382,23 +382,26 @@ class _PeopleSelectionActionWidgetState
   }
 
   Future<void> _updateHideFromMemoriesState(bool shouldHide) async {
+    final updatedPersons = <PersonEntity>[];
     try {
       final personMap = await personEntitiesMapFuture;
       final selectedPersonIds = _getSelectedPersonIds(personMap);
-      if (selectedPersonIds.isEmpty) return;
       for (final personID in selectedPersonIds) {
         final person = personMap[personID];
         if (person == null || person.data.name.isEmpty) continue;
         if (person.data.hideFromMemories == shouldHide) continue;
-        await PersonService.instance.updateAttributes(
+        final updatedPerson = await PersonService.instance.updateAttributes(
           person.remoteID,
           hideFromMemories: shouldHide,
         );
+        updatedPersons.add(updatedPerson);
       }
-      Bus.instance.fire(PeopleChangedEvent());
     } catch (e, s) {
       _logger.severe('Failed to update hide from memories state', e, s);
     } finally {
+      if (updatedPersons.isNotEmpty) {
+        Bus.instance.fire(PeopleChangedEvent(persons: updatedPersons));
+      }
       widget.selectedPeople.clearAll();
     }
   }

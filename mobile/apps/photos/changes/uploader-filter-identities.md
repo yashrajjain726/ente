@@ -1,1 +1,0 @@
-- Fixed duplicate “Someone” entries in the Uploaded by search filter.

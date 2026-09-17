@@ -298,11 +298,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Nonaktfikan kunci layar perangkat saat Ente berada di latar depan dan ada pencadangan yang sedang berlangsung. Hal ini biasanya tidak diperlukan, namun dapat membantu unggahan dan import awal berkas berkas besar selesai lebih cepat.",
   "deviceNotFound": "Perangkat tidak ditemukan",
   "didYouKnow": "Tahukah kamu?",
   "digits": "Digit",
-  "disableAutoLock": "Nonaktifkan kunci otomatis",
   "disableDownloadWarningBody": "Orang yang melihat masih bisa mengambil tangkapan layar atau menyalin foto kamu menggunakan alat eksternal",
   "disableDownloadWarningTitle": "Perlu diketahui",
   "disableLinkMessage": "Ini akan menghapus link publik yang digunakan untuk mengakses \"{albumName}\".",
@@ -1292,7 +1290,6 @@
   },
   "unarchiveAlbum": "Keluarkan album dari arsip",
   "unarchiving": "Mengeluarkan dari arsip...",
-  "unavailableReferralCode": "Maaf, kode ini tidak tersedia.",
   "uncategorized": "Tak Berkategori",
   "unhide": "Tampilkan",
   "unhideToAlbum": "Tampikan ke album",

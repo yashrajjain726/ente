@@ -18,7 +18,7 @@ const (
 	spaceMessageKindPostLike    = "post_like"
 	spaceMessageKindFriendAdded = "friend_added"
 
-	spaceMessageNotificationKindWave = "wave"
+	spaceMessageNotificationKindPoke = "poke"
 
 	maxSpaceMessageCipherEncodedBytes = 8 * 1024
 	maxSpaceMessageCipherDecodedBytes = 6 * 1024
@@ -59,8 +59,8 @@ func (c *MessagesController) Create(ctx context.Context, senderSpace *repo.Space
 	if err != nil {
 		return nil, err
 	}
-	if notificationKind == spaceMessageNotificationKindWave && replyMessageID.Valid {
-		return nil, ente.NewBadRequestWithMessage("wave notification is not supported for replies")
+	if notificationKind == spaceMessageNotificationKindPoke && replyMessageID.Valid {
+		return nil, ente.NewBadRequestWithMessage("poke notification is not supported for replies")
 	}
 	message, err := c.MessagesRepo.CreateMessage(ctx, repo.CreateSpaceMessageRecord{
 		MessageID:                    messageID,
@@ -78,8 +78,8 @@ func (c *MessagesController) Create(ctx context.Context, senderSpace *repo.Space
 		}
 		return nil, err
 	}
-	if notificationKind == spaceMessageNotificationKindWave {
-		go c.ActivityNotifier.OnSpaceWaveSent(spaceActivityActor(senderSpace), recipientSpace.OwnerID)
+	if notificationKind == spaceMessageNotificationKindPoke {
+		go c.ActivityNotifier.OnSpacePokeSent(spaceActivityActor(senderSpace), recipientSpace.OwnerID)
 	} else {
 		go c.ActivityNotifier.OnSpaceMessageSent(spaceActivityActor(senderSpace), recipientSpace.OwnerID)
 	}
@@ -353,7 +353,7 @@ func normalizeOptionalMessageID(messageID string) (string, error) {
 
 func normalizeMessageNotificationKind(notificationKind string) (string, error) {
 	notificationKind = strings.TrimSpace(notificationKind)
-	if notificationKind == "" || notificationKind == spaceMessageNotificationKindWave {
+	if notificationKind == "" || notificationKind == spaceMessageNotificationKindPoke {
 		return notificationKind, nil
 	}
 	return "", ente.NewBadRequestWithMessage("notificationKind is invalid")

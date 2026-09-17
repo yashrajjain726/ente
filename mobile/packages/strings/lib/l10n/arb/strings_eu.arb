@@ -536,7 +536,6 @@
     "description": "Two-factor authentication title"
   },
   "twofactorSetup": "Faktore biko ezarpena",
-  "unavailableReferralCode": "Sentitzen dugu, kode hau ezin da erabili.",
   "uncategorized": "Kategori gabekoa",
   "useRecoveryKey": "Erabili berreskuratze giltza",
   "@useRecoveryKey": {

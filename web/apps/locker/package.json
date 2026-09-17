@@ -12,12 +12,11 @@
         "ente-accounts": "*",
         "ente-base": "*",
         "ente-contacts": "*",
-        "ente-core-wasm": "*",
         "ente-legacy-wasm": "*",
         "ente-locker-wasm": "*"
     },
     "devDependencies": {
         "ente-build-config": "*",
-        "vitest": "4.1.8"
+        "vitest": "4.1.11"
     }
 }

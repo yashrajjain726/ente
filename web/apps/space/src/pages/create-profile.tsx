@@ -2,16 +2,14 @@ import { SpacePageMeta } from "components/PageMeta";
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
-import {
-    SetupProfileScreen,
-    setupProfileBackground,
-} from "screens/SetupProfileScreen";
+import { SetupProfileScreen } from "screens/SetupProfileScreen";
 import { savedSpaceSessionToken } from "services/persistent-session";
 import {
     spaceUsernameAvailability,
     spaceUsernameValidationError,
 } from "services/profile";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { sendPendingSpaceFriendRequest } from "utils/pending-friend-request";
 import { useSpaceRouter } from "utils/route-transitions";
 import { createProfileSourceFromQuery, spaceRoutes } from "utils/routes";
@@ -98,7 +96,7 @@ const Page: React.FC = () => {
     if (!hasSpaceSession || profileLoadStatus != "ready" || profile) {
         return (
             <SpaceRouteFallback
-                background={setupProfileBackground}
+                background={spaceAppBackgroundColor}
                 message={profileLoadError}
             />
         );
@@ -106,7 +104,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={setupProfileBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <SetupProfileScreen
                 initialProfile={pendingCreateProfile}
                 onBack={() =>

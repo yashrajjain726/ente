@@ -26,7 +26,7 @@ const (
 	spaceActivityPostLiked       = "post_liked"
 	spaceActivityPostReplied     = "post_replied"
 	spaceActivityMessageSent     = "message_sent"
-	spaceActivityWaveSent        = "wave_sent"
+	spaceActivityPokeSent        = "poke_sent"
 	spaceActivityMessageLiked    = "message_liked"
 	spaceActivityFriendAdded     = "friend_added"
 	spaceActivityFriendRequested = "friend_requested"
@@ -55,11 +55,11 @@ func spaceActivityActor(space *repo.SpaceRecord) SpaceActivityActor {
 }
 
 type SpaceActivityNotifier interface {
-	OnSpacePostCreated(actor SpaceActivityActor)
+	OnSpacePostCreated(actor SpaceActivityActor, postID int64)
 	OnSpacePostLiked(actor SpaceActivityActor, recipientUserID int64)
 	OnSpacePostReplied(actor SpaceActivityActor, recipientUserID int64)
 	OnSpaceMessageSent(actor SpaceActivityActor, recipientUserID int64)
-	OnSpaceWaveSent(actor SpaceActivityActor, recipientUserID int64)
+	OnSpacePokeSent(actor SpaceActivityActor, recipientUserID int64)
 	OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64)
 	OnSpaceFriendAdded(actor SpaceActivityActor, recipientUserID int64)
 	OnSpaceFriendRequested(actor SpaceActivityActor, recipientUserID int64)
@@ -103,7 +103,7 @@ func NewSpaceWebPushSender(
 	return sender
 }
 
-func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor) {
+func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor, postID int64) {
 	if !n.available() {
 		return
 	}
@@ -121,7 +121,7 @@ func (n *SpaceWebPushSender) OnSpacePostCreated(actor SpaceActivityActor) {
 		"posted a new photo",
 		"Check it out",
 		spaceActivityPostCreated,
-		"/app",
+		fmt.Sprintf("/app/posts/%s/%d", url.PathEscape(actor.SpaceID), postID),
 		subscriptions,
 	)
 }
@@ -138,8 +138,8 @@ func (n *SpaceWebPushSender) OnSpaceMessageSent(actor SpaceActivityActor, recipi
 	n.sendAccountActivity(actor, "sent you a message", "Check it out", spaceActivityMessageSent, conversationURL(actor.SpaceID), recipientUserID)
 }
 
-func (n *SpaceWebPushSender) OnSpaceWaveSent(actor SpaceActivityActor, recipientUserID int64) {
-	n.sendAccountActivity(actor, "waved at you 👋", "Post something", spaceActivityWaveSent, "/app/post", recipientUserID)
+func (n *SpaceWebPushSender) OnSpacePokeSent(actor SpaceActivityActor, recipientUserID int64) {
+	n.sendAccountActivity(actor, "poked you", "Post a photo", spaceActivityPokeSent, "/app/post", recipientUserID)
 }
 
 func (n *SpaceWebPushSender) OnSpaceMessageLiked(actor SpaceActivityActor, recipientUserID int64) {

@@ -37,7 +37,7 @@ You can alternatively install the build from PlayStore or F-Droid.
 
 ## 🧑‍💻 Building from source
 
-1. Install [Flutter v3.38.10](https://flutter.dev/docs/get-started/install) and [Rust](https://www.rust-lang.org/tools/install).
+1. Install [Flutter v3.47.2](https://flutter.dev/docs/get-started/install) and [Rust](https://www.rust-lang.org/tools/install).
 
 2. From any folder inside `mobile/`, install the workspace dependencies with `flutter pub get --enforce-lockfile`. Then, from `rust/`, generate the Rust bindings with `cargo codegen frb`.
 
@@ -60,10 +60,6 @@ To build a release APK, [setup your keystore](https://docs.flutter.dev/deploymen
 ### Updating dependencies
 
 After updating Flutter dependencies, run `pod install` from `ios/` on macOS and commit `ios/Podfile.lock` if it changes.
-
-## 🏙️ Attributions
-
-See the [location dataset attribution](../../../rust/crates/location-dataset/README.md).
 
 ## 🌍 Translate
 

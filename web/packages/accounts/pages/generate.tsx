@@ -15,11 +15,9 @@ import {
     savedPartialLocalUser,
     saveJustSignedUp,
 } from "ente-accounts/services/accounts-db";
+import { saveMasterKeyInSessionAndSafeStore } from "ente-accounts/services/prelogin-session";
+import { getPreloginRecoveryKeyMnemonic } from "ente-accounts/services/recovery-key";
 import { appHomeRoute } from "ente-accounts/services/redirect";
-import {
-    haveMasterKeyInSession,
-    saveMasterKeyInSessionAndSafeStore,
-} from "ente-accounts/services/session-storage";
 import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,
@@ -35,6 +33,7 @@ import { LoadingIndicator } from "ente-base/components/loaders";
 import { useBaseContext } from "ente-base/context";
 import { isNamedError } from "ente-base/error";
 import log from "ente-base/log";
+import { haveMasterKeyInSession } from "ente-base/session-storage";
 import { t } from "i18next";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
@@ -120,6 +119,7 @@ const Page: React.FC<GeneratePageProps> = ({
             <RecoveryKeyContents
                 open
                 onClose={handleRecoveryKeyClose}
+                getRecoveryKeyMnemonic={getPreloginRecoveryKeyMnemonic}
                 showMiniDialog={showMiniDialog}
                 presentation={recoveryKeyPresentation}
             />
@@ -130,6 +130,7 @@ const Page: React.FC<GeneratePageProps> = ({
         <RecoveryKey
             open
             onClose={handleRecoveryKeyClose}
+            getRecoveryKeyMnemonic={getPreloginRecoveryKeyMnemonic}
             showMiniDialog={showMiniDialog}
         />
     ) : userEmail && passwordPresentation ? (

@@ -1,31 +1,27 @@
-import type { WrappedRootContactKey } from "./pkg/ente_photos_wasm";
-
-interface OpenSessionInput {
-    baseUrl: string;
-    authToken: string;
-    masterKeyB64: string;
-    clientPackage?: string;
-    clientVersion?: string;
-}
+import type {
+    EncryptedBox,
+    OpenSessionInput,
+    Session,
+    WrappedRootContactKey,
+} from "./pkg/ente_photos_wasm";
 
 const wasm = () => import("./pkg/ente_photos_wasm");
 
-export type Session = import("./pkg/ente_photos_wasm").Session;
+export type { OpenSessionInput, Session } from "./pkg/ente_photos_wasm";
 
-export const openSession = async ({
-    baseUrl,
-    authToken,
-    masterKeyB64,
-    clientPackage,
-    clientVersion,
-}: OpenSessionInput): Promise<Session> =>
-    (await wasm()).openSession(
-        baseUrl,
-        authToken,
-        masterKeyB64,
-        clientPackage,
-        clientVersion,
-    );
+export const openSession = async (input: OpenSessionInput): Promise<Session> =>
+    (await wasm()).openSession(input);
+
+export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
+    session.encryptWithRecoveryKey(dataB64);
+
+export const generateKey = async () => (await wasm()).cryptoGenerateKey();
+
+export const encryptBox = async (dataB64: string, keyB64: string) =>
+    (await wasm()).cryptoEncryptBox(dataB64, keyB64);
+
+export const decryptBox = async (box: EncryptedBox, keyB64: string) =>
+    (await wasm()).cryptoDecryptBox(box.encryptedData, box.nonce, keyB64);
 
 export const contactsGetDiff = async (
     session: Session,
@@ -51,4 +47,17 @@ export const contactsGetProfilePicture = async (
         wrappedRootContactKey?.encryptedKey,
         wrappedRootContactKey?.header,
         contactID,
+    );
+
+export const openCollectionKey = async (
+    session: Session,
+    ownerID: number,
+    encryptedKey: string,
+    keyDecryptionNonce?: string,
+) =>
+    (await wasm()).collectionsOpenKey(
+        session,
+        BigInt(ownerID),
+        encryptedKey,
+        keyDecryptionNonce,
     );

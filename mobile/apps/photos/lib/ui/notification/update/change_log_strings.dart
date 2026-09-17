@@ -8,6 +8,7 @@ class ChangeLogStrings {
   static ChangeLogStrings? maybeForLocale(
     Locale locale, {
     bool isLocalGallery = false,
+    required bool isAndroid,
   }) {
     final key = locale.countryCode != null && locale.countryCode!.isNotEmpty
         ? '${locale.languageCode}_${locale.countryCode}'
@@ -21,750 +22,932 @@ class ChangeLogStrings {
       return null;
     }
 
-    final entries = strings.entries
+    return strings.forAudience(
+      isLocalGallery: isLocalGallery,
+      isAndroid: isAndroid,
+    );
+  }
+
+  ChangeLogStrings? forAudience({
+    bool isLocalGallery = false,
+    required bool isAndroid,
+  }) {
+    final visibleEntries = entries
+        .where((entry) => !entry.isAndroidOnly || isAndroid)
+        .where((entry) => !entry.isIOSOnly || !isAndroid)
         .where(
           (entry) =>
               isLocalGallery ? !entry.isOnlineOnly : !entry.isLocalGalleryOnly,
         )
         .toList(growable: false);
-    return entries.isEmpty ? null : ChangeLogStrings(entries: entries);
+    return visibleEntries.isEmpty
+        ? null
+        : ChangeLogStrings(entries: visibleEntries);
   }
 
   static bool hasContentForLocale(
     Locale locale, {
     bool isLocalGallery = false,
+    required bool isAndroid,
   }) {
-    return maybeForLocale(locale, isLocalGallery: isLocalGallery) != null;
+    return maybeForLocale(
+          locale,
+          isLocalGallery: isLocalGallery,
+          isAndroid: isAndroid,
+        ) !=
+        null;
   }
 
   static const Map<String, ChangeLogStrings> _translations = {
     'en': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Library Sharing',
+          title: 'Preview strip in the viewer',
           description:
-              'Share your current and future albums with family members automatically. Head to Settings → Family, pick a member, and tap Share albums. New albums are included as you create them.',
+              'Thumbnails at the bottom of the viewer let you jump between photos and videos faster.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Share photos of a person',
+          description:
+              'Share photos of a person with a link that can automatically include new photos of them.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Album descriptions',
+          title: 'Set photos as wallpaper',
+          description: 'Set a photo as your home screen, lock screen, or both.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Hold for 2× playback',
+          description: 'Press and hold a video to watch it at 2× speed.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'And more!',
           description:
-              'Give an album a description alongside its name and cover photo. Descriptions travel with your shared links, so anyone opening one sees the context you added.',
+              'More efficient gallery scrolling and back buttons that are easier to tap.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'And more!',
+          description:
+              'More efficient gallery scrolling, back buttons that are easier to tap, and improved backups.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Faster on big libraries',
+          title: 'And more!',
           description:
-              'Search, Smart Memories, the map, and timeline scrolling are all substantially quicker if you have a large library. Map clustering alone is 2–3x faster.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backups you can watch',
-          description:
-              'Backup Status now shows per-file progress, and large multipart uploads are more reliable.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Selecting text in photos',
-          description:
-              'Controls stay reachable while you select, and tapping selected text clears it.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'A tidier selection menu',
-          description:
-              'The actions in the selection bar are ordered by how often you reach for them, and the share icon now matches your platform.',
+              'More efficient gallery scrolling and back buttons that are easier to tap.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ca': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Compartició de la biblioteca',
+          title: 'Franja de previsualitzacions al visor',
           description:
-              "Comparteix automàticament els àlbums actuals i futurs amb els membres de la família. Ves a Configuració → Família, tria un membre i toca Comparteix àlbums. Els àlbums nous s'hi inclouran a mesura que els creïs.",
+              'Les miniatures de la part inferior del visor et permeten saltar més ràpidament entre fotos i vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Comparteix les fotos d’una persona',
+          description:
+              'Comparteix les fotos d’una persona amb un enllaç que pot incloure automàticament fotos noves seves.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descripcions dels àlbums',
+          title: 'Estableix fotos com a fons de pantalla',
           description:
-              "Dona context a un àlbum amb una descripció, a més del nom i la foto de portada. Les descripcions s'inclouen als enllaços compartits perquè tothom qui n'obri un vegi el context que hi has afegit.",
+              'Estableix una foto com a fons de la pantalla d’inici, de bloqueig o de totes dues.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Mantén premut per reproduir a 2×',
+          description: 'Mantén premut un vídeo per veure’l a velocitat 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'I més coses!',
+          description:
+              'Desplaçament més eficient per la galeria i botons Enrere més fàcils de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'I més coses!',
+          description:
+              'Desplaçament més eficient per la galeria, botons Enrere més fàcils de tocar i còpies de seguretat millorades.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Més ràpid amb biblioteques grans',
+          title: 'I més coses!',
           description:
-              "La cerca, els Records intel·ligents, el mapa i el desplaçament per la línia de temps són molt més ràpids si tens una biblioteca gran. Només l'agrupació del mapa és entre 2 i 3 vegades més ràpida.",
-        ),
-        ChangeLogEntryStrings(
-          title: 'Còpies de seguretat que pots seguir',
-          description:
-              "L'Estat de la còpia de seguretat ara mostra el progrés de cada fitxer, i les pujades grans en diverses parts són més fiables.",
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Selecció de text a les fotos',
-          description:
-              'Els controls continuen accessibles mentre selecciones text, i tocar el text seleccionat en suprimeix la selecció.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Un menú de selecció més ordenat',
-          description:
-              'Les accions de la barra de selecció s’ordenen segons la freqüència amb què les utilitzes, i la icona de compartir ara coincideix amb la de la teva plataforma.',
+              'Desplaçament més eficient per la galeria i botons Enrere més fàcils de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'cs': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Sdílení knihovny',
+          title: 'Pás náhledů v prohlížeči',
           description:
-              'Automaticky sdílejte svá současná i budoucí alba s členy rodiny. Přejděte do Nastavení → Rodina, vyberte člena a klepněte na Sdílet alba. Nová alba se zahrnou hned, jak je vytvoříte.',
+              'Miniatury ve spodní části prohlížeče umožňují rychleji přecházet mezi fotografiemi a videi.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Sdílení fotografií osoby',
+          description:
+              'Sdílejte fotografie osoby pomocí odkazu, který může automaticky zahrnovat její nové fotografie.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Popisy alb',
+          title: 'Nastavení fotografií jako tapety',
           description:
-              'K názvu a titulní fotce alba teď můžete přidat i popis. Popisy se přenášejí do sdílených odkazů, takže každý, kdo je otevře, uvidí kontext, který jste přidali.',
+              'Nastavte fotografii jako tapetu domovské obrazovky, zamykací obrazovky nebo obou.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Podržením přehrajete 2× rychleji',
+          description:
+              'Stisknutím a podržením videa ho můžete sledovat 2× rychleji.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'A mnohem více!',
+          description:
+              'Efektivnější posouvání v galerii a tlačítka Zpět, na která se snáze klepá.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'A mnohem více!',
+          description:
+              'Efektivnější posouvání v galerii, tlačítka Zpět, na která se snáze klepá, a vylepšené zálohování.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Rychlejší u velkých knihoven',
+          title: 'A mnohem více!',
           description:
-              'Vyhledávání, Chytré vzpomínky, mapa i posouvání časové osy jsou u velkých knihoven výrazně rychlejší. Samotné seskupování na mapě je 2–3× rychlejší.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Zálohování pod dohledem',
-          description:
-              'Stav zálohování teď zobrazuje průběh jednotlivých souborů a velká vícedílná nahrávání jsou spolehlivější.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Výběr textu ve fotkách',
-          description:
-              'Ovládací prvky zůstávají při výběru textu dostupné a klepnutí na vybraný text výběr zruší.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Přehlednější nabídka výběru',
-          description:
-              'Akce na liště výběru jsou seřazené podle toho, jak často je používáte, a ikona sdílení teď odpovídá vaší platformě.',
+              'Efektivnější posouvání v galerii a tlačítka Zpět, na která se snáze klepá.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'de': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Bibliothek teilen',
+          title: 'Vorschauleiste in der Fotoansicht',
           description:
-              'Teile deine aktuellen und zukünftigen Alben automatisch mit Familienmitgliedern. Gehe zu Einstellungen → Familie, wähle ein Mitglied aus und tippe auf Alben teilen. Neue Alben werden beim Erstellen automatisch einbezogen.',
+              'Über die Miniaturansichten am unteren Rand kannst du schneller zwischen Fotos und Videos wechseln.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Fotos einer Person teilen',
+          description:
+              'Teile die Fotos einer Person über einen Link, der neue Fotos von ihr automatisch aufnehmen kann.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albumbeschreibungen',
+          title: 'Fotos als Hintergrund festlegen',
           description:
-              'Gib einem Album zusätzlich zu Name und Titelbild eine Beschreibung. Beschreibungen werden über deine geteilten Links mitgegeben, sodass alle, die einen Link öffnen, den von dir hinzugefügten Kontext sehen.',
+              'Lege ein Foto als Hintergrund für den Startbildschirm, den Sperrbildschirm oder beide fest.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Für 2× Wiedergabe gedrückt halten',
+          description:
+              'Halte ein Video gedrückt, um es mit 2× Geschwindigkeit anzusehen.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Und mehr!',
+          description:
+              'Effizienteres Scrollen in der Galerie und Zurück-Schaltflächen, die sich leichter antippen lassen.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Und mehr!',
+          description:
+              'Effizienteres Scrollen in der Galerie, Zurück-Schaltflächen, die sich leichter antippen lassen, und verbesserte Datensicherungen.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Schneller bei großen Bibliotheken',
+          title: 'Und mehr!',
           description:
-              'Suche, Smarte Erinnerungen, Karte und Scrollen in der Zeitleiste sind bei großen Bibliotheken deutlich schneller. Allein die Gruppierung auf der Karte ist 2–3-mal schneller.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backups mit sichtbarem Fortschritt',
-          description:
-              'Der Sicherungsstatus zeigt jetzt den Fortschritt für jede Datei an, und große mehrteilige Uploads sind zuverlässiger.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Text in Fotos auswählen',
-          description:
-              'Die Bedienelemente bleiben während der Auswahl erreichbar, und durch Tippen auf ausgewählten Text wird die Auswahl aufgehoben.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Ein aufgeräumteres Auswahlmenü',
-          description:
-              'Die Aktionen in der Auswahlleiste sind danach sortiert, wie oft du sie verwendest, und das Teilen-Symbol entspricht jetzt deiner Plattform.',
+              'Effizienteres Scrollen in der Galerie und Zurück-Schaltflächen, die sich leichter antippen lassen.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'es': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Uso compartido de la biblioteca',
+          title: 'Tira de vistas previas en el visor',
           description:
-              'Comparte automáticamente tus álbumes actuales y futuros con tus familiares. Ve a Configuración → Familia, elige a un miembro y toca Compartir álbumes. Los álbumes nuevos se incluyen a medida que los creas.',
+              'Las miniaturas de la parte inferior del visor te permiten saltar más rápido entre fotos y vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Compartir fotos de una persona',
+          description:
+              'Comparte las fotos de una persona con un enlace que puede incluir automáticamente nuevas fotos suyas.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descripciones de álbumes',
+          title: 'Usar fotos como fondo de pantalla',
           description:
-              'Añade una descripción a un álbum junto con su nombre y foto de portada. Las descripciones se incluyen en tus enlaces compartidos, para que cualquiera que abra uno vea el contexto que añadiste.',
+              'Establece una foto como fondo de la pantalla de inicio, de la pantalla de bloqueo o de ambas.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Mantén pulsado para reproducir a 2×',
+          description:
+              'Mantén pulsado un vídeo para verlo a una velocidad de 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: '¡Y mucho más!',
+          description:
+              'Desplazamiento más eficiente por la galería y botones Atrás más fáciles de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '¡Y mucho más!',
+          description:
+              'Desplazamiento más eficiente por la galería, botones Atrás más fáciles de tocar y copias de seguridad mejoradas.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Más rapidez en bibliotecas grandes',
+          title: '¡Y mucho más!',
           description:
-              'La búsqueda, los Recuerdos inteligentes, el mapa y el desplazamiento por la cronología son mucho más rápidos si tienes una biblioteca grande. Solo la agrupación del mapa es entre 2 y 3 veces más rápida.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Copias de seguridad que puedes seguir',
-          description:
-              'El Estado de la copia de seguridad ahora muestra el progreso de cada archivo, y las cargas grandes de varias partes son más fiables.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Seleccionar texto en fotos',
-          description:
-              'Los controles permanecen accesibles mientras seleccionas texto, y tocar el texto seleccionado borra la selección.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Un menú de selección más ordenado',
-          description:
-              'Las acciones de la barra de selección se ordenan según la frecuencia con la que las usas, y el icono de compartir ahora coincide con el de tu plataforma.',
+              'Desplazamiento más eficiente por la galería y botones Atrás más fáciles de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'fr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Partage de la photothèque',
+          title: 'Bandeau d’aperçus dans la visionneuse',
           description:
-              'Partagez automatiquement vos albums actuels et futurs avec les membres de votre famille. Accédez à Paramètres → Famille, choisissez un membre et touchez Partager les albums. Les nouveaux albums sont inclus dès leur création.',
+              'Les vignettes au bas de la visionneuse vous permettent de passer plus rapidement d’une photo ou vidéo à l’autre.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Partager les photos d’une personne',
+          description:
+              'Partagez les photos d’une personne avec un lien qui peut inclure automatiquement ses nouvelles photos.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descriptions d’albums',
+          title: 'Définir des photos comme fond d’écran',
           description:
-              'Ajoutez une description à un album en plus de son nom et de sa photo de couverture. Les descriptions accompagnent vos liens partagés, afin que toute personne qui en ouvre un voie le contexte que vous avez ajouté.',
+              'Définissez une photo comme fond de l’écran d’accueil, de l’écran de verrouillage ou des deux.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Maintenir pour lire à 2×',
+          description:
+              'Appuyez longuement sur une vidéo pour la regarder à vitesse 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Et plus encore !',
+          description:
+              'Défilement plus efficace dans la galerie et boutons de retour plus faciles à toucher.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Et plus encore !',
+          description:
+              'Défilement plus efficace dans la galerie, boutons de retour plus faciles à toucher et sauvegardes améliorées.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Plus rapide avec les grandes photothèques',
+          title: 'Et plus encore !',
           description:
-              'La recherche, les Souvenirs intelligents, la carte et le défilement de la chronologie sont nettement plus rapides si votre photothèque est volumineuse. Le regroupement sur la carte est à lui seul 2 à 3 fois plus rapide.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Des sauvegardes à suivre en direct',
-          description:
-              'L’état de la sauvegarde affiche désormais la progression de chaque fichier, et les envois volumineux en plusieurs parties sont plus fiables.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Sélection de texte dans les photos',
-          description:
-              'Les commandes restent accessibles pendant la sélection, et toucher le texte sélectionné efface la sélection.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Un menu de sélection mieux ordonné',
-          description:
-              'Les actions de la barre de sélection sont classées selon leur fréquence d’utilisation, et l’icône de partage correspond désormais à votre plateforme.',
+              'Défilement plus efficace dans la galerie et boutons de retour plus faciles à toucher.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'it': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Condivisione della libreria',
+          title: 'Striscia di anteprime nel visualizzatore',
           description:
-              'Condividi automaticamente gli album attuali e futuri con i membri della famiglia. Vai su Impostazioni → Famiglia, scegli un membro e tocca Condividi album. I nuovi album vengono inclusi man mano che li crei.',
+              'Le miniature nella parte inferiore del visualizzatore ti consentono di passare più velocemente da una foto o un video all’altro.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Condividi le foto di una persona',
+          description:
+              'Condividi le foto di una persona con un link che può includere automaticamente le sue nuove foto.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrizioni degli album',
+          title: 'Imposta foto come sfondo',
           description:
-              'Aggiungi a un album una descrizione oltre al nome e alla foto di copertina. Le descrizioni accompagnano i link condivisi, così chiunque ne apra uno vedrà il contesto che hai aggiunto.',
+              'Imposta una foto come sfondo della schermata Home, della schermata di blocco o di entrambe.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Tieni premuto per la riproduzione a 2×',
+          description: 'Tieni premuto un video per guardarlo a velocità 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'E non è tutto!',
+          description:
+              'Scorrimento più efficiente della galleria e pulsanti Indietro più facili da toccare.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E non è tutto!',
+          description:
+              'Scorrimento più efficiente della galleria, pulsanti Indietro più facili da toccare e backup migliorati.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Più veloce con le librerie grandi',
+          title: 'E non è tutto!',
           description:
-              'La ricerca, i Ricordi intelligenti, la mappa e lo scorrimento della sequenza temporale sono molto più veloci se hai una libreria grande. Il solo raggruppamento sulla mappa è da 2 a 3 volte più veloce.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backup da seguire in tempo reale',
-          description:
-              'Lo Stato backup ora mostra l’avanzamento di ogni file e i caricamenti multipart di grandi dimensioni sono più affidabili.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Selezione del testo nelle foto',
-          description:
-              'I controlli restano accessibili durante la selezione e toccando il testo selezionato la selezione viene annullata.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Un menu di selezione più ordinato',
-          description:
-              'Le azioni nella barra di selezione sono ordinate in base alla frequenza con cui le usi e l’icona di condivisione ora corrisponde alla tua piattaforma.',
+              'Scorrimento più efficiente della galleria e pulsanti Indietro più facili da toccare.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ja': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'ライブラリ共有',
-          description:
-              '現在および今後作成するアルバムを家族と自動的に共有できます。［設定］→［ファミリー］でメンバーを選び、［アルバムを共有］をタップしてください。新しいアルバムも作成時に自動で含まれます。',
+          title: 'ビューアーのプレビューストリップ',
+          description: 'ビューアー下部のサムネイルから、写真やビデオへすばやく移動できます。',
+        ),
+        ChangeLogEntryStrings(
+          title: '人物の写真を共有',
+          description: '人物の写真をリンクで共有できます。リンクにはその人物の新しい写真を自動で追加できます。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'アルバムの説明',
-          description:
-              'アルバムに名前やカバー写真とあわせて説明を追加できます。説明は共有リンクにも表示されるため、リンクを開いた人に追加した背景が伝わります。',
+          title: '写真を壁紙に設定',
+          description: '写真をホーム画面、ロック画面、またはその両方の壁紙に設定できます。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '長押しで2×再生',
+          description: 'ビデオを長押しすると、2×の速度で再生できます。',
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description: 'ギャラリーのスクロール効率が向上し、「戻る」ボタンがタップしやすくなりました。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'ほかにも！',
+          description: 'ギャラリーのスクロール効率が向上し、「戻る」ボタンがタップしやすくなり、バックアップも改善しました。',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '大規模ライブラリでも高速に',
-          description:
-              '大規模なライブラリで、検索、スマートメモリー、マップ、タイムラインのスクロールが大幅に高速化しました。マップのクラスタリングだけでも2～3倍高速です。',
-        ),
-        ChangeLogEntryStrings(
-          title: '進捗が見えるバックアップ',
-          description:
-              'バックアップの状態にファイルごとの進捗が表示されるようになり、大容量のマルチパートアップロードの信頼性も向上しました。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '写真内のテキスト選択',
-          description: 'テキストを選択中も操作ボタンにアクセスでき、選択したテキストをタップすると選択が解除されます。',
-        ),
-        ChangeLogEntryStrings(
-          title: 'すっきりした選択メニュー',
-          description: '選択バーの操作を使用頻度順に並べ替え、共有アイコンもお使いのプラットフォームに合うものになりました。',
+          title: 'ほかにも！',
+          description: 'ギャラリーのスクロール効率が向上し、「戻る」ボタンがタップしやすくなりました。',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'nl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Bibliotheek delen',
+          title: 'Voorbeeldstrook in de viewer',
           description:
-              'Deel je huidige en toekomstige albums automatisch met gezinsleden. Ga naar Instellingen → Familie, kies een lid en tik op Albums delen. Nieuwe albums worden toegevoegd zodra je ze maakt.',
+              "Miniaturen onderaan de viewer laten je sneller tussen foto's en video's springen.",
+        ),
+        ChangeLogEntryStrings(
+          title: "Foto's van een persoon delen",
+          description:
+              "Deel foto's van een persoon via een link die automatisch nieuwe foto's van die persoon kan bevatten.",
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albumbeschrijvingen',
+          title: "Foto's als achtergrond instellen",
           description:
-              'Geef een album naast een naam en omslagfoto ook een beschrijving. Beschrijvingen gaan mee met je gedeelde links, zodat iedereen die een link opent de context ziet die je hebt toegevoegd.',
+              'Stel een foto in als achtergrond van je startscherm, vergrendelscherm of beide.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Vasthouden voor afspelen op 2×',
+          description:
+              'Houd een video ingedrukt om deze op 2× snelheid te bekijken.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'En meer!',
+          description:
+              'Efficiënter scrollen door de galerij en terugknoppen die makkelijker zijn aan te tikken.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'En meer!',
+          description:
+              'Efficiënter scrollen door de galerij, terugknoppen die makkelijker zijn aan te tikken en verbeterde back-ups.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Sneller bij grote bibliotheken',
+          title: 'En meer!',
           description:
-              'Zoeken, Slimme herinneringen, de kaart en scrollen door de tijdlijn zijn allemaal aanzienlijk sneller als je een grote bibliotheek hebt. Alleen al het clusteren op de kaart is 2–3 keer sneller.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Back-ups die je kunt volgen',
-          description:
-              'Back-up status toont nu de voortgang per bestand en grote meerdelige uploads zijn betrouwbaarder.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: "Tekst selecteren in foto's",
-          description:
-              'De bediening blijft bereikbaar terwijl je tekst selecteert en door op geselecteerde tekst te tikken wis je de selectie.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Een overzichtelijker selectiemenu',
-          description:
-              'De acties in de selectiebalk zijn gerangschikt op hoe vaak je ze gebruikt en het deelpictogram past nu bij je platform.',
+              'Efficiënter scrollen door de galerij en terugknoppen die makkelijker zijn aan te tikken.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'no': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Deling av bibliotek',
+          title: 'Forhåndsvisningsstripe i visningen',
           description:
-              'Del nåværende og fremtidige album automatisk med familiemedlemmer. Gå til Innstillinger → Familie, velg et medlem og trykk på Del album. Nye album tas med etter hvert som du oppretter dem.',
+              'Miniatyrbilder nederst i visningen gjør at du kan hoppe raskere mellom bilder og videoer.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Del bilder av en person',
+          description:
+              'Del bilder av en person med en lenke som automatisk kan ta med nye bilder av personen.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albumbeskrivelser',
+          title: 'Bruk bilder som bakgrunn',
           description:
-              'Gi et album en beskrivelse i tillegg til navn og forsidebilde. Beskrivelsene følger de delte lenkene, slik at alle som åpner en, ser konteksten du la til.',
+              'Bruk et bilde som bakgrunn på startskjermen, låseskjermen eller begge.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Hold inne for 2× avspilling',
+          description: 'Trykk og hold på en video for å se den i 2× hastighet.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Og mer!',
+          description:
+              'Mer effektiv rulling i galleriet og tilbakeknapper som er enklere å trykke på.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Og mer!',
+          description:
+              'Mer effektiv rulling i galleriet, tilbakeknapper som er enklere å trykke på og bedre sikkerhetskopiering.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Raskere med store biblioteker',
+          title: 'Og mer!',
           description:
-              'Søk, Smarte minner, kartet og rulling på tidslinjen er betydelig raskere hvis du har et stort bibliotek. Gruppering på kartet alene er 2–3 ganger raskere.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Sikkerhetskopiering du kan følge',
-          description:
-              'Status for sikkerhetskopi viser nå fremdrift per fil, og store opplastinger i flere deler er mer pålitelige.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Velge tekst i bilder',
-          description:
-              'Kontrollene er fortsatt tilgjengelige mens du velger tekst, og et trykk på valgt tekst fjerner markeringen.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'En ryddigere valgmeny',
-          description:
-              'Handlingene i valglinjen er sortert etter hvor ofte du bruker dem, og deleikonet samsvarer nå med plattformen din.',
+              'Mer effektiv rulling i galleriet og tilbakeknapper som er enklere å trykke på.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'pl': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Udostępnianie biblioteki',
+          title: 'Pasek podglądu w przeglądarce',
           description:
-              'Automatycznie udostępniaj rodzinie swoje obecne i przyszłe albumy. Przejdź do Ustawienia → Rodzina, wybierz osobę i stuknij Udostępnij albumy. Nowe albumy będą dodawane w chwili ich utworzenia.',
+              'Miniatury u dołu przeglądarki pozwalają szybciej przechodzić między zdjęciami i filmami.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Udostępnianie zdjęć osoby',
+          description:
+              'Udostępniaj zdjęcia osoby za pomocą linku, który może automatycznie uwzględniać jej nowe zdjęcia.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Opisy albumów',
+          title: 'Ustawianie zdjęć jako tapety',
           description:
-              'Dodaj do albumu opis obok nazwy i zdjęcia na okładkę. Opisy są dołączane do udostępnionych linków, więc każda osoba, która otworzy link, zobaczy dodany przez Ciebie kontekst.',
+              'Ustaw zdjęcie jako tapetę ekranu głównego, ekranu blokady lub obu.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Przytrzymaj, aby odtwarzać 2× szybciej',
+          description:
+              'Naciśnij i przytrzymaj film, aby oglądać go 2× szybciej.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'I jeszcze więcej!',
+          description:
+              'Wydajniejsze przewijanie galerii i łatwiejsze do naciśnięcia przyciski Wstecz.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'I jeszcze więcej!',
+          description:
+              'Wydajniejsze przewijanie galerii, łatwiejsze do naciśnięcia przyciski Wstecz i ulepszone tworzenie kopii zapasowych.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Szybciej przy dużych bibliotekach',
+          title: 'I jeszcze więcej!',
           description:
-              'Wyszukiwanie, Inteligentne wspomnienia, mapa i przewijanie osi czasu działają znacznie szybciej, jeśli masz dużą bibliotekę. Samo grupowanie na mapie jest 2–3 razy szybsze.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Kopie zapasowe z widocznym postępem',
-          description:
-              'Status kopii zapasowej pokazuje teraz postęp dla każdego pliku, a duże przesyłania wieloczęściowe są bardziej niezawodne.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Zaznaczanie tekstu na zdjęciach',
-          description:
-              'Elementy sterujące pozostają dostępne podczas zaznaczania, a stuknięcie zaznaczonego tekstu usuwa zaznaczenie.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Uporządkowane menu zaznaczenia',
-          description:
-              'Działania na pasku zaznaczenia są uporządkowane według częstotliwości użycia, a ikona udostępniania jest teraz zgodna z Twoją platformą.',
+              'Wydajniejsze przewijanie galerii i łatwiejsze do naciśnięcia przyciski Wstecz.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'pt_BR': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Compartilhamento da biblioteca',
+          title: 'Faixa de prévias no visualizador',
           description:
-              'Compartilhe automaticamente seus álbuns atuais e futuros com familiares. Acesse Opções → Família, escolha uma pessoa e toque em Compartilhar álbuns. Novos álbuns são incluídos conforme você os cria.',
+              'As miniaturas na parte inferior do visualizador permitem alternar mais rapidamente entre fotos e vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Compartilhe fotos de uma pessoa',
+          description:
+              'Compartilhe fotos de uma pessoa com um link que pode incluir automaticamente novas fotos dela.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrições de álbuns',
+          title: 'Defina fotos como papel de parede',
           description:
-              'Adicione uma descrição ao álbum, além do nome e da foto de capa. As descrições acompanham os links compartilhados, para que qualquer pessoa que abrir um deles veja o contexto que você adicionou.',
+              'Defina uma foto como papel de parede da tela inicial, da tela de bloqueio ou de ambas.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Segure para reproduzir em 2×',
+          description:
+              'Mantenha um vídeo pressionado para assisti-lo em velocidade 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Rolagem mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Rolagem mais eficiente na galeria, botões Voltar mais fáceis de tocar e backups aprimorados.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mais rapidez em bibliotecas grandes',
+          title: 'E muito mais!',
           description:
-              'A pesquisa, as Memórias inteligentes, o mapa e a rolagem da linha do tempo ficaram muito mais rápidos para bibliotecas grandes. Só o agrupamento no mapa está de 2 a 3 vezes mais rápido.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Backups que você pode acompanhar',
-          description:
-              'O Estado do backup agora mostra o progresso de cada arquivo, e uploads grandes em várias partes estão mais confiáveis.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Seleção de texto em fotos',
-          description:
-              'Os controles continuam acessíveis durante a seleção, e tocar no texto selecionado desfaz a seleção.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Um menu de seleção mais organizado',
-          description:
-              'As ações na barra de seleção são ordenadas pela frequência de uso, e o ícone de compartilhamento agora corresponde à sua plataforma.',
+              'Rolagem mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'pt_PT': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Partilha da biblioteca',
+          title: 'Faixa de pré-visualizações no visualizador',
           description:
-              'Partilhe automaticamente os seus álbuns atuais e futuros com familiares. Aceda a Definições → Família, escolha um membro e toque em Partilhar álbuns. Os novos álbuns são incluídos à medida que os cria.',
+              'As miniaturas na parte inferior do visualizador permitem alternar mais rapidamente entre fotografias e vídeos.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Partilhar fotografias de uma pessoa',
+          description:
+              'Partilhe fotografias de uma pessoa através de uma ligação que pode incluir automaticamente novas fotografias dessa pessoa.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrições de álbuns',
+          title: 'Definir fotografias como fundo',
           description:
-              'Adicione uma descrição a um álbum, além do nome e da fotografia de capa. As descrições acompanham as ligações partilhadas, para que qualquer pessoa que abra uma veja o contexto que adicionou.',
+              'Defina uma fotografia como fundo do ecrã principal, do ecrã de bloqueio ou de ambos.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Manter premido para reproduzir a 2×',
+          description: 'Mantenha um vídeo premido para o ver à velocidade 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Deslocamento mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'E muito mais!',
+          description:
+              'Deslocamento mais eficiente na galeria, botões Voltar mais fáceis de tocar e cópias de segurança melhoradas.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mais rápido com bibliotecas grandes',
+          title: 'E muito mais!',
           description:
-              'A pesquisa, as Memórias inteligentes, o mapa e o deslocamento na cronologia são substancialmente mais rápidos se tiver uma biblioteca grande. Só o agrupamento no mapa é 2 a 3 vezes mais rápido.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Cópias de segurança que pode acompanhar',
-          description:
-              'O Status da cópia de segurança mostra agora o progresso de cada ficheiro e os carregamentos multipartes grandes são mais fiáveis.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Selecionar texto em fotografias',
-          description:
-              'Os controlos continuam acessíveis durante a seleção e tocar no texto selecionado limpa a seleção.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Um menu de seleção mais organizado',
-          description:
-              'As ações na barra de seleção são ordenadas pela frequência de utilização e o ícone de partilha corresponde agora à sua plataforma.',
+              'Deslocamento mais eficiente na galeria e botões Voltar mais fáceis de tocar.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ro': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Partajarea bibliotecii',
+          title: 'Bandă de previzualizare în vizualizator',
           description:
-              'Partajează automat albumele actuale și viitoare cu membrii familiei. Accesează Setări → Familie, alege un membru și atinge Partajează albumele. Albumele noi sunt incluse pe măsură ce le creezi.',
+              'Miniaturile din partea de jos a vizualizatorului te ajută să treci mai repede între fotografii și videoclipuri.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Partajează fotografiile unei persoane',
+          description:
+              'Partajează fotografiile unei persoane cu un link care poate include automat fotografii noi cu aceasta.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Descrieri pentru albume',
+          title: 'Setează fotografii ca fundal',
           description:
-              'Adaugă unui album o descriere, pe lângă nume și fotografia de copertă. Descrierile însoțesc linkurile partajate, astfel încât oricine deschide unul vede contextul adăugat de tine.',
+              'Setează o fotografie ca fundal pentru ecranul principal, ecranul de blocare sau ambele.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ține apăsat pentru redare la 2×',
+          description:
+              'Ține apăsat pe un videoclip pentru a-l viziona la viteza 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Și altele!',
+          description:
+              'Derulare mai eficientă în galerie și butoane Înapoi mai ușor de atins.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Și altele!',
+          description:
+              'Derulare mai eficientă în galerie, butoane Înapoi mai ușor de atins și copii de rezervă îmbunătățite.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mai rapid pentru biblioteci mari',
+          title: 'Și altele!',
           description:
-              'Căutarea, Amintirile inteligente, harta și derularea cronologiei sunt mult mai rapide dacă ai o bibliotecă mare. Numai gruparea pe hartă este de 2–3 ori mai rapidă.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Copii de siguranță pe care le poți urmări',
-          description:
-              'Stare copie de rezervă afișează acum progresul pentru fiecare fișier, iar încărcările multipart mari sunt mai fiabile.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Selectarea textului din fotografii',
-          description:
-              'Comenzile rămân accesibile în timpul selectării, iar atingerea textului selectat șterge selecția.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Un meniu de selecție mai ordonat',
-          description:
-              'Acțiunile din bara de selecție sunt ordonate după frecvența utilizării, iar pictograma de partajare corespunde acum platformei tale.',
+              'Derulare mai eficientă în galerie și butoane Înapoi mai ușor de atins.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'ru': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Общий доступ к библиотеке',
+          title: 'Лента превью в режиме просмотра',
           description:
-              'Автоматически делитесь текущими и будущими альбомами с членами семьи. Откройте Настройки → Семья, выберите участника и нажмите Поделиться альбомами. Новые альбомы будут добавляться по мере их создания.',
+              'Миниатюры в нижней части экрана просмотра позволяют быстрее переходить между фото и видео.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Делитесь фотографиями человека',
+          description:
+              'Делитесь фотографиями человека по ссылке, в которую могут автоматически добавляться его новые фотографии.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Описания альбомов',
+          title: 'Устанавливайте фото как обои',
           description:
-              'Добавляйте к альбому описание вместе с названием и фотографией обложки. Описания передаются по общим ссылкам, поэтому каждый, кто откроет ссылку, увидит добавленный вами контекст.',
+              'Установите фотографию на главный экран, экран блокировки или на оба экрана.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Удерживайте для воспроизведения 2×',
+          description:
+              'Нажмите и удерживайте видео, чтобы смотреть его со скоростью 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'И многое другое!',
+          description:
+              'Более эффективная прокрутка галереи и кнопки «Назад», на которые проще нажимать.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'И многое другое!',
+          description:
+              'Более эффективная прокрутка галереи, кнопки «Назад», на которые проще нажимать, и улучшенное резервное копирование.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Быстрее для больших библиотек',
+          title: 'И многое другое!',
           description:
-              'Поиск, Умные воспоминания, карта и прокрутка временной шкалы стали значительно быстрее для больших библиотек. Одна только группировка на карте работает в 2–3 раза быстрее.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Резервное копирование с видимым прогрессом',
-          description:
-              'Статус резервного копирования теперь показывает прогресс для каждого файла, а большие многочастные загрузки стали надёжнее.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Выделение текста на фотографиях',
-          description:
-              'Элементы управления остаются доступными во время выделения, а нажатие на выделенный текст снимает выделение.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Более аккуратное меню выбора',
-          description:
-              'Действия на панели выбора упорядочены по частоте использования, а значок «Поделиться» теперь соответствует вашей платформе.',
+              'Более эффективная прокрутка галереи и кнопки «Назад», на которые проще нажимать.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'tr': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Kütüphane paylaşımı',
+          title: 'Fotoğraf görüntüleyicide önizleme şeridi',
           description:
-              'Mevcut ve gelecekteki albümlerinizi aile üyeleriyle otomatik olarak paylaşın. Ayarlar → Aile bölümüne gidin, bir üye seçin ve Albümleri paylaş seçeneğine dokunun. Yeni albümler oluşturuldukça otomatik olarak eklenir.',
+              'Görüntüleyicinin altındaki küçük resimler, fotoğraflar ve videolar arasında daha hızlı geçiş yapmanızı sağlar.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Bir kişinin fotoğraflarını paylaşın',
+          description:
+              'Bir kişinin fotoğraflarını, o kişinin yeni fotoğraflarını otomatik olarak ekleyebilen bir bağlantıyla paylaşın.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Albüm açıklamaları',
+          title: 'Fotoğrafları duvar kâğıdı yapın',
           description:
-              'Bir albüme adı ve kapak fotoğrafının yanında bir açıklama ekleyin. Açıklamalar paylaşılan bağlantılarınızla birlikte gider; böylece bağlantıyı açan herkes eklediğiniz bağlamı görür.',
+              'Bir fotoğrafı ana ekranınızın, kilit ekranınızın veya her ikisinin duvar kâğıdı olarak ayarlayın.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '2× oynatma için basılı tutun',
+          description:
+              'Bir videoyu 2× hızda izlemek için videoya basılı tutun.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ve daha fazlası!',
+          description:
+              'Galeride daha verimli kaydırma ve daha kolay dokunulan Geri düğmeleri.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Ve daha fazlası!',
+          description:
+              'Galeride daha verimli kaydırma, daha kolay dokunulan Geri düğmeleri ve iyileştirilmiş yedeklemeler.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Büyük kütüphanelerde daha hızlı',
+          title: 'Ve daha fazlası!',
           description:
-              'Büyük bir kütüphaneniz varsa arama, Akıllı anılar, harita ve zaman çizelgesinde kaydırma çok daha hızlıdır. Yalnızca harita kümeleme bile 2–3 kat daha hızlıdır.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Takip edebileceğiniz yedeklemeler',
-          description:
-              'Yedekleme durumu artık her dosyanın ilerlemesini gösteriyor ve büyük, çok parçalı yüklemeler daha güvenilir.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Fotoğraflarda metin seçme',
-          description:
-              'Metin seçerken kontroller erişilebilir kalır ve seçili metne dokunmak seçimi temizler.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Daha düzenli bir seçim menüsü',
-          description:
-              'Seçim çubuğundaki işlemler kullanım sıklığına göre sıralanıyor ve paylaşım simgesi artık platformunuzla eşleşiyor.',
+              'Galeride daha verimli kaydırma ve daha kolay dokunulan Geri düğmeleri.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'uk': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Спільний доступ до бібліотеки',
+          title: 'Стрічка попереднього перегляду у вікні перегляду',
           description:
-              'Автоматично діліться поточними й майбутніми альбомами з членами родини. Відкрийте Налаштування → Сім’я, виберіть учасника й натисніть Поділитися альбомами. Нові альбоми додаватимуться під час створення.',
+              'Мініатюри внизу вікна перегляду дають змогу швидше переходити між фото й відео.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Діліться фотографіями людини',
+          description:
+              'Діліться фотографіями людини за посиланням, до якого можуть автоматично додаватися її нові фотографії.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Описи альбомів',
+          title: 'Установлюйте фото як шпалери',
           description:
-              'Додавайте до альбому опис разом із назвою та фотографією обкладинки. Описи передаються за спільними посиланнями, тож кожен, хто відкриє посилання, побачить доданий вами контекст.',
+              'Установіть фотографію як шпалери головного екрана, екрана блокування або обох.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Утримуйте для відтворення у 2×',
+          description:
+              'Натисніть і утримуйте відео, щоб дивитися його зі швидкістю 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'І не тільки!',
+          description:
+              'Ефективніше прокручування галереї та кнопки «Назад», яких легше торкатися.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'І не тільки!',
+          description:
+              'Ефективніше прокручування галереї, кнопки «Назад», яких легше торкатися, і поліпшене резервне копіювання.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Швидше для великих бібліотек',
+          title: 'І не тільки!',
           description:
-              'Пошук, Розумні спогади, карта й прокручування часової шкали стали значно швидшими для великих бібліотек. Саме групування на карті працює у 2–3 рази швидше.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Резервне копіювання з видимим перебігом',
-          description:
-              'Стан резервного копіювання тепер показує перебіг для кожного файлу, а великі багатокомпонентні завантаження стали надійнішими.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Виділення тексту на фотографіях',
-          description:
-              'Елементи керування залишаються доступними під час виділення, а натискання на виділений текст скасовує виділення.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Охайніше меню вибору',
-          description:
-              'Дії на панелі вибору впорядковано за частотою використання, а піктограма поширення тепер відповідає вашій платформі.',
+              'Ефективніше прокручування галереї та кнопки «Назад», яких легше торкатися.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'vi': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: 'Chia sẻ thư viện',
+          title: 'Dải xem trước trong trình xem',
           description:
-              'Tự động chia sẻ các album hiện tại và trong tương lai với thành viên gia đình. Vào Cài đặt → Gia đình, chọn một thành viên rồi nhấn Chia sẻ album. Album mới sẽ được thêm vào ngay khi bạn tạo.',
+              'Hình thu nhỏ ở cuối trình xem giúp bạn chuyển nhanh hơn giữa các ảnh và video.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Chia sẻ ảnh của một người',
+          description:
+              'Chia sẻ ảnh của một người bằng liên kết có thể tự động bao gồm ảnh mới của họ.',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Mô tả album',
+          title: 'Đặt ảnh làm hình nền',
           description:
-              'Thêm mô tả cho album bên cạnh tên và ảnh bìa. Mô tả được hiển thị cùng liên kết chia sẻ, để bất kỳ ai mở liên kết đều thấy ngữ cảnh bạn đã thêm.',
+              'Đặt một ảnh làm hình nền màn hình chính, màn hình khóa hoặc cả hai.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Nhấn giữ để phát ở tốc độ 2×',
+          description: 'Nhấn và giữ video để xem ở tốc độ 2×.',
+        ),
+        ChangeLogEntryStrings(
+          title: 'Và còn nhiều hơn thế!',
+          description:
+              'Cuộn thư viện hiệu quả hơn và các nút Quay lại dễ nhấn hơn.',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: 'Và còn nhiều hơn thế!',
+          description:
+              'Cuộn thư viện hiệu quả hơn, các nút Quay lại dễ nhấn hơn và tính năng sao lưu được cải thiện.',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: 'Nhanh hơn với thư viện lớn',
+          title: 'Và còn nhiều hơn thế!',
           description:
-              'Tìm kiếm, Gợi nhớ kỷ niệm, bản đồ và cuộn dòng thời gian đều nhanh hơn đáng kể nếu bạn có thư viện lớn. Riêng việc nhóm trên bản đồ đã nhanh hơn 2–3 lần.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Theo dõi tiến trình sao lưu',
-          description:
-              'Trạng thái sao lưu giờ hiển thị tiến trình của từng tệp, và các lượt tải lên nhiều phần dung lượng lớn đáng tin cậy hơn.',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: 'Chọn văn bản trong ảnh',
-          description:
-              'Các nút điều khiển vẫn trong tầm với khi bạn chọn văn bản, và nhấn vào văn bản đã chọn sẽ xóa lựa chọn.',
-        ),
-        ChangeLogEntryStrings(
-          title: 'Menu lựa chọn gọn gàng hơn',
-          description:
-              'Các thao tác trên thanh lựa chọn được sắp xếp theo tần suất bạn sử dụng, và biểu tượng chia sẻ giờ phù hợp với nền tảng của bạn.',
+              'Cuộn thư viện hiệu quả hơn và các nút Quay lại dễ nhấn hơn.',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'zh_CN': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: '图库共享',
-          description:
-              '自动与家人共享你当前和今后创建的相册。前往“设置”→“家庭”，选择一位成员，然后轻点“共享相册”。新建相册会在创建时自动包含在内。',
+          title: '查看器中的预览条',
+          description: '查看器底部的缩略图可让你更快地在照片和视频之间跳转。',
+        ),
+        ChangeLogEntryStrings(
+          title: '分享某个人的照片',
+          description: '通过链接分享某个人的照片，链接中可自动加入此人的新照片。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '相册描述',
-          description:
-              '除了名称和封面照片外，现在还可以为相册添加描述。描述会随共享链接一起显示，让打开链接的任何人都能看到你添加的背景信息。',
+          title: '将照片设为壁纸',
+          description: '将照片设为主屏幕、锁定屏幕或两者的壁纸。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '长按以2×速度播放',
+          description: '长按视频即可用2×速度观看。',
+        ),
+        ChangeLogEntryStrings(
+          title: '还有更多！',
+          description: '图库滚动更高效，返回按钮更易于点击。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '还有更多！',
+          description: '图库滚动更高效，返回按钮更易于点击，备份也有所改进。',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '大型图库更流畅',
-          description: '如果你的图库规模较大，搜索、智能回忆、地图和时间线滚动现在都会快得多。仅地图聚类速度就提升了 2–3 倍。',
-        ),
-        ChangeLogEntryStrings(
-          title: '看得见进度的备份',
-          description: '“备份状态”现在会显示每个文件的进度，大型分片上传也更加可靠。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '选择照片中的文字',
-          description: '选择文字时，控件会始终保持可用；轻点已选文字即可清除选择。',
-        ),
-        ChangeLogEntryStrings(
-          title: '更整洁的选择菜单',
-          description: '选择栏中的操作会按使用频率排序，共享图标现在也会与所用平台保持一致。',
+          title: '还有更多！',
+          description: '图库滚动更高效，返回按钮更易于点击。',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
     'zh_TW': ChangeLogStrings(
       entries: [
         ChangeLogEntryStrings(
-          title: '圖庫共享',
-          description:
-              '自動與家人共享您目前和未來建立的相簿。前往「設定」→「家庭」，選擇一位成員，然後點一下「共享相簿」。新相簿會在建立時自動包含在內。',
+          title: '檢視器中的預覽列',
+          description: '檢視器底部的縮圖可讓您更快地在照片與影片之間切換。',
+        ),
+        ChangeLogEntryStrings(
+          title: '分享某個人的照片',
+          description: '透過連結分享某個人的照片，連結中可自動加入此人的新照片。',
           isOnlineOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '相簿描述',
-          description:
-              '除了名稱和封面照片外，現在還可以為相簿新增描述。描述會隨共享連結一併顯示，讓開啟連結的任何人都能看到您新增的背景資訊。',
+          title: '將照片設為桌布',
+          description: '將照片設為主畫面、鎖定畫面或兩者的桌布。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '長按以2×速度播放',
+          description: '長按影片即可用2×速度觀看。',
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
+          description: '圖片庫捲動更有效率，返回按鈕更容易點按。',
+          isAndroidOnly: true,
+        ),
+        ChangeLogEntryStrings(
+          title: '還有更多！',
+          description: '圖片庫捲動更有效率，返回按鈕更容易點按，備份也有所改善。',
           isOnlineOnly: true,
+          isIOSOnly: true,
         ),
         ChangeLogEntryStrings(
-          title: '大型圖庫更流暢',
-          description: '如果您的圖庫較大，搜尋、自動分類回憶、地圖和時間軸捲動現在都快得多。僅地圖分群速度就提升了 2–3 倍。',
-        ),
-        ChangeLogEntryStrings(
-          title: '看得見進度的備份',
-          description: '「備份狀態」現在會顯示每個檔案的進度，大型分段上傳也更加可靠。',
-          isOnlineOnly: true,
-        ),
-        ChangeLogEntryStrings(
-          title: '選取照片中的文字',
-          description: '選取文字時，控制項會保持可用；點一下已選取的文字即可清除選取。',
-        ),
-        ChangeLogEntryStrings(
-          title: '更整潔的選取選單',
-          description: '選取列中的操作會按使用頻率排序，共享圖示現在也會與您使用的平台一致。',
+          title: '還有更多！',
+          description: '圖片庫捲動更有效率，返回按鈕更容易點按。',
+          isLocalGalleryOnly: true,
+          isIOSOnly: true,
         ),
       ],
     ),
@@ -776,11 +959,16 @@ class ChangeLogEntryStrings {
   final String description;
   final bool isOnlineOnly;
   final bool isLocalGalleryOnly;
+  final bool isAndroidOnly;
+  final bool isIOSOnly;
 
   const ChangeLogEntryStrings({
     required this.title,
     required this.description,
     this.isOnlineOnly = false,
     this.isLocalGalleryOnly = false,
-  }) : assert(!(isOnlineOnly && isLocalGalleryOnly));
+    this.isAndroidOnly = false,
+    this.isIOSOnly = false,
+  }) : assert(!(isOnlineOnly && isLocalGalleryOnly)),
+       assert(!(isAndroidOnly && isIOSOnly));
 }

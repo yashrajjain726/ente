@@ -5,6 +5,7 @@ import type { FailedSpaceFeedPost, LocalSpaceFeedPost } from "state/app-state";
 let nextLocalFeedPostID = 0;
 
 const postedConfirmationDurationMs = 1500;
+const failedPostDurationMs = 2500;
 
 export const createLocalFeedPostID = () =>
     `space-local-post-${Date.now()}-${nextLocalFeedPostID++}`;
@@ -49,4 +50,10 @@ export const failLocalFeedPost = (
                 : item,
         ),
     );
+
+    window.setTimeout(() => {
+        setLocalFeedPosts((currentPosts) =>
+            currentPosts.filter((item) => item.id != localPostId),
+        );
+    }, failedPostDurationMs);
 };

@@ -4,6 +4,7 @@ import (
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/ente/filedata"
 	"github.com/ente/museum/pkg/utils/auth"
+	"github.com/ente/museum/pkg/utils/network"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
 )
@@ -44,8 +45,16 @@ func (c *Controller) PreviewUploadURL(ctx *gin.Context, request filedata.Preview
 	id := filedata.NewUploadID(request.Type)
 	objectKey := filedata.ObjectKey(request.FileID, fileOwnerID, request.Type, &id)
 	bucketID := c.S3Config.GetBucketID(request.Type)
+	object := ente.TempObject{
+		ObjectKey: objectKey,
+		BucketId:  bucketID,
+		UserID:    fileOwnerID,
+		App:       auth.GetApp(ctx),
+		Purpose:   string(request.Type),
+		Client:    network.GetClientInfo(ctx),
+	}
 	if request.IsMultiPart {
-		multiPartUploadURLs, err2 := c.getMultiPartUploadURL(bucketID, objectKey, request.Count)
+		multiPartUploadURLs, err2 := c.getMultiPartUploadURL(object, request.Count)
 		if err2 != nil {
 			return nil, stacktrace.Propagate(err2, "")
 		}
@@ -55,7 +64,7 @@ func (c *Controller) PreviewUploadURL(ctx *gin.Context, request filedata.Preview
 			CompleteURL: &multiPartUploadURLs.CompleteURL,
 		}, nil
 	}
-	enteUrl, err := c.getUploadURL(bucketID, objectKey)
+	enteUrl, err := c.getUploadURL(object)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

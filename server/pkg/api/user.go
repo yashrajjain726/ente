@@ -13,6 +13,7 @@ import (
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/ente/jwt"
 	"github.com/ente/museum/pkg/controller/user"
+	"github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
 	emailUtil "github.com/ente/museum/pkg/utils/email"
 	"github.com/ente/museum/pkg/utils/handler"
@@ -151,6 +152,25 @@ func (h *UserHandler) GetPublicKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"publicKey": publicKey,
 	})
+}
+
+func (h *UserHandler) GetPublicKeys(c *gin.Context) {
+	var request struct {
+		Emails []string `json:"emails" binding:"required"`
+	}
+	if err := handler.BindJSON(c, &request); err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	publicKeys, err := h.UserController.GetPublicKeys(
+		auth.GetUserID(c.Request.Header),
+		request.Emails,
+	)
+	if err != nil {
+		handler.Error(c, stacktrace.Propagate(err, ""))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"publicKeys": publicKeys})
 }
 
 func (h *UserHandler) GetSessionValidityV2(c *gin.Context) {
@@ -348,15 +368,9 @@ func (h *UserHandler) FinishPasskeyAuthenticationCeremony(c *gin.Context) {
 		return
 	}
 
-	response, err := h.UserController.GetKeyAttributeAndToken(c, userID)
+	response, err := h.UserController.GetKeyAttributeAndToken(c, userID, request.SessionID, repo.PasskeyPendingLogin, false, true)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-
-	err = h.UserController.PasskeyRepo.StoreTokenData(request.SessionID, response)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, "failed to store token data"))
 		return
 	}
 
@@ -379,7 +393,7 @@ func (h *UserHandler) GetTokenForPasskeySession(c *gin.Context) {
 
 func (h *UserHandler) IsPasskeyRecoveryEnabled(c *gin.Context) {
 	userID := auth.GetUserID(c.Request.Header)
-	response, err := h.UserController.GetKeyAttributeAndToken(c, userID)
+	response, err := h.UserController.GetKeyAttributeAndToken(c, userID, "", repo.NoPendingLogin, false, false)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return

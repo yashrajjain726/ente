@@ -3,9 +3,9 @@ import { SpaceMobileBestToast } from "components/MobileBestToast";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
-export const onboardingTitle = "Share everyday moments";
+export const onboardingTitle = "Share everyday photos with your people";
 export const onboardingDescription =
-    "A private space for sharing everyday moments with friends and family. No ads. No algorithms.";
+    "Keep up with friends and family through photos. Share privately, without ads or algorithms.";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
@@ -93,9 +93,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     minHeight: "100svh",
                     mx: "auto",
                     overflow: "hidden",
-                    px: 3,
+                    px: 2,
                     width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 390 },
+                    "@media (min-width: 600px)": { maxWidth: 422 },
                 }}
             >
                 <Box
@@ -106,8 +106,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                         flexShrink: 0,
                         gridTemplateColumns: "40px 1fr 40px",
                         height: 40,
+                        maxWidth: { sm: 342 },
                         mt: "clamp(24px, 5.5svh, 44px)",
-                        width: "100%",
+                        width: "calc(100% - 16px)",
                     }}
                 >
                     <Box />
@@ -187,8 +188,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                                     letterSpacing: 0,
                                     lineHeight: "29px",
                                     m: 0,
-                                    maxWidth: 320,
                                     overflowWrap: "anywhere",
+                                    textWrap: "balance",
+                                    width: "100%",
                                 }}
                             >
                                 {title}
@@ -204,6 +206,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                                     lineHeight: "20px",
                                     m: 0,
                                     mt: "12px",
+                                    textWrap: "pretty",
                                     width: "100%",
                                 }}
                             >
@@ -218,8 +221,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                         flexDirection: "column",
                         flexShrink: 0,
                         gap: "12px",
+                        maxWidth: { sm: 342 },
                         mb: "calc(32px + env(safe-area-inset-bottom))",
-                        width: "100%",
+                        width: "calc(100% - 16px)",
                         "@media (min-width: 600px)": { mb: "44px" },
                     }}
                 >

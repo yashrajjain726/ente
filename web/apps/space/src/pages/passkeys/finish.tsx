@@ -1,10 +1,10 @@
 import { SpaceRouteFallback } from "components/RouteFallback";
 import log from "ente-base/log";
 import React, { useEffect, useRef } from "react";
-import { verifyEmailBackground } from "screens/VerifyEmailScreen";
 import { completeSpaceLoginPasskey } from "services/login";
 import { clearPendingSpacePasskeyVerification } from "services/passkey-verification";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { routeAfterCompletedLogin } from "utils/login-navigation";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -45,7 +45,7 @@ const Page: React.FC = () => {
         })();
     }, [refreshProfile, router, setPendingPasskeyVerification]);
 
-    return <SpaceRouteFallback background={verifyEmailBackground} />;
+    return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
 };
 
 export default Page;

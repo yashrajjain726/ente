@@ -1,4 +1,6 @@
 // Keep this bridge in sync with desktop/src/types/ipc.ts and desktop/src/preload.ts.
+export type ThemeMode = "light" | "dark" | "system";
+
 export type NativeDeviceLockProvider = "touchid" | "none";
 
 export type NativeDeviceLockUnavailableReason =
@@ -39,6 +41,10 @@ export interface Electron {
     clearAppLockConfigFromSafeStorage: () => Promise<void>;
     onMainWindowFocus: (cb: (() => void) | undefined) => void;
     onMainWindowBlur: (cb: (() => void) | undefined) => void;
+    setTitleBarOverlay: (
+        themeMode: ThemeMode,
+        isFileViewerOpen: boolean,
+    ) => void;
     onOpenEnteURL: (cb: ((url: string) => void) | undefined) => void;
     lastShownChangelogVersion: () => Promise<number | undefined>;
     setLastShownChangelogVersion: (version: number) => Promise<void>;

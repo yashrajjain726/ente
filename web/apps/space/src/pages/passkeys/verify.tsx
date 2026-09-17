@@ -6,7 +6,6 @@ import log from "ente-base/log";
 import React, { useEffect, useState } from "react";
 import {
     PasskeyVerificationScreen,
-    passkeyVerificationBackground,
     type PasskeyVerificationStatus,
 } from "screens/PasskeyVerificationScreen";
 import { spaceAuthErrorMessage } from "services/auth-error";
@@ -22,6 +21,7 @@ import {
     type PendingSpacePasskeyVerification,
 } from "services/passkey-verification";
 import { useSpaceAppState } from "state/app-state";
+import { spaceAppBackgroundColor } from "styles/colors";
 import { routeAfterCompletedLogin } from "utils/login-navigation";
 import { useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
@@ -110,14 +110,12 @@ const Page: React.FC = () => {
     };
 
     if (!verification) {
-        return (
-            <SpaceRouteFallback background={passkeyVerificationBackground} />
-        );
+        return <SpaceRouteFallback background={spaceAppBackgroundColor} />;
     }
 
     return (
         <>
-            <SpacePageMeta themeColor={passkeyVerificationBackground} />
+            <SpacePageMeta themeColor={spaceAppBackgroundColor} />
             <PasskeyVerificationScreen
                 canUseTwoFactor={verification.hasTwoFactorFallback}
                 errorMessage={errorMessage}

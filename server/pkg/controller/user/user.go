@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/ente/museum/pkg/controller/collections"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/pkg/controller"
+	"github.com/ente/museum/pkg/controller/authsession"
 	"github.com/ente/museum/pkg/controller/family"
 	"github.com/ente/museum/pkg/repo"
 	authenticatorRepo "github.com/ente/museum/pkg/repo/authenticator"
@@ -34,6 +36,7 @@ import (
 type SpaceAccessResetter interface {
 	ResetUserAccess(ctx context.Context, userID int64) error
 	RevokeBrowserSessions(ctx context.Context, userID int64) error
+	RevokeBrowserSessionsTx(ctx context.Context, tx *sql.Tx, userID int64) error
 }
 
 type SpaceAccountDeletionAccessResetter interface {
@@ -229,6 +232,37 @@ func (c *UserController) GetPublicKey(requesterUserID int64, email string) (stri
 	return key, nil
 }
 
+func (c *UserController) GetPublicKeys(requesterUserID int64, emails []string) ([]string, error) {
+	if len(emails) == 0 {
+		return nil, stacktrace.Propagate(ente.ErrBadRequest, "emails are required")
+	}
+	if len(emails) > ente.MaxPublicKeyBatchSize {
+		return nil, stacktrace.Propagate(ente.ErrBatchSizeTooLarge, "")
+	}
+
+	seen := make(map[string]struct{}, len(emails))
+	for _, value := range emails {
+		normalizedEmail := email.NormalizeEmail(value)
+		if normalizedEmail == "" {
+			return nil, stacktrace.Propagate(ente.ErrBadRequest, "email is required")
+		}
+		if _, ok := seen[normalizedEmail]; ok {
+			return nil, stacktrace.Propagate(ente.ErrBadRequest, "duplicate email")
+		}
+		seen[normalizedEmail] = struct{}{}
+	}
+
+	publicKeys := make([]string, 0, len(emails))
+	for _, value := range emails {
+		publicKey, err := c.GetPublicKey(requesterUserID, value)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		publicKeys = append(publicKeys, publicKey)
+	}
+	return publicKeys, nil
+}
+
 func (c *UserController) GetTwoFactorStatus(userID int64) (bool, error) {
 	isTwoFactorEnabled, err := c.UserRepo.IsTwoFactorEnabled(userID)
 	if err != nil {
@@ -305,12 +339,6 @@ func (c *UserController) handleAccountDeletion(
 	logger.Info("remove push tokens for user")
 	c.PushController.RemoveTokensForUser(userID)
 
-	logger.Info("remove remaining active tokens for user")
-	err = c.RemoveAllTokens(userID)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-
 	user, err := c.UserRepo.Get(userID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -350,14 +378,18 @@ func (c *UserController) markAccountDeletedAndScheduleCleanup(ctx context.Contex
 	}
 	defer transaction.Rollback()
 
-	emailHash, err := c.UserRepo.DeleteTx(ctx, transaction, userID)
+	emailHash, revokedTokens, err := c.UserRepo.DeleteTx(ctx, transaction, userID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := c.DataCleanupRepo.InsertTx(ctx, transaction, userID, emailHash); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	return stacktrace.Propagate(transaction.Commit(), "failed to commit account deletion")
+	if err := transaction.Commit(); err != nil {
+		return stacktrace.Propagate(err, "failed to commit account deletion")
+	}
+	authsession.MarkRevoked(c.Cache, revokedTokens)
+	return nil
 }
 
 func (c *UserController) NotifyAccountDeletion(userID int64, userEmail string, isSubscriptionCancelled bool) {

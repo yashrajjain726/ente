@@ -9,6 +9,8 @@ import {
 } from "ente-base/crypto";
 import { fetchFileLinkFile } from "ente-base/file-download";
 import {
+    HTTPError,
+    isMuseumHTTPError,
     linkDeviceTokenFromResponse,
     linkDeviceTokenRequestHeader,
 } from "ente-base/http";
@@ -23,22 +25,6 @@ import type {
 
 const deviceLimitExceededMessage =
     "This link has been viewed on too many devices. Please contact the owner.";
-
-const isDeviceLimitExceededResponse = async (response: Response) => {
-    if (response.status === 429) {
-        return true;
-    }
-    if (response.status !== 403) {
-        return false;
-    }
-
-    try {
-        const payload = (await response.clone().json()) as { code?: string };
-        return payload.code === "LINK_DEVICE_LIMIT_EXCEEDED";
-    } catch {
-        return false;
-    }
-};
 
 export const extractFileKeyFromURL = async (
     url: URL,
@@ -82,20 +68,21 @@ export const fetchFileInfo = async (
     });
 
     if (!response.ok) {
-        if (await isDeviceLimitExceededResponse(response)) {
+        const error = new HTTPError(response);
+        if (await isMuseumHTTPError(error, 403, "LINK_DEVICE_LIMIT_EXCEEDED")) {
             throw new Error(deviceLimitExceededMessage);
         }
+        if (response.status === 429) {
+            throw new Error("Too many requests. Please try again later.");
+        }
         if (response.status === 410) {
-            let errorBody: { error?: string } | undefined;
-            try {
-                errorBody = (await response.json()) as { error?: string };
-            } catch {
-                // Ignore JSON parse errors and fall back to the generic message.
-            }
-            if (errorBody?.error === "expired token") {
+            if (await isMuseumHTTPError(error, 410, "LINK_EXPIRED")) {
                 throw new Error("This link has expired.");
             }
-            throw new Error("This link has been deleted by the owner.");
+            if (await isMuseumHTTPError(error, 410, "LINK_DISABLED")) {
+                throw new Error("This link has been deleted by the owner.");
+            }
+            throw new Error("This link is no longer available.");
         }
         throw new Error(`Failed to fetch file`);
     }
@@ -403,7 +390,13 @@ export const downloadFile = async (
     const response = await fetchFileLinkFile(accessToken);
 
     if (!response.ok) {
-        if (await isDeviceLimitExceededResponse(response)) {
+        if (
+            await isMuseumHTTPError(
+                new HTTPError(response),
+                403,
+                "LINK_DEVICE_LIMIT_EXCEEDED",
+            )
+        ) {
             throw new Error(deviceLimitExceededMessage);
         }
         throw new Error(`Failed to download file: ${response.statusText}`);

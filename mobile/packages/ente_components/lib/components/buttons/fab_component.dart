@@ -5,9 +5,9 @@ import "package:ente_components/theme/text_styles.dart";
 import "package:ente_components/theme/theme.dart";
 import "package:flutter/material.dart";
 
-enum FABComponentVariant { primary, secondary, destructive }
+enum FABComponentVariant { primary, secondary, outlined, destructive }
 
-/// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=21843-6537&m=dev
+// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=21843-6537&m=dev
 class FABComponent extends StatefulWidget {
   final String? label;
 
@@ -57,13 +57,16 @@ class _FABComponentState extends State<FABComponent> {
         _isPressed ? colors.primaryDark : colors.primary,
       FABComponentVariant.secondary =>
         _isPressed ? colors.fillDarker : colors.fillDark,
+      FABComponentVariant.outlined =>
+        _isPressed ? colors.primaryLightPressed : colors.primaryLight,
       FABComponentVariant.destructive =>
         _isPressed ? colors.warningDark : colors.warning,
     };
     final foregroundColor = switch (widget.variant) {
       FABComponentVariant.primary ||
       FABComponentVariant.destructive => colors.specialWhite,
-      FABComponentVariant.secondary => colors.primary,
+      FABComponentVariant.secondary ||
+      FABComponentVariant.outlined => colors.primary,
     };
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -82,6 +85,12 @@ class _FABComponentState extends State<FABComponent> {
             color: backgroundColor,
             borderRadius: BorderRadius.circular(9999),
           ),
+          foregroundDecoration: widget.variant == FABComponentVariant.outlined
+              ? BoxDecoration(
+                  border: Border.all(color: colors.primaryDark, width: 1),
+                  borderRadius: BorderRadius.circular(9999),
+                )
+              : null,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
             child: Padding(

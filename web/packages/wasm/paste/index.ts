@@ -1,19 +1,15 @@
 import { wrap, type Remote } from "comlink";
+import { workerReady } from "ente-utils/worker";
 import type { PasteWorker } from "./worker";
 
-export type CreatedPaste = Awaited<ReturnType<PasteWorker["create"]>>;
-export type OpenedPaste = Awaited<ReturnType<PasteWorker["open"]>>;
-
 export class PasteClient {
-    private constructor(
-        private worker: Worker,
-        private remote: Remote<PasteWorker>,
-    ) {}
+    private constructor(private remote: Remote<PasteWorker>) {}
 
     static async init(apiOrigin: string) {
         const worker = new Worker(new URL("worker.ts", import.meta.url));
         const RemoteWorker = wrap<typeof PasteWorker>(worker);
-        return new PasteClient(worker, await new RemoteWorker(apiOrigin));
+        const remote = await workerReady(worker, new RemoteWorker(apiOrigin));
+        return new PasteClient(remote);
     }
 
     create = (pasteOrigin: string, text: string, password?: string) =>
@@ -22,6 +18,4 @@ export class PasteClient {
     open = (url: string) => this.remote.open(url);
 
     submitPassword = (password: string) => this.remote.submitPassword(password);
-
-    terminate = () => this.worker.terminate();
 }

@@ -372,7 +372,7 @@ export const loadExistingSpaceProfile = async (options?: {
         const space = await loadExistingOwnedSpace();
         if (!space) return null;
 
-        // Give the home feed, which shares this lookup, the first request slot.
+        // Give the home screen, which shares this lookup, the first request slot.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const ctx = await ensureCurrentSpaceContext();
         const spaceProfile = (await ctx.getSpaceProfile(
@@ -403,7 +403,6 @@ export const loadExistingSpaceProfile = async (options?: {
 export const loadCachedCurrentSpaceAvatar = async () => {
     const avatar = savedSpaceProfileAvatar();
     if (!avatar) return undefined;
-    await restoreSpaceBrowserSessionIfNeeded();
     const avatarUrl = await cachedSpaceMediaBlobURLIfPresent(
         spaceProfileMediaCacheKey(
             avatar.spaceId,

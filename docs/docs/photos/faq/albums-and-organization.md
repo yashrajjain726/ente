@@ -1,6 +1,6 @@
 ---
 title: Albums and Organization FAQ
-description: Frequently asked questions about organizing photos with albums, hiding, archiving, and deletion in Ente Photos
+description: Frequently asked questions about albums, slideshows, hiding, archiving, and deleting photos in Ente Photos
 ---
 
 # Albums and Organization
@@ -73,6 +73,55 @@ The best way to export shared albums is to manually download each shared album:
 4. Import that folder into Ente → the album is preserved correctly
 
 This will reliably preserve the shared album name and contents.
+
+## Slideshows {#album-slideshows-section}
+
+### What does Slideshow do? {#what-is-album-slideshow}
+
+Slideshow plays the photos in an album one after another, full screen, on your device. It is especially useful on large screen devices such as tablets and iPads, where you can leave an album playing like a photo frame.
+
+### How do I start a slideshow from an album? {#start-album-slideshow}
+
+Album slideshows are available in Ente Photos on iOS and Android.
+
+**On mobile:**
+
+1. Open the **Albums** tab.
+2. Open an Ente album.
+3. Tap the three dots in the top-right corner.
+4. Tap **Slideshow**.
+
+### Can I create one slideshow from multiple albums? {#slideshow-multiple-albums}
+
+Yes. Open the **Albums** tab. Press and hold an Ente album, then select the other albums. Tap **Slideshow** at the bottom of the screen.
+
+You can select albums you own and albums shared with you.
+
+### What can I change during a slideshow? {#album-slideshow-settings}
+
+Tap the middle of the screen to show the controls. Then tap the settings button in the top-right corner. You can choose:
+
+- **Time per photo:** 5, 10, 15, or 30 seconds
+- **Photo order:** In order or Shuffle
+- **Background:** Blurred or Black
+
+### How do I control a slideshow? {#control-album-slideshow}
+
+Tap the left side of the screen to see the previous photo. Tap the right side to see the next photo. Tap the middle to show or hide the controls.
+
+Tap pause to stop the slideshow or play to continue.
+
+### Which items appear in an album slideshow? {#album-slideshow-supported-items}
+
+Slideshows show photos and Live Photos. Videos are not included.
+
+### Can I use an album slideshow without an internet connection? {#album-slideshow-offline}
+
+Yes, for photos that are already on your device. Ente needs an internet connection to download any photos stored only in Ente.
+
+### Can I start a slideshow from On device albums or Gallery mode? {#album-slideshow-gallery-mode}
+
+No. Album slideshows are available only for Ente albums after you sign in. You cannot start one from an **On device** album or while using [Gallery mode](/photos/faq/gallery-mode).
 
 ## Uncategorized
 
@@ -320,7 +369,7 @@ Learn more about [Duplicate detection during backup](/photos/features/backup-and
 
 ### How do I delete photos in Ente? {#delete-photos}
 
-When you delete a photo or video in Ente, it's moved to Trash rather than being permanently deleted immediately.
+When you delete a photo or video from your Ente account, it's moved to Trash rather than being permanently deleted immediately.
 
 **On mobile:**
 
@@ -328,27 +377,31 @@ When you delete a photo or video in Ente, it's moved to Trash rather than being 
 - Tap the trash icon in the action bar
 - Confirm the deletion
 
+On Android 11 and newer, photos deleted from your device's gallery through Ente move to Android's system trash. You can restore them from the **Device** tab in Trash, even if they were never backed up.
+
 **On web/desktop:**
 
 - Select the photo(s) you want to delete
 - Click the trash icon or press the Delete key
 - Confirm the deletion
 
-Deleted items remain in Trash for 30 days before being permanently deleted automatically.
+Photos deleted from your Ente account remain in Trash for 30 days before being permanently deleted automatically.
 
 Learn more in the [deletion feature guide](/photos/features/albums-and-organization/deleting).
 
 ### How do I restore deleted photos? {#restore-photos}
 
-If you accidentally deleted photos, you can restore them from Trash within 30 days:
+If you accidentally deleted photos from your Ente account, you can restore them from Trash within 30 days:
 
 **On mobile:**
 
 - Open the Albums tab
 - Tap on 'v' icon at the right.
-- Tap "Trash"
+- Tap **Trash**, then select **Ente** if both tabs are shown
 - Select the photos you want to restore
 - Tap the "Restore" button
+
+To restore photos deleted from your device on Android 11 and newer, select **Device** in Trash instead. Learn more about [Android Device Trash](/photos/features/albums-and-organization/deleting#android-device-trash).
 
 **On web/desktop:**
 
@@ -361,7 +414,7 @@ Restored photos will be moved to an album of choice.
 
 ### How do I permanently delete photos or empty trash? {#empty-trash}
 
-To free up storage space immediately, you can permanently delete items from trash:
+To free up storage space immediately, you can permanently delete items from trash. If the **Ente** and **Device** tabs are shown, select the trash you want to empty first:
 
 **To empty all trash:**
 
@@ -382,13 +435,13 @@ To free up storage space immediately, you can permanently delete items from tras
 
 ### Can I recover files after 30 days in trash? {#recover-after-30-days}
 
-No, files in trash are permanently deleted after 30 days and cannot be recovered. This is an irreversible operation.
+Files in Ente Trash are permanently deleted after 30 days and cannot be recovered. For Android's system trash, check the recovery time shown on each photo.
 
-If you need to keep certain files, make sure to restore them from trash before the 30-day period expires. We recommend regularly checking your trash if you're unsure about deleting certain items.
+Restore any photos you want to keep before their recovery period ends.
 
 ### Does trash count against my storage? {#trash-storage}
 
-Yes, items in trash are included in your storage quota calculation. To free up storage space, you can:
+Items in Ente Trash count toward your Ente storage quota. Photos in Android's system trash use storage on your device. To free up Ente storage, you can:
 
 - Manually empty your trash
 - Permanently delete specific items
@@ -456,7 +509,7 @@ Before deleting your account, make sure to:
 - Press Delete key or click the trash icon
 - Confirm deletion
 
-All selected photos will be moved to trash together.
+Photos deleted from your Ente account will be moved to Trash together.
 
 ### Why can't I delete some photos? {#cannot-delete}
 

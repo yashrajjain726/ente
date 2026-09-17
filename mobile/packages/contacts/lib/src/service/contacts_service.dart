@@ -1,47 +1,11 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:ente_contacts/contacts_api.dart';
 import 'package:ente_contacts/src/db/contacts_database.dart';
 import 'package:ente_frb/contacts.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-typedef CreateContact =
-    Future<ContactRecordOutput> Function(
-      WrappedRootContactKey? wrappedRootContactKey,
-      ContactData data,
-    );
-typedef GetContactDiff =
-    Future<ContactDiffOutput> Function(
-      WrappedRootContactKey? wrappedRootContactKey,
-      int sinceTime,
-      int limit,
-    );
-typedef UpdateContact =
-    Future<ContactRecordOutput> Function(
-      WrappedRootContactKey? wrappedRootContactKey,
-      String contactId,
-      ContactData data,
-    );
-typedef DeleteContact = Future<void> Function(String contactId);
-typedef SetContactAttachment =
-    Future<ContactRecordOutput> Function(
-      WrappedRootContactKey? wrappedRootContactKey,
-      String contactId,
-      AttachmentType attachmentType,
-      Uint8List attachmentBytes,
-    );
-typedef DeleteContactAttachment =
-    Future<ContactRecordOutput> Function(
-      WrappedRootContactKey? wrappedRootContactKey,
-      String contactId,
-      AttachmentType attachmentType,
-    );
-typedef GetContactProfilePicture =
-    Future<ProfilePictureOutput> Function(
-      WrappedRootContactKey? wrappedRootContactKey,
-      String contactId,
-    );
 
 class ContactsService {
   static const _serverMaxSyncLimit = 5000;
@@ -49,33 +13,15 @@ class ContactsService {
 
   ContactsService({
     required SharedPreferences preferences,
-    required CreateContact createContact,
-    required GetContactDiff getDiff,
-    required UpdateContact updateContact,
-    required DeleteContact deleteContact,
-    required SetContactAttachment setAttachment,
-    required DeleteContactAttachment deleteAttachment,
-    required GetContactProfilePicture getProfilePicture,
+    required ContactsApi api,
     ContactsDatabase? database,
   }) : _preferences = preferences,
        _database = database ?? ContactsDatabase(),
-       _createRemoteContact = createContact,
-       _getRemoteDiff = getDiff,
-       _updateRemoteContact = updateContact,
-       _deleteRemoteContact = deleteContact,
-       _setRemoteAttachment = setAttachment,
-       _deleteRemoteAttachment = deleteAttachment,
-       _getRemoteProfilePicture = getProfilePicture;
+       _api = api;
 
   final SharedPreferences _preferences;
   final ContactsDatabase _database;
-  final CreateContact _createRemoteContact;
-  final GetContactDiff _getRemoteDiff;
-  final UpdateContact _updateRemoteContact;
-  final DeleteContact _deleteRemoteContact;
-  final SetContactAttachment _setRemoteAttachment;
-  final DeleteContactAttachment _deleteRemoteAttachment;
-  final GetContactProfilePicture _getRemoteProfilePicture;
+  final ContactsApi _api;
   final Logger _logger = Logger('ContactsService');
 
   WrappedRootContactKey? _wrappedRootContactKey;
@@ -97,10 +43,10 @@ class ContactsService {
     var previousSinceTime = -1;
     List<String>? previousPageIds;
     while (true) {
-      final output = await _getRemoteDiff(
-        _wrappedRootContactKey,
-        sinceTime,
-        limit,
+      final output = await _api.getDiff(
+        wrappedRootContactKey: _wrappedRootContactKey,
+        sinceTime: sinceTime,
+        limit: limit,
       );
       await _saveWrappedRootContactKey(output.wrappedRootContactKey);
       final diff = output.records;
@@ -159,7 +105,10 @@ class ContactsService {
 
   Future<ContactRecord> createContact(ContactData data) async {
     _requireOpen();
-    final output = await _createRemoteContact(_wrappedRootContactKey, data);
+    final output = await _api.createContact(
+      wrappedRootContactKey: _wrappedRootContactKey,
+      data: data,
+    );
     await _saveWrappedRootContactKey(output.wrappedRootContactKey);
     final created = output.record;
     await _database.upsertContacts([created]);
@@ -171,10 +120,10 @@ class ContactsService {
     ContactData data,
   ) async {
     _requireOpen();
-    final output = await _updateRemoteContact(
-      _wrappedRootContactKey,
-      contactId,
-      data,
+    final output = await _api.updateContact(
+      wrappedRootContactKey: _wrappedRootContactKey,
+      contactId: contactId,
+      data: data,
     );
     await _saveWrappedRootContactKey(output.wrappedRootContactKey);
     final updated = output.record;
@@ -184,8 +133,12 @@ class ContactsService {
 
   Future<void> deleteContact(String contactId) async {
     _requireOpen();
-    await _deleteRemoteContact(contactId);
-    final output = await _getRemoteDiff(_wrappedRootContactKey, 0, _syncLimit);
+    await _api.deleteContact(contactId: contactId);
+    final output = await _api.getDiff(
+      wrappedRootContactKey: _wrappedRootContactKey,
+      sinceTime: 0,
+      limit: _syncLimit,
+    );
     await _saveWrappedRootContactKey(output.wrappedRootContactKey);
     final deleted = output.records;
     final matching = deleted
@@ -219,11 +172,11 @@ class ContactsService {
       contactId,
     ))?.profilePictureAttachmentId;
     _requireOpen();
-    final output = await _setRemoteAttachment(
-      _wrappedRootContactKey,
-      contactId,
-      attachmentType,
-      bytes,
+    final output = await _api.setAttachment(
+      wrappedRootContactKey: _wrappedRootContactKey,
+      contactId: contactId,
+      attachmentType: attachmentType,
+      attachmentBytes: bytes,
     );
     await _saveWrappedRootContactKey(output.wrappedRootContactKey);
     final updated = output.record;
@@ -250,9 +203,9 @@ class ContactsService {
       return cached;
     }
     _requireOpen();
-    final output = await _getRemoteProfilePicture(
-      _wrappedRootContactKey,
-      contactId,
+    final output = await _api.getProfilePicture(
+      wrappedRootContactKey: _wrappedRootContactKey,
+      contactId: contactId,
     );
     await _saveWrappedRootContactKey(output.wrappedRootContactKey);
     final bytes = output.bytes;
@@ -268,10 +221,10 @@ class ContactsService {
       contactId,
     ))?.profilePictureAttachmentId;
     _requireOpen();
-    final output = await _deleteRemoteAttachment(
-      _wrappedRootContactKey,
-      contactId,
-      attachmentType,
+    final output = await _api.deleteAttachment(
+      wrappedRootContactKey: _wrappedRootContactKey,
+      contactId: contactId,
+      attachmentType: attachmentType,
     );
     await _saveWrappedRootContactKey(output.wrappedRootContactKey);
     final updated = output.record;

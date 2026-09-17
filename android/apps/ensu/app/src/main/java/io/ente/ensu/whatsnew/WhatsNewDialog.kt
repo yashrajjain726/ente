@@ -20,7 +20,7 @@ import io.ente.ensu.designsystem.EnsuTypography
 @Composable
 fun WhatsNewDialog(
     entries: List<WhatsNewEntry>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -28,31 +28,29 @@ fun WhatsNewDialog(
             Text(
                 text = "What's new",
                 style = EnsuTypography.h3Bold,
-                color = EnsuColor.textPrimary()
+                color = EnsuColor.textPrimary(),
             )
         },
         text = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(EnsuSpacing.lg.dp)
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(EnsuSpacing.lg.dp),
             ) {
-                entries.forEach { entry ->
-                    WhatsNewEntryContent(entry)
-                }
+                entries.forEach { entry -> WhatsNewEntryContent(entry) }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = EnsuColor.textPrimary())
+                colors = ButtonDefaults.textButtonColors(contentColor = EnsuColor.textPrimary()),
             ) {
                 Text(text = "Continue", style = EnsuTypography.body)
             }
         },
-        containerColor = EnsuColor.backgroundBase()
+        containerColor = EnsuColor.backgroundBase(),
     )
 }
 
@@ -62,12 +60,12 @@ private fun WhatsNewEntryContent(entry: WhatsNewEntry) {
         Text(
             text = entry.title,
             style = EnsuTypography.large,
-            color = EnsuColor.textPrimary()
+            color = EnsuColor.textPrimary(),
         )
         Text(
             text = entry.description,
             style = EnsuTypography.body,
-            color = EnsuColor.textMuted()
+            color = EnsuColor.textMuted(),
         )
     }
 }

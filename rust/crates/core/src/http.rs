@@ -328,17 +328,9 @@ impl Response {
         self.0.status().as_u16()
     }
 
-    pub fn header(&self, name: &str) -> Option<&str> {
-        self.0.headers().get(name).and_then(|v| v.to_str().ok())
-    }
-
-    pub fn headers(&self) -> &reqwest::header::HeaderMap {
-        self.0.headers()
-    }
-
-    pub fn error_for_status(self) -> Result<Self, Error> {
+    pub fn error_for_status(self) -> Result<SuccessResponse, Error> {
         if self.0.status().is_success() {
-            Ok(self)
+            Ok(SuccessResponse(self.0))
         } else {
             Err(Error::Http {
                 status: self.0.status().as_u16(),
@@ -347,13 +339,13 @@ impl Response {
         }
     }
 
-    pub async fn error_for_code(self) -> Result<Self, Error> {
+    pub async fn error_for_code(self) -> Result<SuccessResponse, Error> {
         if self.0.status().is_success() {
-            return Ok(self);
+            return Ok(SuccessResponse(self.0));
         }
         let status = self.status();
         let path = self.0.url().path().to_owned();
-        match serde_json::from_slice::<ApiErrorEnvelope>(&self.bytes().await?) {
+        match serde_json::from_slice::<ApiErrorEnvelope>(&self.0.bytes().await?) {
             Ok(envelope) => Err(Error::Api {
                 status,
                 path,
@@ -361,6 +353,15 @@ impl Response {
             }),
             Err(_) => Err(Error::Http { status, path }),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct SuccessResponse(reqwest::Response);
+
+impl SuccessResponse {
+    pub fn headers(&self) -> &reqwest::header::HeaderMap {
+        self.0.headers()
     }
 
     pub async fn json<T: DeserializeOwned>(self) -> Result<T, Error> {
@@ -384,9 +385,9 @@ mod body_stream {
     use bytes::Bytes;
     use futures_core::Stream;
 
-    use super::{Error, Response};
+    use super::{Error, SuccessResponse};
 
-    impl Response {
+    impl SuccessResponse {
         pub fn bytes_stream(self) -> impl Stream<Item = Result<Bytes, Error>> + Send {
             BytesStream(Box::pin(self.0.bytes_stream()))
         }
@@ -763,23 +764,6 @@ mod tests {
             .unwrap();
 
         mock.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn status_and_header_read_directly() {
-        let mut server = Server::new_async().await;
-        server
-            .mock("GET", "/maybe")
-            .with_status(404)
-            .with_header("x-request-id", "rid")
-            .create_async()
-            .await;
-
-        let api = api(&server, None);
-        let response = api.get("/maybe").send().await.unwrap();
-        assert_eq!(response.status(), 404);
-        assert_eq!(response.header("x-request-id"), Some("rid"));
-        assert_eq!(response.header("x-absent"), None);
     }
 
     #[tokio::test]

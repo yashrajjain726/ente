@@ -149,17 +149,20 @@ class MemoryLaneSchedule {
   final String personID;
   final bool isCluster;
   final int beginShowingAt;
+  final int? lastCompletelySeenAt;
 
   const MemoryLaneSchedule({
     required this.personID,
     required this.isCluster,
     required this.beginShowingAt,
+    this.lastCompletelySeenAt,
   });
 
   Map<String, dynamic> toJson() => {
     "personID": personID,
     "isCluster": isCluster,
     "beginShowingAt": beginShowingAt,
+    "lastCompletelySeenAt": lastCompletelySeenAt,
   };
 
   factory MemoryLaneSchedule.fromJson(Map<String, dynamic> json) {
@@ -167,6 +170,7 @@ class MemoryLaneSchedule {
       personID: json["personID"] as String,
       isCluster: json["isCluster"] as bool? ?? false,
       beginShowingAt: json["beginShowingAt"] as int,
+      lastCompletelySeenAt: json["lastCompletelySeenAt"] as int?,
     );
   }
 }

@@ -2,40 +2,12 @@ import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import { getKV, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { apiOrigin } from "ente-base/origins";
+import { CachedSpacePost } from "services/post-cache";
 import type { SpacePost, SpacePostPage } from "services/space";
 import { z } from "zod";
 
 const spaceFeedCacheVersion = 1;
 const spaceFeedCacheSize = 10;
-
-const CachedSpacePostAsset = z.object({
-    encryptedPostKey: z.string(),
-    keyVersion: z.number(),
-    mediaType: z.string().optional(),
-    objectKey: z.string(),
-    postId: z.number(),
-    spaceId: z.string(),
-});
-
-const CachedSpacePost = z.object({
-    avatarKeyVersion: z.number().optional(),
-    avatarObjectID: z.string().optional(),
-    avatarSize: z.number().optional(),
-    avatarUpdatedAt: z.string().optional(),
-    caption: z.string().optional(),
-    friendID: z.string(),
-    height: z.number().optional(),
-    imageAsset: CachedSpacePostAsset.optional(),
-    isUnavailable: z.boolean().optional(),
-    name: z.string(),
-    postId: z.number(),
-    spaceId: z.string(),
-    thumbHash: z.string().optional(),
-    timestampMs: z.number(),
-    username: z.string().optional(),
-    viewerLiked: z.boolean(),
-    width: z.number().optional(),
-});
 
 const SpaceFeedCacheSnapshotSchema = z.object({
     dirty: z.boolean(),
@@ -154,14 +126,20 @@ export const loadCachedSpaceFeed = async (
 
 const writeCachedSpaceFeed = async (
     snapshot: SpaceFeedCacheSnapshot,
-): Promise<void> => {
+    previous?: { syncedAtMs?: number },
+): Promise<boolean> => {
     const generation = cacheGeneration;
     const key = await cacheKey(snapshot.spaceId);
-    if (!key || generation != cacheGeneration) return;
+    if (!key) return true;
+    if (generation != cacheGeneration) return false;
     const normalized = normalizedSnapshot(snapshot);
+    let applied = false;
 
     await enqueueCacheOperation(key, async () => {
         if (generation != cacheGeneration) return;
+        if (previous && memoryCache.get(key)?.syncedAtMs != previous.syncedAtMs)
+            return;
+        applied = true;
         memoryCache.set(key, normalized);
         await setKV(key, normalized);
         if (generation != cacheGeneration) {
@@ -169,24 +147,30 @@ const writeCachedSpaceFeed = async (
             await removeKV(key);
         }
     });
+    return applied;
 };
 
 export const cacheCurrentSpaceFeedPage = async (
     spaceId: string,
     page: SpacePostPage,
+    previous?: { syncedAtMs?: number },
 ) =>
-    writeCachedSpaceFeed({
-        dirty: false,
-        items: page.items,
-        nextCursor: page.nextCursor,
-        spaceId,
-        syncedAtMs: Date.now(),
-        version: spaceFeedCacheVersion,
-    });
+    writeCachedSpaceFeed(
+        {
+            dirty: false,
+            items: page.items,
+            nextCursor: page.nextCursor,
+            spaceId,
+            syncedAtMs: Date.now(),
+            version: spaceFeedCacheVersion,
+        },
+        previous,
+    );
 
 const updateCachedSpaceFeed = async (
     spaceId: string,
     update: (snapshot: SpaceFeedCacheSnapshot) => SpaceFeedCacheSnapshot,
+    createIfMissing = false,
 ) => {
     const generation = cacheGeneration;
     const key = await cacheKey(spaceId);
@@ -204,11 +188,21 @@ const updateCachedSpaceFeed = async (
                     ? normalizedSnapshot(parsed.data)
                     : undefined;
         }
-        if (!snapshot) return;
+        if (!snapshot) {
+            if (!createIfMissing) return;
+            snapshot = {
+                dirty: true,
+                items: [],
+                spaceId,
+                syncedAtMs: Date.now(),
+                version: spaceFeedCacheVersion,
+            };
+        }
 
-        const nextSnapshot = normalizedSnapshot(
-            update(cloneSnapshot(snapshot)),
-        );
+        const nextSnapshot = normalizedSnapshot({
+            ...update(cloneSnapshot(snapshot)),
+            syncedAtMs: Math.max(Date.now(), snapshot.syncedAtMs + 1),
+        });
         if (generation != cacheGeneration) return;
         memoryCache.set(key, nextSnapshot);
         await setKV(key, nextSnapshot);
@@ -223,17 +217,21 @@ const descendingPostOrder = (a: SpacePost, b: SpacePost) =>
     b.timestampMs - a.timestampMs || b.postId - a.postId;
 
 export const prependCachedSpaceFeedPost = (spaceId: string, post: SpacePost) =>
-    updateCachedSpaceFeed(spaceId, (snapshot) => ({
-        ...snapshot,
-        dirty: true,
-        items: [
-            post,
-            ...snapshot.items.filter((item) => item.postId != post.postId),
-        ]
-            .sort(descendingPostOrder)
-            .slice(0, spaceFeedCacheSize),
-        nextCursor: undefined,
-    }));
+    updateCachedSpaceFeed(
+        spaceId,
+        (snapshot) => ({
+            ...snapshot,
+            dirty: true,
+            items: [
+                post,
+                ...snapshot.items.filter((item) => item.postId != post.postId),
+            ]
+                .sort(descendingPostOrder)
+                .slice(0, spaceFeedCacheSize),
+            nextCursor: undefined,
+        }),
+        true,
+    );
 
 export const removeCachedSpaceFeedPost = (spaceId: string, postId: number) =>
     updateCachedSpaceFeed(spaceId, (snapshot) => ({

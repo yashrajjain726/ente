@@ -167,6 +167,9 @@ const createMainWindow = () => {
         path.join(isDev ? "build" : process.resourcesPath, "window-icon.png"),
     );
     const bounds = windowBounds();
+    const themeMode = userPreferences.get("themeMode") ?? "system";
+    nativeTheme.themeSource = themeMode;
+    const shouldUseDarkColors = nativeTheme.shouldUseDarkColors;
 
     const window = new BrowserWindow({
         webPreferences: {
@@ -176,14 +179,15 @@ const createMainWindow = () => {
         icon,
         ...(bounds ?? {}),
         ...minimumWindowSize(),
-        // The overlay must be enabled on macOS too for its CSS dimensions.
         titleBarStyle: "hidden",
         titleBarOverlay:
-            process.platform == "win32"
-                ? { color: "black", symbolColor: "#cdcdcd" }
-                : true,
-        // Match the initial paint to the OS theme to avoid a white or black flash.
-        backgroundColor: nativeTheme.shouldUseDarkColors ? "black" : "white",
+            process.platform == "darwin"
+                ? true
+                : {
+                      color: shouldUseDarkColors ? "black" : "white",
+                      symbolColor: shouldUseDarkColors ? "#cdcdcd" : "black",
+                  },
+        backgroundColor: shouldUseDarkColors ? "black" : "white",
         show: false,
     });
 

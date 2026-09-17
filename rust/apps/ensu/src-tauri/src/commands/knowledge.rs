@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use ente_assets::{AssetStore, download};
 use ente_ensu::config::{AttributionConfig, KnowledgeDatasetConfig};
-use ente_ensu::{llm, retrieval};
+use ente_ensu::retrieval;
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
 use tauri::{AppHandle, Emitter, Manager, State as TauriState, WebviewWindow};
@@ -90,13 +90,13 @@ pub struct KnowledgePackDto {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceCitationDto {
-    pub dataset_id: String,
-    pub dataset_label: String,
-    pub credit: String,
-    pub title: String,
-    pub source_url: String,
-    pub license_label: String,
-    pub license_url: String,
+    dataset_id: String,
+    dataset_label: String,
+    credit: String,
+    title: String,
+    source_url: String,
+    license_label: String,
+    license_url: String,
 }
 
 impl From<retrieval::SourceCitation> for SourceCitationDto {
@@ -127,18 +127,89 @@ impl From<SourceCitationDto> for retrieval::SourceCitation {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct KnowledgePromptContextDto {
-    text: String,
-    citations: Vec<SourceCitationDto>,
+pub struct NoteSourceReferenceDto {
+    collection_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    collection_label: Option<String>,
+    document_id: String,
+    indexed_revision: String,
+    title: String,
+    section: Option<String>,
 }
 
-impl From<retrieval::KnowledgePromptContext> for KnowledgePromptContextDto {
-    fn from(value: retrieval::KnowledgePromptContext) -> Self {
+impl From<ente_ensu::notes::NoteSourceReference> for NoteSourceReferenceDto {
+    fn from(value: ente_ensu::notes::NoteSourceReference) -> Self {
+        Self {
+            collection_id: value.collection_id,
+            collection_label: value.collection_label,
+            document_id: value.document_id,
+            indexed_revision: value.indexed_revision,
+            title: value.title,
+            section: value.section,
+        }
+    }
+}
+
+impl From<NoteSourceReferenceDto> for ente_ensu::notes::NoteSourceReference {
+    fn from(value: NoteSourceReferenceDto) -> Self {
+        Self {
+            collection_id: value.collection_id,
+            collection_label: value.collection_label,
+            document_id: value.document_id,
+            indexed_revision: value.indexed_revision,
+            title: value.title,
+            section: value.section,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum GroundedSourceDto {
+    EnsuPack { citation: SourceCitationDto },
+    LocalNote { reference: NoteSourceReferenceDto },
+}
+
+impl From<retrieval::GroundedSource> for GroundedSourceDto {
+    fn from(value: retrieval::GroundedSource) -> Self {
+        match value {
+            retrieval::GroundedSource::EnsuPack { citation } => Self::EnsuPack {
+                citation: citation.into(),
+            },
+            retrieval::GroundedSource::LocalNote { reference } => Self::LocalNote {
+                reference: reference.into(),
+            },
+        }
+    }
+}
+
+impl From<GroundedSourceDto> for retrieval::GroundedSource {
+    fn from(value: GroundedSourceDto) -> Self {
+        match value {
+            GroundedSourceDto::EnsuPack { citation } => Self::EnsuPack {
+                citation: citation.into(),
+            },
+            GroundedSourceDto::LocalNote { reference } => Self::LocalNote {
+                reference: reference.into(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroundedPromptContextDto {
+    text: String,
+    sources: Vec<GroundedSourceDto>,
+}
+
+impl From<retrieval::GroundedPromptContext> for GroundedPromptContextDto {
+    fn from(value: retrieval::GroundedPromptContext) -> Self {
         Self {
             text: value.text,
-            citations: value.citations.into_iter().map(Into::into).collect(),
+            sources: value.sources.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -168,6 +239,30 @@ pub(crate) fn retrieval_error(error: retrieval::RetrievalError) -> ApiError {
         retrieval::RetrievalError::Zstd(_) => "zstd",
     };
     ApiError::new(code, error.to_string())
+}
+
+fn select_verified_mixed_grounding(
+    pack_hits: &[retrieval::KnowledgePromptHit],
+    note_hits: &[ente_ensu::notes::NotesSearchHit],
+    mut verify: impl FnMut(&ente_ensu::notes::NoteSourceReference) -> Result<bool, ApiError>,
+) -> Result<Vec<retrieval::GroundedExcerpt>, ApiError> {
+    let selected = retrieval::select_mixed_grounding_candidates(pack_hits, note_hits, usize::MAX)
+        .map_err(retrieval_error)?;
+    let mut verified = Vec::with_capacity(selected.len());
+    let mut verified_note_count = 0_usize;
+    for excerpt in selected {
+        if let retrieval::GroundedSource::LocalNote { reference } = &excerpt.source {
+            if verified_note_count == retrieval::MAX_NOTES_GROUNDING_HITS {
+                continue;
+            }
+            if !verify(reference)? {
+                continue;
+            }
+            verified_note_count += 1;
+        }
+        verified.push(excerpt);
+    }
+    Ok(verified)
 }
 
 fn reconcile_and_open(
@@ -410,15 +505,30 @@ pub fn knowledge_cancel_pack_download(knowledge_state: TauriState<'_, State>, st
 
 #[tauri::command]
 pub async fn knowledge_retrieve(
+    app: AppHandle,
     model_state: TauriState<'_, ModelDownloadState>,
     llm_state: TauriState<'_, crate::commands::llm::State>,
-    knowledge_state: TauriState<'_, State>,
     query: String,
     enabled_stable_ids: Vec<String>,
     max_context_utf8_bytes: u32,
     retrieval_epoch: u64,
-) -> Result<Option<KnowledgePromptContextDto>, ApiError> {
-    if query.trim().is_empty() || enabled_stable_ids.is_empty() || max_context_utf8_bytes == 0 {
+) -> Result<Option<GroundedPromptContextDto>, ApiError> {
+    let knowledge_state = app.state::<State>();
+    let (note_collection_ids, notes) = app
+        .try_state::<crate::commands::notes::State>()
+        .map_or_else(
+            || (Vec::new(), None),
+            |state| {
+                (
+                    state.available_index_collection_ids(),
+                    Some(state.retrieval_handle()),
+                )
+            },
+        );
+    if query.trim().is_empty()
+        || (enabled_stable_ids.is_empty() && note_collection_ids.is_empty())
+        || max_context_utf8_bytes == 0
+    {
         return Ok(None);
     }
 
@@ -461,20 +571,10 @@ pub async fn knowledge_retrieve(
             }
         };
         check_cancelled()?;
-        let model = llm::Model::load(llm::ModelLoadParams {
-            model_path: embedding_path.display().to_string(),
-            n_gpu_layers: Some(0),
-            use_mmap: Some(true),
-            use_mlock: Some(false),
-        })
-        .map_err(crate::commands::llm::llm_api_error)?;
-        check_cancelled()?;
-        let threads = std::thread::available_parallelism()
-            .map(|count| count.get().saturating_sub(1).max(1))
-            .unwrap_or(1);
-        let threads = i32::try_from(threads).unwrap_or(1);
-        let context = llm::Context::new_knowledge_embedding(&model, Some(threads))
-            .map_err(crate::commands::llm::llm_api_error)?;
+        let context = crate::commands::llm::load_knowledge_embedding_context(
+            &embedding_path,
+            check_cancelled,
+        )?;
         check_cancelled()?;
         let query_embedding = context
             .embed(query.trim())
@@ -482,7 +582,7 @@ pub async fn knowledge_retrieve(
         check_cancelled()?;
 
         let indexes = indexes.lock().unwrap_or_else(PoisonError::into_inner);
-        let mut hits = Vec::<retrieval::KnowledgePromptHit>::new();
+        let mut pack_hits = Vec::<retrieval::KnowledgePromptHit>::new();
         for dataset in &datasets {
             check_cancelled()?;
             let Some(open) = indexes.get(&dataset.stable_id) else {
@@ -494,7 +594,7 @@ pub async fn knowledge_retrieve(
                 dataset.relevance_threshold,
             ) {
                 Ok(dataset_hits) => {
-                    hits.extend(dataset_hits.into_iter().map(|hit| {
+                    pack_hits.extend(dataset_hits.into_iter().map(|hit| {
                         retrieval::KnowledgePromptHit {
                             dataset_id: dataset.stable_id.clone(),
                             hit,
@@ -513,10 +613,52 @@ pub async fn knowledge_retrieve(
         drop(indexes);
         check_cancelled()?;
 
-        hits.sort_by(|left, right| right.hit.score.total_cmp(&left.hit.score));
-        hits.truncate(embedding.max_hits as usize);
-        let budget = max_context_utf8_bytes.min(embedding.max_context_utf8_bytes) as usize;
-        retrieval::build_knowledge_prompt_context(&hits, budget)
+        let mut note_hits = Vec::new();
+        if let Some(notes) = &notes {
+            for collection_id in &note_collection_ids {
+                check_cancelled()?;
+                match notes.search_collection(collection_id, &query_embedding) {
+                    Ok(collection_hits) => note_hits.extend(collection_hits),
+                    Err(error) => {
+                        crate::commands::notes::mark_index_unreadable(&app, collection_id);
+                        logging::log(
+                            "Knowledge",
+                            format!(
+                                "Notes search skipped and queued for rebuild collection={collection_id} error={error}"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+        check_cancelled()?;
+
+        let context_budget = max_context_utf8_bytes.min(embedding.max_context_utf8_bytes);
+        let mut excerpts = select_verified_mixed_grounding(&pack_hits, &note_hits, |reference| {
+            check_cancelled()?;
+            let Some(notes) = &notes else {
+                return Ok(false);
+            };
+            let verified = notes.verify_source_reference(reference);
+            if !verified {
+                crate::commands::notes::mark_reference_stale(
+                    &app,
+                    &reference.collection_id,
+                    reference.document_id.clone(),
+                );
+            }
+            Ok(verified)
+        })?;
+        for excerpt in &mut excerpts {
+            if let (Some(notes), retrieval::GroundedSource::LocalNote { reference }) =
+                (&notes, &mut excerpt.source)
+            {
+                reference.collection_label = notes.collection_label(&reference.collection_id);
+            }
+        }
+        check_cancelled()?;
+
+        retrieval::build_grounded_prompt_context(&excerpts, context_budget as usize)
             .map(|context| context.map(Into::into))
             .map_err(retrieval_error)
     })
@@ -541,4 +683,41 @@ pub(crate) fn clear_for_exit(app: &AppHandle) {
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ente_ensu::notes::NotesSearchHit;
+
+    const COLLECTION_ID: &str = "123e4567-e89b-12d3-a456-426614174000";
+
+    fn note(index: usize) -> NotesSearchHit {
+        NotesSearchHit {
+            collection_id: COLLECTION_ID.to_string(),
+            document_id: format!("note-{index}.md"),
+            revision: "a".repeat(64),
+            score: 1.0 - index as f32 / 100.0,
+            title: format!("Note {index}"),
+            section: None,
+            text: format!("passage {index}"),
+        }
+    }
+
+    #[test]
+    fn stale_top_notes_are_backfilled_with_verified_hits() {
+        let notes = (0..6).map(note).collect::<Vec<_>>();
+
+        let selected = select_verified_mixed_grounding(&[], &notes, |reference| {
+            Ok(reference.document_id == "note-5.md")
+        })
+        .unwrap();
+
+        assert_eq!(selected.len(), 1);
+        assert!(matches!(
+            &selected[0].source,
+            retrieval::GroundedSource::LocalNote { reference }
+                if reference.document_id == "note-5.md"
+        ));
+    }
 }

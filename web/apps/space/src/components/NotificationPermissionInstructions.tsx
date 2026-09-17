@@ -2,10 +2,16 @@ import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { SpaceBottomSheetTransition } from "components/BottomSheetTransition";
 import { isSpaceIOS } from "hooks/use-pwa-install-prompt";
 import React from "react";
+import {
+    spaceOnAccent,
+    spaceSurface,
+    spaceText,
+    spaceTextMuted,
+} from "styles/colors";
 
 const green = "#08C225";
-const textBase = "#000";
-const textSoft = "#777777";
+const textBase = spaceText;
+const textSoft = spaceTextMuted;
 
 interface SpaceNotificationPermissionInstructionsProps {
     mode?: "brave-push" | "permission";
@@ -44,7 +50,6 @@ export const SpaceNotificationPermissionInstructions: React.FC<
             onClose={onClose}
             aria-labelledby={titleID}
             maxWidth={false}
-            sx={{ "--space-dialog-backdrop": "rgba(0 0 0 / 0.56)" }}
             slots={
                 isBottomSheet
                     ? { transition: SpaceBottomSheetTransition }
@@ -53,7 +58,6 @@ export const SpaceNotificationPermissionInstructions: React.FC<
             slotProps={{
                 paper: {
                     sx: {
-                        bgcolor: "#FFFFFF",
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "0 -18px 44px rgba(0, 0, 0, 0.18)",
@@ -122,7 +126,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
                             key={step}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#FAFAFA",
+                                bgcolor: spaceSurface,
                                 borderRadius: "18px",
                                 color: textSoft,
                                 display: "flex",
@@ -135,7 +139,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
                             <Box
                                 sx={{
                                     alignItems: "center",
-                                    bgcolor: "#E7F6E9",
+                                    bgcolor: "rgba(8, 194, 37, 0.14)",
                                     borderRadius: "14px",
                                     color: green,
                                     display: "flex",
@@ -176,7 +180,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
                         bgcolor: green,
                         border: 0,
                         borderRadius: "20px",
-                        color: "#FFFFFF",
+                        color: spaceOnAccent,
                         cursor: "pointer",
                         display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -191,7 +195,7 @@ export const SpaceNotificationPermissionInstructions: React.FC<
                         width: "100%",
                         "&:active": { filter: "brightness(0.96)" },
                         "&:focus-visible": {
-                            outline: "2px solid rgba(0 0 0 / 0.72)",
+                            outline: `2px solid ${spaceText}`,
                             outlineOffset: 2,
                         },
                         "&:hover": { filter: "brightness(0.98)" },

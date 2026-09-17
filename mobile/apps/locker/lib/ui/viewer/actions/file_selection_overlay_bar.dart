@@ -757,11 +757,11 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
 
     final confirmation = await showDeleteConfirmationSheet(
       context,
-      title: context.strings.areYouSure,
-      body: context.strings.deleteMultipleFilesDialogBody(
+      title: context.strings.moveToTrashQuestion,
+      body: context.strings.itemsWillBeDeletedFromAllCollections(
         count: ownedFiles.length,
       ),
-      deleteButtonLabel: context.strings.yesDeleteFiles(
+      deleteButtonLabel: context.strings.deleteItemCount(
         count: ownedFiles.length,
       ),
       illustration: LockerBottomSheetIllustration.fileDelete,

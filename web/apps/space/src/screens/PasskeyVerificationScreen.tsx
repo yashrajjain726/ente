@@ -2,14 +2,13 @@ import { Box } from "@mui/material";
 import { SpaceBackIcon } from "components/BackIcon";
 import { SpaceButtonSpinner } from "components/ButtonSpinner";
 import React from "react";
+import { spaceAppBackground, spaceOnAccent, spaceText } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 
-export const passkeyVerificationBackground = "#FAFAFA";
-
 const green = "#08C225";
-const primaryLight = "#DDEEDF";
-const primaryDark = "#069D1E";
-const textBase = "#000";
+const primarySurface = "#193C22";
+const primaryText = "#79DD8B";
+const textBase = spaceText;
 const warning = "#F63A3A";
 
 export type PasskeyVerificationStatus = "waiting" | "checking" | "pending";
@@ -52,7 +51,7 @@ export const PasskeyVerificationScreen: React.FC<
         <Box
             component="main"
             sx={{
-                bgcolor: passkeyVerificationBackground,
+                background: spaceAppBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -62,7 +61,7 @@ export const PasskeyVerificationScreen: React.FC<
         >
             <Box
                 sx={{
-                    bgcolor: passkeyVerificationBackground,
+                    bgcolor: "transparent",
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -205,7 +204,7 @@ export const PasskeyVerificationScreen: React.FC<
 
                 <Box
                     sx={{
-                        bgcolor: passkeyVerificationBackground,
+                        bgcolor: "transparent",
                         bottom: 0,
                         boxSizing: "border-box",
                         display: "flex",
@@ -229,7 +228,7 @@ export const PasskeyVerificationScreen: React.FC<
                             bgcolor: green,
                             border: 0,
                             borderRadius: "20px",
-                            color: "white",
+                            color: spaceOnAccent,
                             cursor: "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -258,10 +257,10 @@ export const PasskeyVerificationScreen: React.FC<
                         onClick={onCheckStatus}
                         sx={{
                             alignItems: "center",
-                            bgcolor: primaryLight,
+                            bgcolor: primarySurface,
                             border: 0,
                             borderRadius: "20px",
-                            color: primaryDark,
+                            color: primaryText,
                             cursor: isChecking ? "default" : "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',

@@ -76,6 +76,7 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
     final strings = ChangeLogStrings.maybeForLocale(
       Localizations.localeOf(context),
       isLocalGallery: isLocalGalleryMode,
+      isAndroid: Theme.of(context).platform == TargetPlatform.android,
     );
     if (strings == null) {
       return const SizedBox.shrink();

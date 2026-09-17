@@ -572,11 +572,9 @@
   "@deviceLockEnablePreSteps": {
     "description": "Instructions for enabling device lock"
   },
-  "deviceLockExplanation": "Ente uygulaması önplanda calıştığında ve bir yedekleme işlemi devam ettiğinde, cihaz ekran kilidini devre dışı bırakın. Bu genellikle gerekli olmasa da, büyük dosyaların yüklenmesi ve büyük kütüphanelerin başlangıçta içe aktarılması sürecini hızlandırabilir.",
   "deviceNotFound": "Cihaz bulunamadı",
   "didYouKnow": "Biliyor musun?",
   "digits": "Uzunluk",
-  "disableAutoLock": "Otomatik kilidi devre dışı bırak",
   "disableDownloadWarningBody": "Görüntüleyiciler, hala harici araçlar kullanarak ekran görüntüsü alabilir veya fotoğraflarınızın bir kopyasını kaydedebilir. Lütfen bunu göz önünde bulundurunuz",
   "disableDownloadWarningTitle": "Lütfen dikkate alın",
   "disableLinkMessage": "Bu, \"{albumName}\"e erişim için olan genel bağlantıyı kaldıracaktır.",
@@ -665,7 +663,6 @@
     }
   },
   "earned": "elde edildi",
-  "earnFreeStorage": "Bedava depolama alanı kazanın",
   "earnMoreSpace": "Daha fazla depolama alanı kazanın!",
   "edit": "Düzenle",
   "editAutoAddPeople": "Otomatik olarak kişi eklemeyi düzenle",
@@ -1749,14 +1746,6 @@
   "referrals": "Arkadaşını davet et",
   "referralsAreCurrentlyPaused": "Davetler şu anda durmuş durumda",
   "referralStats": "Yönlendirme istatistikleri",
-  "referralStep1": "1. Kendi davet kodunu özelleştir ve paylaş.",
-  "referralStep2": "2. Onlar Ente’ye senin kodunla kayıt olur.",
-  "referralStep3": "3. Onlar ücretli plana yükselttiklerinde hem onlara {storageInGB}GB hem de sana {storageInGB}GB verilecek.",
-  "@referralStep3": {
-    "placeholders": {
-      "storageInGB": {}
-    }
-  },
   "referralStorageForBoth": "Onlar ücretli plana yükselttiklerinde hem onlara {storageAmountInGB} GB hem de sana {storageAmountInGB} GB verilecek.",
   "@referralStorageForBoth": {
     "placeholders": {
@@ -1863,8 +1852,6 @@
   "saveCode": "Kodu kaydet",
   "saveCollage": "Kolajı kaydet",
   "saveCopy": "Kopyasını kaydet",
-  "saveDocumentDescription": "Önemli belgeleri yükleyin.",
-  "saveDocumentTitle": "Belge",
   "saveKey": "Anahtarı kaydet",
   "@saveKey": {
     "description": "Save key button label"
@@ -2093,7 +2080,6 @@
   "setupFirstAccount": "İlk hesabını ayarla",
   "share": "Paylaş",
   "shareALink": "Bir bağlantı paylaş",
-  "shareCodeEarnStorage": "Kodunu paylaş, ücretsiz depolama alanı kazan.",
   "shareCodes": "Kodları paylaş",
   "shareCodesDuration": "Kodları paylaşma süresini seçin.",
   "sharedAlbumSectionDescription": "Diğer Ente kullanıcılarıyla paylaşılan ve topluluk albümleri oluşturun, bu arada ücretsiz planlara sahip kullanıcıları da içerir.",
@@ -2382,7 +2368,6 @@
   },
   "unarchiveAlbum": "Arşivden Çıkar",
   "unarchiving": "Arşivden çıkarılıyor...",
-  "unavailableReferralCode": "Üzgünüz, bu kod mevcut değil.",
   "uncategorized": "Kategorisiz",
   "undo": "Geri al",
   "unhide": "Gizleme",

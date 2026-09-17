@@ -17,12 +17,12 @@ import {
 
 // This protocol avoids contextBridge's buffer copies for large files.
 export const registerStreamProtocol = (mainWindow: BrowserWindow) => {
-    protocol.handle("stream", (request: Request) => {
+    protocol.handle("stream", async (request: Request) => {
         try {
-            return handleStreamRequest(mainWindow, request);
+            return await handleStreamRequest(mainWindow, request);
         } catch (e) {
-            log.error(`Failed to handle stream request for ${request.url}`, e);
-            return new Response(String(e), { status: 500 });
+            log.error("Failed to handle stream request", e);
+            return new Response("Internal stream error", { status: 500 });
         }
     });
 };
@@ -42,9 +42,22 @@ const handleStreamRequest = async (
     )
         return new Response("", { status: 403 });
 
-    const url = request.url;
+    const { host, searchParams } = new URL(request.url);
+    if (
+        request.method == "OPTIONS" &&
+        host == "video" &&
+        searchParams.get("op") == "generate-hls"
+    ) {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                "Access-Control-Allow-Origin": rendererOrigin,
+                "Access-Control-Allow-Methods": "POST",
+                "Access-Control-Allow-Headers": "X-Auth-Token",
+            },
+        });
+    }
 
-    const { host, searchParams } = new URL(url);
     switch (host) {
         case "read":
             return handleRead(searchParams.get("path")!);
@@ -197,8 +210,9 @@ const handleGenerateHLSWrite = async (
 ) => {
     const fileID = parseInt(params.get("fileID") ?? "", 10);
     const fetchURL = params.get("fetchURL");
-    const authToken = params.get("authToken");
-    if (!fileID || !fetchURL || !authToken) throw new Error("Missing params");
+    const authToken = request.headers.get("X-Auth-Token");
+    if (!fileID || !fetchURL || !authToken)
+        return new Response("Invalid generate HLS request", { status: 400 });
 
     let inputItem: Parameters<typeof makeFileForStreamOrPathOrZipItem>[0];
     const path = params.get("path");

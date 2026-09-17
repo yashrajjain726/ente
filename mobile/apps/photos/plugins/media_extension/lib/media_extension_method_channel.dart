@@ -5,9 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:media_extension/media_extension_action_types.dart';
 import 'package:media_extension/media_extension_platform_interface.dart';
 
-/// An implementation of [MediaExtensionPlatform] that uses method channels.
 class MethodChannelMediaExtension extends MediaExtensionPlatform {
-  /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('media_extension');
 
@@ -42,7 +40,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     );
   }
 
-  /// This Method retrivies the platform version from native thread.
   @override
   Future<String?> getPlatformVersion() async {
     final version = await methodChannel.invokeMethod<String>(
@@ -51,9 +48,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     return version;
   }
 
-  /// This Method sends the selected Image's [uri] to the native thread.
-  /// from the Flutter thread to send results to apps
-  /// which can handle [ACTION_ATTACH_DATA] Intent of [mimeType] `images/*`.
   @override
   Future<bool> setAs(
     String uri,
@@ -72,9 +66,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     return false;
   }
 
-  /// This Method sends the selected Image's [uri] to the native thread.
-  /// from the Flutter thread to send results to apps
-  /// which can handle [ACTION_EDIT] Intent of [mimeType] `images/*`.
   @override
   Future<bool> edit(
     String uri,
@@ -94,9 +85,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     return false;
   }
 
-  /// This Method sends the selected Image's [uri] to the native thread.
-  /// from the Flutter thread to send results
-  /// to apps which can handle [ACTION_VIEW] Intent of [mimeType] `images/*`.
   @override
   Future<bool> openWith(
     String uri,
@@ -115,8 +103,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     return false;
   }
 
-  /// This Method is triggered by the Native Thread which sends the [intentAction]
-  /// and [uri] information in a [HashMap] Structure to the Flutter thread.
   @override
   Future<MediaExtentionAction> getIntentAction() async {
     _ensureMethodCallHandler();
@@ -141,9 +127,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     return _intentActionController.stream;
   }
 
-  /// This Method sends the selected Image's [uri] to the native thread.
-  /// from the Flutter thread to send results to the app
-  /// which invoked our app using [ACTION_PICK] INTENT.
   @override
   Future<void> setResult(String uri) async {
     try {
@@ -153,9 +136,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     }
   }
 
-  /// This Method sends selected media [uris] to the native thread.
-  /// from the Flutter thread to send results to the app
-  /// which invoked our app using [ACTION_PICK] INTENT.
   @override
   Future<void> setResults(List<String> uris) async {
     try {
@@ -165,8 +145,6 @@ class MethodChannelMediaExtension extends MediaExtensionPlatform {
     }
   }
 
-  /// This Method cancels the result to the app
-  /// which invoked our app using [ACTION_PICK] INTENT.
   @override
   Future<void> cancelResult() async {
     try {

@@ -1,12 +1,12 @@
-//! The 75/200 thresholds used downstream are calibrated against this exact
-//! gradient scaling: integer `|dx| + |dy|` of a 3x3 Sobel with replicated
-//! borders, thresholds floored, the low one compared strictly.
+// The 75/200 thresholds used downstream are calibrated against this exact
+// gradient scaling: integer `|dx| + |dy|` of a 3x3 Sobel with replicated
+// borders, thresholds floored, the low one compared strictly.
 
 use crate::cv::OpResult;
 use crate::cv::image::ImageU8;
 
 const CANNY_SHIFT: i32 = 15;
-/// `(int)(tan(22.5 deg) * (1 << CANNY_SHIFT) + 0.5)`.
+// `(int)(tan(22.5 deg) * (1 << CANNY_SHIFT) + 0.5)`.
 const TG22: i32 = 13573;
 
 const MAYBE: u8 = 0;

@@ -97,4 +97,8 @@ func TestListPostsHydratesPostAssets(t *testing.T) {
 	require.Equal(t, int64(123), page.Items[0].Objects[0].Size)
 	require.Equal(t, 1, page.Items[0].Objects[0].Position)
 	require.Equal(t, "bWV0YWRhdGE=", page.Items[0].Objects[0].MetadataCipher)
+	feed, err := controller.ListFeed(ctx, aliceSpace, models.ListFeedRequest{Limit: 10})
+	require.NoError(t, err)
+	require.Equal(t, page.Items, feed.Items)
+
 }

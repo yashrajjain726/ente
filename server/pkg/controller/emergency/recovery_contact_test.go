@@ -3,6 +3,7 @@ package emergency
 import (
 	"database/sql"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -13,6 +14,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+func TestUpdateRecoveryNoticeRejectsActiveSession(t *testing.T) {
+	ctx, db, ctrl := setupEmergencyRecoveryControllerTest(t)
+	ownerID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID: 1, Email: "legacy-owner@ente.com", CreationTime: 1,
+	})
+	contactID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID: 2, Email: "trusted-contact@ente.com", CreationTime: 1,
+	})
+	mustInsertEmergencyRecoverySession(t, db, ownerID, contactID, ente.RecoveryStatusWaiting)
+
+	err := ctrl.UpdateRecoveryNotice(ctx, ownerID, ente.UpdateRecoveryNotice{
+		EmergencyContactID: contactID, RecoveryNoticeInDays: 7,
+	})
+	var apiErr *ente.ApiError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("UpdateRecoveryNotice() error = %v, want API error", err)
+	}
+	if apiErr.Code != ente.ActiveRecoverySession || apiErr.HttpStatusCode != http.StatusBadRequest {
+		t.Fatalf("UpdateRecoveryNotice() error = %+v, want ACTIVE_RECOVERY_SESSION with HTTP 400", apiErr)
+	}
+	if apiErr.Message != "cannot update recovery notice while there is an active recovery session" {
+		t.Fatalf("UpdateRecoveryNotice() message = %q, want the message recognized by older clients", apiErr.Message)
+	}
+}
 
 func TestApproveRecoveryRejectsSpoofedSessionPartiesBeforeUpdate(t *testing.T) {
 	ctx, db, ctrl := setupEmergencyRecoveryControllerTest(t)

@@ -7,14 +7,15 @@ import type { KDFWorker } from "./kdf.worker";
 export {
     boxSealOpenBytes,
     decryptBox,
-    deriveSubKeyBytes,
     encryptBox,
     generateKey,
     generateKeyPair,
-    generateSRPSetup,
     recoveryKeyFromMnemonicOrHex,
-} from "ente-core-wasm";
-export type { EncryptedBoxB64 as EncryptedBox, KeyPair } from "ente-core-wasm";
+} from "ente-prelogin-wasm";
+export type {
+    EncryptedBoxB64 as EncryptedBox,
+    KeyPair,
+} from "ente-prelogin-wasm";
 
 export type { DerivedKey } from "./kdf";
 

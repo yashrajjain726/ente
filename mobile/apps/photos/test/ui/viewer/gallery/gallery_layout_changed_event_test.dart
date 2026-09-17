@@ -12,13 +12,18 @@ import "package:photos/models/file/dummy_file.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/file_load_result.dart";
+import "package:photos/models/gallery/justified_layout_strategy.dart";
+import "package:photos/models/gallery/justified_layout_tuning.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/settings/local_settings.dart";
+import "package:photos/ui/settings/gallery_settings_screen.dart";
+import "package:photos/ui/settings/justified_layout_tuning_screen.dart";
 import "package:photos/ui/viewer/gallery/component/group/group_header_widget.dart";
 import "package:photos/ui/viewer/gallery/component/group/type.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
 import "package:photos/ui/viewer/gallery/gallery_app_bar_config.dart";
+import "package:photos/ui/viewer/gallery/layout_settings.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.dart";
 import "package:shared_preferences/shared_preferences.dart";
@@ -54,10 +59,116 @@ void main() {
 
   setUp(() async {
     await localSettings.setInternalUserDisabled(false);
+    await localSettings.setGalleryLayoutType(GalleryLayoutType.grid);
+    await localSettings.setJustifiedLayoutStrategy(
+      JustifiedLayoutStrategy.comfortLarge,
+    );
+    await localSettings.resetFlexLayoutTuning();
+    await localSettings.resetComfortLargeLayoutTuning();
   });
 
   tearDown(() async {
     await localSettings.setInternalUserDisabled(false);
+  });
+
+  testWidgets(
+    "both layout menus notify galleries when only the strategy changes",
+    (tester) async {
+      var events = 0;
+      final subscription = Bus.instance.on<GalleryLayoutChangedEvent>().listen(
+        (_) => events++,
+      );
+      addTearDown(subscription.cancel);
+      for (final quickMenu in [true, false]) {
+        await localSettings.setGalleryLayoutType(GalleryLayoutType.justified);
+        await localSettings.setJustifiedLayoutStrategy(
+          JustifiedLayoutStrategy.comfortLarge,
+        );
+        events = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: lightThemeData,
+            localizationsDelegates: StringsLocalizations.localizationsDelegates,
+            supportedLocales: StringsLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => quickMenu
+                          ? const Scaffold(body: GalleryLayoutSettings())
+                          : const GallerySettingsScreen(
+                              fromGalleryLayoutSettingsCTA: true,
+                            ),
+                    ),
+                  ),
+                  child: const Text("Open settings"),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text("Open settings"));
+        await tester.pumpAndSettle();
+        if (!quickMenu) {
+          await tester.tap(find.text("Layout (i)"));
+          await tester.pumpAndSettle();
+        }
+        expect(find.text("Justified · Comfort"), findsNothing);
+        expect(find.text("Justified · Flex Full Rows"), findsNothing);
+        await tester.tap(find.text("Justified · Flex (i)"));
+        await tester.pumpAndSettle();
+        expect(
+          localSettings.getGalleryLayoutType(),
+          GalleryLayoutType.justified,
+        );
+        expect(
+          localSettings.getJustifiedLayoutStrategy(),
+          JustifiedLayoutStrategy.flex,
+        );
+        expect(events, 1);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
+  testWidgets("Flex tuning accepts arbitrary decimals and resets one field", (
+    tester,
+  ) async {
+    var events = 0;
+    final subscription = Bus.instance.on<GalleryLayoutChangedEvent>().listen(
+      (_) => events++,
+    );
+    addTearDown(subscription.cancel);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightThemeData,
+        localizationsDelegates: StringsLocalizations.localizationsDelegates,
+        supportedLocales: StringsLocalizations.supportedLocales,
+        home: const JustifiedLayoutTuningScreen(),
+      ),
+    );
+
+    await tester.tap(find.text("Target height scale").first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), "1.1375");
+    await tester.tap(find.text("Save"));
+    await tester.pumpAndSettle();
+
+    expect(localSettings.getFlexLayoutTuning().targetHeightScale, 1.1375);
+    expect(events, 1);
+
+    await tester.tap(find.text("Target height scale").first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Reset to default"));
+    await tester.pumpAndSettle();
+
+    expect(
+      localSettings.getFlexLayoutTuning().targetHeightScale,
+      FlexLayoutTuning.defaults.targetHeightScale,
+    );
+    expect(events, 2);
   });
 
   testWidgets(

@@ -4,12 +4,12 @@ import { isDesktop } from "ente-base/app";
 import { blobCache } from "ente-base/blob-cache";
 import { ensureElectron } from "ente-base/electron";
 import log from "ente-base/log";
-import { ensureMasterKeyFromSession } from "ente-base/session";
 import { ComlinkWorker } from "ente-base/worker/comlink-worker";
 import type { ProcessableUploadItem } from "ente-gallery/services/upload";
 import { createUtilityProcess } from "ente-gallery/utils/native-worker";
 import type { EnteFile } from "ente-media/file";
 import { FileType } from "ente-media/file-type";
+import { ensureMasterKeyFromSession } from "ente-new/photos/services/account-keys";
 import { throttled } from "ente-utils/promise";
 import pDebounce from "p-debounce";
 import { getRemoteFlag, updateRemoteFlag } from "../remote-store";
@@ -72,21 +72,32 @@ const createComlinkWorker = async () => {
 
     const messagePort = await createUtilityProcess(electron, "ml");
 
-    const cw = new ComlinkWorker<typeof MLWorker>(
-        "ML",
-        new Worker(new URL("worker.ts", import.meta.url)),
-    );
+    let worker: Worker | undefined;
+    try {
+        worker = new Worker(new URL("worker.ts", import.meta.url));
+        const cw = new ComlinkWorker<typeof MLWorker>("ML", worker);
 
-    await cw.remote.then((w) =>
-        w.init(transfer(messagePort, [messagePort]), proxy(delegate)),
-    );
-
-    return cw;
+        await cw.remote.then((w) =>
+            w.init(transfer(messagePort, [messagePort]), proxy(delegate)),
+        );
+        return cw;
+    } catch (error) {
+        messagePort.close();
+        worker?.terminate();
+        throw error;
+    }
 };
 
 export const terminateMLWorker = async () => {
     if (_state.comlinkWorker) {
-        await _state.comlinkWorker.then((cw) => cw.terminate());
+        await _state.comlinkWorker.then(
+            (cw) => cw.terminate(),
+            (error: unknown) =>
+                log.warn(
+                    "ML worker initialization failed before shutdown",
+                    error,
+                ),
+        );
         _state.comlinkWorker = undefined;
     }
 };

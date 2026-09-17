@@ -13,49 +13,10 @@ class LockerContactsDisplayService {
 
   static Future<void> init({required SharedPreferences preferences}) async {
     contacts.ContactsDisplayService.instance.init(
-      contactsServiceFactory: () {
-        final session = authenticatedSession();
-        return contacts.ContactsService(
-          preferences: preferences,
-          createContact: (key, data) => createContact(
-            session: session,
-            wrappedRootContactKey: key,
-            data: data,
-          ),
-          getDiff: (key, sinceTime, limit) => getDiff(
-            session: session,
-            wrappedRootContactKey: key,
-            sinceTime: sinceTime,
-            limit: limit,
-          ),
-          updateContact: (key, contactId, data) => updateContact(
-            session: session,
-            wrappedRootContactKey: key,
-            contactId: contactId,
-            data: data,
-          ),
-          deleteContact: (contactId) =>
-              deleteContact(session: session, contactId: contactId),
-          setAttachment: (key, contactId, type, bytes) => setAttachment(
-            session: session,
-            wrappedRootContactKey: key,
-            contactId: contactId,
-            attachmentType: type,
-            attachmentBytes: bytes,
-          ),
-          deleteAttachment: (key, contactId, type) => deleteAttachment(
-            session: session,
-            wrappedRootContactKey: key,
-            contactId: contactId,
-            attachmentType: type,
-          ),
-          getProfilePicture: (key, contactId) => getProfilePicture(
-            session: session,
-            wrappedRootContactKey: key,
-            contactId: contactId,
-          ),
-        );
-      },
+      contactsServiceFactory: () => contacts.ContactsService(
+        preferences: preferences,
+        api: LockerContactsApi(authenticatedSession()),
+      ),
     );
     scheduleEnsureReady();
   }

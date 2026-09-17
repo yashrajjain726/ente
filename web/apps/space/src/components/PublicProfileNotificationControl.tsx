@@ -1,4 +1,5 @@
 import { Notification02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { spaceToastAutoDismissDurationMs } from "components/ActionToast";
 import { SpaceNotificationPermissionInstructions } from "components/NotificationPermissionInstructions";
 import {
     SpacePWAInstallInstructions,
@@ -22,7 +23,6 @@ import {
 
 type SuccessState = "exiting" | "hidden" | "visible";
 
-const successDisplayDurationMs = 2400;
 const toastTransitionDurationMs = 180;
 
 interface SpacePublicProfileNotificationControlProps {
@@ -142,7 +142,7 @@ export const SpacePublicProfileNotificationControl: React.FC<
                         successTimer.current = undefined;
                         setSuccessState("hidden");
                     }, toastTransitionDurationMs);
-                }, successDisplayDurationMs);
+                }, spaceToastAutoDismissDurationMs);
             } else if (permission == "denied") {
                 setState("denied");
                 setPermissionInstructionsOpen(true);
