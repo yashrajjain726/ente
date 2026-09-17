@@ -10,7 +10,7 @@ import {
 import { ensureLocalUser } from "ente-accounts/services/user";
 import { useBaseContext } from "ente-base/context";
 import { isNamedError } from "ente-base/error";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { LegacyOperations, LegacySuggestedUser } from "..";
 import { contactsDisplaySnapshot } from "../..";
 import { resolveContactDisplayFromSnapshot } from "../../resolver";
@@ -20,9 +20,8 @@ import { LegacyRecoveryDayPicker } from "./LegacyRecoveryDayPicker";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-interface LegacyAddContactContentProps<Session> {
-    getSession: () => Promise<Session>;
-    operations: LegacyOperations<Session>;
+interface LegacyAddContactContentProps {
+    operations: LegacyOperations;
     existingEmails: string[];
     onAdded: () => Promise<void>;
     suggestedUsers: LegacySuggestedUser[];
@@ -34,14 +33,15 @@ const nonEnteDialogAttributes = (email: string) => ({
     message: `${email} is not linked to an Ente account yet, so it cannot be used as a trusted contact.`,
 });
 
-export const LegacyAddContactContent = <Session,>({
-    getSession,
+export const LegacyAddContactContent: React.FC<
+    LegacyAddContactContentProps
+> = ({
     operations,
     existingEmails,
     onAdded,
     suggestedUsers,
     variant = "page",
-}: LegacyAddContactContentProps<Session>) => {
+}) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
     const currentUser = ensureLocalUser();
     const [email, setEmail] = useState("");
@@ -104,10 +104,7 @@ export const LegacyAddContactContent = <Session,>({
             return;
         }
         try {
-            const key = await operations.publicKey(
-                await getSession(),
-                normalizedEmail,
-            );
+            const key = await operations.publicKey(normalizedEmail);
             const verificationID = key
                 ? await operations.verificationID(key)
                 : undefined;
@@ -164,10 +161,7 @@ export const LegacyAddContactContent = <Session,>({
 
         void (async () => {
             try {
-                const key = await operations.publicKey(
-                    await getSession(),
-                    normalizedEmail,
-                );
+                const key = await operations.publicKey(normalizedEmail);
                 if (!key) {
                     showMiniDialog(nonEnteDialogAttributes(normalizedEmail));
                     return;
@@ -199,7 +193,6 @@ export const LegacyAddContactContent = <Session,>({
                         action: async () => {
                             try {
                                 await operations.addContact(
-                                    await getSession(),
                                     normalizedEmail,
                                     selectedRecoveryDays,
                                 );

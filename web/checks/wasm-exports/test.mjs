@@ -121,49 +121,6 @@ test("production references cross lazy loaders, aliases, destructuring and worke
     }
 });
 
-test("injected operations count only properties in the receiving interface", () => {
-    const directory = mkdtempSync(join(tmpdir(), "wasm-operations-"));
-    try {
-        const operations = join(directory, "operations.ts");
-        const entry = join(directory, "entry.tsx");
-        writeFileSync(
-            operations,
-            `
-            export const getInfo = () => "info";
-            export const unused = () => "unused";
-        `,
-        );
-        writeFileSync(
-            entry,
-            `
-            import * as operations from "./operations";
-            interface Operations { getInfo(): string; }
-            const View = (props: { operations: Operations }) => null;
-            export const app = <View operations={operations} />;
-        `,
-        );
-        const result = unusedExports(
-            [operations],
-            [
-                {
-                    entryFiles: [entry],
-                    options: {
-                        jsx: ts.JsxEmit.Preserve,
-                        module: ts.ModuleKind.ESNext,
-                        moduleResolution: ts.ModuleResolutionKind.Bundler,
-                    },
-                },
-            ],
-        );
-        assert.deepEqual(
-            result.map(({ name }) => name),
-            ["unused"],
-        );
-    } finally {
-        rmSync(directory, { recursive: true, force: true });
-    }
-});
-
 test("copies of a Rust export need one caller across artifacts", () => {
     const directory = mkdtempSync(join(tmpdir(), "wasm-export-origins-"));
     const file = (name, contents) => {

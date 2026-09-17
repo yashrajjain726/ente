@@ -146,7 +146,7 @@ const warningBannerSx = {
     backgroundColor: "rgba(255, 82, 82, 0.14)",
 };
 
-interface LegacyDrawerContentProps<Session> {
+interface LegacyDrawerContentProps {
     intro?: React.ReactNode;
     renderAddContactButton?: (props: {
         onClick: () => void;
@@ -154,8 +154,7 @@ interface LegacyDrawerContentProps<Session> {
         loading: boolean;
     }) => React.ReactNode;
     open: boolean;
-    getSession: () => Promise<Session>;
-    operations: LegacyOperations<Session>;
+    operations: LegacyOperations;
     suggestedUsers?: LegacySuggestedUser[];
 }
 
@@ -167,14 +166,13 @@ interface ConfirmActionDialogInput {
     action: () => Promise<void>;
 }
 
-export const LegacyDrawerContent = <Session,>({
+export const LegacyDrawerContent: React.FC<LegacyDrawerContentProps> = ({
     intro,
     open,
-    getSession,
     operations,
     suggestedUsers = [],
     renderAddContactButton,
-}: LegacyDrawerContentProps<Session>) => {
+}) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
     const [info, setInfo] = useState<LegacyInfo | undefined>();
     const [isLoading, setIsLoading] = useState(false);
@@ -187,7 +185,7 @@ export const LegacyDrawerContent = <Session,>({
         async (reportErrors: boolean) => {
             setIsLoading(true);
             try {
-                setInfo(await operations.getInfo(await getSession()));
+                setInfo(await operations.getInfo());
                 return true;
             } catch (error) {
                 if (reportErrors) {
@@ -203,7 +201,7 @@ export const LegacyDrawerContent = <Session,>({
                 setIsLoading(false);
             }
         },
-        [getSession, operations, onGenericError],
+        [operations, onGenericError],
     );
 
     const refresh = useCallback(async () => {
@@ -339,7 +337,6 @@ export const LegacyDrawerContent = <Session,>({
         setIsSubmitting(true);
         try {
             await operations.updateRecoveryNotice(
-                await getSession(),
                 selectedOwnerContact.emergencyContact.id,
                 selectedOwnerDays,
             );
@@ -359,7 +356,6 @@ export const LegacyDrawerContent = <Session,>({
             setIsSubmitting(false);
         }
     }, [
-        getSession,
         operations,
         onGenericError,
         refreshAfterMutation,
@@ -391,7 +387,6 @@ export const LegacyDrawerContent = <Session,>({
                             continueColor: "accent",
                             action: async () => {
                                 await operations.startRecovery(
-                                    await getSession(),
                                     selectedTrustedContact.user.id,
                                     selectedTrustedContact.emergencyContact.id,
                                 );
@@ -418,7 +413,6 @@ export const LegacyDrawerContent = <Session,>({
                             continueText: "Cancel recovery",
                             action: async () => {
                                 await operations.stopRecovery(
-                                    await getSession(),
                                     selectedTrustedRecovery.id,
                                     selectedTrustedRecovery.user.id,
                                     selectedTrustedRecovery.emergencyContact.id,
@@ -433,7 +427,6 @@ export const LegacyDrawerContent = <Session,>({
                             continueText: "Remove contact",
                             action: async () => {
                                 await operations.updateContact(
-                                    await getSession(),
                                     selectedTrustedContact.user.id,
                                     selectedTrustedContact.emergencyContact.id,
                                     "CONTACT_LEFT",
@@ -457,7 +450,6 @@ export const LegacyDrawerContent = <Session,>({
                         setIsSubmitting(true);
                         try {
                             await operations.changePassword(
-                                await getSession(),
                                 resetPasswordPage.session.id,
                                 password,
                             );
@@ -750,7 +742,6 @@ export const LegacyDrawerContent = <Session,>({
                 onClose={() => setActiveSheet(undefined)}
             >
                 <LegacyAddContactContent
-                    getSession={getSession}
                     operations={operations}
                     variant="sheet"
                     suggestedUsers={addScreenSuggestedUsers}
@@ -814,7 +805,6 @@ export const LegacyDrawerContent = <Session,>({
                                                 : "Remove contact",
                                         action: async () => {
                                             await operations.updateContact(
-                                                await getSession(),
                                                 selectedOwnerContact.user.id,
                                                 selectedOwnerContact
                                                     .emergencyContact.id,
@@ -852,9 +842,8 @@ export const LegacyDrawerContent = <Session,>({
                             loading={isSubmitting}
                             onClick={() =>
                                 void runAction(
-                                    async () =>
+                                    () =>
                                         operations.updateContact(
-                                            await getSession(),
                                             selectedTrustedInvite.user.id,
                                             selectedTrustedInvite
                                                 .emergencyContact.id,
@@ -870,9 +859,8 @@ export const LegacyDrawerContent = <Session,>({
                             buttonType="tertiaryCritical"
                             onClick={() =>
                                 void runAction(
-                                    async () =>
+                                    () =>
                                         operations.updateContact(
-                                            await getSession(),
                                             selectedTrustedInvite.user.id,
                                             selectedTrustedInvite
                                                 .emergencyContact.id,
@@ -912,7 +900,6 @@ export const LegacyDrawerContent = <Session,>({
                                 continueText: "Reject recovery",
                                 action: async () => {
                                     await operations.rejectRecovery(
-                                        await getSession(),
                                         selectedRecoveryAttempt.id,
                                         selectedRecoveryAttempt.user.id,
                                         selectedRecoveryAttempt.emergencyContact

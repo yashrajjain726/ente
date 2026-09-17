@@ -42,46 +42,30 @@ export interface LegacySuggestedUser {
     email: string;
 }
 
-export interface LegacyOperations<Session> {
-    getInfo(session: Session): Promise<LegacyInfo>;
-    publicKey(session: Session, email: string): Promise<string | undefined>;
+export interface LegacyOperations {
+    getInfo(): Promise<LegacyInfo>;
+    publicKey(email: string): Promise<string | undefined>;
     verificationID(publicKeyB64: string): Promise<string>;
-    addContact(
-        session: Session,
-        email: string,
-        recoveryNoticeInDays?: number,
-    ): Promise<void>;
+    addContact(email: string, recoveryNoticeInDays?: number): Promise<void>;
     updateContact(
-        session: Session,
         userID: number,
         emergencyContactID: number,
         state: LegacyContactRecord["state"],
     ): Promise<void>;
     updateRecoveryNotice(
-        session: Session,
         emergencyContactID: number,
         recoveryNoticeInDays: number,
     ): Promise<void>;
-    startRecovery(
-        session: Session,
-        userID: number,
-        emergencyContactID: number,
-    ): Promise<void>;
+    startRecovery(userID: number, emergencyContactID: number): Promise<void>;
     stopRecovery(
-        session: Session,
         recoveryID: string,
         userID: number,
         emergencyContactID: number,
     ): Promise<void>;
     rejectRecovery(
-        session: Session,
         recoveryID: string,
         userID: number,
         emergencyContactID: number,
     ): Promise<void>;
-    changePassword(
-        session: Session,
-        recoveryID: string,
-        newPassword: string,
-    ): Promise<void>;
+    changePassword(recoveryID: string, newPassword: string): Promise<void>;
 }
