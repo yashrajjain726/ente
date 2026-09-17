@@ -45,7 +45,7 @@ struct LogsView: View {
             }
         }
         .task {
-            refreshEntries()
+            entries = await Self.loadEntries()
         }
         .sheet(item: $shareArchive) { archive in
             ActivityView(activityItems: [archive.url])
@@ -124,11 +124,9 @@ struct LogsView: View {
         }
     }
 
-    private func refreshEntries() {
-        entries = parseLogText(EnsuLogging.shared.readLogText())
-    }
-
-    private func parseLogText(_ text: String) -> [EnsuLogEntry] {
+    @concurrent
+    private static func loadEntries() async -> [EnsuLogEntry] {
+        let text = EnsuLogging.shared.readLogText()
         var entries: [EnsuLogEntry] = []
         for line in text.components(separatedBy: .newlines) {
             guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
@@ -142,7 +140,8 @@ struct LogsView: View {
             {
                 entries.append(
                     EnsuLogEntry(
-                        timestamp: logLineFormatter.date(from: String(line[timestampRange])) ?? Date(),
+                        timestamp: logLineFormatter.date(from: String(line[timestampRange]))
+                            ?? Date(),
                         level: EnsuLogLevel(rawValue: String(line[levelRange])) ?? .info,
                         tag: String(line[tagRange]),
                         message: String(line[messageRange]),
