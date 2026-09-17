@@ -144,6 +144,20 @@ func TestCreateMetaFileUpdatesReadyLockerCount(t *testing.T) {
 	if storage != 10 || photos != 2 || locker != 4 || version != 8 {
 		t.Fatalf("usage state = (%d, %d, %d, %d), want (10, 2, 4, 8)", storage, photos, locker, version)
 	}
+	var app string
+	if err := db.QueryRow(`SELECT app FROM files WHERE owner_id = $1`, userID).Scan(&app); err != nil {
+		t.Fatal(err)
+	}
+	if app != string(ente.Locker) {
+		t.Fatalf("file app = %q, want %q", app, ente.Locker)
+	}
+	var ready bool
+	if err := db.QueryRow(`SELECT file_app_ready FROM usage WHERE user_id = $1`, userID).Scan(&ready); err != nil {
+		t.Fatal(err)
+	}
+	if ready {
+		t.Fatal("new usage row unexpectedly has file app provenance marked ready")
+	}
 }
 
 func setupFileUsageTest(t *testing.T) *sql.DB {
