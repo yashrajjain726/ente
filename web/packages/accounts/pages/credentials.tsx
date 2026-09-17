@@ -3,7 +3,6 @@ import {
     CredentialsForm,
     PasswordForm,
 } from "ente-accounts/components/auth/CredentialsForm";
-import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import { VerifyingPasskey } from "ente-accounts/components/LoginComponents";
 import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
@@ -370,10 +369,7 @@ const Page: React.FC = () => {
                     onChangeEmail={logout}
                 />
             </Shell>
-            <SecondFactorChoice
-                {...secondFactorChoiceProps}
-                presentation={SecondFactorChoiceDialog}
-            />
+            <SecondFactorChoice {...secondFactorChoiceProps} />
         </>
     );
 };

@@ -1,3 +1,4 @@
+import { SignUpForm } from "ente-accounts/components/auth/SignUpForm";
 import {
     replaceSavedLocalUser,
     saveJustSignedUp,
@@ -31,7 +32,6 @@ interface SignUpContentsProps {
     router: NextRouter;
     onLogin: () => void;
     host: string | undefined;
-    presentation: React.ComponentType<SignUpPresentationProps>;
 }
 
 export interface SignUpPresentationProps {
@@ -69,7 +69,6 @@ export const SignUpContents: React.FC<SignUpContentsProps> = ({
     router,
     onLogin,
     host,
-    presentation: Presentation,
 }) => {
     const [isJoinAlbumContext, setIsJoinAlbumContext] = useState(false);
 
@@ -183,7 +182,7 @@ export const SignUpContents: React.FC<SignUpContentsProps> = ({
     }
 
     return (
-        <Presentation
+        <SignUpForm
             email={formik.values.email}
             password={formik.values.password}
             confirmPassword={formik.values.confirmPassword}

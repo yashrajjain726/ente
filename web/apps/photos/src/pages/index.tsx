@@ -1,6 +1,5 @@
 import { DevSettingsDialog } from "@/components/auth/DevSettingsDialog";
 import { PhotosAuthShell } from "@/components/PhotosAuthShell";
-import { SignUpForm } from "ente-accounts/components/auth/SignUpForm";
 import { LoginContents } from "ente-accounts/components/LoginContents";
 import { SignUpContents } from "ente-accounts/components/SignUpContents";
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
@@ -124,7 +123,6 @@ const Page: React.FC = () => {
                         <SignUpContents
                             {...{ router, host }}
                             onLogin={handleShowLogin}
-                            presentation={SignUpForm}
                         />
                     )}
                 </PhotosAuthShell>

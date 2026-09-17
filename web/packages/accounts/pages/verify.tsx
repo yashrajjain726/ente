@@ -1,5 +1,4 @@
 import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
-import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "ente-accounts/components/auth/VerifyEmailForm";
 import { VerifyingPasskey } from "ente-accounts/components/LoginComponents";
 import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
@@ -202,10 +201,7 @@ const Page: React.FC = () => {
                     onChangeEmail={logout}
                 />
             </Shell>
-            <SecondFactorChoice
-                {...secondFactorChoiceProps}
-                presentation={SecondFactorChoiceDialog}
-            />
+            <SecondFactorChoice {...secondFactorChoiceProps} />
         </>
     );
 };

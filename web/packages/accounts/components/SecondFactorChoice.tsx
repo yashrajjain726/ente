@@ -1,6 +1,7 @@
 import type { ModalProps } from "@mui/material";
+import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
-import React, { type ComponentType } from "react";
+import type React from "react";
 
 export type SecondFactorType = "totp" | "passkey";
 
@@ -12,14 +13,12 @@ export interface SecondFactorChoicePresentationProps {
 
 type SecondFactorChoiceProps = ModalVisibilityProps & {
     onSelect: (factor: SecondFactorType) => void;
-    presentation: ComponentType<SecondFactorChoicePresentationProps>;
 };
 
 export const SecondFactorChoice: React.FC<SecondFactorChoiceProps> = ({
     open,
     onClose,
     onSelect,
-    presentation: Presentation,
 }) => {
     const handleDialogClose: ModalProps["onClose"] = (_, reason) => {
         if (reason != "backdropClick") onClose();
@@ -31,7 +30,7 @@ export const SecondFactorChoice: React.FC<SecondFactorChoiceProps> = ({
     };
 
     return (
-        <Presentation
+        <SecondFactorChoiceDialog
             open={open}
             onDialogClose={handleDialogClose}
             onSelect={handleSelect}
