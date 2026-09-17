@@ -1,11 +1,6 @@
 import { Link } from "@mui/material";
 import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
 import { RecoverTwoFactorForm } from "ente-accounts/components/auth/RecoveryForm";
-import {
-    AccountsPageContents,
-    AccountsPageFooter,
-    AccountsPageTitle,
-} from "ente-accounts/components/layouts/centered-paper";
 import { savedPartialLocalUser } from "ente-accounts/services/accounts-db";
 import {
     getRecoverTwoFactor,
@@ -13,25 +8,15 @@ import {
     type TwoFactorRecoveryResponse,
     type TwoFactorType,
 } from "ente-accounts/services/user";
-import { LinkButton } from "ente-base/components/LinkButton";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
-import {
-    SingleInputForm,
-    type SingleInputFormProps,
-} from "ente-base/components/SingleInputForm";
+import type { SingleInputFormProps } from "ente-base/components/SingleInputForm";
 import { useBaseContext } from "ente-base/context";
 import { isHTTP4xxError, isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-    type ComponentType,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trans } from "react-i18next";
 
 export interface TwoFactorRecoverPresentationProps {
@@ -40,19 +25,12 @@ export interface TwoFactorRecoverPresentationProps {
     onBack: () => void;
 }
 
-export interface RecoverPageProps {
+interface RecoverPageProps {
     twoFactorType?: TwoFactorType;
-    presentation?: ComponentType<TwoFactorRecoverPresentationProps>;
 }
 
-const Page: React.FC<RecoverPageProps> = ({
-    twoFactorType = "totp",
-    presentation,
-}) => {
+const Page: React.FC<RecoverPageProps> = ({ twoFactorType = "totp" }) => {
     const { Shell } = useAuthPageConfig();
-    const Presentation =
-        presentation ??
-        (Shell ? ConfiguredRecoverTwoFactorPresentation : undefined);
     const { logout, showMiniDialog, onGenericError } = useBaseContext();
 
     const [sessionID, setSessionID] = useState<string | undefined>(undefined);
@@ -145,44 +123,15 @@ const Page: React.FC<RecoverPageProps> = ({
         return <LoadingIndicator />;
     }
 
-    if (Presentation) {
-        return (
-            <Presentation
+    return (
+        <Shell contentWidth={420}>
+            <RecoverTwoFactorForm
                 onSubmit={handleSubmit}
                 onNoRecoveryKey={handleNoRecoveryKey}
                 onBack={router.back}
             />
-        );
-    }
-
-    return (
-        <AccountsPageContents>
-            <AccountsPageTitle>{t("recover_two_factor")}</AccountsPageTitle>
-            <SingleInputForm
-                autoComplete="off"
-                label={t("recovery_key")}
-                submitButtonTitle={t("recover")}
-                onSubmit={handleSubmit}
-            />
-            <AccountsPageFooter>
-                <LinkButton onClick={() => showContactSupportDialog()}>
-                    {t("no_recovery_key_title")}
-                </LinkButton>
-                <LinkButton onClick={router.back}>{t("go_back")}</LinkButton>
-            </AccountsPageFooter>
-        </AccountsPageContents>
+        </Shell>
     );
 };
 
 export default Page;
-
-function ConfiguredRecoverTwoFactorPresentation(
-    props: TwoFactorRecoverPresentationProps,
-): React.JSX.Element {
-    const Shell = useAuthPageConfig().Shell!;
-    return (
-        <Shell contentWidth={420}>
-            <RecoverTwoFactorForm {...props} />
-        </Shell>
-    );
-}

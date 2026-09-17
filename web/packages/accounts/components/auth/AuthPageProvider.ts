@@ -20,14 +20,16 @@ export interface AuthPageConfig {
         data: string,
     ) => Promise<{ encryptedData: string; nonce: string }>;
     passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
-    Shell?: ComponentType<
-        Pick<AuthPageShellProps, "children" | "contentWidth">
-    >;
+    Shell: ComponentType<Pick<AuthPageShellProps, "children" | "contentWidth">>;
 }
 
-const AuthPageContext = createContext<AuthPageConfig>({});
+const AuthPageContext = createContext<AuthPageConfig | undefined>(undefined);
 
 export const AuthPageProvider = AuthPageContext.Provider;
 
-export const useAuthPageConfig = (): AuthPageConfig =>
-    useContext(AuthPageContext);
+export const useAuthPageConfig = (): AuthPageConfig => {
+    const config = useContext(AuthPageContext);
+    if (!config)
+        throw new Error("AuthPageProvider is required for account pages");
+    return config;
+};

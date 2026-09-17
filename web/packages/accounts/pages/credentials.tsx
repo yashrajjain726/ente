@@ -4,23 +4,13 @@ import {
     PasswordForm,
 } from "ente-accounts/components/auth/CredentialsForm";
 import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
-import { AccountsPageContents } from "ente-accounts/components/layouts/centered-paper";
-import {
-    AccountsPageFooterWithHost,
-    PasswordHeader,
-    VerifyingPasskey,
-    type VerifyingPasskeyPresentationProps,
-} from "ente-accounts/components/LoginComponents";
-import {
-    SecondFactorChoice,
-    type SecondFactorChoicePresentationProps,
-} from "ente-accounts/components/SecondFactorChoice";
+import { VerifyingPasskey } from "ente-accounts/components/LoginComponents";
+import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
 import { sessionExpiredDialogAttributes } from "ente-accounts/components/utils/dialog";
 import { useSecondFactorChoiceIfNeeded } from "ente-accounts/components/utils/second-factor-choice";
 import {
     VerifyMasterPasswordForm,
     type VerifyMasterPasswordFormProps,
-    type VerifyMasterPasswordPresentationProps,
 } from "ente-accounts/components/VerifyMasterPasswordForm";
 import {
     savedIsFirstLogin,
@@ -63,7 +53,6 @@ import {
     generateAndSaveInteractiveKeyAttributes,
     type KeyAttributes,
 } from "ente-accounts/services/user";
-import { LinkButton } from "ente-base/components/LinkButton";
 import { LoadingIndicator } from "ente-base/components/loaders";
 import { useBaseContext } from "ente-base/context";
 import { isDevBuild } from "ente-base/env";
@@ -73,13 +62,7 @@ import { customAPIHost } from "ente-base/origins";
 import { saveAuthToken, savedAuthToken } from "ente-base/token";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import {
-    useCallback,
-    useEffect,
-    useState,
-    type ComponentType,
-    type ReactNode,
-} from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 export interface CredentialsPresentationProps {
     userEmail: string;
@@ -89,31 +72,8 @@ export interface CredentialsPresentationProps {
     onChangeEmail: () => void;
 }
 
-export interface CredentialsPageProps {
-    presentation?: ComponentType<CredentialsPresentationProps>;
-    passwordPresentation?: ComponentType<VerifyMasterPasswordPresentationProps>;
-    passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
-    secondFactorChoicePresentation?: ComponentType<SecondFactorChoicePresentationProps>;
-}
-
-const Page: React.FC<CredentialsPageProps> = ({
-    presentation: explicitPresentation,
-    passwordPresentation: explicitPasswordPresentation,
-    passkeyPresentation: explicitPasskeyPresentation,
-    secondFactorChoicePresentation: explicitSecondFactorChoicePresentation,
-}) => {
-    const { Shell, passkeyPresentation: configuredPasskeyPresentation } =
-        useAuthPageConfig();
-    const Presentation =
-        explicitPresentation ??
-        (Shell ? ConfiguredCredentialsPresentation : undefined);
-    const passkeyPresentation =
-        explicitPasskeyPresentation ?? configuredPasskeyPresentation;
-    const secondFactorChoicePresentation =
-        explicitSecondFactorChoicePresentation ??
-        (Shell ? SecondFactorChoiceDialog : undefined);
-    const passwordPresentation =
-        explicitPasswordPresentation ?? (Shell ? PasswordForm : undefined);
+const Page: React.FC = () => {
+    const { Shell, passkeyPresentation } = useAuthPageConfig();
     const { logout, showMiniDialog } = useBaseContext();
 
     const [userEmail, setUserEmail] = useState<string>("");
@@ -139,8 +99,8 @@ const Page: React.FC<CredentialsPageProps> = ({
     const router = useRouter();
 
     useEffect(() => {
-        if (Presentation) void customAPIHost().then(setHost);
-    }, [Presentation]);
+        void customAPIHost().then(setHost);
+    }, []);
 
     const validateSession = useCallback(async () => {
         const showSessionExpiredDialog = () =>
@@ -389,8 +349,8 @@ const Page: React.FC<CredentialsPageProps> = ({
 
     return (
         <>
-            {Presentation ? (
-                <Presentation
+            <Shell>
+                <CredentialsForm
                     userEmail={userEmail}
                     host={host}
                     passwordForm={
@@ -403,52 +363,19 @@ const Page: React.FC<CredentialsPageProps> = ({
                             }}
                             submitButtonTitle={t("sign_in")}
                             onVerify={handleVerifyMasterPassword}
-                            presentation={passwordPresentation}
+                            presentation={PasswordForm}
                         />
                     }
                     onRecover={handleRecover}
                     onChangeEmail={logout}
                 />
-            ) : (
-                <AccountsPageContents>
-                    <PasswordHeader caption={userEmail} />
-                    <VerifyMasterPasswordForm
-                        {...{
-                            userEmail,
-                            keyAttributes,
-                            getKeyAttributes,
-                            srpAttributes,
-                        }}
-                        submitButtonTitle={t("sign_in")}
-                        onVerify={handleVerifyMasterPassword}
-                    />
-                    <AccountsPageFooterWithHost>
-                        <LinkButton onClick={handleRecover}>
-                            {t("forgot_password")}
-                        </LinkButton>
-                        <LinkButton onClick={logout}>
-                            {t("change_email")}
-                        </LinkButton>
-                    </AccountsPageFooterWithHost>
-                </AccountsPageContents>
-            )}
+            </Shell>
             <SecondFactorChoice
                 {...secondFactorChoiceProps}
-                presentation={secondFactorChoicePresentation}
+                presentation={SecondFactorChoiceDialog}
             />
         </>
     );
 };
 
 export default Page;
-
-function ConfiguredCredentialsPresentation(
-    props: CredentialsPresentationProps,
-): React.JSX.Element {
-    const Shell = useAuthPageConfig().Shell!;
-    return (
-        <Shell>
-            <CredentialsForm {...props} />
-        </Shell>
-    );
-}

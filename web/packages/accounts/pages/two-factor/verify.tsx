@@ -1,6 +1,5 @@
 import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
 import { TwoFactorForm } from "ente-accounts/components/auth/TwoFactorForm";
-import { Verify2FACodeForm } from "ente-accounts/components/Verify2FACodeForm";
 import {
     savedPartialLocalUser,
     saveKeyAttributes,
@@ -10,17 +9,10 @@ import {
     resetSavedLocalUserTokens,
     verifyTwoFactor,
 } from "ente-accounts/services/user";
-import { LinkButton } from "ente-base/components/LinkButton";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
-import { t } from "i18next";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
-import {
-    AccountsPageContents,
-    AccountsPageFooter,
-    AccountsPageTitle,
-} from "../../components/layouts/centered-paper";
+import { useCallback, useEffect, useState } from "react";
 import { unstashRedirect } from "../../services/redirect";
 
 export interface TwoFactorVerifyPresentationProps {
@@ -29,14 +21,8 @@ export interface TwoFactorVerifyPresentationProps {
     onChangeEmail: () => void;
 }
 
-export interface TwoFactorVerifyPageProps {
-    presentation?: ComponentType<TwoFactorVerifyPresentationProps>;
-}
-
-const Page: React.FC<TwoFactorVerifyPageProps> = ({ presentation }) => {
+const Page: React.FC = () => {
     const { Shell } = useAuthPageConfig();
-    const Presentation =
-        presentation ?? (Shell ? ConfiguredTwoFactorPresentation : undefined);
     const { logout } = useBaseContext();
 
     const [twoFactorSessionID, setTwoFactorSessionID] = useState("");
@@ -82,42 +68,15 @@ const Page: React.FC<TwoFactorVerifyPageProps> = ({ presentation }) => {
         [router],
     );
 
-    if (Presentation) {
-        return (
-            <Presentation
+    return (
+        <Shell>
+            <TwoFactorForm
                 onSubmit={handleSubmit}
                 onRecover={handleRecover}
                 onChangeEmail={logout}
             />
-        );
-    }
-
-    return (
-        <AccountsPageContents>
-            <AccountsPageTitle>{t("two_factor")}</AccountsPageTitle>
-            <Verify2FACodeForm
-                onSubmit={handleSubmit}
-                submitButtonText={t("verify")}
-            />
-            <AccountsPageFooter>
-                <LinkButton onClick={handleRecover}>
-                    {t("lost_2fa_device")}
-                </LinkButton>
-                <LinkButton onClick={logout}>{t("change_email")}</LinkButton>
-            </AccountsPageFooter>
-        </AccountsPageContents>
+        </Shell>
     );
 };
 
 export default Page;
-
-function ConfiguredTwoFactorPresentation(
-    props: TwoFactorVerifyPresentationProps,
-): React.JSX.Element {
-    const Shell = useAuthPageConfig().Shell!;
-    return (
-        <Shell>
-            <TwoFactorForm {...props} />
-        </Shell>
-    );
-}

@@ -1,20 +1,8 @@
-import { Box, Typography } from "@mui/material";
 import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
 import { SecondFactorChoiceDialog } from "ente-accounts/components/auth/SecondFactorChoiceDialog";
 import { VerifyEmailForm } from "ente-accounts/components/auth/VerifyEmailForm";
-import {
-    AccountsPageContents,
-    AccountsPageFooter,
-    AccountsPageTitle,
-} from "ente-accounts/components/layouts/centered-paper";
-import {
-    VerifyingPasskey,
-    type VerifyingPasskeyPresentationProps,
-} from "ente-accounts/components/LoginComponents";
-import {
-    SecondFactorChoice,
-    type SecondFactorChoicePresentationProps,
-} from "ente-accounts/components/SecondFactorChoice";
+import { VerifyingPasskey } from "ente-accounts/components/LoginComponents";
+import { SecondFactorChoice } from "ente-accounts/components/SecondFactorChoice";
 import { useSecondFactorChoiceIfNeeded } from "ente-accounts/components/utils/second-factor-choice";
 import {
     replaceSavedLocalUser,
@@ -47,12 +35,8 @@ import {
     sendOTT,
     verifyEmail,
 } from "ente-accounts/services/user";
-import { LinkButton } from "ente-base/components/LinkButton";
 import { LoadingIndicator } from "ente-base/components/loaders";
-import {
-    SingleInputForm,
-    type SingleInputFormProps,
-} from "ente-base/components/SingleInputForm";
+import type { SingleInputFormProps } from "ente-base/components/SingleInputForm";
 import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import log from "ente-base/log";
@@ -60,8 +44,7 @@ import { clearSessionStorage } from "ente-base/session-storage";
 import { saveAuthToken } from "ente-base/token";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
-import { Trans } from "react-i18next";
+import { useCallback, useEffect, useState } from "react";
 
 export interface VerifyEmailPresentationProps {
     email: string;
@@ -71,27 +54,8 @@ export interface VerifyEmailPresentationProps {
     onChangeEmail: () => void;
 }
 
-export interface VerifyPageProps {
-    presentation?: ComponentType<VerifyEmailPresentationProps>;
-    passkeyPresentation?: ComponentType<VerifyingPasskeyPresentationProps>;
-    secondFactorChoicePresentation?: ComponentType<SecondFactorChoicePresentationProps>;
-}
-
-const Page: React.FC<VerifyPageProps> = ({
-    presentation: explicitPresentation,
-    passkeyPresentation: explicitPasskeyPresentation,
-    secondFactorChoicePresentation: explicitSecondFactorChoicePresentation,
-}) => {
-    const { Shell, passkeyPresentation: configuredPasskeyPresentation } =
-        useAuthPageConfig();
-    const Presentation =
-        explicitPresentation ??
-        (Shell ? ConfiguredVerifyEmailPresentation : undefined);
-    const passkeyPresentation =
-        explicitPasskeyPresentation ?? configuredPasskeyPresentation;
-    const secondFactorChoicePresentation =
-        explicitSecondFactorChoicePresentation ??
-        (Shell ? SecondFactorChoiceDialog : undefined);
+const Page: React.FC = () => {
+    const { Shell, passkeyPresentation } = useAuthPageConfig();
     const { logout, showMiniDialog } = useBaseContext();
 
     const [email, setEmail] = useState("");
@@ -227,70 +191,22 @@ const Page: React.FC<VerifyPageProps> = ({
         );
     }
 
-    if (Presentation) {
-        return (
-            <>
-                <Presentation
+    return (
+        <>
+            <Shell>
+                <VerifyEmailForm
                     email={email}
                     resend={resend}
                     onSubmit={onSubmit}
                     onResend={resendEmail}
                     onChangeEmail={logout}
                 />
-                <SecondFactorChoice
-                    {...secondFactorChoiceProps}
-                    presentation={secondFactorChoicePresentation}
-                />
-            </>
-        );
-    }
-
-    return (
-        <AccountsPageContents>
-            <AccountsPageTitle>
-                <Trans
-                    i18nKey="email_sent"
-                    components={{
-                        a: (
-                            <Box
-                                component={"span"}
-                                sx={{
-                                    color: "text.muted",
-                                    wordBreak: "break-word",
-                                }}
-                            />
-                        ),
-                    }}
-                    values={{ email }}
-                />
-            </AccountsPageTitle>
-
-            <Typography variant="small" sx={{ color: "text.muted", mb: 2 }}>
-                {t("check_inbox_hint")}
-            </Typography>
-            <SingleInputForm
-                autoComplete="one-time-code"
-                label={t("verification_code")}
-                submitButtonTitle={t("verify")}
-                onSubmit={onSubmit}
-            />
-
-            <AccountsPageFooter>
-                {resend == "enable" && (
-                    <LinkButton onClick={resendEmail}>
-                        {t("resend_code")}
-                    </LinkButton>
-                )}
-                {resend == "sending" && <span>{t("status_sending")}</span>}
-                {resend == "sent" && <span>{t("status_sent")}</span>}
-                <LinkButton onClick={logout}>{t("change_email")}</LinkButton>
-            </AccountsPageFooter>
-
+            </Shell>
             <SecondFactorChoice
                 {...secondFactorChoiceProps}
-                presentation={secondFactorChoicePresentation}
+                presentation={SecondFactorChoiceDialog}
             />
-        </AccountsPageContents>
+        </>
     );
 };
 
@@ -323,14 +239,3 @@ const redirectionIfNeededOrEmail = async () => {
 
     return { email };
 };
-
-function ConfiguredVerifyEmailPresentation(
-    props: VerifyEmailPresentationProps,
-): React.JSX.Element {
-    const Shell = useAuthPageConfig().Shell!;
-    return (
-        <Shell>
-            <VerifyEmailForm {...props} />
-        </Shell>
-    );
-}

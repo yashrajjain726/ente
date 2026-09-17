@@ -23,12 +23,6 @@ interface HeaderCaptionProps {
     caption?: string;
 }
 
-export const PasswordHeader: React.FC<HeaderCaptionProps> = (props) => (
-    <AccountsPageTitleWithCaption {...props}>
-        {t("password")}
-    </AccountsPageTitleWithCaption>
-);
-
 const PasskeyHeader: React.FC<HeaderCaptionProps> = (props) => (
     <AccountsPageTitleWithCaption {...props}>
         {t("passkey")}
