@@ -87,8 +87,7 @@ public fun ActionButton(
     ) {
         Row(
             modifier =
-                Modifier.heightIn(min = if (inlineLink) 0.dp else 24.dp)
-                    .padding(
+                Modifier.padding(
                         horizontal = if (inlineLink) 0.dp else EnteSpacing.xl,
                         vertical =
                             if (inlineLink) {
@@ -98,7 +97,8 @@ public fun ActionButton(
                             } else {
                                 12.dp
                             },
-                    ),
+                    )
+                    .heightIn(min = if (inlineLink) 0.dp else 24.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {

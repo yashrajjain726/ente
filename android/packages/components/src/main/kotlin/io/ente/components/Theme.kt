@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -51,7 +52,7 @@ public object EnteMotion {
 }
 
 public object EnteTypography {
-    public val display: TextStyle =
+    public val display2: TextStyle =
         TextStyle(
             fontFamily = EnteFontFamily.outfit,
             fontSize = 24.sp,
@@ -74,7 +75,8 @@ public fun EnteTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalEntePalette provides palette(app, darkTheme), content = content)
+    val palette = remember(app, darkTheme) { palette(app, darkTheme) }
+    CompositionLocalProvider(LocalEntePalette provides palette, content = content)
 }
 
 private fun palette(app: EnteApp, dark: Boolean): Palette {

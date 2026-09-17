@@ -59,7 +59,7 @@ public enum EnteMotion {
 }
 
 public enum EnteTypography {
-    public static let display = EnteFont.outfit(size: 24, relativeTo: .title)
+    public static let display2 = EnteFont.outfit(size: 24, relativeTo: .title)
     public static let body = EnteFont.inter(size: 14, weight: .medium, relativeTo: .body)
     public static let bodyBold = EnteFont.inter(size: 14, weight: .semibold, relativeTo: .body)
 }

@@ -73,35 +73,29 @@ private struct ActionStyle: ButtonStyle {
     let cornerRadius: CGFloat
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(foreground(pressed: configuration.isPressed))
-            .background(background(pressed: configuration.isPressed))
+        let colors = colors(pressed: configuration.isPressed)
+        return configuration.label
+            .foregroundStyle(colors.foreground)
+            .background(colors.background)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: EnteMotion.quick), value: configuration.isPressed)
     }
 
-    private func background(pressed: Bool) -> Color {
+    private func colors(pressed: Bool) -> (background: Color, foreground: Color) {
         guard enabled else {
-            return variant == .criticalText || variant == .link ? .clear : palette.fill
+            return (
+                variant == .criticalText || variant == .link ? .clear : palette.fill,
+                palette.disabledText
+            )
         }
         return switch variant {
-        case .primary: pressed ? palette.primaryDarker : palette.primary
-        case .secondary: pressed ? palette.fillDarkest : palette.fill
-        case .neutral: palette.text
-        case .critical: pressed ? palette.dangerDarker : palette.danger
-        case .criticalText, .link: .clear
-        }
-    }
-
-    private func foreground(pressed: Bool) -> Color {
-        guard enabled else { return palette.disabledText }
-        return switch variant {
-        case .primary, .critical: .white
-        case .secondary: palette.text
-        case .neutral: palette.reverseText
-        case .criticalText: pressed ? palette.dangerDarker : palette.danger
-        case .link: pressed ? palette.primaryDarker : palette.primary
+        case .primary: (pressed ? palette.primaryDarker : palette.primary, .white)
+        case .secondary: (pressed ? palette.fillDarkest : palette.fill, palette.text)
+        case .neutral: (palette.text, palette.reverseText)
+        case .critical: (pressed ? palette.dangerDarker : palette.danger, .white)
+        case .criticalText: (.clear, pressed ? palette.dangerDarker : palette.danger)
+        case .link: (.clear, pressed ? palette.primaryDarker : palette.primary)
         }
     }
 }
