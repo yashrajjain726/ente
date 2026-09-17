@@ -279,6 +279,7 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
         )
         .toList();
     final memoryLaneCard = hasMemoryLane ? cards.first : null;
+    final memoryLaneIndex = getMemoryLaneInsertionIndex(memories);
     return [
       if (_shouldShowCraftingMemories && hasContent)
         MemoryCardWrapper(
@@ -296,9 +297,9 @@ class _MemoriesStripWidgetState extends State<MemoriesStripWidget> {
             },
           ),
         ),
-      ...cards.skip(hasMemoryLane ? 1 : 0).take(1),
+      ...cards.skip(hasMemoryLane ? 1 : 0).take(memoryLaneIndex),
       if (memoryLaneCard != null && !hasSeenMemoryLane) memoryLaneCard,
-      ...cards.skip(hasMemoryLane ? 2 : 1),
+      ...cards.skip((hasMemoryLane ? 1 : 0) + memoryLaneIndex),
       if (memoryLaneCard != null && hasSeenMemoryLane) memoryLaneCard,
     ];
   }

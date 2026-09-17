@@ -13,6 +13,11 @@ import "package:photos/ui/home/memories/memory_cover_util.dart";
 import "package:photos/ui/home/memories/memory_music_session.dart";
 import "package:photos/ui/viewer/people/memory_lane_page_v2.dart";
 
+int getMemoryLaneInsertionIndex(List<SmartMemory> memories) {
+  return memories.indexWhere((memory) => memory.type == MemoryType.onThisDay) +
+      1;
+}
+
 Future<void> openAllMemoriesPage({
   required List<SmartMemory> allMemories,
   required int initialPageIndex,
@@ -113,14 +118,17 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
         (widget.isFromMemoriesStrip
             ? widget.isMemoryLaneSeen
             : localSettings.hasSeenMemoryLane(memoryLane.personId));
+    final memories = widget.allMemories
+        .where((memory) => memory.memories.isNotEmpty)
+        .toList();
+    final memoryLaneIndex = hasSeenMemoryLane
+        ? memories.length
+        : getMemoryLaneInsertionIndex(memories);
     final pages = <MemoryPageWrapper>[];
-    for (final smartMemory in widget.allMemories) {
-      if (smartMemory.memories.isEmpty) continue;
+    for (final smartMemory in memories) {
       final index =
           pages.length +
-          (memoryLane != null && !hasSeenMemoryLane && pages.isNotEmpty
-              ? 1
-              : 0);
+          (memoryLane != null && pages.length >= memoryLaneIndex ? 1 : 0);
       pages.add(
         MemoryPageWrapper(
           id: smartMemory.id,
@@ -156,7 +164,7 @@ class _AllMemoriesPageState extends State<AllMemoriesPage> {
     }
     if (memoryLane != null) {
       pages.insert(
-        hasSeenMemoryLane || pages.isEmpty ? pages.length : 1,
+        memoryLaneIndex,
         MemoryPageWrapper(
           id: "memoryLane_${memoryLane.personId}",
           widget: ({onNextMemory, onPreviousMemory}) => MemoryLanePageV2(
