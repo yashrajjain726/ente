@@ -11,6 +11,7 @@ import {
     type PostObjectPayload,
     type PostPage,
     type PostResponse,
+    type ProfileAvatarResponse,
     type SpaceAccountCtxHandle,
     type SpaceActorResponse,
     type SpaceLinkCtxHandle,
@@ -45,12 +46,7 @@ import { normalizeSpaceMessageText } from "utils/message-limits";
 
 export { clearSpaceMediaURLCache } from "services/media-cache";
 
-interface SpaceAvatar {
-    keyVersion: number;
-    objectID: string;
-    size?: number;
-    updatedAt?: string;
-}
+type SpaceAvatar = Pick<ProfileAvatarResponse, "objectID" | "keyVersion">;
 
 type SpaceCover = SpaceAvatar;
 
@@ -1091,8 +1087,6 @@ export const loadCurrentSpacePostAvatarURL: SpacePostAvatarURLLoader = async (
     const avatar = {
         keyVersion: post.avatarKeyVersion,
         objectID: post.avatarObjectID,
-        size: post.avatarSize,
-        updatedAt: post.avatarUpdatedAt,
     };
     const cachedAvatarURL = await cachedAccountAvatarURLIfPresent(
         post.spaceId,
@@ -1123,8 +1117,6 @@ export const loadCurrentFriendAvatarURL = async (
     const avatar = {
         keyVersion: friend.avatarKeyVersion,
         objectID: friend.avatarObjectID,
-        size: friend.avatarSize,
-        updatedAt: friend.avatarUpdatedAt,
     };
     const cachedAvatarURL = await cachedAccountAvatarURLIfPresent(
         friend.spaceId,
@@ -1415,8 +1407,6 @@ export const loadCurrentMessageConversationAvatar = async (
             {
                 keyVersion: friend.avatarKeyVersion,
                 objectID: friend.avatarObjectID,
-                size: friend.avatarSize,
-                updatedAt: friend.avatarUpdatedAt,
             },
             viewerSpaceId,
         );

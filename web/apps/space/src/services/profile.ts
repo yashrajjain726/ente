@@ -5,6 +5,7 @@ import { apiOrigin, apiURL } from "ente-base/origins";
 import {
     openSpaceAccountContext,
     type DecryptedSpaceProfile,
+    type ProfileAvatarResponse,
     type SpaceAccountCtxHandle,
     type SpaceKeyResponse,
     type UpdateSpaceProfileResponse,
@@ -37,12 +38,7 @@ const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
 const minUsernameLength = 4;
 const maxUsernameLength = 30;
 
-interface SpaceAvatar {
-    keyVersion: number;
-    objectID: string;
-    size?: number;
-    updatedAt?: string;
-}
+type SpaceAvatar = Pick<ProfileAvatarResponse, "objectID" | "keyVersion">;
 
 type SpaceCover = SpaceAvatar;
 

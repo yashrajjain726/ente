@@ -12,6 +12,7 @@ export type {
     PostObjectPayload,
     PostPage,
     PostResponse,
+    ProfileAvatarResponse,
     SpaceAccountCtxHandle,
     SpaceActorResponse,
     SpaceKeyResponse,
