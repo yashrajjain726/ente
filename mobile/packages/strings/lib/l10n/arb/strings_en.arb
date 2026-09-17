@@ -654,6 +654,14 @@
   },
   "cleanUncategorized": "Clean Uncategorized",
   "cleanUncategorizedDescription": "Remove all files from Uncategorized that are present in other albums",
+  "cleanedUncategorizedItems": "{count, plural, one{Cleaned {count} item.} other{Cleaned {count} items.}}",
+  "@cleanedUncategorizedItems": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "cleanupComplete": "Cleanup complete",
   "cleanupHiddenFiles": "Clean up hidden files",
   "cleanupHiddenFilesDescription": "Some files in hidden albums still exist in non-hidden albums making them visible outside of the hidden section. Cleaning up will remove them from non-hidden albums.",
@@ -2898,6 +2906,7 @@
     }
   },
   "nothingToSeeHere": "Nothing to see here",
+  "nothingToCleanUpInUncategorized": "Nothing to clean up. These files are not in your other albums.",
   "nothingToTidyUpHere": "Nothing to tidy up here",
   "notifications": "Notifications",
   "notifyMe": "Notify me",
@@ -4615,6 +4624,7 @@
   "unarchiving": "Unarchiving...",
   "unavailableReferralCode": "This code is already taken",
   "uncategorized": "Uncategorized",
+  "uncategorizedIsClean": "Uncategorized is clean.",
   "uncategorizedItemsWillShowUpHere": "Uncategorized items will show up here",
   "undo": "Undo",
   "unhide": "Unhide",

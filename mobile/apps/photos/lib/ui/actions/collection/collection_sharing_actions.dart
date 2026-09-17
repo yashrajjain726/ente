@@ -518,7 +518,8 @@ class CollectionActions {
     await collectionsService.trashEmptyCollection(collection);
   }
 
-  Future<void> removeFromUncatIfPresentInOtherAlbum(
+  Future<({int uncategorizedFilesCount, int removedFilesCount})>
+  removeFromUncatIfPresentInOtherAlbum(
     Collection collection,
     BuildContext bContext,
   ) async {
@@ -526,15 +527,21 @@ class CollectionActions {
       final List<EnteFile> files = await FilesDB.instance.getAllFilesCollection(
         collection.id,
       );
-      if (!bContext.mounted) return;
-      await moveFilesFromCurrentCollection(bContext, collection, files);
-    } catch (e) {
-      logger.severe("Failed to remove files from uncategorized", e);
-      if (!bContext.mounted) return;
-      await showErrorDialogForException(
-        context: bContext,
-        exception: e as Exception,
+      if (!bContext.mounted) {
+        return (uncategorizedFilesCount: files.length, removedFilesCount: 0);
+      }
+      final removedFilesCount = await moveFilesFromCurrentCollection(
+        bContext,
+        collection,
+        files,
       );
+      return (
+        uncategorizedFilesCount: files.length,
+        removedFilesCount: removedFilesCount,
+      );
+    } catch (e, s) {
+      logger.severe("Failed to remove files from uncategorized", e, s);
+      rethrow;
     }
   }
 
@@ -556,12 +563,13 @@ class CollectionActions {
   // Moving an owned file must call the move API even if it is already in
   // another owned collection, because move also removes it from this one.
   // Files owned by someone else can only be removed from this collection.
-  Future<void> moveFilesFromCurrentCollection(
+  Future<int> moveFilesFromCurrentCollection(
     BuildContext? context,
     Collection collection,
     Iterable<EnteFile> files, {
     bool isHidden = false,
   }) async {
+    var movedFilesCount = 0;
     final int currentUserID = Configuration.instance.getUserID()!;
     final isCollectionOwner = collection.owner.id == currentUserID;
     final bool canRemoveAllParticipants = collectionsService
@@ -583,26 +591,27 @@ class CollectionActions {
           filesToRemove,
         );
       }
-      return;
+      return filesToRemove.length;
     }
     if (isCollectionOwner && split.ownedByOtherUsers.isNotEmpty) {
       await collectionsService.removeFromCollection(
         collection.id,
         split.ownedByOtherUsers,
       );
+      movedFilesCount += split.ownedByOtherUsers.length;
     } else if (!isCollectionOwner && split.ownedByCurrentUser.isNotEmpty) {
       await collectionsService.removeFromCollection(
         collection.id,
         split.ownedByCurrentUser,
       );
-      return;
+      return split.ownedByCurrentUser.length;
     }
 
     if (!isCollectionOwner && split.ownedByOtherUsers.isNotEmpty) {
       if (context != null && context.mounted) {
         showShortToast(context, context.strings.canOnlyRemoveFilesOwnedByYou);
       }
-      return;
+      return movedFilesCount;
     }
 
     final Map<int, EnteFile> pendingAssignMap = {};
@@ -693,13 +702,16 @@ class CollectionActions {
           'skipping moving ${entry.value.length} files to uncategorized collection',
         );
       } else {
+        final movedFilesInCollection = entry.value.length;
         await collectionsService.move(
           entry.value,
           toCollectionID: entry.key,
           fromCollectionID: collection.id,
         );
+        movedFilesCount += movedFilesInCollection;
       }
     }
+    return movedFilesCount;
   }
 
   bool _isAutoMoveCandidate(int fromCollectionID, toCollectionID, int userID) {

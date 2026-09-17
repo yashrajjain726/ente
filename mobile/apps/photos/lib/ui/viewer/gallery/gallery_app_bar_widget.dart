@@ -1085,19 +1085,36 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
   }
 
   Future<void> onCleanUncategorizedClick(BuildContext buildContext) async {
+    var cleanupResult = (uncategorizedFilesCount: 0, removedFilesCount: 0);
     final actionResult = await showChoiceActionSheet(
       context,
       isCritical: true,
       title: context.strings.cleanUncategorized,
       firstButtonLabel: context.strings.confirm,
       body: context.strings.cleanUncategorizedDescription,
+      firstButtonOnTap: () async {
+        cleanupResult = await collectionActions
+            .removeFromUncatIfPresentInOtherAlbum(widget.collection!, context);
+      },
     );
     if (actionResult?.action != null && mounted) {
       if (actionResult!.action == ButtonAction.first) {
         if (!buildContext.mounted) return;
-        await collectionActions.removeFromUncatIfPresentInOtherAlbum(
-          widget.collection!,
+        showShortToast(
           buildContext,
+          cleanupResult.removedFilesCount > 0
+              ? buildContext.strings.cleanedUncategorizedItems(
+                  count: cleanupResult.removedFilesCount,
+                )
+              : cleanupResult.uncategorizedFilesCount == 0
+              ? buildContext.strings.uncategorizedIsClean
+              : buildContext.strings.nothingToCleanUpInUncategorized,
+        );
+      } else if (actionResult.action == ButtonAction.error) {
+        if (!buildContext.mounted) return;
+        await showGenericErrorDialog(
+          context: buildContext,
+          error: actionResult.exception,
         );
       }
     }
