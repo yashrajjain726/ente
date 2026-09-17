@@ -26,7 +26,6 @@ import "package:photos/models/metadata/common_keys.dart";
 import 'package:photos/models/selected_files.dart';
 import 'package:photos/module/download/gallery.dart';
 import 'package:photos/service_locator.dart';
-import 'package:photos/services/app_navigation_service.dart';
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/files_service.dart";
 import "package:photos/services/review_service.dart";
@@ -1087,38 +1086,37 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
 
   Future<void> onCleanUncategorizedClick(BuildContext buildContext) async {
     var cleanupResult = (uncategorizedFilesCount: 0, removedFilesCount: 0);
-    final strings = context.strings;
     final actionResult = await showChoiceActionSheet(
       context,
       isCritical: true,
-      title: strings.cleanUncategorized,
-      firstButtonLabel: strings.confirm,
-      body: strings.cleanUncategorizedDescription,
+      title: context.strings.cleanUncategorized,
+      firstButtonLabel: context.strings.confirm,
+      body: context.strings.cleanUncategorizedDescription,
       firstButtonOnTap: () async {
         cleanupResult = await collectionActions
             .removeFromUncatIfPresentInOtherAlbum(widget.collection!, context);
       },
     );
-    if (actionResult?.action == ButtonAction.first) {
-      final toastContext =
-          AppNavigationService.instance.navigatorKey.currentContext;
-      if (toastContext == null || !toastContext.mounted) return;
-      showShortToast(
-        toastContext,
-        cleanupResult.removedFilesCount > 0
-            ? strings.cleanedUncategorizedItems(
-                count: cleanupResult.removedFilesCount,
-              )
-            : cleanupResult.uncategorizedFilesCount == 0
-            ? strings.uncategorizedIsClean
-            : strings.nothingToCleanUpInUncategorized,
-      );
-    } else if (actionResult?.action == ButtonAction.error) {
-      if (!buildContext.mounted) return;
-      await showGenericErrorDialog(
-        context: buildContext,
-        error: actionResult?.exception,
-      );
+    if (actionResult?.action != null && mounted) {
+      if (actionResult!.action == ButtonAction.first) {
+        if (!buildContext.mounted) return;
+        showShortToast(
+          buildContext,
+          cleanupResult.removedFilesCount > 0
+              ? buildContext.strings.cleanedUncategorizedItems(
+                  count: cleanupResult.removedFilesCount,
+                )
+              : cleanupResult.uncategorizedFilesCount == 0
+              ? buildContext.strings.uncategorizedIsClean
+              : buildContext.strings.nothingToCleanUpInUncategorized,
+        );
+      } else if (actionResult.action == ButtonAction.error) {
+        if (!buildContext.mounted) return;
+        await showGenericErrorDialog(
+          context: buildContext,
+          error: actionResult.exception,
+        );
+      }
     }
   }
 

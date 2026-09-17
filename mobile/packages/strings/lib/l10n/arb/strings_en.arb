@@ -2906,7 +2906,7 @@
     }
   },
   "nothingToSeeHere": "Nothing to see here",
-  "nothingToCleanUpInUncategorized": "Nothing to clean up because no items are in your other albums",
+  "nothingToCleanUpInUncategorized": "Nothing to clean up.",
   "nothingToTidyUpHere": "Nothing to tidy up here",
   "notifications": "Notifications",
   "notifyMe": "Notify me",
