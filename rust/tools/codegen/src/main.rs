@@ -478,8 +478,7 @@ fn sanitize_generated_swift_bindings(swift_file: &Path, crate_name: &str) -> Res
         .map_err(|error| format!("failed to read {}: {error}", swift_file.display()))?;
     let free_call_prefix = format!("try! rustCall {{ uniffi_{crate_name}_fn_free_");
 
-    let mut rewritten = String::with_capacity(original.len());
-    let mut replaced = false;
+    let mut rewritten = String::from("// swift-format-ignore-file\n");
 
     for segment in original.split_inclusive('\n') {
         let line = segment.strip_suffix('\n').unwrap_or(segment);
@@ -494,16 +493,13 @@ fn sanitize_generated_swift_bindings(swift_file: &Path, crate_name: &str) -> Res
             if segment.ends_with('\n') {
                 rewritten.push('\n');
             }
-            replaced = true;
         } else {
             rewritten.push_str(segment);
         }
     }
 
-    if replaced {
-        fs::write(swift_file, rewritten)
-            .map_err(|error| format!("failed to write {}: {error}", swift_file.display()))?;
-    }
+    fs::write(swift_file, rewritten)
+        .map_err(|error| format!("failed to write {}: {error}", swift_file.display()))?;
 
     Ok(())
 }

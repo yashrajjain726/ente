@@ -16,6 +16,5 @@ empty_count:
   only_after_dot: true
 
 excluded:
-  - apps/ensu/Ensu/Generated/ensu.swift
-  - apps/cast/Cast/Generated/cast.swift
+  - "apps/*/*/Generated"
   - .build

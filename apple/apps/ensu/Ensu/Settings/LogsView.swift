@@ -133,20 +133,16 @@ struct LogsView: View {
         for line in text.components(separatedBy: .newlines) {
             guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
 
-            if let match = logLineRegex.firstMatch(
-                in: line, options: [], range: NSRange(line.startIndex..., in: line)),
-                let tagRange = Range(match.range(at: 1), in: line),
-                let levelRange = Range(match.range(at: 2), in: line),
-                let timestampRange = Range(match.range(at: 3), in: line),
-                let messageRange = Range(match.range(at: 4), in: line)
+            if let match = line.wholeMatch(
+                of: #/\[(.+?)\]\[(.+?)\] \[(.+?)\] (.*)/#.matchingSemantics(.unicodeScalar))
             {
+                let (_, tag, level, timestamp, message) = match.output
                 entries.append(
                     EnsuLogEntry(
-                        timestamp: logLineFormatter.date(from: String(line[timestampRange]))
-                            ?? Date(),
-                        level: EnsuLogLevel(rawValue: String(line[levelRange])) ?? .info,
-                        tag: String(line[tagRange]),
-                        message: String(line[messageRange]),
+                        timestamp: logLineFormatter.date(from: String(timestamp)) ?? Date(),
+                        level: EnsuLogLevel(rawValue: String(level)) ?? .info,
+                        tag: String(tag),
+                        message: String(message),
                         details: nil
                     )
                 )
@@ -322,12 +318,6 @@ private let logLineFormatter: DateFormatter = {
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
     return formatter
-}()
-
-private let logLineRegex: NSRegularExpression = {
-    let pattern = "^\\[(.+?)\\]\\[(.+?)\\] \\[(.+?)\\] (.*)$"
-    // swift-format-ignore: NeverUseForceTry
-    return try! NSRegularExpression(pattern: pattern, options: [])
 }()
 
 import UIKit

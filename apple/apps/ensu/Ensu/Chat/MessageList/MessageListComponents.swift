@@ -860,12 +860,6 @@ private let messageInlineFonts = InlineFontSet(
     mathSize: 15
 )
 
-// swift-format-ignore: NeverUseForceTry
-private let inlineMathPattern = try! NSRegularExpression(
-    pattern: #"(?<!\\)\$(?!\$)(?:[^$\n\\]|\\.)+?(?<!\\)\$(?!\$)|\\\((?:[^\n\\]|\\.)+?\\\)"#,
-    options: []
-)
-
 private func parseInlineSegments(_ text: String) -> [InlineSegment] {
     let characters = Array(text)
     var segments: [InlineSegment] = []
@@ -881,7 +875,9 @@ private func parseInlineSegments(_ text: String) -> [InlineSegment] {
     }
 
     while index < characters.count {
-        if let mathMatch = findInlineMathMatch(characters, startIndex: index) {
+        if currentStyle != .code,
+            let mathMatch = findInlineMathMatch(characters, startIndex: index)
+        {
             flushBuffer()
             segments.append(.math(mathMatch.latex))
             index = mathMatch.endIndex
@@ -960,6 +956,7 @@ private func findInlineMathMatch(_ characters: [Character], startIndex: Int) -> 
                     return nil
                 }
                 if characters[index + 1] == ")" {
+                    guard index > startIndex + 2 else { return nil }
                     return InlineMathMatch(
                         latex: String(characters[(startIndex + 2)..<index]),
                         endIndex: index + 2
@@ -973,7 +970,10 @@ private func findInlineMathMatch(_ characters: [Character], startIndex: Int) -> 
         return nil
     }
 
-    if characters[startIndex] != "$" || (startIndex > 0 && characters[startIndex - 1] == "\\") {
+    if characters[startIndex] != "$"
+        || (startIndex > 0
+            && (characters[startIndex - 1] == "\\" || characters[startIndex - 1] == "$"))
+    {
         return nil
     }
     if startIndex + 1 < characters.count && characters[startIndex + 1] == "$" {
@@ -985,10 +985,10 @@ private func findInlineMathMatch(_ characters: [Character], startIndex: Int) -> 
         if characters[index] == "\n" {
             return nil
         }
-        if characters[index] == "$" && characters[index - 1] != "\\"
-            && (index + 1 >= characters.count || characters[index + 1] != "$")
-        {
-            if index == startIndex + 1 {
+        if characters[index] == "$" && characters[index - 1] != "\\" {
+            if index == startIndex + 1
+                || (index + 1 < characters.count && characters[index + 1] == "$")
+            {
                 return nil
             }
             return InlineMathMatch(
@@ -1041,9 +1041,10 @@ private func hasClosingSingleAsterisk(_ characters: [Character], startIndex: Int
 }
 
 private func containsInlineMath(_ text: String) -> Bool {
-    let nsText = text as NSString
-    return inlineMathPattern.firstMatch(
-        in: text, range: NSRange(location: 0, length: nsText.length)) != nil
+    parseInlineSegments(text).contains {
+        if case .math = $0 { return true }
+        return false
+    }
 }
 
 private func styledInlineText(
