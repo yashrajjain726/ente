@@ -95,7 +95,7 @@ func (fc *FileCopyController) CopyFiles(c *gin.Context, req ente.CopyFileSyncReq
 
 	// Reuse upload URLs so abandoned copies are cleaned up as orphan objects.
 	// todo:(neeraj) optimize this method by removing the need for getting a signed url for each object
-	uploadUrls, err := fc.FileController.GetUploadURLs(c, userID, len(s3ObjectsToCopy), app, true, network.GetClientInfoForStorage(c))
+	uploadUrls, err := fc.FileController.GetUploadURLs(c, userID, len(s3ObjectsToCopy), app, true, network.GetClientInfo(c))
 	if err != nil {
 		return nil, err
 	}

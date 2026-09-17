@@ -12,7 +12,7 @@ func (h *Handlers) PresignUpload(c *gin.Context, space *spacerepo.SpaceRecord) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	resp, err := h.Module.Assets.PresignUpload(c, space, req, network.GetClientInfoForStorage(c))
+	resp, err := h.Module.Assets.PresignUpload(c, space, req, network.GetClientInfo(c))
 	respondJSON(c, resp, err)
 }
 

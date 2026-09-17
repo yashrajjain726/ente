@@ -203,7 +203,7 @@ func (c *Controller) GetAttachmentUploadURL(ctx *gin.Context, attachmentTypeRaw 
 		Purpose:       "attachment",
 		ContentLength: &req.ContentLength,
 		ContentMD5:    contentMD5,
-		Client:        network.GetClientInfoForStorage(ctx),
+		Client:        network.GetClientInfo(ctx),
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to stage temp object for attachment upload")
 	}

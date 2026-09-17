@@ -1,9 +1,6 @@
 package network
 
 import (
-	"strings"
-	"unicode/utf8"
-
 	"github.com/gin-gonic/gin"
 	"github.com/ua-parser/uap-go/uaparser"
 )
@@ -41,18 +38,4 @@ func GetClientInfo(gin *gin.Context) string {
 		return client
 	}
 	return client + "/" + version
-}
-
-func GetClientInfoForStorage(c *gin.Context) string {
-	var client strings.Builder
-	for _, r := range GetClientInfo(c) {
-		if r == 0 {
-			continue
-		}
-		if client.Len()+utf8.RuneLen(r) > 256 {
-			break
-		}
-		client.WriteRune(r)
-	}
-	return client.String()
 }

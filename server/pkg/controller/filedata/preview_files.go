@@ -51,7 +51,7 @@ func (c *Controller) PreviewUploadURL(ctx *gin.Context, request filedata.Preview
 		UserID:    fileOwnerID,
 		App:       auth.GetApp(ctx),
 		Purpose:   string(request.Type),
-		Client:    network.GetClientInfoForStorage(ctx),
+		Client:    network.GetClientInfo(ctx),
 	}
 	if request.IsMultiPart {
 		multiPartUploadURLs, err2 := c.getMultiPartUploadURL(object, request.Count)

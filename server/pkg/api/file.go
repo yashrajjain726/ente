@@ -136,7 +136,7 @@ func (h *FileHandler) GetUploadURLs(c *gin.Context) {
 
 	userID := auth.GetUserID(c.Request.Header)
 	count, _ := strconv.Atoi(c.Query("count"))
-	urls, err := h.Controller.GetUploadURLs(c, userID, count, enteApp, false, network.GetClientInfoForStorage(c))
+	urls, err := h.Controller.GetUploadURLs(c, userID, count, enteApp, false, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -164,7 +164,7 @@ func (h *FileHandler) GetUploadURLV2(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
-	url, err := h.Controller.GetUploadURLWithMetadata(c, userID, req, enteApp, network.GetClientInfoForStorage(c))
+	url, err := h.Controller.GetUploadURLWithMetadata(c, userID, req, enteApp, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -177,7 +177,7 @@ func (h *FileHandler) GetMultipartUploadURLs(c *gin.Context) {
 
 	userID := auth.GetUserID(c.Request.Header)
 	count, _ := strconv.Atoi(c.Query("count"))
-	urls, err := h.Controller.GetMultipartUploadURLs(c, userID, count, enteApp, network.GetClientInfoForStorage(c))
+	urls, err := h.Controller.GetMultipartUploadURLs(c, userID, count, enteApp, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -195,7 +195,7 @@ func (h *FileHandler) GetMultipartUploadURLV2(c *gin.Context) {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
 	}
-	upload, err := h.Controller.GetMultipartUploadURLWithMetadata(c, userID, req, enteApp, network.GetClientInfoForStorage(c))
+	upload, err := h.Controller.GetMultipartUploadURLWithMetadata(c, userID, req, enteApp, network.GetClientInfo(c))
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
