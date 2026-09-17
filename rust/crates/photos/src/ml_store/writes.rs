@@ -3,15 +3,8 @@ use std::collections::HashMap;
 use ente_vecdb::VecDb;
 
 use super::fill::decode_centroid;
-use super::{Error, FillState, Index, IndexResult, MlStore, Result, Species, state};
-use crate::ml_db::{ClipEmbedding, ClusterSummary, PetRowsForFiles};
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PetEmbedding {
-    pub id: String,
-    pub species: Species,
-    pub embedding: Vec<f32>,
-}
+use super::{Error, FillState, Index, IndexResult, MlStore, Result, state};
+use crate::ml_db::{ClipEmbedding, ClusterSummary};
 
 type Vectors = (Vec<String>, Vec<Vec<f32>>);
 
@@ -78,36 +71,6 @@ impl MlStore {
         self.reset_index(Index::ClusterCentroid)
     }
 
-    pub fn store_pet_face_embeddings(&self, embeddings: &[PetEmbedding]) -> Result<()> {
-        self.store_pet_embeddings(embeddings, Index::PetFace)
-    }
-
-    pub fn store_pet_body_embeddings(&self, embeddings: &[PetEmbedding]) -> Result<()> {
-        self.store_pet_embeddings(embeddings, Index::PetBody)
-    }
-
-    pub fn delete_pet_data_for_files(&self, file_ids: &[i64]) -> Result<()> {
-        if file_ids.is_empty() {
-            return Ok(());
-        }
-        let _mutations = self.lock_mutations();
-        let rows = self.db.get_pet_rows_for_files(file_ids)?;
-        for (index, keys) in pet_keys(&rows) {
-            if let Err(error) = self.with_index(index, |vecdb| vecdb.bulk_remove(&keys)) {
-                log::warn!(
-                    "failed to remove {} vectors from {}: {error}",
-                    keys.len(),
-                    index.name()
-                );
-            }
-        }
-        let face_ids: Vec<String> = rows.faces.into_iter().map(|row| row.pet_face_id).collect();
-        let body_ids: Vec<String> = rows.bodies.into_iter().map(|row| row.pet_body_id).collect();
-        self.db
-            .delete_pet_rows_for_files(file_ids, &face_ids, &body_ids)?;
-        Ok(())
-    }
-
     pub fn clear_all(&self) -> Result<()> {
         let _mutations = self.lock_mutations();
         self.db.clear_non_pet_tables()?;
@@ -115,21 +78,6 @@ impl MlStore {
         self.db.clear_meta()?;
         for slot in &self.indexes {
             slot.purge()?;
-        }
-        Ok(())
-    }
-
-    fn store_pet_embeddings(
-        &self,
-        embeddings: &[PetEmbedding],
-        index_of: fn(Species) -> Index,
-    ) -> Result<()> {
-        if embeddings.is_empty() {
-            return Ok(());
-        }
-        let _mutations = self.lock_mutations();
-        for (index, (keys, vectors)) in pet_vectors(embeddings, index_of) {
-            self.index_write(index, |vecdb| vecdb.bulk_add(&keys, &vectors))?;
         }
         Ok(())
     }
@@ -180,51 +128,20 @@ fn centroid_vectors(summary: &HashMap<String, ClusterSummary>) -> Vectors {
         .unzip()
 }
 
-fn pet_vectors(
-    embeddings: &[PetEmbedding],
-    index_of: fn(Species) -> Index,
-) -> HashMap<Index, Vectors> {
-    let mut grouped: HashMap<Index, Vectors> = HashMap::new();
-    for embedding in embeddings {
-        let index = index_of(embedding.species);
-        if !index.accepts(&embedding.id, &embedding.embedding) {
-            continue;
-        }
-        let (keys, vectors) = grouped.entry(index).or_default();
-        keys.push(embedding.id.clone());
-        vectors.push(embedding.embedding.clone());
-    }
-    grouped
-}
-
-fn pet_keys(rows: &PetRowsForFiles) -> HashMap<Index, Vec<String>> {
-    let faces = rows.faces.iter().filter_map(|row| {
-        Species::from_sql(row.species).map(|species| (Index::PetFace(species), &row.pet_face_id))
-    });
-    let bodies = rows.bodies.iter().filter_map(|row| {
-        Species::from_sql(row.species).map(|species| (Index::PetBody(species), &row.pet_body_id))
-    });
-    let mut grouped: HashMap<Index, Vec<String>> = HashMap::new();
-    for (index, id) in faces.chain(bodies) {
-        grouped.entry(index).or_default().push(id.clone());
-    }
-    grouped
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use ente_vecdb::{OpenCost, SearchParams, VecDb, VecDbError};
 
-    use crate::ml_db::tests::{deny_cluster_summary_inserts_after, seed_pet_rows};
+    use crate::ml_db::tests::deny_cluster_summary_inserts_after;
     use crate::ml_db::vector_encoding::encode_evector;
     use crate::ml_db::{CLIP_EMBEDDING_DIMENSIONS, ClusterSummary};
     use crate::ml_store::tests::{
         DB_FILE, centroid, clips, empty, hot_position, index_path, live_count, meta, nearest,
-        one_hot, open, open_with_unusable_clip_index, pet,
+        one_hot, open, open_with_unusable_clip_index,
     };
-    use crate::ml_store::{Error, FillOutcome, FillState, Index, Species};
+    use crate::ml_store::{Error, FillOutcome, FillState, Index};
 
     #[test]
     fn put_clip_round_trips_through_sql_and_index() {
@@ -428,62 +345,6 @@ mod tests {
     }
 
     #[test]
-    fn pet_embeddings_are_stored_searched_and_deleted_per_species() {
-        let (_directory, store) = open();
-        seed_pet_rows(store.db());
-        let face_dims = Index::PetFace(Species::Dog).dims();
-        let body_dims = Index::PetBody(Species::Dog).dims();
-        store
-            .store_pet_face_embeddings(&[
-                pet("1_pet_0", Species::Dog, 1, face_dims),
-                pet("2_pet_0", Species::Cat, 2, face_dims),
-                pet("bad", Species::Dog, 3, face_dims / 2),
-            ])
-            .unwrap();
-        store
-            .store_pet_body_embeddings(&[pet("1_body_0", Species::Dog, 1, body_dims)])
-            .unwrap();
-        store.store_pet_body_embeddings(&[]).unwrap();
-        assert_eq!(
-            nearest(&store, Index::PetFace(Species::Dog), &one_hot(face_dims, 1)),
-            "1_pet_0"
-        );
-        assert!(
-            store
-                .contains(Index::PetFace(Species::Cat), "2_pet_0")
-                .unwrap()
-        );
-        assert!(!store.contains(Index::PetFace(Species::Dog), "bad").unwrap());
-        assert_eq!(live_count(&store, Index::PetFace(Species::Dog)), 1);
-        assert!(
-            store
-                .contains(Index::PetBody(Species::Dog), "1_body_0")
-                .unwrap()
-        );
-
-        store.delete_pet_data_for_files(&[]).unwrap();
-        store.delete_pet_data_for_files(&[1]).unwrap();
-        assert!(
-            !store
-                .contains(Index::PetFace(Species::Dog), "1_pet_0")
-                .unwrap()
-        );
-        assert!(
-            !store
-                .contains(Index::PetBody(Species::Dog), "1_body_0")
-                .unwrap()
-        );
-        assert!(
-            store
-                .contains(Index::PetFace(Species::Cat), "2_pet_0")
-                .unwrap()
-        );
-        assert!(store.db().get_pet_faces_for_file_id(1).unwrap().is_empty());
-        assert!(store.db().get_pet_bodies_for_file_id(1).unwrap().is_empty());
-        assert_eq!(store.db().get_pet_indexed_file_count(1).unwrap(), 1);
-    }
-
-    #[test]
     fn clear_all_removes_rows_meta_and_index_files() {
         let (directory, store) = open();
         store.fill_clip_index(false).unwrap();
@@ -491,14 +352,6 @@ mod tests {
         store.put_clip(&clips([1])).unwrap();
         store
             .cluster_summary_update(&HashMap::from([centroid("c1", 1)]))
-            .unwrap();
-        store
-            .store_pet_face_embeddings(&[pet(
-                "p",
-                Species::Cat,
-                1,
-                Index::PetFace(Species::Cat).dims(),
-            )])
             .unwrap();
 
         store.clear_all().unwrap();
@@ -520,7 +373,6 @@ mod tests {
         assert_eq!(store.db().count_clip_rows().unwrap(), 0);
         assert_eq!(store.db().count_cluster_summaries().unwrap(), 0);
         assert!(!store.contains(Index::Clip, "1").unwrap());
-        assert!(!store.contains(Index::PetFace(Species::Cat), "p").unwrap());
         assert_eq!(live_count(&store, Index::Clip), 0);
         assert_eq!(
             store.fill_clip_index(false).unwrap(),

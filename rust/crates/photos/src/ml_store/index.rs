@@ -9,49 +9,20 @@ use super::{Error, IndexResult, Result, state};
 use crate::ml_db::{CLIP_EMBEDDING_DIMENSIONS, MlDb};
 
 pub const CLUSTER_CENTROID_DIMENSIONS: usize = 192;
-pub const PET_FACE_DIMENSIONS: usize = 128;
-pub const PET_BODY_DIMENSIONS: usize = 192;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Species {
-    Dog,
-    Cat,
-}
-
-impl Species {
-    pub fn from_sql(species: i64) -> Option<Self> {
-        match species {
-            0 => Some(Self::Dog),
-            1 => Some(Self::Cat),
-            _ => None,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Index {
     Clip,
     ClusterCentroid,
-    PetFace(Species),
-    PetBody(Species),
 }
 
 impl Index {
-    pub const ALL: [Self; 6] = [
-        Self::Clip,
-        Self::ClusterCentroid,
-        Self::PetFace(Species::Dog),
-        Self::PetFace(Species::Cat),
-        Self::PetBody(Species::Dog),
-        Self::PetBody(Species::Cat),
-    ];
+    pub const ALL: [Self; 2] = [Self::Clip, Self::ClusterCentroid];
 
     pub fn dims(self) -> usize {
         match self {
             Self::Clip => CLIP_EMBEDDING_DIMENSIONS,
             Self::ClusterCentroid => CLUSTER_CENTROID_DIMENSIONS,
-            Self::PetFace(_) => PET_FACE_DIMENSIONS,
-            Self::PetBody(_) => PET_BODY_DIMENSIONS,
         }
     }
 
@@ -59,10 +30,6 @@ impl Index {
         match self {
             Self::Clip => "clip",
             Self::ClusterCentroid => "cluster_centroid",
-            Self::PetFace(Species::Dog) => "pet.dog_face",
-            Self::PetFace(Species::Cat) => "pet.cat_face",
-            Self::PetBody(Species::Dog) => "pet.dog_body",
-            Self::PetBody(Species::Cat) => "pet.cat_body",
         }
     }
 
@@ -70,10 +37,6 @@ impl Index {
         match self {
             Self::Clip => 0,
             Self::ClusterCentroid => 1,
-            Self::PetFace(Species::Dog) => 2,
-            Self::PetFace(Species::Cat) => 3,
-            Self::PetBody(Species::Dog) => 4,
-            Self::PetBody(Species::Cat) => 5,
         }
     }
 
@@ -220,9 +183,8 @@ mod tests {
     use crate::ml_db::CLIP_EMBEDDING_DIMENSIONS;
     use crate::ml_store::tests::{
         DB_FILE, centroid, clips, index_path, live_count, lose_index_files, meta, one_hot, open,
-        pet,
     };
-    use crate::ml_store::{Error, FillOutcome, FillReport, FillState, MlStore, Species};
+    use crate::ml_store::{Error, FillOutcome, FillReport, FillState, MlStore};
 
     #[test]
     fn index_positions_follow_the_all_order() {
@@ -328,16 +290,6 @@ mod tests {
             }
         );
         assert_eq!(live_count(&store, Index::ClusterCentroid), 1);
-
-        let dims = Index::PetFace(Species::Dog).dims();
-        store
-            .store_pet_face_embeddings(&[
-                pet("", Species::Dog, 1, dims),
-                pet("p", Species::Dog, 2, dims),
-            ])
-            .unwrap();
-        assert_eq!(live_count(&store, Index::PetFace(Species::Dog)), 1);
-        assert!(store.contains(Index::PetFace(Species::Dog), "p").unwrap());
     }
 
     #[test]

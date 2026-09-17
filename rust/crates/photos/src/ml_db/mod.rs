@@ -98,7 +98,6 @@ pub(crate) mod tests {
     }
 
     pub(crate) use super::queries::clusters::tests::deny_cluster_summary_inserts_after;
-    pub(crate) use super::queries::pets::tests::seed as seed_pet_rows;
     pub(super) use cases;
 
     pub(super) fn open() -> (TempDir, MlDb) {

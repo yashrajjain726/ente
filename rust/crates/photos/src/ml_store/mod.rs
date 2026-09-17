@@ -13,11 +13,8 @@ use crate::ml_db::MlDb;
 
 pub use ente_vecdb::{KeyMatches, Match, SearchParams, Stats};
 pub use fill::{FillOutcome, FillReport};
-pub use index::{
-    CLUSTER_CENTROID_DIMENSIONS, Index, PET_BODY_DIMENSIONS, PET_FACE_DIMENSIONS, Species,
-};
+pub use index::{CLUSTER_CENTROID_DIMENSIONS, Index};
 pub use state::FillState;
-pub use writes::PetEmbedding;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -149,7 +146,7 @@ mod tests {
     use ente_vecdb::{OpenCost, SearchParams, VecDb};
     use tempfile::TempDir;
 
-    use super::{FillOutcome, FillReport, FillState, Index, MlStore, PetEmbedding, Species};
+    use super::{FillOutcome, FillReport, FillState, Index, MlStore};
     use crate::ml_db::vector_encoding::encode_evector;
     use crate::ml_db::{CLIP_EMBEDDING_DIMENSIONS, ClipEmbedding, ClusterSummary};
 
@@ -210,14 +207,6 @@ mod tests {
         (cluster_id.to_string(), summary)
     }
 
-    pub(super) fn pet(id: &str, species: Species, hot: usize, dims: usize) -> PetEmbedding {
-        PetEmbedding {
-            id: id.to_string(),
-            species,
-            embedding: one_hot(dims, hot),
-        }
-    }
-
     pub(super) fn nearest(store: &MlStore, index: Index, query: &[f32]) -> String {
         let params = SearchParams {
             limit: Some(1),
@@ -274,14 +263,6 @@ mod tests {
         assert_eq!(
             store.fill_state(Index::ClusterCentroid).unwrap(),
             FillState::Stale
-        );
-        assert_eq!(
-            store.fill_state(Index::PetFace(Species::Dog)).unwrap(),
-            FillState::Filled
-        );
-        assert_eq!(
-            store.fill_state(Index::PetBody(Species::Cat)).unwrap(),
-            FillState::Filled
         );
     }
 

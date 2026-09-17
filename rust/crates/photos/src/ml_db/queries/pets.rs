@@ -340,7 +340,7 @@ fn read_pet_body(row: &Row<'_>) -> db::Result<PetBodyRow> {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub(in crate::ml_db) mod tests {
     use std::collections::HashMap;
 
     use super::{MlDb, PetBodyRow, PetFaceRow};
@@ -375,7 +375,7 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn seed(db: &MlDb) {
+    pub(in crate::ml_db) fn seed(db: &MlDb) {
         db.bulk_insert_pet_faces(&[
             pet_face(1, 0, 0),
             pet_face(1, 1, -1),
