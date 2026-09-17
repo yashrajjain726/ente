@@ -654,14 +654,6 @@
   },
   "cleanUncategorized": "Clean Uncategorized",
   "cleanUncategorizedDescription": "Remove all files from Uncategorized that are present in other albums",
-  "removedItems": "{count, plural, one{Removed {count} item} other{Removed {count} items}}",
-  "@removedItems": {
-    "placeholders": {
-      "count": {
-        "type": "num"
-      }
-    }
-  },
   "cleanupComplete": "Cleanup complete",
   "cleanupHiddenFiles": "Clean up hidden files",
   "cleanupHiddenFilesDescription": "Some files in hidden albums still exist in non-hidden albums making them visible outside of the hidden section. Cleaning up will remove them from non-hidden albums.",
@@ -3514,6 +3506,14 @@
     "description": "Description for remove contact confirmation dialog"
   },
   "removeContactPhoto": "Remove contact photo",
+  "removedItems": "{count, plural, one{Removed {count} item} other{Removed {count} items}}",
+  "@removedItems": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "removeDuplicates": "Duplicates",
   "removeDuplicatesDesc": "Remove exact duplicates",
   "removeFromAlbum": "Remove from album",
