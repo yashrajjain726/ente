@@ -237,7 +237,7 @@ jobs:
 
             - name: Build and release Tauri app
               id: tauri
-              uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
+              uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
               env:
                   GITHUB_TOKEN: ${{ steps.nightly_token.outputs.token }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.ENSU_TAURI_SIGNING_PRIVATE_KEY }}
@@ -263,9 +263,7 @@ jobs:
                   releaseCommitish: main
                   releaseDraft: false
                   prerelease: true
-                  includeDebug: false
-                  includeRelease: true
-                  includeUpdaterJson: false
+                  uploadUpdaterJson: false
                   args: ${{ format('--target {0} --bundles {1} --config tauri.ci.conf.json', matrix.platform.rust-target, matrix.platform.bundle-targets) }}
 
             # tauri-action emits JSON; ncipollo expects comma-delimited artifact paths.
