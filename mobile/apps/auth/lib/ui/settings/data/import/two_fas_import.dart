@@ -5,6 +5,7 @@ import 'package:ente_auth/models/code.dart';
 import 'package:ente_auth/models/code_display.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
+import 'package:ente_auth/ui/settings/data/import/plain_text_import_parser.dart';
 import 'package:ente_auth/utils/dialog_util.dart';
 import 'package:ente_strings/ente_strings.dart';
 import 'package:ente_ui/components/progress_dialog.dart';
@@ -42,8 +43,13 @@ Future<int?> _process2FasExportFile(
   String path,
   final ProgressDialog dialog,
 ) async {
-  final jsonString = await readPickedImportFileAsString(path);
-  final decodedJson = jsonDecode(jsonString);
+  final export = await readPickedImportFileAsString(path);
+  if (export.trimLeft().startsWith('otpauth://')) {
+    await dialog.show();
+    return saveImportedCodes(parsePlainTextImport(export));
+  }
+
+  final decodedJson = jsonDecode(export);
   int version = (decodedJson['schemaVersion'] ?? 0) as int;
   if (version != 3 && version != 4) {
     if (!context.mounted) return null;

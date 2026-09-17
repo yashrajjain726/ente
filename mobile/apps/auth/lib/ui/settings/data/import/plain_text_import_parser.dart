@@ -23,9 +23,7 @@ List<Code> parsePlainTextImport(String content) {
 }
 
 List<Code> _parseOTPAuthCodes(String content) {
-  final entries = content.contains(',')
-      ? content.split(',')
-      : const LineSplitter().convert(content);
+  final entries = content.split(RegExp(r'(?:\r\n?|\n)|,(?=\s*otpauth://)'));
   return _parseEntries(
     entries.map((entry) => entry.trim()).where((entry) => entry.isNotEmpty),
     Code.fromOTPAuthUrl,
