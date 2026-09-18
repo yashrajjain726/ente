@@ -662,7 +662,9 @@ impl QueryContext<'_> {
                 results.push(entry);
             }
             candidates.push(Reverse(entry));
-            keep_frontier(&mut frontier, entry);
+            if self.arena.is_alive(entry.slot) {
+                keep_frontier(&mut frontier, entry);
+            }
         }
         let mut slots = [0u32; NEIGHBOR_BATCH];
         let mut distances = [0.0f32; NEIGHBOR_BATCH];
@@ -685,7 +687,7 @@ impl QueryContext<'_> {
                     if !trails || scored.distance <= expansion_bound {
                         candidates.push(Reverse(scored));
                     }
-                    if !trails {
+                    if !trails && self.arena.is_alive(slot) {
                         keep_frontier(&mut frontier, scored);
                     }
                 }
@@ -1484,6 +1486,68 @@ mod tests {
                 let by_threshold =
                     search_stored(&graph, &arena, 0, &params(None, Some(2.5), exact), filter);
                 assert!(by_threshold.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn range_search_crosses_distant_bridges_after_retired_nodes() {
+        for storage in [StorageKind::F32, StorageKind::I8] {
+            for retired in [1, RANGE_SEARCH_FLOOR] {
+                let mut arena = VectorArena::with_storage(32, storage).unwrap();
+                let near = axis_vector(32, 0);
+                let mut bridge = near.clone();
+                bridge[0] = 0.8;
+                bridge[1] = 0.6;
+                let mut hit = near.clone();
+                hit[0] = 0.98;
+                hit[1] = (1.0f32 - 0.98 * 0.98).sqrt();
+                let count = RANGE_SEARCH_FLOOR + 2;
+                for index in 0..count {
+                    let vector = if index < RANGE_SEARCH_FLOOR {
+                        &near
+                    } else if index == RANGE_SEARCH_FLOOR {
+                        &bridge
+                    } else {
+                        &hit
+                    };
+                    arena.upsert(&format!("key-{index}"), vector).unwrap();
+                }
+                let parts = (0..count as u32)
+                    .map(|slot| GraphNodeParts {
+                        slot,
+                        level: 0,
+                        neighbors: vec![if slot + 1 < count as u32 {
+                            vec![slot + 1]
+                        } else {
+                            Vec::new()
+                        }],
+                    })
+                    .collect();
+                let graph = Graph::from_parts(Some(0), parts, count, count as u64).unwrap();
+                for index in 0..retired {
+                    arena.remove(&format!("key-{index}"));
+                }
+                let query = arena.pack_query(&near).unwrap();
+                let exact = search(
+                    &graph,
+                    &arena,
+                    &query,
+                    &params(None, Some(0.05), true),
+                    None,
+                );
+                assert_eq!(exact.len(), RANGE_SEARCH_FLOOR - retired + 1);
+                assert_eq!(
+                    search(
+                        &graph,
+                        &arena,
+                        &query,
+                        &params(None, Some(0.05), false),
+                        None,
+                    ),
+                    exact,
+                    "storage={storage:?}, retired={retired}",
+                );
             }
         }
     }
