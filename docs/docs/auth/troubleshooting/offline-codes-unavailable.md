@@ -9,6 +9,11 @@ Ente Auth shows **Unable to access your codes** when the app was configured for 
 
 ## When this can happen
 
+**On Android:**
+
+- After a device-transfer or restore tool copies Ente Auth's data without its Android Keystore key.
+- If the Keystore key is lost while the app's local data remains.
+
 **On iOS:**
 
 - After restoring or transferring Ente Auth to another iPhone. The device-only Keychain key does not transfer with the app's data.
@@ -50,6 +55,7 @@ After resetting the app, select **Use without backups**, then open `Settings > D
 >
 > Do not reset, uninstall, or clear Ente Auth's data yet. Try to restore access to the original secure storage first. If its key has been permanently lost, the encrypted offline database cannot be recovered.
 
+- **On Android:** Try the original device and Android profile. A Keystore key cannot be recovered from app data copied without it.
 - **On iOS:** Try the original iPhone. A device-only key cannot be recovered from data restored to another device.
 - **On macOS:** Restore access to the original login Keychain or a system backup containing both the Keychain and Ente Auth data.
 - **On Linux:** Unlock or restore the Secret Service provider that Ente Auth originally used.
@@ -58,6 +64,8 @@ After resetting the app, select **Use without backups**, then open `Settings > D
 ## Reset the app
 
 Reset only after confirming that your codes are synced to Ente or that you have a usable backup and its password. Keep a copy of the existing app data until recovery or import succeeds.
+
+**On Android:** Open `Settings > Apps > Ente Auth > Storage & cache` and select **Clear storage** or **Clear data**. Menu names vary by device.
 
 **On iOS:** Delete Ente Auth rather than offloading it, then reinstall it.
 
