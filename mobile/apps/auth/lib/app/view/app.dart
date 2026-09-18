@@ -23,10 +23,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 class App extends StatefulWidget {
   final Locale? locale;
   final ThemeMode savedThemeMode;
+  final bool hasInaccessibleOfflineCodes;
   const App({
     super.key,
     this.locale = const Locale("en"),
     this.savedThemeMode = ThemeMode.system,
+    this.hasInaccessibleOfflineCodes = false,
   });
 
   static void setLocale(BuildContext context, Locale newLocale) {
@@ -142,18 +144,24 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   }
 
   Map<String, WidgetBuilder> get _getRoutes {
-    final config = Configuration.instance;
-    final hasOfflineAccount = config.hasOptedForOfflineMode();
-    final isOfflineKeyMissing =
-        hasOfflineAccount && config.getOfflineSecretKey() == null;
     return {
-      "/": (context) =>
-          config.hasConfiguredAccount() ||
-              (hasOfflineAccount && !isOfflineKeyMissing)
-          ? const HomePage()
-          : OnboardingPage(
-              showOfflineKeyUnavailableDialog: isOfflineKeyMissing,
-            ),
+      "/": (context) {
+        final config = Configuration.instance;
+        final hasOfflineAccount = config.hasOptedForOfflineMode();
+        final isOfflineKeyMissing =
+            hasOfflineAccount && config.getOfflineSecretKey() == null;
+        final shouldShowOfflineKeyUnavailableDialog =
+            isOfflineKeyMissing &&
+            (!config.hasConfiguredAccount() ||
+                widget.hasInaccessibleOfflineCodes);
+        return !shouldShowOfflineKeyUnavailableDialog &&
+                (config.hasConfiguredAccount() || hasOfflineAccount)
+            ? const HomePage()
+            : OnboardingPage(
+                showOfflineKeyUnavailableDialog:
+                    shouldShowOfflineKeyUnavailableDialog,
+              );
+      },
     };
   }
 

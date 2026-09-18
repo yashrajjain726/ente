@@ -19,6 +19,7 @@ import 'package:ente_auth/services/window_listener_service.dart';
 import 'package:ente_auth/store/authenticator_db.dart';
 import 'package:ente_auth/store/code_display_store.dart';
 import 'package:ente_auth/store/code_store.dart';
+import 'package:ente_auth/store/offline_authenticator_db.dart';
 import 'package:ente_auth/ui/home_page.dart';
 import 'package:ente_auth/ui/utils/icon_utils.dart';
 import 'package:ente_auth/utils/debug_build_flags.dart';
@@ -145,10 +146,17 @@ Future<void> _runInForeground() async {
       rethrow;
     }
     final Locale? locale = await getLocale(noFallback: true);
+    final hasInaccessibleOfflineCodes = await _hasInaccessibleOfflineCodes(
+      configuration,
+    );
     unawaited(UpdateService.instance.showUpdateNotification());
     runApp(
       AppLock(
-        builder: (args) => App(locale: locale, savedThemeMode: savedThemeMode),
+        builder: (args) => App(
+          locale: locale,
+          savedThemeMode: savedThemeMode,
+          hasInaccessibleOfflineCodes: hasInaccessibleOfflineCodes,
+        ),
         debugShowCheckedModeBanner: false,
         lockScreen: LockScreen(configuration),
         enabled: await LockScreenSettings.instance.shouldShowLockScreen(),
@@ -165,6 +173,20 @@ Future<void> _runInForeground() async {
       ),
     );
   });
+}
+
+Future<bool> _hasInaccessibleOfflineCodes(Configuration configuration) async {
+  if (!configuration.hasConfiguredAccount() ||
+      !configuration.hasOptedForOfflineMode() ||
+      configuration.getOfflineSecretKey() != null) {
+    return false;
+  }
+  try {
+    return await OfflineAuthenticatorDB.instance.hasEntries();
+  } catch (error, stackTrace) {
+    _logger.severe("Failed to inspect offline codes", error, stackTrace);
+    return true;
+  }
 }
 
 Future _runWithLogs(Function() function, {String prefix = ""}) async {
