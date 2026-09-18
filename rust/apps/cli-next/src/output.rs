@@ -7,7 +7,10 @@ use ente_photos::{collections::Collection, files::File};
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::{args::Product, vault::Account};
+use crate::{
+    args::{DEFAULT_LIST_LIMIT, ListArgs, Product},
+    vault::Account,
+};
 
 #[derive(Serialize)]
 pub struct AccountView<'a> {
@@ -62,9 +65,9 @@ impl TryFrom<Collection> for AlbumView {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FileView<'a> {
+pub struct FileView {
     id: String,
-    name: &'a str,
+    name: String,
     #[serde(rename = "type")]
     kind: &'static str,
     owner_id: String,
@@ -73,10 +76,10 @@ pub struct FileView<'a> {
     modified_at: String,
     updated_at: String,
     location: Option<LocationView>,
-    caption: Option<&'a str>,
-    hash: Option<&'a str>,
-    date_time: Option<&'a str>,
-    offset_time: Option<&'a str>,
+    caption: Option<String>,
+    hash: Option<String>,
+    date_time: Option<String>,
+    offset_time: Option<String>,
     duration_seconds: Option<u64>,
     width: Option<u32>,
     height: Option<u32>,
@@ -89,11 +92,11 @@ struct LocationView {
     longitude: f64,
 }
 
-impl<'a> FileView<'a> {
-    pub fn new(file: &'a File, album_ids: &[i64]) -> Result<Self> {
+impl FileView {
+    pub fn new(file: File, album_ids: &[i64]) -> Result<Self> {
         Ok(Self {
             id: file.id.to_string(),
-            name: &file.name,
+            name: file.name,
             kind: file.kind.name(),
             owner_id: file.owner_id.to_string(),
             album_ids: album_ids.iter().map(i64::to_string).collect(),
@@ -104,10 +107,10 @@ impl<'a> FileView<'a> {
                 latitude: location.latitude,
                 longitude: location.longitude,
             }),
-            caption: file.caption.as_deref(),
-            hash: file.hash.as_deref(),
-            date_time: file.date_time.as_deref(),
-            offset_time: file.offset_time.as_deref(),
+            caption: file.caption,
+            hash: file.hash,
+            date_time: file.date_time,
+            offset_time: file.offset_time,
             duration_seconds: file.duration_seconds,
             width: file.width,
             height: file.height,
@@ -153,7 +156,8 @@ pub fn accounts(accounts: &[AccountView<'_>]) -> Result<()> {
         &mut stdout,
         ["SELECTED", "NAME", "EMAIL", "HOST", "LOGGED IN", "ID"],
         &rows,
-    )
+    )?;
+    Ok(())
 }
 
 pub fn account(account: &AccountView<'_>) -> Result<()> {
@@ -170,28 +174,27 @@ pub fn account(account: &AccountView<'_>) -> Result<()> {
     ])
 }
 
-pub fn albums(albums: &[AlbumView]) -> Result<()> {
-    let mut stdout = std::io::stdout().lock();
-    if albums.is_empty() {
-        return writeln!(stdout, "No albums.").map_err(Into::into);
-    }
-    let rows = albums
-        .iter()
-        .map(|album| {
+pub fn albums(
+    albums: impl Iterator<Item = Result<AlbumView>>,
+    args: &ListArgs,
+    as_json: bool,
+) -> Result<()> {
+    list(
+        albums,
+        args,
+        as_json,
+        ["ID", "NAME", "TYPE", "VISIBILITY", "OWNER", "UPDATED"],
+        "No albums.",
+        |album| {
             [
-                album.id.clone(),
+                album.id,
                 escape_controls(&album.name),
                 album.kind.to_owned(),
                 album.visibility.to_owned(),
-                album.owner_id.clone(),
-                album.updated_at.clone(),
+                album.owner_id,
+                album.updated_at,
             ]
-        })
-        .collect::<Vec<_>>();
-    write_table(
-        &mut stdout,
-        ["ID", "NAME", "TYPE", "VISIBILITY", "OWNER", "UPDATED"],
-        &rows,
+        },
     )
 }
 
@@ -206,33 +209,32 @@ pub fn album(album: &AlbumView) -> Result<()> {
     ])
 }
 
-pub fn files(files: &[FileView<'_>]) -> Result<()> {
-    let mut stdout = std::io::stdout().lock();
-    if files.is_empty() {
-        return writeln!(stdout, "No files.").map_err(Into::into);
-    }
-    let rows = files
-        .iter()
-        .map(|file| {
+pub fn files(
+    files: impl Iterator<Item = Result<FileView>>,
+    args: &ListArgs,
+    as_json: bool,
+) -> Result<()> {
+    list(
+        files,
+        args,
+        as_json,
+        ["ID", "NAME", "TYPE", "CREATED", "ALBUMS"],
+        "No files.",
+        |file| {
             [
-                file.id.clone(),
-                escape_controls(file.name),
+                file.id,
+                escape_controls(&file.name),
                 file.kind.to_owned(),
-                file.created_at.clone(),
+                file.created_at,
                 file.album_ids.join(","),
             ]
-        })
-        .collect::<Vec<_>>();
-    write_table(
-        &mut stdout,
-        ["ID", "NAME", "TYPE", "CREATED", "ALBUMS"],
-        &rows,
+        },
     )
 }
 
-pub fn file(file: &FileView<'_>) -> Result<()> {
+pub fn file(file: &FileView) -> Result<()> {
     let mut fields = vec![
-        ("Name", escape_controls(file.name)),
+        ("Name", escape_controls(&file.name)),
         ("Type", file.kind.to_owned()),
         ("Visibility", file.visibility.to_owned()),
         ("Created", file.created_at.clone()),
@@ -243,19 +245,22 @@ pub fn file(file: &FileView<'_>) -> Result<()> {
         ("ID", file.id.clone()),
     ];
     for (label, value) in [
-        ("Caption", file.caption.map(escape_controls)),
+        ("Caption", file.caption.as_deref().map(escape_controls)),
         (
             "Location",
             file.location
                 .as_ref()
                 .map(|l| format!("{}, {}", l.latitude, l.longitude)),
         ),
-        ("Date/time", file.date_time.map(escape_controls)),
-        ("UTC offset", file.offset_time.map(escape_controls)),
+        ("Date/time", file.date_time.as_deref().map(escape_controls)),
+        (
+            "UTC offset",
+            file.offset_time.as_deref().map(escape_controls),
+        ),
         ("Duration", file.duration_seconds.map(|s| format!("{s} s"))),
         ("Width", file.width.map(|w| w.to_string())),
         ("Height", file.height.map(|h| h.to_string())),
-        ("Hash", file.hash.map(escape_controls)),
+        ("Hash", file.hash.as_deref().map(escape_controls)),
     ] {
         if let Some(value) = value {
             fields.push((label, value));
@@ -301,11 +306,56 @@ fn write_fields(fields: &[(&str, String)]) -> Result<()> {
     Ok(())
 }
 
+fn list<T: Serialize, const N: usize>(
+    mut items: impl Iterator<Item = Result<T>>,
+    args: &ListArgs,
+    as_json: bool,
+    header: [&str; N],
+    empty: &str,
+    row: impl Fn(T) -> [String; N],
+) -> Result<()> {
+    let mut stdout = std::io::stdout().lock();
+    let limit = args.limit().map(|limit| limit as usize);
+    let values = items.by_ref().take(limit.unwrap_or(usize::MAX));
+    if as_json {
+        write!(stdout, "[")?;
+        for (index, value) in values.enumerate() {
+            let value = value?;
+            if index > 0 {
+                write!(stdout, ",")?;
+            }
+            serde_json::to_writer(&mut stdout, &value)?;
+        }
+        writeln!(stdout, "]")?;
+    } else {
+        let mut rows = values.map(|value| value.map(&row));
+        let first = rows
+            .by_ref()
+            .take(DEFAULT_LIST_LIMIT as usize)
+            .collect::<Result<Vec<_>>>()?;
+        if first.is_empty() {
+            writeln!(stdout, "{empty}")?;
+        } else {
+            let widths = write_table(&mut stdout, header, &first)?;
+            for row in rows {
+                write_row(&mut stdout, &row?, &widths)?;
+            }
+        }
+    }
+    stdout.flush()?;
+    if let Some(limit) = limit
+        && items.next().transpose()?.is_some()
+    {
+        eprintln!("Showing first {limit} results; use --limit N or --all to see more.");
+    }
+    Ok(())
+}
+
 fn write_table<const N: usize>(
     out: &mut impl Write,
     header: [&str; N],
     rows: &[[String; N]],
-) -> Result<()> {
+) -> Result<[usize; N]> {
     let header = header.map(str::to_owned);
     let widths: [usize; N] = std::array::from_fn(|column| {
         std::iter::once(&header)
@@ -315,22 +365,31 @@ fn write_table<const N: usize>(
             .unwrap_or(0)
     });
     for row in std::iter::once(&header).chain(rows) {
-        for (column, cell) in row.iter().enumerate() {
-            if column > 0 {
-                write!(out, "  ")?;
-            }
-            if column + 1 == N {
-                write!(out, "{cell}")?;
-            } else {
-                write!(
-                    out,
-                    "{}",
-                    pad_str(cell, widths[column], Alignment::Left, None)
-                )?;
-            }
-        }
-        writeln!(out)?;
+        write_row(out, row, &widths)?;
     }
+    Ok(widths)
+}
+
+fn write_row<const N: usize>(
+    out: &mut impl Write,
+    row: &[String; N],
+    widths: &[usize; N],
+) -> Result<()> {
+    for (column, cell) in row.iter().enumerate() {
+        if column > 0 {
+            write!(out, "  ")?;
+        }
+        if column + 1 == N {
+            write!(out, "{cell}")?;
+        } else {
+            write!(
+                out,
+                "{}",
+                pad_str(cell, widths[column], Alignment::Left, None)
+            )?;
+        }
+    }
+    writeln!(out)?;
     Ok(())
 }
 

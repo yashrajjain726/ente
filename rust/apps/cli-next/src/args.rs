@@ -10,10 +10,39 @@ use serde::{Deserialize, Serialize};
     after_help = "Start with: ente-cli-next photos login"
 )]
 pub struct Cli {
-    #[arg(long, global = true, help = "Print the result as JSON")]
-    pub json: bool,
+    #[command(flatten)]
+    pub options: Options,
     #[command(subcommand)]
     pub command: Command,
+}
+
+#[derive(Args)]
+pub struct Options {
+    #[arg(long, global = true, help = "Print the result as JSON")]
+    pub json: bool,
+    #[arg(long, global = true, help = "Use local data without network access")]
+    pub offline: bool,
+}
+
+pub const DEFAULT_LIST_LIMIT: u32 = 100;
+
+#[derive(Args)]
+pub struct ListArgs {
+    #[arg(
+        long,
+        default_value_t = DEFAULT_LIST_LIMIT,
+        value_parser = clap::value_parser!(u32).range(1..),
+        help = "Maximum number of results"
+    )]
+    pub limit: u32,
+    #[arg(long, conflicts_with = "limit", help = "List every result")]
+    pub all: bool,
+}
+
+impl ListArgs {
+    pub fn limit(&self) -> Option<u32> {
+        (!self.all).then_some(self.limit)
+    }
 }
 
 #[derive(Args)]
@@ -73,6 +102,12 @@ Keep the same home and key across unattended invocations."
 pub enum PhotosCommand {
     #[command(flatten)]
     Session(SessionCommand),
+    #[command(flatten)]
+    Library(PhotosLibraryCommand),
+}
+
+#[derive(Subcommand)]
+pub enum PhotosLibraryCommand {
     #[command(about = "Manage albums")]
     Album {
         #[command(subcommand)]
@@ -159,7 +194,7 @@ pub struct ApiArgs {
 #[derive(Subcommand)]
 pub enum AlbumCommand {
     #[command(about = "List your albums, including shared and hidden ones")]
-    List,
+    List(ListArgs),
     #[command(about = "Show an album")]
     View {
         #[arg(help = "Album ID or exact name")]
@@ -170,7 +205,7 @@ pub enum AlbumCommand {
 #[derive(Subcommand)]
 pub enum FileCommand {
     #[command(about = "List files, including shared and hidden ones")]
-    List,
+    List(ListArgs),
     #[command(about = "Show a file's metadata")]
     View {
         #[arg(help = "File ID or exact name")]

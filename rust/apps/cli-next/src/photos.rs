@@ -1,37 +1,79 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{io::Seek, path::Path};
 
-use anyhow::{Context, Result, bail};
-use ente_photos::{collections, files};
+use anyhow::{Context, Result, bail, ensure};
+use ente_core::Session;
+use ente_photos::files;
 use serde_json::json;
 
 use crate::{
     api,
-    args::{AlbumCommand, FileCommand, Product},
+    args::{AlbumCommand, FileCommand, Options, PhotosLibraryCommand, Product},
+    db, home,
     output::{self, AlbumView, FileView},
-    vault::State,
+    replica::Replica,
+    vault::{Account, State},
 };
 
-pub async fn album(command: AlbumCommand, selected: Option<&str>, json_output: bool) -> Result<()> {
-    let state = State::load()?;
-    let account = &state.accounts[state.resolve(selected)?];
-    let session = api::session(account, Product::Photos)?;
-    let albums = collections::list(&session).await?;
+const MAX_CANDIDATES: usize = 10;
+
+pub async fn run(
+    command: PhotosLibraryCommand,
+    selected: Option<&str>,
+    options: &Options,
+) -> Result<()> {
+    ensure!(
+        !options.offline
+            || !matches!(
+                &command,
+                PhotosLibraryCommand::File {
+                    command: FileCommand::Download { .. },
+                    ..
+                }
+            ),
+        "original files are not stored locally; download requires network access"
+    );
+    let (account, home) = open_account(selected, !options.offline)?;
+    let session = api::session(&account, Product::Photos)?;
+    let mut db = db::open(&home.path, &account.db_key, !options.offline)?;
+    let mut replica = Replica::new(&mut db);
+    if !options.offline {
+        replica.sync_collections(&session).await?;
+    } else {
+        ensure!(
+            replica.collections_cursor()?.is_some(),
+            "no local Photos data; run the command online first"
+        );
+    }
     match command {
-        AlbumCommand::List => {
-            let albums = albums
-                .into_iter()
-                .map(AlbumView::try_from)
-                .collect::<Result<Vec<_>>>()?;
-            if json_output {
-                output::json(&albums)
-            } else {
-                output::albums(&albums)
-            }
+        PhotosLibraryCommand::Album { command } => album(command, &replica, options),
+        PhotosLibraryCommand::File { album, command } => {
+            file(command, album.as_deref(), &session, &mut replica, options).await
         }
+    }
+}
+
+fn album(command: AlbumCommand, replica: &Replica<'_>, options: &Options) -> Result<()> {
+    match command {
+        AlbumCommand::List(args) => replica.collections(
+            None,
+            args.limit().map(|limit| i64::from(limit) + 1),
+            |rows| {
+                output::albums(
+                    rows.map(|album| AlbumView::try_from(album?)),
+                    &args,
+                    options.json,
+                )
+            },
+        ),
         AlbumCommand::View { album } => {
-            let album = select(albums, &album, "album", |a| (a.id, &a.name))?;
+            let album =
+                replica.collections(Some(&album), Some((MAX_CANDIDATES + 1) as i64), |rows| {
+                    select(rows.map(|album| Ok(album?)), &album, "album", |a| {
+                        (a.id, &a.name)
+                    })
+                })?;
             let album = AlbumView::try_from(album)?;
-            if json_output {
+            if options.json {
                 output::json(&album)
             } else {
                 output::album(&album)
@@ -40,72 +82,89 @@ pub async fn album(command: AlbumCommand, selected: Option<&str>, json_output: b
     }
 }
 
-pub async fn file(
+async fn file(
     command: FileCommand,
     album: Option<&str>,
-    selected: Option<&str>,
-    json_output: bool,
+    session: &Session,
+    replica: &mut Replica<'_>,
+    options: &Options,
 ) -> Result<()> {
-    let state = State::load()?;
-    let account = &state.accounts[state.resolve(selected)?];
-    let session = api::session(account, Product::Photos)?;
-    let mut albums = collections::list(&session).await?;
-    if let Some(selector) = album {
-        albums = vec![select(albums, selector, "album", |a| (a.id, &a.name))?];
-    }
-    let mut entries: BTreeMap<i64, Entry> = BTreeMap::new();
-    for album in albums {
-        for file in files::list(&session, &album).await? {
-            match entries.entry(file.id) {
-                std::collections::btree_map::Entry::Vacant(entry) => {
-                    entry.insert(Entry {
-                        file,
-                        album_ids: vec![album.id],
-                    });
-                }
-                std::collections::btree_map::Entry::Occupied(mut entry) => {
-                    let entry = entry.get_mut();
-                    entry.album_ids.push(album.id);
-                    if file.updated_at_micros > entry.file.updated_at_micros {
-                        entry.file = file;
-                    }
-                }
-            }
-        }
-    }
-    let mut entries = entries.into_values().collect::<Vec<_>>();
-    for entry in &mut entries {
-        entry.album_ids.sort_unstable();
-    }
-    match command {
-        FileCommand::List => {
-            let views = entries
-                .iter()
-                .map(|entry| FileView::new(&entry.file, &entry.album_ids))
-                .collect::<Result<Vec<_>>>()?;
-            if json_output {
-                output::json(&views)
+    let albums =
+        replica.collections(album, album.map(|_| (MAX_CANDIDATES + 1) as i64), |rows| {
+            if let Some(selector) = album {
+                Ok(vec![select(
+                    rows.map(|album| Ok(album?)),
+                    selector,
+                    "album",
+                    |a| (a.id, &a.name),
+                )?])
             } else {
-                output::files(&views)
+                rows.map(|album| Ok(album?)).collect::<Result<Vec<_>>>()
             }
+        })?;
+    if options.offline {
+        for album in &albums {
+            ensure!(
+                replica.files_synced_to(album.id)?.is_some(),
+                "files for album {:?} have not finished syncing; run the command online first",
+                album.name
+            );
         }
+    } else {
+        replica.sync_files(session, &albums).await?;
+    }
+    let album_id = album.map(|_| albums[0].id);
+    let find = |selector: &str| {
+        replica.files(
+            album_id,
+            Some(selector),
+            Some((MAX_CANDIDATES + 1) as i64),
+            |rows| {
+                select(rows.map(|entry| Ok(entry?)), selector, "file", |e| {
+                    (e.file.id, &e.file.name)
+                })
+            },
+        )
+    };
+    match command {
+        FileCommand::List(args) => replica.files(
+            album_id,
+            None,
+            args.limit().map(|limit| i64::from(limit) + 1),
+            |rows| {
+                output::files(
+                    rows.map(|entry| {
+                        let entry = entry?;
+                        FileView::new(entry.file, &entry.album_ids)
+                    }),
+                    &args,
+                    options.json,
+                )
+            },
+        ),
         FileCommand::View { file } => {
-            let entry = select(entries, &file, "file", |e| (e.file.id, &e.file.name))?;
-            let view = FileView::new(&entry.file, &entry.album_ids)?;
-            if json_output {
+            let entry = find(&file)?;
+            let view = FileView::new(entry.file, &entry.album_ids)?;
+            if options.json {
                 output::json(&view)
             } else {
                 output::file(&view)
             }
         }
         FileCommand::Download { file, output } => {
-            let entry = select(entries, &file, "file", |e| (e.file.id, &e.file.name))?;
+            let entry = find(&file)?;
             let parent = output
                 .parent()
                 .filter(|p| !p.as_os_str().is_empty())
                 .unwrap_or(Path::new("."));
             let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-            files::download(&session, &entry.file, temporary.as_file_mut()).await?;
+            files::download(session, &entry.file, || {
+                let file = temporary.as_file_mut();
+                file.set_len(0)?;
+                file.rewind()?;
+                file.try_clone()
+            })
+            .await?;
             temporary.as_file().sync_all()?;
             let bytes = temporary.as_file().metadata()?.len();
             temporary
@@ -113,7 +172,7 @@ pub async fn file(
                 .map_err(|error| error.error)
                 .with_context(|| format!("cannot save download to {}", output.display()))?;
             output::action(
-                json_output,
+                options.json,
                 &json!({ "id": entry.file.id.to_string(), "output": output, "bytes": bytes }),
                 &format!("Downloaded {:?} to {}.", entry.file.name, output.display()),
             )
@@ -121,34 +180,47 @@ pub async fn file(
     }
 }
 
-struct Entry {
-    file: files::File,
-    album_ids: Vec<i64>,
+fn open_account(selected: Option<&str>, create: bool) -> Result<(Account, home::AccountHome)> {
+    let state = State::load()?;
+    let id = state.accounts[state.resolve(selected)?].storage_id;
+    let home = home::lock_account(id, create)?;
+    let Some(account) = State::load()?
+        .accounts
+        .into_iter()
+        .find(|account| account.storage_id == id)
+    else {
+        home.remove()?;
+        bail!("account was removed while waiting for access");
+    };
+    if create {
+        home::create(&home.path)?;
+    }
+    Ok((account, home))
 }
 
 fn select<T>(
-    items: Vec<T>,
+    items: impl Iterator<Item = Result<T>>,
     selector: &str,
     kind: &str,
     identity: impl Fn(&T) -> (i64, &str),
 ) -> Result<T> {
-    let mut matches = items
-        .into_iter()
-        .filter(|item| {
-            let (id, name) = identity(item);
-            id.to_string() == selector || name == selector
-        })
-        .collect::<Vec<_>>();
+    let mut matches = items.take(MAX_CANDIDATES + 1).collect::<Result<Vec<_>>>()?;
     if matches.len() > 1 {
         let candidates = matches
             .iter()
+            .take(MAX_CANDIDATES)
             .map(|item| {
                 let (id, name) = identity(item);
                 format!("  {id}  {name:?}")
             })
             .collect::<Vec<_>>()
             .join("\n");
-        bail!("{kind} {selector:?} is ambiguous:\n{candidates}");
+        let more = if matches.len() > MAX_CANDIDATES {
+            "\nMore matches omitted; use an ID."
+        } else {
+            ""
+        };
+        bail!("{kind} {selector:?} is ambiguous:\n{candidates}{more}");
     }
     matches
         .pop()

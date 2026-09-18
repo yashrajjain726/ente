@@ -2,7 +2,10 @@ use ente_accounts::{
     AccountsClient, AccountsClientConfig, AuthFlow, AuthFlowUi, AuthenticatedAccount,
     CreateAccountParams, OtpPurpose, SecondFactorMethod, TotpPurpose,
 };
-use ente_core::crypto::{PublicKey, blob, sealed, secretbox, stream};
+use ente_core::{
+    crypto::{PublicKey, blob, sealed, secretbox, stream},
+    io::Md5Writer,
+};
 use ente_test_support::{HARDCODED_OTT, Museum, TestResult};
 use uuid::Uuid;
 use zeroize::Zeroizing;
@@ -366,6 +369,28 @@ async fn exercise(origin: String) -> TestResult {
     assert_eq!(fs::read(output_path).unwrap(), original);
 
     login(&home, "photos", &alice_email, &["--host", &origin]);
+    let added_file = upload_file(&origin, &alice, album, &key, b"added after the first sync")
+        .await
+        .to_string();
+    assert_eq!(home.json(&["photos", "file", "list", "--offline"]), files);
+    let refreshed = home.json(&["photos", "file", "list", "--all"]);
+    assert_eq!(refreshed.as_array().unwrap().len(), 2);
+    assert!(
+        refreshed
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|file| file["id"] == added_file)
+    );
+    assert_eq!(
+        home.json(&["photos", "file", "list", "--offline", "--all"]),
+        refreshed
+    );
+    assert_eq!(
+        home.json(&["photos", "file", "list", "--offline", "--limit", "1"]),
+        json!([refreshed[0]])
+    );
+
     for selector in ["Monsoon 🌧", &album.to_string()] {
         let (conflict, _) = create_album(&origin, &alice, selector, "album").await;
         let output = home.run(&["photos", "album", "view", selector, "--json"]);
@@ -414,9 +439,26 @@ async fn exercise(origin: String) -> TestResult {
         home.json(&["account", "view", "work"])["products"],
         json!(["locker"])
     );
+    let account_dir = home
+        .dir
+        .path()
+        .join("accounts")
+        .join(first_id.as_str().unwrap());
+    assert!(account_dir.join("data.db").is_file());
+    success(home.run(&["account", "logout", "work", "--local"]));
+    assert!(!account_dir.exists());
+    assert!(!account_dir.with_extension("lock").exists());
 
     for entry in fs::read_dir(home.dir.path()).unwrap() {
         let entry = entry.unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(entry.metadata().unwrap().permissions().mode() & 0o077, 0);
+        }
+        if entry.file_type().unwrap().is_dir() {
+            continue;
+        }
         let bytes = fs::read(entry.path()).unwrap();
         assert!(
             !bytes
@@ -428,11 +470,6 @@ async fn exercise(origin: String) -> TestResult {
                 .windows(PASSWORD.len())
                 .any(|b| b == PASSWORD.as_bytes())
         );
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            assert_eq!(entry.metadata().unwrap().permissions().mode() & 0o077, 0);
-        }
     }
     Ok(())
 }
@@ -516,37 +553,40 @@ async fn upload_file(
 ) -> i64 {
     let client = reqwest::Client::new();
     let token = b64::encode_url_safe(&owner.secrets.token);
-    let urls: Value = client
-        .get(format!("{origin}/files/upload-urls"))
-        .header("x-auth-token", &token)
-        .header("x-client-package", "io.ente.photos")
-        .query(&[("count", 2)])
-        .send()
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
     let key = Key::generate();
     let wrapped = secretbox::encrypt(key.as_bytes(), collection_key);
     let mut encrypted = Vec::new();
     let header =
         stream::encrypt_file(&mut std::io::Cursor::new(original), &mut encrypted, &key).unwrap();
     let thumbnail = blob::encrypt(b"thumbnail", &key).unwrap();
-    for (index, bytes) in [&encrypted, &thumbnail.encrypted_data]
-        .into_iter()
-        .enumerate()
-    {
+    let mut object_keys = Vec::new();
+    for bytes in [&encrypted, &thumbnail.encrypted_data] {
+        let mut checksum = Md5Writer::new(std::io::sink());
+        checksum.write_all(bytes).unwrap();
+        let checksum = b64::encode(&checksum.finalize().1);
+        let upload: Value = client
+            .post(format!("{origin}/files/upload-url"))
+            .header("x-auth-token", &token)
+            .header("x-client-package", "io.ente.photos")
+            .json(&json!({"contentLength": bytes.len(), "contentMD5": checksum}))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
         client
-            .put(urls["urls"][index]["url"].as_str().unwrap())
+            .put(upload["url"].as_str().unwrap())
+            .header("content-md5", checksum)
             .body(bytes.clone())
             .send()
             .await
             .unwrap()
             .error_for_status()
             .unwrap();
+        object_keys.push(upload["objectKey"].as_str().unwrap().to_owned());
     }
     let metadata = blob::encrypt_json(
         &json!({
@@ -561,8 +601,8 @@ async fn upload_file(
         .json(&json!({
             "collectionID": album, "encryptedKey": b64::encode(&wrapped.encrypted_data),
             "keyDecryptionNonce": b64::encode(wrapped.nonce.as_bytes()),
-            "file": {"objectKey": urls["urls"][0]["objectKey"], "decryptionHeader": b64::encode(header.as_bytes())},
-            "thumbnail": {"objectKey": urls["urls"][1]["objectKey"], "decryptionHeader": b64::encode(thumbnail.decryption_header.as_bytes())},
+            "file": {"objectKey": object_keys[0], "decryptionHeader": b64::encode(header.as_bytes())},
+            "thumbnail": {"objectKey": object_keys[1], "decryptionHeader": b64::encode(thumbnail.decryption_header.as_bytes())},
             "metadata": {"encryptedData": b64::encode(&metadata.encrypted_data),
                 "decryptionHeader": b64::encode(metadata.decryption_header.as_bytes())}
         })).send().await.unwrap().error_for_status().unwrap().json().await.unwrap();

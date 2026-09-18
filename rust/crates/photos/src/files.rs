@@ -1,8 +1,6 @@
-use std::collections::BTreeMap;
-
 use ente_core::{
     Session, b64,
-    crypto::{self, Header, Key, Nonce, blob, secretbox},
+    crypto::{self, Header, Key, blob},
     http,
 };
 use serde::Deserialize;
@@ -77,130 +75,75 @@ pub enum Error {
     Base64(#[from] b64::DecodeError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("file changes did not advance the cursor for collection {0}")]
-    CursorDidNotAdvance(i64),
+    #[error(transparent)]
+    Collections(#[from] ente_collections::Error),
 }
 
 pub async fn diff(session: &Session, collection: &Collection, since: i64) -> Result<Page, Error> {
-    let response: DiffResponse = http::retry(|| async {
-        session
-            .api
-            .get("/collections/v2/diff")
-            .query(&[("collectionID", collection.id), ("sinceTime", since)])
-            .send()
-            .await?
-            .error_for_code()
-            .await?
-            .json()
-            .await
-    })
-    .await?;
-    let mut cursor = since;
-    let mut changes = Vec::with_capacity(response.diff.len());
-    for remote in response.diff {
-        cursor = cursor.max(remote.updation_time);
-        changes.push(Change {
-            id: remote.id,
-            file: if remote.is_deleted || remote.file.encrypted_data.as_deref() == Some("-") {
-                None
-            } else {
-                Some(remote.open(&collection.key)?)
-            },
-        });
-    }
-    if response.has_more && cursor <= since {
-        return Err(Error::CursorDidNotAdvance(collection.id));
-    }
+    let page = ente_collections::client::files_diff(session, collection.id, since).await?;
+    let changes = page
+        .files
+        .into_iter()
+        .map(|remote| {
+            Ok(Change {
+                id: remote.id,
+                file: if remote.is_deleted() {
+                    None
+                } else {
+                    Some(File::open(remote, &collection.key)?)
+                },
+            })
+        })
+        .collect::<Result<_, Error>>()?;
     Ok(Page {
         changes,
-        cursor,
-        has_more: response.has_more,
+        cursor: page.cursor,
+        has_more: page.has_more,
     })
-}
-
-pub async fn list(session: &Session, collection: &Collection) -> Result<Vec<File>, Error> {
-    let mut files = BTreeMap::new();
-    let mut cursor = 0;
-    loop {
-        let page = diff(session, collection, cursor).await?;
-        for change in page.changes {
-            if let Some(file) = change.file {
-                files.insert(change.id, file);
-            } else {
-                files.remove(&change.id);
-            }
-        }
-        cursor = page.cursor;
-        if !page.has_more {
-            return Ok(files.into_values().collect());
-        }
-    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn download(
+pub async fn download<W: std::io::Write>(
     session: &Session,
     file: &File,
-    output: &mut impl std::io::Write,
+    mut output: impl FnMut() -> std::io::Result<W>,
 ) -> Result<(), Error> {
-    use ente_core::crypto::stream::{DECRYPTION_CHUNK_SIZE, Decryptor};
+    use ente_core::crypto::stream::DecryptingWriter;
     use futures_util::StreamExt;
 
-    let response = http::retry(|| async {
-        let signed: DownloadUrl = session
-            .api
-            .get(&format!("/files/download/v3/{}", file.id))
-            .send()
-            .await?
-            .error_for_code()
-            .await?
-            .json()
-            .await?;
-        session
-            .api
-            .http()
-            .get(&signed.url)
-            .send()
-            .await?
-            .error_for_status()
-    })
-    .await?;
-    let body = response.bytes_stream();
-    let mut body = std::pin::pin!(body);
-    let mut decryptor = Decryptor::new(&file.header, &file.key);
-    let mut buffer = Vec::with_capacity(DECRYPTION_CHUNK_SIZE);
-    let mut seen_final = false;
-    while let Some(chunk) = body.next().await {
-        let chunk = chunk?;
-        let mut remaining = chunk.as_ref();
-        while !remaining.is_empty() {
-            if seen_final {
-                return Err(crypto::Error::StreamTrailingData.into());
+    http::retry_if(
+        || {
+            let output = output();
+            async move {
+                let output = output?;
+                let signed: DownloadUrl = session
+                    .api
+                    .get(&format!("/files/download/v3/{}", file.id))
+                    .send()
+                    .await?
+                    .error_for_code()
+                    .await?
+                    .json()
+                    .await?;
+                let response = session
+                    .api
+                    .http()
+                    .get(&signed.url)
+                    .send()
+                    .await?
+                    .error_for_status()?;
+                let mut body = std::pin::pin!(response.bytes_stream());
+                let mut decryptor = DecryptingWriter::new(&file.header, &file.key, output);
+                while let Some(chunk) = body.next().await {
+                    decryptor.write(&chunk?)?;
+                }
+                decryptor.finish()?;
+                Ok(())
             }
-            let count = remaining.len().min(DECRYPTION_CHUNK_SIZE - buffer.len());
-            buffer.extend_from_slice(&remaining[..count]);
-            remaining = &remaining[count..];
-            if buffer.len() == DECRYPTION_CHUNK_SIZE {
-                let (plaintext, is_final) = decryptor.pull(&buffer)?;
-                output.write_all(&plaintext)?;
-                seen_final = is_final;
-                buffer.clear();
-            }
-        }
-    }
-    if !buffer.is_empty() {
-        let (plaintext, _) = decryptor.pull(&buffer)?;
-        output.write_all(&plaintext)?;
-    }
-    decryptor.finish()?;
-    Ok(())
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct DiffResponse {
-    diff: Vec<RemoteFile>,
-    has_more: bool,
+        },
+        |error| matches!(error, Error::Http(error) if error.is_retryable()),
+    )
+    .await
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -209,43 +152,25 @@ struct DownloadUrl {
     url: String,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RemoteFile {
-    id: i64,
-    #[serde(rename = "ownerID")]
-    owner_id: i64,
-    encrypted_key: String,
-    key_decryption_nonce: String,
-    file: FileAttributes,
-    metadata: FileAttributes,
-    is_deleted: bool,
-    updation_time: i64,
-    magic_metadata: Option<EncryptedMetadata>,
-    pub_magic_metadata: Option<EncryptedMetadata>,
-}
-
-impl RemoteFile {
-    fn open(self, collection_key: &Key) -> Result<File, Error> {
-        let key = Key::try_from_slice(&secretbox::decrypt(
-            &b64::decode(&self.encrypted_key)?,
-            &Nonce::try_from_slice(&b64::decode(&self.key_decryption_nonce)?)?,
-            collection_key,
-        )?)?;
+impl File {
+    fn open(remote: ente_collections::client::File, collection_key: &Key) -> Result<Self, Error> {
+        let key = remote.open_key(collection_key)?;
         let metadata: Metadata = blob::decrypt_json(
             &blob::EncryptedBlob {
-                encrypted_data: b64::decode(self.metadata.encrypted_data.as_deref().unwrap_or(""))?,
+                encrypted_data: b64::decode(
+                    remote.metadata.encrypted_data.as_deref().unwrap_or(""),
+                )?,
                 decryption_header: Header::try_from_slice(&b64::decode(
-                    &self.metadata.decryption_header,
+                    &remote.metadata.decryption_header,
                 )?)?,
             },
             &key,
         )?;
-        let public: PublicMetadata = match self.pub_magic_metadata {
+        let public: PublicMetadata = match remote.pub_magic_metadata {
             Some(encrypted) => encrypted.open(&key)?,
             None => PublicMetadata::default(),
         };
-        let private: PrivateMetadata = match self.magic_metadata {
+        let private: PrivateMetadata = match remote.magic_metadata {
             Some(encrypted) => encrypted.open(&key)?,
             None => PrivateMetadata::default(),
         };
@@ -275,9 +200,9 @@ impl RemoteFile {
                 longitude,
             });
         Ok(File {
-            id: self.id,
-            owner_id: self.owner_id,
-            updated_at_micros: self.updation_time,
+            id: remote.id,
+            owner_id: remote.owner_id,
+            updated_at_micros: remote.updation_time,
             name: public.edited_name.unwrap_or(metadata.title),
             kind,
             created_at_micros: public.edited_time.unwrap_or(metadata.creation_time),
@@ -299,33 +224,8 @@ impl RemoteFile {
                 _ => Visibility::Visible,
             },
             key,
-            header: Header::try_from_slice(&b64::decode(&self.file.decryption_header)?)?,
+            header: Header::try_from_slice(&b64::decode(&remote.file.decryption_header)?)?,
         })
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FileAttributes {
-    encrypted_data: Option<String>,
-    decryption_header: String,
-}
-
-#[derive(Deserialize)]
-struct EncryptedMetadata {
-    data: String,
-    header: String,
-}
-
-impl EncryptedMetadata {
-    fn open<T: serde::de::DeserializeOwned>(&self, key: &Key) -> Result<T, Error> {
-        Ok(blob::decrypt_json(
-            &blob::EncryptedBlob {
-                encrypted_data: b64::decode(&self.data)?,
-                decryption_header: Header::try_from_slice(&b64::decode(&self.header)?)?,
-            },
-            key,
-        )?)
     }
 }
 
