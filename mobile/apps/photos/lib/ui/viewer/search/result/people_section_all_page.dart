@@ -1077,7 +1077,6 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
     return EntePopupMenuOption(
       value: (sortKey: null),
       label: l10n.showIgnored,
-      labelColor: context.componentColors.textLight,
       trailingWidget: IgnorePointer(
         child: ToggleSwitchComponent(
           selected: _showingIgnoredPeople,
