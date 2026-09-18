@@ -5,12 +5,14 @@ import log from "ente-base/log";
 import React from "react";
 import {
     loadCurrentSpacePost,
+    loadCurrentSpacePostAssetURL,
     replyToCurrentPost,
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
+import { viewerPhotosFromPost } from "utils/post-photos";
 import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
 import { spaceRoutes } from "utils/routes";
 
@@ -51,6 +53,7 @@ const viewerPhotoFromPost = (post: SpacePost) => ({
     caption: post.caption,
     friendID: post.friendID,
     height: post.height,
+    photos: post.photos,
     imageUrl: post.imageUrl ?? "",
     name: post.name,
     postId: post.postId,
@@ -169,7 +172,10 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={postBackground} />
             <SpaceFileViewer
+                key={post.postId}
                 photo={viewerPhotoFromPost(post)}
+                photos={viewerPhotosFromPost(viewerPhotoFromPost(post))}
+                onLoadPhoto={loadCurrentSpacePostAssetURL}
                 postActionMode={isOwnPost ? "hidden" : "like-only"}
                 onClose={closePost}
                 onOpenProfile={openOwnerProfile}

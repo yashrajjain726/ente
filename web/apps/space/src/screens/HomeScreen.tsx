@@ -21,6 +21,8 @@ import {
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/post-like-animation";
+import { SpacePostPhotoInput } from "components/PostPhotoInput";
+import { SpacePostPhotosBadge } from "components/PostPhotosBadge";
 import { SpacePWAInstallPrompt } from "components/PWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareInviteButton } from "components/ShareInviteButton";
@@ -47,7 +49,7 @@ import {
 } from "styles/colors";
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom, formatSpaceDate } from "utils/display";
-import { spacePostImageInputAccept } from "utils/post-image";
+import { viewerPhotosFromPost } from "utils/post-photos";
 import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 const homeBackground = spaceAppBackgroundColor;
@@ -99,7 +101,7 @@ interface HomeScreenProps {
     showInstallPrompt?: boolean;
     showInviteFriendsToast?: boolean;
     onAddFriend: () => void;
-    onPostPhotoSelect: (file: File) => void;
+    onPostPhotoSelect: (files: File[]) => void;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onLoadMoreFeedItems?: () => Promise<void> | void;
     onLoadPostAvatar?: SpacePostAvatarURLLoader;
@@ -139,6 +141,7 @@ interface DecodedImageState {
 }
 
 interface SelectedHomeViewer {
+    photos: SpaceViewerPhoto[];
     focusReplyOnOpen?: boolean;
     photo: SpaceViewerPhoto;
     postActionMode?: SpaceViewerPostActionMode;
@@ -356,6 +359,7 @@ class FeedMotionList extends React.Component<FeedMotionListProps> {
 type FeedTimestampStatus = "failed" | "post-limit" | "posted" | "posting";
 
 interface FeedItemProps {
+    photoCount?: number;
     aspectRatio: number;
     avatarUrl: string | null;
     caption?: string;
@@ -633,6 +637,7 @@ const FeedPhotoCaption: React.FC<{ caption: string }> = ({ caption }) => {
 };
 
 const FeedItem: React.FC<FeedItemProps> = ({
+    photoCount = 1,
     aspectRatio,
     avatarUrl,
     caption,
@@ -900,6 +905,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     width: "100%",
                 }}
             >
+                <SpacePostPhotosBadge count={photoCount} />
                 <Box
                     component="button"
                     type="button"
@@ -1526,12 +1532,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         postInputRef.current?.click();
     };
     const openFeedPhoto = (
+        post: SpacePost,
         photo: SpaceViewerPhoto,
         focusReplyOnOpen = false,
     ) => {
         const isOwnPost =
             Boolean(viewerSpaceId) && photo.friendID == viewerSpaceId;
         setSelectedViewer({
+            photos: viewerPhotosFromPost({ ...photo, photos: post.photos }),
             focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
             photo,
             postActionMode: isOwnPost ? "hidden" : "like-only",
@@ -1688,9 +1696,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         : () => loadFeedPostImage(item)
                 }
                 onOpenFriend={onOpenFriend}
-                onOpenPhoto={openFeedPhoto}
+                onOpenPhoto={(photo, focusReply) =>
+                    openFeedPhoto(item, photo, focusReply)
+                }
                 onOpenProfile={onOpenProfile}
                 onSetPostLiked={onSetPostLiked}
+                photoCount={item.photos?.length ?? 1}
                 postId={item.postId}
                 spaceId={item.spaceId}
                 thumbHash={item.thumbHash}
@@ -1724,6 +1735,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isOwnPost
                 name={item.name}
                 onOpenProfile={onOpenProfile}
+                photoCount={item.photoCount}
                 postId={0}
                 timestampStatus={
                     item.status == "failed"
@@ -1792,14 +1804,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onLoadMoreFeedItems,
     ]);
 
-    const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
-        event,
-    ) => {
-        const file = event.target.files?.[0];
-        event.target.value = "";
-        if (file) onPostPhotoSelect(file);
-    };
-
     return (
         <Box
             component="main"
@@ -1832,13 +1836,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onOpenMessages={onOpenMessages}
                     onOpenProfile={onOpenProfile}
                 >
-                    <Box
-                        ref={postInputRef}
-                        component="input"
-                        type="file"
-                        accept={spacePostImageInputAccept}
-                        onChange={handlePostPhotoSelect}
-                        sx={{ display: "none" }}
+                    <SpacePostPhotoInput
+                        inputRef={postInputRef}
+                        onSelect={onPostPhotoSelect}
                     />
                 </SpaceHomeHeader>
                 <Box
@@ -1973,6 +1973,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     lineHeight: "30px",
                                     m: 0,
                                     maxWidth: 260,
+                                    textWrap: "balance",
                                 }}
                             >
                                 Invite your friends and family
@@ -1989,10 +1990,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     m: 0,
                                     mt: "10px",
                                     maxWidth: 250,
+                                    textWrap: "balance",
                                 }}
                             >
-                                You’ll see posts from your friends and family
-                                here.
+                                Keep up with each other through
+                                <br />
+                                everyday photos.
                             </Box>
                             <Box
                                 component="button"
@@ -2049,8 +2052,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 />
                 {selectedViewer && (
                     <SpaceFileViewer
+                        closeOnSwipePastEnd
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
                         photo={selectedViewer.photo}
+                        photos={selectedViewer.photos}
+                        onLoadPhoto={onLoadPostImage}
                         postActionMode={selectedViewer.postActionMode}
                         onClose={closeSelectedPhoto}
                         onOpenProfile={
@@ -2077,7 +2083,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     }
                                   : undefined
                         }
-                        onSwipeLeft={closeSelectedPhoto}
                         onReplyToPost={
                             !selectedPhotoIsOwn &&
                             selectedViewer.photo.friendID != viewerSpaceId

@@ -121,7 +121,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         profileLoadError,
         profileLoadStatus,
         setFriends,
-        setPendingPostPhotoFile,
+        setPendingPostPhotoFiles,
     } = useSpaceAppState();
     const [conversations, setConversations] = React.useState<
         SpaceMessageConversation[]
@@ -697,7 +697,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 }
                 onOpenThread={openConversation}
                 onPostPhotoSelect={(file) => {
-                    setPendingPostPhotoFile(file);
+                    setPendingPostPhotoFiles(file);
                 }}
                 onLoadActivityPost={(post) =>
                     loadCurrentMessageActivityPostPreview(post, actorSpaceId)

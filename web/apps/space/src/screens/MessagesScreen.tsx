@@ -16,6 +16,8 @@ import {
     Popper,
 } from "@mui/material";
 import { SpaceAvatarImage } from "components/AvatarImage";
+import { SpacePostPhotoInput } from "components/PostPhotoInput";
+import { SpacePostPhotosBadge } from "components/PostPhotosBadge";
 import { SpaceLoadingSpinner } from "components/RouteFallback";
 import { SpaceShareInviteButton } from "components/ShareInviteButton";
 import { formatTimeAgo } from "ente-base/date";
@@ -42,7 +44,6 @@ import {
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
 import { clampSpaceMessageText } from "utils/message-limits";
-import { spacePostImageInputAccept } from "utils/post-image";
 
 const green = "#08C225";
 const textBase = spaceText;
@@ -112,7 +113,7 @@ interface MessagesScreenProps {
     ) => void;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
-    onPostPhotoSelect: (file: File) => void;
+    onPostPhotoSelect: (files: File[]) => void;
     onLoadActivityPost?: (
         post: SpaceMessageActivityPost,
     ) => Promise<SpaceMessageActivityPost | undefined>;
@@ -1268,6 +1269,7 @@ const PostQuotePreview: React.FC<{
 }) => {
     const quote = message.quote;
     const imageUrl = quote?.imageUrl ?? activityPost?.imageUrl;
+    const photoCount = quote?.photoCount ?? activityPost?.photoCount ?? 1;
     const isUnavailable =
         !quote ||
         quote.isUnavailable == true ||
@@ -1275,7 +1277,7 @@ const PostQuotePreview: React.FC<{
             (activityPost != undefined || onLoadActivityPost == undefined));
     const loadedQuote =
         quote && imageUrl && !isUnavailable
-            ? { ...quote, imageUrl }
+            ? { ...quote, imageUrl, photoCount }
             : undefined;
     const isLoading = quote != undefined && !imageUrl && !isUnavailable;
     const canOpen = Boolean(loadedQuote);
@@ -1307,6 +1309,7 @@ const PostQuotePreview: React.FC<{
                     font: "inherit",
                     overflow: "hidden",
                     p: 0,
+                    position: "relative",
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
@@ -1359,6 +1362,7 @@ const PostQuotePreview: React.FC<{
                         )}
                     </Box>
                 )}
+                {canOpen && <SpacePostPhotosBadge count={photoCount} />}
             </Box>
         </QuoteFrame>
     );
@@ -1809,13 +1813,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
     const isContextMessagePoke = messageContextMenu?.message.kind == "poke";
 
-    const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
-        event,
-    ) => {
-        const file = event.target.files?.[0];
-        event.target.value = "";
-        if (file) onPostPhotoSelect(file);
-    };
     const openPostPhotoPicker = () => postPhotoInputRef.current?.click();
 
     const sendMessage = () => {
@@ -2131,13 +2128,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
 
     return (
         <>
-            <Box
-                ref={postPhotoInputRef}
-                component="input"
-                type="file"
-                accept={spacePostImageInputAccept}
-                onChange={handlePostPhotoSelect}
-                sx={{ display: "none" }}
+            <SpacePostPhotoInput
+                inputRef={postPhotoInputRef}
+                onSelect={onPostPhotoSelect}
             />
             <Box
                 component="main"
