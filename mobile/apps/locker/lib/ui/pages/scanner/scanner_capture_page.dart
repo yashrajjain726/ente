@@ -109,9 +109,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       }
       _autoCapture.reset();
     } else if (state == AppLifecycleState.resumed) {
-      if (!_reviewActive &&
-          _camera == null &&
-          _status != _CameraStatus.starting) {
+      if (!_reviewActive && _camera == null && _status == _CameraStatus.ready) {
         unawaited(_startCamera());
       }
     }
