@@ -8,12 +8,16 @@ public enum EnteApp: Sendable {
 }
 
 public struct Palette: Sendable {
+    public let isDark: Bool
     public let primary: Color
     public let primaryDarker: Color
     public let text: Color
+    public let hintText: Color
     public let disabledText: Color
     public let reverseText: Color
+    public let surface: Color
     public let fill: Color
+    public let fillDarker: Color
     public let fillDarkest: Color
     public let danger: Color
     public let dangerDarker: Color
@@ -33,12 +37,16 @@ public struct Palette: Sendable {
             primaryDarker = Color(hex: 0x0B4CAD)
         }
         return Palette(
+            isDark: dark,
             primary: primary,
             primaryDarker: primaryDarker,
             text: dark ? .white : .black,
+            hintText: Color(hex: 0x969696),
             disabledText: Color(hex: dark ? 0x414141 : 0xD6D6D6),
             reverseText: dark ? .black : .white,
+            surface: Color(hex: dark ? 0x212121 : 0xFFFFFF),
             fill: Color(hex: dark ? 0x0A0A0A : 0xEAEAEA),
+            fillDarker: Color(hex: dark ? 0x141414 : 0xDEDEDE),
             fillDarkest: Color(hex: dark ? 0x292929 : 0xD2D2D2),
             danger: Color(hex: 0xF63A3A),
             dangerDarker: Color(hex: 0xC52E2E)
@@ -51,6 +59,7 @@ public enum EnteSpacing {
 }
 
 public enum EnteRadius {
+    public static let medium: CGFloat = 12
     public static let button: CGFloat = 20
 }
 
