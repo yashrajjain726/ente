@@ -6,7 +6,28 @@ use super::fill::decode_centroid;
 use super::{Error, FillState, Index, IndexResult, MlStore, Result, state};
 use crate::ml_db::{ClipEmbedding, ClusterSummary};
 
-type Vectors = (Vec<String>, Vec<Vec<f32>>);
+#[derive(Default)]
+struct IndexBatch {
+    keys: Vec<String>,
+    vectors: Vec<Vec<f32>>,
+    rejected_keys: Vec<String>,
+}
+
+impl FromIterator<(String, Option<Vec<f32>>)> for IndexBatch {
+    fn from_iter<I: IntoIterator<Item = (String, Option<Vec<f32>>)>>(entries: I) -> Self {
+        let mut batch = Self::default();
+        for (key, vector) in entries {
+            match vector {
+                Some(vector) => {
+                    batch.keys.push(key);
+                    batch.vectors.push(vector);
+                }
+                None => batch.rejected_keys.push(key),
+            }
+        }
+        batch
+    }
+}
 
 impl MlStore {
     pub fn put_clip(&self, embeddings: &[ClipEmbedding]) -> Result<()> {
@@ -18,8 +39,7 @@ impl MlStore {
         if self.index_is_stale(Index::Clip)? {
             return Ok(());
         }
-        let (keys, vectors) = clip_vectors(embeddings);
-        self.index_write(Index::Clip, |vecdb| vecdb.bulk_add(&keys, &vectors))
+        self.apply_batch(Index::Clip, &clip_batch(embeddings))
     }
 
     pub fn delete_clip(&self, file_ids: &[i64]) -> Result<()> {
@@ -50,10 +70,7 @@ impl MlStore {
         if self.index_is_stale(Index::ClusterCentroid)? {
             return Ok(());
         }
-        let (keys, vectors) = centroid_vectors(summary);
-        self.index_write(Index::ClusterCentroid, |vecdb| {
-            vecdb.bulk_add(&keys, &vectors)
-        })
+        self.apply_batch(Index::ClusterCentroid, &centroid_batch(summary))
     }
 
     pub fn delete_cluster_summary(&self, cluster_id: &str) -> Result<()> {
@@ -86,6 +103,13 @@ impl MlStore {
         Ok(state::read(&self.db, index)? == FillState::Stale)
     }
 
+    fn apply_batch(&self, index: Index, batch: &IndexBatch) -> Result<()> {
+        self.index_write(index, |vecdb| {
+            vecdb.bulk_remove(&batch.rejected_keys)?;
+            vecdb.bulk_add(&batch.keys, &batch.vectors)
+        })
+    }
+
     fn index_write<T>(
         &self,
         index: Index,
@@ -104,28 +128,32 @@ impl MlStore {
     }
 }
 
-fn clip_vectors(embeddings: &[ClipEmbedding]) -> Vectors {
+fn clip_batch(embeddings: &[ClipEmbedding]) -> IndexBatch {
     embeddings
         .iter()
-        .filter_map(|embedding| {
+        .map(|embedding| {
             let key = embedding.file_id.to_string();
             let vector: Vec<f32> = embedding
                 .embedding
                 .iter()
                 .map(|value| *value as f32)
                 .collect();
-            Index::Clip.accepts(&key, &vector).then_some((key, vector))
+            let accepted = Index::Clip.accepts(&key, &vector).then_some(vector);
+            (key, accepted)
         })
-        .unzip()
+        .collect()
 }
 
-fn centroid_vectors(summary: &HashMap<String, ClusterSummary>) -> Vectors {
+fn centroid_batch(summary: &HashMap<String, ClusterSummary>) -> IndexBatch {
     summary
         .iter()
-        .filter_map(|(cluster_id, summary)| {
-            decode_centroid(cluster_id, &summary.avg).map(|vector| (cluster_id.clone(), vector))
+        .map(|(cluster_id, summary)| {
+            (
+                cluster_id.clone(),
+                decode_centroid(cluster_id, &summary.avg),
+            )
         })
-        .unzip()
+        .collect()
 }
 
 #[cfg(test)]
@@ -231,6 +259,72 @@ mod tests {
         assert!(!store.contains(Index::Clip, "2").unwrap());
         assert_eq!(live_count(&store, Index::Clip), 0);
         assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Filled);
+    }
+
+    #[test]
+    fn empty_clip_markers_are_stored_in_sql_and_kept_out_of_the_index() {
+        let (_directory, store) = open();
+        store.fill_clip_index(false).unwrap();
+        store.put_clip(&clips([1])).unwrap();
+        let mut marker = clips([2]);
+        marker[0].embedding = vec![];
+        store.put_clip(&marker).unwrap();
+
+        assert_eq!(
+            store.db().clip_indexed_file_with_version().unwrap(),
+            HashMap::from([(1, 1), (2, 1)])
+        );
+        assert!(store.contains(Index::Clip, "1").unwrap());
+        assert!(!store.contains(Index::Clip, "2").unwrap());
+        assert_eq!(live_count(&store, Index::Clip), 1);
+        assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Filled);
+    }
+
+    #[test]
+    fn rejected_clip_embeddings_evict_previously_indexed_vectors() {
+        let (_directory, store) = open();
+        store.fill_clip_index(false).unwrap();
+        store.put_clip(&clips([1, 2, 3, 4])).unwrap();
+        let mut replacements = clips([1, 2, 3]);
+        replacements[0].embedding = vec![];
+        replacements[1].embedding = vec![1.0, 2.0];
+        replacements[2].embedding[0] = f64::NAN;
+        store.put_clip(&replacements).unwrap();
+
+        assert_eq!(store.db().count_clip_rows().unwrap(), 4);
+        for file_id in ["1", "2", "3"] {
+            assert!(!store.contains(Index::Clip, file_id).unwrap(), "{file_id}");
+        }
+        assert!(store.contains(Index::Clip, "4").unwrap());
+        assert_eq!(live_count(&store, Index::Clip), 1);
+        assert_eq!(store.fill_state(Index::Clip).unwrap(), FillState::Filled);
+        let refill = store.fill_clip_index(true).unwrap();
+        assert_eq!((refill.indexed, refill.skipped), (1, 3));
+    }
+
+    #[test]
+    fn rejected_centroids_evict_previously_indexed_vectors() {
+        let (_directory, store) = open();
+        store.fill_cluster_centroid_index(false).unwrap();
+        store
+            .cluster_summary_update(&HashMap::from([centroid("c1", 1), centroid("c2", 2)]))
+            .unwrap();
+        let malformed = ClusterSummary {
+            avg: encode_evector(&[1.0, 2.0]),
+            count: 1,
+        };
+        store
+            .cluster_summary_update(&HashMap::from([("c1".to_string(), malformed)]))
+            .unwrap();
+
+        assert_eq!(store.db().count_cluster_summaries().unwrap(), 2);
+        assert!(!store.contains(Index::ClusterCentroid, "c1").unwrap());
+        assert!(store.contains(Index::ClusterCentroid, "c2").unwrap());
+        assert_eq!(live_count(&store, Index::ClusterCentroid), 1);
+        assert_eq!(
+            store.fill_state(Index::ClusterCentroid).unwrap(),
+            FillState::Filled
+        );
     }
 
     #[test]
