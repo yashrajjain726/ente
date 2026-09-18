@@ -923,7 +923,7 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
     return (
         <>
             <Dialog
-                open={open && !openNameInput && cgroupPeople.length > 0}
+                open={open && cgroupPeople.length > 0}
                 onClose={onClose}
                 fullScreen={isFullScreen}
                 aria-labelledby={titleID}
@@ -958,30 +958,19 @@ const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
                     <CollectionTileButton
                         onClick={handleAddPerson}
                         aria-label={t("new_person")}
-                        sx={{
+                        sx={(theme) => ({
                             boxSizing: "border-box",
                             border: "1px dashed",
                             borderColor: "stroke.muted",
-                            backgroundColor: "fill.faint",
-                            "&:hover": { backgroundColor: "fill.faintHover" },
-                        }}
+                            color: "text.muted",
+                            "&:hover": { borderColor: "rgba(0 0 0 / 0.45)" },
+                            ...theme.applyStyles("dark", {
+                                "&:hover": {
+                                    borderColor: "rgba(255 255 255 / 0.45)",
+                                },
+                            }),
+                        })}
                     >
-                        <Typography
-                            title={t("new_person")}
-                            sx={{
-                                position: "absolute",
-                                top: 8,
-                                insetInline: 8,
-                                overflow: "hidden",
-                                whiteSpace: "nowrap",
-                                textOverflow: "ellipsis",
-                                fontSize: 14,
-                                lineHeight: "20px",
-                                fontWeight: 500,
-                            }}
-                        >
-                            {t("new_person")}
-                        </Typography>
                         <AddIcon
                             sx={{
                                 position: "absolute",
