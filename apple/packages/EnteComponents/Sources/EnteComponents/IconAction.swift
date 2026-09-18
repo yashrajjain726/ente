@@ -1,7 +1,6 @@
 import SwiftUI
 
 public struct IconAction<Content: View>: View {
-    @Environment(\.entePalette) private var palette
     private let kind: IconActionKind
     private let enabled: Bool
     private let size: CGFloat
@@ -31,7 +30,6 @@ public struct IconAction<Content: View>: View {
         .buttonStyle(
             IconActionStyle(
                 kind: kind,
-                palette: palette,
                 cornerRadius: kind == .circular ? size / 2 : EnteRadius.medium
             )
         )
@@ -48,9 +46,9 @@ public enum IconActionKind: Sendable {
 }
 
 private struct IconActionStyle: ButtonStyle {
+    @Environment(\.entePalette) private var palette
     @Environment(\.isEnabled) private var enabled
     let kind: IconActionKind
-    let palette: Palette
     let cornerRadius: CGFloat
 
     func makeBody(configuration: Configuration) -> some View {

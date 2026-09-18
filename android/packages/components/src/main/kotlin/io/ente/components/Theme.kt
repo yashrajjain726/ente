@@ -28,6 +28,7 @@ internal constructor(
     public val primary: Color,
     public val primaryDarker: Color,
     public val text: Color,
+    public val mutedText: Color,
     public val hintText: Color,
     public val disabledText: Color,
     public val reverseText: Color,
@@ -35,6 +36,7 @@ internal constructor(
     public val fill: Color,
     public val fillDarker: Color,
     public val fillDarkest: Color,
+    public val faintBorder: Color,
     public val danger: Color,
     public val dangerDarker: Color,
 )
@@ -44,6 +46,8 @@ public val LocalEntePalette: ProvidableCompositionLocal<Palette> = staticComposi
 }
 
 public object EnteSpacing {
+    public val xs: Dp = 4.dp
+    public val md: Dp = 12.dp
     public val xl: Dp = 20.dp
 }
 
@@ -72,6 +76,7 @@ public object EnteTypography {
             lineHeight = 20.sp,
         )
     public val bodyBold: TextStyle = body.copy(fontWeight = FontWeight.SemiBold)
+    public val mini: TextStyle = body.copy(fontSize = 12.sp, lineHeight = 16.sp)
 }
 
 @Composable
@@ -96,6 +101,7 @@ private fun palette(app: EnteApp, dark: Boolean): Palette {
         primary = primary,
         primaryDarker = primaryDarker,
         text = if (dark) Color.White else Color.Black,
+        mutedText = Color(if (dark) 0xFF999999 else 0xFF666666),
         hintText = Color(0xFF969696),
         disabledText = Color(if (dark) 0xFF414141 else 0xFFD6D6D6),
         reverseText = if (dark) Color.Black else Color.White,
@@ -103,6 +109,7 @@ private fun palette(app: EnteApp, dark: Boolean): Palette {
         fill = Color(if (dark) 0xFF0A0A0A else 0xFFEAEAEA),
         fillDarker = Color(if (dark) 0xFF141414 else 0xFFDEDEDE),
         fillDarkest = Color(if (dark) 0xFF292929 else 0xFFD2D2D2),
+        faintBorder = Color(if (dark) 0xFF2A2A2A else 0xFFEBEBEB),
         danger = Color(0xFFF63A3A),
         dangerDarker = Color(0xFFC52E2E),
     )
