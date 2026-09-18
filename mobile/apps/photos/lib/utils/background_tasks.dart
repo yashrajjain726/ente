@@ -13,6 +13,7 @@ import "package:permission_handler/permission_handler.dart";
 import "package:photos/db/upload_locks_db.dart";
 import "package:photos/main.dart";
 import "package:photos/module/upload/service/file_uploader.dart";
+import "package:photos/services/machine_learning/ml_run_control.dart";
 import "package:photos/utils/bg_task_utils.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:workmanager/workmanager.dart" as legacy;
@@ -202,13 +203,31 @@ class BackgroundTasks {
             : (Platform.isIOS
                   ? BgTaskUtils.iOSBackgroundAppRefreshTask
                   : BgTaskUtils.androidPeriodicTask);
+        final control = MlRunControl();
+        unawaited(
+          task.stopped.then((reason) {
+            control.requestStop(
+              reason == BackgroundStopReason.foreground
+                  ? MlStopReason.foregroundActive
+                  : MlStopReason.backgroundDeadline,
+            );
+          }),
+        );
         try {
+          final remainingBudget =
+              BgTaskUtils.taskTimeoutFor(taskName) - task.elapsed;
           await runBackgroundTask(
             taskName,
             TimeLogger(),
-            nativeTask: task,
+            control: control,
             mlSelfStop: BgTaskUtils.mlSelfStopFor(taskName) - task.elapsed,
             mlLockWait: BgTaskUtils.mlLockWaitFor(taskName),
+          ).timeout(
+            remainingBudget.isNegative ? Duration.zero : remainingBudget,
+            onTimeout: () async {
+              await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+              throw TimeoutException("Background task timed out");
+            },
           );
           result = task.isStopping
               ? BackgroundTaskResult.stopped

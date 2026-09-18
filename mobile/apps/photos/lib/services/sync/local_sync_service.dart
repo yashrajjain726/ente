@@ -26,7 +26,6 @@ import "package:photos/services/sync/import/diff.dart";
 import "package:photos/services/sync/import/local_assets.dart";
 import "package:photos/services/sync/import/model.dart";
 import "package:photos/services/sync/origin_fetch_tracker.dart";
-import "package:photos/services/sync/sync_service.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:synchronized/synchronized.dart";
 import "package:tuple/tuple.dart";
@@ -77,7 +76,6 @@ class LocalSyncService {
   }
 
   Future<void> sync() async {
-    if (SyncService.instance.backgroundWorkStopped) return;
     if (!permissionService.hasGrantedPermissions()) {
       _logger.info("Skipping local sync since permission has not been granted");
       return;
@@ -103,7 +101,7 @@ class LocalSyncService {
 
     // Local sync must not race downloads; that can create incorrect FilesDB
     // rows.
-    final localSync = _lock.synchronized(() async {
+    await _lock.synchronized(() async {
       final existingLocalFileIDs = await _db.getExistingLocalFileIDs(ownerID);
       _logger.info("${existingLocalFileIDs.length} localIDs were discovered");
 
@@ -124,7 +122,6 @@ class LocalSyncService {
         var toYear = 2010;
         var toTime = DateTime(toYear).microsecondsSinceEpoch;
         while (toTime < syncStartTime) {
-          SyncService.instance.checkBackgroundWork();
           await _loadAndStoreDiff(
             existingLocalFileIDs,
             fromTime: startTime,
@@ -163,12 +160,9 @@ class LocalSyncService {
       final duration = Duration(microseconds: endTime - startTime);
       _logger.info("Load took " + duration.inMilliseconds.toString() + "ms");
     });
-    try {
-      await localSync;
-    } finally {
-      _existingSync?.complete();
-      _existingSync = null;
-    }
+
+    _existingSync?.complete();
+    _existingSync = null;
   }
 
   Future<bool> _refreshDeviceFolderCountAndCover({
@@ -188,7 +182,6 @@ class LocalSyncService {
   }
 
   Future<bool> syncAll() async {
-    if (SyncService.instance.backgroundWorkStopped) return false;
     if (!Configuration.instance.isLoggedIn()) {
       if (!isLocalGalleryMode) {
         _logger.warning("syncAll called when user is not logged in");
@@ -200,7 +193,6 @@ class LocalSyncService {
     final localAssets = await getAllLocalAssets(
       needsTitle: isLocalGalleryMode ? true : null,
     );
-    SyncService.instance.checkBackgroundWork();
     _logger.info(
       "Loading allLocalAssets ${localAssets.length} took ${stopwatch.elapsedMilliseconds}ms ",
     );
@@ -218,7 +210,6 @@ class LocalSyncService {
       existingLocalFileIDs,
       pathToLocalIDs,
     );
-    SyncService.instance.checkBackgroundWork();
     bool hasAnyMappingChanged = false;
     if (localDiffResult.newPathToLocalIDs?.isNotEmpty ?? false) {
       await _db.insertPathIDToLocalIDMapping(

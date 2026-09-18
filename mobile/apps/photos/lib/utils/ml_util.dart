@@ -407,15 +407,12 @@ Future<List<FileMLInstruction>> getLocalGalleryFilesForMlIndexing() async {
 Stream<List<FileMLInstruction>> fetchEmbeddingsAndInstructions(
   int yieldSize, {
   required MLMode mode,
-  MlRunControl? control,
 }) async* {
-  if (control?.stopRequested == true) return;
   if (mode == MLMode.localGallery) {
     final List<FileMLInstruction> filesToIndex =
         await getLocalGalleryFilesForMlIndexing();
     final List<List<FileMLInstruction>> chunks = filesToIndex.chunks(yieldSize);
     for (final batch in chunks) {
-      if (control?.stopRequested == true) return;
       yield batch;
     }
     return;
@@ -428,12 +425,10 @@ Stream<List<FileMLInstruction>> fetchEmbeddingsAndInstructions(
   List<FileMLInstruction> batchToYield = [];
 
   for (final chunk in chunks) {
-    if (control?.stopRequested == true) return;
     if (!localSettings.remoteFetchEnabled) {
       _logger.warning("remoteFetchEnabled is false, skiping embedding fetch");
       final batches = chunk.chunks(yieldSize);
       for (final batch in batches) {
-        if (control?.stopRequested == true) return;
         yield batch;
       }
       continue;
@@ -442,7 +437,6 @@ Stream<List<FileMLInstruction>> fetchEmbeddingsAndInstructions(
       chunk,
       mlDataDB: mlDataDB,
     );
-    if (control?.stopRequested == true) return;
     for (final instruction in pendingInstructions) {
       if (instruction.pendingML) {
         batchToYield.add(instruction);
