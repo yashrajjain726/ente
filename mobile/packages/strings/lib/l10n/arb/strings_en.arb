@@ -2926,7 +2926,7 @@
   "offlineHomeSignupBannerAction": "Back up now",
   "offlineHomeSignupBannerDescription": "Encrypted backups across 3 locations to keep your memories safe.",
   "offlineHomeSignupBannerTitle": "Protect your memories forever",
-  "offlineKeyUnavailableMessage": "The encryption key for your offline codes is unavailable. Starting fresh will permanently remove these codes from this device.",
+  "offlineKeyUnavailableMessage": "Ente Auth cannot access the key for your offline codes.",
   "offlineModeWarning": "You have chosen to proceed without backups. Please take manual backups to make sure your codes are safe.",
   "offlineNameFaceBannerSubtitle": "Sign up to tag them and easily find their photos later.",
   "offlineNameFaceBannerTitle": "Give this face a name",
@@ -4297,7 +4297,6 @@
   "spotlightOnYourself": "Spotlight on yourself",
   "stargazing": "Under the stars",
   "startBackup": "Start backup",
-  "startFresh": "Start fresh",
   "startRecovery": "Start recovery",
   "startRecoveryDesc": "Are you sure you want to initiate recovery for {email}'s account?",
   "@startRecoveryDesc": {

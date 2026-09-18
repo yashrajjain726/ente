@@ -151,7 +151,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           config.hasConfiguredAccount() ||
               (hasOfflineAccount && !isOfflineKeyMissing)
           ? const HomePage()
-          : OnboardingPage(recoverOfflineMode: isOfflineKeyMissing),
+          : OnboardingPage(
+              showOfflineKeyUnavailableDialog: isOfflineKeyMissing,
+            ),
     };
   }
 
