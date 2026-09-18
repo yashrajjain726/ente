@@ -62,44 +62,19 @@ Future<bool> showAddPeopleSheet(
   final success = await showSharingProgressSheet(
     context,
     task: () async {
-      failure = await _shareSelected(
-        collections: collections,
-        selected: selected,
-        role: role,
-        actions: actions,
+      final result = await actions.addEmailsToCollections(
+        collections,
+        selected.map((person) => normalizedSharingEmail(person.email)).toSet(),
+        role,
       );
-      return failure == null;
+      if (!result.succeeded) failure = result;
+      return result.succeeded;
     },
   );
   if (!success && failure != null && context.mounted) {
     await actions.showAddEmailToCollectionFailure(context, failure!);
   }
   return success;
-}
-
-Future<AddEmailToCollectionResult?> _shareSelected({
-  required List<Collection> collections,
-  required List<UserSuggestion> selected,
-  required CollectionParticipantRole role,
-  required CollectionActions actions,
-}) async {
-  AddEmailToCollectionResult? firstFailure;
-  for (final collection in collections) {
-    for (final suggestion in selected) {
-      if (!collectionNeedsShare(collection, suggestion.email)) {
-        continue;
-      }
-      final result = await actions.addEmailToCollection(
-        collection,
-        suggestion.email,
-        role,
-      );
-      if (!result.succeeded) {
-        firstFailure ??= result;
-      }
-    }
-  }
-  return firstFailure;
 }
 
 bool _hasActiveLink(Collection collection) {

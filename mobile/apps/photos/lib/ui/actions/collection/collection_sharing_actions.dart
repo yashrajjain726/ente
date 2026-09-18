@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/errors.dart";
+import "package:photos/core/network/api_response.dart";
 import 'package:photos/db/files_db.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
 import 'package:photos/models/button_result.dart';
@@ -23,6 +24,7 @@ import 'package:photos/ui/components/buttons/button_widget.dart';
 import 'package:photos/ui/components/models/button_type.dart';
 import 'package:photos/ui/notification/toast.dart';
 import 'package:photos/ui/payment/subscription.dart';
+import 'package:photos/ui/sharing/widgets/sharing_role.dart';
 import 'package:photos/utils/dialog_util.dart';
 import 'package:photos/utils/email_util.dart';
 import 'package:photos/utils/share_util.dart';
@@ -184,6 +186,79 @@ class CollectionActions {
     return null;
   }
 
+  Future<AddEmailToCollectionResult> addEmailsToCollections(
+    List<Collection> collections,
+    Set<String> emails,
+    CollectionParticipantRole role,
+  ) async {
+    final ownEmail = Configuration.instance.getEmail()?.trim().toLowerCase();
+    for (final email in emails) {
+      if (!isValidEmail(email)) {
+        return AddEmailToCollectionResult.failure(
+          failure: AddEmailToCollectionFailure.invalidEmail,
+          email: email,
+        );
+      }
+      if (email == ownEmail) {
+        return AddEmailToCollectionResult.failure(
+          failure: AddEmailToCollectionFailure.currentUser,
+          email: email,
+        );
+      }
+    }
+
+    try {
+      final keys = await UserService.instance.getPublicKeys(emails);
+      final publicKeys = <String, String>{};
+      for (final entry in keys.entries) {
+        final publicKey = entry.value;
+        if (publicKey == null || publicKey.isEmpty) {
+          return AddEmailToCollectionResult.failure(
+            failure: AddEmailToCollectionFailure.noAccount,
+            email: entry.key,
+          );
+        }
+        publicKeys[entry.key] = publicKey;
+      }
+      for (final collection in collections) {
+        final collectionPublicKeys = {
+          for (final entry in publicKeys.entries)
+            if (collectionNeedsShare(collection, entry.key))
+              entry.key: entry.value,
+        };
+        if (collectionPublicKeys.isEmpty) continue;
+        final sharees = await collectionsService.shareBatch(
+          collection.id,
+          collectionPublicKeys,
+          role,
+        );
+        collection.updateSharees(sharees);
+      }
+      return const AddEmailToCollectionResult.success();
+    } catch (e) {
+      if (e is UnexpectedApiResponseException &&
+          e.response?.statusCode == 404) {
+        AddEmailToCollectionResult? firstFailure;
+        for (final collection in collections) {
+          for (final email in emails) {
+            if (!collectionNeedsShare(collection, email)) continue;
+            final result = await addEmailToCollection(collection, email, role);
+            if (!result.succeeded) firstFailure ??= result;
+          }
+        }
+        return firstFailure ?? const AddEmailToCollectionResult.success();
+      }
+      logger.severe("Failed to share collections", e);
+      return AddEmailToCollectionResult.failure(
+        failure: e is SharingNotPermittedForFreeAccountsError
+            ? AddEmailToCollectionFailure.sharingNotPermitted
+            : AddEmailToCollectionFailure.other,
+        email: emails.first,
+        error: e,
+      );
+    }
+  }
+
   Future<AddEmailToCollectionResult> addEmailToCollection(
     Collection collection,
     String email,
@@ -218,7 +293,7 @@ class CollectionActions {
       );
     }
     try {
-      final newSharees = await CollectionsService.instance.share(
+      final newSharees = await collectionsService.share(
         collection.id,
         email,
         publicKey,
