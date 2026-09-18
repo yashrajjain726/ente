@@ -206,12 +206,8 @@ class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
         ..reset();
       _progressAnimationController?.reset();
       _selectEntry(index, fastTransition: fastTransition);
-      _playbackToken =
-          index < _entries.length - 1 || widget.onNextMemory != null
-          ? token
-          : null;
+      _playbackToken = token;
     });
-    if (_playbackToken == null) return;
     await _chunkinator!.get(_entries[index]);
     if (!mounted || !widget.isActive || _playbackToken != token) return;
     _playbackElapsed.start();
