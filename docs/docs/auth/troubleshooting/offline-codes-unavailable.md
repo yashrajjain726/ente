@@ -69,7 +69,7 @@ Reset only after confirming that your codes are synced to Ente or that you have 
 
 **On iOS:** Delete Ente Auth rather than offloading it, then reinstall it.
 
-**On macOS:** Quit Ente Auth, move `~/Library/Application Support/io.ente.auth.mac` to a safe location, and run `defaults delete io.ente.auth.mac` in Terminal. If the legacy `ente.authenticator.db` or `ente.offline_authenticator.db` file exists in Documents, move it aside too.
+**On macOS:** Quit Ente Auth, move `~/Library/Containers/io.ente.auth.mac` to a safe location, and run `defaults delete io.ente.auth.mac` in Terminal.
 
 **On Linux:** Quit Ente Auth and move the `io.ente.auth` directory under `$XDG_DATA_HOME` to a safe location. The default location is `~/.local/share/io.ente.auth`. Move legacy `ente_auth` or `enteauth` directories in the same location if they exist.
 
