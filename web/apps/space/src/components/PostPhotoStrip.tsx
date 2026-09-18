@@ -39,9 +39,9 @@ const iconButtonSx = {
 export const SpacePostPhotoStrip: React.FC<{
     activeIndex: number;
     disabled: boolean;
-    onAdd: () => void;
-    onMove: (from: number, to: number) => void;
-    onRemove: () => void;
+    onAdd?: () => void;
+    onMove?: (from: number, to: number) => void;
+    onRemove?: () => void;
     onSelect: (index: number) => void;
     photos: StripPhoto[];
 }> = ({ activeIndex, disabled, onAdd, onMove, onRemove, onSelect, photos }) => {
@@ -53,6 +53,7 @@ export const SpacePostPhotoStrip: React.FC<{
     const [announcement, setAnnouncement] = React.useState("");
     const [hasPhotosOnRight, setHasPhotosOnRight] = React.useState(false);
     const dragging = Boolean(drag);
+    const canMove = Boolean(onMove);
 
     React.useEffect(() => {
         const strip = stripRef.current;
@@ -80,7 +81,7 @@ export const SpacePostPhotoStrip: React.FC<{
 
     React.useEffect(() => {
         const strip = stripRef.current;
-        if (!strip || disabled || photos.length < 2) return;
+        if (!strip || disabled || !canMove || photos.length < 2) return;
         let gesture:
             | {
                   pointerID: number;
@@ -185,7 +186,7 @@ export const SpacePostPhotoStrip: React.FC<{
             completed.to = positionAt(event.clientX);
             stop();
             if (active && completed.from != completed.to) {
-                callbacksRef.current.onMove(completed.from, completed.to);
+                callbacksRef.current.onMove?.(completed.from, completed.to);
                 setAnnouncement(
                     `Photo moved to position ${completed.to + 1} of ${photos.length}`,
                 );
@@ -215,7 +216,7 @@ export const SpacePostPhotoStrip: React.FC<{
             window.removeEventListener("pointercancel", stop);
             window.removeEventListener("keydown", cancelOnEscape, true);
         };
-    }, [disabled, photos.length]);
+    }, [canMove, disabled, photos.length]);
 
     const shownPhotos = drag
         ? movePostPhoto(photos, drag.from, drag.to)
@@ -303,13 +304,18 @@ export const SpacePostPhotoStrip: React.FC<{
                                         aria-pressed={
                                             photo.id == photos[activeIndex]?.id
                                         }
-                                        aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
+                                        aria-keyshortcuts={
+                                            onMove
+                                                ? "Alt+ArrowLeft Alt+ArrowRight"
+                                                : undefined
+                                        }
                                         disabled={disabled}
                                         onClick={() => onSelect(index)}
                                         onKeyDown={(
                                             event: React.KeyboardEvent,
                                         ) => {
                                             if (
+                                                !onMove ||
                                                 !event.altKey ||
                                                 ![
                                                     "ArrowLeft",
@@ -343,7 +349,9 @@ export const SpacePostPhotoStrip: React.FC<{
                                             borderRadius: "9px",
                                             cursor: disabled
                                                 ? "default"
-                                                : "grab",
+                                                : onMove
+                                                  ? "grab"
+                                                  : "pointer",
                                             height: "100%",
                                             width: "100%",
                                             overflow: "hidden",
@@ -356,42 +364,45 @@ export const SpacePostPhotoStrip: React.FC<{
                                     >
                                         {preview(photo)}
                                     </Box>
-                                    {index == activeIndex && !dragging && (
-                                        <Box
-                                            component="button"
-                                            type="button"
-                                            aria-label="Remove photo"
-                                            disabled={disabled}
-                                            onClick={onRemove}
-                                            sx={{
-                                                ...iconButtonSx,
-                                                position: "absolute",
-                                                right: -10,
-                                                top: -10,
-                                                width: 32,
-                                                height: 32,
-                                            }}
-                                        >
+                                    {onRemove &&
+                                        index == activeIndex &&
+                                        !dragging && (
                                             <Box
-                                                component="span"
+                                                component="button"
+                                                type="button"
+                                                aria-label="Remove photo"
+                                                disabled={disabled}
+                                                onClick={onRemove}
                                                 sx={{
-                                                    alignItems: "center",
-                                                    bgcolor: "#3A3A3A",
-                                                    border: "1px solid #000000",
-                                                    borderRadius: "50%",
-                                                    display: "flex",
-                                                    justifyContent: "center",
-                                                    width: 20,
-                                                    height: 20,
+                                                    ...iconButtonSx,
+                                                    position: "absolute",
+                                                    right: -10,
+                                                    top: -10,
+                                                    width: 32,
+                                                    height: 32,
                                                 }}
                                             >
-                                                <HugeiconsIcon
-                                                    icon={Cancel01Icon}
-                                                    size={12}
-                                                />
+                                                <Box
+                                                    component="span"
+                                                    sx={{
+                                                        alignItems: "center",
+                                                        bgcolor: "#3A3A3A",
+                                                        border: "1px solid #000000",
+                                                        borderRadius: "50%",
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            "center",
+                                                        width: 20,
+                                                        height: 20,
+                                                    }}
+                                                >
+                                                    <HugeiconsIcon
+                                                        icon={Cancel01Icon}
+                                                        size={12}
+                                                    />
+                                                </Box>
                                             </Box>
-                                        </Box>
-                                    )}
+                                        )}
                                 </Box>
                             </Box>
                         ))}
@@ -412,7 +423,7 @@ export const SpacePostPhotoStrip: React.FC<{
                         />
                     )}
                 </Box>
-                {photos.length < maxSpacePostPhotos && (
+                {onAdd && photos.length < maxSpacePostPhotos && (
                     <Box
                         component="button"
                         type="button"

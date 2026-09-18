@@ -3,6 +3,10 @@ import {
     SpaceViewerPostBackdrop,
     type SpaceViewerPhoto,
 } from "components/FileViewer";
+import {
+    SpacePostPhotoEditor,
+    type SpacePostPhotoEditResult,
+} from "components/PostPhotoEditor";
 import { SpacePostPhotoInput } from "components/PostPhotoInput";
 import { SpacePostPhotoStrip } from "components/PostPhotoStrip";
 import log from "ente-base/log";
@@ -16,6 +20,7 @@ import {
     spacePostImageErrorMessage,
     spacePostPreviewImageForFile,
     type SpaceDraftPostImage,
+    type SpacePostPhotoEdit,
 } from "utils/post-image";
 import { maxSpacePostPhotos, movePostPhoto } from "utils/post-photos";
 import { useSpaceRouter } from "utils/route-transitions";
@@ -26,6 +31,8 @@ interface DraftPhoto {
     id: number;
     error?: string;
     photo?: SpaceViewerPhoto;
+    originalPhoto?: SpaceViewerPhoto;
+    edit?: SpacePostPhotoEdit;
 }
 
 let nextDraftPhotoID = 0;
@@ -48,8 +55,9 @@ export const SpacePostComposer: React.FC<{
     const [activeIndex, setActiveIndex] = React.useState(0);
     const [isPublishing, setIsPublishing] = React.useState(false);
     const [isExiting, setIsExiting] = React.useState(false);
+    const [isEditing, setIsEditing] = React.useState(false);
     const inputRef = React.useRef<HTMLInputElement | null>(null);
-    const previewURLsRef = React.useRef(new Map<number, string>());
+    const previewURLsRef = React.useRef(new Set<string>());
     const publishedPreviewURLRef = React.useRef<string>(undefined);
     const preparingRef = React.useRef(new Set<number>());
     const draftsRef = React.useRef(drafts);
@@ -126,10 +134,12 @@ export const SpacePostComposer: React.FC<{
                         URL.revokeObjectURL(photo.imageUrl);
                         continue;
                     }
-                    previewURLsRef.current.set(draft.id, photo.imageUrl);
+                    previewURLsRef.current.add(photo.imageUrl);
                     setDrafts((current) =>
                         current.map((item) =>
-                            item.id == draft.id ? { ...item, photo } : item,
+                            item.id == draft.id
+                                ? { ...item, photo, originalPhoto: photo }
+                                : item,
                         ),
                     );
                 } catch (error) {
@@ -165,9 +175,15 @@ export const SpacePostComposer: React.FC<{
         }
         const removed = drafts[activeIndex];
         if (!removed) return;
-        const url = previewURLsRef.current.get(removed.id);
-        if (url) URL.revokeObjectURL(url);
-        previewURLsRef.current.delete(removed.id);
+        for (const url of new Set([
+            removed.photo?.imageUrl,
+            removed.originalPhoto?.imageUrl,
+        ])) {
+            if (url) {
+                URL.revokeObjectURL(url);
+                previewURLsRef.current.delete(url);
+            }
+        }
         setDrafts((current) =>
             current.filter((draft) => draft.id != removed.id),
         );
@@ -176,6 +192,29 @@ export const SpacePostComposer: React.FC<{
     const movePhoto = (from: number, to: number) => {
         setDrafts((current) => movePostPhoto(current, from, to));
         setActiveIndex(to);
+    };
+    const applyEdits = (results: SpacePostPhotoEditResult[], index: number) => {
+        const nextDrafts = drafts.map((draft) => {
+            const result = results.find((result) => result.id == draft.id);
+            if (!result) return draft;
+            if (draft.photo!.imageUrl != draft.originalPhoto!.imageUrl) {
+                URL.revokeObjectURL(draft.photo!.imageUrl);
+                previewURLsRef.current.delete(draft.photo!.imageUrl);
+            }
+            const photo = result.preview
+                ? {
+                      ...draft.originalPhoto!,
+                      imageUrl: result.preview.url,
+                      width: result.preview.width,
+                      height: result.preview.height,
+                  }
+                : draft.originalPhoto!;
+            previewURLsRef.current.add(photo.imageUrl);
+            return { ...draft, edit: result.edit, photo };
+        });
+        setDrafts(nextDrafts);
+        setActiveIndex(index);
+        setIsEditing(false);
     };
     const photos = drafts.map((draft, index) => ({
         ...(draft.photo ?? placeholder),
@@ -215,6 +254,7 @@ export const SpacePostComposer: React.FC<{
                 draftPostPreparationError={preparationError}
                 isDraftPostPreviewPending={isPreparing || !drafts.length}
                 onClose={onClose}
+                onEditDraftPhoto={() => setIsEditing(true)}
                 onDraftPostExitStart={() => setIsPublishing(true)}
                 onDraftPostExitAnimationStart={() => setIsExiting(true)}
                 onDraftPostPublished={() => {
@@ -228,9 +268,12 @@ export const SpacePostComposer: React.FC<{
                                   drafts[0]!.photo!.imageUrl;
                               return onPublish(
                                   drafts.map((draft) => ({
+                                      cropArea: draft.edit?.cropArea,
                                       file: draft.file,
                                       height: draft.photo!.height,
                                       previewUrl: draft.photo!.imageUrl,
+                                      rotationDegrees:
+                                          draft.edit?.rotationDegrees,
                                       width: draft.photo!.width,
                                   })),
                                   caption,
@@ -243,6 +286,21 @@ export const SpacePostComposer: React.FC<{
                 onPhotoIndexChange={setActiveIndex}
                 postActionMode="draft-post"
             />
+            {isEditing && (
+                <SpacePostPhotoEditor
+                    initialIndex={activeIndex}
+                    onClose={() => setIsEditing(false)}
+                    onDone={applyEdits}
+                    photos={drafts.map((draft) => ({
+                        id: draft.id,
+                        imageURL: draft.originalPhoto!.imageUrl,
+                        previewURL: draft.photo!.imageUrl,
+                        width: draft.originalPhoto!.width!,
+                        height: draft.originalPhoto!.height!,
+                        edit: draft.edit,
+                    }))}
+                />
+            )}
         </>
     );
 };

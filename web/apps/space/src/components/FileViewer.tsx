@@ -4,6 +4,7 @@ import {
     Cancel01Icon,
     Delete02Icon,
     Edit01Icon,
+    Edit03Icon,
     Loading03Icon,
     MoreHorizontalIcon,
     Tick02Icon,
@@ -137,6 +138,7 @@ interface SpaceFileViewerProps {
     draftPostPreparationError?: string;
     isDraftPostPreviewPending?: boolean;
     onClose: () => void;
+    onEditDraftPhoto?: () => void;
     onDeletePost?: () => Promise<void> | void;
     onDraftPostExitAnimationStart?: () => void;
     onDraftPostExitStart?: () => void;
@@ -334,6 +336,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     focusReplyOnOpen = false,
     isDraftPostPreviewPending = false,
     onClose,
+    onEditDraftPhoto,
     onDeletePost,
     onDraftPostExitAnimationStart,
     onDraftPostExitStart,
@@ -1462,6 +1465,34 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 icon={MoreHorizontalIcon}
                                 size={26}
                                 strokeWidth={2}
+                            />
+                        </Box>
+                    )}
+                    {isDraftPost && onEditDraftPhoto && (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Edit photo"
+                            title="Edit photo"
+                            disabled={
+                                isDraftPostActionRunning ||
+                                isDraftPostPreviewPending ||
+                                Boolean(draftPostPreparationError)
+                            }
+                            onClick={onEditDraftPhoto}
+                            sx={{
+                                ...viewerHeaderButtonSx,
+                                mr: postPhotoCount > 1 ? "8px" : 0,
+                                "&:disabled": {
+                                    opacity: 0.3,
+                                    cursor: "default",
+                                },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={Edit03Icon}
+                                size={16}
+                                strokeWidth={1.8}
                             />
                         </Box>
                     )}
