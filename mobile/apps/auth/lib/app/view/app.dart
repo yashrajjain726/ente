@@ -145,14 +145,13 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     return {
       "/": (context) {
         final config = Configuration.instance;
-        final hasConfiguredAccount = config.hasConfiguredAccount();
+        if (config.hasConfiguredAccount()) {
+          return const HomePage();
+        }
         final hasOfflineAccount = config.hasOptedForOfflineMode();
-        final isOfflineKeyMissing =
-            hasOfflineAccount && config.getOfflineSecretKey() == null;
         final shouldShowOfflineKeyUnavailableDialog =
-            !hasConfiguredAccount && isOfflineKeyMissing;
-        return !shouldShowOfflineKeyUnavailableDialog &&
-                (hasConfiguredAccount || hasOfflineAccount)
+            hasOfflineAccount && config.getOfflineSecretKey() == null;
+        return !shouldShowOfflineKeyUnavailableDialog && hasOfflineAccount
             ? const HomePage()
             : OnboardingPage(
                 showOfflineKeyUnavailableDialog:
