@@ -249,27 +249,80 @@ const viewerCaptionTextSx = {
 } as const;
 
 const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
+    const bubbleRef = React.useRef<HTMLParagraphElement | null>(null);
+    const [isLongCaption, setIsLongCaption] = React.useState(false);
+
+    React.useLayoutEffect(() => {
+        const bubble = bubbleRef.current;
+        if (!bubble) return;
+
+        const updateLayout = () => {
+            const lineHeight = parseFloat(getComputedStyle(bubble).lineHeight);
+            setIsLongCaption(
+                bubble.getBoundingClientRect().height > lineHeight * 4,
+            );
+        };
+        updateLayout();
+        const observer = new ResizeObserver(updateLayout);
+        observer.observe(bubble);
+        return () => observer.disconnect();
+    }, [caption]);
+
     return (
-        <Box
-            component="p"
-            data-space-viewer-chrome="true"
-            title={caption}
-            sx={{
-                ...viewerCaptionTextSx,
-                bottom: "14%",
-                left: "50%",
-                m: 0,
-                maxWidth: "78vw",
-                minWidth: 0,
-                overflowWrap: "break-word",
-                position: "fixed",
-                transform: "translateX(-50%)",
-                width: "78vw",
-                zIndex: 2,
-            }}
-        >
-            <SpaceCaptionText caption={caption} />
-        </Box>
+        <>
+            <Box
+                ref={bubbleRef}
+                component="p"
+                aria-hidden={isLongCaption || undefined}
+                data-space-viewer-chrome="true"
+                title={caption}
+                sx={{
+                    ...viewerCaptionTextSx,
+                    bottom: "14%",
+                    left: "50%",
+                    m: 0,
+                    maxWidth: "78vw",
+                    minWidth: 0,
+                    overflowWrap: "break-word",
+                    position: "fixed",
+                    transform: "translateX(-50%)",
+                    visibility: isLongCaption ? "hidden" : "visible",
+                    width: "78vw",
+                    zIndex: 2,
+                }}
+            >
+                <SpaceCaptionText caption={caption} />
+            </Box>
+            {isLongCaption && (
+                <Box
+                    role="region"
+                    aria-label="Caption"
+                    tabIndex={0}
+                    sx={{
+                        ...viewerCaptionTextSx,
+                        bgcolor: "rgba(32, 32, 32, 0.85)",
+                        borderRadius: "16px",
+                        boxSizing: "border-box",
+                        fontWeight: 400,
+                        lineHeight: "22px",
+                        maxHeight: "33svh",
+                        overflowWrap: "anywhere",
+                        overflowY: "auto",
+                        overscrollBehaviorY: "contain",
+                        p: "14px 16px",
+                        scrollbarWidth: "thin",
+                        textAlign: "left",
+                        textWrap: "wrap",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                    }}
+                >
+                    {caption}
+                </Box>
+            )}
+        </>
     );
 };
 
@@ -2042,67 +2095,73 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     </Box>
                 </Box>
             )}
-            {hasDisplayCaption && !isCaptionEditing && (
-                <SpaceViewerCaption caption={displayCaption} />
-            )}
-            {showPhotoLikeButton && !isCaptionEditing && (
-                <Box
-                    data-space-viewer-bottom="true"
-                    sx={{
-                        alignItems: "stretch",
-                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 0,
-                        left: canReplyToPost
-                            ? { xs: "16px", sm: "auto" }
-                            : "auto",
-                        maxWidth: canReplyToPost ? { sm: 390 } : undefined,
-                        position: "fixed",
-                        right: "16px",
-                        width: canReplyToPost
-                            ? { sm: "calc(100% - 32px)" }
-                            : undefined,
-                        zIndex: 2,
-                    }}
-                >
-                    <SpacePostReplyControls
-                        canSendReply={canSendReply}
-                        isReplyMode={isReplyMode}
-                        liked={isPhotoLiked}
-                        likePopID={photoLikePopID}
-                        onLike={handlePhotoLikeClick}
-                        onSendReply={sendReply}
-                        replyActionPhase={replyActionPhase}
-                        replyInputRef={replyInputRef}
-                        replyInputProps={
-                            canReplyToPost
-                                ? {
-                                      onBlur: () => setIsReplyFocused(false),
-                                      onChange: (event) => {
-                                          const nextText =
-                                              clampSpaceMessageText(
-                                                  event.target.value,
-                                              );
-                                          event.currentTarget.value = nextText;
-                                          setReplyText(nextText);
-                                          replyDraftsRef.current.set(
-                                              activePostKey,
-                                              nextText,
-                                          );
-                                      },
-                                      onFocus: () => setIsReplyFocused(true),
-                                      onKeyDown: handleReplyKeyDown,
-                                      onPointerDown:
-                                          handleReplyInputPointerDown,
-                                      readOnly: canAddFriendForPostAction,
-                                      value: replyText,
-                                  }
-                                : undefined
-                        }
-                    />
-                </Box>
-            )}
+            {(hasDisplayCaption || showPhotoLikeButton) &&
+                !isCaptionEditing && (
+                    <Box
+                        data-space-viewer-bottom="true"
+                        sx={{
+                            alignItems: "stretch",
+                            bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            left: { xs: "16px", sm: "auto" },
+                            maxWidth: { sm: 390 },
+                            position: "fixed",
+                            right: "16px",
+                            width: { sm: "calc(100% - 32px)" },
+                            zIndex: 2,
+                        }}
+                    >
+                        {hasDisplayCaption && (
+                            <SpaceViewerCaption
+                                key={activePostKey}
+                                caption={displayCaption}
+                            />
+                        )}
+                        {showPhotoLikeButton && (
+                            <SpacePostReplyControls
+                                canSendReply={canSendReply}
+                                isReplyMode={isReplyMode}
+                                liked={isPhotoLiked}
+                                likePopID={photoLikePopID}
+                                onLike={handlePhotoLikeClick}
+                                onSendReply={sendReply}
+                                replyActionPhase={replyActionPhase}
+                                replyInputRef={replyInputRef}
+                                replyInputProps={
+                                    canReplyToPost
+                                        ? {
+                                              onBlur: () =>
+                                                  setIsReplyFocused(false),
+                                              onChange: (event) => {
+                                                  const nextText =
+                                                      clampSpaceMessageText(
+                                                          event.target.value,
+                                                      );
+                                                  event.currentTarget.value =
+                                                      nextText;
+                                                  setReplyText(nextText);
+                                                  replyDraftsRef.current.set(
+                                                      activePostKey,
+                                                      nextText,
+                                                  );
+                                              },
+                                              onFocus: () =>
+                                                  setIsReplyFocused(true),
+                                              onKeyDown: handleReplyKeyDown,
+                                              onPointerDown:
+                                                  handleReplyInputPointerDown,
+                                              readOnly:
+                                                  canAddFriendForPostAction,
+                                              value: replyText,
+                                          }
+                                        : undefined
+                                }
+                            />
+                        )}
+                    </Box>
+                )}
             {canDeletePost && (
                 <ConfirmationActionSheet
                     open={deleteSheetOpen}
