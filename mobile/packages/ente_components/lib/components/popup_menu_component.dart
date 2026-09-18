@@ -244,31 +244,31 @@ class _EntePopupMenuRow<T> extends StatelessWidget {
 
     return Opacity(
       opacity: option.enabled ? 1 : 0.5,
-      child: Row(
-        children: [
-          if (option.leadingWidget != null) ...[
-            SizedBox.square(
-              dimension: 24,
-              child: Center(
-                child: IconTheme.merge(
-                  data: IconThemeData(
-                    color: colors.textLight,
-                    size: IconSizes.small,
+      child: IconTheme.merge(
+        data: IconThemeData(color: colors.textLight),
+        child: Row(
+          children: [
+            if (option.leadingWidget != null) ...[
+              SizedBox.square(
+                dimension: 24,
+                child: Center(
+                  child: IconTheme.merge(
+                    data: const IconThemeData(size: IconSizes.small),
+                    child: option.leadingWidget!,
                   ),
-                  child: option.leadingWidget!,
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
+              const SizedBox(width: 6),
+            ],
+            Expanded(child: title),
+            if (option.trailingWidget != null)
+              option.trailingWidget!
+            else if (option.activeTrailingWidget != null)
+              option.isActive
+                  ? option.activeTrailingWidget!
+                  : const SizedBox(width: Spacing.md),
           ],
-          Expanded(child: title),
-          if (option.trailingWidget != null)
-            option.trailingWidget!
-          else if (option.activeTrailingWidget != null)
-            option.isActive
-                ? option.activeTrailingWidget!
-                : const SizedBox(width: Spacing.md),
-        ],
+        ),
       ),
     );
   }
