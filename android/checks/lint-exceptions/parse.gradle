@@ -115,7 +115,7 @@ gradle.rootProject { project ->
                             }
                         }
                     }
-                    PsiTreeUtil.collectElementsOfType(file, PsiComment).each { comment ->
+                    SyntaxTraverser.psiTraverser(file).filter(PsiComment).each { comment ->
                         def match = comment.text =~ /\bnoinspection\b([^\r\n]*)/
                         if (match.find()) {
                             record(comment.textOffset,

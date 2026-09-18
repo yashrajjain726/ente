@@ -255,7 +255,7 @@ jobs:
                   path: rust/target
 
     photos-desktop-ensu-android:
-        # For desktop-lint.yml, android-lint.yml and ensu-android-build.yml.
+        # For desktop-lint.yml and android-lint.yml.
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -320,7 +320,7 @@ jobs:
                   path: rust/target
 
     ensu-ios:
-        # For ensu-ios-build.yml.
+        # For apple-lint.yml.
         runs-on: macos-latest
         steps:
             - name: Checkout
