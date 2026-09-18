@@ -307,7 +307,10 @@ class FileAppBarState extends State<FileAppBar> {
         ),
       );
     }
-    if (!isFileHidden && isFileUploaded && !widget.file.isTrash) {
+    if (!isFileHidden &&
+        isFileUploaded &&
+        !widget.file.isTrash &&
+        widget.galleryType != GalleryType.sharedPublicCollection) {
       _actions.add(
         Center(
           child: FavoriteWidget(widget.file, iconSize: 24, tapTargetSize: 48),
