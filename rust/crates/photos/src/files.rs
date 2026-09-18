@@ -175,9 +175,9 @@ impl File {
             None => PrivateMetadata::default(),
         };
         let kind = match metadata.file_type {
-            0 => Kind::Image,
-            1 => Kind::Video,
-            2 => Kind::LivePhoto,
+            Some(0) => Kind::Image,
+            Some(1) => Kind::Video,
+            Some(2) => Kind::LivePhoto,
             _ => Kind::Unknown,
         };
         let hash = metadata.hash.filter(|hash| !hash.is_empty()).or_else(|| {
@@ -233,7 +233,7 @@ impl File {
 #[serde(rename_all = "camelCase")]
 struct Metadata {
     title: String,
-    file_type: i32,
+    file_type: Option<i32>,
     creation_time: i64,
     modification_time: Option<i64>,
     latitude: Option<f64>,

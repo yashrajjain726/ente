@@ -194,7 +194,7 @@ async fn exercise(origin: String) -> TestResult {
     )
     .await;
     let original = b"original photo bytes from Museum";
-    let file_id = upload_file(&origin, &alice, album, &key, original)
+    let file_id = upload_file(&origin, &alice, album, &key, original, Some(0))
         .await
         .to_string();
 
@@ -270,6 +270,7 @@ async fn exercise(origin: String) -> TestResult {
     assert_eq!(files.as_array().unwrap().len(), 1);
     assert_eq!(files[0]["id"], file_id);
     assert_eq!(files[0]["name"], "original.jpg");
+    assert_eq!(files[0]["type"], "image");
     assert_eq!(files[0]["albumIds"], json!([album.to_string()]));
     let output_dir = tempfile::tempdir().unwrap();
     let output_path = output_dir.path().join("owned.jpg");
@@ -369,19 +370,21 @@ async fn exercise(origin: String) -> TestResult {
     assert_eq!(fs::read(output_path).unwrap(), original);
 
     login(&home, "photos", &alice_email, &["--host", &origin]);
-    let added_file = upload_file(&origin, &alice, album, &key, b"added after the first sync")
+    let added_original = b"added after the first sync";
+    let added_file = upload_file(&origin, &alice, album, &key, added_original, None)
         .await
         .to_string();
     assert_eq!(home.json(&["photos", "file", "list", "--offline"]), files);
     let refreshed = home.json(&["photos", "file", "list", "--all"]);
     assert_eq!(refreshed.as_array().unwrap().len(), 2);
-    assert!(
-        refreshed
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|file| file["id"] == added_file)
-    );
+    let added = refreshed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|file| file["id"] == added_file)
+        .unwrap();
+    assert_eq!(added["type"], "unknown");
+    assert_eq!(home.json(&["photos", "file", "view", &added_file]), *added);
     assert_eq!(
         home.json(&["photos", "file", "list", "--offline", "--all"]),
         refreshed
@@ -390,6 +393,16 @@ async fn exercise(origin: String) -> TestResult {
         home.json(&["photos", "file", "list", "--offline", "--limit", "1"]),
         json!([refreshed[0]])
     );
+    let output_path = output_dir.path().join("unknown-type");
+    success(home.run(&[
+        "photos",
+        "file",
+        "download",
+        &added_file,
+        "--output",
+        output_path.to_str().unwrap(),
+    ]));
+    assert_eq!(fs::read(output_path).unwrap(), added_original);
 
     for selector in ["Monsoon 🌧", &album.to_string()] {
         let (conflict, _) = create_album(&origin, &alice, selector, "album").await;
@@ -550,6 +563,7 @@ async fn upload_file(
     album: i64,
     collection_key: &Key,
     original: &[u8],
+    file_type: Option<i32>,
 ) -> i64 {
     let client = reqwest::Client::new();
     let token = b64::encode_url_safe(&owner.secrets.token);
@@ -588,14 +602,14 @@ async fn upload_file(
             .unwrap();
         object_keys.push(upload["objectKey"].as_str().unwrap().to_owned());
     }
-    let metadata = blob::encrypt_json(
-        &json!({
-            "title": "original.jpg", "fileType": 0, "creationTime": 1_700_000_000_000_000i64,
-            "modificationTime": 1_700_000_000_000_000i64
-        }),
-        &key,
-    )
-    .unwrap();
+    let mut metadata = json!({
+        "title": "original.jpg", "creationTime": 1_700_000_000_000_000i64,
+        "modificationTime": 1_700_000_000_000_000i64
+    });
+    if let Some(file_type) = file_type {
+        metadata["fileType"] = json!(file_type);
+    }
+    let metadata = blob::encrypt_json(&metadata, &key).unwrap();
     let result: Value = client.post(format!("{origin}/files"))
         .header("x-auth-token", &token).header("x-client-package", "io.ente.photos")
         .json(&json!({
