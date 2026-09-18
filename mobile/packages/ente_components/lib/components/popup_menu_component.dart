@@ -108,8 +108,6 @@ Future<T?> showEntePopupMenu<T>({
   double elevation = 0.0,
   double itemHorizontalPadding = Spacing.lg,
 }) {
-  final colors = context.componentColors;
-  final menuStrokeColor = colors.strokeFaint;
   final button = context.findRenderObject()! as RenderBox;
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   // Anchor the menu to the button's bottom edge so it drops below the button
@@ -130,14 +128,13 @@ Future<T?> showEntePopupMenu<T>({
 
   return showMenu<T>(
     context: context,
-    color: colors.fillLight,
+    color: Colors.transparent,
     elevation: elevation,
     surfaceTintColor: Colors.transparent,
     menuPadding: EdgeInsets.zero,
     constraints: BoxConstraints.tightFor(width: menuWidth),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(borderRadius),
-      side: BorderSide(color: menuStrokeColor),
     ),
     clipBehavior: Clip.antiAlias,
     position: position,
@@ -148,16 +145,43 @@ Future<T?> showEntePopupMenu<T>({
         enabled: option.enabled,
         padding: EdgeInsets.zero,
         height: itemHeight,
-        child: Container(
-          key: ValueKey('ente-popup-menu-item-$index'),
-          height: itemHeight,
-          padding: EdgeInsets.symmetric(horizontal: itemHorizontalPadding),
-          decoration: BoxDecoration(
-            border: option.showDivider && index != options.length - 1
-                ? Border(bottom: BorderSide(color: menuStrokeColor))
-                : null,
-          ),
-          child: _EntePopupMenuRow(option: option),
+        child: Builder(
+          builder: (context) {
+            final colors = context.componentColors;
+            final borderSide = BorderSide(color: colors.strokeFaint);
+            final isFirst = index == 0;
+            final isLast = index == options.length - 1;
+            return Ink(
+              color: colors.fillLight,
+              child: Container(
+                key: ValueKey('ente-popup-menu-item-$index'),
+                height: itemHeight,
+                padding: EdgeInsets.symmetric(
+                  horizontal: itemHorizontalPadding,
+                ),
+                decoration: BoxDecoration(
+                  border: option.showDivider && !isLast
+                      ? Border(bottom: borderSide)
+                      : null,
+                ),
+                foregroundDecoration: BoxDecoration(
+                  border: Border(
+                    top: isFirst ? borderSide : BorderSide.none,
+                    bottom: isLast ? borderSide : BorderSide.none,
+                    left: borderSide,
+                    right: borderSide,
+                  ),
+                  borderRadius: BorderRadius.vertical(
+                    top: isFirst ? Radius.circular(borderRadius) : Radius.zero,
+                    bottom: isLast
+                        ? Radius.circular(borderRadius)
+                        : Radius.zero,
+                  ),
+                ),
+                child: _EntePopupMenuRow(option: option),
+              ),
+            );
+          },
         ),
       );
     }),
