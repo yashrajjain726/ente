@@ -80,13 +80,17 @@ fn select_neighbors(
             count += 1;
         }
     }
-    for candidate in candidates {
-        if count == cap {
-            break;
-        }
-        if !selected[..count].contains(&candidate.slot) {
-            selected[count] = candidate.slot;
-            count += 1;
+    for alive in [true, false] {
+        for candidate in candidates {
+            if count == cap {
+                return count;
+            }
+            if arena.is_alive(candidate.slot) == alive
+                && !selected[..count].contains(&candidate.slot)
+            {
+                selected[count] = candidate.slot;
+                count += 1;
+            }
         }
     }
     count
@@ -1705,6 +1709,64 @@ mod tests {
             graph.write_level_list(0, 0, &full);
             graph.link_back(0, 0, cap as u32 + 1, cap, &arena);
             assert_eq!(graph.level_neighbors(0, 0).len(), expected);
+        }
+    }
+
+    #[test]
+    fn overflowing_backlinks_preserve_a_diverse_retired_bridge() {
+        for storage in [StorageKind::F32, StorageKind::I8] {
+            let mut arena = VectorArena::with_storage(32, storage).unwrap();
+            let owner = axis_vector(32, 0);
+            arena.upsert("owner", &owner).unwrap();
+            let mut nearby = owner;
+            nearby[1] = 0.1;
+            let nearby = normalized(nearby);
+            for index in 1..32 {
+                arena.upsert(&format!("near-{index}"), &nearby).unwrap();
+            }
+            let mut bridge = vec![0.0; 32];
+            bridge[1] = -1.0;
+            arena.upsert("bridge", &bridge).unwrap();
+            let mut survivor = bridge;
+            survivor[2] = 0.1;
+            let survivor = normalized(survivor);
+            arena.upsert("survivor", &survivor).unwrap();
+            let parts = (0..34)
+                .map(|slot| GraphNodeParts {
+                    slot,
+                    level: 0,
+                    neighbors: vec![match slot {
+                        0 => (1..=32).collect(),
+                        32 => vec![33],
+                        _ => vec![0],
+                    }],
+                })
+                .collect();
+            let mut graph = Graph::from_parts(Some(0), parts, 34, 34).unwrap();
+            arena.remove("bridge").unwrap();
+            let query = arena.pack_query(&survivor).unwrap();
+            for round in 0..80 {
+                let UpsertOutcome::NewSlot(slot) = arena.upsert("incoming", &nearby).unwrap()
+                else {
+                    panic!("incoming was not retired");
+                };
+                graph.reserve_slots(arena.slot_count());
+                graph.attach_empty_node(slot, 0);
+                graph.write_level_list(slot, 0, &[0]);
+                graph.link_back(0, 0, slot, LEVEL_ZERO_NEIGHBOR_CAP, &arena);
+                assert!(graph.neighbors_of(0, 0).contains(&32), "round {round}");
+                for (limit, distance) in [(Some(1), None), (None, Some(0.05))] {
+                    let found = search(
+                        &graph,
+                        &arena,
+                        &query,
+                        &params(limit, distance, false),
+                        None,
+                    );
+                    assert_eq!(keys(&found), ["survivor"]);
+                }
+                arena.remove("incoming").unwrap();
+            }
         }
     }
 

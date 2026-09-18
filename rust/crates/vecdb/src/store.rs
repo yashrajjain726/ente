@@ -1944,6 +1944,79 @@ mod tests {
     }
 
     #[test]
+    fn repeated_equivalent_vectors_remain_searchable_across_replay() {
+        for storage in [StorageKind::F32, StorageKind::I8] {
+            let dir = TempDir::new().unwrap();
+            let path = dir.path().join("db");
+            let replay_path = dir.path().join("replay");
+            let db = VecDb::open(&path, 32, Some(storage)).unwrap();
+            let keys: Vec<_> = (0..3000).map(|index| format!("key-{index}")).collect();
+            let vectors: Vec<_> = (1..=3000)
+                .map(|index| seeded_unit_vector(index, 32))
+                .collect();
+            db.bulk_add(&keys, &vectors).unwrap();
+            for round in 0..48 {
+                let scale = if round % 2 == 0 { 2.0 } else { 1.0 };
+                for (key, vector) in keys.iter().zip(&vectors).take(3) {
+                    let scaled: Vec<_> = vector.iter().map(|value| value * scale).collect();
+                    db.add(key, &scaled).unwrap();
+                }
+                if round == 23 {
+                    db.flush().unwrap();
+                }
+            }
+            let verify = |db: &VecDb| {
+                for key in keys.iter().take(3) {
+                    let query = db.get(key).unwrap().unwrap();
+                    let nearest = db.search(&query, &limit_params(1)).unwrap();
+                    assert_eq!(nearest[0].key, *key, "storage={storage:?}");
+                    let nearby = db
+                        .search(
+                            &query,
+                            &SearchParams {
+                                max_distance: Some(0.2),
+                                ..SearchParams::default()
+                            },
+                        )
+                        .unwrap();
+                    assert!(
+                        nearby.iter().any(|hit| hit.key == *key),
+                        "storage={storage:?}, key={key}",
+                    );
+                }
+                let state = db.shared.state_read();
+                assert_eq!(state.arena.dead_count(), 144);
+                assert_eq!(state.arena.live_count(), 3000);
+                assert_eq!(state.graph.as_ref().unwrap().insert_ordinal(), 3144);
+            };
+            verify(&db);
+            fs::copy(&path, &replay_path).unwrap();
+            fs::copy(snapshot_path(&path), snapshot_path(&replay_path)).unwrap();
+            let read_only = VecDb::open_read_only(&replay_path, 32, Some(storage)).unwrap();
+            verify(&read_only);
+            test_support::assert_identical_graphs(
+                db.shared.state_read().graph.as_ref().unwrap(),
+                read_only.shared.state_read().graph.as_ref().unwrap(),
+            );
+            drop(read_only);
+            let replayed = VecDb::open(&replay_path, 32, Some(storage)).unwrap();
+            verify(&replayed);
+            test_support::assert_identical_graphs(
+                db.shared.state_read().graph.as_ref().unwrap(),
+                replayed.shared.state_read().graph.as_ref().unwrap(),
+            );
+            db.flush().unwrap();
+            drop(db);
+            let reopened = VecDb::open(&path, 32, Some(storage)).unwrap();
+            verify(&reopened);
+            test_support::assert_identical_graphs(
+                reopened.shared.state_read().graph.as_ref().unwrap(),
+                replayed.shared.state_read().graph.as_ref().unwrap(),
+            );
+        }
+    }
+
+    #[test]
     fn f32_replacement_preserves_distinct_stored_bits() {
         let dir = TempDir::new().unwrap();
         let db = open_writer(&dir.path().join("db"));
