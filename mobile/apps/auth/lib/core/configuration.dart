@@ -94,15 +94,15 @@ class Configuration extends BaseConfiguration
   }
 
   Future<void> optForOfflineMode() async {
-    if ((await _secureStorage.containsKey(key: offlineAuthSecretKey))) {
-      _offlineAuthKey = await _secureStorage.read(key: offlineAuthSecretKey);
-    } else {
-      _offlineAuthKey = CryptoUtil.bin2base64(CryptoUtil.generateKey());
+    var offlineAuthKey = await _secureStorage.read(key: offlineAuthSecretKey);
+    if (offlineAuthKey == null) {
+      offlineAuthKey = CryptoUtil.bin2base64(CryptoUtil.generateKey());
       await _secureStorage.write(
         key: offlineAuthSecretKey,
-        value: _offlineAuthKey,
+        value: offlineAuthKey,
       );
     }
+    _offlineAuthKey = offlineAuthKey;
     await _preferences.setBool(hasOptedForOfflineModeKey, true);
   }
 

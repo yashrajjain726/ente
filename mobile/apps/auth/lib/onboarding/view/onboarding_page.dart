@@ -11,6 +11,7 @@ import 'package:ente_auth/app/view/app.dart';
 import 'package:ente_auth/core/configuration.dart';
 import 'package:ente_auth/events/trigger_logout_event.dart';
 import 'package:ente_auth/locale.dart';
+import 'package:ente_auth/store/offline_authenticator_db.dart';
 import 'package:ente_auth/theme/colors.dart';
 import 'package:ente_auth/theme/ente_theme.dart';
 import 'package:ente_auth/ui/account/logout_dialog.dart';
@@ -34,12 +35,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:local_auth/local_auth.dart';
 
 class OnboardingPage extends StatefulWidget {
-  final bool showOfflineKeyUnavailableDialog;
+  final bool recoverOfflineMode;
 
-  const OnboardingPage({
-    super.key,
-    this.showOfflineKeyUnavailableDialog = false,
-  });
+  const OnboardingPage({super.key, this.recoverOfflineMode = false});
 
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
@@ -58,6 +56,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   int _activeDotIndex = 0;
   int _currentPage = 0;
   bool _autoScrollDisabled = false;
+  bool _isRecoveringOfflineMode = false;
 
   @override
   void initState() {
@@ -73,20 +72,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
       await autoLogoutAlert(context);
     });
     _startAutoScroll();
-    if (widget.showOfflineKeyUnavailableDialog) {
+    if (widget.recoverOfflineMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final l10n = context.strings;
-        unawaited(
-          showErrorDialog(
-            context,
-            l10n.unableToAccessYourCodes,
-            l10n.offlineKeyUnavailableMessage,
-            isDismissable: false,
-            showContactSupport: false,
-            dismissButtonLabel: l10n.ok,
-          ),
-        );
+        unawaited(_recoverOfflineMode());
       });
     }
     super.initState();
@@ -275,6 +263,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
     final bool hasOptedBefore = Configuration.instance.hasOptedForOfflineMode();
+    if (hasOptedBefore &&
+        Configuration.instance.getOfflineSecretKey() == null) {
+      await _recoverOfflineMode();
+      return;
+    }
     ButtonResult? result;
     if (!hasOptedBefore && !shouldSkipAuthGuidance) {
       if (!mounted) return;
@@ -301,6 +294,40 @@ class _OnboardingPageState extends State<OnboardingPage> {
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _recoverOfflineMode() async {
+    if (_isRecoveringOfflineMode) return;
+    _isRecoveringOfflineMode = true;
+    try {
+      final offlineDatabase = OfflineAuthenticatorDB.instance;
+      if (await offlineDatabase.hasEntries()) {
+        if (!mounted) return;
+        final l10n = context.strings;
+        final result = await showChoiceDialog(
+          context,
+          title: l10n.unableToAccessYourCodes,
+          body: l10n.offlineKeyUnavailableMessage,
+          firstButtonLabel: l10n.startFresh,
+          secondButtonLabel: l10n.cancel,
+          isCritical: true,
+          isDismissible: false,
+        );
+        if (result?.action != ButtonAction.first) return;
+        await offlineDatabase.clearTable();
+      }
+      await Configuration.instance.optForOfflineMode();
+      if (!mounted) return;
+      unawaited(
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (BuildContext context) => const HomePage(),
+          ),
+        ),
+      );
+    } finally {
+      _isRecoveringOfflineMode = false;
     }
   }
 
