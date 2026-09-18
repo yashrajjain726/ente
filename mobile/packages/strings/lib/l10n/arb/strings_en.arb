@@ -2829,6 +2829,7 @@
     }
   },
   "nothingToSeeHere": "Nothing to see here",
+  "nothingToCleanUp": "Nothing to clean up",
   "nothingToTidyUpHere": "Nothing to tidy up here",
   "notifications": "Notifications",
   "notifyMe": "Notify me",
@@ -3434,6 +3435,14 @@
     "description": "Description for remove contact confirmation dialog"
   },
   "removeContactPhoto": "Remove contact photo",
+  "removedItems": "{count, plural, one{Removed {count} item} other{Removed {count} items}}",
+  "@removedItems": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "removeDuplicates": "Duplicates",
   "removeDuplicatesDesc": "Remove exact duplicates",
   "removeFromAlbum": "Remove from album",
