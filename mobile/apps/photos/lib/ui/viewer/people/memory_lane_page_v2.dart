@@ -79,7 +79,9 @@ class MemoryLanePageV2 extends StatefulWidget {
 }
 
 class _MemoryLanePageV2State extends State<MemoryLanePageV2> {
-  static const _playbackInterval = Duration(seconds: 3);
+  late final _playbackInterval = Duration(
+    seconds: widget.isFromMemoriesStrip ? 3 : 1,
+  );
 
   final _logger = Logger("MemoryLanePageV2");
   Timer? _playbackTimer;
