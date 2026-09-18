@@ -1,7 +1,4 @@
-import {
-    encryptSpaceRootEntityKey,
-    openSpaceAccountContext,
-} from "ente-space-wasm";
+import { encryptBox, openSpaceAccountContext } from "ente-space-wasm";
 import { afterEach, expect, test, vi } from "vitest";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -26,6 +23,7 @@ interface UploadedPost {
 const uploadFixture = async (failSecondUpload = false) => {
     const rootKey = btoa("r".repeat(32));
     const spaceKey = btoa("s".repeat(32));
+    const { encryptedData, nonce } = await encryptBox(spaceKey, rootKey);
     const ctx = await openSpaceAccountContext({
         baseUrl: "http://localhost",
         spaceSessionToken: "test-session",
@@ -35,10 +33,10 @@ const uploadFixture = async (failSecondUpload = false) => {
             {
                 spaceId: "test-space",
                 spaceSlug: "test",
-                rootWrappedSpaceKey: await encryptSpaceRootEntityKey(
-                    spaceKey,
-                    rootKey,
-                ),
+                rootWrappedSpaceKey: Buffer.concat([
+                    Buffer.from(nonce, "base64"),
+                    Buffer.from(encryptedData, "base64"),
+                ]).toString("base64"),
                 publicKey: "",
                 encryptedSecretKey: "",
                 encryptedProfile: "",
