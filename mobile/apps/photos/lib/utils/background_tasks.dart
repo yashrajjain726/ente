@@ -42,40 +42,51 @@ class BackgroundTasks {
     final useNative = await nativeEnabled(
       await SharedPreferences.getInstance(),
     );
-    if (!useNative) {
-      if (_configuredNative != false) {
-        try {
-          await _configureNative(enabled: false);
-        } catch (error, stack) {
-          _logger.warning("Failed to disable native scheduling", error, stack);
+    var shouldRetireLegacySchedules = false;
+    try {
+      if (!useNative) {
+        if (_configuredNative != false) {
+          try {
+            await _configureNative(enabled: false);
+          } catch (error, stack) {
+            _logger.warning(
+              "Failed to disable native scheduling",
+              error,
+              stack,
+            );
+          }
+          await BgTaskUtils.configureWorkmanager();
+          _configuredNative = false;
+        } else if (Platform.isIOS) {
+          await BgTaskUtils.ensureIOSProcessingTaskScheduled();
         }
-        await BgTaskUtils.configureWorkmanager();
-        _configuredNative = false;
-      } else if (Platform.isIOS) {
-        await BgTaskUtils.ensureIOSProcessingTaskScheduled();
+      } else {
+        if (Platform.isIOS) await retireLegacySchedules();
+        await _configureNative(enabled: true);
+        _configuredNative = true;
+        shouldRetireLegacySchedules = Platform.isAndroid;
       }
-    } else {
-      if (Platform.isIOS) await retireLegacySchedules();
-      await _configureNative(enabled: true);
-      _configuredNative = true;
-    }
-    if (!isProcessBg &&
-        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      await BackgroundManager.stopActiveRun();
-      final acquired = await ProcessLockClient.instance.tryAcquire(
-        name: "background_process",
-        origin: "fg",
-        operation: "backgroundRecovery",
-      );
-      if (acquired) {
-        try {
-          await UploadLocksDB.instance.releaseLocksAcquiredByOwnerBefore(
-            ProcessType.background.toString(),
-            DateTime.now().microsecondsSinceEpoch,
-          );
-          if (useNative && Platform.isAndroid) await retireLegacySchedules();
-        } finally {
-          await ProcessLockClient.instance.release(name: "background_process");
+    } finally {
+      if (!isProcessBg &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        await BackgroundManager.stopActiveRun();
+        final acquired = await ProcessLockClient.instance.tryAcquire(
+          name: "background_process",
+          origin: "fg",
+          operation: "backgroundRecovery",
+        );
+        if (acquired) {
+          try {
+            await UploadLocksDB.instance.releaseLocksAcquiredByOwnerBefore(
+              ProcessType.background.toString(),
+              DateTime.now().microsecondsSinceEpoch,
+            );
+            if (shouldRetireLegacySchedules) await retireLegacySchedules();
+          } finally {
+            await ProcessLockClient.instance.release(
+              name: "background_process",
+            );
+          }
         }
       }
     }
