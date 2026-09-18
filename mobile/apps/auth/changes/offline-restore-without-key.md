@@ -1,1 +1,1 @@
-- Fixed startup after restoring offline app data without its device encryption key.
+- Show troubleshooting guidance when Auth cannot access the encryption key for offline codes.
