@@ -146,16 +146,6 @@ class OfflineAuthenticatorDB {
     return _convertRows(rows);
   }
 
-  Future<bool> hasEntries() async {
-    final db = await instance.database;
-    final rows = await db.query(
-      entityTable,
-      columns: ['_generatedID'],
-      limit: 1,
-    );
-    return rows.isNotEmpty;
-  }
-
   Future<void> deleteByIDs({List<int>? generatedIDs, List<String>? ids}) async {
     final db = await instance.database;
     final batch = db.batch();

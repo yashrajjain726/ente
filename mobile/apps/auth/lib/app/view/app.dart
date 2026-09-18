@@ -23,12 +23,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 class App extends StatefulWidget {
   final Locale? locale;
   final ThemeMode savedThemeMode;
-  final bool hasInaccessibleOfflineCodes;
   const App({
     super.key,
     this.locale = const Locale("en"),
     this.savedThemeMode = ThemeMode.system,
-    this.hasInaccessibleOfflineCodes = false,
   });
 
   static void setLocale(BuildContext context, Locale newLocale) {
@@ -147,15 +145,14 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     return {
       "/": (context) {
         final config = Configuration.instance;
+        final hasConfiguredAccount = config.hasConfiguredAccount();
         final hasOfflineAccount = config.hasOptedForOfflineMode();
         final isOfflineKeyMissing =
             hasOfflineAccount && config.getOfflineSecretKey() == null;
         final shouldShowOfflineKeyUnavailableDialog =
-            isOfflineKeyMissing &&
-            (!config.hasConfiguredAccount() ||
-                widget.hasInaccessibleOfflineCodes);
+            !hasConfiguredAccount && isOfflineKeyMissing;
         return !shouldShowOfflineKeyUnavailableDialog &&
-                (config.hasConfiguredAccount() || hasOfflineAccount)
+                (hasConfiguredAccount || hasOfflineAccount)
             ? const HomePage()
             : OnboardingPage(
                 showOfflineKeyUnavailableDialog:

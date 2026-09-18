@@ -1,1 +1,1 @@
-- Show troubleshooting guidance when Auth cannot access the encryption key for offline codes.
+- Show troubleshooting guidance when an offline-only Auth installation cannot access its encryption key.

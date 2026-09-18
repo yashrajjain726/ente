@@ -267,7 +267,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
     final bool hasOptedBefore = Configuration.instance.hasOptedForOfflineMode();
-    if (hasOptedBefore &&
+    if (!Configuration.instance.hasConfiguredAccount() &&
+        hasOptedBefore &&
         Configuration.instance.getOfflineSecretKey() == null) {
       await _showOfflineKeyUnavailableDialog();
       return;

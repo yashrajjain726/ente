@@ -5,7 +5,7 @@ description: Recover or reset Ente Auth when the key for offline codes is unavai
 
 # Offline codes unavailable
 
-Ente Auth shows **Unable to access your codes** when the app was configured for offline mode but its encryption key is no longer available from the operating system's secure storage.
+Ente Auth shows **Unable to access your codes** when an offline-only installation no longer has access to its encryption key in the operating system's secure storage.
 
 ## When this can happen
 
