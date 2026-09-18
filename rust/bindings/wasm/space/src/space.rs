@@ -146,6 +146,14 @@ pub struct PostPhotoAssetOptions {
     thumb_hash: Option<String>,
 }
 
+#[derive(Deserialize, Tsify)]
+pub struct PostPhotoInput {
+    #[serde(with = "swb::preserve")]
+    #[tsify(type = "Uint8Array")]
+    bytes: js_sys::Uint8Array,
+    options: PostPhotoAssetOptions,
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatedSpace {
@@ -1227,31 +1235,43 @@ impl SpaceAccountCtxHandle {
     pub async fn create_photo_post(
         &self,
         space_id: String,
-        photo_bytes: Vec<u8>,
+        photos: Vec<<PostPhotoInput as Tsify>::JsType>,
         caption: Option<String>,
-        photo_options: <PostPhotoAssetOptions as Tsify>::JsType,
     ) -> Result<<PostResponse as Tsify>::JsType, Error> {
-        let photo_options = PostPhotoAssetOptions::from_js(photo_options)?;
+        if photos.is_empty() || photos.len() > 10 {
+            return Err(
+                ente_space::Error::InvalidInput("Choose between 1 and 10 photos".into()).into(),
+            );
+        }
+        let photos = photos
+            .into_iter()
+            .map(PostPhotoInput::from_js)
+            .collect::<Result<Vec<_>, _>>()?;
         let post_key = self.inner.generate_post_key();
-        let object = self
-            .inner
-            .upload_post_photo_asset(
-                &space_id,
-                &post_key,
-                &photo_bytes,
-                ente_space::PostPhotoAssetOptions {
-                    width: photo_options.width,
-                    height: photo_options.height,
-                    media_type: photo_options.media_type,
-                    thumb_hash: photo_options.thumb_hash,
-                },
-            )
-            .await?;
+        let mut objects = Vec::with_capacity(photos.len());
+        for (position, photo) in photos.into_iter().enumerate() {
+            let mut object = self
+                .inner
+                .upload_post_photo_asset(
+                    &space_id,
+                    &post_key,
+                    &photo.bytes.to_vec(),
+                    ente_space::PostPhotoAssetOptions {
+                        width: photo.options.width,
+                        height: photo.options.height,
+                        media_type: photo.options.media_type,
+                        thumb_hash: photo.options.thumb_hash,
+                    },
+                )
+                .await?;
+            object.position = Some(position as i32);
+            objects.push(object);
+        }
         let (post_id, _) = self
             .inner
             .create_post(
                 &space_id,
-                &[object],
+                &objects,
                 caption.as_ref().map(String::as_bytes),
                 Some(&post_key),
             )

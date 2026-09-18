@@ -45,7 +45,7 @@ const Page: React.FC = () => {
         profileLoadStatus,
         setFriends,
         setLocalFeedPosts,
-        setPendingPostPhotoFile,
+        setPendingPostPhotoFiles,
     } = useSpaceAppState();
     const [friendRequestSentToastName, setFriendRequestSentToastName] =
         useState<string>();
@@ -332,7 +332,7 @@ const Page: React.FC = () => {
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
                 onInviteFriendsToastClose={closeInviteFriendsToast}
                 onAddFriend={() => setIsAddFriendOpen(true)}
-                onPostPhotoSelect={setPendingPostPhotoFile}
+                onPostPhotoSelect={setPendingPostPhotoFiles}
                 onDeletePost={async (postId) => {
                     const spaceId = profile?.spaceId;
                     if (!spaceId) throw new Error("Missing space.");

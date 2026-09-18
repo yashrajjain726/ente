@@ -10,7 +10,7 @@ const spaceInvitePreviewDescription =
     "See the everyday photos I share on Ente Space.";
 const previewImages = {
     home: "https://ente.space/images/meta.png",
-    invite: "https://ente.space/images/meta-invite.png",
+    invite: "https://ente.space/images/meta.png",
 } as const;
 
 interface SpacePageMetaProps {

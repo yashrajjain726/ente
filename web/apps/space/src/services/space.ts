@@ -79,9 +79,16 @@ export interface SpacePostAsset {
     spaceId: string;
 }
 
-export interface SpacePost extends SpacePostBase {
+export interface SpacePostPhoto {
+    height?: number;
     imageAsset?: SpacePostAsset;
     imageUrl?: string;
+    thumbHash?: string;
+    width?: number;
+}
+
+export interface SpacePost extends SpacePostBase, SpacePostPhoto {
+    photos?: SpacePostPhoto[];
 }
 
 export interface SpacePostPage {
@@ -89,10 +96,7 @@ export interface SpacePostPage {
     nextCursor?: string;
 }
 
-export interface SpaceProfilePost extends SpacePostBase {
-    imageAsset?: SpacePostAsset;
-    imageUrl?: string;
-}
+export type SpaceProfilePost = SpacePost;
 
 export interface SpaceProfilePostPage {
     items: SpaceProfilePost[];
@@ -140,6 +144,7 @@ export type SpaceMessageKind = MessageResponse["kind"];
 export interface SpaceMessageQuote {
     imageUrl?: string;
     isUnavailable?: boolean;
+    photoCount?: number;
     postId: number;
     spaceId: string;
 }
@@ -166,6 +171,7 @@ export type SpaceMessageActivityType = MessageConversationActivity["type"];
 export interface SpaceMessageActivityPost {
     imageUrl?: string;
     isDeleted?: boolean;
+    photoCount?: number;
     postId: number;
     spaceId: string;
 }
@@ -439,6 +445,14 @@ const cacheAccountPostAssetURL = async (
 const firstObject = (post: PostResponse) =>
     post.objects.find((object) => object.objectKey.trim()) ?? null;
 
+const postPhotosFromResponse = (post: PostResponse): SpacePostPhoto[] =>
+    post.objects.map((object) => ({
+        height: object.height,
+        imageAsset: postAssetFrom(post, object),
+        thumbHash: object.thumbHash,
+        width: object.width,
+    }));
+
 const postBaseFromResponse = (
     post: PostResponse,
     author: FriendProfile,
@@ -489,6 +503,7 @@ const postFromAccountPost = async (
         height: object.height,
         imageAsset: postAssetFrom(post, object),
         imageUrl,
+        photos: postPhotosFromResponse(post),
         thumbHash: object.thumbHash,
         width: object.width,
     };
@@ -506,6 +521,7 @@ const profilePostFromPost = (post: PostResponse): SpaceProfilePost => {
         avatarUrl: null,
         height: object.height,
         imageAsset: postAssetFrom(post, object),
+        photos: postPhotosFromResponse(post),
         thumbHash: object.thumbHash,
         width: object.width,
     };
@@ -621,6 +637,7 @@ const messageQuoteFromPostResponse = async (
 ): Promise<SpaceMessageQuote> => {
     const object = firstObject(post);
     const quote: SpaceMessageQuote = {
+        photoCount: post.objects.length,
         postId: post.postId,
         spaceId: post.spaceId,
     };
@@ -757,6 +774,7 @@ export const loadCurrentMessageActivityPostPreview = async (
             ...post,
             imageUrl: quote.imageUrl,
             isDeleted: quote.isUnavailable,
+            photoCount: quote.photoCount,
         };
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1132,37 +1150,36 @@ export const loadCurrentFriendAvatarURL = async (
 
 export const createCurrentPhotoPost = async ({
     caption,
-    file,
-    height,
+    images,
     spaceId,
-    thumbHash,
-    width,
 }: {
     caption?: string;
-    file: File;
-    height?: number;
+    images: { file: File; height: number; width: number; thumbHash: string }[];
     spaceId: string;
-    thumbHash: string;
-    width?: number;
 }) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const normalizedWidth = normalizedImageDimension(width);
-        const normalizedHeight = normalizedImageDimension(height);
+        const photos = await Promise.all(
+            images.map(async (image) => ({
+                bytes: new Uint8Array(await image.file.arrayBuffer()),
+                options: {
+                    width: normalizedImageDimension(image.width),
+                    height: normalizedImageDimension(image.height),
+                    mediaType: image.file.type || undefined,
+                    thumbHash: image.thumbHash || undefined,
+                },
+            })),
+        );
         const created = await ctx.createPhotoPost(
             spaceId,
-            bytes,
+            photos,
             caption?.trim() || null,
-            {
-                width: normalizedWidth,
-                height: normalizedHeight,
-                mediaType: file.type || undefined,
-                thumbHash: thumbHash || undefined,
-            },
         );
-        const object = firstObject(created);
-        if (object) await cacheAccountPostAssetURL(created, object, file);
+        await Promise.all(
+            created.objects.map((object, index) =>
+                cacheAccountPostAssetURL(created, object, images[index]!.file),
+            ),
+        );
         const post = await postFromAccountPost(ctx, created, true, spaceId);
         await prependCachedSpaceFeedPost(spaceId, post);
         return post;
