@@ -54,11 +54,11 @@ class BackgroundTasks {
       } else if (Platform.isIOS) {
         await BgTaskUtils.ensureIOSProcessingTaskScheduled();
       }
-      return;
+    } else {
+      if (Platform.isIOS) await retireLegacySchedules();
+      await _configureNative(enabled: true);
+      _configuredNative = true;
     }
-    if (Platform.isIOS) await retireLegacySchedules();
-    await _configureNative(enabled: true);
-    _configuredNative = true;
     if (!isProcessBg &&
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
       await BackgroundManager.stopActiveRun();
@@ -73,7 +73,7 @@ class BackgroundTasks {
             ProcessType.background.toString(),
             DateTime.now().microsecondsSinceEpoch,
           );
-          if (Platform.isAndroid) await retireLegacySchedules();
+          if (useNative && Platform.isAndroid) await retireLegacySchedules();
         } finally {
           await ProcessLockClient.instance.release(name: "background_process");
         }
@@ -176,69 +176,75 @@ class BackgroundTasks {
     var result = BackgroundTaskResult.stopped;
     await runWithLogs(
       () async {
-        _logger.info("${task.identifier}: task started");
-        final prefs = await SharedPreferences.getInstance();
-        if (!await nativeEnabled(prefs)) {
-          _logger.info("${task.identifier}: skipped, native backend disabled");
-          result = BackgroundTaskResult.skipped;
-          return;
-        }
-        task.throwIfStopping();
-        final acquired = await ProcessLockClient.instance.tryAcquire(
-          name: "background_process",
-          origin: "bg",
-          operation: task.identifier,
-        );
-        if (!acquired) {
-          _logger.info("${task.identifier}: skipped, background pipeline busy");
-          result = BackgroundTaskResult.skipped;
-          return;
-        }
-        task.throwIfStopping();
-        await retireLegacySchedules();
-        final taskName = task.identifier == processing
-            ? (Platform.isIOS
-                  ? BgTaskUtils.iOSBackgroundProcessingTask
-                  : BgTaskUtils.androidBackgroundProcessingTask)
-            : (Platform.isIOS
-                  ? BgTaskUtils.iOSBackgroundAppRefreshTask
-                  : BgTaskUtils.androidPeriodicTask);
-        final control = MlRunControl();
-        unawaited(
-          task.stopped.then((reason) {
-            control.requestStop(
-              reason == BackgroundStopReason.foreground
-                  ? MlStopReason.foregroundActive
-                  : MlStopReason.backgroundDeadline,
-            );
-          }),
-        );
         try {
-          final remainingBudget =
-              BgTaskUtils.taskTimeoutFor(taskName) - task.elapsed;
-          await runBackgroundTask(
-            taskName,
-            TimeLogger(),
-            control: control,
-            mlSelfStop: BgTaskUtils.mlSelfStopFor(taskName) - task.elapsed,
-            mlLockWait: BgTaskUtils.mlLockWaitFor(taskName),
-          ).timeout(
-            remainingBudget.isNegative ? Duration.zero : remainingBudget,
-            onTimeout: () async {
-              await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
-              throw TimeoutException("Background task timed out");
-            },
+          _logger.info("${task.identifier}: task started");
+          final prefs = await SharedPreferences.getInstance();
+          if (!await nativeEnabled(prefs)) {
+            _logger.info(
+              "${task.identifier}: skipped, native backend disabled",
+            );
+            result = BackgroundTaskResult.skipped;
+            return;
+          }
+          task.throwIfStopping();
+          final acquired = await ProcessLockClient.instance.tryAcquire(
+            name: "background_process",
+            origin: "bg",
+            operation: task.identifier,
           );
-          result = task.isStopping
-              ? BackgroundTaskResult.stopped
-              : BackgroundTaskResult.completed;
+          if (!acquired) {
+            _logger.info(
+              "${task.identifier}: skipped, background pipeline busy",
+            );
+            result = BackgroundTaskResult.skipped;
+            return;
+          }
+          task.throwIfStopping();
+          await retireLegacySchedules();
+          final taskName = task.identifier == processing
+              ? (Platform.isIOS
+                    ? BgTaskUtils.iOSBackgroundProcessingTask
+                    : BgTaskUtils.androidBackgroundProcessingTask)
+              : (Platform.isIOS
+                    ? BgTaskUtils.iOSBackgroundAppRefreshTask
+                    : BgTaskUtils.androidPeriodicTask);
+          final control = MlRunControl();
+          unawaited(
+            task.stopped.then((reason) {
+              control.requestStop(
+                reason == BackgroundStopReason.foreground
+                    ? MlStopReason.foregroundActive
+                    : MlStopReason.backgroundDeadline,
+              );
+            }),
+          );
+          try {
+            final remainingBudget =
+                BgTaskUtils.taskTimeoutFor(taskName) - task.elapsed;
+            await runBackgroundTask(
+              taskName,
+              TimeLogger(),
+              control: control,
+              mlSelfStop: BgTaskUtils.mlSelfStopFor(taskName) - task.elapsed,
+              mlLockWait: BgTaskUtils.mlLockWaitFor(taskName),
+            ).timeout(
+              remainingBudget.isNegative ? Duration.zero : remainingBudget,
+              onTimeout: () async {
+                await BgTaskUtils.releaseResourcesForKill(taskName, prefs);
+                throw TimeoutException("Background task timed out");
+              },
+            );
+            result = task.isStopping
+                ? BackgroundTaskResult.stopped
+                : BackgroundTaskResult.completed;
+          } finally {
+            await Computer.shared().turnOff();
+          }
         } on BackgroundTaskStopped {
           result = BackgroundTaskResult.stopped;
         } catch (error, stack) {
           _logger.warning("${task.identifier}: task failed", error, stack);
           result = BackgroundTaskResult.failed;
-        } finally {
-          await Computer.shared().turnOff();
         }
         _logger.info("${task.identifier}: task ${result.name}");
       },
