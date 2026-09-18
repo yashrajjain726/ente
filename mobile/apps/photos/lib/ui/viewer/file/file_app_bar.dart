@@ -537,11 +537,7 @@ class FileAppBarState extends State<FileAppBar> {
     return EntePopupMenuOption<int>(
       value: value,
       label: label,
-      leadingWidget: HugeIcon(
-        icon: hugeIcon,
-        size: IconSizes.small,
-        color: context.componentColors.textLight,
-      ),
+      leadingWidget: HugeIcon(icon: hugeIcon, size: IconSizes.small),
       trailingWidget: trailing,
       enabled: enabled,
     );
