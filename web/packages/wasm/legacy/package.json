@@ -6,10 +6,6 @@
         ".": {
             "types": "./index.ts",
             "import": "./index.ts"
-        },
-        "./authenticated": {
-            "types": "./authenticated.ts",
-            "import": "./authenticated.ts"
         }
     },
     "module": "./index.ts",

@@ -1,8 +1,8 @@
 import { namedError } from "ente-base/error";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
-import { prepareCastPayload } from "ente-cast-wasm";
 import type { Collection } from "ente-media/collection";
+import { prepareCastPayload } from "ente-photos-wasm";
 import { z } from "zod";
 
 export const revokeAllCastTokens = async () =>

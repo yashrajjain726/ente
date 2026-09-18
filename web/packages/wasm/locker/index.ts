@@ -9,15 +9,20 @@ import type {
     WrappedRootContactKey,
 } from "./pkg/ente_locker_wasm";
 
-const wasm = () => import("./pkg/ente_locker_wasm");
-
 export type { OpenSessionInput, Session } from "./pkg/ente_locker_wasm";
+
+const wasm = () => import("./pkg/ente_locker_wasm");
 
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
 
-export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
-    session.encryptWithRecoveryKey(dataB64);
+export const recoveryKeyMnemonic = async (session: Session) =>
+    (await wasm()).authRecoveryKeyMnemonic(session);
+
+export const encryptBoxWithRecoveryKey = async (
+    session: Session,
+    dataB64: string,
+) => (await wasm()).authEncryptWithRecoveryKey(session, dataB64);
 
 export const openCollectionKey = async (
     session: Session,

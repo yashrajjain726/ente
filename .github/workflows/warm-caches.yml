@@ -218,6 +218,13 @@ jobs:
                   lookup-only: true
                   shared-key: rust-wasm
 
+            # rust-src timestamps must match the cached build-std artifacts.
+            - name: Cache Cast toolchain
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  key: cast-toolchain-${{ hashFiles('rust/bindings/wasm/cast/rust-toolchain.toml') }}
+                  path: ~/.rustup/toolchains/nightly-*
+
             - name: Cache web
               uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
@@ -248,7 +255,7 @@ jobs:
                   path: rust/target
 
     photos-desktop-ensu-android:
-        # For desktop-lint.yml, android-lint.yml and ensu-android-build.yml.
+        # For desktop-lint.yml and android-lint.yml.
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -313,7 +320,7 @@ jobs:
                   path: rust/target
 
     ensu-ios:
-        # For ensu-ios-build.yml.
+        # For apple-lint.yml.
         runs-on: macos-latest
         steps:
             - name: Checkout

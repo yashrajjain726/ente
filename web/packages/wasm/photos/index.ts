@@ -5,15 +5,20 @@ import type {
     WrappedRootContactKey,
 } from "./pkg/ente_photos_wasm";
 
-const wasm = () => import("./pkg/ente_photos_wasm");
-
 export type { OpenSessionInput, Session } from "./pkg/ente_photos_wasm";
+
+const wasm = () => import("./pkg/ente_photos_wasm");
 
 export const openSession = async (input: OpenSessionInput): Promise<Session> =>
     (await wasm()).openSession(input);
 
-export const encryptBoxWithRecoveryKey = (session: Session, dataB64: string) =>
-    session.encryptWithRecoveryKey(dataB64);
+export const recoveryKeyMnemonic = async (session: Session) =>
+    (await wasm()).authRecoveryKeyMnemonic(session);
+
+export const encryptBoxWithRecoveryKey = async (
+    session: Session,
+    dataB64: string,
+) => (await wasm()).authEncryptWithRecoveryKey(session, dataB64);
 
 export const generateKey = async () => (await wasm()).cryptoGenerateKey();
 
@@ -60,4 +65,17 @@ export const openCollectionKey = async (
         BigInt(ownerID),
         encryptedKey,
         keyDecryptionNonce,
+    );
+
+export const prepareCastPayload = async (
+    publicKey: string,
+    pqPublicKey: string | undefined,
+    collectionID: number,
+    collectionKey: string,
+) =>
+    (await wasm()).castPreparePayload(
+        publicKey,
+        pqPublicKey,
+        BigInt(collectionID),
+        collectionKey,
     );

@@ -1,8 +1,5 @@
-import {
-    AccountsPageContents,
-    AccountsPageFooter,
-    AccountsPageTitle,
-} from "ente-accounts/components/layouts/centered-paper";
+import { useAuthPageConfig } from "ente-accounts/components/auth/AuthPageProvider";
+import { RecoverAccountForm } from "ente-accounts/components/auth/RecoveryForm";
 import {
     savedKeyAttributes,
     savedPartialLocalUser,
@@ -16,30 +13,20 @@ import {
     decryptAndStoreTokenIfNeeded,
     sendOTT,
 } from "ente-accounts/services/user";
-import { LinkButton } from "ente-base/components/LinkButton";
-import {
-    SingleInputForm,
-    type SingleInputFormProps,
-} from "ente-base/components/SingleInputForm";
-import { useBaseContext } from "ente-base/context";
+import type { SingleInputFormProps } from "ente-base/components/SingleInputForm";
 import log from "ente-base/log";
 import { haveMasterKeyInSession } from "ente-base/session-storage";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export interface RecoverAccountPresentationProps {
     onSubmit: SingleInputFormProps["onSubmit"];
-    onNoRecoveryKey: () => void;
     onBack: () => void;
 }
 
-export interface RecoverPageProps {
-    presentation?: ComponentType<RecoverAccountPresentationProps>;
-}
-
-const Page: React.FC<RecoverPageProps> = ({ presentation: Presentation }) => {
-    const { showMiniDialog } = useBaseContext();
+const Page: React.FC = () => {
+    const { Shell } = useAuthPageConfig();
 
     const [keyAttributes, setKeyAttributes] = useState<
         KeyAttributes | undefined
@@ -97,41 +84,10 @@ const Page: React.FC<RecoverPageProps> = ({ presentation: Presentation }) => {
         [router, keyAttributes],
     );
 
-    const showNoRecoveryKeyMessage = useCallback(() => {
-        showMiniDialog({
-            title: t("sorry"),
-            message: t("no_recovery_key_message"),
-            continue: { color: "secondary" },
-            cancel: false,
-        });
-    }, [showMiniDialog]);
-
-    if (Presentation) {
-        return (
-            <Presentation
-                onSubmit={handleSubmit}
-                onNoRecoveryKey={showNoRecoveryKeyMessage}
-                onBack={router.back}
-            />
-        );
-    }
-
     return (
-        <AccountsPageContents>
-            <AccountsPageTitle>{t("recover_account")}</AccountsPageTitle>
-            <SingleInputForm
-                autoComplete="off"
-                label={t("recovery_key")}
-                submitButtonTitle={t("recover")}
-                onSubmit={handleSubmit}
-            />
-            <AccountsPageFooter>
-                <LinkButton onClick={showNoRecoveryKeyMessage}>
-                    {t("no_recovery_key_title")}
-                </LinkButton>
-                <LinkButton onClick={router.back}>{t("go_back")}</LinkButton>
-            </AccountsPageFooter>
-        </AccountsPageContents>
+        <Shell contentWidth={420}>
+            <RecoverAccountForm onSubmit={handleSubmit} onBack={router.back} />
+        </Shell>
     );
 };
 

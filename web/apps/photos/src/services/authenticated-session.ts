@@ -4,20 +4,21 @@ import {
     bindCollectionKeyOpener,
     unbindCollectionKeyOpener,
 } from "ente-new/photos/services/collection";
-import { openCollectionKey, openSession, type Session } from "ente-photos-wasm";
+import { openCollectionKey, openSession } from "ente-photos-wasm";
 
-const sessions = createAuthenticatedSessionCache((input): Promise<Session> => {
-    const opening = openSession(input);
-    bindCollectionKeyOpener(async (input) =>
-        openCollectionKey(
-            await (sessions.current() ?? sessions.ensure()),
-            input.ownerID,
-            input.encryptedKey,
-            input.keyDecryptionNonce,
+const sessions = createAuthenticatedSessionCache(
+    openSession,
+    masterKeyFromSession,
+    (session) =>
+        bindCollectionKeyOpener((input) =>
+            openCollectionKey(
+                session,
+                input.ownerID,
+                input.encryptedKey,
+                input.keyDecryptionNonce,
+            ),
         ),
-    );
-    return opening;
-}, masterKeyFromSession);
+);
 
 export const openAuthenticatedSession = sessions.open;
 export const ensureAuthenticatedSession = sessions.ensure;

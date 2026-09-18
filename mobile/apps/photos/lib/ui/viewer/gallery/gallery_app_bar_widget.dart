@@ -1223,12 +1223,8 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       }
       final int? userID = Configuration.instance.getUserID();
       final bool isOwner = userID == collection.owner.id;
-      final CollectionParticipantRole role = collection.getRole(userID ?? -1);
-      final bool isAdmin = role == CollectionParticipantRole.admin;
-      final bool canManageParticipants = isOwner || isAdmin;
-      if (canManageParticipants) {
-        final bool shouldOpenManageLink =
-            isOwner && isQuickLink && collection.hasLink;
+      if (isOwner) {
+        final bool shouldOpenManageLink = isQuickLink && collection.hasLink;
         unawaited(
           routeToPage(
             context,
@@ -1237,8 +1233,6 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
                 : ShareCollectionPage(collection),
           ),
         );
-      } else if (collection.hasLink) {
-        unawaited(routeToPage(context, ShareCollectionPage(collection)));
       } else {
         unawaited(routeToPage(context, AlbumParticipantsPage(collection)));
       }

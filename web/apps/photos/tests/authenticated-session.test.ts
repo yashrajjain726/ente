@@ -74,9 +74,7 @@ beforeEach(async () => {
 
 const mockSession = () =>
     ({
-        encryptWithRecoveryKey: vi.fn(),
         free: vi.fn(),
-        recoveryKeyMnemonic: vi.fn(),
         updateAuthToken: vi.fn(),
         [Symbol.dispose]: vi.fn(),
     }) satisfies Session;
@@ -100,6 +98,9 @@ test("concurrent opens share a session and retain the latest token", async () =>
     );
     expect(openSession).toHaveBeenCalledTimes(1);
 
+    expect(await sessions.ensureAuthenticatedSession()).toBe(session);
+    expect(masterKeyFromSession).not.toHaveBeenCalled();
+
     sessions.clearAuthenticatedSession();
     sessions.clearAuthenticatedSession();
     expect(session.free).not.toHaveBeenCalled();
@@ -111,15 +112,42 @@ test("concurrent opens share a session and retain the latest token", async () =>
     expect(openSession).toHaveBeenCalledTimes(2);
 });
 
-test("the bound collection opener retries a failed initialization", async () => {
+test("collection keys reuse the opened session without reading browser storage", async () => {
+    const session = mockSession();
+    openSession.mockResolvedValue(session);
+    await sessions.ensureAuthenticatedSession();
+    const opener = bindCollectionKeyOpener.mock.calls[0]![0];
+    vi.clearAllMocks();
+
+    openCollectionKey.mockResolvedValue("collection-key");
+    for (const ownerID of [1, 2]) {
+        await expect(
+            opener({ ownerID, encryptedKey: "encrypted-key" }),
+        ).resolves.toBe("collection-key");
+        expect(openCollectionKey).toHaveBeenLastCalledWith(
+            session,
+            ownerID,
+            "encrypted-key",
+            undefined,
+        );
+    }
+    expect(savedAuthToken).not.toHaveBeenCalled();
+    expect(apiOrigin).not.toHaveBeenCalled();
+    expect(masterKeyFromSession).not.toHaveBeenCalled();
+    expect(openSession).not.toHaveBeenCalled();
+});
+
+test("failed initialization leaves the collection opener unbound and can be retried", async () => {
     const error = new Error("WASM download failed");
     const session = mockSession();
     openSession.mockRejectedValueOnce(error).mockResolvedValueOnce(session);
 
     const opening = sessions.openAuthenticatedSession(1, "token", "key");
-    await Promise.resolve();
-    const opener = bindCollectionKeyOpener.mock.calls[0]![0];
     await expect(opening).rejects.toBe(error);
+    expect(bindCollectionKeyOpener).not.toHaveBeenCalled();
+
+    await sessions.ensureAuthenticatedSession();
+    const opener = bindCollectionKeyOpener.mock.calls[0]![0];
 
     openCollectionKey.mockResolvedValue("collection-key");
     await expect(
@@ -181,6 +209,7 @@ test("clearing during initialization disposes its eventual handle", async () => 
     ready.resolve(session);
     await expect(opening).rejects.toThrow("Authenticated session was cleared");
     expect(session.free).toHaveBeenCalledTimes(1);
+    expect(bindCollectionKeyOpener).not.toHaveBeenCalled();
 });
 
 test.each(["resolve", "reject"])(
@@ -210,6 +239,7 @@ test.each(["resolve", "reject"])(
             outcome === "resolve" ? 1 : 0,
         );
         expect(next.free).not.toHaveBeenCalled();
+        expect(bindCollectionKeyOpener).toHaveBeenCalledOnce();
         expect(
             await sessions.openAuthenticatedSession(2, "new-token", "key"),
         ).toBe(next);

@@ -7,12 +7,14 @@ import {
 } from "../src/services/trash";
 
 const {
+    ensureAuthenticatedSession,
     getCollectionRecord,
     getEncryptedFileRecord,
     fetchLockerTrash,
     encryptBox,
     warn,
 } = vi.hoisted(() => ({
+    ensureAuthenticatedSession: vi.fn(),
     getCollectionRecord: vi.fn(),
     getEncryptedFileRecord: vi.fn(),
     fetchLockerTrash: vi.fn(),
@@ -24,7 +26,8 @@ vi.mock("../src/services/locker-cache", () => ({
     getEncryptedFileRecord,
 }));
 vi.mock("../src/services/sync/decrypt", () => ({
-    decryptCollectionKey: (record: { id: number }) => `collection-${record.id}`,
+    openCollectionKeyForRecord: (_session: unknown, record: { id: number }) =>
+        `collection-${record.id}`,
 }));
 vi.mock("../src/services/sync/sync", () => ({ fetchLockerTrash }));
 vi.mock("ente-locker-wasm", () => ({
@@ -40,11 +43,14 @@ vi.mock("ente-base/http", () => ({
 vi.mock("ente-base/origins", () => ({ apiURL: (path: string) => path }));
 vi.mock("ente-base/log", () => ({ default: { warn } }));
 vi.mock("ente-accounts/services/user", () => ({}));
-vi.mock("../src/services/authenticated-session", () => ({}));
+vi.mock("../src/services/authenticated-session", () => ({
+    ensureAuthenticatedSession,
+}));
 const fetchMock = vi.fn<typeof fetch>();
 const items = [{ id: 1, collectionID: 2 }];
 beforeEach(() => {
     vi.resetAllMocks();
+    ensureAuthenticatedSession.mockResolvedValue({});
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
     getCollectionRecord.mockImplementation((id: number) => ({ id }));
@@ -85,22 +91,22 @@ test("trash mutations preserve endpoints and payloads", async () => {
         ["/trash/empty", "POST", { lastUpdatedAt: 123 }],
     ]);
 });
-test("restore rewraps the original file key for the chosen destination", async () => {
-    await restoreFromTrash(items, 9);
+test("restore reuses one session to rewrap file keys for the chosen destination", async () => {
+    await restoreFromTrash([...items, { id: 3, collectionID: 2 }], 9);
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
     expect(getEncryptedFileRecord).toHaveBeenCalledWith(1, 2);
+    expect(getEncryptedFileRecord).toHaveBeenCalledWith(3, 2);
     expect(encryptBox).toHaveBeenCalledWith("file-key", "collection-9");
     expect(fetchMock).toHaveBeenCalledWith(
         "/collections/restore-files",
         expect.objectContaining({
             body: JSON.stringify({
                 collectionID: 9,
-                files: [
-                    {
-                        id: 1,
-                        encryptedKey: "rewrapped",
-                        keyDecryptionNonce: "new-nonce",
-                    },
-                ],
+                files: [1, 3].map((id) => ({
+                    id,
+                    encryptedKey: "rewrapped",
+                    keyDecryptionNonce: "new-nonce",
+                })),
             }),
         }),
     );
@@ -108,6 +114,7 @@ test("restore rewraps the original file key for the chosen destination", async (
 test("restore refreshes missing cache records once before retrying", async () => {
     getEncryptedFileRecord.mockReturnValueOnce(undefined);
     await restoreFromTrash(items, 9);
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
     expect(fetchLockerTrash).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 });

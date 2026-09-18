@@ -10,7 +10,6 @@ import "package:photos/core/errors.dart";
 import "package:photos/core/network/api_response.dart";
 import 'package:photos/db/files_db.dart';
 import 'package:photos/gateways/collections/models/create_request.dart';
-import "package:photos/models/api/collection/user.dart";
 import 'package:photos/models/button_result.dart';
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/file/file.dart';
@@ -19,20 +18,44 @@ import "package:photos/models/metadata/collection_magic.dart";
 import "package:photos/models/metadata/common_keys.dart";
 import 'package:photos/services/account/user_service.dart';
 import 'package:photos/services/collections_service.dart';
-import 'package:photos/services/contacts/contact_identity_resolver.dart';
 import 'package:photos/services/hidden_service.dart';
-import 'package:photos/ui/common/progress_dialog.dart';
-import "package:photos/ui/common/user_dialogs.dart";
 import 'package:photos/ui/components/action_sheet_widget.dart';
 import 'package:photos/ui/components/buttons/button_widget.dart';
-import 'package:photos/ui/components/dialog_widget.dart';
 import 'package:photos/ui/components/models/button_type.dart';
 import 'package:photos/ui/notification/toast.dart';
 import 'package:photos/ui/payment/subscription.dart';
+import 'package:photos/ui/sharing/widgets/sharing_role.dart';
 import 'package:photos/utils/dialog_util.dart';
 import 'package:photos/utils/email_util.dart';
 import 'package:photos/utils/share_util.dart';
 import "package:styled_text/styled_text.dart";
+
+enum AddEmailToCollectionFailure {
+  invalidEmail,
+  currentUser,
+  noAccount,
+  sharingNotPermitted,
+  other,
+}
+
+class AddEmailToCollectionResult {
+  const AddEmailToCollectionResult.success()
+    : failure = null,
+      error = null,
+      email = "";
+
+  const AddEmailToCollectionResult.failure({
+    required this.failure,
+    required this.email,
+    this.error,
+  });
+
+  final AddEmailToCollectionFailure? failure;
+  final Object? error;
+  final String email;
+
+  bool get succeeded => failure == null;
+}
 
 class CollectionActions {
   final Logger logger = Logger((CollectionActions).toString());
@@ -163,270 +186,189 @@ class CollectionActions {
     return null;
   }
 
-  Future<bool> removeParticipant(
-    BuildContext context,
-    Collection collection,
-    User user,
-  ) async {
-    final actionResult = await showActionSheet(
-      context: context,
-      buttons: [
-        ButtonWidget(
-          buttonType: ButtonType.critical,
-          isInAlert: true,
-          shouldStickToDarkTheme: true,
-          buttonAction: ButtonAction.first,
-          shouldSurfaceExecutionStates: true,
-          labelText: context.strings.yesRemove,
-          onTap: () async {
-            final newSharees = await CollectionsService.instance.unshare(
-              collection.id,
-              user.email,
-            );
-            collection.updateSharees(newSharees);
-          },
-        ),
-        ButtonWidget(
-          buttonType: ButtonType.secondary,
-          buttonAction: ButtonAction.cancel,
-          isInAlert: true,
-          shouldStickToDarkTheme: true,
-          labelText: context.strings.cancel,
-        ),
-      ],
-      title: context.strings.removeWithQuestionMark,
-      body: context.strings.removeAlbumParticipantBody(
-        userEmail: resolveDisplayName(user),
-      ),
-    );
-    if (actionResult?.action != null) {
-      if (actionResult!.action == ButtonAction.error) {
-        if (!context.mounted) return false;
-        await showGenericErrorDialog(
-          context: context,
-          error: actionResult.exception,
-        );
-      }
-      return actionResult.action == ButtonAction.first;
-    }
-    return false;
-  }
-
-  Future<bool> doesEmailHaveAccount(
-    BuildContext context,
-    String email, {
-    bool showProgress = false,
-  }) async {
-    ProgressDialog? dialog;
-    String? publicKey;
-    if (showProgress) {
-      dialog = createProgressDialog(
-        context,
-        context.strings.sharing,
-        isDismissible: true,
-      );
-      await dialog.show();
-    }
-    try {
-      publicKey = await UserService.instance.getPublicKey(email);
-    } catch (e) {
-      await dialog?.hide();
-      logger.severe("Failed to get public key", e);
-      if (!context.mounted) return false;
-      await showGenericErrorDialog(context: context, error: e);
-      return false;
-    }
-    if (publicKey == null || publicKey == '') {
-      // todo: neeraj replace this as per the design where a new screen
-      // is used for error. Do this change along with handling of network errors
-      if (!context.mounted) return false;
-      await showInviteDialog(context, email);
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-  Future<Set<String>> addEmailsToCollections(
-    BuildContext context,
+  Future<AddEmailToCollectionResult> addEmailsToCollections(
     List<Collection> collections,
     Set<String> emails,
     CollectionParticipantRole role,
   ) async {
-    final validEmails = <String>{};
     final ownEmail = Configuration.instance.getEmail()?.trim().toLowerCase();
     for (final email in emails) {
-      if (!context.mounted) return {};
       if (!isValidEmail(email)) {
+        return AddEmailToCollectionResult.failure(
+          failure: AddEmailToCollectionFailure.invalidEmail,
+          email: email,
+        );
+      }
+      if (email == ownEmail) {
+        return AddEmailToCollectionResult.failure(
+          failure: AddEmailToCollectionFailure.currentUser,
+          email: email,
+        );
+      }
+    }
+
+    try {
+      final keys = await UserService.instance.getPublicKeys(emails);
+      final publicKeys = <String, String>{};
+      for (final entry in keys.entries) {
+        final publicKey = entry.value;
+        if (publicKey == null || publicKey.isEmpty) {
+          return AddEmailToCollectionResult.failure(
+            failure: AddEmailToCollectionFailure.noAccount,
+            email: entry.key,
+          );
+        }
+        publicKeys[entry.key] = publicKey;
+      }
+      for (final collection in collections) {
+        final collectionPublicKeys = {
+          for (final entry in publicKeys.entries)
+            if (collectionNeedsShare(collection, entry.key))
+              entry.key: entry.value,
+        };
+        if (collectionPublicKeys.isEmpty) continue;
+        final sharees = await collectionsService.shareBatch(
+          collection.id,
+          collectionPublicKeys,
+          role,
+        );
+        collection.updateSharees(sharees);
+      }
+      return const AddEmailToCollectionResult.success();
+    } catch (e) {
+      if (e is UnexpectedApiResponseException &&
+          e.response?.statusCode == 404) {
+        AddEmailToCollectionResult? firstFailure;
+        for (final collection in collections) {
+          for (final email in emails) {
+            if (!collectionNeedsShare(collection, email)) continue;
+            final result = await addEmailToCollection(collection, email, role);
+            if (!result.succeeded) firstFailure ??= result;
+          }
+        }
+        return firstFailure ?? const AddEmailToCollectionResult.success();
+      }
+      logger.severe("Failed to share collections", e);
+      return AddEmailToCollectionResult.failure(
+        failure: e is SharingNotPermittedForFreeAccountsError
+            ? AddEmailToCollectionFailure.sharingNotPermitted
+            : AddEmailToCollectionFailure.other,
+        email: emails.first,
+        error: e,
+      );
+    }
+  }
+
+  Future<AddEmailToCollectionResult> addEmailToCollection(
+    Collection collection,
+    String email,
+    CollectionParticipantRole role,
+  ) async {
+    if (!isValidEmail(email)) {
+      return AddEmailToCollectionResult.failure(
+        failure: AddEmailToCollectionFailure.invalidEmail,
+        email: email,
+      );
+    } else if (email.trim() == Configuration.instance.getEmail()) {
+      return AddEmailToCollectionResult.failure(
+        failure: AddEmailToCollectionFailure.currentUser,
+        email: email,
+      );
+    }
+    String? publicKey;
+    try {
+      publicKey = await UserService.instance.getPublicKey(email);
+    } catch (e) {
+      logger.severe("Failed to get public key", e);
+      return AddEmailToCollectionResult.failure(
+        failure: AddEmailToCollectionFailure.other,
+        email: email,
+        error: e,
+      );
+    }
+    if (publicKey == null || publicKey == '') {
+      return AddEmailToCollectionResult.failure(
+        failure: AddEmailToCollectionFailure.noAccount,
+        email: email,
+      );
+    }
+    try {
+      final newSharees = await collectionsService.share(
+        collection.id,
+        email,
+        publicKey,
+        role,
+      );
+      collection.updateSharees(newSharees);
+      return const AddEmailToCollectionResult.success();
+    } catch (e) {
+      if (e is SharingNotPermittedForFreeAccountsError) {
+        return AddEmailToCollectionResult.failure(
+          failure: AddEmailToCollectionFailure.sharingNotPermitted,
+          email: email,
+          error: e,
+        );
+      }
+      logger.severe("failed to share collection", e);
+      return AddEmailToCollectionResult.failure(
+        failure: AddEmailToCollectionFailure.other,
+        email: email,
+        error: e,
+      );
+    }
+  }
+
+  Future<void> showAddEmailToCollectionFailure(
+    BuildContext context,
+    AddEmailToCollectionResult result,
+  ) async {
+    switch (result.failure) {
+      case AddEmailToCollectionFailure.invalidEmail:
         await showErrorDialog(
           context,
           context.strings.invalidEmailAddress,
           context.strings.enterValidEmail,
         );
-      } else if (email == ownEmail) {
+      case AddEmailToCollectionFailure.currentUser:
         await showErrorDialog(
           context,
           context.strings.oops,
           context.strings.youCannotShareWithYourself,
         );
-      } else {
-        validEmails.add(email);
-      }
-    }
-
-    final publicKeys = <String, String>{};
-    try {
-      final keys = await UserService.instance.getPublicKeys(validEmails);
-      for (final entry in keys.entries) {
-        if (!context.mounted) return {};
-        final publicKey = entry.value;
-        if (publicKey == null || publicKey.isEmpty) {
-          await showInviteDialog(context, entry.key);
-        } else {
-          publicKeys[entry.key] = publicKey;
-        }
-      }
-    } catch (e) {
-      logger.severe("Failed to get public keys", e);
-      if (context.mounted) {
-        await showGenericErrorDialog(context: context, error: e);
-      }
-      return {};
-    }
-    if (publicKeys.isEmpty) return {};
-
-    try {
-      for (final collection in collections) {
-        if (!context.mounted) return {};
-        final sharees = await collectionsService.shareBatch(
-          collection.id,
-          publicKeys,
-          role,
-        );
-        collection.updateSharees(sharees);
-      }
-      return publicKeys.keys.toSet();
-    } catch (e) {
-      if (!context.mounted) return {};
-      if (e is UnexpectedApiResponseException &&
-          e.response?.statusCode == 404) {
-        final sharedEmails = <String>{};
-        for (final email in publicKeys.keys) {
-          var result = false;
-          for (final collection in collections) {
-            if (!context.mounted) return sharedEmails;
-            result = await addEmailToCollection(
-              context,
-              collection,
-              email,
-              role,
-            );
-          }
-          if (result) sharedEmails.add(email);
-        }
-        return sharedEmails;
-      }
-      if (e is SharingNotPermittedForFreeAccountsError) {
-        await _showUnSupportedAlert(context);
-      } else {
-        logger.severe("Failed to share collection", e);
-        await showGenericErrorDialog(context: context, error: e);
-      }
-      return {};
-    }
-  }
-
-  Future<bool> addEmailToCollection(
-    BuildContext context,
-    Collection collection,
-    String email,
-    CollectionParticipantRole role, {
-    bool showProgress = false,
-  }) async {
-    if (!isValidEmail(email)) {
-      await showErrorDialog(
-        context,
-        context.strings.invalidEmailAddress,
-        context.strings.enterValidEmail,
-      );
-      return false;
-    } else if (email.trim() == Configuration.instance.getEmail()) {
-      await showErrorDialog(
-        context,
-        context.strings.oops,
-        context.strings.youCannotShareWithYourself,
-      );
-      return false;
-    }
-
-    ProgressDialog? dialog;
-    String? publicKey;
-    if (showProgress) {
-      dialog = createProgressDialog(
-        context,
-        context.strings.sharing,
-        isDismissible: true,
-      );
-      await dialog.show();
-    }
-
-    try {
-      publicKey = await UserService.instance.getPublicKey(email);
-    } catch (e) {
-      await dialog?.hide();
-      logger.severe("Failed to get public key", e);
-      if (!context.mounted) return false;
-      await showGenericErrorDialog(context: context, error: e);
-      return false;
-    }
-    if (publicKey == null || publicKey == '') {
-      // todo: neeraj replace this as per the design where a new screen
-      // is used for error. Do this change along with handling of network errors
-      if (!context.mounted) return false;
-      await showDialogWidget(
-        context: context,
-        title: context.strings.inviteToEnte,
-        icon: Icons.info_outline,
-        body: context.strings.emailNoEnteAccountPhotos(email: email),
-        isDismissible: true,
-        buttons: [
-          ButtonWidget(
-            buttonType: ButtonType.neutral,
-            icon: Icons.adaptive.share,
-            labelText: context.strings.sendInvite,
-            isInAlert: true,
-            onTap: () async {
-              unawaited(
-                shareText(context.strings.shareTextRecommendUsingEnteForPhotos),
-              );
-            },
+      case AddEmailToCollectionFailure.noAccount:
+        await showBottomSheetComponent<void>(
+          context: context,
+          builder: (sheetContext) => BottomSheetComponent(
+            title: context.strings.inviteToEnte,
+            message: context.strings.emailNoEnteAccountPhotos(
+              email: result.email,
+            ),
+            illustration: Image.asset("assets/warning-grey.png"),
+            closeTooltip: context.strings.close,
+            actions: [
+              ButtonComponent(
+                label: context.strings.sendInvite,
+                variant: ButtonComponentVariant.neutral,
+                leading: Icon(Icons.adaptive.share),
+                shouldSurfaceExecutionStates: false,
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  unawaited(
+                    shareText(
+                      context.strings.shareTextRecommendUsingEnteForPhotos,
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      );
-      return false;
-    } else {
-      try {
-        final newSharees = await collectionsService.share(
-          collection.id,
-          email,
-          publicKey,
-          role,
         );
-        await dialog?.hide();
-        collection.updateSharees(newSharees);
-        return true;
-      } catch (e) {
-        await dialog?.hide();
-        if (e is SharingNotPermittedForFreeAccountsError) {
-          if (!context.mounted) return false;
-          await _showUnSupportedAlert(context);
-        } else {
-          logger.severe("failed to share collection", e);
-          if (!context.mounted) return false;
-          await showGenericErrorDialog(context: context, error: e);
-        }
-        return false;
-      }
+      case AddEmailToCollectionFailure.sharingNotPermitted:
+        await _showUnSupportedAlert(context);
+      case AddEmailToCollectionFailure.other:
+        await showGenericErrorDialog(context: context, error: result.error);
+      case null:
+        return;
     }
   }
 

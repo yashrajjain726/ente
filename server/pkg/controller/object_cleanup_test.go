@@ -17,6 +17,39 @@ import (
 	"github.com/spf13/viper"
 )
 
+func TestFileRegistrationStoresApp(t *testing.T) {
+	_, fileRepo, db := setupObjectCleanupRaceTest(t, "http://127.0.0.1")
+	ownerID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       1,
+		Email:        "file-app-owner@ente.com",
+		CreationTime: 1,
+	})
+	testutil.InsertUsage(t, db, ownerID, 0)
+	collectionID := insertObjectCleanupTestCollection(t, db, ownerID)
+	const fileObjectKey = "1/file-app-file"
+	const thumbnailObjectKey = "1/file-app-thumbnail"
+	if _, err := db.Exec(`
+		INSERT INTO temp_objects(object_key, expiration_time, bucket_id)
+		VALUES ($1, 0, 'b2-eu-cen'), ($2, 0, 'b2-eu-cen')`, fileObjectKey, thumbnailObjectKey); err != nil {
+		t.Fatalf("failed to stage objects: %v", err)
+	}
+
+	file, _, err := fileRepo.Create(objectCleanupTestFile(
+		ownerID, collectionID, fileObjectKey, thumbnailObjectKey,
+	), 100, 10, 110, ownerID, ente.Photos)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var app string
+	if err := db.QueryRow(`SELECT app FROM files WHERE file_id = $1`, file.ID).Scan(&app); err != nil {
+		t.Fatal(err)
+	}
+	if app != string(ente.Photos) {
+		t.Fatalf("file app = %q, want %q", app, ente.Photos)
+	}
+}
+
 func TestFileRegistrationRollsBackWhenCleanupWins(t *testing.T) {
 	cleanupDeleting := make(chan struct{})
 	releaseCleanup := make(chan struct{})
@@ -65,26 +98,9 @@ func TestFileRegistrationRollsBackWhenCleanupWins(t *testing.T) {
 
 	registrationDone := make(chan error, 1)
 	go func() {
-		_, _, err := fileRepo.Create(ente.File{
-			OwnerID:            ownerID,
-			CollectionID:       collectionID,
-			EncryptedKey:       "encrypted-key",
-			KeyDecryptionNonce: "key-nonce",
-			File: ente.FileAttributes{
-				ObjectKey:        fileObjectKey,
-				DecryptionHeader: "file-header",
-			},
-			Thumbnail: ente.FileAttributes{
-				ObjectKey:        thumbnailObjectKey,
-				DecryptionHeader: "thumbnail-header",
-			},
-			Metadata: ente.FileAttributes{
-				EncryptedData:    "encrypted-metadata",
-				DecryptionHeader: "metadata-header",
-			},
-			UpdationTime: 1,
-			Info:         &ente.FileInfo{FileSize: 100, ThumbnailSize: 10},
-		}, 100, 10, 110, ownerID, ente.Photos)
+		_, _, err := fileRepo.Create(objectCleanupTestFile(
+			ownerID, collectionID, fileObjectKey, thumbnailObjectKey,
+		), 100, 10, 110, ownerID, ente.Photos)
 		registrationDone <- err
 	}()
 	waitForTempObjectDeleteLock(t, db)
@@ -192,4 +208,27 @@ func insertObjectCleanupTestCollection(t *testing.T, db *sql.DB, ownerID int64) 
 		t.Fatalf("failed to insert collection: %v", err)
 	}
 	return collectionID
+}
+
+func objectCleanupTestFile(ownerID, collectionID int64, fileObjectKey, thumbnailObjectKey string) ente.File {
+	return ente.File{
+		OwnerID:            ownerID,
+		CollectionID:       collectionID,
+		EncryptedKey:       "encrypted-key",
+		KeyDecryptionNonce: "key-nonce",
+		File: ente.FileAttributes{
+			ObjectKey:        fileObjectKey,
+			DecryptionHeader: "file-header",
+		},
+		Thumbnail: ente.FileAttributes{
+			ObjectKey:        thumbnailObjectKey,
+			DecryptionHeader: "thumbnail-header",
+		},
+		Metadata: ente.FileAttributes{
+			EncryptedData:    "encrypted-metadata",
+			DecryptionHeader: "metadata-header",
+		},
+		UpdationTime: 1,
+		Info:         &ente.FileInfo{FileSize: 100, ThumbnailSize: 10},
+	}
 }

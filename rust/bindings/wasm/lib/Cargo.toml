@@ -4,6 +4,7 @@ edition.workspace = true
 
 [features]
 accounts = ["dep:ente-accounts", "dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
+cast = ["dep:ente-cast", "dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
 collections = ["session", "dep:ente-collections"]
 contacts = [
     "session",
@@ -14,6 +15,7 @@ crypto = ["dep:serde", "dep:serde-wasm-bindgen", "dep:tsify"]
 crypto-blob = ["crypto"]
 crypto-file = ["crypto-blob", "dep:md-5"]
 crypto-seal = ["crypto"]
+legacy = ["session", "dep:ente-legacy", "dep:wasm-bindgen-futures"]
 locker = ["session", "dep:ente-locker"]
 prelogin = ["accounts", "crypto"]
 session = [
@@ -25,9 +27,11 @@ session = [
 
 [dependencies]
 ente-accounts = { workspace = true, optional = true }
+ente-cast = { workspace = true, optional = true }
 ente-collections = { workspace = true, optional = true }
 ente-contacts = { workspace = true, optional = true }
 ente-core.workspace = true
+ente-legacy = { workspace = true, optional = true }
 ente-locker = { workspace = true, optional = true }
 js-sys.workspace = true
 log.workspace = true

@@ -1,21 +1,6 @@
-import type {
-    LegacyContactState,
-    OpenSessionInput,
-    Session,
-} from "./pkg/ente_legacy_wasm";
+import type { LegacyContactState, Session } from "./pkg/ente_locker_wasm";
 
-export type {
-    LegacyContactRecord,
-    LegacyInfo,
-    LegacyRecoverySession,
-    OpenSessionInput,
-    Session,
-} from "./pkg/ente_legacy_wasm";
-
-const wasm = () => import("./pkg/ente_legacy_wasm");
-
-export const openSession = async (input: OpenSessionInput): Promise<Session> =>
-    (await wasm()).openSession(input);
+const wasm = () => import("./pkg/ente_locker_wasm");
 
 export const getInfo = async (session: Session) =>
     (await wasm()).legacyGetInfo(session);

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import ts from "typescript";
-import { rustFunctionExports, unusedExports } from "./exports.mjs";
+import { rustExports, unusedExports } from "./exports.mjs";
 
 test("production references cross lazy loaders, aliases, destructuring and workers", () => {
     const directory = mkdtempSync(join(tmpdir(), "wasm-exports-"));
@@ -27,6 +27,16 @@ test("production references cross lazy loaders, aliases, destructuring and worke
             export function typeOnly(): void;
             export function wrapperOnly(): void;
             export function start(): void;
+            export class Handle {
+                constructor();
+                free(): void;
+                [Symbol.dispose](): void;
+                readonly key: string;
+                run(): void;
+                orphan(): void;
+                testOnly(): void;
+                constraintOnly(): void;
+            }
         `,
         );
         const wrapper = file(
@@ -49,6 +59,14 @@ test("production references cross lazy loaders, aliases, destructuring and worke
             import { aliased as action } from "./raw";
             execute();
             action();
+            import { Handle } from "./raw";
+            const handle = new Handle();
+            handle.run();
+            console.log(handle.key);
+            const ignore = <T extends { constraintOnly(): void }>(handle: T) => {};
+            ignore(handle);
+            const unrelated = { orphan() {} };
+            unrelated.orphan();
             type Signature = typeof import("./raw").typeOnly;
             new Worker(new URL("./worker.ts", import.meta.url));
         `,
@@ -57,7 +75,7 @@ test("production references cross lazy loaders, aliases, destructuring and worke
         file("unused.ts", `import { orphan } from "./raw"; orphan();`);
         file(
             "binding.test.ts",
-            `import { testOnly } from "./raw"; testOnly();`,
+            `import { testOnly, Handle } from "./raw"; testOnly(); new Handle().testOnly();`,
         );
         const projects = [
             {
@@ -73,6 +91,9 @@ test("production references cross lazy loaders, aliases, destructuring and worke
                 .map(({ name }) => name)
                 .sort();
         assert.deepEqual(check(), [
+            "Handle.constraintOnly",
+            "Handle.orphan",
+            "Handle.testOnly",
             "orphan",
             "testOnly",
             "typeOnly",
@@ -87,11 +108,69 @@ test("production references cross lazy loaders, aliases, destructuring and worke
         };`,
         );
         assert.deepEqual(check(), [
+            "Handle.constraintOnly",
+            "Handle.orphan",
+            "Handle.testOnly",
             "orphan",
             "testOnly",
             "typeOnly",
             "wrapperOnly",
         ]);
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
+test("module arguments and props reference only the receiving contract", () => {
+    const directory = mkdtempSync(join(tmpdir(), "wasm-module-exports-"));
+    const bindings = join(directory, "bindings.ts");
+    const entry = join(directory, "entry.tsx");
+    try {
+        writeFileSync(
+            bindings,
+            `
+            export const getInfo = (_session: number) => {};
+            export const publicKey = () => "key";
+            export const unused = () => {};
+        `,
+        );
+        const consumers = `
+            import * as legacy from "./bindings";
+            function Panel<Session>({ session, legacy }: {
+                session: Session;
+                legacy: { getInfo(session: Session): void };
+            }) {
+                legacy.getInfo(session);
+                return null;
+            }
+            function verify(api: { publicKey(): string }) {
+                return api.publicKey();
+            }
+            verify(legacy);
+        `;
+        const check = () =>
+            unusedExports(
+                [bindings],
+                [
+                    {
+                        entryFiles: [entry],
+                        options: {
+                            jsx: ts.JsxEmit.Preserve,
+                            module: ts.ModuleKind.ESNext,
+                            moduleResolution: ts.ModuleResolutionKind.Bundler,
+                        },
+                    },
+                ],
+            ).map(({ name }) => name);
+
+        writeFileSync(
+            entry,
+            consumers + "<Panel session={42} legacy={legacy} />;",
+        );
+        assert.deepEqual(check(), ["unused"]);
+
+        writeFileSync(entry, consumers);
+        assert.deepEqual(check(), ["getInfo", "unused"]);
     } finally {
         rmSync(directory, { recursive: true, force: true });
     }
@@ -112,6 +191,12 @@ test("copies of a Rust export need one caller across artifacts", () => {
 pub fn shared_operation() {}
 
 pub fn internal_helper() {}
+
+#[wasm_bindgen]
+impl Session {
+    #[wasm_bindgen(js_name = updateAuthToken)]
+    pub fn update_auth_token(&self, token: String) {}
+}
 `,
         );
         const appSource = (app) =>
@@ -127,12 +212,17 @@ pub fn local_operation() {}
         const declarations = `
             export function sharedOperation(): void;
             export function localOperation(): void;
+            export class Session {
+                private constructor();
+                free(): void;
+                updateAuthToken(token: string): void;
+            }
         `;
         const left = file("left.d.ts", declarations);
         const right = file("right.d.ts", declarations);
         const origins = new Map([
-            [left, rustFunctionExports([shared, leftSource])],
-            [right, rustFunctionExports([shared, rightSource])],
+            [left, rustExports([shared, leftSource])],
+            [right, rustExports([shared, rightSource])],
         ]);
         const entry = file(
             "entry.ts",
@@ -140,6 +230,12 @@ pub fn local_operation() {}
             import { sharedOperation, localOperation } from "./left";
             sharedOperation();
             localOperation();
+            import type { Session } from "./left";
+            const cache = <T extends { updateAuthToken(token: string): void }>(open: () => Promise<T>) => {
+                void open().then(session => session.updateAuthToken("token"));
+            };
+            declare const open: () => Promise<Session>;
+            cache(open);
         `,
         );
         file(
@@ -175,6 +271,7 @@ pub fn local_operation() {}
         );
         assert.deepEqual(check(), [
             { file: shared, name: "sharedOperation" },
+            { file: shared, name: "Session.updateAuthToken" },
             { file: rightSource, name: "localOperation" },
         ]);
 

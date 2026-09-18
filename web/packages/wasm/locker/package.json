@@ -6,6 +6,10 @@
         ".": {
             "types": "./index.ts",
             "import": "./index.ts"
+        },
+        "./legacy": {
+            "types": "./legacy.ts",
+            "import": "./legacy.ts"
         }
     },
     "module": "./index.ts",

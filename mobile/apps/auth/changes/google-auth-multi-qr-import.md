@@ -1,0 +1,1 @@
+- Import multi-QR Google Authenticator exports in a single session.

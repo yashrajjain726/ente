@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:ente_auth/models/code.dart';
-import 'package:ente_auth/models/code_display.dart';
 import 'package:ente_auth/ui/settings/data/import/import_file_cleanup.dart';
 import 'package:ente_auth/ui/settings/data/import/import_flow.dart';
 import 'package:ente_strings/ente_strings.dart';
@@ -36,6 +35,10 @@ Future<int?> _processBitwardenExportFile(
 ) async {
   final jsonString = await readPickedImportFileAsString(path);
   final data = jsonDecode(jsonString);
+  return saveImportedCodes(parseBitwardenCodes(data));
+}
+
+List<Code> parseBitwardenCodes(Map<String, dynamic> data) {
   List<dynamic> jsonArray = data['items'];
   final Map<String, String> folderIdToName = {};
   try {
@@ -50,6 +53,7 @@ Future<int?> _processBitwardenExportFile(
     if (item['login'] != null && item['login']['totp'] != null) {
       var totp = item['login']['totp'];
       String? folderID = item['folderId'];
+      String? note = item['notes'];
 
       Code code;
       if (totp.contains("otpauth://")) {
@@ -76,9 +80,13 @@ Future<int?> _processBitwardenExportFile(
           Code.defaultDigits,
         );
       }
-      if (folderID != null && folderIdToName.containsKey(folderID)) {
+      final folderName = folderID == null ? null : folderIdToName[folderID];
+      if (folderName != null || note != null) {
         code = code.copyWith(
-          display: CodeDisplay(tags: [folderIdToName[folderID]!]),
+          display: code.display.copyWith(
+            tags: folderName == null ? null : [folderName],
+            note: note,
+          ),
         );
       }
 
@@ -86,5 +94,5 @@ Future<int?> _processBitwardenExportFile(
     }
   }
 
-  return saveImportedCodes(parsedCodes);
+  return parsedCodes;
 }

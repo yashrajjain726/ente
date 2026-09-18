@@ -24,12 +24,14 @@ vi.mock("../src/services/locker-db", () => ({
     deleteTrashFileRecords: vi.fn(),
     saveTrashSinceTime: vi.fn(),
 }));
-const { openCollectionKey, decryptMetadataJSON } = vi.hoisted(() => ({
-    openCollectionKey: vi.fn(),
-    decryptMetadataJSON: vi.fn(),
-}));
+const { ensureAuthenticatedSession, openCollectionKey, decryptMetadataJSON } =
+    vi.hoisted(() => ({
+        ensureAuthenticatedSession: vi.fn(),
+        openCollectionKey: vi.fn(),
+        decryptMetadataJSON: vi.fn(),
+    }));
 vi.mock("../src/services/authenticated-session", () => ({
-    ensureAuthenticatedSession: () => "session",
+    ensureAuthenticatedSession,
 }));
 vi.mock("ente-locker-wasm", () => ({
     openCollectionKey,
@@ -103,6 +105,7 @@ beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
     replaceLockerCache({ collections: new Map(), files: new Map() });
     vi.mocked(db.loadLockerSnapshotFromDB).mockResolvedValue(snapshot());
+    ensureAuthenticatedSession.mockResolvedValue("session");
     openCollectionKey.mockResolvedValue("collection-key");
     decryptMetadataJSON.mockImplementation(
         (value: { encryptedData: string }) =>
@@ -136,6 +139,7 @@ test("persisted hydration preserves memberships, metadata, trash and cursors wit
     expect(getLockerCacheSnapshot().files.get(10)?.size).toBe(2);
     expect(getLockerCacheSnapshot().files.has(11)).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
 });
 
 test("partial decryption failure excludes only the failed collection and its cache records", async () => {
@@ -222,6 +226,7 @@ test("incremental sync paginates changed collections and trash, skipping up-to-d
             }),
         );
     await syncLockerState();
+    expect(ensureAuthenticatedSession).toHaveBeenCalledOnce();
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
         "/collections/v2?sinceTime=5",
         "/collections/v2/diff?collectionID=1&sinceTime=10",

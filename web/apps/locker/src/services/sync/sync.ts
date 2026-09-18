@@ -2,6 +2,8 @@ import type { LockerCollection, LockerItem } from "@/types";
 import { authenticatedRequestHeaders, ensureOk } from "ente-base/http";
 import log from "ente-base/log";
 import { apiURL } from "ente-base/origins";
+import type { Session } from "ente-locker-wasm";
+import { ensureAuthenticatedSession } from "../authenticated-session";
 import {
     type EncryptedCollectionRecord,
     type EncryptedFileRecord,
@@ -150,6 +152,7 @@ const withoutFailedCollections = (
 };
 
 const hydrateLockerState = async (
+    session: Session,
     collections: Map<number, EncryptedCollectionRecord>,
     files: EncryptedFileRecord[],
     trashFiles: StoredTrashFileRecord[],
@@ -157,7 +160,7 @@ const hydrateLockerState = async (
 ): Promise<LockerHydratedState> => {
     const activeCache = buildLockerCache(collections, files, []);
 
-    const decrypted = await decryptAllData(activeCache);
+    const decrypted = await decryptAllData(session, activeCache);
     if (
         decrypted.totalCollectionCount > 0 &&
         decrypted.collections.length === 0
@@ -180,6 +183,7 @@ const hydrateLockerState = async (
     }
 
     const trash = await decryptStoredTrash(
+        session,
         hydratedCache,
         trashFiles,
         trashLastUpdatedAt,
@@ -196,8 +200,10 @@ const hydrateLockerState = async (
 
 export const loadPersistedLockerState =
     async (): Promise<LockerPersistedState> => {
+        const session = await ensureAuthenticatedSession();
         const snapshot = await loadLockerSnapshotFromDB();
         const hydrated = await hydrateLockerState(
+            session,
             snapshot.collections,
             snapshot.files,
             snapshot.trashFiles,
@@ -213,6 +219,7 @@ export const loadPersistedLockerState =
     };
 
 export const syncLockerState = async (): Promise<LockerHydratedState> => {
+    const session = await ensureAuthenticatedSession();
     const snapshot = await loadLockerSnapshotFromDB();
     const collectionChanges = await fetchEncryptedCollections(
         snapshot.collectionsSinceTime,
@@ -227,7 +234,7 @@ export const syncLockerState = async (): Promise<LockerHydratedState> => {
             latestCollectionsSinceTime,
             change.updationTime,
         );
-        const record = await toEncryptedCollectionRecord(change);
+        const record = await toEncryptedCollectionRecord(session, change);
         changedCollections.push(record);
         if (record.isDeleted) {
             deletedCollectionIDs.push(record.id);
@@ -308,6 +315,7 @@ export const syncLockerState = async (): Promise<LockerHydratedState> => {
 
     const nextSnapshot = await loadLockerSnapshotFromDB();
     const hydrated = await hydrateLockerState(
+        session,
         nextSnapshot.collections,
         nextSnapshot.files,
         nextSnapshot.trashFiles,

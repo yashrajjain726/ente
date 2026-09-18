@@ -2,17 +2,17 @@ import { execFileSync } from "node:child_process";
 import { existsSync, globSync, readFileSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import ts from "typescript";
-import { rustFunctionExports, unusedExports } from "./exports.mjs";
+import { rustExports, unusedExports } from "./exports.mjs";
 
 const cwd = resolve(import.meta.dirname, "../..");
 const rustDirectory = resolve(cwd, "../rust/bindings/wasm");
-const rustExports = (crate) =>
-    rustFunctionExports(
+const crateExports = (crate) =>
+    rustExports(
         globSync(`${crate}/src/**/*.rs`, { cwd: rustDirectory }).map((file) =>
             resolve(rustDirectory, file),
         ),
     );
-const sharedExports = rustExports("lib");
+const sharedExports = crateExports("lib");
 const rustOrigins = new Map();
 const files = [];
 for (const manifestPath of globSync("packages/wasm/*/package.json", { cwd })) {
@@ -30,7 +30,7 @@ for (const manifestPath of globSync("packages/wasm/*/package.json", { cwd })) {
         throw new Error(`Build WASM before checking exports: ${bindings}`);
     rustOrigins.set(
         bindings,
-        new Map([...sharedExports, ...rustExports(basename(directory))]),
+        new Map([...sharedExports, ...crateExports(basename(directory))]),
     );
     files.push(
         bindings,

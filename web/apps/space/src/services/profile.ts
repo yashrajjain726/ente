@@ -4,7 +4,11 @@ import { isNamedError } from "ente-base/error";
 import { apiOrigin, apiURL } from "ente-base/origins";
 import {
     openSpaceAccountContext,
+    type DecryptedSpaceProfile,
+    type ProfileAvatarResponse,
     type SpaceAccountCtxHandle,
+    type SpaceKeyResponse,
+    type UpdateSpaceProfileResponse,
 } from "ente-space-wasm";
 import type {
     SetupProfile,
@@ -23,7 +27,6 @@ import {
     savedSpaceSessionToken,
     saveSpaceOwnedSpaces,
     saveSpaceProfileAvatar,
-    type OwnedSpace,
 } from "services/persistent-session";
 import {
     parseSpaceProfilePayload,
@@ -35,38 +38,9 @@ const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
 const minUsernameLength = 4;
 const maxUsernameLength = 30;
 
-interface SpaceAvatar {
-    keyVersion: number;
-    objectID: string;
-    size?: number;
-    updatedAt?: string;
-}
+type SpaceAvatar = Pick<ProfileAvatarResponse, "objectID" | "keyVersion">;
 
 type SpaceCover = SpaceAvatar;
-
-interface CreatedSpace {
-    spaceId: string;
-    spaceSlug: string;
-}
-
-interface SpaceLookup {
-    spaceId: string;
-    spaceSlug: string;
-}
-
-interface DecryptedSpaceProfile {
-    spaceId: string;
-    spaceSlug: string;
-    profile: string;
-    avatar?: SpaceAvatar;
-    cover?: SpaceCover;
-    updatedAt?: string;
-}
-
-interface UpdateSpaceProfileResponse {
-    avatar?: SpaceAvatar;
-    cover?: SpaceCover;
-}
 
 export type UsernameAvailability = "available" | "taken";
 
@@ -100,7 +74,7 @@ const spaceProfilePayloadFor = (profile: SetupProfileInput) =>
 export const isSpaceSessionUnauthorized = (error: unknown) =>
     isNamedError(error, "session_unauthorized");
 
-const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
+const defaultOwnedSpace = (spaces: SpaceKeyResponse[]) => spaces[0];
 
 const currentSpaceContextConfig = async () => {
     const sessionRestore = restoreSpaceBrowserSessionIfNeeded();
@@ -131,9 +105,11 @@ let currentSpaceContext:
 let pendingCurrentSpaceContext:
     | { cacheKey: string; promise: Promise<SpaceAccountCtxHandle> }
     | undefined;
-let currentOwnedSpace: { cacheKey: string; space: OwnedSpace } | undefined;
+let currentOwnedSpace:
+    | { cacheKey: string; space: SpaceKeyResponse }
+    | undefined;
 let pendingCurrentOwnedSpace:
-    | { cacheKey: string; promise: Promise<OwnedSpace | undefined> }
+    | { cacheKey: string; promise: Promise<SpaceKeyResponse | undefined> }
     | undefined;
 let currentSpaceProfile:
     | { cacheKey: string; profile: SetupProfile | null }
@@ -146,7 +122,7 @@ let currentSpaceContextGeneration = 0;
 const cloneSetupProfile = (profile: SetupProfile | null) =>
     profile ? { ...profile } : null;
 
-const cloneOwnedSpace = (space: OwnedSpace | undefined) =>
+const cloneOwnedSpace = (space: SpaceKeyResponse | undefined) =>
     space ? { ...space } : undefined;
 
 export const openCurrentSpaceContext = async () => {
@@ -218,7 +194,7 @@ const loadAndPersistOwnedSpaces = async (
     ctx: SpaceAccountCtxHandle,
     sessionToken: string,
 ) => {
-    const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
+    const spaces = await ctx.listOwnedSpaces();
     saveSpaceOwnedSpaces(sessionToken, spaces);
     return spaces;
 };
@@ -375,10 +351,10 @@ export const loadExistingSpaceProfile = async (options?: {
         // Give the home screen, which shares this lookup, the first request slot.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const ctx = await ensureCurrentSpaceContext();
-        const spaceProfile = (await ctx.getSpaceProfile(
+        const spaceProfile = await ctx.getSpaceProfile(
             space.spaceId,
             space.spaceId,
-        )) as DecryptedSpaceProfile;
+        );
         await persistCurrentOwnedSpaces(ctx);
         const profile = profileFromDecryptedSpaceProfile(spaceProfile);
         persistSpaceProfileAvatar(profile);
@@ -481,7 +457,7 @@ export const saveSpaceProfile = async (
 
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
+        const spaces = await ctx.listOwnedSpaces();
         const sessionToken = savedSpaceSessionToken();
         if (sessionToken) saveSpaceOwnedSpaces(sessionToken, spaces);
         const existingSpace =
@@ -504,21 +480,21 @@ export const saveSpaceProfile = async (
             spaceId = existingSpace.spaceId;
             spaceSlug = existingSpace.spaceSlug;
             if (normalizeSpaceUsername(spaceSlug) != username) {
-                const updatedSlug = (await ctx.updateSpaceSlug(
+                const updatedSlug = await ctx.updateSpaceSlug(
                     spaceId,
                     username,
-                )) as SpaceLookup;
+                );
                 spaceSlug = updatedSlug.spaceSlug;
             }
         } else {
-            const created = (await ctx.createSpace(
+            const created = await ctx.createSpace(
                 username,
                 profilePayload,
                 referredBySpaceId?.trim() || undefined,
-            )) as CreatedSpace;
+            );
             spaceId = created.spaceId;
             spaceSlug = created.spaceSlug;
-            const createdSpaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
+            const createdSpaces = await ctx.listOwnedSpaces();
             if (sessionToken) {
                 saveSpaceOwnedSpaces(sessionToken, createdSpaces);
             }
@@ -530,11 +506,11 @@ export const saveSpaceProfile = async (
             const avatarBytes = new Uint8Array(
                 await profile.avatarFile.arrayBuffer(),
             );
-            updateResponse = (await ctx.updateSpaceProfileWithAvatar(
+            updateResponse = await ctx.updateSpaceProfileWithAvatar(
                 spaceId,
                 profilePayload,
                 avatarBytes,
-            )) as UpdateSpaceProfileResponse;
+            );
             avatarUrl = updateResponse.avatar?.objectID
                 ? await rememberCachedSpaceMediaBlobURL(
                       spaceProfileMediaCacheKey(
@@ -550,11 +526,11 @@ export const saveSpaceProfile = async (
             const coverBytes = new Uint8Array(
                 await profile.coverFile.arrayBuffer(),
             );
-            updateResponse = (await ctx.updateSpaceProfileWithCover(
+            updateResponse = await ctx.updateSpaceProfileWithCover(
                 spaceId,
                 profilePayload,
                 coverBytes,
-            )) as UpdateSpaceProfileResponse;
+            );
             coverUrl = updateResponse.cover?.objectID
                 ? await rememberCachedSpaceMediaBlobURL(
                       spaceProfileMediaCacheKey(
@@ -567,10 +543,10 @@ export const saveSpaceProfile = async (
                   )
                 : URL.createObjectURL(profile.coverFile);
         } else if (existingSpace) {
-            updateResponse = (await ctx.updateSpaceProfile(
+            updateResponse = await ctx.updateSpaceProfile(
                 spaceId,
                 profilePayload,
-            )) as UpdateSpaceProfileResponse;
+            );
         }
 
         const savedProfile = {
