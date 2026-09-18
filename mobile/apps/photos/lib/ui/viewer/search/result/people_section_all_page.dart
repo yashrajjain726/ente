@@ -1067,7 +1067,6 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
         icon: directionIcon,
         size: 12,
         strokeWidth: 3,
-        color: context.componentColors.textLight,
       ),
     );
   }
