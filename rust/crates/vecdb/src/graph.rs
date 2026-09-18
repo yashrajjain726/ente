@@ -146,7 +146,6 @@ struct UpperLevel {
     dense_of_slot: Vec<u32>,
     neighbors: Vec<u32>,
     lengths: Vec<u16>,
-    free: Vec<u32>,
 }
 
 impl UpperLevel {
@@ -155,7 +154,6 @@ impl UpperLevel {
             dense_of_slot: Vec::new(),
             neighbors: Vec::new(),
             lengths: Vec::new(),
-            free: Vec::new(),
         }
     }
 
@@ -163,7 +161,6 @@ impl UpperLevel {
         self.dense_of_slot.capacity() * size_of::<u32>()
             + self.neighbors.capacity() * size_of::<u32>()
             + self.lengths.capacity() * size_of::<u16>()
-            + self.free.capacity() * size_of::<u32>()
     }
 }
 
@@ -331,11 +328,6 @@ impl Graph {
         }
     }
 
-    pub(crate) fn reinsert(&mut self, slot: u32, arena: &VectorArena) {
-        self.detach(slot);
-        self.insert(slot, arena);
-    }
-
     pub(crate) fn entry_point(&self) -> Option<u32> {
         self.entry_point
     }
@@ -455,77 +447,12 @@ impl Graph {
         if upper.dense_of_slot.len() < span {
             grow_amortized(&mut upper.dense_of_slot, span, ABSENT_DENSE);
         }
-        let dense = match upper.free.pop() {
-            Some(dense) => dense,
-            None => {
-                let dense = upper.lengths.len() as u32;
-                upper.lengths.push(0);
-                upper
-                    .neighbors
-                    .resize(upper.lengths.len() * UPPER_LEVEL_NEIGHBOR_CAP, 0);
-                dense
-            }
-        };
-        upper.lengths[dense as usize] = 0;
+        let dense = upper.lengths.len() as u32;
+        upper.lengths.push(0);
+        upper
+            .neighbors
+            .resize(upper.lengths.len() * UPPER_LEVEL_NEIGHBOR_CAP, 0);
         upper.dense_of_slot[slot as usize] = dense;
-    }
-
-    fn release_node(&mut self, slot: u32, level: usize) {
-        self.zero_lengths[slot as usize] = 0;
-        for layer in 1..=level {
-            let upper = &mut self.upper[layer - 1];
-            let dense = upper.dense_of_slot[slot as usize];
-            if dense == ABSENT_DENSE {
-                continue;
-            }
-            upper.dense_of_slot[slot as usize] = ABSENT_DENSE;
-            upper.lengths[dense as usize] = 0;
-            upper.free.push(dense);
-        }
-    }
-
-    fn detach(&mut self, slot: u32) {
-        let Some(level) = self.level_of(slot).map(usize::from) else {
-            return;
-        };
-        self.node_levels[slot as usize] = ABSENT_LEVEL;
-        for layer in 0..=level {
-            let mut buffer = [0u32; LEVEL_ZERO_NEIGHBOR_CAP];
-            let count = {
-                let list = self.level_neighbors(slot, layer);
-                buffer[..list.len()].copy_from_slice(list);
-                list.len()
-            };
-            for &neighbor in &buffer[..count] {
-                self.unlink(neighbor, layer, slot);
-            }
-        }
-        self.release_node(slot, level);
-        if self.entry_point == Some(slot) {
-            self.entry_point = self.highest_slot();
-        }
-    }
-
-    fn unlink(&mut self, slot: u32, level: usize, other: u32) {
-        if !self.holds_level(slot, level) {
-            return;
-        }
-        let mut buffer = [0u32; LEVEL_ZERO_NEIGHBOR_CAP];
-        let count = {
-            let list = self.level_neighbors(slot, level);
-            if !list.contains(&other) {
-                return;
-            }
-            let mut count = 0;
-            for &value in list {
-                if value != other {
-                    buffer[count] = value;
-                    count += 1;
-                }
-            }
-            count
-        };
-        self.write_level_list(slot, level, &buffer[..count]);
     }
 
     fn link_back(&mut self, slot: u32, level: usize, other: u32, cap: usize, arena: &VectorArena) {
@@ -561,19 +488,6 @@ impl Graph {
         let target = reverse_prune_target(cap, &scored[..count]);
         let kept_count = select_neighbors(arena, &scored[..count], target, &mut kept);
         self.write_level_list(slot, level, &kept[..kept_count]);
-    }
-
-    fn highest_slot(&self) -> Option<u32> {
-        let mut best: Option<(u16, u32)> = None;
-        for (index, &level) in self.node_levels.iter().enumerate() {
-            if level == ABSENT_LEVEL {
-                continue;
-            }
-            if best.is_none_or(|(best_level, _)| level > best_level) {
-                best = Some((level, index as u32));
-            }
-        }
-        best.map(|(_, slot)| slot)
     }
 
     fn next_level(&mut self) -> usize {
@@ -1290,11 +1204,8 @@ mod tests {
     }
 
     fn apply_upsert(arena: &mut VectorArena, graph: &mut Graph, key: &str, vector: &[f32]) {
-        match arena.upsert(key, vector).unwrap() {
-            UpsertOutcome::NewSlot(slot) => graph.insert(slot, arena),
-            UpsertOutcome::RecycledSlot(slot) | UpsertOutcome::ReplacedInPlace(slot) => {
-                graph.reinsert(slot, arena);
-            }
+        if let UpsertOutcome::NewSlot(slot) = arena.upsert(key, vector).unwrap() {
+            graph.insert(slot, arena);
         }
     }
 
@@ -1911,13 +1822,14 @@ mod tests {
     }
 
     #[test]
-    fn reinsert_moves_key_to_its_new_position() {
+    fn replacement_moves_key_to_its_new_position() {
         let (mut arena, mut graph) = build_fixture(300, 16, 0x4000_0000);
         let old_vector = arena.vector_values(7);
         let new_vector = seeded_unit_vector(0x4222_0000, 16);
         let outcome = arena.upsert("key-7", &new_vector).unwrap();
-        assert_eq!(outcome, UpsertOutcome::ReplacedInPlace(7));
-        graph.reinsert(7, &arena);
+        assert_eq!(outcome, UpsertOutcome::NewSlot(300));
+        graph.insert(300, &arena);
+        assert_eq!(arena.vector_values(7), old_vector);
         let new_query = arena.pack_query(&new_vector).unwrap();
         for exact in [false, true] {
             let top = search(
@@ -1931,7 +1843,7 @@ mod tests {
             assert!(top[0].distance < 1e-3);
         }
         let old_query = arena.pack_query(&old_vector).unwrap();
-        let moved_distance = arena.distance_to_query(old_query.as_query(), 7);
+        let moved_distance = arena.distance_to_query(old_query.as_query(), 300);
         assert!(moved_distance > 0.3);
         let near_old = search(
             &graph,
@@ -1954,14 +1866,14 @@ mod tests {
     }
 
     #[test]
-    fn reinsert_of_entry_point_keeps_graph_searchable() {
+    fn replacement_of_entry_point_keeps_graph_searchable() {
         let (mut arena, mut graph) = build_fixture(300, 16, 0x5000_0000);
         let entry_slot = graph.entry_point().unwrap();
         let entry_key = arena.key_of_slot(entry_slot).unwrap().to_string();
         let new_vector = seeded_unit_vector(0x5222_0000, 16);
         let outcome = arena.upsert(&entry_key, &new_vector).unwrap();
-        assert_eq!(outcome, UpsertOutcome::ReplacedInPlace(entry_slot));
-        graph.reinsert(entry_slot, &arena);
+        assert_eq!(outcome, UpsertOutcome::NewSlot(300));
+        graph.insert(300, &arena);
         assert!(graph.entry_point().is_some());
         let query = arena.pack_query(&new_vector).unwrap();
         let top = search(&graph, &arena, &query, &params(Some(1), None, false), None);
@@ -1977,13 +1889,13 @@ mod tests {
     }
 
     #[test]
-    fn reinsert_recycled_slot_serves_the_new_key() {
+    fn insert_after_deletion_serves_the_new_key() {
         let (mut arena, mut graph) = build_fixture(300, 16, 0x6000_0000);
         assert_eq!(arena.remove("key-3"), Some(3));
         let new_vector = seeded_unit_vector(0x6222_0000, 16);
         let outcome = arena.upsert("fresh", &new_vector).unwrap();
-        assert_eq!(outcome, UpsertOutcome::RecycledSlot(3));
-        graph.reinsert(3, &arena);
+        assert_eq!(outcome, UpsertOutcome::NewSlot(300));
+        graph.insert(300, &arena);
         let query = arena.pack_query(&new_vector).unwrap();
         for exact in [false, true] {
             let top = search(&graph, &arena, &query, &params(Some(1), None, exact), None);
@@ -2002,13 +1914,13 @@ mod tests {
     }
 
     #[test]
-    fn reinsert_of_the_only_node_resets_entry_point() {
+    fn replacement_of_the_only_node_preserves_the_routing_node() {
         let mut arena = VectorArena::new(8).unwrap();
         arena.upsert("solo", &axis_vector(8, 0)).unwrap();
         let mut graph = Graph::rebuild(&arena);
         assert_eq!(graph.entry_point(), Some(0));
         arena.upsert("solo", &axis_vector(8, 3)).unwrap();
-        graph.reinsert(0, &arena);
+        graph.insert(1, &arena);
         assert_eq!(graph.entry_point(), Some(0));
         let query = arena.pack_query(&axis_vector(8, 3)).unwrap();
         let found = search(&graph, &arena, &query, &params(Some(5), None, false), None);
@@ -2503,19 +2415,28 @@ mod tests {
     }
 
     #[test]
-    fn repeated_reinserts_shrink_levels_yet_keep_every_node_reachable() {
+    fn repeated_replacements_preserve_levels_and_keep_live_nodes_reachable() {
         let (mut arena, mut graph) = build_fixture(600, 16, 0xB000_0000);
-        let mut stale_seen = false;
+        let original_levels: Vec<_> = graph
+            .slots()
+            .map(|slot| (slot, graph.level_of(slot)))
+            .collect();
+        let key = arena
+            .key_of_slot(graph.entry_point().unwrap())
+            .unwrap()
+            .to_string();
         for round in 0..40u64 {
-            let victim = graph.entry_point().unwrap();
-            let key = arena.key_of_slot(victim).unwrap().to_string();
             let vector = seeded_unit_vector(0xB100_0000 + round, 16);
+            let slot = arena.slot_count() as u32;
             assert_eq!(
                 arena.upsert(&key, &vector).unwrap(),
-                UpsertOutcome::ReplacedInPlace(victim)
+                UpsertOutcome::NewSlot(slot)
             );
-            graph.reinsert(victim, &arena);
-            stale_seen |= stale_downward_edge_exists(&graph);
+            graph.insert(slot, &arena);
+            assert!(!stale_downward_edge_exists(&graph));
+            for &(slot, level) in &original_levels {
+                assert_eq!(graph.level_of(slot), level);
+            }
             assert_graph_invariants(&graph);
             let reloaded = Graph::from_parts(
                 graph.entry_point(),
@@ -2537,7 +2458,6 @@ mod tests {
             );
             assert_eq!(everything.len(), 600);
         }
-        assert!(stale_seen);
         let rebuilt = Graph::from_parts(
             graph.entry_point(),
             graph_parts(&graph),
