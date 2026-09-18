@@ -1,5 +1,6 @@
 pub mod collections;
 pub mod db;
+pub mod files;
 pub mod location;
 pub mod metadata;
 pub mod ml_db;
