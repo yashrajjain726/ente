@@ -19,6 +19,7 @@ const suppressions = [
         'import kotlin.Suppress as Quiet\n@Quiet("NewApi") fun example() {}',
     ],
     ["kt", 'val text = """${run {\n@Suppress("NewApi")\noldMethod()\n}}"""'],
+    ["kt", "//noinspection NewApi\nfun example() {}"],
     ["java", '@android.annotation.SuppressLint("NewApi") class Example {}'],
     ["java", '@SuppressWarnings(value = {"NewApi"}) class Example {}'],
     ["java", "//noinspection NewApi\nclass Example {}"],
