@@ -518,8 +518,7 @@ class CollectionActions {
     await collectionsService.trashEmptyCollection(collection);
   }
 
-  Future<({int uncategorizedFilesCount, int removedFilesCount})>
-  removeFromUncatIfPresentInOtherAlbum(
+  Future<int> removeFromUncatIfPresentInOtherAlbum(
     Collection collection,
     BuildContext bContext,
   ) async {
@@ -528,17 +527,9 @@ class CollectionActions {
         collection.id,
       );
       if (!bContext.mounted) {
-        return (uncategorizedFilesCount: files.length, removedFilesCount: 0);
+        return 0;
       }
-      final removedFilesCount = await moveFilesFromCurrentCollection(
-        bContext,
-        collection,
-        files,
-      );
-      return (
-        uncategorizedFilesCount: files.length,
-        removedFilesCount: removedFilesCount,
-      );
+      return await moveFilesFromCurrentCollection(bContext, collection, files);
     } catch (e, s) {
       logger.severe("Failed to remove files from uncategorized", e, s);
       rethrow;

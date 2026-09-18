@@ -1085,7 +1085,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
   }
 
   Future<void> onCleanUncategorizedClick(BuildContext buildContext) async {
-    var cleanupResult = (uncategorizedFilesCount: 0, removedFilesCount: 0);
+    var removedFilesCount = 0;
     final actionResult = await showChoiceActionSheet(
       context,
       isCritical: true,
@@ -1093,7 +1093,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       firstButtonLabel: context.strings.confirm,
       body: context.strings.cleanUncategorizedDescription,
       firstButtonOnTap: () async {
-        cleanupResult = await collectionActions
+        removedFilesCount = await collectionActions
             .removeFromUncatIfPresentInOtherAlbum(widget.collection!, context);
       },
     );
@@ -1102,12 +1102,8 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         if (!buildContext.mounted) return;
         showShortToast(
           buildContext,
-          cleanupResult.removedFilesCount > 0
-              ? buildContext.strings.removedItems(
-                  count: cleanupResult.removedFilesCount,
-                )
-              : cleanupResult.uncategorizedFilesCount == 0
-              ? buildContext.strings.uncategorizedIsClean
+          removedFilesCount > 0
+              ? buildContext.strings.removedItems(count: removedFilesCount)
               : buildContext.strings.nothingToCleanUp,
         );
       } else if (actionResult.action == ButtonAction.error) {
