@@ -409,12 +409,14 @@ const Page: React.FC = () => {
                                   postSpaceId: string,
                                   postId: number,
                                   text: string,
+                                  objectKey: string,
                               ) =>
                                   replyToCurrentPost(
                                       actorSpaceId,
                                       postSpaceId,
                                       postId,
                                       text,
+                                      objectKey,
                                   )
                           )(profile.spaceId)
                         : undefined

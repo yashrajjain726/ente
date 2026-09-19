@@ -151,12 +151,14 @@ interface SpaceFileViewerProps {
         spaceId: string,
         postId: number,
         text: string,
+        objectKey: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     onPhotoIndexChange?: (index: number) => void;
     photo: SpaceViewerPhoto;
     photoIndex?: number;
+    initialPhotoIndex?: number;
     photos?: SpaceViewerPhoto[];
     focusReplyOnOpen?: boolean;
     postActionMode?: SpaceViewerPostActionMode;
@@ -351,10 +353,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     onPhotoIndexChange,
     photo,
     photoIndex,
+    initialPhotoIndex = 0,
     photos,
     postActionMode = "like-only",
 }) => {
-    const [localPhotoIndex, setLocalPhotoIndex] = React.useState(0);
+    const [localPhotoIndex, setLocalPhotoIndex] =
+        React.useState(initialPhotoIndex);
     const [loadedPhotoURLs, setLoadedPhotoURLs] = React.useState<
         Record<string, string>
     >({});
@@ -403,6 +407,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const postPhotoCount = activePhoto.postPhotoCount ?? 1;
     const postPhotoIndex = activePhoto.postPhotoIndex ?? 0;
     const activePhotoKey = photoKey(activePhoto);
+    const activeReplyKey = `${activePhoto.spaceId}:${activePhoto.postId}:${activePhoto.imageAsset?.objectKey}`;
+    const activeReplyKeyRef = React.useRef(activeReplyKey);
+    activeReplyKeyRef.current = activeReplyKey;
     const activePostKey = `${activePhoto.spaceId ?? ""}:${activePhoto.postId ?? ""}`;
     const hasPhotoLoadError = Boolean(photoLoadErrors[activePhotoKey]);
     const canUpdatePostCaption =
@@ -446,8 +453,19 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const replyDraftsRef = React.useRef(new Map<string, string>());
     const [isReplyFocused, setIsReplyFocused] =
         React.useState(focusReplyOnOpen);
-    const [replyActionPhase, setReplyActionPhase] =
-        React.useState<SpaceActionPhase | null>(null);
+    const [replyPhases, setReplyPhases] = React.useState<
+        Record<string, SpaceActionPhase | null>
+    >({});
+    const replyActionPhase = replyPhases[activeReplyKey] ?? null;
+    const setReplyActionPhase = React.useCallback(
+        (phase: SpaceActionPhase | null) => {
+            setReplyPhases((phases) => ({
+                ...phases,
+                [activeReplyKey]: phase,
+            }));
+        },
+        [activeReplyKey],
+    );
     const [addFriendSheetOpen, setAddFriendSheetOpen] = React.useState(false);
     const [addFriendIntent, setAddFriendIntent] =
         React.useState<SpaceInviteIntent>("like");
@@ -501,7 +519,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const canReplyToPost = Boolean(
         !isDraftPost &&
         (canAddFriendForPostAction ||
-            (activePhoto.spaceId && activePhoto.postId && onReplyToPost)),
+            (activePhoto.spaceId &&
+                activePhoto.postId &&
+                activePhoto.imageAsset &&
+                onReplyToPost)),
     );
     const isReplyMode =
         canReplyToPost &&
@@ -764,11 +785,13 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             !canSendReply ||
             !activePhoto.spaceId ||
             !activePhoto.postId ||
+            !activePhoto.imageAsset ||
             !onReplyToPost
         ) {
             return;
         }
 
+        const objectKey = activePhoto.imageAsset.objectKey;
         setReplyActionPhase("busy");
         void (async () => {
             try {
@@ -776,9 +799,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     activePhoto.spaceId!,
                     activePhoto.postId!,
                     text,
+                    objectKey,
                 );
-                replyDraftsRef.current.delete(activePostKey);
-                setReplyText("");
+                replyDraftsRef.current.delete(activeReplyKey);
+                if (activeReplyKeyRef.current == activeReplyKey)
+                    setReplyText("");
                 setReplyActionPhase("done");
             } catch (error) {
                 log.error("Failed to send post reply", error);
@@ -869,7 +894,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         }, viewerActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
-    }, [replyActionPhase]);
+    }, [replyActionPhase, setReplyActionPhase]);
 
     React.useEffect(() => {
         if (isDraftPost || isCaptionEditingRef.current) return;
@@ -886,10 +911,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setCaptionUpdateActionPhase(null);
         setHasCaptionUpdateError(false);
         setIsCaptionEditing(false);
-        setReplyText(replyDraftsRef.current.get(activePostKey) ?? "");
+    }, [activePostKey]);
+
+    React.useLayoutEffect(() => {
+        setReplyText(replyDraftsRef.current.get(activeReplyKey) ?? "");
         setIsReplyFocused(focusReplyOnOpen && canReplyToPost);
-        setReplyActionPhase(null);
-    }, [activePostKey, canReplyToPost, focusReplyOnOpen]);
+    }, [activeReplyKey, canReplyToPost, focusReplyOnOpen]);
 
     React.useEffect(() => {
         setPhotoLikePopID(0);
@@ -2151,7 +2178,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                                       nextText;
                                                   setReplyText(nextText);
                                                   replyDraftsRef.current.set(
-                                                      activePostKey,
+                                                      activeReplyKey,
                                                       nextText,
                                                   );
                                               },

@@ -43,6 +43,8 @@ import {
     spaceProfileTextField,
 } from "services/profile-payload";
 import { normalizeSpaceMessageText } from "utils/message-limits";
+import { spacePostDeletedEvent } from "utils/post-events";
+import { postQuoteErrorState, postQuotePhotoIndex } from "utils/post-quote";
 
 export { clearSpaceMediaURLCache } from "services/media-cache";
 
@@ -144,6 +146,8 @@ export type SpaceMessageKind = MessageResponse["kind"];
 export interface SpaceMessageQuote {
     imageUrl?: string;
     isUnavailable?: boolean;
+    hasLoadError?: boolean;
+    objectKey?: string;
     photoCount?: number;
     postId: number;
     spaceId: string;
@@ -159,6 +163,7 @@ export interface SpaceMessage {
     recipient: FriendProfile;
     replyMessageId?: string;
     replyPostId?: number;
+    replyObjectKey?: string;
     sender: FriendProfile;
     text: string;
     updatedAtMs: number;
@@ -168,13 +173,7 @@ export interface SpaceMessage {
 
 export type SpaceMessageActivityType = MessageConversationActivity["type"];
 
-export interface SpaceMessageActivityPost {
-    imageUrl?: string;
-    isDeleted?: boolean;
-    photoCount?: number;
-    postId: number;
-    spaceId: string;
-}
+export type SpaceMessageActivityPost = SpaceMessageQuote;
 
 export interface SpaceMessageActivity {
     createdAtMs: number;
@@ -634,14 +633,18 @@ const messageQuoteFromPostResponse = async (
     post: PostResponse,
     includeImage: boolean,
     viewerSpaceId?: string,
+    objectKey?: string,
 ): Promise<SpaceMessageQuote> => {
-    const object = firstObject(post);
+    const photoIndex = postQuotePhotoIndex(post.objects, objectKey);
+    const object = post.objects[photoIndex];
     const quote: SpaceMessageQuote = {
+        objectKey,
         photoCount: post.objects.length,
         postId: post.postId,
         spaceId: post.spaceId,
     };
-    if (!includeImage || !object) return quote;
+    if (!object || post.isUnavailable) return { ...quote, isUnavailable: true };
+    if (!includeImage) return quote;
 
     try {
         const imageUrl = await accountPostAssetURL(
@@ -657,7 +660,7 @@ const messageQuoteFromPostResponse = async (
         quote.imageUrl = imageUrl;
     } catch (error) {
         log.warn("Failed to load quoted post image", error);
-        quote.isUnavailable = true;
+        Object.assign(quote, postQuoteErrorState(error));
     }
     return quote;
 };
@@ -673,6 +676,7 @@ const messageQuoteFromReplyPost = async (
     }
 
     const fallbackQuote: SpaceMessageQuote = {
+        objectKey: message.replyObjectKey,
         postId: message.replyPostId,
         spaceId: message.recipientSpaceId,
     };
@@ -689,10 +693,11 @@ const messageQuoteFromReplyPost = async (
             post,
             includeImage,
             viewerSpaceId,
+            message.replyObjectKey,
         );
     } catch (error) {
         log.warn("Failed to load quoted post", error);
-        return { ...fallbackQuote, isUnavailable: true };
+        return { ...fallbackQuote, ...postQuoteErrorState(error) };
     }
 };
 
@@ -736,6 +741,7 @@ const messageFromSpaceMessage = async (
         recipient,
         replyMessageId: message.replyMessageId,
         replyPostId: message.replyPostId,
+        replyObjectKey: message.replyObjectKey,
         sender,
         text: message.text,
         updatedAtMs: timestampMsFromSpaceDate(message.updatedAt),
@@ -749,14 +755,17 @@ const messageActivityPostFromActivity = (
     if (typeof activity.postId != "number" || !activity.postSpaceId) {
         return undefined;
     }
-    return { postId: activity.postId, spaceId: activity.postSpaceId };
+    return {
+        postId: activity.postId,
+        spaceId: activity.postSpaceId,
+        objectKey: activity.replyObjectKey,
+    };
 };
 
 export const loadCurrentMessageActivityPostPreview = async (
     post: SpaceMessageActivityPost,
     viewerSpaceId?: string,
 ): Promise<SpaceMessageActivityPost | undefined> => {
-    if (post.isDeleted) return post;
     const ctx = await ensureCurrentSpaceContext();
     try {
         const response = await ctx.getPost(
@@ -764,18 +773,13 @@ export const loadCurrentMessageActivityPostPreview = async (
             BigInt(post.postId),
             viewerSpaceId ?? null,
         );
-        const quote = await messageQuoteFromPostResponse(
+        return await messageQuoteFromPostResponse(
             ctx,
             response,
             true,
             viewerSpaceId,
+            post.objectKey,
         );
-        return {
-            ...post,
-            imageUrl: quote.imageUrl,
-            isDeleted: quote.isUnavailable,
-            photoCount: quote.photoCount,
-        };
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1212,6 +1216,7 @@ export const replyToCurrentPost = async (
     postSpaceId: string,
     postId: number,
     text: string,
+    objectKey: string,
 ) => {
     const messageText = normalizeSpaceMessageText(text);
     const ctx = await ensureCurrentSpaceContext();
@@ -1221,6 +1226,7 @@ export const replyToCurrentPost = async (
             postSpaceId,
             BigInt(postId),
             messageText,
+            objectKey,
         );
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1500,6 +1506,7 @@ export const deleteCurrentPost = async (spaceId: string, postId: number) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
         await ctx.deletePost(spaceId, BigInt(postId));
+        window.dispatchEvent(new Event(spacePostDeletedEvent));
         await removeCachedSpaceFeedPost(spaceId, postId);
     } finally {
         releaseCurrentSpaceContext(ctx);

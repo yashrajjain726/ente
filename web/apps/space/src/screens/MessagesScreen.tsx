@@ -44,6 +44,8 @@ import {
 import { spaceTouchTargetSize } from "styles/touch-targets";
 import { firstNameFrom } from "utils/display";
 import { clampSpaceMessageText } from "utils/message-limits";
+import { spacePostDeletedEvent } from "utils/post-events";
+import { postQuoteErrorState, postQuoteKey } from "utils/post-quote";
 
 const green = "#08C225";
 const textBase = spaceText;
@@ -300,9 +302,6 @@ const conversationId = (conversation: SpaceMessageConversation) =>
         ? conversation.latestActivity.id
         : (conversation.friend.spaceId ?? conversation.friend.id);
 
-const activityPostKey = (post: SpaceMessageActivityPost) =>
-    `${post.spaceId}:${post.postId}`;
-
 const conversationTimeSections = (
     conversations: SpaceMessageConversation[],
     newConversationIds: string[],
@@ -426,7 +425,7 @@ const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
             fontWeight: 500,
             lineHeight: "16px",
             listStyle: "none",
-            py: "14px",
+            py: "32px",
             textAlign: "center",
         }}
     >
@@ -471,16 +470,17 @@ const ConversationListItem: React.FC<{
     const post = conversation.latestActivity.post;
     const postThumbnailUrl = (activityPost ?? post)?.imageUrl;
     const showPostThumbnailSlot = Boolean(post);
-    const isPostThumbnailUnavailable =
-        Boolean(post?.isDeleted) ||
-        Boolean(activityPost && !activityPost.imageUrl);
+    const isPostThumbnailUnavailable = Boolean(
+        (activityPost ?? post)?.isUnavailable,
+    );
+    const hasPostThumbnailLoadError = Boolean(activityPost?.hasLoadError);
     const unreadCount = conversation.unreadCount;
     const showPostSomething = shouldShowPostSomething(
         conversation,
         latestPostCreatedAtMs,
     );
     React.useEffect(() => {
-        if (!post || post.isDeleted || post.imageUrl || activityPost) {
+        if (!post || post.isUnavailable || post.imageUrl || activityPost) {
             return;
         }
         onLoadActivityPost?.(post);
@@ -489,7 +489,7 @@ const ConversationListItem: React.FC<{
         onLoadActivityPost,
         post,
         post?.imageUrl,
-        post?.isDeleted,
+        post?.isUnavailable,
     ]);
     const confirmFriendRequest = () => {
         void onConfirmFriendRequest(conversation).catch((error: unknown) =>
@@ -731,7 +731,9 @@ const ConversationListItem: React.FC<{
                                 aria-label={
                                     isPostThumbnailUnavailable
                                         ? "Post image unavailable"
-                                        : "Loading post image"
+                                        : hasPostThumbnailLoadError
+                                          ? "Couldn't load post image"
+                                          : "Loading post image"
                                 }
                                 role="img"
                                 sx={{
@@ -895,7 +897,7 @@ const ConversationSection: React.FC<{
                         activityPost={
                             conversation.latestActivity.post
                                 ? activityPostsByKey[
-                                      activityPostKey(
+                                      postQuoteKey(
                                           conversation.latestActivity.post,
                                       )
                                   ]
@@ -1268,35 +1270,53 @@ const PostQuotePreview: React.FC<{
     onOpenQuotePost,
 }) => {
     const quote = message.quote;
-    const imageUrl = quote?.imageUrl ?? activityPost?.imageUrl;
-    const photoCount = quote?.photoCount ?? activityPost?.photoCount ?? 1;
-    const isUnavailable =
-        !quote ||
-        quote.isUnavailable == true ||
-        (!imageUrl &&
-            (activityPost != undefined || onLoadActivityPost == undefined));
+    const preview = activityPost ?? quote;
+    const isUnavailable = !quote || Boolean(preview?.isUnavailable);
+    const hasLoadError = Boolean(preview?.hasLoadError);
+    const imageUrl =
+        isUnavailable || hasLoadError ? undefined : preview?.imageUrl;
+    const photoCount = preview?.photoCount ?? 1;
     const loadedQuote =
-        quote && imageUrl && !isUnavailable
-            ? { ...quote, imageUrl, photoCount }
-            : undefined;
-    const isLoading = quote != undefined && !imageUrl && !isUnavailable;
+        quote && imageUrl ? { ...quote, ...preview, imageUrl } : undefined;
+    const isLoading = Boolean(
+        quote && !imageUrl && !isUnavailable && !hasLoadError,
+    );
     const canOpen = Boolean(loadedQuote);
+    const canRetry = hasLoadError && Boolean(onLoadActivityPost);
+    const unavailableLabel =
+        quote?.objectKey !== undefined && preview?.photoCount !== undefined
+            ? "Photo unavailable"
+            : "Post unavailable";
 
     React.useEffect(() => {
-        if (!quote || imageUrl || isUnavailable) return;
+        if (!quote || activityPost || imageUrl || isUnavailable || hasLoadError)
+            return;
         onLoadActivityPost?.(quote);
-    }, [imageUrl, isUnavailable, onLoadActivityPost, quote]);
+    }, [
+        activityPost,
+        hasLoadError,
+        imageUrl,
+        isUnavailable,
+        onLoadActivityPost,
+        quote,
+    ]);
 
     return (
         <QuoteFrame isOwn={isOwn} mb={mb}>
             <Box
-                component={canOpen ? "button" : "div"}
-                type={canOpen ? "button" : undefined}
-                aria-label={canOpen ? "Open quoted post" : undefined}
+                component={canOpen || canRetry ? "button" : "div"}
+                type={canOpen || canRetry ? "button" : undefined}
+                aria-label={
+                    canOpen
+                        ? "Open quoted photo"
+                        : canRetry
+                          ? "Retry loading photo"
+                          : undefined
+                }
                 onClick={(event: React.MouseEvent) => {
-                    if (!loadedQuote) return;
                     event.stopPropagation();
-                    onOpenQuotePost(loadedQuote);
+                    if (canRetry && quote) onLoadActivityPost?.(quote);
+                    else if (loadedQuote) onOpenQuotePost(loadedQuote);
                 }}
                 sx={{
                     appearance: "none",
@@ -1304,7 +1324,7 @@ const PostQuotePreview: React.FC<{
                     border: 0,
                     borderRadius: "28px",
                     color: "inherit",
-                    cursor: canOpen ? "pointer" : "default",
+                    cursor: canOpen || canRetry ? "pointer" : "default",
                     display: "inline-flex",
                     font: "inherit",
                     overflow: "hidden",
@@ -1334,14 +1354,18 @@ const PostQuotePreview: React.FC<{
                         role="img"
                         aria-label={
                             isLoading
-                                ? "Loading post image"
-                                : "Post unavailable"
+                                ? "Loading photo"
+                                : hasLoadError
+                                  ? "Couldn't load photo"
+                                  : unavailableLabel
                         }
                         sx={{
                             alignItems: "center",
                             bgcolor: incomingQuoteBubble,
                             color: incomingQuoteText,
                             display: "flex",
+                            flexDirection: "column",
+                            gap: "8px",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 700,
@@ -1359,6 +1383,13 @@ const PostQuotePreview: React.FC<{
                                 size={28}
                                 strokeWidth={1.5}
                             />
+                        )}
+                        {isUnavailable ? (
+                            unavailableLabel
+                        ) : hasLoadError ? (
+                            "Couldn't load photo. Tap to retry."
+                        ) : (
+                            <SpaceLoadingSpinner />
                         )}
                     </Box>
                 )}
@@ -1754,44 +1785,76 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         () => conversationTimeSections(conversations, newConversationIds),
         [conversations, newConversationIds],
     );
+    const previewGenerationRef = React.useRef(0);
+    React.useEffect(() => {
+        const cancelPreviewLoads = () => {
+            previewGenerationRef.current++;
+            activityPostLoadsInFlightRef.current.clear();
+        };
+        const invalidatePreviews = () => {
+            cancelPreviewLoads();
+            setActivityPostsByKey({});
+        };
+        const onVisibilityChange = () => {
+            if (document.visibilityState == "visible") invalidatePreviews();
+        };
+        invalidatePreviews();
+        window.addEventListener("focus", invalidatePreviews);
+        window.addEventListener("online", invalidatePreviews);
+        window.addEventListener(spacePostDeletedEvent, invalidatePreviews);
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        return () => {
+            cancelPreviewLoads();
+            window.removeEventListener("focus", invalidatePreviews);
+            window.removeEventListener("online", invalidatePreviews);
+            window.removeEventListener(
+                spacePostDeletedEvent,
+                invalidatePreviews,
+            );
+            document.removeEventListener(
+                "visibilitychange",
+                onVisibilityChange,
+            );
+        };
+    }, [selectedFriend?.id]);
     const loadActivityPost = React.useCallback(
         (post: SpaceMessageActivityPost) => {
             if (!onLoadActivityPost) return;
-            const key = activityPostKey(post);
+            const key = postQuoteKey(post);
+            const cached = activityPostsByKey[key];
             if (
-                activityPostsByKey[key] ||
+                (cached && !cached.hasLoadError) ||
                 activityPostLoadsInFlightRef.current.has(key)
-            ) {
+            )
                 return;
-            }
+            const generation = previewGenerationRef.current;
             activityPostLoadsInFlightRef.current.add(key);
-            void onLoadActivityPost(post)
-                .then((loadedPost) => {
-                    setActivityPostsByKey((currentPosts) =>
-                        currentPosts[key]
-                            ? currentPosts
-                            : {
-                                  ...currentPosts,
-                                  [key]: loadedPost ?? {
-                                      ...post,
-                                      isDeleted: true,
-                                  },
-                              },
-                    );
-                })
+            const target = {
+                spaceId: post.spaceId,
+                postId: post.postId,
+                objectKey: post.objectKey,
+            };
+            setActivityPostsByKey((posts) => ({ ...posts, [key]: target }));
+            const storePreview = (preview: SpaceMessageActivityPost) => {
+                if (generation != previewGenerationRef.current) return;
+                setActivityPostsByKey((posts) => ({
+                    ...posts,
+                    [key]: preview,
+                }));
+            };
+            void onLoadActivityPost(target)
+                .then((loadedPost) =>
+                    storePreview(
+                        loadedPost ?? { ...target, isUnavailable: true },
+                    ),
+                )
                 .catch((error: unknown) => {
                     log.warn("Failed to load message activity post", error);
-                    setActivityPostsByKey((currentPosts) =>
-                        currentPosts[key]
-                            ? currentPosts
-                            : {
-                                  ...currentPosts,
-                                  [key]: { ...post, isDeleted: true },
-                              },
-                    );
+                    storePreview({ ...target, ...postQuoteErrorState(error) });
                 })
                 .finally(() => {
-                    activityPostLoadsInFlightRef.current.delete(key);
+                    if (generation == previewGenerationRef.current)
+                        activityPostLoadsInFlightRef.current.delete(key);
                 });
         },
         [activityPostsByKey, onLoadActivityPost],
@@ -2459,7 +2522,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                                 activityPost={
                                                                     message.quote
                                                                         ? activityPostsByKey[
-                                                                              activityPostKey(
+                                                                              postQuoteKey(
                                                                                   message.quote,
                                                                               )
                                                                           ]

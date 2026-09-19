@@ -18,6 +18,14 @@ pub enum Error {
 impl Error {
     fn name(&self) -> Option<&'static str> {
         match self {
+            Self::Space(ente_space::Error::Http(ente_core::http::Error::Http {
+                status: 404 | 410,
+                ..
+            })) => Some("content_unavailable"),
+            Self::Space(ente_space::Error::Http(ente_core::http::Error::Http {
+                status: 403,
+                ..
+            })) => Some("permission_denied"),
             Self::Space(error) if error.is_content_error() => Some("content_unavailable"),
             Self::Space(ente_space::Error::SpaceLimitReached) => Some("space_limit_reached"),
             Self::Space(ente_space::Error::SpaceSlugAlreadyExists) => {
@@ -258,6 +266,7 @@ pub struct MessageResponse {
     recipient_space_id: String,
     text: String,
     reply_post_id: Option<i64>,
+    reply_object_key: Option<String>,
     reply_message_id: Option<String>,
     liked: bool,
     viewer_liked: bool,
@@ -286,6 +295,7 @@ struct MessageConversationActivity {
     message_id: Option<String>,
     text: Option<String>,
     post_id: Option<i64>,
+    reply_object_key: Option<String>,
     post_space_id: Option<String>,
     is_unavailable: bool,
 }
@@ -662,7 +672,9 @@ fn account_message_to_js(
     decrypted: DecryptedMessage,
 ) -> Result<MessageResponse, Error> {
     message.kind = decrypted.payload.kind;
-    Ok(message_to_js(message, decrypted.payload.text))
+    let mut response = message_to_js(message, decrypted.payload.text);
+    response.reply_object_key = decrypted.payload.reply_object_key;
+    Ok(response)
 }
 
 fn message_to_js(message: ente_space::MessageResponse, text: String) -> MessageResponse {
@@ -673,6 +685,7 @@ fn message_to_js(message: ente_space::MessageResponse, text: String) -> MessageR
         recipient_space_id: message.recipient_space_id,
         text,
         reply_post_id: message.reply_post_id,
+        reply_object_key: None,
         reply_message_id: message.reply_message_id,
         liked: message.liked,
         viewer_liked: message.viewer_liked,
@@ -691,6 +704,7 @@ fn unavailable_message_to_js(message: ente_space::MessageResponse) -> MessageRes
         recipient_space_id: message.recipient_space_id,
         text: String::new(),
         reply_post_id: message.reply_post_id,
+        reply_object_key: None,
         reply_message_id: message.reply_message_id,
         liked: message.liked,
         viewer_liked: message.viewer_liked,
@@ -784,6 +798,9 @@ async fn message_conversation_activity_to_js(
         .as_ref()
         .map(|payload| payload.kind.clone())
         .unwrap_or_else(|| activity.kind.clone());
+    let reply_object_key = payload
+        .as_ref()
+        .and_then(|payload| payload.reply_object_key.clone());
     let text = payload.map(|payload| payload.text);
     Ok(MessageConversationActivity {
         id: activity.id,
@@ -794,6 +811,7 @@ async fn message_conversation_activity_to_js(
         message_id: activity.message_id,
         text,
         post_id: activity.post_id,
+        reply_object_key,
         post_space_id: activity.post_space_id,
         is_unavailable: false,
     })
@@ -811,6 +829,7 @@ fn unavailable_message_conversation_activity_to_js(
         message_id: activity.message_id,
         text: None,
         post_id: activity.post_id,
+        reply_object_key: None,
         post_space_id: activity.post_space_id,
         is_unavailable: true,
     }
@@ -1427,10 +1446,17 @@ impl SpaceAccountCtxHandle {
         post_space_id: String,
         post_id: i64,
         text: String,
+        object_key: Option<String>,
     ) -> Result<<MessageResponse as Tsify>::JsType, Error> {
         let message = self
             .inner
-            .reply_to_post(&sender_space_id, &post_space_id, post_id, &text)
+            .reply_to_post(
+                &sender_space_id,
+                &post_space_id,
+                post_id,
+                &text,
+                object_key.as_deref(),
+            )
             .await?;
         let decrypted = self
             .inner
@@ -1812,69 +1838,84 @@ mod tests {
     async fn encrypted_message_kinds_preserve_server_events_and_allow_pokes() {
         let (ctx, message_key, encrypted_message_key) = message_context();
 
-        for (server_kind, payload_kind, expected_kind) in [
-            ("regular", "regular", "regular"),
-            ("regular", "poke", "poke"),
-            ("regular", "post_like", "regular"),
-            ("regular", "post_reply", "regular"),
-            ("regular", "friend_added", "regular"),
-            ("regular", "unknown", "regular"),
-            ("post_reply", "post_reply", "post_reply"),
-            ("post_reply", "regular", "post_reply"),
-            ("post_reply", "poke", "post_reply"),
-            ("post_reply", "post_like", "post_reply"),
-            ("post_reply", "friend_added", "post_reply"),
-        ] {
-            let plaintext = format!(r#"{{"version":1,"kind":"{payload_kind}","text":"hello"}}"#);
-            let cipher = b64::encode(&secretbox::encrypt_combined(
-                plaintext.as_bytes(),
-                &message_key,
-            ));
-            let mut response = message("message-1", &encrypted_message_key, &cipher);
-            response.kind = server_kind.into();
-            response.reply_post_id = (server_kind == "post_reply").then_some(42);
-            let activity = ente_space::MessageConversationActivity {
-                id: "activity-1".into(),
-                activity_type: if server_kind == "post_reply" {
-                    "post_reply".into()
-                } else {
-                    "message".into()
-                },
-                kind: response.kind.clone(),
-                created_at: response.created_at.clone(),
-                outgoing: false,
-                message_id: Some(response.message_id.clone()),
-                sender_space_id: response.sender_space_id.clone(),
-                recipient_space_id: response.recipient_space_id.clone(),
-                message_cipher: response.message_cipher.clone(),
-                encrypted_message_key: response.encrypted_message_key.clone(),
-                reply_message_id: None,
-                post_id: response.reply_post_id,
-                post_space_id: response.reply_post_id.map(|_| "space-1".into()),
-            };
-            let converted = resilient_account_message_response_to_js(&ctx, "space-1", response)
-                .await
-                .unwrap_or_else(|error| panic!("{error}"));
-            let converted_activity =
-                resilient_message_conversation_activity_to_js(&ctx, "space-1", activity.clone())
+        for reply_object_key in [None, Some("first"), Some("second")] {
+            for (server_kind, payload_kind, expected_kind) in [
+                ("regular", "regular", "regular"),
+                ("regular", "poke", "poke"),
+                ("regular", "post_like", "regular"),
+                ("regular", "post_reply", "regular"),
+                ("regular", "friend_added", "regular"),
+                ("regular", "unknown", "regular"),
+                ("post_reply", "post_reply", "post_reply"),
+                ("post_reply", "regular", "post_reply"),
+                ("post_reply", "poke", "post_reply"),
+                ("post_reply", "post_like", "post_reply"),
+                ("post_reply", "friend_added", "post_reply"),
+            ] {
+                let photo_field = reply_object_key
+                    .map(|key| format!(r#","replyObjectKey":"{key}""#))
+                    .unwrap_or_default();
+                let plaintext = format!(
+                    r#"{{"version":1,"kind":"{payload_kind}","text":"hello"{photo_field}}}"#
+                );
+                let cipher = b64::encode(&secretbox::encrypt_combined(
+                    plaintext.as_bytes(),
+                    &message_key,
+                ));
+                let mut response = message("message-1", &encrypted_message_key, &cipher);
+                response.kind = server_kind.into();
+                response.reply_post_id = (server_kind == "post_reply").then_some(42);
+                let activity = ente_space::MessageConversationActivity {
+                    id: "activity-1".into(),
+                    activity_type: if server_kind == "post_reply" {
+                        "post_reply".into()
+                    } else {
+                        "message".into()
+                    },
+                    kind: response.kind.clone(),
+                    created_at: response.created_at.clone(),
+                    outgoing: false,
+                    message_id: Some(response.message_id.clone()),
+                    sender_space_id: response.sender_space_id.clone(),
+                    recipient_space_id: response.recipient_space_id.clone(),
+                    message_cipher: response.message_cipher.clone(),
+                    encrypted_message_key: response.encrypted_message_key.clone(),
+                    reply_message_id: None,
+                    post_id: response.reply_post_id,
+                    post_space_id: response.reply_post_id.map(|_| "space-1".into()),
+                };
+                let converted = resilient_account_message_response_to_js(&ctx, "space-1", response)
                     .await
                     .unwrap_or_else(|error| panic!("{error}"));
+                let converted_activity = resilient_message_conversation_activity_to_js(
+                    &ctx,
+                    "space-1",
+                    activity.clone(),
+                )
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
 
-            assert_eq!(
-                converted.kind, expected_kind,
-                "message: server={server_kind}, payload={payload_kind}"
-            );
-            assert_eq!(
-                converted_activity.kind, expected_kind,
-                "activity: server={server_kind}, payload={payload_kind}"
-            );
-            assert_eq!(converted.text, "hello");
-            assert_eq!(converted.reply_post_id, activity.post_id);
-            assert!(!converted.is_unavailable);
-            assert_eq!(converted_activity.text.as_deref(), Some("hello"));
-            assert_eq!(converted_activity.activity_type, activity.activity_type);
-            assert_eq!(converted_activity.post_id, activity.post_id);
-            assert!(!converted_activity.is_unavailable);
+                assert_eq!(
+                    converted.kind, expected_kind,
+                    "message: server={server_kind}, payload={payload_kind}"
+                );
+                assert_eq!(
+                    converted_activity.kind, expected_kind,
+                    "activity: server={server_kind}, payload={payload_kind}"
+                );
+                assert_eq!(converted.reply_object_key.as_deref(), reply_object_key);
+                assert_eq!(
+                    converted_activity.reply_object_key.as_deref(),
+                    reply_object_key
+                );
+                assert_eq!(converted.text, "hello");
+                assert_eq!(converted.reply_post_id, activity.post_id);
+                assert!(!converted.is_unavailable);
+                assert_eq!(converted_activity.text.as_deref(), Some("hello"));
+                assert_eq!(converted_activity.activity_type, activity.activity_type);
+                assert_eq!(converted_activity.post_id, activity.post_id);
+                assert!(!converted_activity.is_unavailable);
+            }
         }
     }
 

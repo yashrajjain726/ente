@@ -116,6 +116,7 @@ interface HomeScreenProps {
         postSpaceId: string,
         postId: number,
         text: string,
+        objectKey: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
@@ -727,7 +728,7 @@ const FeedPhoto: React.FC<{
                     }}
                 />
             )}
-            {!isPostUnavailable && !isPhotoReady && thumbHashDataURL ? (
+            {!isPostUnavailable && thumbHashDataURL ? (
                 <Box
                     component="img"
                     alt=""
