@@ -166,9 +166,13 @@ impl ScannerSession {
             detection.reason,
             detection.confidence
         );
-        let quad = detection.quad.map(|quad| quad.in_source(extent));
-        let quad = match quad {
-            Some(quad) => refine_capture(&bgr, quad).map_err(ScanError::Pipeline)?,
+        let quad = match detection.quad {
+            Some(quad) => refine_capture(
+                &bgr,
+                quad.in_source(extent),
+                quad.needs_complete_source_support,
+            )
+            .map_err(ScanError::Pipeline)?,
             None => None,
         };
         let Some(quad) = quad else {

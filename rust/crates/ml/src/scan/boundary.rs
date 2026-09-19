@@ -12,6 +12,7 @@ pub(super) enum SearchBudget {
 #[derive(Clone, Copy)]
 pub(super) struct MaskQuad {
     pub corners: Quad,
+    pub needs_complete_source_support: bool,
     extent: SourceExtent,
 }
 
@@ -272,7 +273,12 @@ fn supported_fit(p: [Point; 4], boundary: &[Point], extent: SourceExtent) -> Opt
     Some(fitted)
 }
 
-fn evidence(map: &ProbabilityMap, component: &Component, p: [Point; 4], live: bool) -> Option<f64> {
+fn evidence(
+    map: &ProbabilityMap,
+    component: &Component,
+    p: [Point; 4],
+    live: bool,
+) -> Option<(f64, bool)> {
     let extent = SourceExtent {
         width: map.width as f64,
         height: map.height as f64,
@@ -329,19 +335,59 @@ fn evidence(map: &ProbabilityMap, component: &Component, p: [Point; 4], live: bo
     let thickness =
         (area(&p) / (0..4).map(|i| distance(p[i], p[(i + 1) % 4])).sum::<f64>()).max(1.0);
     let tolerance = (thickness * if live { 0.065 } else { 0.085 }).max(1.2);
-    if residual > tolerance {
+    if residual > tolerance && (live || !sustained_sides(&component.boundary, p, tolerance)) {
         return None;
     }
     let fill = component.pixels.len() as f64 / area(&p);
     if !(0.76..=1.16).contains(&fill) {
         return None;
     }
-    Some(
+    Some((
         purity
             * captured
-            * (1.0 - 0.15 * (residual / tolerance))
+            * (1.0 - 0.15 * (residual / tolerance).min(1.0))
             * (component.pixels.len() as f64 / map.values.len() as f64).sqrt(),
-    )
+        residual > tolerance,
+    ))
+}
+
+fn sustained_sides(boundary: &[Point], p: [Point; 4], tolerance: f64) -> bool {
+    let lines = std::array::from_fn::<_, 4, _>(|side| Line::through(p[side], p[(side + 1) % 4]));
+    let mut straight_sides = 0;
+    for side in 0..4 {
+        let a = p[side];
+        let b = p[(side + 1) % 4];
+        let line = lines[side];
+        let length_squared = (b.x - a.x).powi(2) + (b.y - a.y).powi(2);
+        let mut bins: [Vec<f64>; 16] = std::array::from_fn(|_| Vec::new());
+        for &point in boundary {
+            let along =
+                ((point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y)) / length_squared;
+            let residual = line.residual(point).abs();
+            if (0.0..1.0).contains(&along)
+                && lines
+                    .iter()
+                    .all(|other| residual <= other.residual(point).abs())
+            {
+                bins[(along * 16.0) as usize].push(residual);
+            }
+        }
+        let mut touched = 0;
+        let mut straight = 0;
+        for mut bin in bins {
+            if bin.is_empty() {
+                continue;
+            }
+            bin.sort_by(f64::total_cmp);
+            touched += usize::from(bin[0] <= tolerance);
+            straight += usize::from(bin[bin.len() / 2] <= tolerance);
+        }
+        if touched < 12 {
+            return false;
+        }
+        straight_sides += usize::from(straight >= 12);
+    }
+    straight_sides >= 3
 }
 
 fn supporting_intersections(hull: &[Point], indices: [usize; 4]) -> Option<[Point; 4]> {
@@ -461,13 +507,22 @@ pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBu
                     continue;
                 };
                 let quad = canonical(candidate, extent);
-                let Some(confidence) = evidence(map, &component, points(quad), live) else {
+                let Some((confidence, needs_complete_source_support)) =
+                    evidence(map, &component, points(quad), live)
+                else {
                     continue;
                 };
-                if confidence > best.confidence {
+                if best.quad.is_none_or(|current| {
+                    if current.needs_complete_source_support != needs_complete_source_support {
+                        !needs_complete_source_support
+                    } else {
+                        confidence > best.confidence
+                    }
+                }) {
                     best = Detection {
                         quad: Some(MaskQuad {
                             corners: quad,
+                            needs_complete_source_support,
                             extent,
                         }),
                         confidence,
@@ -493,7 +548,75 @@ fn brightness(source: &ImageU8, x: f64, y: f64) -> Option<f64> {
     )
 }
 
-pub(super) fn refine_capture(source: &ImageU8, quad: Quad) -> OpResult<Option<Quad>> {
+fn nearby_color_edge(source: &ImageU8, edge: [Point; 2], band: f64) -> bool {
+    let line = Line::through(edge[0], edge[1]);
+    let sample = |x: f64, y: f64| -> Option<[f64; 3]> {
+        if x < 0.0 || y < 0.0 || x >= source.width as f64 || y >= source.height as f64 {
+            return None;
+        }
+        let offset = ((y as usize) * source.width as usize + x as usize) * 3;
+        Some(std::array::from_fn(|channel| {
+            source.data[offset + channel] as f64
+        }))
+    };
+    (0..48)
+        .filter(|&i| {
+            let t = (i as f64 + 1.0) / 49.0;
+            let center = Point {
+                x: edge[0].x + (edge[1].x - edge[0].x) * t,
+                y: edge[0].y + (edge[1].y - edge[0].y) * t,
+            };
+            (-30..=30).any(|step| {
+                let offset = step as f64 * band / 30.0;
+                let Some(a) = sample(
+                    center.x + line.nx * (offset - 1.25),
+                    center.y + line.ny * (offset - 1.25),
+                ) else {
+                    return false;
+                };
+                let Some(b) = sample(
+                    center.x + line.nx * (offset + 1.25),
+                    center.y + line.ny * (offset + 1.25),
+                ) else {
+                    return false;
+                };
+                let delta = std::array::from_fn::<_, 3, _>(|i| a[i] - b[i]);
+                let dot = |a: [f64; 3], b: [f64; 3]| {
+                    (a[0] * b[0] + 2.0 * a[1] * b[1] + a[2] * b[2]) / 4.0
+                };
+                let energy = dot(delta, delta);
+                let penalty = 1.0 + 0.25 * (offset / band).powi(2);
+                if energy < (6.0 * penalty).powi(2) {
+                    return false;
+                }
+                [2.5, 4.0, 6.0].into_iter().all(|reach| {
+                    let Some(a) = sample(
+                        center.x + line.nx * (offset - reach),
+                        center.y + line.ny * (offset - reach),
+                    ) else {
+                        return false;
+                    };
+                    let Some(b) = sample(
+                        center.x + line.nx * (offset + reach),
+                        center.y + line.ny * (offset + reach),
+                    ) else {
+                        return false;
+                    };
+                    let wide = std::array::from_fn::<_, 3, _>(|i| a[i] - b[i]);
+                    let wide_energy = dot(wide, wide);
+                    wide_energy >= 36.0 && dot(delta, wide) >= 0.7 * (energy * wide_energy).sqrt()
+                })
+            })
+        })
+        .count()
+        >= 32
+}
+
+pub(super) fn refine_capture(
+    source: &ImageU8,
+    quad: Quad,
+    needs_complete_support: bool,
+) -> OpResult<Option<Quad>> {
     let extent = SourceExtent::new(source.width, source.height)?;
     validate_quad(quad, extent)?;
     let scale = (640.0 / extent.width.max(extent.height)).min(1.0);
@@ -592,8 +715,9 @@ pub(super) fn refine_capture(source: &ImageU8, quad: Quad) -> OpResult<Option<Qu
         lines[side] = fitted;
         improved += 1;
     }
-    if supported < 3 {
-        log::debug!("capture rejected: only {supported} source-supported sides");
+    if (supported < 3 || needs_complete_support)
+        && !(0..4).all(|side| nearby_color_edge(&preview, [p[side], p[(side + 1) % 4]], band * 3.0))
+    {
         return Ok(None);
     }
     if improved == 0 {
@@ -806,12 +930,13 @@ mod tests {
             .flat_map(|v| [if *v > 0.5 { 230 } else { 50 }; 3])
             .collect();
         let source = ImageU8::new(256, 256, 3, data)?;
-        let refined = refine_capture(&source, quad)?.ok_or("visible supporting edges rejected")?;
+        let refined =
+            refine_capture(&source, quad, false)?.ok_or("visible supporting edges rejected")?;
         for (actual, expected) in points(refined).into_iter().zip(p) {
             assert!(distance(actual, expected) < 2.0);
         }
         let unsupported = ImageU8::new(256, 256, 3, vec![230; 256 * 256 * 3])?;
-        assert!(refine_capture(&unsupported, quad)?.is_none());
+        assert!(refine_capture(&unsupported, quad, false)?.is_none());
         Ok(())
     }
 
@@ -941,6 +1066,122 @@ mod tests {
     }
 
     #[test]
+    fn ordinary_supported_page_precedes_an_uncertain_competing_fit() -> OpResult<()> {
+        let mut map = ProbabilityMap::new(vec![0.02; 256 * 256], 256, 256)?;
+        for y in 20..180 {
+            for x in 15..105 {
+                map.values[y * 256 + x] = 0.75;
+            }
+        }
+        for y in 40..200 {
+            for x in 145..235 {
+                map.values[y * 256 + x] = 0.98;
+            }
+        }
+        for x in (150..230).step_by(6) {
+            for xx in x..x + 2 {
+                for y in 40..54 {
+                    map.values[y * 256 + xx] = 0.02;
+                }
+            }
+        }
+        let found = locate(&map, SourceExtent::new(256, 256)?, SearchBudget::Capture)
+            .quad
+            .ok_or("supported page rejected")?;
+        assert!(points(found.corners).iter().all(|point| point.x < 110.0));
+        assert!(!found.needs_complete_source_support);
+        let extent = SourceExtent::new(256, 256)?;
+        let mut source = ImageU8::new(256, 256, 3, vec![50; 256 * 256 * 3])?;
+        for y in 20..180 {
+            for x in 15..105 {
+                source.data[(y * 256 + x) * 3..(y * 256 + x + 1) * 3].fill(220);
+                map.values[y * 256 + x] = 0.02;
+            }
+        }
+        assert!(
+            refine_capture(
+                &source,
+                found.in_source(extent),
+                found.needs_complete_source_support
+            )?
+            .is_some()
+        );
+        let uncertain = locate(&map, extent, SearchBudget::Capture)
+            .quad
+            .ok_or("uncertain competing candidate was not exercised")?;
+        assert!(uncertain.needs_complete_source_support);
+        assert!(
+            refine_capture(
+                &source,
+                uncertain.in_source(extent),
+                uncertain.needs_complete_source_support
+            )?
+            .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_boundary_irregularities_preserve_four_sustained_page_sides() -> OpResult<()> {
+        let p = [(40.0, 30.0), (220.0, 30.0), (220.0, 230.0), (40.0, 230.0)]
+            .map(|(x, y)| Point { x, y });
+        let mut map = polygon_mask(p)?;
+        for y in (40..220).step_by(8) {
+            for yy in y..y + 2 {
+                for x in (40..50).chain(210..220) {
+                    map.values[yy * 256 + x] = 0.02;
+                }
+            }
+        }
+        for x in (50..210).step_by(8) {
+            for xx in x..x + 2 {
+                for y in (30..40).chain(220..230) {
+                    map.values[y * 256 + xx] = 0.02;
+                }
+            }
+        }
+        let extent = SourceExtent::new(256, 256)?;
+        let found = locate(&map, extent, SearchBudget::Capture)
+            .quad
+            .ok_or("page with four sustained sides rejected")?;
+        for (actual, expected) in points(found.corners).into_iter().zip(p) {
+            assert!(distance(actual, expected) < 4.0);
+        }
+        let mut source = ImageU8::new(256, 256, 3, vec![50; 256 * 256 * 3])?;
+        for y in 30..230 {
+            for x in 40..220 {
+                source.data[(y * 256 + x) * 3..(y * 256 + x + 1) * 3].fill(220);
+            }
+        }
+        assert!(
+            refine_capture(
+                &source,
+                found.in_source(extent),
+                found.needs_complete_source_support
+            )?
+            .is_some()
+        );
+        for y in 0..31 {
+            for x in 40..220 {
+                source.data[(y * 256 + x) * 3..(y * 256 + x + 1) * 3].fill(if y == 30 {
+                    30
+                } else {
+                    220
+                });
+            }
+        }
+        assert!(
+            refine_capture(
+                &source,
+                found.in_source(extent),
+                found.needs_complete_source_support
+            )?
+            .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn canonical_labels_survive_nonsquare_source_scaling() -> OpResult<()> {
         let p = [(0.4, 0.02), (0.9, 0.4), (0.6, 0.95), (0.1, 0.4)].map(|(x, y)| Point { x, y });
         let a = canonical(
@@ -980,7 +1221,7 @@ mod tests {
             [(58.0, 38.0), (342.0, 38.0), (342.0, 262.0), (58.0, 262.0)]
                 .map(|(x, y)| Point { x, y }),
         );
-        let after = refine_capture(&source, before)?.ok_or("source boundary rejected")?;
+        let after = refine_capture(&source, before, false)?.ok_or("source boundary rejected")?;
         let expected = [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
             .map(|(x, y)| Point { x, y });
         let before_error: f64 = points(before)
@@ -1052,6 +1293,75 @@ mod source_evidence_tests {
     use super::*;
 
     #[test]
+    fn color_edge_rejects_thin_strokes_without_a_background_step() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, vec![220; 400 * 300 * 3])?;
+        for x in 60..340 {
+            source.data[(100 * 400 + x) * 3..(100 * 400 + x + 1) * 3].fill(30);
+        }
+        let edge = [Point { x: 60.0, y: 100.0 }, Point { x: 340.0, y: 100.0 }];
+        assert!(!nearby_color_edge(&source, edge, 7.2));
+        for y in 100..300 {
+            for x in 0..400 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(150);
+            }
+        }
+        assert!(nearby_color_edge(&source, edge, 7.2));
+        Ok(())
+    }
+
+    #[test]
+    fn chromatic_edges_support_pages_with_equal_luminance() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, [80, 140, 200].repeat(400 * 300))?;
+        for y in 40..260 {
+            for x in 60..340 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3]
+                    .copy_from_slice(&[200, 140, 80]);
+            }
+        }
+        let quad = quad_from_points(
+            [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        assert!(refine_capture(&source, quad, false)?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn nearby_page_edges_support_a_modestly_displaced_mask() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, vec![160; 400 * 300 * 3])?;
+        for y in 40..260 {
+            for x in 60..340 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(220);
+            }
+        }
+        for offset in [-5.0, 5.0] {
+            let quad = quad_from_points([
+                Point {
+                    x: 60.0 + offset,
+                    y: 40.0 + offset,
+                },
+                Point {
+                    x: 340.0 - offset,
+                    y: 40.0 + offset,
+                },
+                Point {
+                    x: 340.0 - offset,
+                    y: 260.0 - offset,
+                },
+                Point {
+                    x: 60.0 + offset,
+                    y: 260.0 - offset,
+                },
+            ]);
+            assert!(
+                refine_capture(&source, quad, false)?.is_some(),
+                "offset {offset}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn visible_but_non_straight_edges_keep_the_detected_page() -> OpResult<()> {
         let mut source = ImageU8::new(400, 300, 3, vec![190; 400 * 300 * 3])?;
         for y in 0..300 {
@@ -1071,7 +1381,7 @@ mod source_evidence_tests {
             [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
                 .map(|(x, y)| Point { x, y }),
         );
-        assert_eq!(refine_capture(&source, quad)?, Some(quad));
+        assert_eq!(refine_capture(&source, quad, false)?, Some(quad));
         Ok(())
     }
 
@@ -1094,7 +1404,7 @@ mod source_evidence_tests {
             [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
                 .map(|(x, y)| Point { x, y }),
         );
-        assert!(refine_capture(&source, quad)?.is_none());
+        assert!(refine_capture(&source, quad, false)?.is_none());
         Ok(())
     }
 
@@ -1110,7 +1420,7 @@ mod source_evidence_tests {
             [(70.0, 50.0), (315.0, 65.0), (295.0, 250.0), (60.0, 240.0)]
                 .map(|(x, y)| Point { x, y }),
         );
-        assert!(refine_capture(&source, quad)?.is_none());
+        assert!(refine_capture(&source, quad, false)?.is_none());
         Ok(())
     }
 
@@ -1126,9 +1436,9 @@ mod source_evidence_tests {
             [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
                 .map(|(x, y)| Point { x, y }),
         );
-        assert!(refine_capture(&source, quad)?.is_some());
+        assert!(refine_capture(&source, quad, false)?.is_some());
         let extent = SourceExtent::new(400, 300)?;
-        assert!(refine_capture(&source, extent.full_frame())?.is_some());
+        assert!(refine_capture(&source, extent.full_frame(), false)?.is_some());
         Ok(())
     }
 }
