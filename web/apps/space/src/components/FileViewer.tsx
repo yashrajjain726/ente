@@ -4,6 +4,7 @@ import {
     Cancel01Icon,
     Delete02Icon,
     Edit01Icon,
+    Edit03Icon,
     Loading03Icon,
     MoreHorizontalIcon,
     Tick02Icon,
@@ -19,6 +20,7 @@ import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceCaptionText } from "components/CaptionText";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { spacePostLikePopDurationMs } from "components/post-like-animation";
+import { SpacePostPhotosCounter } from "components/PostPhotosCounter";
 import { SpacePostReplyControls } from "components/PostReplyControls";
 import log from "ente-base/log";
 import type PhotoSwipe from "photoswipe";
@@ -137,6 +139,7 @@ interface SpaceFileViewerProps {
     draftPostPreparationError?: string;
     isDraftPostPreviewPending?: boolean;
     onClose: () => void;
+    onEditDraftPhoto?: () => void;
     onDeletePost?: () => Promise<void> | void;
     onDraftPostExitAnimationStart?: () => void;
     onDraftPostExitStart?: () => void;
@@ -148,12 +151,14 @@ interface SpaceFileViewerProps {
         spaceId: string,
         postId: number,
         text: string,
+        objectKey: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onUpdatePostCaption?: (postId: number, caption: string) => Promise<void>;
     onPhotoIndexChange?: (index: number) => void;
     photo: SpaceViewerPhoto;
     photoIndex?: number;
+    initialPhotoIndex?: number;
     photos?: SpaceViewerPhoto[];
     focusReplyOnOpen?: boolean;
     postActionMode?: SpaceViewerPostActionMode;
@@ -249,27 +254,80 @@ const viewerCaptionTextSx = {
 } as const;
 
 const SpaceViewerCaption: React.FC<{ caption: string }> = ({ caption }) => {
+    const bubbleRef = React.useRef<HTMLParagraphElement | null>(null);
+    const [isLongCaption, setIsLongCaption] = React.useState(false);
+
+    React.useLayoutEffect(() => {
+        const bubble = bubbleRef.current;
+        if (!bubble) return;
+
+        const updateLayout = () => {
+            const lineHeight = parseFloat(getComputedStyle(bubble).lineHeight);
+            setIsLongCaption(
+                bubble.getBoundingClientRect().height > lineHeight * 4,
+            );
+        };
+        updateLayout();
+        const observer = new ResizeObserver(updateLayout);
+        observer.observe(bubble);
+        return () => observer.disconnect();
+    }, [caption]);
+
     return (
-        <Box
-            component="p"
-            data-space-viewer-chrome="true"
-            title={caption}
-            sx={{
-                ...viewerCaptionTextSx,
-                bottom: "14%",
-                left: "50%",
-                m: 0,
-                maxWidth: "78vw",
-                minWidth: 0,
-                overflowWrap: "break-word",
-                position: "fixed",
-                transform: "translateX(-50%)",
-                width: "78vw",
-                zIndex: 2,
-            }}
-        >
-            <SpaceCaptionText caption={caption} />
-        </Box>
+        <>
+            <Box
+                ref={bubbleRef}
+                component="p"
+                aria-hidden={isLongCaption || undefined}
+                data-space-viewer-chrome="true"
+                title={caption}
+                sx={{
+                    ...viewerCaptionTextSx,
+                    bottom: "14%",
+                    left: "50%",
+                    m: 0,
+                    maxWidth: "78vw",
+                    minWidth: 0,
+                    overflowWrap: "break-word",
+                    position: "fixed",
+                    transform: "translateX(-50%)",
+                    visibility: isLongCaption ? "hidden" : "visible",
+                    width: "78vw",
+                    zIndex: 2,
+                }}
+            >
+                <SpaceCaptionText caption={caption} />
+            </Box>
+            {isLongCaption && (
+                <Box
+                    role="region"
+                    aria-label="Caption"
+                    tabIndex={0}
+                    sx={{
+                        ...viewerCaptionTextSx,
+                        bgcolor: "rgba(32, 32, 32, 0.85)",
+                        borderRadius: "16px",
+                        boxSizing: "border-box",
+                        fontWeight: 400,
+                        lineHeight: "22px",
+                        maxHeight: "33svh",
+                        overflowWrap: "anywhere",
+                        overflowY: "auto",
+                        overscrollBehaviorY: "contain",
+                        p: "14px 16px",
+                        scrollbarWidth: "thin",
+                        textAlign: "left",
+                        textWrap: "wrap",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                    }}
+                >
+                    {caption}
+                </Box>
+            )}
+        </>
     );
 };
 
@@ -281,6 +339,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     focusReplyOnOpen = false,
     isDraftPostPreviewPending = false,
     onClose,
+    onEditDraftPhoto,
     onDeletePost,
     onDraftPostExitAnimationStart,
     onDraftPostExitStart,
@@ -294,10 +353,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     onPhotoIndexChange,
     photo,
     photoIndex,
+    initialPhotoIndex = 0,
     photos,
     postActionMode = "like-only",
 }) => {
-    const [localPhotoIndex, setLocalPhotoIndex] = React.useState(0);
+    const [localPhotoIndex, setLocalPhotoIndex] =
+        React.useState(initialPhotoIndex);
     const [loadedPhotoURLs, setLoadedPhotoURLs] = React.useState<
         Record<string, string>
     >({});
@@ -346,6 +407,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const postPhotoCount = activePhoto.postPhotoCount ?? 1;
     const postPhotoIndex = activePhoto.postPhotoIndex ?? 0;
     const activePhotoKey = photoKey(activePhoto);
+    const activeReplyKey = `${activePhoto.spaceId}:${activePhoto.postId}:${activePhoto.imageAsset?.objectKey}`;
+    const activeReplyKeyRef = React.useRef(activeReplyKey);
+    activeReplyKeyRef.current = activeReplyKey;
     const activePostKey = `${activePhoto.spaceId ?? ""}:${activePhoto.postId ?? ""}`;
     const hasPhotoLoadError = Boolean(photoLoadErrors[activePhotoKey]);
     const canUpdatePostCaption =
@@ -389,8 +453,19 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const replyDraftsRef = React.useRef(new Map<string, string>());
     const [isReplyFocused, setIsReplyFocused] =
         React.useState(focusReplyOnOpen);
-    const [replyActionPhase, setReplyActionPhase] =
-        React.useState<SpaceActionPhase | null>(null);
+    const [replyPhases, setReplyPhases] = React.useState<
+        Record<string, SpaceActionPhase | null>
+    >({});
+    const replyActionPhase = replyPhases[activeReplyKey] ?? null;
+    const setReplyActionPhase = React.useCallback(
+        (phase: SpaceActionPhase | null) => {
+            setReplyPhases((phases) => ({
+                ...phases,
+                [activeReplyKey]: phase,
+            }));
+        },
+        [activeReplyKey],
+    );
     const [addFriendSheetOpen, setAddFriendSheetOpen] = React.useState(false);
     const [addFriendIntent, setAddFriendIntent] =
         React.useState<SpaceInviteIntent>("like");
@@ -444,7 +519,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const canReplyToPost = Boolean(
         !isDraftPost &&
         (canAddFriendForPostAction ||
-            (activePhoto.spaceId && activePhoto.postId && onReplyToPost)),
+            (activePhoto.spaceId &&
+                activePhoto.postId &&
+                activePhoto.imageAsset &&
+                onReplyToPost)),
     );
     const isReplyMode =
         canReplyToPost &&
@@ -707,11 +785,13 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             !canSendReply ||
             !activePhoto.spaceId ||
             !activePhoto.postId ||
+            !activePhoto.imageAsset ||
             !onReplyToPost
         ) {
             return;
         }
 
+        const objectKey = activePhoto.imageAsset.objectKey;
         setReplyActionPhase("busy");
         void (async () => {
             try {
@@ -719,9 +799,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     activePhoto.spaceId!,
                     activePhoto.postId!,
                     text,
+                    objectKey,
                 );
-                replyDraftsRef.current.delete(activePostKey);
-                setReplyText("");
+                replyDraftsRef.current.delete(activeReplyKey);
+                if (activeReplyKeyRef.current == activeReplyKey)
+                    setReplyText("");
                 setReplyActionPhase("done");
             } catch (error) {
                 log.error("Failed to send post reply", error);
@@ -812,7 +894,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         }, viewerActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
-    }, [replyActionPhase]);
+    }, [replyActionPhase, setReplyActionPhase]);
 
     React.useEffect(() => {
         if (isDraftPost || isCaptionEditingRef.current) return;
@@ -829,10 +911,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setCaptionUpdateActionPhase(null);
         setHasCaptionUpdateError(false);
         setIsCaptionEditing(false);
-        setReplyText(replyDraftsRef.current.get(activePostKey) ?? "");
+    }, [activePostKey]);
+
+    React.useLayoutEffect(() => {
+        setReplyText(replyDraftsRef.current.get(activeReplyKey) ?? "");
         setIsReplyFocused(focusReplyOnOpen && canReplyToPost);
-        setReplyActionPhase(null);
-    }, [activePostKey, canReplyToPost, focusReplyOnOpen]);
+    }, [activeReplyKey, canReplyToPost, focusReplyOnOpen]);
 
     React.useEffect(() => {
         setPhotoLikePopID(0);
@@ -1412,34 +1496,38 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             />
                         </Box>
                     )}
-                    {postPhotoCount > 1 && (
+                    {isDraftPost && onEditDraftPhoto && (
                         <Box
-                            component="span"
-                            aria-live="polite"
-                            aria-label={`Photo ${postPhotoIndex + 1} of ${postPhotoCount}`}
+                            component="button"
+                            type="button"
+                            aria-label="Edit photo"
+                            title="Edit photo"
+                            disabled={
+                                isDraftPostActionRunning ||
+                                isDraftPostPreviewPending ||
+                                Boolean(draftPostPreparationError)
+                            }
+                            onClick={onEditDraftPhoto}
                             sx={{
-                                alignItems: "center",
-                                bgcolor: "#FFFFFF",
-                                borderRadius: "999px",
-                                boxSizing: "border-box",
-                                color: "#000000",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontVariantNumeric: "tabular-nums",
-                                fontWeight: 700,
-                                height: 24,
-                                justifyContent: "center",
-                                lineHeight: "16px",
-                                minWidth: 48,
-                                px: "10px",
-                                whiteSpace: "nowrap",
+                                ...viewerHeaderButtonSx,
+                                mr: postPhotoCount > 1 ? "8px" : 0,
+                                "&:disabled": {
+                                    opacity: 0.3,
+                                    cursor: "default",
+                                },
                             }}
                         >
-                            {postPhotoIndex + 1} / {postPhotoCount}
+                            <HugeiconsIcon
+                                icon={Edit03Icon}
+                                size={16}
+                                strokeWidth={1.8}
+                            />
                         </Box>
                     )}
+                    <SpacePostPhotosCounter
+                        index={postPhotoIndex}
+                        count={postPhotoCount}
+                    />
                     <Box
                         component="button"
                         type="button"
@@ -2042,67 +2130,73 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     </Box>
                 </Box>
             )}
-            {hasDisplayCaption && !isCaptionEditing && (
-                <SpaceViewerCaption caption={displayCaption} />
-            )}
-            {showPhotoLikeButton && !isCaptionEditing && (
-                <Box
-                    data-space-viewer-bottom="true"
-                    sx={{
-                        alignItems: "stretch",
-                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 0,
-                        left: canReplyToPost
-                            ? { xs: "16px", sm: "auto" }
-                            : "auto",
-                        maxWidth: canReplyToPost ? { sm: 390 } : undefined,
-                        position: "fixed",
-                        right: "16px",
-                        width: canReplyToPost
-                            ? { sm: "calc(100% - 32px)" }
-                            : undefined,
-                        zIndex: 2,
-                    }}
-                >
-                    <SpacePostReplyControls
-                        canSendReply={canSendReply}
-                        isReplyMode={isReplyMode}
-                        liked={isPhotoLiked}
-                        likePopID={photoLikePopID}
-                        onLike={handlePhotoLikeClick}
-                        onSendReply={sendReply}
-                        replyActionPhase={replyActionPhase}
-                        replyInputRef={replyInputRef}
-                        replyInputProps={
-                            canReplyToPost
-                                ? {
-                                      onBlur: () => setIsReplyFocused(false),
-                                      onChange: (event) => {
-                                          const nextText =
-                                              clampSpaceMessageText(
-                                                  event.target.value,
-                                              );
-                                          event.currentTarget.value = nextText;
-                                          setReplyText(nextText);
-                                          replyDraftsRef.current.set(
-                                              activePostKey,
-                                              nextText,
-                                          );
-                                      },
-                                      onFocus: () => setIsReplyFocused(true),
-                                      onKeyDown: handleReplyKeyDown,
-                                      onPointerDown:
-                                          handleReplyInputPointerDown,
-                                      readOnly: canAddFriendForPostAction,
-                                      value: replyText,
-                                  }
-                                : undefined
-                        }
-                    />
-                </Box>
-            )}
+            {(hasDisplayCaption || showPhotoLikeButton) &&
+                !isCaptionEditing && (
+                    <Box
+                        data-space-viewer-bottom="true"
+                        sx={{
+                            alignItems: "stretch",
+                            bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            left: { xs: "16px", sm: "auto" },
+                            maxWidth: { sm: 390 },
+                            position: "fixed",
+                            right: "16px",
+                            width: { sm: "calc(100% - 32px)" },
+                            zIndex: 2,
+                        }}
+                    >
+                        {hasDisplayCaption && (
+                            <SpaceViewerCaption
+                                key={activePostKey}
+                                caption={displayCaption}
+                            />
+                        )}
+                        {showPhotoLikeButton && (
+                            <SpacePostReplyControls
+                                canSendReply={canSendReply}
+                                isReplyMode={isReplyMode}
+                                liked={isPhotoLiked}
+                                likePopID={photoLikePopID}
+                                onLike={handlePhotoLikeClick}
+                                onSendReply={sendReply}
+                                replyActionPhase={replyActionPhase}
+                                replyInputRef={replyInputRef}
+                                replyInputProps={
+                                    canReplyToPost
+                                        ? {
+                                              onBlur: () =>
+                                                  setIsReplyFocused(false),
+                                              onChange: (event) => {
+                                                  const nextText =
+                                                      clampSpaceMessageText(
+                                                          event.target.value,
+                                                      );
+                                                  event.currentTarget.value =
+                                                      nextText;
+                                                  setReplyText(nextText);
+                                                  replyDraftsRef.current.set(
+                                                      activeReplyKey,
+                                                      nextText,
+                                                  );
+                                              },
+                                              onFocus: () =>
+                                                  setIsReplyFocused(true),
+                                              onKeyDown: handleReplyKeyDown,
+                                              onPointerDown:
+                                                  handleReplyInputPointerDown,
+                                              readOnly:
+                                                  canAddFriendForPostAction,
+                                              value: replyText,
+                                          }
+                                        : undefined
+                                }
+                            />
+                        )}
+                    </Box>
+                )}
             {canDeletePost && (
                 <ConfirmationActionSheet
                     open={deleteSheetOpen}

@@ -456,7 +456,10 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                 />
             ) : null}
             {!isUnavailable && (
-                <SpacePostPhotosBadge count={item.photos?.length ?? 1} />
+                <SpacePostPhotosBadge
+                    count={item.photos?.length ?? 1}
+                    inset={8}
+                />
             )}
             {isUnavailable && (
                 <Box
@@ -509,6 +512,7 @@ interface ProfileScreenProps {
         postSpaceId: string,
         postId: number,
         text: string,
+        objectKey: string,
     ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onUnfriend?: () => Promise<void> | void;

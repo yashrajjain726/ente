@@ -14,7 +14,7 @@ import { useSpaceAppState } from "state/app-state";
 import { spaceAppBackgroundColor } from "styles/colors";
 import { viewerPhotosFromPost } from "utils/post-photos";
 import { hasPreviousSpaceRoute, useSpaceRouter } from "utils/route-transitions";
-import { spaceRoutes } from "utils/routes";
+import { postPhotoIdFromObjectKey, spaceRoutes } from "utils/routes";
 
 const postBackground = "#000000";
 
@@ -70,6 +70,12 @@ const Page: React.FC = () => {
     const spaceId =
         valueFromQuery(router.query.spaceId) ?? pathParams.spaceId ?? "";
     const postId = postIdFromQuery(router.query.postId) ?? pathParams.postId;
+    const photoId =
+        valueFromQuery(router.query.photo) ??
+        (typeof window == "undefined"
+            ? undefined
+            : (new URLSearchParams(window.location.search).get("photo") ??
+              undefined));
     const [post, setPost] = React.useState<SpacePost | null>(null);
     const [postLoadError, setPostLoadError] = React.useState<string>();
     const [isPostLoading, setIsPostLoading] = React.useState(false);
@@ -168,13 +174,33 @@ const Page: React.FC = () => {
         );
     }
 
+    const photos = viewerPhotosFromPost(viewerPhotoFromPost(post));
+    const photoIndex =
+        photoId === undefined
+            ? 0
+            : photos.findIndex(
+                  (photo) =>
+                      photo.imageAsset &&
+                      postPhotoIdFromObjectKey(photo.imageAsset.objectKey) ==
+                          photoId,
+              );
+    if (photoIndex < 0) {
+        return (
+            <SpaceRouteFallback
+                background={spaceAppBackgroundColor}
+                message="Photo unavailable."
+            />
+        );
+    }
+
     return (
         <>
             <SpacePageMeta themeColor={postBackground} />
             <SpaceFileViewer
-                key={post.postId}
+                key={`${post.postId}:${photoId ?? ""}`}
                 photo={viewerPhotoFromPost(post)}
-                photos={viewerPhotosFromPost(viewerPhotoFromPost(post))}
+                photos={photos}
+                initialPhotoIndex={photoIndex}
                 onLoadPhoto={loadCurrentSpacePostAssetURL}
                 postActionMode={isOwnPost ? "hidden" : "like-only"}
                 onClose={closePost}
@@ -182,12 +208,13 @@ const Page: React.FC = () => {
                 onReplyToPost={
                     isOwnPost
                         ? undefined
-                        : (postSpaceId, nextPostId, text) =>
+                        : (postSpaceId, nextPostId, text, objectKey) =>
                               replyToCurrentPost(
                                   actorSpaceId,
                                   postSpaceId,
                                   nextPostId,
                                   text,
+                                  objectKey,
                               )
                 }
                 onSetPostLiked={async (nextPostId, liked) => {

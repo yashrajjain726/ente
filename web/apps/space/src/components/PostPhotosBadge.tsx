@@ -2,7 +2,13 @@ import { Album02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 
-export const SpacePostPhotosBadge = ({ count }: { count: number }) =>
+export const SpacePostPhotosBadge = ({
+    count,
+    inset = 10,
+}: {
+    count: number;
+    inset?: number;
+}) =>
     count > 1 ? (
         <Box
             component="span"
@@ -17,8 +23,8 @@ export const SpacePostPhotosBadge = ({ count }: { count: number }) =>
                 opacity: 0.8,
                 pointerEvents: "none",
                 position: "absolute",
-                right: 10,
-                top: 10,
+                right: inset,
+                top: inset,
                 width: 30,
                 zIndex: 2,
             }}

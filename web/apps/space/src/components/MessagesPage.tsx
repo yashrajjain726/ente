@@ -692,7 +692,11 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 }}
                 onOpenQuotePost={(quote) =>
                     void router.push(
-                        spaceRoutes.post(quote.spaceId, quote.postId),
+                        spaceRoutes.post(
+                            quote.spaceId,
+                            quote.postId,
+                            quote.objectKey,
+                        ),
                     )
                 }
                 onOpenThread={openConversation}
