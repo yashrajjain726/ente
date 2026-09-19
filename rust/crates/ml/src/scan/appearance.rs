@@ -838,6 +838,113 @@ fn enhance_neutral_strokes(image: &mut ImageU8, contrasts: &[f32]) {
     }
 }
 
+fn dark_stock_support(analysis: &Analysis) -> f32 {
+    let mut supported = [0.0; 9];
+    let mut available = [0.0; 9];
+    for y in 0..analysis.height {
+        for x in 0..analysis.width {
+            let sample = analysis.samples[y * analysis.width + x];
+            let region = (y * 3 / analysis.height) * 3 + x * 3 / analysis.width;
+            available[region] += sample.coverage;
+            if sample.coverage < 0.6 || sample.luminance >= 0.08 {
+                continue;
+            }
+            let mut low = sample.luminance;
+            let mut high = sample.luminance;
+            for nearby_y in y.saturating_sub(1)..=(y + 1).min(analysis.height - 1) {
+                for nearby_x in x.saturating_sub(1)..=(x + 1).min(analysis.width - 1) {
+                    let neighbor = analysis.samples[nearby_y * analysis.width + nearby_x];
+                    if neighbor.coverage >= 0.6 {
+                        low = low.min(neighbor.luminance);
+                        high = high.max(neighbor.luminance);
+                    }
+                }
+            }
+            supported[region] += sample.coverage * (1.0 - transition(high - low, 0.006, 0.025));
+        }
+    }
+    let total = supported.iter().sum::<f32>() / available.iter().sum::<f32>().max(1.0);
+    let mut regions = std::array::from_fn::<_, 9, _>(|i| supported[i] / available[i].max(1.0));
+    regions.sort_unstable_by(f32::total_cmp);
+    transition(total, 0.55, 0.75) * transition(regions[2], 0.35, 0.6)
+}
+
+fn light_stroke_contrast(image: &ImageU8, valid: Option<&[u8]>) -> Vec<f32> {
+    let width = image.width as usize;
+    let height = image.height as usize;
+    let tables = transfer_tables();
+    let background: Vec<f32> = image
+        .data
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .enumerate()
+        .map(|(index, pixel)| {
+            if valid.is_some_and(|mask| mask[index] == 0) {
+                return 1.0;
+            }
+            luminance([
+                tables.decode[pixel[2] as usize],
+                tables.decode[pixel[1] as usize],
+                tables.decode[pixel[0] as usize],
+            ])
+        })
+        .collect();
+    let radius = width.max(height).div_ceil(192).max(2);
+    let mut contrasts = vec![0.0; width * height];
+    for (index, &level) in background.iter().enumerate() {
+        if valid.is_some_and(|mask| mask[index] == 0) {
+            continue;
+        }
+        let x = index % width;
+        let y = index / width;
+        let mut contrast = 0.0f32;
+        for distance in [radius, radius * 2, radius * 3] {
+            for (a, b) in [
+                (
+                    background[y * width + x.saturating_sub(distance)],
+                    background[y * width + (x + distance).min(width - 1)],
+                ),
+                (
+                    background[y.saturating_sub(distance) * width + x],
+                    background[(y + distance).min(height - 1) * width + x],
+                ),
+            ] {
+                let difference = (level - a.max(b)).max(0.0);
+                let agreement = 1.0 - transition((a - b).abs() / difference.max(0.005), 0.25, 0.75);
+                let darkness = 1.0 - transition(a.max(b), 0.04, 0.08);
+                contrast = contrast.max(difference * agreement * darkness);
+            }
+        }
+        contrasts[index] = contrast;
+    }
+    contrasts
+}
+
+fn enhance_light_strokes(image: &mut ImageU8, contrasts: &[f32], support: f32) {
+    let tables = transfer_tables();
+    for (pixel, &contrast) in image.data.as_chunks_mut::<3>().0.iter_mut().zip(contrasts) {
+        let weight = support * transition(contrast, 0.005, 0.025);
+        if weight == 0.0 {
+            continue;
+        }
+        let rgb = [
+            tables.decode[pixel[2] as usize],
+            tables.decode[pixel[1] as usize],
+            tables.decode[pixel[0] as usize],
+        ];
+        let level = luminance(rgb);
+        let paper = (level - contrast).max(0.0);
+        let lift = 2.0 * contrast * (1.0 - level) / (1.0 - paper + 2.0 * contrast);
+        let gain = (level + weight * lift) / level.max(f32::EPSILON);
+        let maximum = rgb.iter().copied().fold(0.0, f32::max);
+        let gain = gain.min(1.0 / maximum.max(f32::EPSILON));
+        pixel[0] = encode(rgb[2] * gain, &tables.encode);
+        pixel[1] = encode(rgb[1] * gain, &tables.encode);
+        pixel[2] = encode(rgb[0] * gain, &tables.encode);
+    }
+}
+
 fn meaningful_color(image: &ImageU8, valid: Option<&[u8]>, adaptation: [f32; 3]) -> bool {
     let width = image.width as usize;
     let height = image.height as usize;
@@ -931,6 +1038,12 @@ pub(super) fn render_document(
         }
     });
     let contrasts = field.as_ref().map(|_| stroke_contrast(image, valid));
+    let dark_support = if field.is_none() {
+        dark_stock_support(&analysis)
+    } else {
+        0.0
+    };
+    let light_contrasts = (dark_support > 0.0).then(|| light_stroke_contrast(image, valid));
     render(
         image,
         valid,
@@ -941,12 +1054,192 @@ pub(super) fn render_document(
     if let Some(contrasts) = contrasts {
         enhance_neutral_strokes(image, &contrasts);
     }
+    if let Some(contrasts) = light_contrasts {
+        enhance_light_strokes(image, &contrasts, dark_support);
+    }
     Ok(mode)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn light_text_on_dark_stock_gains_contrast_without_lifting_the_stock() {
+        for mode in [ColorMode::Color, ColorMode::Grayscale] {
+            let mut page = image(384, 512, [24; 3]);
+            for y in 80..420 {
+                for x in 40..344 {
+                    if y % 29 < 3 && x % 17 < 11 {
+                        page.data[(y * 384 + x) * 3..(y * 384 + x + 1) * 3].fill(120);
+                    }
+                }
+            }
+            let original = page.clone();
+            process(&mut page, None, Some(mode));
+            let mut ink = 0.0;
+            let mut count = 0;
+            for (pixel, before) in page
+                .data
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .zip(original.data.as_chunks::<3>().0)
+            {
+                if before[0] == 120 {
+                    ink += pixel[0] as f32;
+                    count += 1;
+                } else {
+                    assert!(pixel[0].abs_diff(24) <= 1);
+                }
+            }
+            assert!(ink / count as f32 - 24.0 >= 96.0 * 1.3);
+        }
+    }
+
+    #[test]
+    fn dark_stock_keeps_noise_panels_and_continuous_tones() {
+        for stock in [[24; 3], [55; 3], [18, 29, 62]] {
+            let mut page = image(384, 512, stock);
+            for y in 0..512 {
+                for x in 0..384 {
+                    let noise = ((x * 17 + y * 11) % 5) as i16 - 2;
+                    let mut rgb = stock.map(|value| (value as i16 + noise) as u8);
+                    if (40..344).contains(&x) && (100..156).contains(&y) {
+                        rgb = [((x - 40) * 255 / 303) as u8; 3];
+                    }
+                    for (i, gray) in [45, 96, 150, 208].into_iter().enumerate() {
+                        if (32 + i * 84..96 + i * 84).contains(&x) && (300..364).contains(&y) {
+                            rgb = [gray; 3];
+                        }
+                    }
+                    page.data[(y * 384 + x) * 3..(y * 384 + x + 1) * 3]
+                        .copy_from_slice(&[rgb[2], rgb[1], rgb[0]]);
+                }
+            }
+            let original = page.clone();
+            process(&mut page, None, Some(ColorMode::Color));
+            for (index, (&actual, &expected)) in page.data.iter().zip(&original.data).enumerate() {
+                assert_eq!(actual, expected, "stock {stock:?} at byte {index}");
+            }
+        }
+    }
+
+    #[test]
+    fn light_stroke_tones_and_antialiasing_remain_monotonic() {
+        for stock in [8u8, 24, 48] {
+            let mut previous = [stock; 5];
+            for ink in stock + 1..=255 {
+                let mut page = image(192, 256, [stock; 3]);
+                for y in 0..5 {
+                    let coverage = [0.2, 0.5, 1.0, 0.7, 0.3][y];
+                    let value = (stock as f32 + (ink - stock) as f32 * coverage).round() as u8;
+                    for x in 50..142 {
+                        page.data[((80 + y) * 192 + x) * 3..((80 + y) * 192 + x + 1) * 3]
+                            .fill(value);
+                    }
+                }
+                process(&mut page, None, Some(ColorMode::Grayscale));
+                let profile: [u8; 5] =
+                    std::array::from_fn(|y| page.data[((80 + y) * 192 + 96) * 3]);
+                assert!(profile[0] <= profile[1] && profile[1] <= profile[2]);
+                assert!(profile[2] >= profile[3] && profile[3] >= profile[4]);
+                for (y, previous) in previous.iter_mut().enumerate() {
+                    let actual = page.data[((80 + y) * 192 + 96) * 3];
+                    assert!(
+                        actual >= *previous,
+                        "{stock}/{ink}/{y}: {actual} < {previous}"
+                    );
+                    *previous = actual;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn shaded_dark_colored_stock_keeps_hue_while_light_strokes_brighten() {
+        let tables = transfer_tables();
+        for stock in [[24; 3], [56; 3], [18, 28, 58]] {
+            for ink in [[104; 3], [145, 107, 73], [80, 134, 175]] {
+                let mut page = image(384, 512, stock);
+                let mut strokes = vec![false; 384 * 512];
+                for y in 0..512 {
+                    for x in 0..384 {
+                        let index = y * 384 + x;
+                        let stroke = (40..344).contains(&x)
+                            && (70..440).contains(&y)
+                            && y % 29 < 3
+                            && x % 17 < 11;
+                        let rgb = if stroke { ink } else { stock };
+                        let illumination = 0.55 + 0.4 * x as f32 / 384.0;
+                        for (channel, value) in rgb.into_iter().enumerate() {
+                            page.data[index * 3 + 2 - channel] = encode(
+                                tables.decode[value as usize] * illumination,
+                                &tables.encode,
+                            );
+                        }
+                        strokes[index] = stroke;
+                    }
+                }
+                let original = page.clone();
+                process(&mut page, None, Some(ColorMode::Color));
+                let mut before_sum = 0.0;
+                let mut after_sum = 0.0;
+                for ((pixel, before), stroke) in page
+                    .data
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .zip(original.data.as_chunks::<3>().0)
+                    .zip(strokes)
+                {
+                    if stroke {
+                        let rgb = pixel.map(|v| tables.decode[v as usize]);
+                        let old_rgb = before.map(|v| tables.decode[v as usize]);
+                        assert!(chroma_distance(chromaticity(rgb), chromaticity(old_rgb)) < 0.015);
+                        before_sum += pixel_luma(*before);
+                        after_sum += pixel_luma(*pixel);
+                    } else {
+                        assert_eq!(pixel, before);
+                    }
+                }
+                assert!(after_sum > before_sum * 1.25);
+            }
+        }
+    }
+
+    fn pixel_luma(pixel: [u8; 3]) -> f32 {
+        luminance([pixel[2] as f32, pixel[1] as f32, pixel[0] as f32])
+    }
+
+    #[test]
+    fn dark_continuous_tone_images_retain_highlights_and_noise() {
+        let mut page = image(384, 512, [0; 3]);
+        for y in 0..512 {
+            for x in 0..384 {
+                let a = (-((x as f32 - 132.0).powi(2) + (y as f32 - 180.0).powi(2)) / 1800.0).exp();
+                let b = (-((x as f32 - 260.0).powi(2) + (y as f32 - 330.0).powi(2)) / 3200.0).exp();
+                let noise = ((x * 37 + y * 19) % 5) as f32 - 2.0;
+                let rgb = [
+                    22.0 + 116.0 * a + 32.0 * b + noise,
+                    25.0 + 76.0 * a + 80.0 * b + noise,
+                    31.0 + 60.0 * a + 126.0 * b + noise,
+                ];
+                for (channel, value) in rgb.into_iter().enumerate() {
+                    page.data[(y * 384 + x) * 3 + 2 - channel] = value.round() as u8;
+                }
+            }
+        }
+        let original = page.clone();
+        process(&mut page, None, Some(ColorMode::Color));
+        let mut difference = 0u64;
+        for (&actual, &expected) in page.data.iter().zip(&original.data) {
+            let error = actual.abs_diff(expected);
+            assert!(error <= 3, "{actual} versus {expected}");
+            difference += error as u64;
+        }
+        assert!(difference as f64 / (page.data.len() as f64) < 0.1);
+    }
 
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum Region {
