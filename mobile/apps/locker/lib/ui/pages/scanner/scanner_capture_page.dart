@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:locker/services/scanner/auto_capture_controller.dart';
-import 'package:locker/services/scanner/scan_geometry.dart';
+import 'package:locker/services/scanner/quad_stability.dart';
 import 'package:locker/services/scanner/scan_session_controller.dart';
 import 'package:locker/services/scanner/scanner_models.dart';
 import 'package:locker/ui/pages/scanner/capture_flight.dart';
@@ -35,8 +35,11 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
     with WidgetsBindingObserver {
   final _logger = Logger('ScannerCapturePage');
   final _session = ScanSessionController();
-  final _stabilizer = QuadStabilizer();
+  final _stabilizer = QuadStability();
   final _autoCapture = AutoCaptureController();
+  final _frameClock = Stopwatch()..start();
+  Timer? _quadExpiry;
+  int _analysisGeneration = 0;
 
   CameraController? _camera;
   _CameraStatus _status = _CameraStatus.starting;
@@ -86,6 +89,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
 
   @override
   void dispose() {
+    _quadExpiry?.cancel();
+    _frameClock.stop();
     WidgetsBinding.instance.removeObserver(this);
     _session.removeListener(_onSessionChanged);
     unawaited(_camera?.dispose());
@@ -103,6 +108,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final camera = _camera;
     if (state == AppLifecycleState.inactive) {
+      _resetLiveTracking();
       if (camera != null) {
         setState(() => _camera = null);
         unawaited(camera.dispose());
@@ -126,11 +132,11 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   }
 
   Future<void> _startCamera() async {
+    _resetLiveTracking();
     setState(() {
       _status = _CameraStatus.starting;
       _stableQuad = null;
     });
-    _stabilizer.reset();
     _autoCapture.reset();
     try {
       final cameras = await availableCameras();
@@ -186,33 +192,42 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   }
 
   Future<void> _pauseCamera() async {
+    _resetLiveTracking();
     final camera = _camera;
     if (camera == null) return;
     setState(() {
       _camera = null;
       _stableQuad = null;
     });
-    _stabilizer.reset();
     _autoCapture.reset();
     await camera.dispose();
   }
 
   void _onFrame(CameraImage image) {
+    final camera = _camera;
     if (_reviewActive ||
+        camera == null ||
         _analysisInFlight ||
         _takingPicture ||
         !_session.isServiceReady) {
       return;
     }
     _analysisInFlight = true;
-    unawaited(_analyze(image));
+    unawaited(
+      _analyze(image, camera, _frameClock.elapsed, _analysisGeneration),
+    );
   }
 
-  Future<void> _analyze(CameraImage image) async {
+  Future<void> _analyze(
+    CameraImage image,
+    CameraController camera,
+    Duration observedAt,
+    int generation,
+  ) async {
     try {
       final rotation = Platform.isIOS
           ? 0
-          : _camera?.description.sensorOrientation ?? 0;
+          : camera.description.sensorOrientation;
       ScanQuad? raw;
       if (image.planes.length >= 3) {
         raw = await _session.detectLiveYuv(
@@ -235,22 +250,55 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
           rotation,
         );
       }
-      final stable = _stabilizer.update(raw);
+      if (!mounted ||
+          camera != _camera ||
+          generation != _analysisGeneration ||
+          _takingPicture) {
+        return;
+      }
+      final now = _frameClock.elapsed;
+      final sample = _stabilizer.update(
+        raw,
+        observedAt: observedAt,
+        now: now,
+        rotationDegrees: rotation,
+      );
+      _quadExpiry?.cancel();
+      if (sample.quad != null) {
+        _quadExpiry = Timer(sample.validUntil! - now, () {
+          if (!mounted) return;
+          _resetLiveTracking();
+          _autoCapture.invalidateArming();
+          setState(() {});
+        });
+      }
       var fire = false;
       if (_autoMode) {
         fire = _autoCapture.onFrame(
-          stable,
+          sample.quad,
           captureBusy: _takingPicture || _session.isProcessing,
+          timestamp: observedAt,
+          resetProgress: sample.resetCapture,
         );
       }
-      if (mounted) {
-        setState(() => _stableQuad = stable);
-        if (fire) unawaited(_capture());
-      }
+      setState(() => _stableQuad = sample.quad);
+      if (fire) unawaited(_capture());
     } catch (_) {
+      if (mounted && generation == _analysisGeneration && camera == _camera) {
+        _resetLiveTracking();
+        _autoCapture.invalidateArming();
+        setState(() {});
+      }
     } finally {
       _analysisInFlight = false;
     }
+  }
+
+  void _resetLiveTracking() {
+    _analysisGeneration++;
+    _quadExpiry?.cancel();
+    _stabilizer.reset(observedBefore: _frameClock.elapsed);
+    _stableQuad = null;
   }
 
   Future<void> _capture() async {
@@ -265,7 +313,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       _snapQuad = quad;
       _snapId++;
     });
-    _stabilizer.reset();
+    _resetLiveTracking();
     try {
       final shot = await camera.takePicture();
       final bytes = await shot.readAsBytes();
