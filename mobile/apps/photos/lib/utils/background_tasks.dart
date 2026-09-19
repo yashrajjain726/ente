@@ -14,6 +14,8 @@ import "package:photos/db/upload_locks_db.dart";
 import "package:photos/main.dart";
 import "package:photos/module/upload/service/file_uploader.dart";
 import "package:photos/services/machine_learning/ml_run_control.dart";
+import "package:photos/services/notification_service.dart";
+import "package:photos/settings/local_settings.dart";
 import "package:photos/utils/bg_task_utils.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:workmanager/workmanager.dart" as legacy;
@@ -28,6 +30,10 @@ class BackgroundTasks {
   static const refresh = "io.ente.photos.nativeBackgroundRefresh";
   static const processing = "io.ente.photos.nativeBackgroundProcessing";
   static const _pipelineHandoffWait = Duration(seconds: 5);
+  static final _cooperativeStopReasons = {
+    for (final reason in BackgroundStopReason.values)
+      if (reason != BackgroundStopReason.system) reason.name,
+  };
   static Future<void> _configuration = Future.value();
   static bool? _configuredNative;
 
@@ -144,14 +150,63 @@ class BackgroundTasks {
             ]
           : [],
       enabled: enabled,
-      onOutcome: (outcome) {
+      onOutcome: (outcome) async {
         _logger.info(
           "${outcome.identifier}: ${outcome.outcome.name}"
           "${outcome.reason == null ? '' : ' (${outcome.reason})'}"
           "${outcome.error == null ? '' : ': ${outcome.error}'}",
         );
+        if (_reportedByTask(outcome)) return;
+        await _debugNotify(
+          await SharedPreferences.getInstance(),
+          switch (outcome.outcome) {
+            BackgroundOutcome.skipped => "Skipped",
+            BackgroundOutcome.stopped => "Stopped",
+            BackgroundOutcome.failed => "Failed",
+            BackgroundOutcome.forcedTeardown => "Forced teardown",
+          },
+          [outcome.identifier, ?outcome.reason, ?outcome.error],
+        );
       },
     );
+  }
+
+  static bool _reportedByTask(BackgroundTaskOutcome outcome) {
+    if (outcome.outcome == BackgroundOutcome.skipped ||
+        outcome.outcome == BackgroundOutcome.forcedTeardown) {
+      return false;
+    }
+    final reason = outcome.reason;
+    return reason == null || _cooperativeStopReasons.contains(reason);
+  }
+
+  static Future<void> _debugNotify(
+    SharedPreferences prefs,
+    String title,
+    List<String> details,
+  ) async {
+    try {
+      if (prefs.getBool("ls.internal_user_disabled") == true ||
+          !_isRemoteInternalUser(prefs) ||
+          !LocalSettings(prefs).isBGDebugNotificationsEnabled) {
+        return;
+      }
+      await NotificationService.instance.showBackgroundDebugNotification(
+        title,
+        details.join("\n"),
+      );
+    } catch (error, stack) {
+      _logger.warning("Background debug notification failed", error, stack);
+    }
+  }
+
+  static bool _isRemoteInternalUser(SharedPreferences prefs) {
+    try {
+      final flags = jsonDecode(prefs.getString("remote_flags") ?? "{}");
+      return flags is Map && flags["internalUser"] == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<bool> nativeEnabled(SharedPreferences prefs) async {
@@ -159,13 +214,7 @@ class BackgroundTasks {
     if (prefs.getBool("ls.internal_user_disabled") == true) {
       return false;
     }
-    if (kDebugMode) return true;
-    try {
-      final flags = jsonDecode(prefs.getString("remote_flags") ?? "{}");
-      return flags is Map && flags["internalUser"] == true;
-    } catch (_) {
-      return false;
-    }
+    return kDebugMode || _isRemoteInternalUser(prefs);
   }
 
   static Future<bool> _acquirePipeline(BackgroundTask task) async {
@@ -206,9 +255,9 @@ class BackgroundTasks {
     var result = BackgroundTaskResult.stopped;
     await runWithLogs(
       () async {
+        final prefs = await SharedPreferences.getInstance();
         try {
           _logger.info("${task.identifier}: task started");
-          final prefs = await SharedPreferences.getInstance();
           if (!await nativeEnabled(prefs)) {
             _logger.info(
               "${task.identifier}: skipped, native backend disabled",
@@ -216,6 +265,7 @@ class BackgroundTasks {
             result = BackgroundTaskResult.skipped;
             return;
           }
+          await _debugNotify(prefs, "Started", [task.identifier]);
           task.throwIfStopping();
           if (!await _acquirePipeline(task)) {
             _logger.info(
@@ -277,6 +327,16 @@ class BackgroundTasks {
           result = BackgroundTaskResult.failed;
         }
         _logger.info("${task.identifier}: task ${result.name}");
+        final title = switch (result) {
+          BackgroundTaskResult.completed => "Success",
+          BackgroundTaskResult.skipped => "Skipped",
+          BackgroundTaskResult.stopped => "Stopped",
+          BackgroundTaskResult.failed => "Failed",
+        };
+        await _debugNotify(prefs, "$title ${task.elapsed.inSeconds}s", [
+          task.identifier,
+          ?task.stopReason?.name,
+        ]);
       },
       prefix: "[bg]",
       sentryInitTimeout: const Duration(seconds: 5),
