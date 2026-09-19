@@ -714,6 +714,157 @@ fn refine_color_edges(
     Some(refined)
 }
 
+fn source_color(source: &ImageU8, x: f64, y: f64) -> Option<[u8; 3]> {
+    if x < 0.0 || y < 0.0 || x >= source.width as f64 || y >= source.height as f64 {
+        return None;
+    }
+    let index = (y as usize * source.width as usize + x as usize) * 3;
+    Some([
+        source.data[index],
+        source.data[index + 1],
+        source.data[index + 2],
+    ])
+}
+
+fn printed_band_color(source: &ImageU8, p: [Point; 4], side: usize, band: f64) -> Option<[u8; 3]> {
+    let a = p[side];
+    let b = p[(side + 1) % 4];
+    let line = Line::through(a, b);
+    let reach =
+        (band * 12.0).min(distance(a, p[(side + 3) % 4]).min(distance(b, p[(side + 2) % 4])) / 4.0);
+    let mut profile = [[0_u8; 3]; 14];
+    for (index, profile_color) in profile.iter_mut().enumerate() {
+        let depth = index as i32 - 1;
+        let offset = if depth < 0 {
+            band
+        } else {
+            -(depth as f64) * reach / 12.0
+        };
+        let mut colors = [[0_u8; 3]; 16];
+        for (i, color) in colors.iter_mut().enumerate() {
+            let t = 0.2 + 0.6 * i as f64 / 15.0;
+            let x = a.x + (b.x - a.x) * t + line.nx * offset;
+            let y = a.y + (b.y - a.y) * t + line.ny * offset;
+            *color = source_color(source, x, y)?;
+        }
+        *profile_color = std::array::from_fn(|channel| {
+            let mut values = colors.map(|color| color[channel]);
+            values.sort_unstable();
+            values[8]
+        });
+    }
+    (0..3)
+        .any(|channel| {
+            let change = profile[0][channel].abs_diff(profile[13][channel]);
+            change >= 32
+                && profile.windows(2).any(|pair| {
+                    let step = pair[0][channel].abs_diff(pair[1][channel]);
+                    step >= 24 && step as u16 * 2 >= change as u16
+                })
+        })
+        .then_some(profile[0])
+}
+
+fn edge_continues_beyond_content(
+    source: &ImageU8,
+    corner: Point,
+    neighbor: Point,
+    band: f64,
+    outside_sign: f64,
+    content: [u8; 3],
+) -> bool {
+    let length = distance(corner, neighbor);
+    let beyond = |amount: f64| Point {
+        x: corner.x + (corner.x - neighbor.x) * amount / length,
+        y: corner.y + (corner.y - neighbor.y) * amount / length,
+    };
+    let edge = [beyond(band), beyond(band * 3.0)];
+    let line = Line::through(edge[0], edge[1]);
+    let scores = color_edge_scores(source, edge, band / 2.0);
+    (0..91).any(|step| {
+        if scores.values.iter().filter(|row| row[step] >= 4.0).count() < 40 {
+            return false;
+        }
+        let offset = (step as f64 - 45.0) * band / 60.0;
+        let mut background = [[0_u8; 3]; 16];
+        for (i, color) in background.iter_mut().enumerate() {
+            let center = beyond(band * (1.0 + 2.0 * i as f64 / 15.0));
+            let x = center.x + line.nx * (offset + outside_sign * band);
+            let y = center.y + line.ny * (offset + outside_sign * band);
+            let Some(value) = source_color(source, x, y) else {
+                return false;
+            };
+            *color = value;
+        }
+        if !(0..3).any(|channel| {
+            let mut values = background.map(|color| color[channel]);
+            values.sort_unstable();
+            let reference = values[8];
+            let mut deviations = values.map(|value| value.abs_diff(reference));
+            deviations.sort_unstable();
+            let difference = content[channel].abs_diff(reference);
+            difference >= 24 && difference as u16 > 3 * deviations[8] as u16
+        }) {
+            return false;
+        }
+        let mut deltas = [[0.0; 3]; 48];
+        for (i, delta) in deltas.iter_mut().enumerate() {
+            let center = beyond(band * (1.0 + 2.0 * (i as f64 + 1.0) / 49.0));
+            let sample = |offset: f64| {
+                source_color(
+                    source,
+                    center.x + line.nx * offset,
+                    center.y + line.ny * offset,
+                )
+            };
+            let (Some(a), Some(b)) = (sample(offset - 1.25), sample(offset + 1.25)) else {
+                return false;
+            };
+            *delta = std::array::from_fn(|channel| a[channel] as f64 - b[channel] as f64);
+        }
+        let reference = std::array::from_fn(|channel| {
+            let mut values = deltas.map(|delta| delta[channel]);
+            values.sort_by(f64::total_cmp);
+            values[24]
+        });
+        let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        (0..48)
+            .filter(|&i| {
+                scores.values[i][step] >= 4.0
+                    && dot(deltas[i], reference)
+                        > 0.9 * (dot(deltas[i], deltas[i]) * dot(reference, reference)).sqrt()
+            })
+            .count()
+            >= 40
+    })
+}
+
+fn cuts_printed_content(source: &ImageU8, p: [Point; 4], band: f64) -> bool {
+    let support = |edge: [Point; 2]| {
+        color_edge_scores(source, edge, band / 2.0)
+            .values
+            .iter()
+            .filter(|row| row.iter().any(|&score| score >= 4.0))
+            .count()
+    };
+    (0..4).any(|side| {
+        let Some(content) = printed_band_color(source, p, side, band) else {
+            return false;
+        };
+        let first =
+            edge_continues_beyond_content(source, p[side], p[(side + 3) % 4], band, 1.0, content);
+        let second = edge_continues_beyond_content(
+            source,
+            p[(side + 1) % 4],
+            p[(side + 2) % 4],
+            band,
+            -1.0,
+            content,
+        );
+        (first && second) || ((first || second) && support([p[side], p[(side + 1) % 4]]) < 32)
+    })
+}
+
 pub(super) fn refine_capture(
     source: &ImageU8,
     quad: Quad,
@@ -735,6 +886,13 @@ pub(super) fn refine_capture(
         y: p.y * sy,
     });
     let band = (preview.width.min(preview.height) as f64 * 0.008).clamp(1.5, 5.0);
+    let retain_content = |candidate: [Point; 4], source_quad: Quad| {
+        if cuts_printed_content(&preview, candidate, band) {
+            None
+        } else {
+            Some(source_quad)
+        }
+    };
     let mut lines = std::array::from_fn::<_, 4, _>(|i| Line::through(p[i], p[(i + 1) % 4]));
     let mut improved = 0;
     let mut supported = 0;
@@ -828,35 +986,35 @@ pub(super) fn refine_capture(
         return Ok(None);
     }
     if let Some(refined) = refine_color_edges(p, &color_samples, band * 3.0) {
-        let refined = quad_from_points(refined.map(|p| Point {
+        let source_refined = quad_from_points(refined.map(|p| Point {
             x: p.x / sx,
             y: p.y / sy,
         }));
-        if validate_quad(refined, extent).is_ok() {
-            return Ok(Some(refined));
+        if validate_quad(source_refined, extent).is_ok() {
+            return Ok(retain_content(refined, source_refined));
         }
     }
     if improved == 0 {
-        return Ok(Some(quad));
+        return Ok(retain_content(p, quad));
     }
     let mut refined = p;
     for i in 0..4 {
         let Some(point) = lines[(i + 3) % 4].intersection(lines[i]) else {
-            return Ok(Some(quad));
+            return Ok(retain_content(p, quad));
         };
         if distance(point, p[i]) > band * 1.5 {
-            return Ok(Some(quad));
+            return Ok(retain_content(p, quad));
         }
         refined[i] = point;
     }
-    let refined = quad_from_points(refined.map(|p| Point {
+    let source_refined = quad_from_points(refined.map(|p| Point {
         x: p.x / sx,
         y: p.y / sy,
     }));
-    if validate_quad(refined, extent).is_err() {
-        return Ok(Some(quad));
+    if validate_quad(source_refined, extent).is_err() {
+        return Ok(retain_content(p, quad));
     }
-    Ok(Some(refined))
+    Ok(retain_content(refined, source_refined))
 }
 
 #[cfg(test)]
@@ -1407,6 +1565,163 @@ mod benchmarks {
 #[cfg(test)]
 mod source_evidence_tests {
     use super::*;
+
+    #[test]
+    fn biased_header_seed_cannot_remove_printed_content() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 600, 3, vec![180; 400 * 600 * 3])?;
+        for y in 60..540 {
+            for x in 60..340 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(195);
+            }
+        }
+        for y in 63..100 {
+            for x in 65..335 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(50);
+            }
+        }
+        let biased = quad_from_points(
+            [(60.0, 88.0), (340.0, 88.0), (340.0, 540.0), (60.0, 540.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        if let Some(refined) = refine_capture(&source, biased, false)? {
+            assert!(
+                refined.top_left.y <= 65.0 && refined.top_right.y <= 65.0,
+                "printed header lost: {refined:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn tilted_header_seeds_preserve_content_across_rotation_and_paper_tone() -> OpResult<()> {
+        for (background, paper, ink) in [
+            ([180; 3], [195; 3], [50; 3]),
+            ([100; 3], [60; 3], [210; 3]),
+            ([180; 3], [195; 3], [35, 130, 165]),
+            ([100; 3], [60; 3], [190, 80, 130]),
+        ] {
+            let mut source = ImageU8::new(400, 600, 3, background.repeat(400 * 600))?;
+            for y in 60..540 {
+                for x in 60..340 {
+                    source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].copy_from_slice(&paper);
+                }
+            }
+            for y in 63..100 {
+                for x in 65..335 {
+                    source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].copy_from_slice(&ink);
+                }
+            }
+            for y in 0..600 {
+                for x in 0..400 {
+                    for channel in 0..3 {
+                        let index = (y * 400 + x) * 3 + channel;
+                        source.data[index] = (source.data[index] as i32 + x as i32 / 20 - 10) as u8;
+                    }
+                }
+            }
+            for (left, right) in [(60.0, 88.0), (88.0, 60.0)] {
+                for turns in 0..4 {
+                    let rotated = crate::cv::rotate_u8(&source, turns * 90)?;
+                    let rotate = |(x, y)| match turns {
+                        0 => Point { x, y },
+                        1 => Point { x: 600.0 - y, y: x },
+                        2 => Point {
+                            x: 400.0 - x,
+                            y: 600.0 - y,
+                        },
+                        _ => Point { x: y, y: 400.0 - x },
+                    };
+                    let biased = canonical(
+                        [(60.0, left), (340.0, right), (340.0, 540.0), (60.0, 540.0)].map(rotate),
+                        SourceExtent::new(rotated.width, rotated.height)?,
+                    );
+                    let Some(refined) = refine_capture(&rotated, biased, false)? else {
+                        continue;
+                    };
+                    let corners = points(refined);
+                    for point in
+                        [(66.0, 64.0), (334.0, 64.0), (334.0, 99.0), (66.0, 99.0)].map(rotate)
+                    {
+                        assert!(
+                            (0..4).all(|side| {
+                                cross(corners[side], corners[(side + 1) % 4], point)
+                                    >= -distance(corners[side], corners[(side + 1) % 4]) * 1.5
+                            }),
+                            "printed header lost at rotation {turns}: {refined:?}"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn plain_margins_and_folded_corners_remain_usable_on_textured_backgrounds() -> OpResult<()> {
+        for folded in [false, true] {
+            let mut source = ImageU8::new(400, 600, 3, vec![0; 400 * 600 * 3])?;
+            for y in 0..600 {
+                for x in 0..400 {
+                    let paper = (60..340).contains(&x)
+                        && (60..540).contains(&y)
+                        && (!folded || x + y >= 160);
+                    let value = if paper {
+                        195 + y / 15
+                    } else {
+                        80 + (x * 31 + y * 17) % 80
+                    };
+                    source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(value as u8);
+                }
+            }
+            for turns in 0..4 {
+                let rotated = crate::cv::rotate_u8(&source, turns * 90)?;
+                let rotate = |(x, y)| match turns {
+                    0 => Point { x, y },
+                    1 => Point { x: 600.0 - y, y: x },
+                    2 => Point {
+                        x: 400.0 - x,
+                        y: 600.0 - y,
+                    },
+                    _ => Point { x: y, y: 400.0 - x },
+                };
+                let seed = canonical(
+                    [(60.0, 60.0), (340.0, 88.0), (340.0, 540.0), (60.0, 540.0)].map(rotate),
+                    SourceExtent::new(rotated.width, rotated.height)?,
+                );
+                assert!(
+                    refine_capture(&rotated, seed, false)?.is_some(),
+                    "plain margin rejected: rotation {turns}, folded {folded}"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn curled_printed_header_keeps_background_above_its_outer_edge() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 600, 3, vec![0; 400 * 600 * 3])?;
+        for y in 0..600 {
+            for x in 0..400 {
+                let top = 82.0 - 22.0 * ((x as f64 - 200.0) / 140.0).powi(2);
+                let color = if (60..340).contains(&x) && (y as f64) >= top && y < 540 {
+                    if y < 112 {
+                        [35, 90, 50]
+                    } else {
+                        [135, 200, 175]
+                    }
+                } else {
+                    [70 + ((x * 13 + y * 7) % 24) as u8; 3]
+                };
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].copy_from_slice(&color);
+            }
+        }
+        let seed = quad_from_points(
+            [(60.0, 72.0), (340.0, 72.0), (340.0, 540.0), (60.0, 540.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        assert!(refine_capture(&source, seed, false)?.is_some());
+        Ok(())
+    }
 
     #[test]
     fn broad_printed_panel_does_not_displace_a_supported_outer_page() -> OpResult<()> {
