@@ -36,12 +36,16 @@ struct PaperCell {
     weight: f32,
 }
 
+#[derive(Clone, Copy)]
+enum PaperScale {
+    Coarse,
+    Detailed,
+}
+
 struct PaperField {
     width: usize,
     height: usize,
-    log_luminance: Vec<f32>,
-    confidence: Vec<f32>,
-    target_log_luminance: f32,
+    gain: Vec<f32>,
 }
 
 struct TransferTables {
@@ -302,7 +306,7 @@ fn estimate_field(analysis: &Analysis) -> Option<PaperField> {
     if valid_weight < 12.0 || paper_weight / valid_weight < 0.38 {
         return None;
     }
-    retain_paper_component(&mut cells, width, height);
+    retain_paper_components(&mut cells, width, height, PaperScale::Coarse);
     if paper_curvature(&cells, width, height) > MAX_PAPER_CURVATURE {
         return None;
     }
@@ -380,17 +384,114 @@ fn estimate_field(analysis: &Analysis) -> Option<PaperField> {
     }
     let confidence_start = (width.min(height) as f32 * 0.3).max(2.0);
     let confidence_end = (width.max(height) as f32 * 0.75).max(confidence_start + 1.0);
-    let confidence = distance
+    let confidence: Vec<f32> = distance
         .into_iter()
         .map(|value| 1.0 - transition(value as f32, confidence_start, confidence_end))
         .collect();
-    Some(PaperField {
+    Some(refine_field(
+        analysis,
+        &cells,
         width,
         height,
-        log_luminance: field,
-        confidence,
+        &field,
+        &confidence,
         target_log_luminance,
-    })
+    ))
+}
+
+fn refine_field(
+    analysis: &Analysis,
+    cells: &[PaperCell],
+    width: usize,
+    height: usize,
+    field: &[f32],
+    confidence: &[f32],
+    target: f32,
+) -> PaperField {
+    let support: Vec<f32> = cells
+        .iter()
+        .map(|cell| f32::from(cell.weight > 0.0))
+        .collect();
+    let support = close_background(&support, width, height, 1);
+    let background: Vec<f32> = analysis
+        .samples
+        .iter()
+        .map(|sample| sample.luminance.max(MIN_PAPER_LUMINANCE).ln())
+        .collect();
+    let background = close_background(&background, analysis.width, analysis.height, 3);
+    let mut detailed_cells: Vec<PaperCell> = background
+        .iter()
+        .zip(&analysis.samples)
+        .map(|(&log_luminance, sample)| PaperCell {
+            log_luminance,
+            weight: sample.coverage,
+        })
+        .collect();
+    retain_paper_components(
+        &mut detailed_cells,
+        analysis.width,
+        analysis.height,
+        PaperScale::Detailed,
+    );
+    let gain = analysis
+        .samples
+        .iter()
+        .enumerate()
+        .map(|(index, sample)| {
+            let x = (index % analysis.width) as f32 / analysis.width as f32
+                + 0.5 / analysis.width as f32;
+            let y = (index / analysis.width) as f32 / analysis.height as f32
+                + 0.5 / analysis.height as f32;
+            let coarse = interpolate(field, width, height, x, y);
+            let confidence = interpolate(confidence, width, height, x, y);
+            let support = interpolate(&support, width, height, x, y);
+            let difference = background[index] - coarse;
+            let weight = transition(support, 0.5, 1.0)
+                * (1.0 - transition(difference.abs(), 0.65, 0.85))
+                * sample.coverage
+                * f32::from(detailed_cells[index].weight > 0.0);
+            let paper = coarse + difference * weight;
+            ((target - paper).clamp(-0.08, 4.0f32.ln()) * confidence).exp()
+        })
+        .collect();
+    PaperField {
+        width: analysis.width,
+        height: analysis.height,
+        gain,
+    }
+}
+
+fn close_background(values: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
+    let mut source = values.to_vec();
+    let mut target = source.clone();
+    for maximum in [true, false] {
+        for horizontal in [true, false] {
+            for y in 0..height {
+                for x in 0..width {
+                    let position = if horizontal { x } else { y };
+                    let length = if horizontal { width } else { height };
+                    let mut value = source[y * width + x];
+                    for nearby in
+                        position.saturating_sub(radius)..=(position + radius).min(length - 1)
+                    {
+                        let index = if horizontal {
+                            y * width + nearby
+                        } else {
+                            nearby * width + x
+                        };
+                        value = if maximum {
+                            value.max(source[index])
+                        } else {
+                            value.min(source[index])
+                        };
+                    }
+                    target[y * width + x] = value;
+                }
+            }
+            std::mem::swap(&mut source, &mut target);
+        }
+    }
+    source
 }
 
 fn paper_adaptation(analysis: &Analysis) -> [f32; 3] {
@@ -438,6 +539,24 @@ fn neighbors(x: usize, y: usize, width: usize, height: usize) -> [Option<usize>;
 }
 
 fn paper_curvature(cells: &[PaperCell], width: usize, height: usize) -> f32 {
+    let mut smoothed = cells.to_vec();
+    for y in 0..height {
+        for x in 0..width {
+            let mut sum = 0.0;
+            let mut weight = 0.0;
+            for near_y in y.saturating_sub(1)..=(y + 1).min(height - 1) {
+                for near_x in x.saturating_sub(1)..=(x + 1).min(width - 1) {
+                    let cell = cells[near_y * width + near_x];
+                    sum += cell.log_luminance * cell.weight;
+                    weight += cell.weight;
+                }
+            }
+            if weight > 0.0 {
+                smoothed[y * width + x].log_luminance = sum / weight;
+            }
+        }
+    }
+    let cells = &smoothed;
     let mut curvature = Vec::new();
     for y in 0..height {
         for x in 0..width {
@@ -477,12 +596,18 @@ fn paper_curvature(cells: &[PaperCell], width: usize, height: usize) -> f32 {
     }
 }
 
-fn retain_paper_component(cells: &mut [PaperCell], width: usize, height: usize) {
+fn retain_paper_components(
+    cells: &mut [PaperCell],
+    width: usize,
+    height: usize,
+    scale: PaperScale,
+) {
     let mut labels = vec![usize::MAX; cells.len()];
     let mut queue = Vec::with_capacity(cells.len());
     let mut best_label = 0;
     let mut best_weight = 0.0;
     let mut label = 0;
+    let mut components = Vec::new();
     for start in 0..cells.len() {
         if cells[start].weight <= 0.0 || labels[start] != usize::MAX {
             continue;
@@ -492,8 +617,15 @@ fn retain_paper_component(cells: &mut [PaperCell], width: usize, height: usize) 
         labels[start] = label;
         let mut index = 0;
         let mut weight = 0.0;
+        let mut edges = 0u8;
         while index < queue.len() {
             let current = queue[index];
+            let x = current % width;
+            let y = current / width;
+            edges |= u8::from(x == 0)
+                | (u8::from(x + 1 == width) << 1)
+                | (u8::from(y == 0) << 2)
+                | (u8::from(y + 1 == height) << 3);
             weight += cells[current].weight * (0.3 * cells[current].log_luminance).exp();
             for neighbor in neighbors(current % width, current / width, width, height)
                 .into_iter()
@@ -501,7 +633,7 @@ fn retain_paper_component(cells: &mut [PaperCell], width: usize, height: usize) 
             {
                 if cells[neighbor].weight > 0.0
                     && labels[neighbor] == usize::MAX
-                    && paper_cells_agree(cells, current, neighbor, width, height)
+                    && paper_cells_agree(cells, current, neighbor, width, height, scale)
                 {
                     labels[neighbor] = label;
                     queue.push(neighbor);
@@ -513,10 +645,18 @@ fn retain_paper_component(cells: &mut [PaperCell], width: usize, height: usize) 
             best_weight = weight;
             best_label = label;
         }
+        components.push((weight, edges));
         label += 1;
     }
+    let (minimum_edges, minimum_weight) = match scale {
+        PaperScale::Coarse => (2, best_weight * 0.1),
+        PaperScale::Detailed => (1, 0.0),
+    };
     for (cell, label) in cells.iter_mut().zip(labels) {
-        if label != best_label {
+        let border_paper = components.get(label).is_some_and(|&(weight, edges)| {
+            edges.count_ones() >= minimum_edges && weight >= minimum_weight
+        });
+        if label != best_label && !border_paper {
             cell.weight = 0.0;
         }
     }
@@ -528,8 +668,12 @@ fn paper_cells_agree(
     neighbor: usize,
     width: usize,
     height: usize,
+    scale: PaperScale,
 ) -> bool {
     let step = (cells[neighbor].log_luminance - cells[current].log_luminance).abs();
+    if matches!(scale, PaperScale::Detailed) {
+        return step <= 0.025;
+    }
     if step > MAX_CELL_LOG_STEP {
         return false;
     }
@@ -547,10 +691,11 @@ fn paper_cells_agree(
             .filter(|cell| cell.weight > 0.0)
     };
     if let (Some(before), Some(after)) = (at(before), at(after)) {
-        let slope = (cells[current].log_luminance - before.log_luminance)
-            .abs()
-            .max((after.log_luminance - cells[neighbor].log_luminance).abs());
-        step <= slope * 2.0 + 0.035
+        let before_slope = cells[current].log_luminance - before.log_luminance;
+        let after_slope = after.log_luminance - cells[neighbor].log_luminance;
+        let slope = cells[neighbor].log_luminance - cells[current].log_luminance;
+        (slope - (before_slope + after_slope) * 0.5).abs()
+            <= (after_slope - before_slope).abs() + 0.035
     } else {
         true
     }
@@ -604,10 +749,7 @@ fn render(
         if let Some(field) = field {
             let x = (index % width) as f32 / width as f32 + 0.5 / width as f32;
             let y = (index / width) as f32 / height as f32 + 0.5 / height as f32;
-            let paper = interpolate(&field.log_luminance, field.width, field.height, x, y);
-            let confidence = interpolate(&field.confidence, field.width, field.height, x, y);
-            let gain =
-                ((field.target_log_luminance - paper).clamp(-0.08, 4.0f32.ln()) * confidence).exp();
+            let gain = interpolate(&field.gain, field.width, field.height, x, y);
             for value in &mut rgb {
                 *value *= gain;
             }
@@ -1095,12 +1237,9 @@ mod tests {
                 );
             }
         }
-        assert!(estimate_field(&analyze(&fixture.shaded, None, ANALYSIS_LONG_EDGE)).is_none());
+        let analysis = analyze(&fixture.shaded, None, ANALYSIS_LONG_EDGE);
         let mut output = fixture.shaded;
-        assert!(matches!(
-            process(&mut output, None, Some(ColorMode::Color)),
-            ColorMode::Color
-        ));
+        render(&mut output, None, None, paper_adaptation(&analysis), false);
         for x in [40, 340] {
             let paper = &output.data[(40 * 384 + x) * 3..][..3];
             assert!(
@@ -1405,6 +1544,175 @@ mod tests {
         assert!(faint_contrast > 10.0);
         assert!(region_mean(&output, &fixture.regions, Region::Ink) < 42.0);
         assert!(has_color(&output, None));
+        assert!(region_error(&output, &fixture.clean, &fixture.regions, Region::Paper) < 7.0);
+        assert!(paper_deviation(&output, &fixture.regions) < 5.0);
+    }
+
+    #[test]
+    fn directional_shadow_edges_preserve_faint_ink_and_solid_bars() {
+        let transfer = transfer_tables();
+        for (width, height) in [(320, 448), (640, 896), (1280, 1792)] {
+            for diagonal in [false, true] {
+                let mut fixture = document(width, height, [248; 3], false);
+                for y in height / 3..height * 2 / 5 {
+                    for x in width / 8..width * 7 / 8 {
+                        let index = y * width + x;
+                        fixture.clean.data[index * 3..][..3].fill(30);
+                        fixture.regions[index] = Region::Ink;
+                    }
+                }
+                for (index, pixel) in fixture
+                    .shaded
+                    .data
+                    .as_chunks_mut::<3>()
+                    .0
+                    .iter_mut()
+                    .enumerate()
+                {
+                    let x = (index % width) as f32 / width as f32;
+                    let y = (index / width) as f32 / height as f32;
+                    let boundary = if diagonal { 0.2 + y * 0.55 } else { 0.43 };
+                    let illumination = 0.33 + 0.56 * transition(x, boundary, boundary + 0.008);
+                    for (channel, value) in pixel.iter_mut().enumerate() {
+                        *value = encode(
+                            transfer.decode[fixture.clean.data[index * 3 + channel] as usize]
+                                * illumination,
+                            &transfer.encode,
+                        );
+                    }
+                }
+                let mut output = fixture.shaded;
+                process(&mut output, None, None);
+                let paper_error =
+                    region_error(&output, &fixture.clean, &fixture.regions, Region::Paper);
+                let faint_contrast = region_mean(&output, &fixture.regions, Region::Paper)
+                    - region_mean(&output, &fixture.regions, Region::Faint);
+                let mut edge_error = 0.0;
+                let mut count = 0;
+                for (index, &region) in fixture.regions.iter().enumerate() {
+                    let x = (index % width) as f32 / width as f32;
+                    let y = (index / width) as f32 / height as f32;
+                    let boundary = if diagonal { 0.2 + y * 0.55 } else { 0.43 };
+                    if region == Region::Paper && (x - boundary).abs() < 0.025 {
+                        edge_error += output.data[index * 3].abs_diff(248) as f32;
+                        count += 1;
+                    }
+                }
+                let edge_error = edge_error / count as f32;
+                assert!(
+                    paper_error < 7.0,
+                    "{width} diagonal {diagonal}: {paper_error}"
+                );
+                assert!(
+                    edge_error < 7.0,
+                    "{width} diagonal {diagonal}: {edge_error}"
+                );
+                assert!(faint_contrast > 10.0, "{width}: {faint_contrast}");
+                assert!(region_mean(&output, &fixture.regions, Region::Ink) < 44.0);
+            }
+        }
+    }
+
+    #[test]
+    fn printed_gray_gradients_are_not_illumination_measurements() {
+        let transfer = transfer_tables();
+        for (low, high) in [(140.0, 210.0), (200.0, 232.0), (226.0, 242.0)] {
+            let mut fixture = document(480, 688, [248; 3], false);
+            for y in 220..490 {
+                for x in 100..380 {
+                    let index = y * 480 + x;
+                    let value = (low + (high - low) * (x - 100) as f32 / 280.0) as u8;
+                    let illumination =
+                        0.37 + 0.55 * x as f32 / 480.0 + 0.045 * (y as f32 / 688.0 * 5.0).sin();
+                    fixture.clean.data[index * 3..][..3].fill(value);
+                    fixture.shaded.data[index * 3..][..3].fill(encode(
+                        transfer.decode[value as usize] * illumination,
+                        &transfer.encode,
+                    ));
+                    fixture.regions[index] = Region::Illustration;
+                }
+            }
+            let mut output = fixture.shaded;
+            process(&mut output, None, None);
+            let error = region_error(
+                &output,
+                &fixture.clean,
+                &fixture.regions,
+                Region::Illustration,
+            );
+            assert!(error < 8.0, "gradient {low}..{high}: {error}");
+        }
+    }
+
+    #[test]
+    fn small_neutral_panels_preserve_contrast() {
+        let transfer = transfer_tables();
+        for edge in [16, 24, 32, 48, 64, 96] {
+            for value in [128, 160, 192, 216, 232] {
+                let mut fixture = document(512, 704, [248; 3], false);
+                for y in 560..560 + edge {
+                    for x in 200..200 + edge {
+                        let index = y * 512 + x;
+                        let illumination =
+                            0.37 + 0.55 * x as f32 / 512.0 + 0.045 * (y as f32 / 704.0 * 5.0).sin();
+                        fixture.clean.data[index * 3..][..3].fill(value);
+                        fixture.shaded.data[index * 3..][..3].fill(encode(
+                            transfer.decode[value as usize] * illumination,
+                            &transfer.encode,
+                        ));
+                        fixture.regions[index] = Region::Illustration;
+                    }
+                }
+                let mut output = fixture.shaded;
+                process(&mut output, None, None);
+                let contrast = region_mean(&output, &fixture.regions, Region::Paper)
+                    - region_mean(&output, &fixture.regions, Region::Illustration);
+                assert!(
+                    contrast >= (248 - value) as f32 * 0.75,
+                    "{edge}px panel {value}: contrast {contrast}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hard_shadows_on_colored_stock_preserve_chromaticity() {
+        let mut fixture = document(400, 560, [235, 211, 159], true);
+        let transfer = transfer_tables();
+        for (index, pixel) in fixture
+            .shaded
+            .data
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .enumerate()
+        {
+            let illumination = if index % 400 < 180 { 0.4 } else { 0.91 };
+            for (channel, value) in pixel.iter_mut().enumerate() {
+                *value = encode(
+                    transfer.decode[fixture.clean.data[index * 3 + channel] as usize]
+                        * illumination,
+                    &transfer.encode,
+                );
+            }
+        }
+        let mut output = fixture.shaded;
+        assert!(matches!(process(&mut output, None, None), ColorMode::Color));
+        assert!(paper_deviation(&output, &fixture.regions) < 4.0);
+        let expected = chromaticity([
+            transfer.decode[235],
+            transfer.decode[211],
+            transfer.decode[159],
+        ]);
+        for x in [40, 340] {
+            let pixel = &output.data[(40 * 400 + x) * 3..][..3];
+            let actual = chromaticity([
+                transfer.decode[pixel[2] as usize],
+                transfer.decode[pixel[1] as usize],
+                transfer.decode[pixel[0] as usize],
+            ]);
+            assert!(chroma_distance(expected, actual) < 0.005);
+        }
     }
 
     #[test]
@@ -1436,17 +1744,28 @@ mod tests {
                 + 0.06 * (x * 18.0 - y * 14.0).cos();
             pixel.fill(encode(tone, &transfer.encode));
         }
-        let before = photo.data.clone();
-        process(&mut photo, None, None);
-        let change = photo
-            .data
-            .iter()
-            .zip(before)
-            .map(|(&a, b)| a.abs_diff(b) as f32)
-            .sum::<f32>()
-            / photo.data.len() as f32;
-        eprintln!("monochrome photograph change {change:.3}");
-        assert!(change < 3.0);
+        for caption in [false, true] {
+            let mut photo = photo.clone();
+            if caption {
+                for y in 425..485 {
+                    for x in 30..345 {
+                        if y % 12 < 3 && x % 17 < 11 {
+                            photo.data[(y * 384 + x) * 3..][..3].fill(25);
+                        }
+                    }
+                }
+            }
+            let before = photo.data.clone();
+            process(&mut photo, None, None);
+            let change = photo
+                .data
+                .iter()
+                .zip(before)
+                .map(|(&a, b)| a.abs_diff(b) as f32)
+                .sum::<f32>()
+                / photo.data.len() as f32;
+            assert!(change < 3.0, "caption {caption}: {change}");
+        }
     }
 
     #[test]
