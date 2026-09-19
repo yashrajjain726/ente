@@ -9,7 +9,7 @@ const ANALYSIS_LONG_EDGE: usize = 384;
 const CELL_EDGE: usize = 16;
 const CHROMA_BIN_COUNT: usize = 48;
 const PAPER_CHROMA_RADIUS: f32 = 0.032;
-const NEUTRAL_CHROMA_SPREAD: f32 = 0.034;
+const NEUTRAL_CHROMA_SPREAD: f32 = 0.067;
 const MIN_PAPER_LUMINANCE: f32 = 0.12;
 const MAX_CELL_LOG_STEP: f32 = 0.14;
 const MAX_PAPER_CURVATURE: f32 = 16.0;
@@ -42,7 +42,6 @@ struct PaperField {
     log_luminance: Vec<f32>,
     confidence: Vec<f32>,
     target_log_luminance: f32,
-    adaptation: [f32; 3],
 }
 
 struct TransferTables {
@@ -385,20 +384,48 @@ fn estimate_field(analysis: &Analysis) -> Option<PaperField> {
         .into_iter()
         .map(|value| 1.0 - transition(value as f32, confidence_start, confidence_end))
         .collect();
-    let adaptation = if neutral {
-        let paper_luminance = luminance(chroma);
-        chroma.map(|channel| (paper_luminance / channel.max(0.001)).clamp(0.88, 1.12))
-    } else {
-        [1.0; 3]
-    };
     Some(PaperField {
         width,
         height,
         log_luminance: field,
         confidence,
         target_log_luminance,
-        adaptation,
     })
+}
+
+fn paper_adaptation(analysis: &Analysis) -> [f32; 3] {
+    let Some(chroma) = paper_chromaticity(analysis) else {
+        return [1.0; 3];
+    };
+    let spread = chroma.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+        - chroma.iter().copied().fold(f32::INFINITY, f32::min);
+    if spread >= NEUTRAL_CHROMA_SPREAD {
+        return [1.0; 3];
+    }
+    let mut supported = [0.0; 9];
+    let mut available = [0.0; 9];
+    for (index, sample) in analysis.samples.iter().enumerate() {
+        let x = index % analysis.width;
+        let y = index / analysis.width;
+        let region = (y * 3 / analysis.height) * 3 + x * 3 / analysis.width;
+        available[region] += sample.coverage;
+        if sample.smoothness > 0.5
+            && chroma_distance(chromaticity(sample.rgb), chroma) < PAPER_CHROMA_RADIUS
+        {
+            supported[region] += sample.coverage;
+        }
+    }
+    let broad_support = supported.iter().sum::<f32>() >= available.iter().sum::<f32>() * 0.2;
+    let regions = supported
+        .iter()
+        .zip(available)
+        .filter(|(support, available)| available > &0.0 && **support >= available * 0.05)
+        .count();
+    if !broad_support || regions < 7 {
+        return [1.0; 3];
+    }
+    let paper_luminance = luminance(chroma);
+    chroma.map(|channel| (paper_luminance / channel.max(0.001)).clamp(0.88, 1.12))
 }
 
 fn neighbors(x: usize, y: usize, width: usize, height: usize) -> [Option<usize>; 4] {
@@ -551,7 +578,13 @@ fn encode(value: f32, table: &[f32]) -> u8 {
     (table[low] * (1.0 - fraction) + table[high] * fraction).round() as u8
 }
 
-fn render(image: &mut ImageU8, valid: Option<&[u8]>, field: Option<&PaperField>, grayscale: bool) {
+fn render(
+    image: &mut ImageU8,
+    valid: Option<&[u8]>,
+    field: Option<&PaperField>,
+    adaptation: [f32; 3],
+    grayscale: bool,
+) {
     let width = image.width as usize;
     let height = image.height as usize;
     let tables = transfer_tables();
@@ -560,7 +593,7 @@ fn render(image: &mut ImageU8, valid: Option<&[u8]>, field: Option<&PaperField>,
             pixel.fill(255);
             continue;
         }
-        if field.is_none() && !grayscale {
+        if field.is_none() && adaptation == [1.0; 3] && !grayscale {
             continue;
         }
         let mut rgb = [
@@ -575,12 +608,15 @@ fn render(image: &mut ImageU8, valid: Option<&[u8]>, field: Option<&PaperField>,
             let confidence = interpolate(&field.confidence, field.width, field.height, x, y);
             let gain =
                 ((field.target_log_luminance - paper).clamp(-0.08, 4.0f32.ln()) * confidence).exp();
-            for (value, adaptation) in rgb.iter_mut().zip(field.adaptation) {
-                *value *= gain * (1.0 + (adaptation - 1.0) * confidence);
+            for value in &mut rgb {
+                *value *= gain;
             }
-            let maximum = rgb.iter().copied().fold(1.0, f32::max);
-            rgb.iter_mut().for_each(|value| *value /= maximum);
         }
+        for (value, adaptation) in rgb.iter_mut().zip(adaptation) {
+            *value *= adaptation;
+        }
+        let maximum = rgb.iter().copied().fold(1.0, f32::max);
+        rgb.iter_mut().for_each(|value| *value /= maximum);
         if grayscale {
             pixel.fill(encode(luminance(rgb), &tables.encode));
         } else {
@@ -591,10 +627,20 @@ fn render(image: &mut ImageU8, valid: Option<&[u8]>, field: Option<&PaperField>,
     }
 }
 
-fn meaningful_color(image: &ImageU8, valid: Option<&[u8]>) -> bool {
+fn meaningful_color(image: &ImageU8, valid: Option<&[u8]>, adaptation: [f32; 3]) -> bool {
     let width = image.width as usize;
     let height = image.height as usize;
-    let mut coherent = 0;
+    let decode = &transfer_tables().decode;
+    let corrected = |pixel: &[u8]| {
+        std::array::from_fn::<_, 3, _>(|channel| {
+            decode[pixel[2 - channel] as usize] * adaptation[channel]
+        })
+    };
+    let radius = (width.max(height) / 192).max(2);
+    let mut saturated = 0.0;
+    let mut colored_content = 0.0;
+    let mut content = 0.0;
+    let mut available = 0;
     for y in 0..height {
         for x in 0..width {
             let index = y * width + x;
@@ -602,22 +648,37 @@ fn meaningful_color(image: &ImageU8, valid: Option<&[u8]>) -> bool {
                 continue;
             }
             let pixel = &image.data[index * 3..index * 3 + 3];
-            let low = pixel[0].min(pixel[1]).min(pixel[2]) as i16;
-            let high = pixel[0].max(pixel[1]).max(pixel[2]) as i16;
-            if high - low < 13 {
+            let rgb = corrected(pixel);
+            let low = rgb.into_iter().fold(f32::INFINITY, f32::min);
+            let high = rgb.into_iter().fold(0.0, f32::max);
+            let brightness = |x: usize, y: usize| {
+                let neighbor = y * width + x;
+                if valid.is_some_and(|mask| mask[neighbor] == 0) {
+                    luminance(rgb)
+                } else {
+                    luminance(corrected(&image.data[neighbor * 3..neighbor * 3 + 3]))
+                }
+            };
+            let horizontal = brightness(x.saturating_sub(radius), y)
+                .min(brightness((x + radius).min(width - 1), y));
+            let vertical = brightness(x, y.saturating_sub(radius))
+                .min(brightness(x, (y + radius).min(height - 1)));
+            let local = horizontal.max(vertical);
+            let contrast = (1.0 - luminance(rgb) / local.max(0.01)).max(0.0);
+            let ink = contrast * transition(contrast, 0.08, 0.3);
+            available += 1;
+            content += ink;
+            let strength = transition((high - low) / high.sqrt().max(0.01), 0.045, 0.12);
+            if strength == 0.0 {
                 continue;
             }
-            if width * height < 36 {
-                return true;
-            }
-            let differences = [
-                pixel[2] as i16 - pixel[1] as i16,
-                pixel[0] as i16 - pixel[1] as i16,
-            ];
-            let mut matched = false;
+            let differences = [rgb[0] - rgb[1], rgb[2] - rgb[1]];
+            let mut matched = width * height < 36;
             for neighbor in [
                 (x + 1 < width).then_some(index + 1),
                 (y + 1 < height).then_some(index + width),
+                (x > 0 && y + 1 < height).then(|| index + width - 1),
+                (x + 1 < width && y + 1 < height).then_some(index + width + 1),
             ]
             .into_iter()
             .flatten()
@@ -625,26 +686,21 @@ fn meaningful_color(image: &ImageU8, valid: Option<&[u8]>) -> bool {
                 if valid.is_some_and(|mask| mask[neighbor] == 0) {
                     continue;
                 }
-                let other = &image.data[neighbor * 3..neighbor * 3 + 3];
-                let other_differences = [
-                    other[2] as i16 - other[1] as i16,
-                    other[0] as i16 - other[1] as i16,
-                ];
-                let dot = differences[0] as i32 * other_differences[0] as i32
-                    + differences[1] as i32 * other_differences[1] as i32;
-                let length = differences[0] as i32 * differences[0] as i32
-                    + differences[1] as i32 * differences[1] as i32;
-                matched |= dot > length / 2;
+                let other = corrected(&image.data[neighbor * 3..neighbor * 3 + 3]);
+                let other_differences = [other[0] - other[1], other[2] - other[1]];
+                let dot =
+                    differences[0] * other_differences[0] + differences[1] * other_differences[1];
+                let length = differences[0].powi(2) + differences[1].powi(2);
+                matched |= dot > length * 0.5;
             }
             if matched {
-                coherent += 1;
-                if coherent >= 6 {
-                    return true;
-                }
+                saturated += strength * transition((high - low) / high.max(0.01), 0.12, 0.3);
+                colored_content += ink * strength;
             }
         }
     }
-    false
+    saturated / available.max(1) as f32 >= 0.02
+        || (colored_content > 0.0 && colored_content >= content * 0.4)
 }
 
 pub(super) fn render_document(
@@ -655,18 +711,21 @@ pub(super) fn render_document(
     validate(image, valid)?;
     let analysis = analyze(image, valid, ANALYSIS_LONG_EDGE);
     let field = estimate_field(&analysis);
-    let explicit_grayscale = matches!(requested_mode, Some(ColorMode::Grayscale));
-    render(image, valid, field.as_ref(), explicit_grayscale);
+    let adaptation = paper_adaptation(&analysis);
     let mode = requested_mode.unwrap_or_else(|| {
-        if meaningful_color(image, valid) {
+        if meaningful_color(image, valid, adaptation) {
             ColorMode::Color
         } else {
             ColorMode::Grayscale
         }
     });
-    if requested_mode.is_none() && matches!(mode, ColorMode::Grayscale) {
-        render(image, valid, None, true);
-    }
+    render(
+        image,
+        valid,
+        field.as_ref(),
+        adaptation,
+        matches!(mode, ColorMode::Grayscale),
+    );
     Ok(mode)
 }
 
@@ -694,6 +753,14 @@ mod tests {
             Ok(mode) => mode,
             Err(error) => panic!("{error}"),
         }
+    }
+
+    fn has_color(image: &ImageU8, valid: Option<&[u8]>) -> bool {
+        meaningful_color(
+            image,
+            valid,
+            paper_adaptation(&analyze(image, valid, ANALYSIS_LONG_EDGE)),
+        )
     }
 
     fn image(width: usize, height: usize, rgb: [u8; 3]) -> ImageU8 {
@@ -874,18 +941,26 @@ mod tests {
     }
 
     #[test]
-    fn keeps_tiny_coherent_stamps_and_one_pixel_color_strokes() {
-        let mut stamped = image(1600, 2200, [244; 3]);
-        for y in 1200..1209 {
-            for x in 400..407 {
-                let offset = (y * 1600 + x) * 3;
-                stamped.data[offset..offset + 3].copy_from_slice(&[61, 32, 194]);
+    fn small_stamp_on_monochrome_print_chooses_grayscale() {
+        for stamp in [false, true] {
+            let mut printed = document(160, 220, [244; 3], false).clean;
+            if stamp {
+                for y in 180..184 {
+                    for x in 40..44 {
+                        let offset = (y * 160 + x) * 3;
+                        printed.data[offset..offset + 3].copy_from_slice(&[194, 32, 61]);
+                    }
+                }
             }
+            assert!(matches!(
+                process(&mut printed, None, None),
+                ColorMode::Grayscale
+            ));
         }
-        assert!(matches!(
-            process(&mut stamped, None, None),
-            ColorMode::Color
-        ));
+    }
+
+    #[test]
+    fn sparse_colored_writing_as_main_content_stays_color() {
         let mut signature = image(700, 1000, [244; 3]);
         for x in 230..249 {
             let offset = (720 * 700 + x) * 3;
@@ -895,6 +970,159 @@ mod tests {
             process(&mut signature, None, None),
             ColorMode::Color
         ));
+    }
+
+    #[test]
+    fn stamp_decisions_follow_content_proportions_across_resolutions() {
+        for (width, height) in [(192, 264), (576, 792), (1152, 1584)] {
+            for stamp_width in [width / 50, width / 20, width / 10] {
+                let mut printed = document(width, height, [244; 3], false).clean;
+                for y in height * 4 / 5..height * 4 / 5 + stamp_width {
+                    for x in width / 3..width / 3 + stamp_width {
+                        printed.data[(y * width + x) * 3..][..3].copy_from_slice(&[173, 93, 66]);
+                    }
+                }
+                let mut explicit = printed.clone();
+                assert!(
+                    matches!(process(&mut printed, None, None), ColorMode::Grayscale),
+                    "{width}x{height}, stamp {stamp_width}"
+                );
+                assert!(
+                    printed
+                        .data
+                        .as_chunks::<3>()
+                        .0
+                        .iter()
+                        .all(|p| p[0] == p[1] && p[1] == p[2])
+                );
+                assert!(matches!(
+                    process(&mut explicit, None, Some(ColorMode::Color)),
+                    ColorMode::Color
+                ));
+                let pixel = &explicit.data[((height * 4 / 5) * width + width / 3) * 3..][..3];
+                assert!(pixel[0] > pixel[2] + 60);
+            }
+        }
+    }
+
+    #[test]
+    fn faint_colored_handwriting_is_distinct_from_an_accent_on_black_print() {
+        for (width, height) in [(224, 320), (672, 960)] {
+            for rgb in [[63, 82, 153], [191, 203, 227]] {
+                let mut writing = image(width, height, [244; 3]);
+                let mut printed = document(width, height, [244; 3], false).clean;
+                let mut previous_y = (height * 4 / 5) as isize;
+                for x in width / 4..width * 3 / 4 {
+                    let y = (height * 4 / 5) as isize
+                        + ((x as f32 / width as f32 * 80.0).sin() * 8.0) as isize;
+                    for stroke_y in previous_y.min(y)..=previous_y.max(y) {
+                        let index = stroke_y as usize * width + x;
+                        writing.data[index * 3..][..3].copy_from_slice(&[rgb[2], rgb[1], rgb[0]]);
+                        printed.data[index * 3..][..3].copy_from_slice(&[rgb[2], rgb[1], rgb[0]]);
+                    }
+                    previous_y = y;
+                }
+                for shadow in [false, true] {
+                    let mut writing = writing.clone();
+                    let mut printed = printed.clone();
+                    if shadow {
+                        for image in [&mut writing, &mut printed] {
+                            for (index, pixel) in
+                                image.data.as_chunks_mut::<3>().0.iter_mut().enumerate()
+                            {
+                                let illumination = if index % width < width / 2 {
+                                    0.42
+                                } else {
+                                    0.91
+                                };
+                                for value in pixel {
+                                    *value = encode(
+                                        transfer_tables().decode[*value as usize] * illumination,
+                                        &transfer_tables().encode,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    assert!(
+                        matches!(process(&mut writing, None, None), ColorMode::Color),
+                        "writing {width} {rgb:?} shadow {shadow}"
+                    );
+                    assert!(
+                        matches!(process(&mut printed, None, None), ColorMode::Grayscale),
+                        "accent {width} {rgb:?} shadow {shadow}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn highlighted_monochrome_print_stays_color() {
+        let mut page = document(384, 544, [244; 3], false).clean;
+        for y in 181..197 {
+            for x in 35..323 {
+                let pixel = &mut page.data[(y * 384 + x) * 3..][..3];
+                if pixel[0] > 220 {
+                    pixel.copy_from_slice(&[103, 230, 242]);
+                }
+            }
+        }
+        assert!(matches!(process(&mut page, None, None), ColorMode::Color));
+        let pixel = &page.data[(195 * 384 + 40) * 3..][..3];
+        assert!(pixel[2] > pixel[0] + 100);
+    }
+
+    #[test]
+    fn neutral_paper_cast_is_corrected_without_an_illumination_field() {
+        let mut fixture = document(384, 544, [248; 3], true);
+        let tables = transfer_tables();
+        for (index, pixel) in fixture
+            .shaded
+            .data
+            .as_chunks_mut::<3>()
+            .0
+            .iter_mut()
+            .enumerate()
+        {
+            let illumination = if index % 384 < 192 { 0.45 } else { 0.9 };
+            for (channel, value) in pixel.iter_mut().enumerate() {
+                *value = encode(
+                    tables.decode[fixture.clean.data[index * 3 + channel] as usize]
+                        * illumination
+                        * [0.94, 1.01, 1.06][channel],
+                    &tables.encode,
+                );
+            }
+        }
+        assert!(estimate_field(&analyze(&fixture.shaded, None, ANALYSIS_LONG_EDGE)).is_none());
+        let mut output = fixture.shaded;
+        assert!(matches!(
+            process(&mut output, None, Some(ColorMode::Color)),
+            ColorMode::Color
+        ));
+        for x in [40, 340] {
+            let paper = &output.data[(40 * 384 + x) * 3..][..3];
+            assert!(
+                paper.iter().max().expect("channel") - paper.iter().min().expect("channel") <= 2
+            );
+        }
+        assert!(
+            region_mean(&output, &fixture.regions, Region::Paper)
+                - region_mean(&output, &fixture.regions, Region::Faint)
+                > 10.0
+        );
+        for (actual, expected) in output
+            .data
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(fixture.clean.data.as_chunks::<3>().0.iter())
+        {
+            if expected[0] as i16 - expected[2] as i16 > 100 {
+                assert!(actual[0] as i16 - actual[2] as i16 > 75);
+            }
+        }
     }
 
     #[test]
@@ -1048,7 +1276,7 @@ mod tests {
             pixels.data[value * 3..value * 3 + 3].fill(value as u8);
         }
         let expected = pixels.data.clone();
-        render(&mut pixels, None, None, true);
+        render(&mut pixels, None, None, [1.0; 3], true);
         assert_eq!(pixels.data, expected);
     }
 
@@ -1176,7 +1404,7 @@ mod tests {
             - region_mean(&output, &fixture.regions, Region::Faint);
         assert!(faint_contrast > 10.0);
         assert!(region_mean(&output, &fixture.regions, Region::Ink) < 42.0);
-        assert!(meaningful_color(&output, None));
+        assert!(has_color(&output, None));
     }
 
     #[test]
@@ -1192,7 +1420,7 @@ mod tests {
                     .iter()
                     .all(|pixel| pixel.iter().zip(original).all(|(&a, b)| a.abs_diff(b) <= 1))
             );
-            assert!(meaningful_color(&page, None));
+            assert!(has_color(&page, None));
         }
     }
 
@@ -1258,8 +1486,14 @@ mod tests {
                     let analysis = analyze(&output, None, long_edge);
                     samples = analysis.samples.len();
                     let field = estimate_field(&analysis);
-                    render(&mut output, None, field.as_ref(), false);
-                    assert!(meaningful_color(&output, None));
+                    render(
+                        &mut output,
+                        None,
+                        field.as_ref(),
+                        paper_adaptation(&analysis),
+                        false,
+                    );
+                    assert!(has_color(&output, None));
                     elapsed.push(start.elapsed().as_secs_f64() * 1000.0);
                 }
                 elapsed.sort_unstable_by(f64::total_cmp);
