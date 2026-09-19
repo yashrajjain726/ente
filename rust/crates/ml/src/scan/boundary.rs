@@ -506,6 +506,7 @@ pub(super) fn refine_capture(source: &ImageU8, quad: Quad) -> OpResult<Option<Qu
         if samples.len() < 32 {
             continue;
         }
+        supported += 1;
         let fitted = fit_line(&samples, line, 0.75);
         if samples
             .iter()
@@ -516,7 +517,6 @@ pub(super) fn refine_capture(source: &ImageU8, quad: Quad) -> OpResult<Option<Qu
         {
             continue;
         }
-        supported += 1;
         if after <= before * 1.15 {
             continue;
         }
@@ -757,6 +757,53 @@ mod benchmarks {
 #[cfg(test)]
 mod source_evidence_tests {
     use super::*;
+
+    #[test]
+    fn visible_but_non_straight_edges_keep_the_detected_page() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, vec![190; 400 * 300 * 3])?;
+        for y in 0..300 {
+            for x in 0..400 {
+                let horizontal = (x as f64 / 12.0).sin() * 3.5;
+                let vertical = (y as f64 / 12.0).sin() * 3.5;
+                if x as f64 >= 60.0 + vertical
+                    && (x as f64) < 340.0 + vertical
+                    && y as f64 >= 40.0 + horizontal
+                    && (y as f64) < 260.0 + horizontal
+                {
+                    source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(210);
+                }
+            }
+        }
+        let quad = quad_from_points(
+            [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        assert_eq!(refine_capture(&source, quad)?, Some(quad));
+        Ok(())
+    }
+
+    #[test]
+    fn isolated_strong_edge_segments_do_not_support_an_interior_crop() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, vec![235; 400 * 300 * 3])?;
+        for (x0, y0, x1, y1) in [
+            (130, 40, 240, 50),
+            (330, 110, 340, 190),
+            (130, 250, 240, 260),
+            (60, 110, 70, 190),
+        ] {
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(35);
+                }
+            }
+        }
+        let quad = quad_from_points(
+            [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        assert!(refine_capture(&source, quad)?.is_none());
+        Ok(())
+    }
 
     #[test]
     fn unsupported_interior_text_regions_fall_back_to_the_whole_image() -> OpResult<()> {
