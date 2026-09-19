@@ -769,6 +769,75 @@ fn render(
     }
 }
 
+fn stroke_contrast(image: &ImageU8, valid: Option<&[u8]>) -> Vec<f32> {
+    let width = image.width as usize;
+    let height = image.height as usize;
+    let tables = transfer_tables();
+    let background: Vec<f32> = image
+        .data
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .enumerate()
+        .map(|(index, pixel)| {
+            if valid.is_some_and(|mask| mask[index] == 0) {
+                return 0.0;
+            }
+            luminance([
+                tables.decode[pixel[2] as usize],
+                tables.decode[pixel[1] as usize],
+                tables.decode[pixel[0] as usize],
+            ])
+        })
+        .collect();
+    let radius = width.max(height).div_ceil(192).max(2);
+    let mut contrasts = vec![0.0; width * height];
+    for (index, &level) in background.iter().enumerate() {
+        if valid.is_some_and(|mask| mask[index] == 0) {
+            continue;
+        }
+        let x = index % width;
+        let y = index / width;
+        let mut paper = level;
+        for distance in [radius, radius * 2] {
+            let horizontal = background[y * width + x.saturating_sub(distance)]
+                .min(background[y * width + (x + distance).min(width - 1)]);
+            let vertical = background[y.saturating_sub(distance) * width + x]
+                .min(background[(y + distance).min(height - 1) * width + x]);
+            paper = paper.max(horizontal).max(vertical);
+        }
+        let contrast = (1.0 - level / paper.max(0.01)).max(0.0);
+        contrasts[index] = contrast;
+    }
+    contrasts
+}
+
+fn enhance_neutral_strokes(image: &mut ImageU8, contrasts: &[f32]) {
+    let tables = transfer_tables();
+    for (pixel, &contrast) in image.data.as_chunks_mut::<3>().0.iter_mut().zip(contrasts) {
+        if contrast <= 0.02 {
+            continue;
+        }
+        let rgb = [
+            tables.decode[pixel[2] as usize],
+            tables.decode[pixel[1] as usize],
+            tables.decode[pixel[0] as usize],
+        ];
+        let low = rgb.into_iter().fold(f32::INFINITY, f32::min);
+        let high = rgb.into_iter().fold(0.0, f32::max);
+        let neutrality = 1.0 - transition((high - low) / high.max(0.01), 0.04, 0.12);
+        let paper = luminance(rgb) / (1.0 - contrast).max(f32::EPSILON);
+        let weight = neutrality * transition(paper, 0.75, 0.9) * transition(contrast, 0.02, 0.07);
+        if weight == 0.0 {
+            continue;
+        }
+        let gain = 1.0 / (1.0 + 2.0 * weight * contrast);
+        pixel[0] = encode(rgb[2] * gain, &tables.encode);
+        pixel[1] = encode(rgb[1] * gain, &tables.encode);
+        pixel[2] = encode(rgb[0] * gain, &tables.encode);
+    }
+}
+
 fn meaningful_color(image: &ImageU8, valid: Option<&[u8]>, adaptation: [f32; 3]) -> bool {
     let width = image.width as usize;
     let height = image.height as usize;
@@ -861,6 +930,7 @@ pub(super) fn render_document(
             ColorMode::Grayscale
         }
     });
+    let contrasts = field.as_ref().map(|_| stroke_contrast(image, valid));
     render(
         image,
         valid,
@@ -868,6 +938,9 @@ pub(super) fn render_document(
         adaptation,
         matches!(mode, ColorMode::Grayscale),
     );
+    if let Some(contrasts) = contrasts {
+        enhance_neutral_strokes(image, &contrasts);
+    }
     Ok(mode)
 }
 
@@ -1788,6 +1861,81 @@ mod tests {
         let paper = page.data[(30 * 320 + 30) * 3];
         assert!((250..=252).contains(&paper));
         assert_eq!(page.data[(200 * 320 + 200) * 3], 255);
+    }
+
+    #[test]
+    fn equally_supported_ink_preserves_tonal_order() {
+        let mut previous = [0; 5];
+        for ink in 0..248 {
+            let mut page = image(192, 256, [248; 3]);
+            for y in 50..220 {
+                for x in 32..160 {
+                    if y % 16 < 5 && x % 11 < 7 {
+                        let coverage = [0.25, 0.75, 1.0, 0.75, 0.25][y % 16];
+                        let value = (248.0 - (248 - ink) as f32 * coverage).round() as u8;
+                        page.data[(y * 192 + x) * 3..][..3].fill(value);
+                    }
+                }
+            }
+            process(&mut page, None, Some(ColorMode::Grayscale));
+            let profile =
+                std::array::from_fn::<_, 5, _>(|offset| page.data[((64 + offset) * 192 + 48) * 3]);
+            for (actual, before) in profile.into_iter().zip(previous) {
+                assert!(actual >= before, "ink {ink}: {before} -> {actual}");
+            }
+            assert!(profile[0] >= profile[1] && profile[1] >= profile[2]);
+            assert!(profile[2] <= profile[3] && profile[3] <= profile[4]);
+            previous = profile;
+        }
+    }
+
+    #[test]
+    fn faint_neutral_strokes_gain_contrast_without_amplifying_paper_noise() {
+        for scale in [1, 2, 4] {
+            let width = 160 * scale;
+            let height = 224 * scale;
+            for ink in [224u8, 232, 240] {
+                let mut page = image(width, height, [248; 3]);
+                let mut strokes = vec![false; width * height];
+                for y in 0..height {
+                    for x in 0..width {
+                        let index = y * width + x;
+                        let noise = ((x / scale * 13 + y / scale * 7) % 3) as i16 - 1;
+                        let stroke = (30 * scale..190 * scale).contains(&y)
+                            && (20 * scale..140 * scale).contains(&x)
+                            && y % (16 * scale) < 2 * scale
+                            && x % (9 * scale) < 6 * scale;
+                        let value = if stroke { ink } else { 248 };
+                        page.data[index * 3..][..3].fill((value as i16 + noise) as u8);
+                        strokes[index] = stroke;
+                    }
+                }
+                process(&mut page, None, Some(ColorMode::Grayscale));
+                let mut paper = Vec::new();
+                let mut marked = Vec::new();
+                for (pixel, stroke) in page.data.as_chunks::<3>().0.iter().zip(strokes) {
+                    if stroke {
+                        marked.push(pixel[0] as f32);
+                    } else {
+                        paper.push(pixel[0] as f32);
+                    }
+                }
+                let paper_mean = paper.iter().sum::<f32>() / paper.len() as f32;
+                let ink_mean = marked.iter().sum::<f32>() / marked.len() as f32;
+                let deviation = (paper
+                    .iter()
+                    .map(|value| (value - paper_mean).powi(2))
+                    .sum::<f32>()
+                    / paper.len() as f32)
+                    .sqrt();
+                assert!(
+                    paper_mean - ink_mean >= (248 - ink) as f32 * 1.6,
+                    "scale {scale}, ink {ink}: {}",
+                    paper_mean - ink_mean
+                );
+                assert!(deviation < 3.0, "scale {scale}, ink {ink}: {deviation}");
+            }
+        }
     }
 
     #[test]
