@@ -548,7 +548,21 @@ fn brightness(source: &ImageU8, x: f64, y: f64) -> Option<f64> {
     )
 }
 
-fn nearby_color_edge(source: &ImageU8, edge: [Point; 2], band: f64) -> bool {
+struct ColorEdgeScores {
+    values: [[f64; 91]; 48],
+    supported: [bool; 48],
+}
+
+impl ColorEdgeScores {
+    fn supported_positions(&self) -> usize {
+        self.supported
+            .iter()
+            .filter(|&&supported| supported)
+            .count()
+    }
+}
+
+fn color_edge_scores(source: &ImageU8, edge: [Point; 2], band: f64) -> ColorEdgeScores {
     let line = Line::through(edge[0], edge[1]);
     let sample = |x: f64, y: f64| -> Option<[f64; 3]> {
         if x < 0.0 || y < 0.0 || x >= source.width as f64 || y >= source.height as f64 {
@@ -559,57 +573,145 @@ fn nearby_color_edge(source: &ImageU8, edge: [Point; 2], band: f64) -> bool {
             source.data[offset + channel] as f64
         }))
     };
-    (0..48)
-        .filter(|&i| {
-            let t = (i as f64 + 1.0) / 49.0;
-            let center = Point {
-                x: edge[0].x + (edge[1].x - edge[0].x) * t,
-                y: edge[0].y + (edge[1].y - edge[0].y) * t,
+    let mut supported = [false; 48];
+    let values = std::array::from_fn(|i| {
+        let t = (i as f64 + 1.0) / 49.0;
+        let center = Point {
+            x: edge[0].x + (edge[1].x - edge[0].x) * t,
+            y: edge[0].y + (edge[1].y - edge[0].y) * t,
+        };
+        std::array::from_fn(|step| {
+            let offset = (step as f64 - 45.0) * band / 30.0;
+            let Some(a) = sample(
+                center.x + line.nx * (offset - 1.25),
+                center.y + line.ny * (offset - 1.25),
+            ) else {
+                return 0.0;
             };
-            (-30..=30).any(|step| {
-                let offset = step as f64 * band / 30.0;
-                let Some(a) = sample(
-                    center.x + line.nx * (offset - 1.25),
-                    center.y + line.ny * (offset - 1.25),
-                ) else {
-                    return false;
-                };
-                let Some(b) = sample(
-                    center.x + line.nx * (offset + 1.25),
-                    center.y + line.ny * (offset + 1.25),
-                ) else {
-                    return false;
-                };
-                let delta = std::array::from_fn::<_, 3, _>(|i| a[i] - b[i]);
-                let dot = |a: [f64; 3], b: [f64; 3]| {
-                    (a[0] * b[0] + 2.0 * a[1] * b[1] + a[2] * b[2]) / 4.0
-                };
-                let energy = dot(delta, delta);
-                let penalty = 1.0 + 0.25 * (offset / band).powi(2);
-                if energy < (6.0 * penalty).powi(2) {
-                    return false;
-                }
-                [2.5, 4.0, 6.0].into_iter().all(|reach| {
-                    let Some(a) = sample(
-                        center.x + line.nx * (offset - reach),
-                        center.y + line.ny * (offset - reach),
-                    ) else {
-                        return false;
-                    };
-                    let Some(b) = sample(
-                        center.x + line.nx * (offset + reach),
-                        center.y + line.ny * (offset + reach),
-                    ) else {
-                        return false;
-                    };
-                    let wide = std::array::from_fn::<_, 3, _>(|i| a[i] - b[i]);
-                    let wide_energy = dot(wide, wide);
-                    wide_energy >= 36.0 && dot(delta, wide) >= 0.7 * (energy * wide_energy).sqrt()
-                })
-            })
+            let Some(b) = sample(
+                center.x + line.nx * (offset + 1.25),
+                center.y + line.ny * (offset + 1.25),
+            ) else {
+                return 0.0;
+            };
+            let delta = std::array::from_fn::<_, 3, _>(|i| a[i] - b[i]);
+            let dot =
+                |a: [f64; 3], b: [f64; 3]| (a[0] * b[0] + 2.0 * a[1] * b[1] + a[2] * b[2]) / 4.0;
+            let energy = dot(delta, delta);
+            let penalty = 1.0 + 0.25 * (offset / band).powi(2);
+            if energy < 9.0 {
+                return 0.0;
+            }
+            let Some(inner) = sample(
+                center.x + line.nx * (offset - 0.5),
+                center.y + line.ny * (offset - 0.5),
+            ) else {
+                return 0.0;
+            };
+            let Some(outer) = sample(
+                center.x + line.nx * (offset + 0.5),
+                center.y + line.ny * (offset + 0.5),
+            ) else {
+                return 0.0;
+            };
+            let fine = std::array::from_fn::<_, 3, _>(|i| inner[i] - outer[i]);
+            let wide = [2.5, 4.0, 6.0].map(|reach| {
+                let a = sample(
+                    center.x + line.nx * (offset - reach),
+                    center.y + line.ny * (offset - reach),
+                )?;
+                let b = sample(
+                    center.x + line.nx * (offset + reach),
+                    center.y + line.ny * (offset + reach),
+                )?;
+                Some(std::array::from_fn::<_, 3, _>(|i| a[i] - b[i]))
+            });
+            let [Some(a), Some(b), Some(c)] = wide else {
+                return 0.0;
+            };
+            let agrees = |wide: [f64; 3], minimum: f64| {
+                let wide_energy = dot(wide, wide);
+                wide_energy >= minimum && dot(delta, wide) >= 0.7 * (energy * wide_energy).sqrt()
+            };
+            if (15..76).contains(&step)
+                && energy >= (6.0 * penalty).powi(2)
+                && [a, b, c].into_iter().all(|wide| agrees(wide, 36.0))
+            {
+                supported[i] = true;
+            }
+            if [a, b].into_iter().all(|wide| agrees(wide, 9.0)) {
+                (1.0 + dot(fine, fine).sqrt()) / penalty
+            } else {
+                0.0
+            }
         })
-        .count()
-        >= 32
+    });
+    ColorEdgeScores { values, supported }
+}
+
+fn refine_color_edges(
+    p: [Point; 4],
+    scores: &[ColorEdgeScores; 4],
+    band: f64,
+) -> Option<[Point; 4]> {
+    let mut lines = std::array::from_fn::<_, 4, _>(|i| Line::through(p[i], p[(i + 1) % 4]));
+    for i in 0..4 {
+        let available = scores[i].supported_positions();
+        if available < 32 {
+            return None;
+        }
+        let mut best = None;
+        let mut best_score = 0.0;
+        for start in 0..91 {
+            for end in 0..91 {
+                let mut supported = 0;
+                let mut strength = 0.0;
+                let mut weighted_support = 0.0;
+                for (position, row) in scores[i].values.iter().enumerate() {
+                    let t = (position as f64 + 1.0) / 49.0;
+                    let offset = (start as f64 * (1.0 - t) + end as f64 * t).round() as usize;
+                    let score = row[offset];
+                    supported += usize::from(score > 0.0);
+                    strength += score / (score + 16.0);
+                    if score > 0.0 {
+                        weighted_support +=
+                            (1.0 + 0.25 * ((offset as f64 - 45.0) / 30.0).powi(2)).recip();
+                    }
+                }
+                let score = weighted_support + strength * 0.1;
+                if supported >= 32 && supported * 5 >= available * 4 && score > best_score {
+                    best_score = score;
+                    best = Some((start, end));
+                }
+            }
+        }
+        let (start, end) = best?;
+        let mut samples = Vec::new();
+        for (position, row) in scores[i].values.iter().enumerate() {
+            let t = (position as f64 + 1.0) / 49.0;
+            let index = (start as f64 * (1.0 - t) + end as f64 * t).round() as usize;
+            if row[index] == 0.0 {
+                continue;
+            }
+            let offset = (index as f64 - 45.0) * band / 30.0;
+            samples.push(Point {
+                x: p[i].x + (p[(i + 1) % 4].x - p[i].x) * t + lines[i].nx * offset,
+                y: p[i].y + (p[(i + 1) % 4].y - p[i].y) * t + lines[i].ny * offset,
+            });
+        }
+        if samples.len() < 32 {
+            return None;
+        }
+        lines[i] = fit_line(&samples, lines[i], band);
+    }
+    let mut refined = p;
+    for i in 0..4 {
+        refined[i] = lines[(i + 3) % 4].intersection(lines[i])?;
+        if distance(refined[i], p[i]) > band * 1.5 {
+            return None;
+        }
+    }
+    Some(refined)
 }
 
 pub(super) fn refine_capture(
@@ -715,10 +817,24 @@ pub(super) fn refine_capture(
         lines[side] = fitted;
         improved += 1;
     }
+    let color_samples = std::array::from_fn::<_, 4, _>(|side| {
+        color_edge_scores(&preview, [p[side], p[(side + 1) % 4]], band * 3.0)
+    });
     if (supported < 3 || needs_complete_support)
-        && !(0..4).all(|side| nearby_color_edge(&preview, [p[side], p[(side + 1) % 4]], band * 3.0))
+        && color_samples
+            .iter()
+            .any(|samples| samples.supported_positions() < 32)
     {
         return Ok(None);
+    }
+    if let Some(refined) = refine_color_edges(p, &color_samples, band * 3.0) {
+        let refined = quad_from_points(refined.map(|p| Point {
+            x: p.x / sx,
+            y: p.y / sy,
+        }));
+        if validate_quad(refined, extent).is_ok() {
+            return Ok(Some(refined));
+        }
     }
     if improved == 0 {
         return Ok(Some(quad));
@@ -1293,19 +1409,82 @@ mod source_evidence_tests {
     use super::*;
 
     #[test]
+    fn broad_printed_panel_does_not_displace_a_supported_outer_page() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, vec![180; 400 * 300 * 3])?;
+        for y in 40..260 {
+            for x in 60..340 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(195);
+            }
+        }
+        for y in 45..255 {
+            for x in 65..335 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(90);
+            }
+        }
+        for y in [100, 150, 200] {
+            for x in 62..65 {
+                source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(30);
+            }
+        }
+        let quad = quad_from_points(
+            [(60.0, 40.0), (340.0, 40.0), (340.0, 260.0), (60.0, 260.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        let refined = refine_capture(&source, quad, false)?.ok_or("page rejected")?;
+        for (actual, expected) in points(refined).into_iter().zip(points(quad)) {
+            assert!(
+                distance(actual, expected) < 2.0,
+                "{actual:?} vs {expected:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn sustained_chromatic_edges_refine_displaced_page_corners() -> OpResult<()> {
+        let mut source = ImageU8::new(400, 300, 3, [80, 140, 200].repeat(400 * 300))?;
+        let expected = [(80.0, 40.0), (315.0, 60.0), (340.0, 245.0), (60.0, 265.0)]
+            .map(|(x, y)| Point { x, y });
+        for y in 0..300 {
+            for x in 0..400 {
+                let point = Point {
+                    x: x as f64,
+                    y: y as f64,
+                };
+                if (0..4).all(|i| cross(expected[i], expected[(i + 1) % 4], point) >= 0.0) {
+                    source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3]
+                        .copy_from_slice(&[40, 160, 200]);
+                }
+            }
+        }
+        let displaced = quad_from_points(
+            [(84.0, 45.0), (312.0, 66.0), (344.0, 250.0), (66.0, 260.0)]
+                .map(|(x, y)| Point { x, y }),
+        );
+        let refined = refine_capture(&source, displaced, false)?.ok_or("page rejected")?;
+        for (actual, expected) in points(refined).into_iter().zip(expected) {
+            assert!(
+                distance(actual, expected) < 2.0,
+                "{actual:?} vs {expected:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn color_edge_rejects_thin_strokes_without_a_background_step() -> OpResult<()> {
         let mut source = ImageU8::new(400, 300, 3, vec![220; 400 * 300 * 3])?;
         for x in 60..340 {
             source.data[(100 * 400 + x) * 3..(100 * 400 + x + 1) * 3].fill(30);
         }
         let edge = [Point { x: 60.0, y: 100.0 }, Point { x: 340.0, y: 100.0 }];
-        assert!(!nearby_color_edge(&source, edge, 7.2));
+        assert!(color_edge_scores(&source, edge, 7.2).supported_positions() < 32);
         for y in 100..300 {
             for x in 0..400 {
                 source.data[(y * 400 + x) * 3..(y * 400 + x + 1) * 3].fill(150);
             }
         }
-        assert!(nearby_color_edge(&source, edge, 7.2));
+        assert!(color_edge_scores(&source, edge, 7.2).supported_positions() >= 32);
         Ok(())
     }
 

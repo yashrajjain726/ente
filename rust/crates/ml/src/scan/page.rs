@@ -135,6 +135,30 @@ pub(super) struct RenderPlan {
     pub aspect_evidence: AspectEvidence,
 }
 
+struct CameraAspect {
+    ratio: f64,
+    focal_squared: f64,
+}
+
+fn camera_aspect(p: [(f64, f64); 4]) -> Option<CameraAspect> {
+    let h = ProjectiveMap::from_unit_quad(p).ok()?.coefficients;
+    let denominator = h[6] * h[7];
+    if denominator == 0.0 {
+        return None;
+    }
+    let focal_squared = -(h[0] * h[1] + h[3] * h[4]) / denominator;
+    if !focal_squared.is_finite() || focal_squared <= 0.0 {
+        return None;
+    }
+    let ratio = ((h[0] * h[0] + h[3] * h[3] + focal_squared * h[6] * h[6])
+        / (h[1] * h[1] + h[4] * h[4] + focal_squared * h[7] * h[7]))
+        .sqrt();
+    (ratio.is_finite() && ratio > 0.0).then_some(CameraAspect {
+        ratio,
+        focal_squared,
+    })
+}
+
 fn aspect_ratio(quad: Quad, extent: SourceExtent) -> OpResult<(f64, AspectEvidence)> {
     let p = points(quad);
     let horizontal = (distance(p[0], p[1]) * distance(p[2], p[3])).sqrt();
@@ -146,27 +170,42 @@ fn aspect_ratio(quad: Quad, extent: SourceExtent) -> OpResult<(f64, AspectEviden
             (p.y - extent.height * 0.5) / extent.width,
         )
     });
-    let h = ProjectiveMap::from_unit_quad(normalized)?.coefficients;
-    let denominator = h[6] * h[7];
-    let focal_squared = -(h[0] * h[1] + h[3] * h[4]) / denominator;
-    let diagonal = extent.width.hypot(extent.height) / extent.width;
-    if denominator.abs() < 1e-5 || !focal_squared.is_finite() || focal_squared <= 0.0 {
+    let Some(camera) = camera_aspect(normalized) else {
+        return Ok((edge_ratio, AspectEvidence::OppositeEdges));
+    };
+    let mut sensitivity: f64 = 0.0;
+    let mut focal_uncertainty: f64 = 0.0;
+    for corner in 0..4 {
+        for axis in 0..2 {
+            for offset in [-0.5, 0.5] {
+                let mut perturbed = normalized;
+                if axis == 0 {
+                    perturbed[corner].0 += offset / extent.width;
+                } else {
+                    perturbed[corner].1 += offset / extent.width;
+                }
+                let Some(estimate) = camera_aspect(perturbed) else {
+                    return Ok((edge_ratio, AspectEvidence::OppositeEdges));
+                };
+                sensitivity = sensitivity.max((estimate.ratio / camera.ratio).ln().abs());
+                focal_uncertainty = focal_uncertainty
+                    .max((estimate.focal_squared / camera.focal_squared - 1.0).abs());
+            }
+        }
+    }
+    let focal_margin = 1.0 - focal_uncertainty;
+    if focal_margin <= 0.0 {
         return Ok((edge_ratio, AspectEvidence::OppositeEdges));
     }
-    let focal = focal_squared.sqrt() / diagonal;
-    let ratio = ((h[0] * h[0] + h[3] * h[3] + focal_squared * h[6] * h[6])
-        / (h[1] * h[1] + h[4] * h[4] + focal_squared * h[7] * h[7]))
-        .sqrt();
-    let focal_support =
-        ((focal - 0.35) / 0.35).clamp(0.0, 1.0) * ((4.0 - focal) / 2.0).clamp(0.0, 1.0);
-    let perspective_support = (h[6].abs().min(h[7].abs()) / 0.2).clamp(0.0, 1.0);
-    let agreement = (1.0 - (ratio / edge_ratio).ln().abs() / 1.8f64.ln()).clamp(0.0, 1.0);
-    let confidence = focal_support * perspective_support * agreement;
-    if confidence == 0.0 || !ratio.is_finite() {
+    let correction = (camera.ratio / edge_ratio).ln();
+    let correction_uncertainty = (sensitivity * correction / 0.01)
+        .hypot(focal_uncertainty / focal_margin * correction / 0.05);
+    let confidence = (-correction_uncertainty.powi(2)).exp();
+    if confidence == 0.0 {
         return Ok((edge_ratio, AspectEvidence::OppositeEdges));
     }
     Ok((
-        (edge_ratio.ln() * (1.0 - confidence) + ratio.ln() * confidence).exp(),
+        (edge_ratio.ln() + correction * confidence).exp(),
         AspectEvidence::CameraBlend(confidence),
     ))
 }
@@ -381,6 +420,119 @@ mod benchmarks {
 #[cfg(test)]
 mod camera_geometry_tests {
     use super::*;
+
+    fn projected_rectangle(ratio: f64, pitch: f64, yaw: f64, roll: f64, focal: f64) -> Quad {
+        let focal = 1600.0 * focal;
+        let depth = focal * ratio.max(1.0) / (1200.0 * 0.42);
+        quad_from_points(
+            [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)].map(|(x, y)| {
+                let x = x * ratio;
+                let y_tilted = y * pitch.cos();
+                let z_tilted = y * pitch.sin();
+                let x_tilted = x * yaw.cos() + z_tilted * yaw.sin();
+                let z = depth - x * yaw.sin() + z_tilted * yaw.cos();
+                let x_rotated = x_tilted * roll.cos() - y_tilted * roll.sin();
+                let y_rotated = x_tilted * roll.sin() + y_tilted * roll.cos();
+                Point {
+                    x: 800.0 + focal * (x_rotated + 0.07) / z,
+                    y: 600.0 + focal * (y_rotated - 0.05) / z,
+                }
+            }),
+        )
+    }
+
+    #[test]
+    fn uncertain_camera_estimates_change_smoothly_with_corner_edits() -> OpResult<()> {
+        let extent = SourceExtent::new(1600, 1200)?;
+        for (coordinates, axis) in [
+            (
+                [
+                    (743.5897227842361, 177.50543714500964),
+                    (1241.083461791277, 449.33223891071975),
+                    (1385.403361869976, 684.2934076953679),
+                    (584.6916052512825, 954.1840077098459),
+                ],
+                0,
+            ),
+            (
+                [
+                    (742.7429337520152, 399.2380002234131),
+                    (1287.6039534807205, 316.6797717195004),
+                    (1509.314852161333, 813.0879147816449),
+                    (203.6059315316379, 1005.405351286754),
+                ],
+                1,
+            ),
+        ] {
+            let p = coordinates.map(|(x, y)| Point { x, y });
+            let mut previous: Option<f64> = None;
+            for step in -100..=100 {
+                let mut edited = p;
+                if axis == 0 {
+                    edited[0].x += step as f64 * 0.05;
+                } else {
+                    edited[0].y += step as f64 * 0.05;
+                }
+                let plan = RenderPlan::new(quad_from_points(edited), extent, 0, 500_000)?;
+                let ratio = plan.width as f64 / plan.height as f64;
+                if let Some(previous) = previous {
+                    assert!(
+                        (ratio / previous - 1.0_f64).abs() < 0.02,
+                        "step {step}: {previous} -> {ratio}"
+                    );
+                }
+                previous = Some(ratio);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn physical_rectangles_keep_proportions_across_camera_settings() -> OpResult<()> {
+        let extent = SourceExtent::new(1600, 1200)?;
+        for ratio in [0.3, 0.7, 1.0, 1.7, 3.0] {
+            for (pitch, yaw) in [(0.5, 0.3), (0.73, 0.54), (0.58, 0.9), (-0.47, 0.66)] {
+                for roll in [0.0, 0.43] {
+                    for focal in [0.7, 1.2, 2.0] {
+                        let quad = projected_rectangle(ratio, pitch, yaw, roll, focal);
+                        let p = points(quad);
+                        let edge_ratio = ((distance(p[0], p[1]) * distance(p[2], p[3]))
+                            / (distance(p[1], p[2]) * distance(p[3], p[0])))
+                        .sqrt();
+                        let (estimated, _) = aspect_ratio(quad, extent)?;
+                        assert!(
+                            (estimated / ratio).ln().abs()
+                                <= (edge_ratio / ratio).ln().abs() + 1e-10
+                        );
+                        for budget in [60_000, 500_000, 4_000_000] {
+                            let original = RenderPlan::new(quad, extent, 0, budget)?;
+                            let actual = original.width as f64 / original.height as f64;
+                            if yaw < 0.8 && focal <= 1.2 {
+                                assert!(
+                                    (actual / ratio - 1.0).abs() < 0.06,
+                                    "ratio={ratio} pitch={pitch} yaw={yaw} roll={roll} focal={focal}: {actual} {:?}",
+                                    original.aspect_evidence
+                                );
+                            }
+                            assert!(
+                                original.width as u64 * original.height as u64 <= budget as u64
+                            );
+                            for rotation in [90, 180, 270] {
+                                let rotated = RenderPlan::new(quad, extent, rotation, budget)?;
+                                let expected = if rotation == 180 {
+                                    (original.width, original.height)
+                                } else {
+                                    (original.height, original.width)
+                                };
+                                assert_eq!((rotated.width, rotated.height), expected);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 
     fn camera_quad(width: f64, height: f64, yaw: f64, pitch: f64) -> Quad {
         let project = |x: f64, y: f64| {
