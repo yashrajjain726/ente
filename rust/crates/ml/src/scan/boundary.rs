@@ -389,8 +389,21 @@ pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBu
         reason: "insufficient supported page boundary",
     };
     let cutoffs: &[f32] = if live { &[0.5] } else { &[0.5, 0.35, 0.7] };
-    for &cutoff in cutoffs {
-        for component in components(map, cutoff, if live { 2 } else { 4 }) {
+    let component_groups = cutoffs
+        .iter()
+        .map(|&cutoff| components(map, cutoff, if live { 2 } else { 4 }))
+        .collect::<Vec<_>>();
+    let largest = component_groups
+        .iter()
+        .flatten()
+        .map(|c| c.pixels.len())
+        .max()
+        .unwrap_or(0);
+    for group in component_groups {
+        for component in group {
+            if component.pixels.len() * 2 < largest {
+                continue;
+            }
             let boundary_source: Vec<_> = component
                 .boundary
                 .iter()
@@ -866,10 +879,64 @@ mod tests {
                 map.values[y * 256 + x] = 0.98;
             }
         }
-        let found = locate(&map, SourceExtent::new(1200, 800)?, SearchBudget::Capture)
-            .quad
-            .ok_or("page rejected")?;
-        assert!(points(found.corners).iter().all(|p| p.x < 110.0));
+        for budget in [SearchBudget::Live, SearchBudget::Capture] {
+            let found = locate(&map, SourceExtent::new(1200, 800)?, budget)
+                .quad
+                .ok_or("page rejected")?;
+            assert!(points(found.corners).iter().all(|p| p.x < 110.0));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn unsupported_dominant_region_does_not_promote_a_small_island() -> OpResult<()> {
+        for foreground in [0.65, 0.98] {
+            let mut map = polygon_mask(
+                [
+                    (213.0, 213.0),
+                    (233.0, 213.0),
+                    (233.0, 233.0),
+                    (213.0, 233.0),
+                ]
+                .map(|(x, y)| Point { x, y }),
+            )?;
+            for y in 0..256 {
+                for x in 0..256 {
+                    if (x as f64 - 100.0).hypot(y as f64 - 100.0) < 75.0 {
+                        map.values[y * 256 + x] = foreground;
+                    }
+                }
+            }
+            for budget in [SearchBudget::Live, SearchBudget::Capture] {
+                assert!(
+                    locate(&map, SourceExtent::new(1200, 800)?, budget)
+                        .quad
+                        .is_none(),
+                    "foreground {foreground} yielded a minor interior crop"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn isolated_small_pages_and_narrow_receipts_remain_detectable() -> OpResult<()> {
+        for (width, height) in [(16.0, 16.0), (16.0, 40.0), (8.0, 190.0)] {
+            let p =
+                [(0.0, 0.0), (width, 0.0), (width, height), (0.0, height)].map(|(x, y)| Point {
+                    x: x + 100.0,
+                    y: y + 30.0,
+                });
+            let map = polygon_mask(p)?;
+            for budget in [SearchBudget::Live, SearchBudget::Capture] {
+                let found = locate(&map, SourceExtent::new(1200, 800)?, budget)
+                    .quad
+                    .ok_or("small page rejected")?;
+                for (actual, expected) in points(found.corners).into_iter().zip(p) {
+                    assert!(distance(actual, expected) < 2.0);
+                }
+            }
+        }
         Ok(())
     }
 
