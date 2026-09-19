@@ -249,6 +249,12 @@ const Content = styled("div")`
         z-index: 1;
     }
 
+    .heroCopy h2,
+    .feature:has(.pokePreview) h2 {
+        max-width: none;
+        font-size: clamp(22px, 6.7vw, 30px);
+    }
+
     .feature:has(.privacyVisual) h2 {
         max-width: none;
     }
