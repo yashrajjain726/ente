@@ -45,6 +45,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
   _CameraStatus _status = _CameraStatus.starting;
   ScanQuad? _stableQuad;
   bool _analysisInFlight = false;
+  Duration? _analysisObservedAt;
   bool _takingPicture = false;
   bool _torchOn = false;
   bool _autoMode = true;
@@ -213,9 +214,9 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       return;
     }
     _analysisInFlight = true;
-    unawaited(
-      _analyze(image, camera, _frameClock.elapsed, _analysisGeneration),
-    );
+    final observedAt = _frameClock.elapsed;
+    _analysisObservedAt = observedAt;
+    unawaited(_analyze(image, camera, observedAt, _analysisGeneration));
   }
 
   Future<void> _analyze(
@@ -265,12 +266,8 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       );
       _quadExpiry?.cancel();
       if (sample.displayQuad != null) {
-        _quadExpiry = Timer(sample.validUntil! - now, () {
-          if (!mounted) return;
-          _resetLiveTracking();
-          _autoCapture.invalidateArming();
-          setState(() {});
-        });
+        final deadline = sample.validUntil!;
+        _quadExpiry = Timer(deadline - now, () => _expireQuad(deadline));
       }
       var fire = false;
       if (_autoMode) {
@@ -279,6 +276,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
           captureBusy: _takingPicture || _session.isProcessing,
           timestamp: observedAt,
           resetProgress: sample.resetCapture,
+          documentPresent: raw != null,
         );
       }
       setState(() => _stableQuad = sample.displayQuad);
@@ -291,7 +289,22 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
       }
     } finally {
       _analysisInFlight = false;
+      _analysisObservedAt = null;
     }
+  }
+
+  void _expireQuad(Duration deadline) {
+    if (!mounted) return;
+    final observedAt = _analysisObservedAt;
+    if (observedAt != null && observedAt < deadline) {
+      final remaining =
+          observedAt + QuadStability.maximumFreshness - _frameClock.elapsed;
+      if (remaining > Duration.zero) {
+        _quadExpiry = Timer(remaining, () => _expireQuad(deadline));
+        return;
+      }
+    }
+    setState(() => _stableQuad = null);
   }
 
   void _resetLiveTracking() {

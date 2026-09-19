@@ -14,8 +14,9 @@ class AutoCaptureController {
   AutoCaptureState _state = AutoCaptureState.searching;
   double _progress = 0;
   Duration _armedElapsed = Duration.zero;
-  Duration _graceElapsed = Duration.zero;
-  Duration _clearElapsed = Duration.zero;
+  Duration? _missingSince;
+  Duration _missingGrace = armGrace;
+  Duration? _clearSince;
   Duration? _lastFrameAt;
 
   AutoCaptureState get state => _state;
@@ -27,6 +28,7 @@ class AutoCaptureController {
     required bool captureBusy,
     required Duration timestamp,
     bool resetProgress = false,
+    bool? documentPresent,
   }) {
     final last = _lastFrameAt;
     if (timestamp.isNegative || (last != null && timestamp <= last)) {
@@ -37,7 +39,7 @@ class AutoCaptureController {
     final dt = last == null || resetProgress ? Duration.zero : timestamp - last;
     if (resetProgress) {
       invalidateArming();
-      _clearElapsed = Duration.zero;
+      _clearSince = null;
     }
 
     final eligible =
@@ -51,32 +53,39 @@ class AutoCaptureController {
           _state = AutoCaptureState.arming;
           _progress = 0;
           _armedElapsed = Duration.zero;
-          _graceElapsed = Duration.zero;
+          _missingSince = null;
         }
         return false;
       case AutoCaptureState.arming:
         if (eligible) {
-          _graceElapsed = Duration.zero;
-          _armedElapsed += dt;
+          final missingSince = _missingSince;
+          _missingSince = null;
+          if (missingSince == null) {
+            _armedElapsed += dt;
+          } else if (timestamp - missingSince > _missingGrace) {
+            _armedElapsed = Duration.zero;
+          }
           _progress = _armedElapsed.inMicroseconds / armHold.inMicroseconds;
           if (_armedElapsed >= armHold) {
             notifyCaptureStarted();
             return true;
           }
         } else {
-          _graceElapsed += dt;
-          if (_graceElapsed >= armGrace) {
-            _state = AutoCaptureState.searching;
-            _progress = 0;
+          if (_missingSince == null) {
+            _missingSince = timestamp;
+            _missingGrace = dt > armGrace ? dt + armGrace : armGrace;
+            if (_missingGrace > armHold) _missingGrace = armHold;
+          } else if (timestamp - _missingSince! >= _missingGrace) {
+            invalidateArming();
           }
         }
         return false;
       case AutoCaptureState.cooldown:
-        if (stableQuad != null || captureBusy) {
-          _clearElapsed = Duration.zero;
+        if ((documentPresent ?? stableQuad != null) || captureBusy) {
+          _clearSince = null;
         } else {
-          _clearElapsed += dt;
-          if (_clearElapsed >= clearHold) {
+          _clearSince ??= timestamp;
+          if (timestamp - _clearSince! >= clearHold) {
             _state = AutoCaptureState.searching;
           }
         }
@@ -88,7 +97,8 @@ class AutoCaptureController {
     _state = AutoCaptureState.cooldown;
     _progress = 0;
     _armedElapsed = Duration.zero;
-    _clearElapsed = Duration.zero;
+    _missingSince = null;
+    _clearSince = null;
   }
 
   void invalidateArming() {
@@ -96,15 +106,17 @@ class AutoCaptureController {
     _state = AutoCaptureState.searching;
     _progress = 0;
     _armedElapsed = Duration.zero;
-    _graceElapsed = Duration.zero;
+    _missingSince = null;
+    _missingGrace = armGrace;
   }
 
   void reset() {
     _state = AutoCaptureState.searching;
     _progress = 0;
     _armedElapsed = Duration.zero;
-    _graceElapsed = Duration.zero;
-    _clearElapsed = Duration.zero;
+    _missingSince = null;
+    _missingGrace = armGrace;
+    _clearSince = null;
     _lastFrameAt = null;
   }
 }

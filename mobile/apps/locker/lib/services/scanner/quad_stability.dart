@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:locker/services/scanner/scanner_models.dart';
 
 class QuadStabilitySample {
@@ -22,9 +24,11 @@ class QuadStability {
   ScanQuad? _anchor;
   ScanQuad? _previous;
   Duration? _lastObservation;
+  Duration? _lastDetection;
   Duration? _displayUntil;
   int? _rotation;
   Duration _freshness = minimumFreshness;
+  bool _pendingCornerMotion = false;
 
   QuadStabilitySample update(
     ScanQuad? detection, {
@@ -62,17 +66,7 @@ class QuadStability {
     _lastObservation = observedAt;
     _rotation = rotation;
     if (detection == null) {
-      if (_displayUntil != null && now >= _displayUntil!) {
-        _anchor = null;
-        _previous = null;
-        _displayUntil = null;
-      }
-      return QuadStabilitySample(
-        quad: null,
-        displayQuad: _previous,
-        resetCapture: interrupted,
-        validUntil: _displayUntil,
-      );
+      return _withoutDetection(observedAt, now, interrupted);
     }
     final previous = _previous;
     final aligned = previous == null
@@ -82,9 +76,23 @@ class QuadStability {
     final moved =
         anchor != null &&
         aligned.relativeMotionTo(anchor) > maximumRelativeMotion;
+    if (moved && !_pendingCornerMotion) {
+      final distance =
+          maximumRelativeMotion *
+          math.sqrt(math.min(aligned.area, anchor.area));
+      final movedCorners = Iterable<int>.generate(4).where(
+        (i) => (aligned.corners[i] - anchor.corners[i]).distance > distance,
+      );
+      if (movedCorners.length == 1) {
+        _pendingCornerMotion = true;
+        return _withoutDetection(observedAt, now, interrupted);
+      }
+    }
+    _pendingCornerMotion = false;
     if (anchor == null || moved) _anchor = aligned;
     _previous = aligned;
-    _displayUntil = observedAt + observationWindow;
+    _lastDetection = observedAt;
+    _displayUntil = now + observationWindow;
     return QuadStabilitySample(
       quad: aligned,
       displayQuad: aligned,
@@ -93,12 +101,37 @@ class QuadStability {
     );
   }
 
+  QuadStabilitySample _withoutDetection(
+    Duration observedAt,
+    Duration now,
+    bool interrupted,
+  ) {
+    final lost =
+        _lastDetection != null &&
+        observedAt - _lastDetection! >= maximumFreshness;
+    if (lost) {
+      _anchor = null;
+      _previous = null;
+      _lastDetection = null;
+      _pendingCornerMotion = false;
+    }
+    final visible = _displayUntil != null && now < _displayUntil!;
+    return QuadStabilitySample(
+      quad: null,
+      displayQuad: visible ? _previous : null,
+      resetCapture: interrupted || lost,
+      validUntil: visible ? _displayUntil : null,
+    );
+  }
+
   void reset({Duration? observedBefore}) {
     _anchor = null;
     _previous = null;
     _lastObservation = observedBefore;
+    _lastDetection = null;
     _displayUntil = null;
     _rotation = null;
     _freshness = minimumFreshness;
+    _pendingCornerMotion = false;
   }
 }
