@@ -264,7 +264,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
         rotationDegrees: rotation,
       );
       _quadExpiry?.cancel();
-      if (sample.quad != null) {
+      if (sample.displayQuad != null) {
         _quadExpiry = Timer(sample.validUntil! - now, () {
           if (!mounted) return;
           _resetLiveTracking();
@@ -281,7 +281,7 @@ class _ScannerCapturePageState extends State<ScannerCapturePage>
           resetProgress: sample.resetCapture,
         );
       }
-      setState(() => _stableQuad = sample.quad);
+      setState(() => _stableQuad = sample.displayQuad);
       if (fire) unawaited(_capture());
     } catch (_) {
       if (mounted && generation == _analysisGeneration && camera == _camera) {

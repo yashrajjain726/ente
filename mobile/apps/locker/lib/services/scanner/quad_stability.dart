@@ -4,10 +4,12 @@ class QuadStabilitySample {
   const QuadStabilitySample({
     required this.quad,
     required this.resetCapture,
+    this.displayQuad,
     this.validUntil,
   });
 
   final ScanQuad? quad;
+  final ScanQuad? displayQuad;
   final bool resetCapture;
   final Duration? validUntil;
 }
@@ -20,7 +22,7 @@ class QuadStability {
   ScanQuad? _anchor;
   ScanQuad? _previous;
   Duration? _lastObservation;
-  Duration? _lastDetection;
+  Duration? _displayUntil;
   int? _rotation;
   Duration _freshness = minimumFreshness;
 
@@ -60,12 +62,17 @@ class QuadStability {
     _lastObservation = observedAt;
     _rotation = rotation;
     if (detection == null) {
-      if (_lastDetection != null && observedAt - _lastDetection! >= gapLimit) {
+      if (_displayUntil != null && now >= _displayUntil!) {
         _anchor = null;
         _previous = null;
-        _lastDetection = null;
+        _displayUntil = null;
       }
-      return QuadStabilitySample(quad: null, resetCapture: interrupted);
+      return QuadStabilitySample(
+        quad: null,
+        displayQuad: _previous,
+        resetCapture: interrupted,
+        validUntil: _displayUntil,
+      );
     }
     final previous = _previous;
     final aligned = previous == null
@@ -77,11 +84,12 @@ class QuadStability {
         aligned.relativeMotionTo(anchor) > maximumRelativeMotion;
     if (anchor == null || moved) _anchor = aligned;
     _previous = aligned;
-    _lastDetection = observedAt;
+    _displayUntil = observedAt + observationWindow;
     return QuadStabilitySample(
       quad: aligned,
+      displayQuad: aligned,
       resetCapture: interrupted || moved,
-      validUntil: observedAt + observationWindow,
+      validUntil: _displayUntil,
     );
   }
 
@@ -89,7 +97,7 @@ class QuadStability {
     _anchor = null;
     _previous = null;
     _lastObservation = observedBefore;
-    _lastDetection = null;
+    _displayUntil = null;
     _rotation = null;
     _freshness = minimumFreshness;
   }
