@@ -456,7 +456,10 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                 />
             ) : null}
             {!isUnavailable && (
-                <SpacePostPhotosBadge count={item.photos?.length ?? 1} />
+                <SpacePostPhotosBadge
+                    count={item.photos?.length ?? 1}
+                    inset={8}
+                />
             )}
             {isUnavailable && (
                 <Box

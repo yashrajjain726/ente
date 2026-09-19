@@ -406,6 +406,25 @@ export const SpacePostPhotoStrip: React.FC<{
                                 </Box>
                             </Box>
                         ))}
+                        {onAdd && photos.length < maxSpacePostPhotos && (
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Add photos"
+                                disabled={disabled}
+                                onClick={onAdd}
+                                sx={{
+                                    ...iconButtonSx,
+                                    bgcolor: "#242424",
+                                    borderRadius: "9px",
+                                    flexShrink: 0,
+                                    width: photoSize,
+                                    height: photoSize,
+                                }}
+                            >
+                                <HugeiconsIcon icon={Add01Icon} size={20} />
+                            </Box>
+                        )}
                     </Box>
                     {hasPhotosOnRight && (
                         <Box
@@ -423,36 +442,6 @@ export const SpacePostPhotoStrip: React.FC<{
                         />
                     )}
                 </Box>
-                {onAdd && photos.length < maxSpacePostPhotos && (
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Add photos"
-                        disabled={disabled}
-                        onClick={onAdd}
-                        sx={{
-                            ...iconButtonSx,
-                            flexShrink: 0,
-                            width: 44,
-                            height: 44,
-                        }}
-                    >
-                        <Box
-                            component="span"
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "#242424",
-                                borderRadius: "50%",
-                                display: "flex",
-                                justifyContent: "center",
-                                width: 32,
-                                height: 32,
-                            }}
-                        >
-                            <HugeiconsIcon icon={Add01Icon} size={20} />
-                        </Box>
-                    </Box>
-                )}
             </Box>
             <Box
                 role="status"

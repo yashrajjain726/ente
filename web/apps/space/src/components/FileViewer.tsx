@@ -20,6 +20,7 @@ import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceCaptionText } from "components/CaptionText";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import { spacePostLikePopDurationMs } from "components/post-like-animation";
+import { SpacePostPhotosCounter } from "components/PostPhotosCounter";
 import { SpacePostReplyControls } from "components/PostReplyControls";
 import log from "ente-base/log";
 import type PhotoSwipe from "photoswipe";
@@ -1496,34 +1497,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             />
                         </Box>
                     )}
-                    {postPhotoCount > 1 && (
-                        <Box
-                            component="span"
-                            aria-live="polite"
-                            aria-label={`Photo ${postPhotoIndex + 1} of ${postPhotoCount}`}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "#FFFFFF",
-                                borderRadius: "999px",
-                                boxSizing: "border-box",
-                                color: "#000000",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontVariantNumeric: "tabular-nums",
-                                fontWeight: 700,
-                                height: 24,
-                                justifyContent: "center",
-                                lineHeight: "16px",
-                                minWidth: 48,
-                                px: "10px",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {postPhotoIndex + 1} / {postPhotoCount}
-                        </Box>
-                    )}
+                    <SpacePostPhotosCounter
+                        index={postPhotoIndex}
+                        count={postPhotoCount}
+                    />
                     <Box
                         component="button"
                         type="button"
