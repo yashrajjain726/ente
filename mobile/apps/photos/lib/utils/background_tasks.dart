@@ -27,6 +27,7 @@ class BackgroundTasks {
   static final _logger = Logger("BackgroundTasks");
   static const refresh = "io.ente.photos.nativeBackgroundRefresh";
   static const processing = "io.ente.photos.nativeBackgroundProcessing";
+  static const _pipelineHandoffWait = Duration(seconds: 5);
   static Future<void> _configuration = Future.value();
   static bool? _configuredNative;
 
@@ -167,6 +168,24 @@ class BackgroundTasks {
     }
   }
 
+  static Future<bool> _acquirePipeline(BackgroundTask task) async {
+    final wait = task.identifier == processing
+        ? _pipelineHandoffWait
+        : Duration.zero;
+    final waited = Stopwatch()..start();
+    while (true) {
+      if (await ProcessLockClient.instance.tryAcquire(
+        name: "background_process",
+        origin: "bg",
+        operation: task.identifier,
+      )) {
+        return true;
+      }
+      if (task.isStopping || waited.elapsed >= wait) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
   static Future<void> retireLegacySchedules() async {
     BgTaskUtils.resetProcessingSchedule();
     final identifiers = Platform.isIOS
@@ -198,12 +217,7 @@ class BackgroundTasks {
             return;
           }
           task.throwIfStopping();
-          final acquired = await ProcessLockClient.instance.tryAcquire(
-            name: "background_process",
-            origin: "bg",
-            operation: task.identifier,
-          );
-          if (!acquired) {
+          if (!await _acquirePipeline(task)) {
             _logger.info(
               "${task.identifier}: skipped, background pipeline busy",
             );
@@ -227,6 +241,9 @@ class BackgroundTasks {
                     ? MlStopReason.foregroundActive
                     : MlStopReason.backgroundDeadline,
               );
+              if (reason == BackgroundStopReason.preempted) {
+                stopBackgroundSync();
+              }
             }),
           );
           try {
@@ -236,6 +253,8 @@ class BackgroundTasks {
               taskName,
               TimeLogger(),
               control: control,
+              shouldYield: () =>
+                  task.stopReason == BackgroundStopReason.preempted,
               mlSelfStop: BgTaskUtils.mlSelfStopFor(taskName) - task.elapsed,
               mlLockWait: BgTaskUtils.mlLockWaitFor(taskName),
             ).timeout(

@@ -246,6 +246,7 @@ Future<void> runBackgroundTask(
   Duration? mlSelfStop,
   Duration? mlLockWait,
   MlRunControl? control,
+  bool Function()? shouldYield,
 }) async {
   // Created at task start so a stop that fires before ML begins stays
   // latched for the whole task.
@@ -285,11 +286,21 @@ Future<void> runBackgroundTask(
       "[BG TASK] No recent foreground activity, proceeding with background work",
     );
 
-    await _runMinimally(taskId, tlog, mlRunControl, mlLockWait);
+    await _runMinimally(
+      taskId,
+      tlog,
+      mlRunControl,
+      mlLockWait,
+      shouldYield ?? () => false,
+    );
   } finally {
     mlSelfStopTimer?.cancel();
     mlForegroundWatchTimer.cancel();
   }
+}
+
+void stopBackgroundSync() {
+  if (_isSyncInitialized) SyncService.instance.stopSync();
 }
 
 Future<void> _runMinimally(
@@ -297,7 +308,14 @@ Future<void> _runMinimally(
   TimeLogger tlog,
   MlRunControl mlRunControl,
   Duration? mlLockWait,
+  bool Function() shouldYield,
 ) async {
+  bool isYieldingBefore(String stage) {
+    if (!shouldYield()) return false;
+    _logger.info("[BG TASK] $taskId yielding before $stage");
+    return true;
+  }
+
   try {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -354,9 +372,11 @@ Future<void> _runMinimally(
 
     _logger.info("[BG TASK] update notification");
     updateService.showUpdateNotification().ignore();
+    if (isYieldingBefore("sync")) return;
     _logger.info("[BG TASK] sync starting");
     await _sync('bgTaskActiveProcess');
     _logger.info("[BG TASK] sync completed");
+    if (isYieldingBefore("post-sync work")) return;
 
     _logger.info("[BG TASK] locale fetch");
     final locale = await getLocale();
@@ -403,6 +423,7 @@ Future<void> _runMinimally(
         }
       }
     }
+    if (isYieldingBefore("smart albums sync")) return;
     _logger.info("[BG TASK] smart albums sync");
     await smartAlbumsService.syncSmartAlbums();
 
