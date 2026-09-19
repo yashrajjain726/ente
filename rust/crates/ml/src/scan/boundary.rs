@@ -344,6 +344,39 @@ fn evidence(map: &ProbabilityMap, component: &Component, p: [Point; 4], live: bo
     )
 }
 
+fn supporting_intersections(hull: &[Point], indices: [usize; 4]) -> Option<[Point; 4]> {
+    let edges = indices.map(|i| [hull[i], hull[(i + 1) % hull.len()]]);
+    let lines = edges.map(|[a, b]| Line::through(a, b));
+    let mut p = [Point { x: 0.0, y: 0.0 }; 4];
+    for i in 0..4 {
+        p[i] = lines[(i + 3) % 4].intersection(lines[i])?;
+    }
+    let hull_area = (0..hull.len())
+        .map(|i| {
+            let a = hull[i];
+            let b = hull[(i + 1) % hull.len()];
+            a.x * b.y - a.y * b.x
+        })
+        .sum::<f64>()
+        * 0.5;
+    if area(&p) <= 0.0 || hull_area / area(&p) < 0.90 {
+        return None;
+    }
+    let mut missing_corners = 0;
+    for i in 0..4 {
+        let next = (i + 1) % 4;
+        let length = distance(p[i], p[next]);
+        if distance(edges[i][0], edges[i][1]) < length * 0.60 {
+            return None;
+        }
+        let missing_area = cross(edges[(i + 3) % 4][1], p[i], edges[i][0]).abs() * 0.5;
+        if missing_area > area(&p) * 0.01 {
+            missing_corners += 1;
+        }
+    }
+    (missing_corners <= 1).then_some(p)
+}
+
 pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBudget) -> Detection {
     let live = matches!(budget, SearchBudget::Live);
     let extent = SourceExtent {
@@ -370,7 +403,15 @@ pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBu
             if hull_source.len() < 4 {
                 continue;
             }
+            let supporting_hull = simplify(hull_source.clone(), 6)
+                .into_iter()
+                .map(|p| Point {
+                    x: p.x * extent.width / frame.width,
+                    y: p.y * extent.height / frame.height,
+                })
+                .collect::<Vec<_>>();
             let simplified = simplify(hull_source, if live { 4 } else { 6 });
+            let mut candidates = Vec::new();
             for a in 0..simplified.len() - 3 {
                 for b in a + 1..simplified.len() - 2 {
                     for c in b + 1..simplified.len() - 1 {
@@ -382,28 +423,43 @@ pub(super) fn locate(map: &ProbabilityMap, frame: SourceExtent, budget: SearchBu
                                         y: p.y * extent.height / frame.height,
                                     },
                                 );
-                            let Some(candidate) =
-                                supported_fit(candidate, &component.boundary, extent)
-                            else {
-                                continue;
-                            };
-                            let quad = canonical(candidate, extent);
-                            let Some(confidence) = evidence(map, &component, points(quad), live)
-                            else {
-                                continue;
-                            };
-                            if confidence > best.confidence {
-                                best = Detection {
-                                    quad: Some(MaskQuad {
-                                        corners: quad,
-                                        extent,
-                                    }),
-                                    confidence,
-                                    reason: "four supported sides",
-                                };
+                            candidates.push(candidate);
+                        }
+                    }
+                }
+            }
+            if supporting_hull.len() > 4 {
+                for a in 0..supporting_hull.len() - 3 {
+                    for b in a + 1..supporting_hull.len() - 2 {
+                        for c in b + 1..supporting_hull.len() - 1 {
+                            for d in c + 1..supporting_hull.len() {
+                                if let Some(candidate) =
+                                    supporting_intersections(&supporting_hull, [a, b, c, d])
+                                {
+                                    candidates.push(candidate);
+                                }
                             }
                         }
                     }
+                }
+            }
+            for candidate in candidates {
+                let Some(candidate) = supported_fit(candidate, &component.boundary, extent) else {
+                    continue;
+                };
+                let quad = canonical(candidate, extent);
+                let Some(confidence) = evidence(map, &component, points(quad), live) else {
+                    continue;
+                };
+                if confidence > best.confidence {
+                    best = Detection {
+                        quad: Some(MaskQuad {
+                            corners: quad,
+                            extent,
+                        }),
+                        confidence,
+                        reason: "four supported sides",
+                    };
                 }
             }
         }
@@ -554,7 +610,7 @@ pub(super) fn refine_capture(source: &ImageU8, quad: Quad) -> OpResult<Option<Qu
 mod tests {
     use super::*;
 
-    fn polygon_mask(p: [Point; 4]) -> OpResult<ProbabilityMap> {
+    fn polygon_mask<const N: usize>(p: [Point; N]) -> OpResult<ProbabilityMap> {
         let mut values = Vec::new();
         for y in 0..256 {
             for x in 0..256 {
@@ -565,7 +621,7 @@ mod tests {
                             x: x as f64 + dx,
                             y: y as f64 + dy,
                         };
-                        if (0..4).all(|i| cross(p[i], p[(i + 1) % 4], q) >= 0.0) {
+                        if (0..N).all(|i| cross(p[i], p[(i + 1) % N], q) >= 0.0) {
                             covered += 1;
                         }
                     }
@@ -574,6 +630,176 @@ mod tests {
             }
         }
         ProbabilityMap::new(values, 256, 256)
+    }
+
+    #[test]
+    fn cut_corner_recovers_intersection_of_supporting_sides() -> OpResult<()> {
+        let map = polygon_mask(
+            [
+                (60.0, 30.0),
+                (220.0, 30.0),
+                (220.0, 230.0),
+                (30.0, 230.0),
+                (30.0, 70.0),
+            ]
+            .map(|(x, y)| Point { x, y }),
+        )?;
+        let expected = [(30.0, 30.0), (220.0, 30.0), (220.0, 230.0), (30.0, 230.0)]
+            .map(|(x, y)| Point { x, y });
+        for budget in [SearchBudget::Live, SearchBudget::Capture] {
+            let found = locate(&map, SourceExtent::new(1200, 1600)?, budget)
+                .quad
+                .ok_or("folded page rejected")?;
+            for (actual, expected) in points(found.corners).into_iter().zip(expected) {
+                assert!(
+                    distance(actual, expected) < 2.0,
+                    "{actual:?} versus {expected:?}"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn cut_corner(p: [Point; 4], corner: usize, fraction: f64) -> [Point; 5] {
+        let interpolate = |a: Point, b: Point| Point {
+            x: a.x + (b.x - a.x) * fraction,
+            y: a.y + (b.y - a.y) * fraction,
+        };
+        [
+            interpolate(p[corner], p[(corner + 1) % 4]),
+            p[(corner + 1) % 4],
+            p[(corner + 2) % 4],
+            p[(corner + 3) % 4],
+            interpolate(p[corner], p[(corner + 3) % 4]),
+        ]
+    }
+
+    #[test]
+    fn supporting_corners_survive_rotation_perspective_and_cut_size() -> OpResult<()> {
+        let extent = SourceExtent::new(256, 256)?;
+        for coordinates in [
+            [(60.0, 40.0), (200.0, 40.0), (200.0, 216.0), (60.0, 216.0)],
+            [(61.0, 52.0), (198.0, 40.0), (213.0, 203.0), (43.0, 215.0)],
+        ] {
+            for angle in [0.0_f64, 0.43, 1.28] {
+                let p = coordinates.map(|(x, y)| Point {
+                    x: 128.0 + (x - 128.0) * angle.cos() - (y - 128.0) * angle.sin(),
+                    y: 128.0 + (x - 128.0) * angle.sin() + (y - 128.0) * angle.cos(),
+                });
+                for corner in 0..4 {
+                    for fraction in [0.08, 0.18, 0.30] {
+                        let map = polygon_mask(cut_corner(p, corner, fraction))?;
+                        for budget in [SearchBudget::Live, SearchBudget::Capture] {
+                            let found = locate(&map, SourceExtent::new(1200, 1600)?, budget)
+                                .quad
+                                .ok_or_else(|| {
+                                format!("rejected angle {angle}, corner {corner}, cut {fraction}")
+                            })?;
+                            for (actual, expected) in points(found.corners)
+                                .into_iter()
+                                .zip(points(canonical(p, extent)))
+                            {
+                                assert!(
+                                    distance(actual, expected) < 2.0,
+                                    "angle {angle}, corner {corner}, cut {fraction}: {actual:?} versus {expected:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn large_missing_corners_and_regular_polygons_are_not_completed() -> OpResult<()> {
+        let p = [(35.0, 25.0), (225.0, 25.0), (225.0, 235.0), (35.0, 235.0)]
+            .map(|(x, y)| Point { x, y });
+        let pentagon = std::array::from_fn::<_, 5, _>(|i| {
+            let angle = i as f64 * std::f64::consts::TAU / 5.0;
+            Point {
+                x: 128.0 + angle.cos() * 95.0,
+                y: 128.0 + angle.sin() * 95.0,
+            }
+        });
+        let octagon = std::array::from_fn::<_, 8, _>(|i| {
+            let angle = i as f64 * std::f64::consts::TAU / 8.0;
+            Point {
+                x: 128.0 + angle.cos() * 95.0,
+                y: 128.0 + angle.sin() * 95.0,
+            }
+        });
+        for map in [
+            polygon_mask(cut_corner(p, 0, 0.60))?,
+            polygon_mask(pentagon)?,
+            polygon_mask(octagon)?,
+            polygon_mask(
+                [
+                    (90.0, 25.0),
+                    (170.0, 25.0),
+                    (225.0, 80.0),
+                    (225.0, 235.0),
+                    (35.0, 235.0),
+                    (35.0, 80.0),
+                ]
+                .map(|(x, y)| Point { x, y }),
+            )?,
+        ] {
+            for budget in [SearchBudget::Live, SearchBudget::Capture] {
+                assert!(
+                    locate(&map, SourceExtent::new(1200, 1600)?, budget)
+                        .quad
+                        .is_none()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn local_corner_obstruction_preserves_the_four_main_sides() -> OpResult<()> {
+        let p = [(35.0, 25.0), (225.0, 25.0), (225.0, 235.0), (35.0, 235.0)]
+            .map(|(x, y)| Point { x, y });
+        let mut map = polygon_mask(p)?;
+        for y in 25..65 {
+            for x in 35..75 {
+                map.values[y * 256 + x] = 0.02;
+            }
+        }
+        for budget in [SearchBudget::Live, SearchBudget::Capture] {
+            let found = locate(&map, SourceExtent::new(1200, 1600)?, budget)
+                .quad
+                .ok_or("obscured page rejected")?;
+            for (actual, expected) in points(found.corners).into_iter().zip(p) {
+                assert!(distance(actual, expected) < 2.0);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn completed_corner_still_requires_source_page_edges() -> OpResult<()> {
+        let p = [(35.0, 25.0), (225.0, 25.0), (225.0, 235.0), (35.0, 235.0)]
+            .map(|(x, y)| Point { x, y });
+        let map = polygon_mask(cut_corner(p, 0, 0.25))?;
+        let quad = locate(&map, SourceExtent::new(256, 256)?, SearchBudget::Capture)
+            .quad
+            .ok_or("cut page rejected")?
+            .corners;
+        let data = map
+            .values
+            .iter()
+            .flat_map(|v| [if *v > 0.5 { 230 } else { 50 }; 3])
+            .collect();
+        let source = ImageU8::new(256, 256, 3, data)?;
+        let refined = refine_capture(&source, quad)?.ok_or("visible supporting edges rejected")?;
+        for (actual, expected) in points(refined).into_iter().zip(p) {
+            assert!(distance(actual, expected) < 2.0);
+        }
+        let unsupported = ImageU8::new(256, 256, 3, vec![230; 256 * 256 * 3])?;
+        assert!(refine_capture(&unsupported, quad)?.is_none());
+        Ok(())
     }
 
     #[test]
