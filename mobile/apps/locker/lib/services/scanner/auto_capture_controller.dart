@@ -3,7 +3,7 @@ import 'package:locker/services/scanner/scanner_models.dart';
 enum AutoCaptureState { searching, arming, cooldown }
 
 class AutoCaptureController {
-  static const armHold = Duration(milliseconds: 1000);
+  static const armHold = Duration(milliseconds: 700);
 
   static const armGrace = Duration(milliseconds: 250);
 
