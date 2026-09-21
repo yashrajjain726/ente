@@ -2621,6 +2621,8 @@ dependencies = [
  "jxl-oxide",
  "kamadak-exif",
  "moxcms",
+ "png 0.18.1",
+ "tempfile",
  "thiserror 2.0.18",
  "tiff 0.10.3",
 ]
