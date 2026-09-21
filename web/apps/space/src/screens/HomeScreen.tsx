@@ -5,6 +5,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import { SpaceActionToast } from "components/ActionToast";
 import { SpaceAvatarImage } from "components/AvatarImage";
 import { SpaceCaptionText } from "components/CaptionText";
@@ -549,7 +550,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
         <Box
             component="button"
             type="button"
-            aria-label={isLiked ? "Unlike post" : "Like post"}
+            aria-label="Like post"
             aria-pressed={isLiked}
             onClick={onClick}
             sx={{
@@ -2152,6 +2153,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 position: "relative",
             }}
         >
+            {hasFeedItems && (
+                <Box component="h1" sx={visuallyHidden}>
+                    Home
+                </Box>
+            )}
             <Box
                 sx={{
                     bgcolor: homeBackground,
