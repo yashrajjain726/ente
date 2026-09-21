@@ -268,6 +268,9 @@ func (c *CollectionController) isRemoveAllowed(ctx *gin.Context,
 }
 
 func (c *CollectionController) IsCopyAllowed(ctx *gin.Context, actorUserID int64, req ente.CopyFileSyncRequest) error {
+	if err := validateCollectionFileItems(req.CollectionFileItems); err != nil {
+		return err
+	}
 	srcCollection, err := c.AccessCtrl.GetCollection(ctx, &access.GetCollectionParams{
 		CollectionID: req.SrcCollectionID,
 		ActorUserID:  actorUserID,

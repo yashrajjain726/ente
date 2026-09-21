@@ -2,6 +2,7 @@ package collections
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/ente/museum/ente"
@@ -34,6 +35,9 @@ func TestCollectionFileActionsRejectInvalidItems(t *testing.T) {
 	move := func(files []ente.CollectionFileItem) error {
 		return controller.MoveFiles(nil, ente.MoveFilesRequest{FromCollectionID: 1, ToCollectionID: 2, Files: files})
 	}
+	copyFiles := func(files []ente.CollectionFileItem) error {
+		return controller.IsCopyAllowed(nil, 1, ente.CopyFileSyncRequest{SrcCollectionID: 1, DstCollection: 2, CollectionFileItems: files})
+	}
 	tests := []struct {
 		name    string
 		invalid ente.CollectionFileItem
@@ -43,6 +47,9 @@ func TestCollectionFileActionsRejectInvalidItems(t *testing.T) {
 		{"add short key", ente.CollectionFileItem{ID: 2, EncryptedKey: b64OfLen(encryptedCollectionKeyLen - 1), KeyDecryptionNonce: valid.KeyDecryptionNonce}, add},
 		{"restore missing key", ente.CollectionFileItem{ID: 2, KeyDecryptionNonce: valid.KeyDecryptionNonce}, restore},
 		{"move missing nonce", ente.CollectionFileItem{ID: 2, EncryptedKey: valid.EncryptedKey}, move},
+		{"copy missing ID", ente.CollectionFileItem{EncryptedKey: valid.EncryptedKey, KeyDecryptionNonce: valid.KeyDecryptionNonce}, copyFiles},
+		{"copy short key", ente.CollectionFileItem{ID: 2, EncryptedKey: b64OfLen(encryptedCollectionKeyLen - 1), KeyDecryptionNonce: valid.KeyDecryptionNonce}, copyFiles},
+		{"copy invalid base64 key", ente.CollectionFileItem{ID: 2, EncryptedKey: strings.Repeat("!", len(valid.EncryptedKey)), KeyDecryptionNonce: valid.KeyDecryptionNonce}, copyFiles},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
