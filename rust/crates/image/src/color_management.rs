@@ -55,6 +55,7 @@ impl<'a> IccConverter<'a> {
             Ok(image) => image,
             Err((image, err)) => {
                 eprintln!("[ml][decode] failed to convert embedded ICC profile to sRGB: {err}");
+                self.source_profile = None;
                 image
             }
         }

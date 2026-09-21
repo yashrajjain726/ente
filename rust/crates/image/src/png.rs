@@ -593,6 +593,11 @@ mod tests {
             None,
             Some(b"invalid ICC profile".to_vec()),
             Some(moxcms::ColorProfile::new_srgb().encode().unwrap()),
+            Some(
+                moxcms::ColorProfile::new_gray_with_gamma(1.8)
+                    .encode()
+                    .unwrap(),
+            ),
             Some(pq.encode().unwrap()),
             Some(hlg.encode().unwrap()),
         ] {
@@ -714,32 +719,6 @@ mod tests {
             ),
             Err(ImageError::TooLarge(_))
         ));
-    }
-
-    #[test]
-    fn jpeg_fallback_caps_output_and_keeps_original_dimensions() {
-        let bytes = crate::image_compression::encode_rgb(
-            &[100; 12 * 8 * 3],
-            12,
-            8,
-            crate::image_compression::EncodedImageFormat::Jpeg { quality: 90 },
-        )
-        .unwrap();
-        let output = decode_bounded(ImageInput::Bytes(&bytes), 6).unwrap();
-        assert_eq!(
-            output.original_dimensions,
-            Dimensions {
-                width: 12,
-                height: 8
-            }
-        );
-        assert_eq!(
-            output.image.dimensions,
-            Dimensions {
-                width: 6,
-                height: 4
-            }
-        );
     }
 
     #[test]

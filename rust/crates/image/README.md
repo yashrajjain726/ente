@@ -12,13 +12,16 @@ let decoded = decode_bounded(ImageInput::Bytes(&encoded_bytes), 6000)?;
 The result contains `image`, an RGB8 `DecodedImage`, and `original_dimensions`.
 Both sets of dimensions include EXIF orientation. Output preserves aspect ratio
 with integer rounding, never upscales, and fits within the requested maximum side.
-Existing decode functions and callers are unchanged.
+This API is opt-in and is not wired into ML, the viewer, or other production
+callers. Existing decode entry points remain in use.
 
 PNG is detected from its signature and decoded row by row through the `png`
 crate. Pixels are converted using the existing ICC-to-sRGB handling and reduced
 with an area average before applying orientation. Palette, transparency,
 grayscale, 16-bit samples, and Adam7 interlacing are supported. Alpha is discarded,
 matching the existing RGB decoder. APNG returns its default image.
+Trailing chunks are validated too, so damaged files tolerated by the existing
+decoder may be rejected here.
 
 Non-interlaced PNG needs the reduced RGB output and a few source/target rows.
 Adam7 additionally needs a floating-point accumulator at the reduced dimensions
@@ -31,9 +34,10 @@ its side length is permitted. These are allocation guards, not a process-wide
 RSS limit; caller-owned encoded bytes and color-management allocations also use
 memory. Decode time still depends on the source image size.
 
-Other formats use the existing decoder followed by a resize. Their output is
-bounded, but their full-resolution decode memory is not bounded by `max_side`.
-PNG failures are returned directly without retrying a full-image decode.
+Only PNG is currently supported. Other formats return an unsupported-format
+decode error before pixel decoding. JPEG and HEIC can be added explicitly in
+later changes. There is no fallback to the existing full-image decoder, including
+when PNG decoding fails.
 
 Run the optional large-input regression with:
 
